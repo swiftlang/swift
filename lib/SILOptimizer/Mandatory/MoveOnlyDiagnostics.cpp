@@ -205,7 +205,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
     diagnose(astContext, markedValue,
              diag::sil_moveonlychecker_guaranteed_value_captured_by_closure,
              varName);
-    emitObjectDiagnosticsForPartialApplyUses();
+    emitObjectDiagnosticsForPartialApplyUses(varName);
     registerDiagnosticEmitted(markedValue);
   }
 
@@ -379,22 +379,27 @@ void DiagnosticEmitter::emitObjectDiagnosticsForGuaranteedUses(
   }
 }
 
-void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses() const {
+void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses(
+    StringRef capturedVarName) const {
   auto &astContext = fn->getASTContext();
 
   for (auto *user : getCanonicalizer().consumingUsesNeedingCopy) {
     if (!isa<PartialApplyInst>(user))
       continue;
-    diagnose(astContext, user,
-             diag::sil_moveonlychecker_consuming_closure_use_here);
+    diagnose(astContext,
+             user,
+             diag::sil_moveonlychecker_consuming_closure_use_here,
+             capturedVarName);
   }
 
   for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
     if (!isa<PartialApplyInst>(user))
       continue;
 
-    diagnose(astContext, user,
-             diag::sil_moveonlychecker_consuming_closure_use_here);
+    diagnose(astContext,
+             user,
+             diag::sil_moveonlychecker_consuming_closure_use_here,
+             capturedVarName);
   }
 }
 

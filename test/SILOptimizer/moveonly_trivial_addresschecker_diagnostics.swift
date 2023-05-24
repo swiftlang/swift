@@ -67,9 +67,9 @@ public struct AggStruct {
     //
     // TODO: Improve error message!
     init(myInit: Int) { // expected-error {{'self' consumed more than once}}
-        let x = self // expected-note {{consuming use here}}
+        let x = self // expected-note {{consumed here}}
         let _ = x
-    } // expected-note {{consuming use here}}
+    } // expected-note {{consumed here}}
 
     // Make sure we can reinitialize successfully.
     init(myInit2: Int) {
@@ -85,9 +85,9 @@ public struct AggStruct {
     init(myInit3: Int) { // expected-error {{'self' consumed more than once}}
         self.init()
         self.center = myInit3
-        let x = self.pair // expected-note {{consuming use here}}
+        let x = self.pair // expected-note {{consumed here}}
         let _ = x
-    } // expected-note {{consuming use here}}
+    } // expected-note {{consumed here}}
 
     init(myInit4: Int) {
         self.init()
@@ -117,9 +117,9 @@ public func aggStructSimpleChainTest() {
 public func aggStructSimpleChainTestArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    var y2 = x2 // expected-note {{consuming use here}}
-    y2 = x2 // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    var y2 = x2 // expected-note {{consumed here}}
+    y2 = x2 // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -145,52 +145,52 @@ public func aggStructMultipleNonConsumingUseTest() {
 public func aggStructMultipleNonConsumingUseTestArg(_ x2: inout AggStruct) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructUseAfterConsume() {
     var x2 = AggStruct() // expected-error {{'x2' consumed more than once}}
     x2 = AggStruct()
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructUseAfterConsumeArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-              // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+              // expected-note @-1 {{consumed here}}
 }
 
 public func aggStructDoubleConsume() {
     var x2 = AggStruct()  // expected-error {{'x2' consumed more than once}}
     x2 = AggStruct()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructDoubleConsumeArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
 }
 
 public func aggStructLoopConsume() {
-    var x2 = AggStruct() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggStruct() // expected-error {{'x2' consumed in a loop}}
     x2 = AggStruct()
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggStructLoopConsumeArg(_ x2: inout AggStruct) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -208,23 +208,23 @@ public func aggStructDiamondArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggStructDiamondInLoop() {
     var x2 = AggStruct()
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = AggStruct()
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -234,9 +234,9 @@ public func aggStructDiamondInLoopArg(_ x2: inout AggStruct) {
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
@@ -258,22 +258,22 @@ public func aggStructAccessFieldArg(_ x2: inout AggStruct) {
 }
 
 public func aggStructConsumeField() {
-    var x2 = AggStruct() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggStruct() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggStruct()
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructConsumeFieldArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
     }
 }
 
@@ -294,22 +294,22 @@ public func aggStructAccessGrandFieldArg(_ x2: inout AggStruct) {
 }
 
 public func aggStructConsumeGrandField() {
-    var x2 = AggStruct() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggStruct() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggStruct()
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     }
 }
 
@@ -332,9 +332,9 @@ public struct AggGenericStruct<T> { // FIXME: this generic parameter should prob
     //
     // TODO: Improve error message!
     init(myInit: UnsafeRawPointer) { // expected-error {{'self' consumed more than once}}
-        let x = self // expected-note {{consuming use here}}
+        let x = self // expected-note {{consumed here}}
         let _ = x
-    } // expected-note {{consuming use here}}
+    } // expected-note {{consumed here}}
 
     // Make sure we can reinitialize successfully.
     init(myInit2: UnsafeRawPointer) {
@@ -350,9 +350,9 @@ public struct AggGenericStruct<T> { // FIXME: this generic parameter should prob
     init(myInit3: UnsafeRawPointer) { // expected-error {{'self' consumed more than once}}
         self.init()
         self.rhs = myInit3
-        let x = self.lhs // expected-note {{consuming use here}}
+        let x = self.lhs // expected-note {{consumed here}}
         let _ = x
-    } // expected-note {{consuming use here}}
+    } // expected-note {{consumed here}}
 
     init(myInit4: UnsafeRawPointer) {
         self.init()
@@ -380,7 +380,7 @@ public func aggGenericStructSimpleChainTest() {
 }
 
 public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<String>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -406,52 +406,52 @@ public func aggGenericStructMultipleNonConsumingUseTest() {
 public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<String>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsume() {
     var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed more than once}}
     x2 = AggGenericStruct<String>()
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}x
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}x
 }
 
 public func aggGenericStructDoubleConsume() {
     var x2 = AggGenericStruct<String>()  // expected-error {{'x2' consumed more than once}}
     x2 = AggGenericStruct<String>()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
 }
 
 public func aggGenericStructLoopConsume() {
-    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed in a loop}}
     x2 = AggGenericStruct<String>()
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<String>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -469,22 +469,22 @@ public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructDiamondInLoop() {
-    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<String>()
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -494,9 +494,9 @@ public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<String
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
@@ -518,22 +518,22 @@ public func aggGenericStructAccessFieldArg(_ x2: inout AggGenericStruct<String>)
 }
 
 public func aggGenericStructConsumeField() {
-    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<String>()
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
     }
 }
 
@@ -554,31 +554,31 @@ public func aggGenericStructAccessGrandFieldArg(_ x2: inout AggGenericStruct<Str
 }
 
 public func aggGenericStructConsumeGrandField() {
-    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<String>()
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandField2() {
     var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed more than once}}
     x2 = AggGenericStruct<String>()
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
     }
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructConsumeGrandFieldArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     }
 }
 
@@ -595,7 +595,7 @@ public func aggGenericStructSimpleChainTest<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructSimpleChainTestArg<T>(_ x2: inout AggGenericStruct<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -621,52 +621,52 @@ public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: T.Type) {
 public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: inout AggGenericStruct<T>) { //expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsume<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed more than once}}
     x2 = AggGenericStruct<T>()
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsume<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed more than once}}
     x2 = AggGenericStruct<T>()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
 }
 
 public func aggGenericStructLoopConsume<T>(_ x: T.Type) {
-    var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed in a loop}}
     x2 = AggGenericStruct<T>()
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructLoopConsumeArg<T>(_ x2: inout AggGenericStruct<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -684,22 +684,22 @@ public func aggGenericStructDiamondArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructDiamondInLoop<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     x2 = AggGenericStruct<T>()
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -709,9 +709,9 @@ public func aggGenericStructDiamondInLoopArg<T>(_ x2: inout AggGenericStruct<T>)
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
@@ -733,22 +733,22 @@ public func aggGenericStructAccessFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
 }
 
 public func aggGenericStructConsumeField<T>(_ x: T.Type) {
-    var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<T>()
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
     }
 }
 
@@ -769,22 +769,22 @@ public func aggGenericStructAccessGrandFieldArg<T>(_ x2: inout AggGenericStruct<
 }
 
 public func aggGenericStructConsumeGrandField<T>(_ x: T.Type) {
-    var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<T>()
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     }
 }
 
@@ -809,7 +809,7 @@ public func enumSimpleChainTest() {
 }
 
 public func enumSimpleChainTestArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -835,52 +835,52 @@ public func enumMultipleNonConsumingUseTest() {
 public func enumMultipleNonConsumingUseTestArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumUseAfterConsume() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumUseAfterConsumeArg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
 }
 
 public func enumDoubleConsume() {
     var x2 = EnumTy.klass(NonTrivialStruct())  // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumDoubleConsumeArg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
 }
 
 public func enumLoopConsume() {
-    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed in a loop}}
     x2 = EnumTy.klass(NonTrivialStruct())
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func enumLoopConsumeArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -898,23 +898,23 @@ public func enumDiamondArg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func enumDiamondInLoop() {
     var x2 = EnumTy.klass(NonTrivialStruct())
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}} 
     x2 = EnumTy.klass(NonTrivialStruct())
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -924,9 +924,9 @@ public func enumDiamondInLoopArg(_ x2: inout EnumTy) {
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
@@ -934,8 +934,8 @@ public func enumDiamondInLoopArg(_ x2: inout EnumTy) {
 public func enumAssignToVar1() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     x3 = EnumTy.klass(NonTrivialStruct())
     consumeVal(x3)
 }
@@ -944,9 +944,9 @@ public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
                                                             
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
     x3 = EnumTy.klass(NonTrivialStruct())
     consumeVal(x3)
 }
@@ -954,17 +954,17 @@ public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
 public func enumAssignToVar2() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func enumAssignToVar2Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-     // expected-note @-1 {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+     // expected-note @-1 {{consumed here}}
     borrowVal(x3)
 }
 
@@ -978,7 +978,7 @@ public func enumAssignToVar3() {
 
 public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                             
-    var x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
     x3 = EnumTy.klass(NonTrivialStruct())
     consumeVal(x3)
 }
@@ -986,33 +986,33 @@ public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{missin
 public func enumAssignToVar4() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar4Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar5() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
     x3 = EnumTy.klass(NonTrivialStruct())
     consumeVal(x3)
 }
 
 public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' used after consume}}
                                                             
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
     x3 = EnumTy.klass(NonTrivialStruct())
     consumeVal(x3)
 }
@@ -1020,10 +1020,10 @@ public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' u
 public func enumPatternMatchIfLet1() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
 }
@@ -1031,20 +1031,20 @@ public func enumPatternMatchIfLet1() {
 public func enumPatternMatchIfLet1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
         borrowVal(x)
     }
 }
 
 public func enumPatternMatchIfLet2() {
-    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed in a loop}}
     x2 = EnumTy.klass(NonTrivialStruct())
     for _ in 0..<1024 {
-        if case let EnumTy.klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let EnumTy.klass(x) = x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1052,7 +1052,7 @@ public func enumPatternMatchIfLet2() {
 
 public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        if case let EnumTy.klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let EnumTy.klass(x) = x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1062,19 +1062,19 @@ public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{
 public func enumPatternMatchSwitch1() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
         // erroring though.
-        borrowVal(x2) // expected-note {{non-consuming use here}}
+        borrowVal(x2) // expected-note {{used here}}
     case .int:
         break
     }
 }
 
 public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
@@ -1097,7 +1097,7 @@ public func enumPatternMatchSwitch2() {
 }
 
 public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
     case .int:
@@ -1109,9 +1109,9 @@ public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {
 public func enumPatternMatchSwitch2WhereClause() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
-           where x2.doSomething(): // expected-note {{non-consuming use here}}
+           where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
     case .int:
         break
@@ -1121,7 +1121,7 @@ public func enumPatternMatchSwitch2WhereClause() {
 }
 
 public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where x2.doSomething():
         borrowVal(k)
@@ -1147,7 +1147,7 @@ public func enumPatternMatchSwitch2WhereClause2() {
 }
 
 public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where boolValue:
         borrowVal(k)
@@ -1167,8 +1167,8 @@ public func closureClassUseAfterConsume1() {
         var x2 = NonTrivialStruct() // expected-error {{'x2' consumed more than once}}
         x2 = NonTrivialStruct()
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -1178,8 +1178,8 @@ public func closureClassUseAfterConsume2() {
         var x2 = NonTrivialStruct() // expected-error {{'x2' consumed more than once}}
         x2 = NonTrivialStruct()
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -1190,9 +1190,9 @@ public func closureClassUseAfterConsumeArg(_ argX: inout NonTrivialStruct) {
         // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
         // expected-error @-2 {{'x2' consumed more than once}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     f(&argX)
 }
@@ -1205,9 +1205,9 @@ public func closureCaptureClassUseAfterConsume() {
     x2 = NonTrivialStruct()
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     f()
 }
@@ -1222,17 +1222,17 @@ public func closureCaptureClassUseAfterConsumeError() {
     x2 = NonTrivialStruct()
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     f()
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
-    var x4 = x2 // expected-note {{consuming use here}}
-    // expected-note @-1 {{consuming use here}}
-    x4 = x2 // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
+    var x4 = x2 // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed here}}
+    x4 = x2 // expected-note {{consumed here}}
     _ = x4
     let _ = x3
 }
@@ -1255,13 +1255,13 @@ public func deferCaptureClassUseAfterConsume() {
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
-    defer { // expected-note {{non-consuming use here}}
+    defer { // expected-note {{used here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func deferCaptureClassUseAfterConsume2() {
@@ -1270,13 +1270,13 @@ public func deferCaptureClassUseAfterConsume2() {
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
-    defer { //  expected-note {{non-consuming use here}}
+    defer { //  expected-note {{used here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
-    let x3 = x2 // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
     let _ = x3
 }
 
@@ -1286,9 +1286,9 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {
     borrowVal(x2)
     defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     print("foo")
 }
@@ -1301,10 +1301,10 @@ public func closureAndDeferCaptureClassUseAfterConsume() {
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
             consumeVal(x2)
-            // expected-note @-1 {{consuming use here}}
-            // expected-note @-2 {{consuming use here}}
+            // expected-note @-1 {{consumed here}}
+            // expected-note @-2 {{consumed here}}
         }
         print("foo")
     }
@@ -1318,13 +1318,13 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     let f = {
-        consumeVal(x2) // expected-note {{consuming use here}}
-        defer { // expected-note {{non-consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        defer { // expected-note {{used here}}
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
             consumeVal(x2)
-            // expected-note @-1 {{consuming use here}}
-            // expected-note @-2 {{consuming use here}}
+            // expected-note @-1 {{consumed here}}
+            // expected-note @-2 {{consumed here}}
         }
         print("foo")
     }
@@ -1338,13 +1338,13 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     let f = {
-        consumeVal(x2) // expected-note {{consuming use here}}
-        defer { // expected-note {{non-consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        defer { // expected-note {{used here}}
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
             consumeVal(x2)
-            // expected-note @-1 {{consuming use here}}
-            // expected-note @-2 {{consuming use here}}
+            // expected-note @-1 {{consumed here}}
+            // expected-note @-2 {{consumed here}}
         }
         print("foo")
     }
@@ -1360,10 +1360,10 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivial
         defer { // expected-note {{captured indirectly by this call}}
             borrowVal(x2) // expected-note {{captured here}}
             consumeVal(x2) // expected-note {{captured here}}
-            // expected-note @-1 {{consuming use here}}
+            // expected-note @-1 {{consumed here}}
             consumeVal(x2) // expected-note {{captured here}}
-            // expected-note @-1 {{consuming use here}}
-            // expected-note @-2 {{consuming use here}}
+            // expected-note @-1 {{consumed here}}
+            // expected-note @-2 {{consumed here}}
         }
         print("foo")
     }
@@ -1378,9 +1378,9 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
@@ -1395,9 +1395,9 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
@@ -1414,15 +1414,15 @@ public func closureAndClosureCaptureClassUseAfterConsume3() {
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    f() // expected-note {{non-consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    f() // expected-note {{used here}}
 }
 
 public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {

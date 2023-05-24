@@ -48,17 +48,17 @@ public final class FinalKlass {
 /////////////////
 
 public func classSimpleChainTest(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
                // expected-error @-1 {{'x2' consumed more than once}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
-    let k3 = x2 // expected-note {{consuming use here}}
+    let k3 = x2 // expected-note {{consumed here}}
     let _ = k3
     borrowVal(k2)
 }
 
 public func classSimpleChainArgTest(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -76,7 +76,7 @@ public func classSimpleChainOwnedArgTest2(_ x2: consuming Klass) {
 }
 
 public func classSimpleNonConsumingUseTest(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
 }
 
@@ -93,7 +93,7 @@ public func classSimpleNonConsumingUseOwnedArgTest2(_ x2: consuming Klass) {
 }
 
 public func classMultipleNonConsumingUseTest(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
@@ -102,7 +102,7 @@ public func classMultipleNonConsumingUseTest(_ x: borrowing Klass) { // expected
 public func classMultipleNonConsumingUseArgTest(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classMultipleNonConsumingUseOwnedArgTest(_ x2: __owned Klass) {
@@ -119,80 +119,80 @@ public func classMultipleNonConsumingUseOwnedArgTest2(_ x2: consuming Klass) {
 
 public func classUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classUseAfterConsumeArg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classUseAfterConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classUseAfterConsumeOwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classDoubleConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
-                // expected-note @-1 {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+                // expected-note @-1 {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classDoubleConsumeArg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classDoubleConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classDoubleConsumeOwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func classLoopConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func classLoopConsumeArg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func classLoopConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed by a use in a loop}}
+public func classLoopConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func classLoopConsumeOwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed by a use in a loop}}
+public func classLoopConsumeOwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func classDiamond(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     if boolValue {
         consumeVal(x2)
     } else {
@@ -202,9 +202,9 @@ public func classDiamond(_ x: borrowing Klass) { // expected-error {{'x' is borr
 
 public func classDiamondArg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -225,15 +225,15 @@ public func classDiamondOwnedArg2(_ x2: consuming Klass) {
 }
 
 public func classDiamondInLoop(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-    // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{'x2' consumed more than once}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -241,51 +241,51 @@ public func classDiamondInLoop(_ x: borrowing Klass) { // expected-error {{'x' i
 public func classDiamondInLoopArg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
 
 public func classDiamondInLoopOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func classDiamondInLoopOwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func classAssignToVar1(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar1Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                 // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
@@ -294,135 +294,135 @@ public func classAssignToVar1Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { 
 // with move only var.
 public func classAssignToVar1OwnedArg(_ x: borrowing Klass, _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar1OwnedArg2(_ x: borrowing Klass, _ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func classAssignToVar2Arg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func classAssignToVar2OwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func classAssignToVar2OwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 // NOTE: consumeVal(x3) should not be marked.
 public func classAssignToVar3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 // NOTE: consumeVal(x3) is a bug.
 public func classAssignToVar3Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                             // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar3OwnedArg(_ x: borrowing Klass, _ x2: __owned Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar3OwnedArg2(_ x: borrowing Klass, _ x2: consuming Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar4(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar4Arg(_ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar4OwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar4OwnedArg2(_ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar5(_ x: borrowing Klass) {  // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
-    // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar5Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                             // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
     borrowVal(x2)
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar5OwnedArg(_ x: borrowing Klass, _ x2: __owned Klass) { // expected-error {{'x2' used after consume}}
                                                                          // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAssignToVar5OwnedArg2(_ x: borrowing Klass, _ x2: consuming Klass) { // expected-error {{'x2' used after consume}}
                                                                          // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func classAccessAccessField(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.k)
     for _ in 0..<1024 {
         borrowVal(x2.k)
@@ -451,7 +451,7 @@ public func classAccessAccessFieldOwnedArg2(_ x2: consuming Klass) {
 }
 
 public func classAccessConsumeField(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     consumeVal(x2.k) // expected-error {{cannot consume noncopyable stored property 'x2.k' of a class}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-error {{cannot consume noncopyable stored property 'x2.k' of a class}}
@@ -481,7 +481,7 @@ public func classAccessConsumeFieldOwnedArg2(_ x2: consuming Klass) {
 
 extension Klass {
     func testNoUseSelf() { // expected-error {{'self' is borrowed and cannot be consumed}}
-        let x = self // expected-note {{consuming use here}}
+        let x = self // expected-note {{consumed here}}
         let _ = x
     }
 }
@@ -491,14 +491,14 @@ extension Klass {
 /////////////////
 
 public func finalClassSimpleChainTest(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
 public func finalClassSimpleChainTestArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -516,7 +516,7 @@ public func finalClassSimpleChainTestOwnedArg2(_ x2: consuming FinalKlass) {
 }
 
 public func finalClassSimpleNonConsumingUseTest(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
 }
 
@@ -533,7 +533,7 @@ public func finalClassSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming FinalKl
 }
 
 public func finalClassMultipleNonConsumingUseTest(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
@@ -542,7 +542,7 @@ public func finalClassMultipleNonConsumingUseTest(_ x: borrowing FinalKlass) { /
 public func finalClassMultipleNonConsumingUseTestArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassMultipleNonConsumingUseTestownedArg(_ x2: __owned FinalKlass) {
@@ -559,80 +559,80 @@ public func finalClassMultipleNonConsumingUseTestownedArg2(_ x2: consuming Final
 
 public func finalClassUseAfterConsume(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassUseAfterConsumeArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassUseAfterConsumeOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassUseAfterConsumeOwnedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassDoubleConsume(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
-                // expected-note @-1 {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+                // expected-note @-1 {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassDoubleConsumeArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassDoubleConsumeownedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassDoubleConsumeownedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func finalClassLoopConsume(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func finalClassLoopConsumeArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func finalClassLoopConsumeOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed by a use in a loop}}
+public func finalClassLoopConsumeOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func finalClassLoopConsumeOwnedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed by a use in a loop}}
+public func finalClassLoopConsumeOwnedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func finalClassDiamond(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     if boolValue {
         consumeVal(x2)
     } else {
@@ -642,9 +642,9 @@ public func finalClassDiamond(_ x: borrowing FinalKlass) { // expected-error {{'
 
 public func finalClassDiamondArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -666,14 +666,14 @@ public func finalClassDiamondOwnedArg2(_ x2: consuming FinalKlass) {
 
 public func finalClassDiamondInLoop(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-    // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    // expected-note @-1 {{consumed here}}
+    // expected-error @-2 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -681,183 +681,183 @@ public func finalClassDiamondInLoop(_ x: borrowing FinalKlass) { // expected-err
 public func finalClassDiamondInLoopArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
 
 public func finalClassDiamondInLoopOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func finalClassDiamondInLoopOwnedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func finalClassAssignToVar1(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar1Arg(_ x: borrowing FinalKlass, _ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                                            // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar1OwnedArg(_ x: borrowing FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
                                                                                         // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar1OwnedArg2(_ x: borrowing FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
                                                                                         // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar2(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func finalClassAssignToVar2Arg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func finalClassAssignToVar2OwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func finalClassAssignToVar2OwnedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func finalClassAssignToVar3(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar3Arg(_ x: borrowing FinalKlass, _ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                                            // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar3OwnedArg(_ x: borrowing FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar3OwnedArg2(_ x: borrowing FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar4(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar4Arg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar4OwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar4OwnedArg2(_ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar5(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar5Arg(_ x: borrowing FinalKlass, _ x2: borrowing FinalKlass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                                            // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
     borrowVal(x2)
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar5OwnedArg(_ x: borrowing FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' used after consume}}
                                                                                         // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAssignToVar5OwnedArg2(_ x: borrowing FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x2' used after consume}}
                                                                                         // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func finalClassAccessField(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.k)
     for _ in 0..<1024 {
         borrowVal(x2.k)
@@ -886,7 +886,7 @@ public func finalClassAccessFieldOwnedArg2(_ x2: consuming FinalKlass) {
 }
 
 public func finalClassConsumeField(_ x: borrowing FinalKlass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     consumeVal(x2.k) // expected-error {{cannot consume noncopyable stored property 'x2.k' of a class}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-error {{cannot consume noncopyable stored property 'x2.k' of a class}}
@@ -937,14 +937,14 @@ public struct AggStruct {
 }
 
 public func aggStructSimpleChainTest(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
 public func aggStructSimpleChainTestArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -962,7 +962,7 @@ public func aggStructSimpleChainTestOwnedArg2(_ x2: consuming AggStruct) {
 }
 
 public func aggStructSimpleNonConsumingUseTest(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
 }
 
@@ -979,7 +979,7 @@ public func aggStructSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming AggStruc
 }
 
 public func aggStructMultipleNonConsumingUseTest(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
@@ -988,7 +988,7 @@ public func aggStructMultipleNonConsumingUseTest(_ x: borrowing AggStruct) { // 
 public func aggStructMultipleNonConsumingUseTestArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructMultipleNonConsumingUseTestOwnedArg(_ x2: __owned AggStruct) {
@@ -1005,80 +1005,80 @@ public func aggStructMultipleNonConsumingUseTestOwnedArg2(_ x2: consuming AggStr
 
 public func aggStructUseAfterConsume(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructUseAfterConsumeArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructUseAfterConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructUseAfterConsumeOwnedArg2(_ x2: consuming AggStruct) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructDoubleConsume(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
-                // expected-note @-1 {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+                // expected-note @-1 {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructDoubleConsumeArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructDoubleConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructDoubleConsumeOwnedArg2(_ x2: consuming AggStruct) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggStructLoopConsume(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggStructLoopConsumeArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggStructLoopConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed by a use in a loop}}
+public func aggStructLoopConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggStructLoopConsumeOwnedArg2(_ x2: consuming AggStruct) { // expected-error {{'x2' consumed by a use in a loop}}
+public func aggStructLoopConsumeOwnedArg2(_ x2: consuming AggStruct) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggStructDiamond(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     if boolValue {
         consumeVal(x2)
     } else {
@@ -1088,9 +1088,9 @@ public func aggStructDiamond(_ x: borrowing AggStruct) { // expected-error {{'x'
 
 public func aggStructDiamondArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -1112,14 +1112,14 @@ public func aggStructDiamondOwnedArg2(_ x2: consuming AggStruct) {
 
 public func aggStructDiamondInLoop(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-    // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    // expected-note @-1 {{consumed here}}
+    // expected-error @-2 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -1127,39 +1127,39 @@ public func aggStructDiamondInLoop(_ x: borrowing AggStruct) { // expected-error
 public func aggStructDiamondInLoopArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
 
 public func aggStructDiamondInLoopOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func aggStructDiamondInLoopOwnedArg2(_ x2: consuming AggStruct) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func aggStructAccessField(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1188,47 +1188,47 @@ public func aggStructAccessFieldOwnedArg2(_ x2: consuming AggStruct) {
 }
 
 public func aggStructConsumeField(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    let x2 = x // expected-note {{consumed here}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructConsumeFieldArg(_ x2: borrowing AggStruct) {
     // expected-error @-1 {{cannot use 'x2' after partial consume}}
     // expected-error @-2 {{cannot use 'x2' after partial consume}}
-    consumeVal(x2.lhs) // expected-note {{partial consume here}}
+    consumeVal(x2.lhs) // expected-note {{partially consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{partial consume here}}
+        consumeVal(x2.lhs) // expected-note {{partially consumed here}}
     }
 }
 
 public func aggStructConsumeFieldOwnedArg(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructConsumeFieldOwnedArg2(_ x2: consuming AggStruct) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructAccessGrandField(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -1257,42 +1257,42 @@ public func aggStructAccessGrandFieldOwnedArg2(_ x2: consuming AggStruct) {
 }
 
 public func aggStructConsumeGrandField(_ x: borrowing AggStruct) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    let x2 = x // expected-note {{consumed here}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructConsumeGrandFieldArg(_ x2: borrowing AggStruct) {
     // expected-error @-1 {{cannot use 'x2' after partial consume}}
     // expected-error @-2 {{cannot use 'x2' after partial consume}}
-    consumeVal(x2.pair.lhs) // expected-note {{partial consume here}}
+    consumeVal(x2.pair.lhs) // expected-note {{partially consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{partial consume here}}
+        consumeVal(x2.pair.lhs) // expected-note {{partially consumed here}}
     }
 }
 
 public func aggStructConsumeGrandFieldOwnedArg(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggStructConsumeGrandFieldOwnedArg2(_ x2: consuming AggStruct) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
@@ -1319,9 +1319,9 @@ public func aggStructConsumeFieldError(_ x2: __owned AggStruct) {
     if boolValue {
         consumeVal(x2.lhs)
     } else {
-        consumeVal(x2.pair.rhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.rhs) // expected-note {{consumed here}}
     }
-    borrowVal(x2.pair) // expected-note {{non-consuming use here}}
+    borrowVal(x2.pair) // expected-note {{used here}}
 }
 
 public func aggStructConsumeFieldError2(_ x2: consuming AggStruct) {
@@ -1329,35 +1329,35 @@ public func aggStructConsumeFieldError2(_ x2: consuming AggStruct) {
     if boolValue {
         consumeVal(x2.lhs)
     } else {
-        consumeVal(x2.pair.rhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.rhs) // expected-note {{consumed here}}
     }
-    borrowVal(x2.pair) // expected-note {{non-consuming use here}}
+    borrowVal(x2.pair) // expected-note {{used here}}
 }
 
 public func aggStructConsumeFieldError3(_ x2: __owned AggStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
     if boolValue {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2.pair.rhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.rhs) // expected-note {{consumed here}}
     }
     consumeVal(x2)
-    // expected-note @-1 {{consuming use here}}
-    // expected-note @-2 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
+    // expected-note @-2 {{consumed here}}
 }
 
 public func aggStructConsumeFieldError4(_ x2: __owned AggStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
     if boolValue {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2.pair.rhs) // expected-note {{consuming use here}}
+        consumeVal(x2.pair.rhs) // expected-note {{consumed here}}
     }
     consumeVal(x2)
-    // expected-note @-1 {{consuming use here}}
-    // expected-note @-2 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
+    // expected-note @-2 {{consumed here}}
 }
 
 //////////////////////////////
@@ -1372,14 +1372,14 @@ public struct AggGenericStruct<T> { // FIXME: for better test coverage this shou
 }
 
 public func aggGenericStructSimpleChainTest(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
 public func aggGenericStructSimpleChainTestArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -1397,7 +1397,7 @@ public func aggGenericStructSimpleChainTestOwnedArg2(_ x2: consuming AggGenericS
 }
 
 public func aggGenericStructSimpleNonConsumingUseTest(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
 }
 
@@ -1414,7 +1414,7 @@ public func aggGenericStructSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming A
 }
 
 public func aggGenericStructMultipleNonConsumingUseTest(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
@@ -1423,7 +1423,7 @@ public func aggGenericStructMultipleNonConsumingUseTest(_ x: borrowing AggGeneri
 public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructMultipleNonConsumingUseTestOwnedArg(_ x2: __owned AggGenericStruct<String>) {
@@ -1440,80 +1440,80 @@ public func aggGenericStructMultipleNonConsumingUseTestOwnedArg2(_ x2: consuming
 
 public func aggGenericStructUseAfterConsume(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeOwnedArg2(_ x2: consuming AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsume(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
-                // expected-note @-1 {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+                // expected-note @-1 {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeOwnedArg2(_ x2: consuming AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructLoopConsume(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructLoopConsumeArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed by a use in a loop}}
+public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg2(_ x2: consuming AggGenericStruct<String>) { // expected-error {{'x2' consumed by a use in a loop}}
+public func aggGenericStructLoopConsumeOwnedArg2(_ x2: consuming AggGenericStruct<String>) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructDiamond(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     if boolValue {
         consumeVal(x2)
     } else {
@@ -1523,9 +1523,9 @@ public func aggGenericStructDiamond(_ x: borrowing AggGenericStruct<String>) { /
 
 public func aggGenericStructDiamondArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -1547,14 +1547,14 @@ public func aggGenericStructDiamondOwnedArg2(_ x2: consuming AggGenericStruct<St
 
 public func aggGenericStructDiamondInLoop(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-    // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    // expected-note @-1 {{consumed here}}
+    // expected-error @-2 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -1562,39 +1562,39 @@ public func aggGenericStructDiamondInLoop(_ x: borrowing AggGenericStruct<String
 public func aggGenericStructDiamondInLoopArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg2(_ x2: consuming AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func aggGenericStructAccessField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1623,47 +1623,47 @@ public func aggGenericStructAccessFieldOwnedArg2(_ x2: consuming AggGenericStruc
 }
 
 public func aggGenericStructConsumeField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    let x2 = x // expected-note {{consumed here}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldArg(_ x2: borrowing AggGenericStruct<String>) {
     // expected-error @-1 {{cannot use 'x2' after partial consume}}
     // expected-error @-2 {{cannot use 'x2' after partial consume}}
-    consumeVal(x2.lhs) // expected-note {{partial consume here}}
+    consumeVal(x2.lhs) // expected-note {{partially consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{partial consume here}}
+        consumeVal(x2.lhs) // expected-note {{partially consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldOwnedArg2(_ x2: consuming AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructAccessGrandField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -1692,42 +1692,42 @@ public func aggGenericStructAccessGrandFieldOwnedArg2(_ x2: consuming AggGeneric
 }
 
 public func aggGenericStructConsumeGrandField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    let x2 = x // expected-note {{consumed here}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldArg(_ x2: borrowing AggGenericStruct<String>) {
     // expected-error @-1 {{cannot use 'x2' after partial consume}}
     // expected-error @-2 {{cannot use 'x2' after partial consume}}
-    consumeVal(x2.pair.lhs) // expected-note {{partial consume here}}
+    consumeVal(x2.pair.lhs) // expected-note {{partially consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{partial consume here}}
+        consumeVal(x2.pair.lhs) // expected-note {{partially consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg2(_ x2: consuming AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
@@ -1736,14 +1736,14 @@ public func aggGenericStructConsumeGrandFieldOwnedArg2(_ x2: consuming AggGeneri
 ////////////////////////////////////////////////////////////
 
 public func aggGenericStructSimpleChainTest<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
 public func aggGenericStructSimpleChainTestArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -1761,7 +1761,7 @@ public func aggGenericStructSimpleChainTestOwnedArg2<T>(_ x2: consuming AggGener
 }
 
 public func aggGenericStructSimpleNonConsumingUseTest<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
 }
 
@@ -1778,7 +1778,7 @@ public func aggGenericStructSimpleNonConsumingUseTestOwnedArg2<T>(_ x2: consumin
 }
 
 public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
@@ -1787,7 +1787,7 @@ public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: borrowing AggGen
 public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: borrowing AggGenericStruct<T>) { //expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructMultipleNonConsumingUseTestOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
@@ -1804,80 +1804,80 @@ public func aggGenericStructMultipleNonConsumingUseTestOwnedArg2<T>(_ x2: consum
 
 public func aggGenericStructUseAfterConsume<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsumeOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsume<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
-                // expected-note @-1 {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+                // expected-note @-1 {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructDoubleConsumeOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructLoopConsume<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructLoopConsumeArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed by a use in a loop}}
+public func aggGenericStructLoopConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) { // expected-error {{'x2' consumed by a use in a loop}}
+public func aggGenericStructLoopConsumeOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructDiamond<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     if boolValue {
         consumeVal(x2)
     } else {
@@ -1887,9 +1887,9 @@ public func aggGenericStructDiamond<T>(_ x: borrowing AggGenericStruct<T>) { // 
 
 public func aggGenericStructDiamondArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -1911,14 +1911,14 @@ public func aggGenericStructDiamondOwnedArg2<T>(_ x2: consuming AggGenericStruct
 
 public func aggGenericStructDiamondInLoop<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-    // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    // expected-note @-1 {{consumed here}}
+    // expected-error @-2 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -1926,39 +1926,39 @@ public func aggGenericStructDiamondInLoop<T>(_ x: borrowing AggGenericStruct<T>)
 public func aggGenericStructDiamondInLoopArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func aggGenericStructAccessField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1987,47 +1987,47 @@ public func aggGenericStructAccessFieldOwnedArg2<T>(_ x2: consuming AggGenericSt
 }
 
 public func aggGenericStructConsumeField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    let x2 = x // expected-note {{consumed here}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     // expected-error @-1 {{cannot use 'x2' after partial consume}}
     // expected-error @-2 {{cannot use 'x2' after partial consume}}
-    consumeVal(x2.lhs) // expected-note {{partial consume here}}
+    consumeVal(x2.lhs) // expected-note {{partially consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{partial consume here}}
+        consumeVal(x2.lhs) // expected-note {{partially consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeFieldOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructAccessGrandField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -2056,42 +2056,42 @@ public func aggGenericStructAccessGrandFieldOwnedArg2<T>(_ x2: consuming AggGene
 }
 
 public func aggGenericStructConsumeGrandField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    let x2 = x // expected-note {{consumed here}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     // expected-error @-1 {{cannot use 'x2' after partial consume}}
     // expected-error @-2 {{cannot use 'x2' after partial consume}}
-    consumeVal(x2.pair.lhs) // expected-note {{partial consume here}}
+    consumeVal(x2.pair.lhs) // expected-note {{partially consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{partial consume here}}
+        consumeVal(x2.pair.lhs) // expected-note {{partially consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg2<T>(_ x2: consuming AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+    consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
@@ -2108,14 +2108,14 @@ public enum EnumTy {
 }
 
 public func enumSimpleChainTest(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
 public func enumSimpleChainTestArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let y2 = x2 // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
@@ -2133,7 +2133,7 @@ public func enumSimpleChainTestOwnedArg2(_ x2: consuming EnumTy) {
 }
 
 public func enumSimpleNonConsumingUseTest(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
 }
 
@@ -2150,7 +2150,7 @@ public func enumSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming EnumTy) {
 }
 
 public func enumMultipleNonConsumingUseTest(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
@@ -2159,7 +2159,7 @@ public func enumMultipleNonConsumingUseTest(_ x: borrowing EnumTy) { // expected
 public func enumMultipleNonConsumingUseTestArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumMultipleNonConsumingUseTestOwnedArg(_ x2: __owned EnumTy) {
@@ -2176,80 +2176,80 @@ public func enumMultipleNonConsumingUseTestOwnedArg2(_ x2: consuming EnumTy) {
 
 public func enumUseAfterConsume(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumUseAfterConsumeArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumUseAfterConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumUseAfterConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
     borrowVal(x2)
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumDoubleConsume(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
-                // expected-note @-1 {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+                // expected-note @-1 {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumDoubleConsumeArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumDoubleConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumDoubleConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
-    consumeVal(x2) // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func enumLoopConsume(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func enumLoopConsumeArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func enumLoopConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
+public func enumLoopConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func enumLoopConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
+public func enumLoopConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func enumDiamond(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     if boolValue {
         consumeVal(x2)
     } else {
@@ -2259,9 +2259,9 @@ public func enumDiamond(_ x: borrowing EnumTy) { // expected-error {{'x' is borr
 
 public func enumDiamondArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     if boolValue {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     } else {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
@@ -2283,14 +2283,14 @@ public func enumDiamondOwnedArg2(_ x2: consuming EnumTy) {
 
 public func enumDiamondInLoop(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-    // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    // expected-note @-1 {{consumed here}}
+    // expected-error @-2 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
@@ -2298,224 +2298,224 @@ public func enumDiamondInLoop(_ x: borrowing EnumTy) { // expected-error {{'x' i
 public func enumDiamondInLoopArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       }
     }
 }
 
 public func enumDiamondInLoopOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func enumDiamondInLoopOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-1 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
       if boolValue {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming use here}}
+          consumeVal(x2) // expected-note {{consumed here}}
+          // expected-note @-1 {{consumed here}}
       }
     }
 }
 
 public func enumAssignToVar1(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar1Arg(_ x: borrowing EnumTy, _ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                              // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar1OwnedArg(_ x: borrowing EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
                                                                           // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar1OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
                                                                           // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar2(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func enumAssignToVar2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func enumAssignToVar2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func enumAssignToVar2OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x2 // expected-note {{consumed here}}
     borrowVal(x3)
 }
 
 public func enumAssignToVar3(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar3Arg(_ x: borrowing EnumTy, _ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                              // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar3OwnedArg(_ x: borrowing EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar3OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x3 = x2
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar4(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar4Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar4OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar4OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar5(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
-               // expected-note @-1 {{consuming use here}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar5Arg(_ x: borrowing EnumTy, _ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
                                                              // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
     borrowVal(x2)
-    x3 = x // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar5OwnedArg(_ x: borrowing EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
                                                                           // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumAssignToVar5OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
                                                                           // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    var x3 = x2 // expected-note {{consuming use here}}
-    borrowVal(x2) // expected-note {{non-consuming use here}}
-    x3 = x // expected-note {{consuming use here}}
+    var x3 = x2 // expected-note {{consumed here}}
+    borrowVal(x2) // expected-note {{used here}}
+    x3 = x // expected-note {{consumed here}}
     consumeVal(x3)
 }
 
 public func enumPatternMatchIfLet1(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
 }
 
 public func enumPatternMatchIfLet1Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
 }
 
 public func enumPatternMatchIfLet1OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
 }
 
 public func enumPatternMatchIfLet1OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let .klass(x) = x2 { // expected-note {{consuming use here}}
+    if case let .klass(x) = x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
 }
 
 public func enumPatternMatchIfLet2(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
-               // expected-note @-1 {{consuming use here}}
+    let x2 = x // expected-error {{'x2' consumed in a loop}}
+               // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -2523,23 +2523,23 @@ public func enumPatternMatchIfLet2(_ x: borrowing EnumTy) { // expected-error {{
 
 public func enumPatternMatchIfLet2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
 }
 
-public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
+public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
 }
 
-public func enumPatternMatchIfLet2OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
+public func enumPatternMatchIfLet2OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -2547,18 +2547,18 @@ public func enumPatternMatchIfLet2OwnedArg2(_ x2: consuming EnumTy) { // expecte
 
 public func enumPatternMatchSwitch1(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
-               // expected-note @-1 {{consuming use here}}
-    switch x2 { // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
-        borrowVal(x2) // expected-note {{non-consuming use here}}
+        borrowVal(x2) // expected-note {{used here}}
     case .int:
         break
     }
 }
 
 public func enumPatternMatchSwitch1Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
@@ -2570,27 +2570,27 @@ public func enumPatternMatchSwitch1Arg(_ x2: borrowing EnumTy) { // expected-err
 }
 
 public func enumPatternMatchSwitch1OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
-        borrowVal(x2) // expected-note {{non-consuming use here}}
+        borrowVal(x2) // expected-note {{used here}}
     case .int:
         break
     }
 }
 
 public func enumPatternMatchSwitch1OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
-        borrowVal(x2) // expected-note {{non-consuming use here}}
+        borrowVal(x2) // expected-note {{used here}}
     case .int:
         break
     }
 }
 
 public func enumPatternMatchSwitch2(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     switch x2 {
     case let .klass(k):
         borrowVal(k)
@@ -2600,7 +2600,7 @@ public func enumPatternMatchSwitch2(_ x: borrowing EnumTy) { // expected-error {
 }
 
 public func enumPatternMatchSwitch2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
     case .int:
@@ -2629,10 +2629,10 @@ public func enumPatternMatchSwitch2OwnedArg2(_ x2: consuming EnumTy) {
 // QOI: We can do better here. We should also flag x2
 public func enumPatternMatchSwitch2WhereClause(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
-               // expected-note @-1 {{consuming use here}}
-    switch x2 { // expected-note {{consuming use here}}
+               // expected-note @-1 {{consumed here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k)
-           where x2.doSomething(): // expected-note {{non-consuming use here}}
+           where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
     case .int:
         break
@@ -2642,7 +2642,7 @@ public func enumPatternMatchSwitch2WhereClause(_ x: borrowing EnumTy) { // expec
 }
 
 public func enumPatternMatchSwitch2WhereClauseArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where x2.doSomething():
         borrowVal(k)
@@ -2654,9 +2654,9 @@ public func enumPatternMatchSwitch2WhereClauseArg(_ x2: borrowing EnumTy) { // e
 }
 
 public func enumPatternMatchSwitch2WhereClauseOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k)
-           where x2.doSomething(): // expected-note {{non-consuming use here}}
+           where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
     case .int:
         break
@@ -2666,9 +2666,9 @@ public func enumPatternMatchSwitch2WhereClauseOwnedArg(_ x2: __owned EnumTy) { /
 }
 
 public func enumPatternMatchSwitch2WhereClauseOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k)
-           where x2.doSomething(): // expected-note {{non-consuming use here}}
+           where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
     case .int:
         break
@@ -2678,7 +2678,7 @@ public func enumPatternMatchSwitch2WhereClauseOwnedArg2(_ x2: consuming EnumTy) 
 }
 
 public func enumPatternMatchSwitch2WhereClause2(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     switch x2 {
     case let .klass(k)
            where boolValue:
@@ -2691,7 +2691,7 @@ public func enumPatternMatchSwitch2WhereClause2(_ x: borrowing EnumTy) { // expe
 }
 
 public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consuming use here}}
+    switch x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where boolValue:
         borrowVal(k)
@@ -2733,12 +2733,12 @@ public func enumPatternMatchSwitch2WhereClause2OwnedArg2(_ x2: consuming EnumTy)
 public func closureLetClassUseAfterConsume1(_ x: borrowing Klass) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     // expected-error @-2 {{noncopyable 'x' cannot be consumed when captured by a closure}}
-    let f = { // expected-note {{closure capture here}}
+    let f = { // expected-note {{closure capturing 'x' here}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
-        // expected-note @-1 {{consuming use here}}
+        // expected-note @-1 {{consumed here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -2746,10 +2746,10 @@ public func closureLetClassUseAfterConsume1(_ x: borrowing Klass) {
 public func closureLetClassUseAfterConsume2(_ argX: borrowing Klass) {
     let f = { (_ x: borrowing Klass) in // expected-error {{'x' is borrowed and cannot be consumed}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
-                   // expected-note @-1 {{consuming use here}}
+                   // expected-note @-1 {{consumed here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f(argX)
 }
@@ -2757,8 +2757,8 @@ public func closureLetClassUseAfterConsume2(_ argX: borrowing Klass) {
 public func closureLetClassUseAfterConsumeArg(_ argX: borrowing Klass) {
     let f = { (_ x2: borrowing Klass) in // expected-error {{'x2' is borrowed and cannot be consumed}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f(argX)
 }
@@ -2768,23 +2768,23 @@ public func closureLetCaptureClassUseAfterConsume(_ x: consuming Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
 
 public func closureLetCaptureClassUseAfterConsume1(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    var x2 = x // expected-note {{consuming use here}}
+    var x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}} 
-    x2 = x  // expected-note {{consuming use here}}
+    x2 = x  // expected-note {{consumed here}}
 
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     f()
 }
@@ -2807,21 +2807,21 @@ public func closureLetCaptureClassUseAfterConsume3(_ x2: inout Klass) {
 
     useClosure {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 
 public func closureLetCaptureClassUseAfterConsumeError(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
     let x3 = x2
@@ -2831,10 +2831,10 @@ public func closureLetCaptureClassUseAfterConsumeError(_ x: borrowing Klass) { /
 public func closureLetCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
-    let f = { // expected-note {{closure capture here}}
+    let f = { // expected-note {{closure capturing 'x2' here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -2844,8 +2844,8 @@ public func closureLetCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -2855,9 +2855,9 @@ public func closureLetCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming Klass
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}} 
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     f()
 }
@@ -2867,8 +2867,8 @@ public func closureLetCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned Klass) 
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
     let x3 = x2
@@ -2881,13 +2881,13 @@ public func closureLetCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass
     // expected-error @-3 {{missing reinitialization of inout parameter 'x2' after consume}} 
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     f()
-    let x3 = x2 // expected-note {{consuming use here}}
-    consumeVal(x2) // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
+    consumeVal(x2) // expected-note {{consumed here}}
     x2 = Klass()
     let _ = x3
 }
@@ -2900,12 +2900,12 @@ public func closureVarClassUseAfterConsume1(_ x: borrowing Klass) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     // expected-error @-2 {{noncopyable 'x' cannot be consumed when captured by a closure}}
     var f = {}
-    f = { // expected-note {{closure capture here}}
+    f = { // expected-note {{closure capturing 'x' here}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
-        // expected-note @-1 {{consuming use here}}
+        // expected-note @-1 {{consumed here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -2914,10 +2914,10 @@ public func closureVarClassUseAfterConsume2(_ argX: borrowing Klass) {
     var f = {(_ x: borrowing Klass) in }
     f = { (_ x: borrowing Klass) in // expected-error {{'x' is borrowed and cannot be consumed}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
-        // expected-note @-1 {{consuming use here}}
+        // expected-note @-1 {{consumed here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f(argX)
 }
@@ -2926,14 +2926,14 @@ public func closureVarClassUseAfterConsumeArg(_ argX: borrowing Klass) {
     var f = {(_ x2: borrowing Klass) in}
     f = { (_ x2: borrowing Klass) in // expected-error {{'x2' is borrowed and cannot be consumed}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f(argX)
 }
 
 public func closureVarCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var f = {}
     f = { 
         borrowVal(x2)
@@ -2944,8 +2944,8 @@ public func closureVarCaptureClassUseAfterConsume(_ x: borrowing Klass) { // exp
 }
 
 public func closureVarCaptureClassUseAfterConsume1(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    var x2 = x // expected-note {{consuming use here}}
-    x2 = x  // expected-note {{consuming use here}}
+    var x2 = x // expected-note {{consumed here}}
+    x2 = x  // expected-note {{consumed here}}
 
     var f = {}
     f = { 
@@ -2985,15 +2985,15 @@ public func closureVarCaptureClassUseAfterConsume4(_ x2: inout Klass) {
 
     useClosure {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
 }
 
 
 public func closureVarCaptureClassUseAfterConsumeError(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var f = {}
     f = { 
         borrowVal(x2)
@@ -3009,10 +3009,10 @@ public func closureVarCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
     var f = {}
-    f = { // expected-note {{closure capture here}}
+    f = { // expected-note {{closure capturing 'x2' here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     f()
 }
@@ -3068,28 +3068,28 @@ public func closureVarCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass
 ///////////////////////
 
 public func deferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     defer {
         borrowVal(x2)
         // TODO: Defer can only run once, so this error shouldn't occur.
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
-    consumeVal(x) // expected-note {{consuming use here}}
+    consumeVal(x) // expected-note {{consumed here}}
 }
 
 public func deferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-3 {{'x2' used after consume}}
-    defer { // expected-note {{non-consuming use here}}
+    defer { // expected-note {{used here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
-    let x3 = x2 // expected-note {{consuming use here}}
+    let x3 = x2 // expected-note {{consumed here}}
     let _ = x3
 }
 
@@ -3098,8 +3098,8 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     borrowVal(x2)
     defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     print("foo")
 }
@@ -3108,8 +3108,8 @@ public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
     print("foo")
 }
@@ -3119,9 +3119,9 @@ public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming Klass) {
     // expected-error @-2 {{'x2' consumed more than once}}
     defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
     print("foo")
 }
@@ -3129,25 +3129,25 @@ public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming Klass) {
 public func deferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' used after consume}}
-    defer { // expected-note {{non-consuming use here}}
+    defer { // expected-note {{used here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
     }
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func deferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
-    defer { // expected-note {{non-consuming use here}}
+    defer { // expected-note {{used here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        consumeVal(x2) // expected-note {{consumed here}}
+        // expected-note @-1 {{consumed here}}
     }
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
 }
 
 /////////////////////////////////
@@ -3155,13 +3155,13 @@ public func deferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
 /////////////////////////////////
 
 public func closureLetAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3171,14 +3171,14 @@ public func closureLetAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) 
 public func closureLetAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     // TODO: This is wrong
     let x2 = x // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3188,15 +3188,15 @@ public func closureLetAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass)
 // TODO: MG
 public func closureLetAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-3 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consumed here}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3207,11 +3207,11 @@ public func closureLetAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass)
 public func closureLetAndDeferCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
-    let f = { // expected-note {{closure capture here}}
+    let f = { // expected-note {{closure capturing 'x2' here}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3223,8 +3223,8 @@ public func closureLetAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned 
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3237,9 +3237,9 @@ public func closureLetAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: consumi
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         print("foo")
     }
@@ -3252,8 +3252,8 @@ public func closureLetAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3267,9 +3267,9 @@ public func closureLetAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consumi
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         print("foo")
     }
@@ -3282,14 +3282,14 @@ public func closureLetAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consumi
 ///////////////////////////////////////////
 
 public func closureLetAndClosureCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3298,7 +3298,7 @@ public func closureLetAndClosureCaptureClassUseAfterConsume(_ x: borrowing Klass
 
 public func closureLetAndClosureCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-3 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-4 {{'x2' consumed more than once}}
@@ -3306,38 +3306,38 @@ public func closureLetAndClosureCaptureClassUseAfterConsume2(_ x: borrowing Klas
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    let x3 = x2 // expected-note {{consumed here}}
     _ = x3
 }
 
 public func closureLetAndClosureCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-4 {{'x2' consumed more than once}}
     x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    let x3 = x2 // expected-note {{consumed here}}
     _ = x3
 }
 
@@ -3345,11 +3345,11 @@ public func closureLetAndClosureCaptureClassArgUseAfterConsume(_ x2: borrowing K
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
     // expected-error @-3 {{'x2' is borrowed and cannot be consumed by closure capture}}
-    let f = { // expected-note {{closure capture here}}
-        let g = { // expected-note {{closure capture here}}
+    let f = { // expected-note {{closure capturing 'x2' here}}
+        let g = { // expected-note {{closure capturing 'x2' here}}
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3362,8 +3362,8 @@ public func closureLetAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owne
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3376,9 +3376,9 @@ public func closureLetAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: consu
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
@@ -3391,8 +3391,8 @@ public func closureLetAndClosureCaptureClassOwnedArgUseAfterConsume3(_ x2: __own
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3406,9 +3406,9 @@ public func closureLetAndClosureCaptureClassOwnedArgUseAfterConsume4(_ x2: consu
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
@@ -3423,15 +3423,15 @@ public func closureLetAndClosureCaptureClassOwnedArgUseAfterConsume5(_ x2: consu
     let f = {
         let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-note {{consuming use here}}
-    f() // expected-note {{non-consuming use here}}
+    consumeVal(x2) // expected-note {{consumed here}}
+    f() // expected-note {{used here}}
 }
 
 /////////////////////////////////
@@ -3439,14 +3439,14 @@ public func closureLetAndClosureCaptureClassOwnedArgUseAfterConsume5(_ x2: consu
 /////////////////////////////////
 
 public func closureVarAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     var f = {}
     f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3455,14 +3455,14 @@ public func closureVarAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) 
 
 public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     var f = {}
     f = {
         consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3472,15 +3472,15 @@ public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass)
 // TODO: MG
 public func closureVarAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     var f = {}
     f = {
         consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3492,11 +3492,11 @@ public func closureVarAndDeferCaptureClassArgUseAfterConsume(_ x2: borrowing Kla
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
     var f = {}
-    f = {// expected-note {{closure capture here}}
+    f = {// expected-note {{closure capturing 'x2' here}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3509,8 +3509,8 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned 
     f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3524,9 +3524,9 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: consumi
     f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         print("foo")
     }
@@ -3540,8 +3540,8 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned
     f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         print("foo")
     }
@@ -3556,9 +3556,9 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consumi
     f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
-            // expected-note @-1 {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed here}}
         }
         print("foo")
     }
@@ -3571,7 +3571,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consumi
 ///////////////////////////////////////////
 
 public func closureVarAndClosureCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var f = {}
     f = {
         var g = {}
@@ -3588,7 +3588,7 @@ public func closureVarAndClosureCaptureClassUseAfterConsume(_ x: borrowing Klass
 
 public func closureVarAndClosureCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     var f = {}
     f = {
@@ -3608,9 +3608,9 @@ public func closureVarAndClosureCaptureClassUseAfterConsume2(_ x: borrowing Klas
 
 public func closureVarAndClosureCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     var f = {}
     f = {
@@ -3633,12 +3633,12 @@ public func closureVarAndClosureCaptureClassArgUseAfterConsume(_ x2: borrowing K
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
     // expected-error @-3 {{'x2' is borrowed and cannot be consumed by closure capture}}
     var f = {}
-    f = {// expected-note {{closure capture here}}
+    f = {// expected-note {{closure capturing 'x2' here}}
         var g = {}
-        g = {// expected-note {{closure capture here}}
+        g = {// expected-note {{closure capturing 'x2' here}}
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3708,7 +3708,7 @@ public func closureVarAndClosureCaptureClassOwnedArgUseAfterConsume4(_ x2: consu
 /////////////////////////////////
 
 public func closureVarAndClosureLetCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     var f = {}
     f = {
         let g = {
@@ -3724,7 +3724,7 @@ public func closureVarAndClosureLetCaptureClassUseAfterConsume(_ x: borrowing Kl
 
 public func closureVarAndClosureLetCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     var f = {}
     f = {
@@ -3743,9 +3743,9 @@ public func closureVarAndClosureLetCaptureClassUseAfterConsume2(_ x: borrowing K
 
 public func closureVarAndClosureLetCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     var f = {}
     f = {
@@ -3767,11 +3767,11 @@ public func closureVarAndClosureLetCaptureClassArgUseAfterConsume(_ x2: borrowin
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
     // expected-error @-3 {{'x2' is borrowed and cannot be consumed by closure capture}}
     var f = {}
-    f = {// expected-note {{closure capture here}}
-let g = {// expected-note {{closure capture here}}
+    f = {// expected-note {{closure capturing 'x2' here}}
+let g = {// expected-note {{closure capturing 'x2' here}}
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3833,7 +3833,7 @@ public func closureVarAndClosureLetCaptureClassOwnedArgUseAfterConsume4(_ x2: co
 }
 
 public func closureLetAndClosureVarCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    let x2 = x // expected-note {{consuming use here}}
+    let x2 = x // expected-note {{consumed here}}
     let f = {
         var g = {}
         g = {
@@ -3849,7 +3849,7 @@ public func closureLetAndClosureVarCaptureClassUseAfterConsume(_ x: borrowing Kl
 
 public func closureLetAndClosureVarCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     let f = {
         let h = {
@@ -3872,9 +3872,9 @@ public func closureLetAndClosureVarCaptureClassUseAfterConsume2(_ x: borrowing K
 
 public func closureLetAndClosureVarCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
     x2 = x
-    // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
 
     let f = {
         var g = {}
@@ -3895,12 +3895,12 @@ public func closureLetAndClosureVarCaptureClassArgUseAfterConsume(_ x2: borrowin
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
     // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
     // expected-error @-3 {{'x2' is borrowed and cannot be consumed by closure capture}}
-    let f = {// expected-note {{closure capture here}}
+    let f = {// expected-note {{closure capturing 'x2' here}}
         var g = {}
-        g = {// expected-note {{closure capture here}}
+        g = {// expected-note {{closure capturing 'x2' here}}
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-note {{consumed here}}
+            consumeVal(x2) // expected-note {{consumed here}}
         }
         g()
     }
@@ -3967,15 +3967,15 @@ public func closureLetAndClosureVarCaptureClassOwnedArgUseAfterConsume4(_ x2: co
 
 func moveOperatorTest(_ k: __owned Klass) {
     let k2 = k // expected-error {{'k2' consumed more than once}}
-    let k3 = consume k2 // expected-note {{consuming use here}}
-    let _ = consume k2 // expected-note {{consuming use here}}
+    let k3 = consume k2 // expected-note {{consumed here}}
+    let _ = consume k2 // expected-note {{consumed here}}
     let _ = k3
 }
 
 func moveOperatorTest2(_ k: consuming Klass) {
     let k2 = k // expected-error {{'k2' consumed more than once}}
-    let k3 = consume k2 // expected-note {{consuming use here}}
-    let _ = consume k2 // expected-note {{consuming use here}}
+    let k3 = consume k2 // expected-note {{consumed here}}
+    let _ = consume k2 // expected-note {{consumed here}}
     let _ = k3
 }
 
@@ -3985,14 +3985,14 @@ func moveOperatorTest2(_ k: consuming Klass) {
 
 func blackHoleTestCase(_ k: __owned Klass) {
     let k2 = k // expected-error {{'k2' consumed more than once}}
-    let _ = k2 // expected-note {{consuming use here}}
-    let _ = k2 // expected-note {{consuming use here}}
+    let _ = k2 // expected-note {{consumed here}}
+    let _ = k2 // expected-note {{consumed here}}
 }
 
 func blackHoleTestCase2(_ k: consuming Klass) {
     let k2 = k // expected-error {{'k2' consumed more than once}}
-    let _ = k2 // expected-note {{consuming use here}}
-    let _ = k2 // expected-note {{consuming use here}}
+    let _ = k2 // expected-note {{consumed here}}
+    let _ = k2 // expected-note {{consumed here}}
 }
 
 ////////////////////////////////////////////
@@ -4002,15 +4002,15 @@ func blackHoleTestCase2(_ k: consuming Klass) {
 func sameCallSiteTestConsumeTwice(_ k: __owned Klass) { // expected-error {{'k' consumed more than once}}
     func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
     consumeKlassTwice(k, k)
-    // expected-note @-1 {{consuming use here}}
-    // expected-note @-2 {{consuming use here}}
+    // expected-note @-1 {{consumed here}}
+    // expected-note @-2 {{consumed here}}
 }
 
 func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: borrowing Klass) {}
     consumeKlassAndUseKlass(k, k)
-    // expected-note @-1 {{consuming use here}}
-    // expected-note @-2 {{non-consuming use here}}
+    // expected-note @-1 {{consumed here}}
+    // expected-note @-2 {{used here}}
 }
 
 ////////////////////////////////
@@ -4099,12 +4099,12 @@ func testEmptyStruct() {
 
   func testGuaranteedArg2(_ x: borrowing EmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    consume(x) // expected-note {{consuming use here}}
+    consume(x) // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg3(_ x: borrowing EmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    let _ = x // expected-note {{consuming use here}}
+    let _ = x // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg4(_ x: borrowing EmptyStruct) {
@@ -4113,7 +4113,7 @@ func testEmptyStruct() {
 
   func testGuaranteedArg5(_ x: borrowing EmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    let y = x // expected-note {{consuming use here}}
+    let y = x // expected-note {{consumed here}}
     _ = y
   }
 
@@ -4123,13 +4123,13 @@ func testEmptyStruct() {
 
   func testGuaranteedArg7(_ x: borrowing EmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    x.doSomething3() // expected-note {{consuming use here}}
+    x.doSomething3() // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg7a(_ x: borrowing EmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    x.doSomething3() // expected-note {{consuming use here}}
-    x.doSomething3() // expected-note {{consuming use here}}
+    x.doSomething3() // expected-note {{consumed here}}
+    x.doSomething3() // expected-note {{consumed here}}
   }
 }
 
@@ -4154,12 +4154,12 @@ func testStructContainingEmptyStruct() {
 
   func testGuaranteedArg2(_ x: borrowing StructContainingEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    consume(x) // expected-note {{consuming use here}}
+    consume(x) // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg3(_ x: borrowing StructContainingEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    let _ = x // expected-note {{consuming use here}}
+    let _ = x // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg4(_ x: borrowing StructContainingEmptyStruct) {
@@ -4168,7 +4168,7 @@ func testStructContainingEmptyStruct() {
 
   func testGuaranteedArg5(_ x: borrowing StructContainingEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    let y = x // expected-note {{consuming use here}}
+    let y = x // expected-note {{consumed here}}
     _ = y
   }
 
@@ -4178,13 +4178,13 @@ func testStructContainingEmptyStruct() {
 
   func testGuaranteedArg7(_ x: borrowing StructContainingEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    x.x.doSomething3() // expected-note {{consuming use here}}
+    x.x.doSomething3() // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg7a(_ x: borrowing StructContainingEmptyStruct) {
     // expected-error @-1 {{cannot use 'x' after partial consume}}
-    x.x.doSomething3() // expected-note {{partial consume here}}
-    x.x.doSomething3() // expected-note {{non-consuming use here}}
+    x.x.doSomething3() // expected-note {{partially consumed here}}
+    x.x.doSomething3() // expected-note {{used here}}
   }
 }
 
@@ -4210,12 +4210,12 @@ func testStructContainingTwoEmptyStruct() {
 
   func testGuaranteedArg2(_ x: borrowing StructContainingTwoEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    consume(x) // expected-note {{consuming use here}}
+    consume(x) // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg3(_ x: borrowing StructContainingTwoEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    let _ = x // expected-note {{consuming use here}}
+    let _ = x // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg4(_ x: borrowing StructContainingTwoEmptyStruct) {
@@ -4224,7 +4224,7 @@ func testStructContainingTwoEmptyStruct() {
 
   func testGuaranteedArg5(_ x: borrowing StructContainingTwoEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    let y = x // expected-note {{consuming use here}}
+    let y = x // expected-note {{consumed here}}
     _ = y
   }
 
@@ -4234,12 +4234,12 @@ func testStructContainingTwoEmptyStruct() {
 
   func testGuaranteedArg7(_ x: borrowing StructContainingTwoEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    x.x.doSomething3() // expected-note {{consuming use here}}
+    x.x.doSomething3() // expected-note {{consumed here}}
   }
 
   func testGuaranteedArg8(_ x: borrowing StructContainingTwoEmptyStruct) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    x.y.doSomething3() // expected-note {{consuming use here}}
+    x.y.doSomething3() // expected-note {{consumed here}}
   }
 }
 
@@ -4262,13 +4262,13 @@ case third(MyEnum2)
 
 func testMyEnum() {
   func test1(_ x: borrowing MyEnum) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    if case let .first(y) = x { // expected-note {{consuming use here}}
+    if case let .first(y) = x { // expected-note {{consumed here}}
       _ = y
     }
   }
 
   func test2(_ x: borrowing MyEnum) { // expected-error {{'x' is borrowed and cannot be consumed}}
-    if case let .third(.first(y)) = x { // expected-note {{consuming use here}}
+    if case let .third(.first(y)) = x { // expected-note {{consumed here}}
       _ = y
     }
   }

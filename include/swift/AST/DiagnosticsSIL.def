@@ -764,7 +764,7 @@ ERROR(sil_moveonlychecker_capture_consumed, none,
 ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of inout parameter '%0' after consume", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
-      "'%0' consumed by a use in a loop", (StringRef))
+      "'%0' consumed in a loop", (StringRef))
 
 ERROR(sil_moveonlychecker_use_after_partial_consume, none,
       "cannot use '%0' after partial consume", (StringRef))
@@ -774,28 +774,23 @@ ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed, none,
       (StringRef, bool))
 
 ERROR(sil_moveonlychecker_cannot_destructure_has_deinit, none,
-      "cannot partially consume '%0' since it has a user defined deinit",
+      "cannot partially consume '%0' when it has a deinitializer",
       (StringRef))
 
 NOTE(sil_moveonlychecker_partial_consume_here, none,
-     "partial consume here", ())
+     "partially consumed here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
-     "consuming use here", ())
+     "consumed here", ())
 NOTE(sil_moveonlychecker_other_consuming_use_here, none,
-     "other consuming use here", ())
+     "other consume here", ())
 NOTE(sil_moveonlychecker_two_consuming_uses_here, none,
-     "two consuming uses here", ())
+     "multiple consumes here", ())
 NOTE(sil_moveonlychecker_consuming_and_non_consuming_uses_here, none,
-     "consuming and non-consuming uses here", ())
+     "consumed and used here", ())
 NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
-     "closure capture here", ())
-
-// TODO: a lot of these "non-consuming use" notes are just emitted to point out
-// an "invalid use after consume". I'd say most of them are for that.
-// In the other narrow cases where that's not quite right, we could go with
-// something vague like "use here"
+     "closure capturing '%0' here", (StringRef))
 NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
-     "non-consuming use here", ())
+     "used here", ())
 
 NOTE(sil_movekillscopyablevalue_value_cyclic_consumed_in_loop_here, none,
      "consuming in loop use here", ())
