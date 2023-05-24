@@ -139,4 +139,19 @@ internal func spawn(_ path: String, args: [String]) throws {
   }
 }
 
+struct CFileStream: TextOutputStream {
+  var fp: UnsafeMutablePointer<FILE>
+
+  public func write(_ string: String) {
+    fputs(string, fp)
+  }
+
+  public func flush() {
+    fflush(fp)
+  }
+}
+
+var standardOutput = CFileStream(fp: stdout)
+var standardError = CFileStream(fp: stderr)
+
 #endif // os(macOS)
