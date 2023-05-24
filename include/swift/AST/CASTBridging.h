@@ -202,9 +202,8 @@ typedef struct BridgedFuncDecl {
 } BridgedFuncDecl;
 
 typedef struct BridgedDeclContextAndDecl {
-  BridgedDeclContext declContext;
-  void *nominalDecl;
-  void *decl;
+  BridgedDeclContext asDeclContext;
+  void *asDecl;
 } BridgedDeclContextAndDecl;
 
 typedef struct BridgedTypeAttributes {
@@ -338,7 +337,8 @@ void *TypeAliasDecl_create(
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
     BridgedSourceLoc cEqualLoc, void *opaqueUnderlyingType);
 
-void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members);
+void IterableDeclContext_setParsedMembers(BridgedArrayRef members,
+                                          void *opaqueDecl);
 
 BridgedDeclContextAndDecl
 StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,

@@ -68,7 +68,7 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 
   let base: UnsafeBufferPointer<UInt8>
 
-  @Boxed var declContext: BridgedDeclContext
+  @Boxed private(set) var declContext: BridgedDeclContext
 
   let ctx: BridgedASTContext
 
@@ -120,6 +120,17 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
     }
 
     return out
+  }
+}
+
+extension ASTGenVisitor {
+  /// Replaces the current declaration context with `declContext` for the duration of its execution, and calls `body`.
+  @inline(__always)
+  func withDeclContext(_ declContext: BridgedDeclContext, _ body: () -> Void) {
+    let oldDeclContext = self.declContext
+    self.declContext = declContext
+    body()
+    self.declContext = oldDeclContext
   }
 }
 

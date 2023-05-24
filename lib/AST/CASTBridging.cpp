@@ -8,6 +8,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/Stmt.h"
@@ -517,10 +518,15 @@ void *TypeAliasDecl_create(
   return static_cast<Decl *>(decl);
 }
 
-void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
-  auto declMembers = convertArrayRef<Decl *>(members);
-  for (auto m : declMembers)
-    ((NominalTypeDecl *)decl)->addMember(m);
+void IterableDeclContext_setParsedMembers(BridgedArrayRef bridgedMembers,
+                                          void *opaqueDecl) {
+  auto *decl = static_cast<Decl *>(opaqueDecl);
+  auto &ctx = decl->getASTContext();
+  auto members = convertArrayRef<Decl *>(bridgedMembers);
+
+  ctx.evaluator.cacheOutput(
+      ParseMembersRequest{cast<IterableDeclContext>(decl)},
+      FingerprintAndMembers{llvm::None, ctx.AllocateCopy(members)});
 }
 
 BridgedDeclContextAndDecl
@@ -530,14 +536,13 @@ StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                   void *_Nullable opaqueGenericParamList) {
   ASTContext &context = convertASTContext(cContext);
 
-  auto *out = new (context)
+  auto *decl = new (context)
       StructDecl(convertSourceLoc(cStructKeywordLoc), convertIdentifier(cName),
                  convertSourceLoc(cNameLoc), {},
                  static_cast<GenericParamList *>(opaqueGenericParamList),
                  convertDeclContext(cDeclContext));
 
-  return {bridgeDeclContext(out), static_cast<NominalTypeDecl *>(out),
-          static_cast<Decl *>(out)};
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
 BridgedDeclContextAndDecl ClassDecl_create(BridgedASTContext cContext,
@@ -547,13 +552,12 @@ BridgedDeclContextAndDecl ClassDecl_create(BridgedASTContext cContext,
                                            BridgedSourceLoc cNameLoc) {
   ASTContext &context = convertASTContext(cContext);
 
-  auto *out = new (context)
+  auto *decl = new (context)
       ClassDecl(convertSourceLoc(cClassKeywordLoc), convertIdentifier(cName),
                 convertSourceLoc(cNameLoc), {}, nullptr,
                 convertDeclContext(cDeclContext), false);
 
-  return {bridgeDeclContext(out), static_cast<NominalTypeDecl *>(out),
-          static_cast<Decl *>(out)};
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,

@@ -4,6 +4,8 @@ import CASTBridging
 @_spi(SyntaxTransformVisitor)
 import SwiftSyntax
 
+// MARK: - TypeDecl
+
 extension ASTGenVisitor {
   public func visit(_ node: TypeAliasDeclSyntax) -> ASTNode {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
@@ -25,7 +27,7 @@ extension ASTGenVisitor {
   public func visit(_ node: StructDeclSyntax) -> ASTNode {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let out = StructDecl_create(
+    let decl = StructDecl_create(
       self.ctx,
       self.declContext,
       self.bridgedSourceLoc(for: node.structKeyword),
@@ -34,34 +36,33 @@ extension ASTGenVisitor {
       self.visit(node.genericParameterClause)?.rawValue
     )
 
-    let oldDeclContext = declContext
-    declContext = out.declContext
-    defer { declContext = oldDeclContext }
+    self.withDeclContext(decl.asDeclContext) {
+      IterableDeclContext_setParsedMembers(self.visit(node.memberBlock.members), decl.asDecl)
+    }
 
-    NominalTypeDecl_setMembers(out.nominalDecl, self.visit(node.memberBlock.members))
-
-    return .decl(out.decl)
+    return .decl(decl.asDecl)
   }
 
   public func visit(_ node: ClassDeclSyntax) -> ASTNode {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let out = ClassDecl_create(
+    let decl = ClassDecl_create(
       self.ctx,
       self.declContext,
       self.bridgedSourceLoc(for: node.classKeyword),
       name,
       nameLoc
     )
-    let oldDeclContext = declContext
-    declContext = out.declContext
-    defer { declContext = oldDeclContext }
 
-    NominalTypeDecl_setMembers(out.nominalDecl, self.visit(node.memberBlock.members))
+    self.withDeclContext(decl.asDeclContext) {
+      IterableDeclContext_setParsedMembers(self.visit(node.memberBlock.members), decl.asDecl)
+    }
 
-    return .decl(out.decl)
+    return .decl(decl.asDecl)
   }
+}
 
+extension ASTGenVisitor {
   public func visit(_ node: VariableDeclSyntax) -> ASTNode {
     let pattern = visit(node.bindings.first!.pattern).rawValue
     let initializer = visit(node.bindings.first!.initializer!).rawValue
@@ -131,19 +132,10 @@ extension ASTGenVisitor {
       self.visit(node.signature.returnClause?.type)?.rawValue
     )
 
-    let oldDeclContext = declContext
-    declContext = out.declContext
-    defer { declContext = oldDeclContext }
-
-    let body: ASTNode?
-    if let nodeBody = node.body {
-      body = visit(nodeBody)
-    } else {
-      body = nil
-    }
-
-    if let body = body {
-      FuncDecl_setBody(out.funcDecl, body.rawValue)
+    if let body = node.body {
+      self.withDeclContext(out.declContext) {
+        FuncDecl_setBody(out.funcDecl, self.visit(body).rawValue)
+      }
     }
 
     return .decl(out.decl)
