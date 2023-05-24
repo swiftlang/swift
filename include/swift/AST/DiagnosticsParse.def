@@ -309,6 +309,9 @@ ERROR(observing_accessor_in_subscript,none,
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 
+ERROR(init_accessor_expected_name,none,
+      "expected property name in init accessor effect", ())
+
 // Import
 ERROR(decl_expected_module_name,none,
       "expected module name in import declaration", ())

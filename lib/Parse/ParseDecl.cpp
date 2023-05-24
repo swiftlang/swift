@@ -7186,6 +7186,67 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
   return Status;
 }
 
+template <typename EffectAttr>
+static ParserStatus parseInitAccessorEffect(Parser &P,
+                                            DeclAttributes &attributes,
+                                            StringRef attrName) {
+  ParserStatus status;
+
+  if (P.Tok.isContextualKeyword(attrName)) {
+    auto effectLoc = P.consumeToken();
+    if (!P.Tok.is(tok::l_paren)) {
+      P.diagnose(P.Tok.getLoc(), diag::attr_expected_lparen,
+                 attrName, true);
+      status.setIsParseError();
+      return status;
+    }
+
+    // Consume '('
+    P.consumeToken();
+
+    // Consume the identifier list
+    SmallVector<Identifier, 4> properties;
+    while (!P.Tok.is(tok::r_paren)) {
+      Identifier propertyName;
+      SourceLoc propertyNameLoc;
+      if (P.parseIdentifier(propertyName, propertyNameLoc,
+                            diag::init_accessor_expected_name,
+                            /*diagnoseDollarPrefix=*/true)) {
+        status.setIsParseError();
+        return status;
+      }
+
+      properties.push_back(propertyName);
+    }
+
+    if (!P.Tok.is(tok::r_paren)) {
+      P.diagnose(P.Tok.getLoc(), diag::attr_expected_rparen,
+                 attrName, true);
+      status.setIsParseError();
+      return status;
+    }
+
+    // Consume ')'
+    SourceLoc rParenLoc = P.consumeToken();
+
+    auto *attr = EffectAttr::create(P.Context, SourceLoc(),
+                                    SourceRange(effectLoc, rParenLoc),
+                                    properties);
+    attributes.add(attr);
+  }
+
+  return status;
+}
+
+ParserStatus Parser::parseInitAccessorEffects(ParsedAccessors &accessors,
+                                              AccessorKind currentKind,
+                                              DeclAttributes &attrs) {
+  ParserStatus status;
+  status |= parseInitAccessorEffect<InitializesAttr>(*this, attrs, "initializes");
+  status |= parseInitAccessorEffect<AccessesAttr>(*this, attrs, "accesses");
+  return status;
+}
+
 bool Parser::parseAccessorAfterIntroducer(
     SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
     bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
@@ -7200,6 +7261,7 @@ bool Parser::parseAccessorAfterIntroducer(
   SourceLoc throwsLoc;
   Status |= parseGetEffectSpecifier(accessors, asyncLoc, throwsLoc,
                                     hasEffectfulGet, Kind, Loc);
+  Status |= parseInitAccessorEffects(accessors, Kind, Attributes);
 
   // Set up a function declaration.
   auto accessor =
