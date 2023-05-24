@@ -2797,7 +2797,7 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   } else {
     bool hasSetter = wrapperVar->isSettable(nullptr) &&
     wrapperVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
-    if (hasSetter)
+    if (hasSetter && !var->isLet())
       property->setImplInfo(StorageImplInfo::getMutableComputed());
     else
       property->setImplInfo(StorageImplInfo::getImmutableComputed());
