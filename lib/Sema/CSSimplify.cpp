@@ -14786,8 +14786,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
 
-    (void)matchTypes(type1, OptionalType::get(type2),
-                     ConstraintKind::Conversion,
+    (void)matchTypes(type1, OptionalType::get(type2), ConstraintKind::Equal,
                      TypeMatchFlags::TMF_ApplyingFix, locator);
 
     return SolutionKind::Solved;
