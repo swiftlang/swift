@@ -6412,7 +6412,7 @@ public:
       LayoutConstraint Layout);
 
   // Returns the reduced shape type for this pack archetype.
-  CanType getReducedShape() const;
+  CanType getReducedShape();
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PackArchetype;
