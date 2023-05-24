@@ -388,6 +388,10 @@ final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruct
   public var fromAddress: Value { operand.value }
 }
 
+final public class UncheckedTrivialBitCastInst : SingleValueInstruction, UnaryInstruction {
+  public var fromValue: Value { operand.value }
+}
+
 final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {
   public var pointer: Value { operand.value }
@@ -626,7 +630,9 @@ final public
 class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
+class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {
+  public var value: Value { return operand.value }
+}
 
 final public
 class MarkDependenceInst : SingleValueInstruction {

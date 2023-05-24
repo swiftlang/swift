@@ -77,6 +77,7 @@ public func registerSILClasses() {
   register(UpcastInst.self)
   register(UncheckedRefCastInst.self)
   register(UncheckedAddrCastInst.self)
+  register(UncheckedTrivialBitCastInst.self)
   register(MarkMustCheckInst.self)
   register(ObjectInst.self)
   register(RawPointerToRefInst.self)
