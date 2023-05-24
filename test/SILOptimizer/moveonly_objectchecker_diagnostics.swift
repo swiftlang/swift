@@ -4184,7 +4184,7 @@ func testStructContainingEmptyStruct() {
   func testGuaranteedArg7a(_ x: borrowing StructContainingEmptyStruct) {
     // expected-error @-1 {{cannot use 'x' after partial consume}}
     x.x.doSomething3() // expected-note {{partial consume here}}
-    x.x.doSomething3() // expected-note {{boundary use here}}
+    x.x.doSomething3() // expected-note {{non-consuming use here}}
   }
 }
 

@@ -779,8 +779,6 @@ ERROR(sil_moveonlychecker_cannot_destructure_has_deinit, none,
 
 NOTE(sil_moveonlychecker_partial_consume_here, none,
      "partial consume here", ())
-NOTE(sil_moveonlychecker_boundary_use, none,
-     "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use here", ())
 NOTE(sil_moveonlychecker_other_consuming_use_here, none,
@@ -791,8 +789,14 @@ NOTE(sil_moveonlychecker_consuming_and_non_consuming_uses_here, none,
      "consuming and non-consuming uses here", ())
 NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
      "closure capture here", ())
+
+// TODO: a lot of these "non-consuming use" notes are just emitted to point out
+// an "invalid use after consume". I'd say most of them are for that.
+// In the other narrow cases where that's not quite right, we could go with
+// something vague like "use here"
 NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
      "non-consuming use here", ())
+
 NOTE(sil_movekillscopyablevalue_value_cyclic_consumed_in_loop_here, none,
      "consuming in loop use here", ())
 NOTE(sil_moveonlychecker_deinit_here, none,
