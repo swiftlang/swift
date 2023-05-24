@@ -657,8 +657,11 @@ private:
 
     // Convert the contextual type to the pattern, which establishes the
     // bindings.
-    cs.addConstraint(ConstraintKind::Conversion, context.getType(), patternType,
-                     locator);
+    auto *loc = cs.getConstraintLocator(
+        locator, {LocatorPathElt::PatternMatch(pattern),
+                  LocatorPathElt::ContextualType(context.purpose)});
+    cs.addConstraint(ConstraintKind::Equal, context.getType(), patternType,
+                     loc);
 
     // For any pattern variable that has a parent variable (i.e., another
     // pattern variable with the same name in the same case), require that
