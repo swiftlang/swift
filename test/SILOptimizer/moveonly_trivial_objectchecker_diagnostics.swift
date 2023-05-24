@@ -1810,7 +1810,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned NonTrivialS
 }
 
 public func closureCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     let f = {
         borrowVal(x2)
@@ -1835,7 +1835,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned NonTrivial
 }
 
 public func closureCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' consumed more than once}}
     let f = {
@@ -1898,7 +1898,7 @@ public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned NonTrivialStr
 
 public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming NonTrivialStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     defer {
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -1920,7 +1920,7 @@ public func deferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned NonTrivialSt
 }
 
 public func deferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' used after consume}}
     // expected-error @-3 {{'x2' consumed more than once}}
     defer { // expected-note {{non-consuming use here}}
@@ -2008,7 +2008,7 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Non
 }
 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     let f = {
         defer {
@@ -2037,7 +2037,7 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned No
 }
 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     let f = {
         defer {
@@ -2115,7 +2115,7 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned N
 
 public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming NonTrivialStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     let f = {
         let g = {
             borrowVal(x2)
