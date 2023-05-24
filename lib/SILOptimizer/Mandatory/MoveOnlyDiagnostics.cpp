@@ -563,7 +563,7 @@ void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
                      [&](unsigned index) { return pair.second.test(index); })) {
       LLVM_DEBUG(llvm::dbgs()
                  << "    Destructure Boundary Use: " << *pair.first);
-      diagnose(astContext, pair.first, diag::sil_moveonlychecker_boundary_use);
+      diagnose(astContext, pair.first, diag::sil_moveonlychecker_nonconsuming_use_here);
     }
   }
   registerDiagnosticEmitted(markedValue);
