@@ -344,8 +344,6 @@ Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
                                  Optional<DiagnosticTransaction> &transaction,
                                  bool suppressDiagnostics) {
 #if SWIFT_SWIFT_PARSER
-  using ParsingFlags = SourceFile::ParsingFlags;
-  const auto parsingOpts = SF.getParsingOptions();
   const auto &langOpts = Context.LangOpts;
 
   // We only need to do parsing if we either have ASTGen enabled, or want the
