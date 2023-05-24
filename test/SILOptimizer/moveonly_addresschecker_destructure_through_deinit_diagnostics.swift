@@ -74,23 +74,23 @@ func testConsumeCopyable(_ x: consuming DeinitStruct) {
 }
 
 func testConsumeNonCopyable1(_ x: consuming DeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x' when it has a deinitializer}}
     consume(x.third.rhs)
 }
 
 func testConsumeNonCopyable2(_ x: consuming DeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x' when it has a deinitializer}}
     consume(x.fourth.0)
 }
 
 func testConsumeNonCopyable3(_ x: consuming DeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x' when it has a deinitializer}}
     consume(x.fourth.1)
 }
 
 
 func testConsumeNonCopyable4(_ x: consuming DeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x' when it has a deinitializer}}
     consume(x.fifth)
 }
 
@@ -120,33 +120,33 @@ func testStructContainDeinitStructConsumeCopyable1(_ x: consuming StructContainD
 
 
 func testStructContainStructContainDeinitStructConsumeNonCopyable1(_ xyz: consuming StructContainDeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'xyz.first' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'xyz.first' when it has a deinitializer}}
     consume(xyz.first.third.rhs)
 }
 
 func testStructContainStructContainDeinitStructConsumeNonCopyable1a(_ x: consuming StructContainDeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x.second.0' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x.second.0' when it has a deinitializer}}
     consume(x.second.0.third.rhs)
 }
 
 func testStructContainStructContainDeinitStructConsumeNonCopyable2(_ x: consuming StructContainDeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x.first' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x.first' when it has a deinitializer}}
     consume(x.first.fourth.0)
 }
 
 func testStructContainStructContainDeinitStructConsumeNonCopyable2a(_ x: consuming StructContainDeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x.second.1' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x.second.1' when it has a deinitializer}}
     consume(x.second.1.fourth.0)
 }
 
 func testStructContainStructContainDeinitStructConsumeNonCopyable3(_ x: consuming StructContainDeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x.first' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x.first' when it has a deinitializer}}
     consume(x.first.fourth.1)
 }
 
 
 func testStructContainStructContainDeinitStructConsumeNonCopyable4(_ x: consuming StructContainDeinitStruct) {
-    // expected-error @+1 {{cannot partially consume 'x.first' since it has a user defined deinit}}
+    // expected-error @+1 {{cannot partially consume 'x.first' when it has a deinitializer}}
     consume(x.first.fifth)
 }
 
