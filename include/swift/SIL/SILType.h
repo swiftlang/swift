@@ -346,6 +346,8 @@ public:
     return !isAddressOnly(F);
   }
 
+  bool isLoadable(const SILFunction *f) const { return isLoadable(*f); }
+
   /// True if either:
   /// 1) The type, or the referenced type of an address type, is loadable.
   /// 2) The SIL Module conventions uses lowered addresses
