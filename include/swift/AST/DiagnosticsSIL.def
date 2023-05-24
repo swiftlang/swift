@@ -762,7 +762,7 @@ ERROR(sil_moveonlychecker_guaranteed_value_captured_by_closure, none,
 ERROR(sil_moveonlychecker_capture_consumed_in_closure, none,
       "captured '%0' cannot be consumed within a closure", (StringRef))
 ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
-      "missing reinitialization of '%0' after consume", (StringRef))
+      "missing reinitialization of inout parameter '%0' after consume", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
       "'%0' consumed by a use in a loop", (StringRef))
 

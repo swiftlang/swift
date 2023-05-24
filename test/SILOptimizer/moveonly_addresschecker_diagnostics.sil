@@ -304,7 +304,7 @@ sil [ossa] @classSimpleChainArgTest : $@convention(thin) (@inout Klass) -> () {
 bb0(%0 : $*Klass):
   %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
   // expected-error @-1 {{'x2' consumed more than once}}
-  // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+  // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
   debug_value %1 : $*Klass, var, name "x2", argno 1, expr op_deref
   %3 = alloc_stack [lexical] $Klass, var, name "y2"
   %4 = mark_must_check [consumable_and_assignable] %3 : $*Klass

@@ -144,7 +144,7 @@ public func classSimpleChainTest(_ x: borrowing Klass) { // expected-error {{'x'
 
 public func classSimpleChainArgTest(_ x2: inout Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     var y2 = x2 // expected-note {{consuming use here}}
     y2 = x2 // expected-note {{consuming use here}}
     // expected-note @-1 {{consuming use here}}
@@ -170,7 +170,7 @@ public func classMultipleNonConsumingUseTest(_ x: borrowing Klass) { // expected
     consumeVal(x2)
 }
 
-public func classMultipleNonConsumingUseArgTest(_ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classMultipleNonConsumingUseArgTest(_ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -183,7 +183,7 @@ public func classMultipleNonConsumingUseArgTest2(_ x2: inout Klass) { // expecte
     borrowVal(x2) // expected-note {{non-consuming use here}}
 }
 
-public func classMultipleNonConsumingUseArgTest3(_ x2: inout Klass) {  // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classMultipleNonConsumingUseArgTest3(_ x2: inout Klass) {  // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                                        // expected-error @-1 {{'x2' consumed more than once}}
     borrowVal(x2)
     borrowVal(x2)
@@ -210,7 +210,7 @@ public func classUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x'
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classUseAfterConsumeArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classUseAfterConsumeArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                          // expected-error @-1 {{'x2' consumed more than once}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -226,7 +226,7 @@ public func classDoubleConsume(_ x: borrowing Klass) { // expected-error {{'x' i
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classDoubleConsumeArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classDoubleConsumeArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                        // expected-error @-1 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -242,7 +242,7 @@ public func classLoopConsume(_ x: borrowing Klass) { // expected-error {{'x' is 
     }
 }
 
-public func classLoopConsumeArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classLoopConsumeArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -265,8 +265,8 @@ public func classDiamond(_ x: borrowing Klass) { // expected-error {{'x' is borr
     }
 }
 
-public func classDiamondArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                 // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func classDiamondArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -289,8 +289,8 @@ public func classDiamondInLoop(_ x: borrowing Klass) { // expected-error {{'x' i
     }
 }
 
-public func classDiamondInLoopArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                       // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func classDiamondInLoopArg(_ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                       // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -324,7 +324,7 @@ public func classAssignToVar1(_ x: borrowing Klass) { // expected-error {{'x' is
 }
 
 public func classAssignToVar1Arg(_ x2: inout Klass) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
             // expected-note @-1 {{consuming use here}}
@@ -342,7 +342,7 @@ public func classAssignToVar2(_ x: borrowing Klass) { // expected-error {{'x' is
 }
 
 public func classAssignToVar2Arg(_ x2: inout Klass) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
             // expected-note @-1 {{consuming use here}}
@@ -357,14 +357,14 @@ public func classAssignToVar3(_ x: borrowing Klass) { // expected-error {{'x' is
     consumeVal(x3)
 }
 
-public func classAssignToVar3Arg(_ x: borrowing Klass, _ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classAssignToVar3Arg(_ x: borrowing Klass, _ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                             // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func classAssignToVar3Arg2(_ x: borrowing Klass, _ x2: inout Klass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func classAssignToVar3Arg2(_ x: borrowing Klass, _ x2: inout Klass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                                    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
@@ -381,7 +381,7 @@ public func classAssignToVar4(_ x: borrowing Klass) { // expected-error {{'x' is
 }
 
 public func classAssignToVar4Arg(_ x2: inout Klass) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2)   // expected-note {{consuming use here}}
                 // expected-note @-1 {{consuming use here}}
@@ -472,7 +472,7 @@ public func finalClassSimpleChainTest() {
     borrowVal(k2)
 }
 
-public func finalClassSimpleChainTestArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func finalClassSimpleChainTestArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -517,7 +517,7 @@ public func finalClassMultipleNonConsumingUseTest() {
     consumeVal(x2)
 }
 
-public func finalClassMultipleNonConsumingUseTestArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func finalClassMultipleNonConsumingUseTestArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -532,7 +532,7 @@ public func finalClassUseAfterConsume() {
 }
 
 public func finalClassUseAfterConsumeArg(_ x2: inout FinalKlass) { // expected-error {{'x2' consumed more than once}}
-                                                                   // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                                   // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -547,7 +547,7 @@ public func finalClassDoubleConsume() {
 }
 
 public func finalClassDoubleConsumeArg(_ x2: inout FinalKlass) { // expected-error {{'x2' consumed more than once}}
-                                                                 // expected-error @-1 {{missing reinitialization of 'x2' after consume}}    
+                                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}    
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
                           // expected-note @-1 {{consuming use here}}
@@ -561,7 +561,7 @@ public func finalClassLoopConsume() {
     }
 }
 
-public func finalClassLoopConsumeArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func finalClassLoopConsumeArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -577,8 +577,8 @@ public func finalClassDiamond() {
     }
 }
 
-public func finalClassDiamondArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                           // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func finalClassDiamondArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                           // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -600,8 +600,8 @@ public func finalClassDiamondInLoop() {
     }
 }
 
-public func finalClassDiamondInLoopArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                                 // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func finalClassDiamondInLoopArg(_ x2: inout FinalKlass) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -636,7 +636,7 @@ public func finalClassAssignToVar1() {
 
 public func finalClassAssignToVar1Arg(_ x2: inout FinalKlass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
     // expected-note @-1 {{consuming use here}}
@@ -653,7 +653,7 @@ public func finalClassAssignToVar2() {
 }
 
 public func finalClassAssignToVar2Arg(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -670,7 +670,7 @@ public func finalClassAssignToVar3() {
 }
 
 public func finalClassAssignToVar3Arg(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = FinalKlass()
     consumeVal(x3)
@@ -685,7 +685,7 @@ public func finalClassAssignToVar4() {
 }
 
 public func finalClassAssignToVar4Arg(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -711,7 +711,7 @@ public func finalClassAssignToVar5Arg(_ x2: inout FinalKlass) {
 }
 
 public func finalClassAssignToVar5Arg2(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = FinalKlass()
     consumeVal(x3)
@@ -827,7 +827,7 @@ public func aggStructSimpleChainTest() {
 
 public func aggStructSimpleChainTestArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     var y2 = x2 // expected-note {{consuming use here}}
     y2 = x2 // expected-note {{consuming use here}}
     // expected-note @-1 {{consuming use here}}
@@ -853,7 +853,7 @@ public func aggStructMultipleNonConsumingUseTest() {
     consumeVal(x2)
 }
 
-public func aggStructMultipleNonConsumingUseTestArg(_ x2: inout AggStruct) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggStructMultipleNonConsumingUseTestArg(_ x2: inout AggStruct) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -869,7 +869,7 @@ public func aggStructUseAfterConsume() {
 
 public func aggStructUseAfterConsumeArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -884,7 +884,7 @@ public func aggStructDoubleConsume() {
 }
 
 public func aggStructDoubleConsumeArg(_ x2: inout AggStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -899,7 +899,7 @@ public func aggStructLoopConsume() {
     }
 }
 
-public func aggStructLoopConsumeArg(_ x2: inout AggStruct) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggStructLoopConsumeArg(_ x2: inout AggStruct) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -916,8 +916,8 @@ public func aggStructDiamond() {
 }
 
 public func aggStructDiamondArg(_ x2: inout AggStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -941,8 +941,8 @@ public func aggStructDiamondInLoop() {
 }
 
 public func aggStructDiamondInLoopArg(_ x2: inout AggStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -980,8 +980,8 @@ public func aggStructConsumeField() {
 }
 
 public func aggStructConsumeFieldArg(_ x2: inout AggStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
@@ -1016,8 +1016,8 @@ public func aggStructConsumeGrandField() {
 }
 
 public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
@@ -1092,7 +1092,7 @@ public func aggGenericStructSimpleChainTest() {
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -1116,7 +1116,7 @@ public func aggGenericStructMultipleNonConsumingUseTest() {
     consumeVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1131,7 +1131,7 @@ public func aggGenericStructUseAfterConsume() {
 }
 
 public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1147,7 +1147,7 @@ public func aggGenericStructDoubleConsume() {
 }
 
 public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1162,7 +1162,7 @@ public func aggGenericStructLoopConsume() {
     }
 }
 
-public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -1179,8 +1179,8 @@ public func aggGenericStructDiamond() {
 }
 
 public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -1203,8 +1203,8 @@ public func aggGenericStructDiamondInLoop() {
 }
 
 public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -1242,8 +1242,8 @@ public func aggGenericStructConsumeField() {
 }
 
 public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
@@ -1287,8 +1287,8 @@ public func aggGenericStructConsumeGrandField2() {
 }
 
 public func aggGenericStructConsumeGrandFieldArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
@@ -1307,7 +1307,7 @@ public func aggGenericStructSimpleChainTest<T>(_ x: T.Type) {
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg<T>(_ x2: inout AggGenericStruct<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggGenericStructSimpleChainTestArg<T>(_ x2: inout AggGenericStruct<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -1331,7 +1331,7 @@ public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: T.Type) {
     consumeVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: inout AggGenericStruct<T>) { //expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: inout AggGenericStruct<T>) { //expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1346,7 +1346,7 @@ public func aggGenericStructUseAfterConsume<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructUseAfterConsumeArg<T>(_ x2: inout AggGenericStruct<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1362,7 +1362,7 @@ public func aggGenericStructDoubleConsume<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructDoubleConsumeArg<T>(_ x2: inout AggGenericStruct<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1377,7 +1377,7 @@ public func aggGenericStructLoopConsume<T>(_ x: T.Type) {
     }
 }
 
-public func aggGenericStructLoopConsumeArg<T>(_ x2: inout AggGenericStruct<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func aggGenericStructLoopConsumeArg<T>(_ x2: inout AggGenericStruct<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -1394,8 +1394,8 @@ public func aggGenericStructDiamond<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructDiamondArg<T>(_ x2: inout AggGenericStruct<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -1418,8 +1418,8 @@ public func aggGenericStructDiamondInLoop<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructDiamondInLoopArg<T>(_ x2: inout AggGenericStruct<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -1457,8 +1457,8 @@ public func aggGenericStructConsumeField<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructConsumeFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
@@ -1493,8 +1493,8 @@ public func aggGenericStructConsumeGrandField<T>(_ x: T.Type) {
 }
 
 public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
@@ -1521,7 +1521,7 @@ public func enumSimpleChainTest() {
     borrowVal(k2)
 }
 
-public func enumSimpleChainTestArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumSimpleChainTestArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -1545,7 +1545,7 @@ public func enumMultipleNonConsumingUseTest() {
     consumeVal(x2)
 }
 
-public func enumMultipleNonConsumingUseTestArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumMultipleNonConsumingUseTestArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1560,7 +1560,7 @@ public func enumUseAfterConsume() {
 }
 
 public func enumUseAfterConsumeArg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1576,7 +1576,7 @@ public func enumDoubleConsume() {
 }
 
 public func enumDoubleConsumeArg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1591,7 +1591,7 @@ public func enumLoopConsume() {
     }
 }
 
-public func enumLoopConsumeArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumLoopConsumeArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -1608,8 +1608,8 @@ public func enumDiamond() {
 }
 
 public func enumDiamondArg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -1633,8 +1633,8 @@ public func enumDiamondInLoop() {
 }
 
 public func enumDiamondInLoopArg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -1654,7 +1654,7 @@ public func enumAssignToVar1() {
 }
 
 public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
                                                             
     var x3 = x2 // expected-note {{consuming use here}}
@@ -1673,7 +1673,7 @@ public func enumAssignToVar2() {
 }
 
 public func enumAssignToVar2Arg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -1689,7 +1689,7 @@ public func enumAssignToVar3() {
     consumeVal(x3)
 }
 
-public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                             
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = EnumTy.klass(Klass())
@@ -1705,7 +1705,7 @@ public func enumAssignToVar4() {
 }
 
 public func enumAssignToVar4Arg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1730,7 +1730,7 @@ public func enumAssignToVar5Arg(_ x2: inout EnumTy) {
     consumeVal(x3)
 }
 
-public func enumAssignToVar5Arg2(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumAssignToVar5Arg2(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                             
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = EnumTy.klass(Klass())
@@ -1750,7 +1750,7 @@ public func enumPatternMatchIfLet1() {
 }
 
 public func enumPatternMatchIfLet1Arg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use here}}
         borrowVal(x)
@@ -1771,7 +1771,7 @@ public func enumPatternMatchIfLet2() {
     }
 }
 
-public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         if case let EnumTy.klass(x) = x2 {  // expected-note {{consuming use here}}
             borrowVal(x)
@@ -1791,7 +1791,7 @@ public func enumPatternMatchSwitch1() {
     }
 }
 
-public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k):
         borrowVal(k)
@@ -1812,7 +1812,7 @@ public func enumPatternMatchSwitch2() {
     }
 }
 
-public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k):
         borrowVal(k)
@@ -1836,7 +1836,7 @@ public func enumPatternMatchSwitch2WhereClause() {
     }
 }
 
-public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k)
            where x2.doSomething():
@@ -1862,7 +1862,7 @@ public func enumPatternMatchSwitch2WhereClause2() {
     }
 }
 
-public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k)
            where boolValue:
@@ -1892,7 +1892,7 @@ public func addressOnlyGenericSimpleChainTest<T>(_ x: borrowing AddressOnlyGener
 
 public func addressOnlyGenericSimpleChainArgTest<T>(_ x2: inout AddressOnlyGeneric<T>) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     var y2 = x2 // expected-note {{consuming use here}}
     y2 = x2 // expected-note {{consuming use here}}
     // expected-note @-1 {{consuming use here}}
@@ -1930,7 +1930,7 @@ public func addressOnlyGenericMultipleNonConsumingUseTest<T>(_ x: borrowing Addr
     consumeVal(x2)
 }
 
-public func addressOnlyGenericMultipleNonConsumingUseArgTest<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericMultipleNonConsumingUseArgTest<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1943,7 +1943,7 @@ public func addressOnlyGenericMultipleNonConsumingUseArgTest2<T>(_ x2: inout Add
     borrowVal(x2) // expected-note {{non-consuming use here}}
 }
 
-public func addressOnlyGenericMultipleNonConsumingUseArgTest3<T>(_ x2: inout AddressOnlyGeneric<T>) {  // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericMultipleNonConsumingUseArgTest3<T>(_ x2: inout AddressOnlyGeneric<T>) {  // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                                        // expected-error @-1 {{'x2' consumed more than once}}
     borrowVal(x2)
     borrowVal(x2)
@@ -2000,7 +2000,7 @@ public func addressOnlyGenericUseAfterConsume<T>(_ x: borrowing AddressOnlyGener
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func addressOnlyGenericUseAfterConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericUseAfterConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                          // expected-error @-1 {{'x2' consumed more than once}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2023,7 +2023,7 @@ public func addressOnlyGenericDoubleConsume<T>(_ x: borrowing AddressOnlyGeneric
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func addressOnlyGenericDoubleConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericDoubleConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                        // expected-error @-1 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2045,7 +2045,7 @@ public func addressOnlyGenericLoopConsume<T>(_ x: borrowing AddressOnlyGeneric<T
     }
 }
 
-public func addressOnlyGenericLoopConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericLoopConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -2075,8 +2075,8 @@ public func addressOnlyGenericDiamond<T>(_ x: borrowing AddressOnlyGeneric<T>) {
     }
 }
 
-public func addressOnlyGenericDiamondArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                 // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericDiamondArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -2107,8 +2107,8 @@ public func addressOnlyGenericDiamondInLoop<T>(_ x: borrowing AddressOnlyGeneric
     }
 }
 
-public func addressOnlyGenericDiamondInLoopArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                       // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericDiamondInLoopArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                       // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -2171,7 +2171,7 @@ public func addressOnlyGenericAssignToVar1<T>(_ x: borrowing AddressOnlyGeneric<
 }
 
 public func addressOnlyGenericAssignToVar1Arg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
             // expected-note @-1 {{consuming use here}}
@@ -2196,7 +2196,7 @@ public func addressOnlyGenericAssignToVar2<T>(_ x: borrowing AddressOnlyGeneric<
 }
 
 public func addressOnlyGenericAssignToVar2Arg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
             // expected-note @-1 {{consuming use here}}
@@ -2219,14 +2219,14 @@ public func addressOnlyGenericAssignToVar3<T>(_ x: borrowing AddressOnlyGeneric<
     consumeVal(x3)
 }
 
-public func addressOnlyGenericAssignToVar3Arg<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericAssignToVar3Arg<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                             // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func addressOnlyGenericAssignToVar3Arg2<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyGenericAssignToVar3Arg2<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                                    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
@@ -2243,7 +2243,7 @@ public func addressOnlyGenericAssignToVar4<T>(_ x: borrowing AddressOnlyGeneric<
 }
 
 public func addressOnlyGenericAssignToVar4Arg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2)   // expected-note {{consuming use here}}
                 // expected-note @-1 {{consuming use here}}
@@ -2396,8 +2396,8 @@ public func addressOnlyGenericAccessConsumeFieldArg<T>(_ x2: inout AddressOnlyGe
 }
 
 public func addressOnlyGenericAccessConsumeFieldArg2<T>(_ x2: inout AddressOnlyGeneric<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
 
     for _ in 0..<1024 {
@@ -2432,8 +2432,8 @@ public func addressOnlyGenericAccessConsumeGrandFieldArg<T>(_ x2: inout AddressO
 }
 
 public func addressOnlyGenericAccessConsumeGrandFieldArg2<T>(_ x2: inout AddressOnlyGeneric<T>) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
 
     for _ in 0..<1024 {
@@ -2482,7 +2482,7 @@ extension AddressOnlyGeneric {
         let _ = x
     }
 
-    mutating func testNoUseSelf2() { // expected-error {{missing reinitialization of 'self' after consume}}
+    mutating func testNoUseSelf2() { // expected-error {{missing reinitialization of inout parameter 'self' after consume}}
         let x = self // expected-note {{consuming use here}}
         let _ = x
     }
@@ -2533,7 +2533,7 @@ public func addressOnlyProtocolSimpleChainTest(_ x: borrowing AddressOnlyProtoco
 
 public func addressOnlyProtocolSimpleChainArgTest(_ x2: inout AddressOnlyProtocol) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     var y2 = x2 // expected-note {{consuming use here}}
     y2 = x2 // expected-note {{consuming use here}}
     // expected-note @-1 {{consuming use here}}
@@ -2571,7 +2571,7 @@ public func addressOnlyProtocolMultipleNonConsumingUseTest(_ x: borrowing Addres
     consumeVal(x2)
 }
 
-public func addressOnlyProtocolMultipleNonConsumingUseArgTest(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolMultipleNonConsumingUseArgTest(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2584,7 +2584,7 @@ public func addressOnlyProtocolMultipleNonConsumingUseArgTest2(_ x2: inout Addre
     borrowVal(x2) // expected-note {{non-consuming use here}}
 }
 
-public func addressOnlyProtocolMultipleNonConsumingUseArgTest3(_ x2: inout AddressOnlyProtocol) {  // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolMultipleNonConsumingUseArgTest3(_ x2: inout AddressOnlyProtocol) {  // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                                        // expected-error @-1 {{'x2' consumed more than once}}
     borrowVal(x2)
     borrowVal(x2)
@@ -2641,7 +2641,7 @@ public func addressOnlyProtocolUseAfterConsume(_ x: borrowing AddressOnlyProtoco
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func addressOnlyProtocolUseAfterConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolUseAfterConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                          // expected-error @-1 {{'x2' consumed more than once}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2664,7 +2664,7 @@ public func addressOnlyProtocolDoubleConsume(_ x: borrowing AddressOnlyProtocol)
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func addressOnlyProtocolDoubleConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolDoubleConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                        // expected-error @-1 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2686,7 +2686,7 @@ public func addressOnlyProtocolLoopConsume(_ x: borrowing AddressOnlyProtocol) {
     }
 }
 
-public func addressOnlyProtocolLoopConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolLoopConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -2716,8 +2716,8 @@ public func addressOnlyProtocolDiamond(_ x: borrowing AddressOnlyProtocol) { // 
     }
 }
 
-public func addressOnlyProtocolDiamondArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                 // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolDiamondArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -2748,8 +2748,8 @@ public func addressOnlyProtocolDiamondInLoop(_ x: borrowing AddressOnlyProtocol)
     }
 }
 
-public func addressOnlyProtocolDiamondInLoopArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
-                                                       // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolDiamondInLoopArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+                                                       // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -2812,7 +2812,7 @@ public func addressOnlyProtocolAssignToVar1(_ x: borrowing AddressOnlyProtocol) 
 }
 
 public func addressOnlyProtocolAssignToVar1Arg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
             // expected-note @-1 {{consuming use here}}
@@ -2837,7 +2837,7 @@ public func addressOnlyProtocolAssignToVar2(_ x: borrowing AddressOnlyProtocol) 
 }
 
 public func addressOnlyProtocolAssignToVar2Arg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
             // expected-note @-1 {{consuming use here}}
@@ -2860,14 +2860,14 @@ public func addressOnlyProtocolAssignToVar3(_ x: borrowing AddressOnlyProtocol) 
     consumeVal(x3)
 }
 
-public func addressOnlyProtocolAssignToVar3Arg(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolAssignToVar3Arg(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                             // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func addressOnlyProtocolAssignToVar3Arg2(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of 'x2' after consume}}
+public func addressOnlyProtocolAssignToVar3Arg2(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
                                                                    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
@@ -2884,7 +2884,7 @@ public func addressOnlyProtocolAssignToVar4(_ x: borrowing AddressOnlyProtocol) 
 }
 
 public func addressOnlyProtocolAssignToVar4Arg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
-                                                      // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+                                                      // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2)   // expected-note {{consuming use here}}
                 // expected-note @-1 {{consuming use here}}
@@ -3004,8 +3004,8 @@ public func addressOnlyProtocolAccessConsumeFieldArg(_ x2: inout AddressOnlyProt
 }
 
 public func addressOnlyProtocolAccessConsumeFieldArg2(_ x2: inout AddressOnlyProtocol) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
 
     for _ in 0..<1024 {
@@ -3071,7 +3071,7 @@ public func closureLetClassUseAfterConsume2() {
 public func closureLetClassUseAfterConsumeArg(_ argX: inout Klass) {
     // TODO: Fix this
     let f = { (_ x2: inout Klass) in
-        // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+        // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
         // expected-error @-2 {{'x2' consumed more than once}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -3083,7 +3083,7 @@ public func closureLetClassUseAfterConsumeArg(_ argX: inout Klass) {
 
 // We do not support captures of vars by closures today.
 public func closureLetCaptureClassUseAfterConsume() {
-    var x2 = Klass() // expected-error {{missing reinitialization of 'x2' after consume}}
+    var x2 = Klass() // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
@@ -3096,7 +3096,7 @@ public func closureLetCaptureClassUseAfterConsume() {
 }
 
 public func closureLetCaptureClassUseAfterConsume2() {
-    var x2 = Klass() // expected-error {{missing reinitialization of 'x2' after consume}}
+    var x2 = Klass() // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     x2 = Klass()
     let f = {
         borrowVal(x2)
@@ -3106,7 +3106,7 @@ public func closureLetCaptureClassUseAfterConsume2() {
 }
 
 public func closureLetCaptureClassUseAfterConsumeError() {
-    var x2 = Klass() // expected-error {{missing reinitialization of 'x2' after consume}}
+    var x2 = Klass() // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
@@ -3185,7 +3185,7 @@ public func closureVarClassUseAfterConsumeArg(_ argX: inout Klass) {
     // TODO: Fix this
     var f = { (_ x2: inout Klass) in}
     f = { (_ x2: inout Klass) in
-        // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+        // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
         // expected-error @-2 {{'x2' consumed more than once}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -3254,7 +3254,7 @@ public func closureVarCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 public func deferCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' used after consume}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
     defer { // expected-note {{non-consuming use here}}
@@ -3269,7 +3269,7 @@ public func deferCaptureClassUseAfterConsume() {
 
 public func deferCaptureClassUseAfterConsume2() {
     var x2 = Klass()
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = Klass()
@@ -3284,7 +3284,7 @@ public func deferCaptureClassUseAfterConsume2() {
 }
 
 public func deferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
     defer {
@@ -3298,7 +3298,7 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 
 public func closureLetAndDeferCaptureClassUseAfterConsume() {
     var x2 = Klass()
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
@@ -3316,7 +3316,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume() {
 
 public func closureLetAndDeferCaptureClassUseAfterConsume2() {
     var x2 = Klass() // expected-error {{'x2' used after consume}}
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
@@ -3335,7 +3335,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume2() {
 
 public func closureLetAndDeferCaptureClassUseAfterConsume3() {
     var x2 = Klass() // expected-error {{'x2' used after consume}}
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = { 
@@ -3354,7 +3354,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume3() {
 }
 
 public func closureLetAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-note @-3 {{'x2' is declared 'inout'}}
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
@@ -3377,7 +3377,7 @@ public func closureLetAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) 
 
 public func closureLetAndClosureCaptureClassUseAfterConsume() {
     var x2 = Klass() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     x2 = Klass()
     let f = {
         let g = {
@@ -3393,7 +3393,7 @@ public func closureLetAndClosureCaptureClassUseAfterConsume() {
 
 public func closureLetAndClosureCaptureClassUseAfterConsume2() {
     var x2 = Klass() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     x2 = Klass()
     let f = {
         let g = {
@@ -3436,7 +3436,7 @@ public func closureLetAndClosureCaptureClassArgUseAfterConsume(_ x2: inout Klass
 
 public func closureVarAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = Klass() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     x2 = x // expected-note {{consuming use here}}
     var f = {}
     f = {
@@ -3453,7 +3453,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) 
 
 public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = Klass()
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = x // expected-note {{consuming use here}}
     var f = {}
@@ -3474,7 +3474,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass)
 public func closureVarAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     x2 = x
     // expected-note @-1 {{consuming use here}}
     var f = {}
@@ -3522,7 +3522,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned 
 }
 
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming Klass) {
-    // expected-error @-1 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     var f = {}
     f = {
@@ -3555,7 +3555,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned
 
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     var f = {}
     f = {
         defer {

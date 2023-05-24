@@ -82,7 +82,7 @@ func d(x: __owned M) { // expected-error {{captured 'x' cannot be consumed withi
     // expected-note @-1 {{consuming use here}}
 }
 
-func d2(x: consuming M) { // expected-error {{missing reinitialization of 'x' after consume}}
+func d2(x: consuming M) { // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
     clodger({ consume(x) })
     // expected-note @-1 {{consuming use here}}
 }
@@ -129,7 +129,7 @@ func k(x: borrowing M) {
 }
 
 
-func l(x: inout M) { // expected-error {{missing reinitialization of 'x' after consume}}
+func l(x: inout M) { // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
     clodger({ consume(x) }) // expected-note {{consuming use here}}
 }
 
