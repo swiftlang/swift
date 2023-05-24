@@ -775,12 +775,9 @@ ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed, none,
       "cannot consume noncopyable stored property '%0' %select{of a class|that is global}1",
       (StringRef, bool))
 
-ERROR(sil_moveonlychecker_cannot_destructure_deinit_nominal_type_self, none,
-      "Cannot partially consume '%0' since it has a user defined deinit",
+ERROR(sil_moveonlychecker_cannot_destructure_has_deinit, none,
+      "cannot partially consume '%0' since it has a user defined deinit",
       (StringRef))
-ERROR(sil_moveonlychecker_cannot_destructure_deinit_nominal_type_field, none,
-      "Cannot partially consume '%0' since it contains field '%1.%2' whose type %3 has a user defined deinit",
-      (StringRef, StringRef, StringRef, DeclBaseName))
 
 NOTE(sil_moveonlychecker_partial_consume_here, none,
      "partial consume here", ())

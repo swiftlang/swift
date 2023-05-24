@@ -683,25 +683,21 @@ void DiagnosticEmitter::emitCannotDestructureDeinitNominalError(
     MarkMustCheckInst *markedValue, StringRef pathString,
     NominalTypeDecl *deinitedNominal, SILInstruction *consumingUser) {
   auto &astContext = fn->getASTContext();
+
   SmallString<64> varName;
   getVariableNameForValue(markedValue, varName);
 
+  if (!pathString.empty())
+    varName.append(pathString);
+
+  diagnose(
+      astContext, consumingUser,
+      diag::sil_moveonlychecker_cannot_destructure_has_deinit,
+      varName);
   registerDiagnosticEmitted(markedValue);
 
-  if (pathString.empty()) {
-    diagnose(
-        astContext, markedValue,
-        diag::sil_moveonlychecker_cannot_destructure_deinit_nominal_type_self,
-        varName);
-  } else {
-    diagnose(
-        astContext, markedValue,
-        diag::sil_moveonlychecker_cannot_destructure_deinit_nominal_type_field,
-        varName, varName, pathString.drop_front(),
-        deinitedNominal->getBaseName());
-  }
-  diagnose(astContext, consumingUser,
-           diag::sil_moveonlychecker_consuming_use_here);
-  astContext.Diags.diagnose(deinitedNominal->getValueTypeDestructor(),
-                            diag::sil_moveonlychecker_deinit_here);
+  // point to the deinit if we know where it is.
+  if (auto deinitLoc =
+      deinitedNominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
+    astContext.Diags.diagnose(deinitLoc, diag::sil_moveonlychecker_deinit_here);
 }
