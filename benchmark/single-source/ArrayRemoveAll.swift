@@ -26,8 +26,8 @@ class Slow {
   }
 }
 
-let inputArray_Int: [Int] = Array(0..<1_000_000)
-let inputArray_Class: [Slow] = (0..<100_000).map(Slow.init(num:))
+let inputArray_Int: [Int] = Array(0..<500_000)
+let inputArray_Class: [Slow] = (0..<50_000).map(Slow.init(num:))
 
 @inline(never)
 func removeAll<T>(_ arr: [T]) -> [T] {
