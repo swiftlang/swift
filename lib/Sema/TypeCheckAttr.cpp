@@ -7584,6 +7584,11 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::ambiguous_member_overload_set,
                          DeclNameRef(name));
+
+      for (auto *choice : propertyResults) {
+        ctx.Diags.diagnose(choice, diag::decl_declared_here, choice->getName());
+      }
+
       failed = true;
       break;
     }

@@ -35,3 +35,23 @@ func test_use_of_initializes_accesses_on_non_inits() {
     }
   }
 }
+
+func test_invalid_refs_in_init_attrs() {
+  struct Test {
+    var c: Int { get { 42 } }
+    var x: Int {
+      init(newValue) initializes(a) accesses(b c) {}
+      // expected-error@-1 {{find type 'a' in scope}}
+      // expected-error@-2 {{find type 'b' in scope}}
+      // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
+    }
+
+    var y: String {
+      init(newValue) initializes(test) {}
+      // expected-error@-1 {{ambiguous reference to member 'test'}}
+    }
+
+    func test(_: Int) {} // expected-note {{'test' declared here}}
+    func test(_: String) -> Int { 42 } // expected-note {{'test' declared here}}
+  }
+}
