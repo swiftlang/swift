@@ -206,6 +206,16 @@ extension Duration {
     return Duration(_attoseconds:
       _Int128(nanoseconds).multiplied(by: 1_000_000_000))
   }
+  
+  /// A `Duration` measured in nanoseconds.
+  ///
+  ///       let d: Duration = .nanoseconds(1929)
+  ///
+  /// - Returns: A `Duration` representing a given number of nanoseconds.
+  @available(SwiftStdlib 5.9, *)
+  public static func nanoseconds(_ nanoseconds: Double) -> Duration {
+    Duration(nanoseconds, scale: 1_000_000_000)
+  }
 }
 
 @available(SwiftStdlib 5.7, *)
