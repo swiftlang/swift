@@ -422,6 +422,12 @@ public:
   /// silently.
   void diagnoseAndConsumeError(llvm::Error error) const;
 
+  /// Report modularization error, either directly or indirectly if it
+  /// caused a \c TypeError or \c ExtensionError. Returns any unhandled errors.
+  llvm::Error
+  diagnoseModularizationError(llvm::Error error,
+                   DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;
+
   /// Report an unexpected format error that could happen only from a
   /// memory-level inconsistency. Please prefer passing an error to
   /// `fatal(llvm::Error error)` when possible.

@@ -232,21 +232,15 @@ void ExtensionError::diagnose(const ModuleFile *MF) const {
                        diag::modularization_issue_side_effect_extension_error);
 }
 
-llvm::Error ModuleFile::diagnoseFatal(llvm::Error error) const {
-
-  auto &ctx = getContext();
-  if (FileContext) {
-    if (ctx.LangOpts.EnableDeserializationRecovery) {
-      // Attempt to report relevant errors as diagnostics.
-      // At this time, only ModularizationErrors are reported directly. They
-      // can get here either directly or as underlying causes to a TypeError or
-      // and ExtensionError.
-      auto handleModularizationError =
-        [&](const ModularizationError &modularError) -> llvm::Error {
-          modularError.diagnose(this);
-          return llvm::Error::success();
-        };
-      error = llvm::handleErrors(std::move(error),
+llvm::Error
+ModuleFile::diagnoseModularizationError(llvm::Error error,
+                                        DiagnosticBehavior limit) const {
+  auto handleModularizationError =
+    [&](const ModularizationError &modularError) -> llvm::Error {
+      modularError.diagnose(this, limit);
+      return llvm::Error::success();
+    };
+  llvm::Error outError = llvm::handleErrors(std::move(error),
         handleModularizationError,
         [&](TypeError &typeError) -> llvm::Error {
           if (typeError.diagnoseUnderlyingReason(handleModularizationError)) {
@@ -262,6 +256,16 @@ llvm::Error ModuleFile::diagnoseFatal(llvm::Error error) const {
           }
           return llvm::make_error<ExtensionError>(std::move(extError));
         });
+
+  return outError;
+}
+
+llvm::Error ModuleFile::diagnoseFatal(llvm::Error error) const {
+
+  auto &ctx = getContext();
+  if (FileContext) {
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      error = diagnoseModularizationError(std::move(error));
 
       // If no error is left, it was reported as a diagnostic. There's no
       // need to crash.
