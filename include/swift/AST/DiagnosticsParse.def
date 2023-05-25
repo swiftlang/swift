@@ -2120,5 +2120,13 @@ ERROR(sil_markuncheckedreferencebinding_requires_attribute,none,
 ERROR(sil_markuncheckedreferencebinding_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_unchecked_reference_binding", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: Init accessors
+//------------------------------------------------------------------------------
+
+ERROR(init_accessor_is_not_in_type_context,none,
+      "init accessors could only be associated with properties",
+      ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
