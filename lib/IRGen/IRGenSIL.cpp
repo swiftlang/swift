@@ -441,7 +441,15 @@ public:
 
   // A cached dominance analysis.
   std::unique_ptr<DominanceInfo> Dominance;
-  
+
+  /// For each instruction which did allocate pack metadata on-stack, the stack
+  /// locations at which they were allocated.
+  ///
+  /// Used to emit cleanups for those allocations in
+  /// emitDeallocateDynamicPackMetadataAllocas.
+  llvm::DenseMap<SILInstruction *, llvm::SmallVector<StackPackAlloc, 2>>
+      StackPackAllocs;
+
   IRGenSILFunction(IRGenModule &IGM, SILFunction *f);
   ~IRGenSILFunction();
   
@@ -1475,7 +1483,6 @@ public:
   LOADABLE_REF_STORAGE_HELPER(Name)
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
-  
 };
 
 } // end anonymous namespace
@@ -2545,7 +2552,17 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
     IGM.emittedRuntimeFuncs.clear();
 #endif
 
+    assert(OutstandingStackPackAllocs.empty());
+
     visit(&I);
+
+    // Record the on-stack pack allocations emitted on behalf of this SIL
+    // instruction.  They will be cleaned up when visiting the corresponding
+    // cleanup markers.
+    for (auto pair : OutstandingStackPackAllocs) {
+      StackPackAllocs[&I].push_back(pair);
+    }
+    OutstandingStackPackAllocs.clear();
 
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
     if (!isa<DebugValueInst>(&I)) {
@@ -5691,6 +5708,10 @@ void IRGenSILFunction::visitDeallocPackInst(swift::DeallocPackInst *i) {
 
 void IRGenSILFunction::visitDeallocPackMetadataInst(
     DeallocPackMetadataInst *i) {
+  auto iter = StackPackAllocs.find(i->getIntroducer());
+  if (iter == StackPackAllocs.end())
+    return;
+  cleanupStackAllocPacks(*this, iter->getSecond());
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
