@@ -1,0 +1,32 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -lower-aggregate-instrs %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+struct S : ~Copyable {
+  deinit {}
+}
+struct S2 : ~Copyable {
+  var s1 = S()
+  var s2 = S()
+}
+
+// Test that a struct-with-deinit is not expanded. Doing so would
+// forget the deinit.
+//
+// public func testDeinitTwo() {
+//   var s = S2()
+// }
+//
+// CHECK-LABEL: sil @testDeinitTwo : $@convention(thin) () -> () {
+// CHECK:         release_value %{{.*}} : $S2
+// CHECK-LABEL: } // end sil function 'testDeinitTwo'
+sil @testDeinitTwo : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $S ()
+  %1 = struct $S2 (%0 : $S, %0 : $S)
+  release_value %1 : $S2
+  %5 = tuple ()
+  return %5 : $()
+}
