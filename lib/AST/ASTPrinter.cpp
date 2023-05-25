@@ -3212,7 +3212,14 @@ static bool usesFeatureTupleConformances(Decl *decl) {
 }
 
 static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
-  return false;
+  auto &attrs = decl->getAttrs();
+  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
+    if (isa<UsedAttr>(attr))
+      return true;
+    if (isa<SectionAttr>(attr))
+      return true;
+    return false;
+  });
 }
 
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
