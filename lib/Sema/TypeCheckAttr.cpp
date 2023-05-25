@@ -3551,13 +3551,25 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
 }
 
 void AttributeChecker::visitInitializesAttr(InitializesAttr *attr) {
-  assert(isa<AccessorDecl>(D));
-  (void)attr->getPropertyDecls(cast<AccessorDecl>(D));
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::init_accessor_initializes_attribute_on_other_declaration);
+    return;
+  }
+
+  (void)attr->getPropertyDecls(accessor);
 }
 
 void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
-  assert(isa<AccessorDecl>(D));
-  (void)attr->getPropertyDecls(cast<AccessorDecl>(D));
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::init_accessor_accesses_attribute_on_other_declaration);
+    return;
+  }
+
+  (void)attr->getPropertyDecls(accessor);
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
