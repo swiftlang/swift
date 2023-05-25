@@ -44,7 +44,7 @@ void StackNesting::setup() {
 
         BI.StackInsts.push_back(Alloc);
       } else if (I.isDeallocatingStack()) {
-        auto *AllocInst = cast<SingleValueInstruction>(I.getOperand(0));
+        auto *AllocInst = getAllocForDealloc(&I);
         if (!BI.StackInsts.empty() && BI.StackInsts.back() == AllocInst) {
           // As an optimization, we ignore perfectly nested alloc-dealloc pairs
           // inside a basic block.
@@ -349,7 +349,7 @@ void StackNesting::dump() const {
         dumpBits(StackLocs[BitNr].AliveLocs);
         llvm::dbgs() << ",     " << *StackInst;
       } else if (StackInst->isDeallocatingStack()) {
-        auto *AllocInst = cast<SingleValueInstruction>(StackInst->getOperand(0));
+        auto *AllocInst = getAllocForDealloc(StackInst);
         int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
         llvm::dbgs() << "  dealloc for #" << BitNr << "\n"
                         "    " << *StackInst;
