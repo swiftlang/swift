@@ -388,7 +388,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       if (castType->isPureMoveOnly()) {
         // can't cast anything to move-only; there should be no valid ones.
-        Ctx.Diags.diagnose(cast->getLoc(), diag::moveonly_cast);
+        Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
       }
 
@@ -398,7 +398,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto fromType = cast->getSubExpr()->getType()) {
         if (fromType->isPureMoveOnly()) {
           // can't cast move-only to anything.
-          Ctx.Diags.diagnose(cast->getLoc(), diag::moveonly_cast);
+          Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
           return;
         }
       }
@@ -6208,13 +6208,13 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     if (auto *eltDecl = topFieldToError.dyn_cast<EnumElementDecl *>()) {
       DE.diagnoseWithNotes(
           copyableNominalType->diagnose(
-              diag::moveonly_copyable_type_that_contains_moveonly_type,
+              diag::noncopyable_within_copyable,
               copyableNominalType->getDescriptiveKind(),
               copyableNominalType->getBaseName()),
           [&]() {
             eltDecl->diagnose(
                 diag::
-                    moveonly_copyable_type_that_contains_moveonly_type_location,
+                    noncopyable_within_copyable_location,
                 fieldKind, parentName.userFacingName(),
                 fieldName.userFacingName());
           });
@@ -6224,12 +6224,12 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     auto *varDecl = topFieldToError.get<VarDecl *>();
     DE.diagnoseWithNotes(
         copyableNominalType->diagnose(
-            diag::moveonly_copyable_type_that_contains_moveonly_type,
+            diag::noncopyable_within_copyable,
             copyableNominalType->getDescriptiveKind(),
             copyableNominalType->getBaseName()),
         [&]() {
           varDecl->diagnose(
-              diag::moveonly_copyable_type_that_contains_moveonly_type_location,
+              diag::noncopyable_within_copyable_location,
               fieldKind, parentName.userFacingName(),
               fieldName.userFacingName());
         });

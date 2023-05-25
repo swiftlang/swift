@@ -1732,7 +1732,7 @@ ERROR(expose_enum_case_tuple_to_cxx,none,
 ERROR(expose_protocol_to_cxx_unsupported,none,
       "protocol %0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_move_only_to_cxx,none,
-      "move-only %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+      "noncopyable %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%0 %1 is not yet exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -6944,30 +6944,6 @@ ERROR(wrap_invalid_attr_added_by_access_note, none,
 
 #undef WHICH_ACCESS_NOTE
 
-// Move Only diagnostics
-
-ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
-      none, "Can not use feature when experimental move only is disabled! Pass"
-      " the frontend flag -enable-experimental-move-only to swift to enable "
-      "the usage of this language feature", ())
-ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
-      none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
-ERROR(noimplicitcopy_attr_invalid_in_generic_context,
-      none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
-ERROR(moveonly_generics, none, "move-only type %0 cannot be used with generics yet", (Type))
-ERROR(moveonly_effectful_getter,none,
-      "%0 of move-only type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
-ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
-      "'@_noImplicitCopy' has no effect when applied to a move only type", ())
-ERROR(moveonly_enums_do_not_support_indirect,none,
-      "move-only enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
-ERROR(moveonly_cast,none,
-      "move-only types cannot be conditionally cast", ())
-ERROR(moveonly_failable_init,none,
-      "move-only types cannot have failable initializers yet", ())
-ERROR(moveonly_objc_enum_banned, none,
-      "@objc enums cannot be marked as move-only", ())
-
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
 //------------------------------------------------------------------------------
@@ -7024,21 +7000,6 @@ ERROR(concurrency_task_to_thread_model_global_actor,none,
 ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
       "annotating a type with a global actor %0 is not permitted within %1",
       (TypeRepr*, StringRef))
-
-ERROR(moveOnly_not_allowed_here,none,
-      "'moveOnly' only applies to structs or enums", ())
-ERROR(consume_expression_not_passed_lvalue,none,
-      "'consume' can only be applied to lvalues", ())
-ERROR(borrow_expression_not_passed_lvalue,none,
-      "'borrow' can only be applied to lvalues", ())
-ERROR(copy_expression_not_passed_lvalue,none,
-      "'copy' can only be applied to lvalues", ())
-ERROR(copy_expression_cannot_be_used_with_noncopyable_types,none,
-      "'copy' cannot be applied to noncopyable types", ())
-
-ERROR(moveOnly_requires_lexical_lifetimes,none,
-      "noncopyable types require lexical borrow scopes "
-      "(add -enable-lexical-borrow-scopes=true)", ())
 
 //------------------------------------------------------------------------------
 // MARK: #_hasSymbol
@@ -7172,31 +7133,68 @@ NOTE(macro_expand_circular_reference_unnamed_through, none,
      "circular reference expanding %0 macros", (StringRef))
 
 //------------------------------------------------------------------------------
-// MARK: Move Only Errors
+// MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(moveonly_copyable_type_that_contains_moveonly_type, none,
-      "%0 %1 cannot contain a move-only type without also being move-only",
+ERROR(noncopyable_within_copyable, none,
+      "%0 %1 cannot contain a noncopyable type without also being noncopyable",
       (DescriptiveDeclKind, DeclName))
-NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
-     "contained move-only %0 '%1.%2'",
+NOTE(noncopyable_within_copyable_location, none,
+     "contained noncopyable %0 '%1.%2'",
      (DescriptiveDeclKind, StringRef, StringRef))
-ERROR(moveonly_cannot_conform_to_type, none,
-     "move-only %0 %1 cannot conform to %2",
+ERROR(noncopyable_cannot_conform_to_type, none,
+     "noncopyable %0 %1 cannot conform to %2",
      (DescriptiveDeclKind, DeclName, Type))
-ERROR(moveonly_parameter_missing_ownership, none,
+ERROR(noncopyable_parameter_requires_ownership, none,
       "noncopyable parameter must specify its ownership", ())
-ERROR(moveonly_parameter_subscript_unsupported, none,
+ERROR(noncopyable_parameter_subscript_unsupported, none,
       "subscripts cannot have noncopyable parameters yet", ())
-NOTE(moveonly_parameter_ownership_suggestion, none,
+NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_copyable,none,
-      "Copyable types cannot be 'consuming' or 'borrowing' yet", ())
+      "copyable types cannot be 'consuming' or 'borrowing' yet", ())
 ERROR(self_ownership_specifier_copyable,none,
-      "%0 is not yet valid on %1s in a Copyable type",
+      "%0 is not yet valid on %1s of a copyable type",
       (SelfAccessKind, DescriptiveDeclKind))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
+ERROR(noncopyable_generics, none, "noncopyable type %0 cannot be used with generics yet", (Type))
+ERROR(noncopyable_effectful_getter,none,
+      "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
+ERROR(noncopyable_enums_do_not_support_indirect,none,
+      "noncopyable enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
+ERROR(noncopyable_cast,none,
+      "noncopyable types cannot be conditionally cast", ())
+ERROR(noncopyable_failable_init,none,
+      "noncopyable types cannot have failable initializers yet", ())
+ERROR(noncopyable_objc_enum, none,
+      "noncopyable enums cannot be marked '@objc'", ())
+ERROR(moveOnly_not_allowed_here,none,
+      "'@_moveOnly' attribute is only valid on structs or enums", ())
+ERROR(consume_expression_not_passed_lvalue,none,
+      "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
+ERROR(borrow_expression_not_passed_lvalue,none,
+      "'borrow' can only be applied to a local binding ('let', 'var', or parameter)", ())
+ERROR(copy_expression_not_passed_lvalue,none,
+      "'copy' can only be applied to a local binding ('let', 'var', or parameter)", ())
+ERROR(copy_expression_cannot_be_used_with_noncopyable_types,none,
+      "'copy' cannot be applied to noncopyable types", ())
+
+ERROR(moveOnly_requires_lexical_lifetimes,none,
+      "noncopyable types require lexical borrow scopes "
+      "(add -enable-lexical-borrow-scopes=true)", ())
+
+// Experimental noncopyable feature diagnostics:
+ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental move only is disabled! Pass"
+            " the frontend flag -enable-experimental-move-only to swift to enable "
+            "the usage of this language feature", ())
+ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
+      none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
+ERROR(noimplicitcopy_attr_invalid_in_generic_context,
+      none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
+ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
+      "'@_noImplicitCopy' has no effect when applied to a noncopyable type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)
