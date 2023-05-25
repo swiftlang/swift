@@ -1339,7 +1339,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
     } else {
       accessSpecifier = ""
     }
-    return [
+    var results: [DeclSyntax] = [
       """
 
       \(raw:accessSpecifier)class \(context.makeUniqueName("name")) {
@@ -1358,6 +1358,41 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
 
         func hello() -> String {
           \(body.statements)
+        }
+      }
+      """,
+      """
+
+      struct \(context.makeUniqueName("name")): Equatable {
+        static func == (lhs: Self, rhs: Self) -> Bool { false }
+      }
+      """
+    ]
+
+    if let _ = node.argumentList.first(labeled: "causeErrors") {
+
+      results += ["""
+
+      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expect error: need 'any'
+        #introduceTypeCheckingErrors // make sure we get nested errors
+      }
+      """]
+    }
+
+    return results
+  }
+}
+
+public struct IntroduceTypeCheckingErrorsMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> [DeclSyntax] {
+    return [
+      """
+
+      struct \(context.makeUniqueName("name")) {
+        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expect error: need 'any'
         }
       }
       """

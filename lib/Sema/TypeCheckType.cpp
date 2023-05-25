@@ -5335,9 +5335,15 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
   } else if (auto *macroDecl = dyn_cast<MacroDecl>(decl)) {
     checkExistentialTypes(ctx, macroDecl->getGenericParams());
     checkExistentialTypes(ctx, macroDecl->getTrailingWhereClause());
+  } else if (auto *macroExpansionDecl = dyn_cast<MacroExpansionDecl>(decl)) {
+    ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
+    macroExpansionDecl->getArgs()->walk(visitor);
+    for (auto *genArg : macroExpansionDecl->getGenericArgs())
+      genArg->walk(visitor);
   }
 
-  if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
+  if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl) ||
+      isa<MacroExpansionDecl>(decl))
     return;
 
   ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
