@@ -158,67 +158,23 @@ extension _ArrayBufferProtocol {
       self.count = oldCount + growth
     }
 
-    let elements = self.subscriptBaseAddress
-    let oldTailIndex = subrange.upperBound
-    let oldTailStart = elements + oldTailIndex
-    let newTailIndex = oldTailIndex + growth
-    let newTailStart = oldTailStart + growth
+    let elements = self.firstElementAddress
+
+    // erase all the elements we're replacing to create a hole
+    let holeStart = elements + subrange.lowerBound
+    let holeEnd = holeStart + newCount
+    holeStart.deinitialize(count: eraseCount)
+
+    // resize the hole to make it the correct size
+    let tailStart = elements + subrange.upperBound
     let tailCount = oldCount - subrange.upperBound
+    holeEnd.moveInitialize(from: tailStart, count: tailCount)
 
-    if growth > 0 {
-      // Slide the tail part of the buffer forwards, in reverse order
-      // so as not to self-clobber.
-      newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
-
-      // Update the original subrange
-      var i = newValues.startIndex
-      for j in subrange {
-        elements[j] = newValues[i]
-        newValues.formIndex(after: &i)
-      }
-      // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(to: newValues[i])
-        newValues.formIndex(after: &i)
-      }
-      _expectEnd(of: newValues, is: i)
-    }
-    else { // We're not growing the buffer
-      // Assign all the new elements into the start of the subrange
-      var i = subrange.lowerBound
-      var j = newValues.startIndex
-      for _ in 0..<newCount {
-        elements[i] = newValues[j]
-        i += 1
-        newValues.formIndex(after: &j)
-      }
-      _expectEnd(of: newValues, is: j)
-
-      // If the size didn't change, we're done.
-      if growth == 0 {
-        return
-      }
-
-      // Move the tail backward to cover the shrinkage.
-      let shrinkage = -growth
-      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
-
-        // Update the rest of the replaced range with the first
-        // part of the tail.
-        newTailStart.moveUpdate(from: oldTailStart, count: shrinkage)
-
-        // Slide the rest of the tail back
-        oldTailStart.moveInitialize(
-          from: oldTailStart + shrinkage, count: tailCount - shrinkage)
-      }
-      else {                      // Tail fits within erased elements
-        // Update the start of the replaced range with the tail
-        newTailStart.moveUpdate(from: oldTailStart, count: tailCount)
-
-        // Destroy elements remaining after the tail in subrange
-        (newTailStart + tailCount).deinitialize(
-          count: shrinkage - tailCount)
-      }
+    // place the values into the hole we created
+    var place = holeStart
+    for element in newValues {
+      place.initialize(to: element)
+      place += 1
     }
   }
 }
