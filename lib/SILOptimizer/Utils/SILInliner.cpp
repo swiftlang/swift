@@ -1019,6 +1019,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocPackInst:
+  case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
@@ -1047,6 +1048,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocPackInst:
+  case SILInstructionKind::DeallocPackMetadataInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:

@@ -1247,7 +1247,8 @@ namespace {
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this) ||
-      isa<AllocPackInst>(this))
+      isa<AllocPackInst>(this) ||
+      isa<AllocPackMetadataInst>(this))
     return true;
 
   if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
@@ -1278,7 +1279,8 @@ bool SILInstruction::isAllocatingStack() const {
 bool SILInstruction::isDeallocatingStack() const {
   if (isa<DeallocStackInst>(this) ||
       isa<DeallocStackRefInst>(this) ||
-      isa<DeallocPackInst>(this))
+      isa<DeallocPackInst>(this) ||
+      isa<DeallocPackMetadataInst>(this))
     return true;
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
@@ -1290,6 +1292,24 @@ bool SILInstruction::isDeallocatingStack() const {
   return false;
 }
 
+bool SILInstruction::mayRequirePackMetadata() const {
+  switch (getKind()) {
+  case SILInstructionKind::AllocPackInst:
+  case SILInstructionKind::PartialApplyInst:
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::MetatypeInst:
+  case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::OpenPackElementInst:
+  case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::WitnessMethodInst:
+    return true;
+  default:
+    return false;
+  }
+}
 
 /// Create a new copy of this instruction, which retains all of the operands
 /// and other information of this one.  If an insertion point is specified,

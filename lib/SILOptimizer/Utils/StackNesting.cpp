@@ -207,6 +207,9 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
                              SILType::getEmptyTupleType(context),
                              SubstitutionMap(), {bi});
     }
+    case SILInstructionKind::AllocPackMetadataInst:
+      return B.createDeallocPackMetadata(Location,
+                                         cast<AllocPackMetadataInst>(Alloc));
     default:
       llvm_unreachable("unknown stack allocation");
   }
