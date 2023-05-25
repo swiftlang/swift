@@ -219,6 +219,17 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
       return B.createDeallocStackRef(Location, cast<AllocRefInstBase>(Alloc));
     case SILInstructionKind::AllocPackInst:
       return B.createDeallocPack(Location, cast<AllocPackInst>(Alloc));
+    case SILInstructionKind::BuiltinInst: {
+      auto *bi = cast<BuiltinInst>(Alloc);
+      assert(bi->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
+             bi->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc);
+      auto &context = Alloc->getFunction()->getModule().getASTContext();
+      auto identifier =
+          context.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
+      return B.createBuiltin(Location, identifier,
+                             SILType::getEmptyTupleType(context),
+                             SubstitutionMap(), {bi});
+    }
     default:
       llvm_unreachable("unknown stack allocation");
   }
