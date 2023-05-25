@@ -31,6 +31,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -261,6 +262,13 @@ namespace {
       return props;
     }
 
+    RecursiveProperties mergeHasPack(HasPack_t hasPack,
+                                     RecursiveProperties props) {
+      if (hasPack == HasPack)
+        props.setHasPack();
+      return props;
+    }
+
     RecursiveProperties applyLifetimeAnnotation(LifetimeAnnotation annotation,
                                                 RecursiveProperties props) {
       switch (annotation) {
@@ -333,7 +341,8 @@ namespace {
                                                IsAddressOnly, IsNotResilient,
                                                isSensitive,
                                                DoesNotHaveRawPointer,
-                                               IsLexical});
+                                               IsLexical,
+                                               HasPack});
     }
 
     RetTy visitSILPackType(CanSILPackType type,
@@ -343,7 +352,8 @@ namespace {
                                                IsAddressOnly, IsNotResilient,
                                                isSensitive,
                                                DoesNotHaveRawPointer,
-                                               IsLexical});
+                                               IsLexical,
+                                               HasPack});
     }
 
     RetTy visitPackExpansionType(CanPackExpansionType type,
@@ -355,6 +365,7 @@ namespace {
                                       type.getPatternType(),
                                       TC, Expansion));
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      props.setHasPack();
       return asImpl().handleAddressOnly(type, props);
     }
 
@@ -2252,6 +2263,7 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      properties.setHasPack();
       for (auto i : indices(packType.getElementTypes())) {
         auto &eltLowering =
           TC.getTypeLowering(packType->getSILElementType(i),
@@ -2268,6 +2280,7 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      properties.setHasPack();
       auto &patternLowering =
         TC.getTypeLowering(origType.getPackExpansionPatternType(),
                            packExpansionType.getPatternType(),
@@ -2362,7 +2375,19 @@ namespace {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
       }
-      
+
+      // [is_or_contains_pack_unsubstituted] Visit the fields of the
+      // unsubstituted type to find pack types which would be substituted away.
+      for (auto field : D->getStoredProperties()) {
+        auto fieldInterfaceTy = field->getInterfaceType()->getCanonicalType();
+        auto origFieldType = AbstractionPattern(
+            D->getGenericSignature().getCanonicalSignature(), fieldInterfaceTy);
+        auto fieldProperties =
+            classifyType(origFieldType, fieldInterfaceTy, TC, Expansion);
+        properties =
+            mergeHasPack(fieldProperties.isOrContainsPack(), properties);
+      }
+
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
         properties.setAddressOnly();
@@ -2441,6 +2466,19 @@ namespace {
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
+
+      // [is_or_contains_pack_unsubstituted] Visit the elements of the
+      // unsubstituted type to find pack types which would be substituted away.
+      for (auto elt : D->getAllElements()) {
+        if (!elt->hasAssociatedValues())
+          continue;
+        auto eltInterfaceTy = elt->getInterfaceType()->getCanonicalType();
+        auto origEltType = AbstractionPattern(
+            D->getGenericSignature().getCanonicalSignature(), eltInterfaceTy);
+        auto eltProperties =
+            classifyType(origEltType, eltInterfaceTy, TC, Expansion);
+        properties = mergeHasPack(eltProperties.isOrContainsPack(), properties);
+      }
 
       // If the whole enum is indirect, we lower it as if all payload
       // cases were indirect. This means a fixed-layout indirect enum
@@ -4646,6 +4684,7 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << "isOrContainsRawPointer: " << BOOL(Properties.isOrContainsRawPointer())
      << ".\n"
      << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
+     << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
      << "\n";
 }
 

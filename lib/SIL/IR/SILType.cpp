@@ -128,6 +128,11 @@ bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
   return result;
 }
 
+bool SILType::isOrContainsPack(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  return F.getTypeLowering(contextType).isOrContainsPack();
+}
+
 bool SILType::isEmpty(const SILFunction &F) const {
   // Infinite types are never empty.
   if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {

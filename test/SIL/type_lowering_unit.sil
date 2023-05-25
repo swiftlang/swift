@@ -16,3 +16,81 @@ bb0(%0 : @owned $S):
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin {{.*}} print-type-lowering with: @argument[0]
+// CHECK:       isOrContainsPack: true
+// CHECK-LABEL: end {{.*}} print-type-lowering with: @argument[0]
+sil @pack_argument : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
+bb0(%0 : $*Pack{repeat each T}):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+public struct VG<each T> {
+  var value: (repeat each T)
+}
+
+public struct VGS<T> {
+  let g: VG<T>
+}
+
+public enum VGE<T> {
+  case one(VG<T>)
+  case two(VG<T, T>, VG<T>)
+  case three(VG<T, T, T>)
+}
+
+// CHECK-LABEL: begin {{.*}} pack_field: print-type-lowering with: %instance
+// CHECK:       isOrContainsPack: true
+// CHECK-LABEL: end {{.*}} pack_field: print-type-lowering with: %instance
+sil @pack_field : $@convention(thin) <T> (@in_guaranteed VGS<T>) -> () {
+entry(%instance : $*VGS<T>):
+  specify_test "print-type-lowering %instance"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin {{.*}} pack_element: print-type-lowering with: %instance
+// CHECK:       isOrContainsPack: true
+// CHECK-LABEL: end {{.*}} pack_element: print-type-lowering with: %instance
+sil @pack_element : $@convention(thin) <T> (@in_guaranteed VGE<T>) -> () {
+entry(%instance : $*VGE<T>):
+  specify_test "print-type-lowering %instance"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+public struct G<T> {
+  var value: (T, T)
+}
+
+public struct GS<T> {
+  let g: G<T>
+}
+
+public enum GE<T> {
+  case one(G<T>)
+  case two(G<T>, G<T>)
+  case three(G<T>)
+}
+
+// CHECK-LABEL: begin {{.*}} nonpack_field: print-type-lowering with: %instance
+// CHECK:       isOrContainsPack: false
+// CHECK-LABEL: end {{.*}} nonpack_field: print-type-lowering with: %instance
+sil @nonpack_field : $@convention(thin) <T> (@in_guaranteed GS<T>) -> () {
+entry(%instance : $*GS<T>):
+  specify_test "print-type-lowering %instance"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin {{.*}} nonpack_element: print-type-lowering with: %instance
+// CHECK:       isOrContainsPack: false
+// CHECK-LABEL: end {{.*}} nonpack_element: print-type-lowering with: %instance
+sil @nonpack_element : $@convention(thin) <T> (@in_guaranteed GE<T>) -> () {
+entry(%instance : $*GE<T>):
+  specify_test "print-type-lowering %instance"
+  %retval = tuple ()
+  return %retval : $()
+}
