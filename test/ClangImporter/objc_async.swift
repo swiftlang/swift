@@ -408,3 +408,22 @@ extension CoffeeDelegate  {
         return await self.icedMochaServiceGenerateMocha!(NSObject())
     }
 }
+
+// rdar://99758612 -- sendable requirement on ObjC protocols
+
+class NonSendableClassConformingToSendableProtocol: NSObject, SendableProtocol {
+  // expected-error@-1 {{type 'NonSendableClassConformingToSendableProtocol' does not conform to protocol 'Sendable'}}
+}
+
+class SendableClassConformingToSendableProtocol: NSObject, SendableProtocol, @unchecked Sendable {
+  // no-error
+}
+
+class NonSendableClassConformingToSendableProtocolRefined: NSObject, SendableProtocolRefined {
+  // expected-error@-1 {{type 'NonSendableClassConformingToSendableProtocolRefined' does not conform to protocol 'Sendable'}}
+}
+
+class SendableClassConformingToSendableProtocolRefined: NSObject, SendableProtocolRefined, @unchecked Sendable {
+  // no-error
+}
+

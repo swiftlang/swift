@@ -43,6 +43,9 @@ import _Concurrency
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension AuditedBoth : @unchecked Sendable {
 
+// CHECK-LABEL: public protocol SendableProtocol
+// CHECK-SAME: : Sendable
+
 // CHECK-LABEL: enum SendableEnum :
 // CHECK-SAME: @unchecked Sendable
 

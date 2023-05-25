@@ -225,6 +225,9 @@ SENDABLE @interface AuditedSendable : NSObject @end
 @interface AuditedNonSendable : NSObject @end
 NONSENDABLE SENDABLE @interface AuditedBoth : NSObject @end
 
+SENDABLE @protocol SendableProtocol @end
+@protocol SendableProtocolRefined <SendableProtocol> @end
+
 typedef NS_ENUM(unsigned, SendableEnum) {
   SendableEnumFoo, SendableEnumBar
 };
