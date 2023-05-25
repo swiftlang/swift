@@ -76,6 +76,11 @@ OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
   return IGM.getOptions().OptMode;
 }
 
+bool IRGenFunction::canStackPromotePackMetadata() const {
+  return IGM.getSILModule().getOptions().EnablePackMetadataStackPromotion &&
+         !packMetadataStackPromotionDisabled;
+}
+
 ModuleDecl *IRGenFunction::getSwiftModule() const {
   return IGM.getSwiftModule();
 }
