@@ -5486,6 +5486,8 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// The result is always a GlobalValue.
 Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
                                           ForDefinition_t forDefinition) {
+  assert(!Lowering::shouldSkipLowering(var));
+
   LinkEntity entity = LinkEntity::forFieldOffset(var);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  forDefinition);
@@ -5493,6 +5495,8 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
                                        ForDefinition_t forDefinition) {
+  assert(!Lowering::shouldSkipLowering(Case));
+
   LinkEntity entity = LinkEntity::forEnumCase(Case);
   auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, forDefinition);
 
