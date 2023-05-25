@@ -780,8 +780,8 @@ NOTE(sil_movechecking_partial_consume_here, none,
      "partially consumed here", ())
 NOTE(sil_movechecking_consuming_use_here, none,
      "consumed here", ())
-NOTE(sil_movechecking_other_consuming_use_here, none,
-     "other consume here", ())
+NOTE(sil_movechecking_consumed_again_here, none,
+     "consumed again here", ())
 NOTE(sil_movechecking_two_consuming_uses_here, none,
      "multiple consumes here", ())
 NOTE(sil_movechecking_consuming_and_non_consuming_uses_here, none,
@@ -799,8 +799,7 @@ NOTE(sil_movechecking_deinit_here, none,
 ERROR(sil_movechecking_not_understand_consumable_and_assignable, none,
       "usage of no-implicit-copy value that the compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_not_understand_moveonly, none,
-      "usage of a noncopyable type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug"
-      "check!", ())
+      "usage of a noncopyable type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_missed_copy, none,
       "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_exclusivity_violation, none,

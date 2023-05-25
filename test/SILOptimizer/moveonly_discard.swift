@@ -22,7 +22,7 @@ struct GoodFileDescriptor {
   deinit { // expected-error {{'self' consumed more than once}}
     // FIXME: this is suppose to be valid. rdar://106044273
     close() // expected-note {{consumed here}}
-  } // expected-note {{other consume here}}
+  } // expected-note {{consumed again here}}
 }
 
 @_moveOnly
@@ -34,7 +34,7 @@ struct BadFileDescriptor {
   var rawFileDescriptor: Int {
     __consuming get { // expected-error {{'self' consumed more than once}}
       discard self    // expected-note {{consumed here}}
-      return self.rawFileDescriptor  // expected-note {{consumed here}}
+      return self.rawFileDescriptor  // expected-note {{consumed again here}}
                                      // expected-warning@-1 {{function call causes an infinite recursion}}
     }
   }
@@ -43,7 +43,7 @@ struct BadFileDescriptor {
     if b {
       discard self // expected-note {{consumed here}}
     }
-    return rawFileDescriptor // expected-note {{consumed here}}
+    return rawFileDescriptor // expected-note {{consumed again here}}
   }
 
   __consuming func closeRepeatedly(_ n: Int) -> Int { // expected-error {{'self' used after consume}}
@@ -75,7 +75,7 @@ final class Wallet {
       self = .within(existingWallet)
     }
     discard(forever: true) // expected-note {{consumed here}}
-  } // expected-note {{consumed here}}
+  } // expected-note {{consumed again here}}
 
   __consuming func discard(forever: Bool) { // expected-error {{'self' consumed in a loop}}
     while forever {
@@ -86,7 +86,7 @@ final class Wallet {
   __consuming func inspect() { // expected-error {{'self' consumed more than once}}
     switch self { // expected-note {{consumed here}}
     case .green, .yellow, .red:
-      discard self // expected-note {{consumed here}}
+      discard self // expected-note {{consumed again here}}
     default:
       return
     }

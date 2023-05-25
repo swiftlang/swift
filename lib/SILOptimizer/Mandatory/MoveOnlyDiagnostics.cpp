@@ -285,7 +285,7 @@ void DiagnosticEmitter::emitObjectOwnedDiagnostic(
         diagnose(astContext, user,
                  diag::sil_movechecking_consuming_use_here);
         diagnose(astContext, &*ii,
-                 diag::sil_movechecking_other_consuming_use_here);
+                 diag::sil_movechecking_consumed_again_here);
         break;
       }
 
@@ -333,7 +333,7 @@ void DiagnosticEmitter::emitObjectOwnedDiagnostic(
           diagnose(astContext, user,
                    diag::sil_movechecking_consuming_use_here);
           diagnose(astContext, iter->second,
-                   diag::sil_movechecking_other_consuming_use_here);
+                   diag::sil_movechecking_consumed_again_here);
           break;
         }
       }
@@ -476,7 +476,7 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
     diagnose(astContext, violatingUser,
              diag::sil_movechecking_consuming_use_here);
     diagnose(astContext, lastLiveUser,
-             diag::sil_movechecking_consuming_use_here);
+             diag::sil_movechecking_consumed_again_here);
     return;
   }
 
