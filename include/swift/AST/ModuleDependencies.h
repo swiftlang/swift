@@ -543,7 +543,18 @@ public:
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleImport(ImportPath::Module module,
                        llvm::StringSet<> *alreadyAddedModules = nullptr) {
-    addModuleImport(module.front().Item.str(), alreadyAddedModules);
+    std::string ImportedModuleName = module.front().Item.str().str();
+    auto submodulePath = module.getSubmodulePath();
+    if (submodulePath.size() > 0 && !submodulePath[0].Item.empty()) {
+      assert(submodulePath.size() == 1 && "Unsupported Clang submodule import");
+      auto submoduleComponent = submodulePath[0];
+      // Special case: a submodule named "Foo.Private" can be moved to a top-level
+      // module named "Foo_Private". ClangImporter has special support for this.
+      if (submoduleComponent.Item.str() == "Private")
+        ImportedModuleName = ImportedModuleName + "_Private";
+    }
+
+    addModuleImport(ImportedModuleName, alreadyAddedModules);
   }
 
   /// Add all of the module imports in the given source
