@@ -134,7 +134,7 @@ func testLocalLetClosureCaptureVar() {
         borrowVal(x)
         consumeVal(x) // expected-note {{consumed here}}
         consumeVal(x) // expected-note {{consumed here}}
-        // expected-note @-1 {{consumed here}}
+        // expected-note @-1 {{consumed again here}}
         borrowConsumeVal(x, x)
         // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
@@ -937,7 +937,7 @@ func testLocalLetClosureCaptureConsuming(_ x: consuming SingleElt) {
         borrowVal(x)
         consumeVal(x) // expected-note {{consumed here}}
         consumeVal(x) // expected-note {{consumed here}}
-        // expected-note @-1 {{consumed here}}
+        // expected-note @-1 {{consumed again here}}
         borrowConsumeVal(x, x) // expected-note {{used here}}
         // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}

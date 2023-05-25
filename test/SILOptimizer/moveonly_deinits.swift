@@ -18,17 +18,17 @@ struct MoveOnlyStruct {
         var y = MoveOnlyStruct() // expected-error {{'y' consumed more than once}}
         y = self
         // expected-note @-1 {{consumed here}}
-        // expected-note @-2 {{other consume here}}
+        // expected-note @-2 {{consumed again here}}
         // We get an infinite recursion since we are going to call our own
         // deinit here. We are just testing diagnostics here though.
         // expected-warning @-6 {{function call causes an infinite recursion}}
         _ = y
         // expected-note @-1 {{consumed here}}
-        let z = y // expected-note {{consumed here}}
+        let z = y // expected-note {{consumed again here}}
         let _ = z
         globalMoveOnlyStruct = self // expected-note {{consumed here}}
-        // expected-note @-1 {{other consume here}}
-    } // expected-note {{other consume here}}
+        // expected-note @-1 {{consumed again here}}
+    } // expected-note {{consumed again here}}
 }
 
 @_moveOnly
@@ -44,12 +44,12 @@ enum MoveOnlyEnum {
         _ = x
         var y = MoveOnlyEnum.lhs(Klass())
         y = self // expected-note {{consumed here}}
-        // expected-note @-1 {{other consume here}}
+        // expected-note @-1 {{consumed again here}}
         // We get an infinite recursion since we are going to call our own
         // deinit here. We are just testing diagnostics here though.
         // expected-warning @-5 {{function call causes an infinite recursion}}
         _ = y 
         globalMoveOnlyEnum = self // expected-note {{consumed here}}
-        // expected-note @-1 {{other consume here}}
-    } // expected-note {{other consume here}}
+        // expected-note @-1 {{consumed again here}}
+    } // expected-note {{consumed again here}}
 }
