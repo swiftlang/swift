@@ -1444,6 +1444,16 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     auto allFieldsInitialized =
         getAnyUninitializedMemberAtInst(Use.Inst, 0, TheMemory.getNumElements()) == -1;
     Use.Kind = allFieldsInitialized ? DIUseKind::Set : DIUseKind::Assign;
+  } else if (isFullyInitialized && isa<AssignOrInitInst>(Use.Inst)) {
+    auto allFieldsInitialized =
+        getAnyUninitializedMemberAtInst(Use.Inst, 0,
+                                        TheMemory.getNumElements()) == -1;
+    if (allFieldsInitialized) {
+      Use.Kind = DIUseKind::Set;
+    } else {
+      diagnose(Module, Use.Inst->getLoc(), diag::use_of_self_before_fully_init);
+      return;
+    }
   } else if (isFullyInitialized) {
     Use.Kind = DIUseKind::Assign;
   } else {
@@ -1470,7 +1480,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       HasConditionalInitAssign = true;
     return;
   }
-  
+
   // Otherwise, we have a definite init or assign.  Make sure the instruction
   // itself is tagged properly.
   NeedsUpdateForInitState.push_back(UseID);

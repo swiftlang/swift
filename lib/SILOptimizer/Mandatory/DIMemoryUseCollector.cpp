@@ -91,12 +91,6 @@ static unsigned getElementCountRec(TypeExpansionContext context,
       for (auto *VD : NTD->getStoredProperties())
         NumElements += getElementCountRec(
             context, Module, T.getFieldType(VD, Module, context), false);
-
-      for (auto *var : NTD->getInitAccessorProperties()) {
-        (void)var;
-        NumElements++;
-      }
-
       return NumElements;
     }
   }
@@ -671,7 +665,7 @@ private:
 };
 } // end anonymous namespace
 
-/// addElementUses - An operation (e.g. load, store, inout use, etc) on a value
+/// addElementUses - An operation (e.g. load, store, inout usec etc) on a value
 /// acts on all of the aggregate elements in that value.  For example, a load
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
@@ -1197,8 +1191,37 @@ ElementUseCollector::collectAssignOrInitUses(PartialApplyInst *pai,
       continue;
     }
 
-    trackUse(DIMemoryUse(User, DIUseKind::InitOrAssign, BaseEltNo,
-                         TheMemory.getNumElements()));
+    auto instLoc = User->getLoc();
+    auto *assignment = instLoc.getAsASTNode<AssignExpr>();
+    assert(assignment);
+
+    auto propertyRef = cast<MemberRefExpr>(assignment->getDest())->getDecl();
+
+    auto initAccessor =
+        cast<VarDecl>(propertyRef.getDecl())->getAccessor(AccessorKind::Init);
+
+    auto selfTy = pai->getOperand(1)->getType();
+    auto *typeDC =
+        propertyRef.getDecl()->getDeclContext()->getSelfNominalTypeDecl();
+
+    auto addUse = [&](VarDecl *property, DIUseKind useKind) {
+      auto expansionContext = TypeExpansionContext(*pai->getFunction());
+      auto type = selfTy.getFieldType(property, Module, expansionContext);
+      addElementUses(Module.getFieldIndex(typeDC, property), type, User,
+                     useKind);
+    };
+
+    if (auto *initializes =
+            initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
+      for (auto *property : initializes->getPropertyDecls(initAccessor))
+        addUse(property, DIUseKind::InitOrAssign);
+    }
+
+    if (auto *initializes =
+            initAccessor->getAttrs().getAttribute<AccessesAttr>()) {
+      for (auto *property : initializes->getPropertyDecls(initAccessor))
+        addUse(property, DIUseKind::Load);
+    }
   }
 }
 
