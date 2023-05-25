@@ -40,6 +40,7 @@
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -185,7 +186,7 @@ SourceLoc ModuleFile::getSourceLoc() const {
   auto filename = getModuleFilename();
   auto bufferID = SourceMgr.getIDForBufferIdentifier(filename);
   if (!bufferID)
-    bufferID = SourceMgr.addMemBufferCopy(StringRef(), filename);
+    bufferID = SourceMgr.addMemBufferCopy("<binary format>", filename);
   return SourceMgr.getLocForBufferStart(*bufferID);
 }
 
@@ -238,6 +239,103 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // We could pass along the `path` information through notes.
   // However, for a top-level decl a path would just duplicate the
   // expected module name and the decl name from the diagnostic.
+
+  // Show context with relevant file paths.
+  ctx.Diags.diagnose(SourceLoc(),
+                     diag::modularization_issue_note_expected,
+                     declIsType, expectedModule,
+                     expectedModule->getModuleSourceFilename());
+
+  const clang::Module *expectedUnderlying =
+                                   expectedModule->findUnderlyingClangModule();
+  if (!expectedModule->isNonSwiftModule() &&
+      expectedUnderlying) {
+    auto CML = ctx.getClangModuleLoader();
+    auto &CSM = CML->getClangASTContext().getSourceManager();
+    StringRef filename = CSM.getFilename(expectedUnderlying->DefinitionLoc);
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::modularization_issue_note_expected_underlying,
+                       expectedUnderlying->Name,
+                       filename);
+  }
+
+  if (foundModule)
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::modularization_issue_note_found,
+                       declIsType, foundModule,
+                       foundModule->getModuleSourceFilename());
+
+  // A Swift language version mismatch could lead to a different set of rules
+  // from APINotes files being applied when building the module vs when reading
+  // from it.
+  version::Version
+    moduleLangVersion = referenceModule->getCompatibilityVersion(),
+    clientLangVersion = MF->getContext().LangOpts.EffectiveLanguageVersion;
+  ModuleDecl *referenceModuleDecl = referenceModule->getAssociatedModule();
+  if (clientLangVersion != moduleLangVersion) {
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::modularization_issue_swift_version,
+                       referenceModuleDecl, moduleLangVersion,
+                       clientLangVersion);
+  }
+
+  // If the error is in a resilient swiftmodule adjacent to a swiftinterface,
+  // deleting the module to rebuild from the swiftinterface may fix the issue.
+  // Limit this suggestion to distributed Swift modules to not hint at
+  // deleting local caches and such.
+  bool referenceModuleIsDistributed = referenceModuleDecl &&
+                                      referenceModuleDecl->isNonUserModule();
+  if (referenceModule->getResilienceStrategy() ==
+                                               ResilienceStrategy::Resilient &&
+      referenceModuleIsDistributed) {
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::modularization_issue_stale_module,
+                       referenceModuleDecl,
+                       referenceModule->getModuleFilename());
+  }
+
+  // If the missing decl was expected to be in a clang module,
+  // it may be hidden by some clang defined passed via `-Xcc` affecting how
+  // headers are seen.
+  if (expectedUnderlying) {
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::modularization_issue_audit_headers,
+                       expectedModule->isNonSwiftModule(), expectedModule);
+  }
+
+  // If the reference goes from a distributed module to a local module,
+  // the compiler may have picked up an undesired module. We usually expect
+  // distributed modules to only reference other distributed modules.
+  // Local modules can reference both local modules and distributed modules.
+  if (referenceModuleIsDistributed) {
+    if (!expectedModule->isNonUserModule()) {
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::modularization_issue_layering_expected_local,
+                         referenceModuleDecl, expectedModule);
+    } else if (foundModule && !foundModule->isNonUserModule()) {
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::modularization_issue_layering_found_local,
+                         referenceModuleDecl, foundModule);
+    }
+  }
+
+  // If a type moved between MyModule and MyModule_Private, it can be caused
+  // by the use of `-Xcc -D` to change the API of the modules, leading to
+  // decls moving between both modules.
+  if (errorKind == Kind::DeclMoved ||
+      errorKind == Kind::DeclKindChanged) {
+    StringRef foundModuleName = foundModule->getName().str();
+    StringRef expectedModuleName = expectedModule->getName().str();
+    if (foundModuleName != expectedModuleName &&
+        (foundModuleName.startswith(expectedModuleName) ||
+         expectedModuleName.startswith(foundModuleName)) &&
+        (expectedUnderlying ||
+         expectedModule->findUnderlyingClangModule())) {
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::modularization_issue_related_modules,
+                         declIsType, name);
+    }
+  }
 }
 
 void TypeError::diagnose(const ModuleFile *MF) const {
@@ -2064,7 +2162,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         [&](const ModularizationError &modularError) {
           modularError.diagnose(this, DiagnosticBehavior::Warning);
         });
-      getContext().Diags.diagnose(getSourceLoc(),
+      getContext().Diags.diagnose(SourceLoc(),
                                   diag::modularization_issue_worked_around);
     } else {
       return std::move(error);

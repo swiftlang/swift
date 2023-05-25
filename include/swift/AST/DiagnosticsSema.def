@@ -873,18 +873,54 @@ ERROR(need_hermetic_seal_to_import_module,none,
       (Identifier))
 
 ERROR(modularization_issue_decl_moved,Fatal,
-      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "%1 was expected to be in %2, but now a candidate is found only in %3",
       (bool, DeclName, const ModuleDecl*, const ModuleDecl*))
 ERROR(modularization_issue_decl_type_changed,Fatal,
-      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and is now a candidate is found only in %4}5",
       (bool, DeclName, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
-      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "%1 is not found, it was expected to be in %2",
       (bool, DeclName, const ModuleDecl*))
+
+NOTE(modularization_issue_note_expected,none,
+     "the %select{declaration|type}0 was expected to be found in module %1 at '%2'",
+     (bool, const ModuleDecl*, StringRef))
+NOTE(modularization_issue_note_expected_underlying,none,
+     "or expected to be found in the underlying module '%0' defined at '%1'",
+     (StringRef, StringRef))
+NOTE(modularization_issue_note_found,none,
+     "the %select{declaration|type}0 was actually found in module %1 at '%2'",
+     (bool, const ModuleDecl*, StringRef))
+
+NOTE(modularization_issue_stale_module,none,
+     "the module %0 has enabled library-evolution; "
+     "the following file may need to be deleted if the SDK was modified: '%1'",
+     (const ModuleDecl *, StringRef))
+NOTE(modularization_issue_swift_version,none,
+     "the module %0 was built with a Swift language version set to %1 "
+     "while the current invocation uses %2; "
+     "APINotes may change how clang declarations are imported",
+     (const ModuleDecl *, llvm::VersionTuple, llvm::VersionTuple))
+NOTE(modularization_issue_audit_headers,none,
+     "declarations in the %select{underlying|}0 clang module %1 "
+     "may be hidden by clang project settings",
+     (bool, const ModuleDecl*))
+NOTE(modularization_issue_layering_expected_local,none,
+     "the distributed module %0 refers to the local module %1; "
+     "this may be caused by clang project settings",
+     (const ModuleDecl*, const ModuleDecl*))
+NOTE(modularization_issue_layering_found_local,none,
+     "the reference may break layering; the candidate was found in "
+     "the local module %1 for a reference from the distributed module %0",
+     (const ModuleDecl*, const ModuleDecl*))
+NOTE(modularization_issue_related_modules,none,
+     "the %select{declaration|type}0 %1 moved between related modules; "
+     "clang project settings may affect headers shared between these modules",
+     (bool, DeclName))
 
 NOTE(modularization_issue_side_effect_extension_error,none,
      "could not deserialize extension",
