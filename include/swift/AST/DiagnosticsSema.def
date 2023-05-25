@@ -5099,6 +5099,9 @@ ERROR(distributed_actor_func_nonisolated, none,
 ERROR(distributed_actor_func_inout, none,
       "cannot declare 'inout' argument %0 in %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_func_unsupported_specifier, none,
+      "cannot declare '%0' argument %1 in %2 %3",
+      (StringRef, DeclName, DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_func_closure, none,
       "%0 %1 cannot declare closure arguments, as they cannot be serialized",
       (DescriptiveDeclKind, DeclName))
