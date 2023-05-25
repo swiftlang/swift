@@ -3,7 +3,7 @@
 // RUN:      -Xllvm -sil-print-debuginfo %s -g -O -o - -emit-sil \
 // RUN:    | %FileCheck %s --check-prefix=SIL
 // IR.
-// RUN: %target-swift-frontend %use_no_opaque_pointers -parse-as-library -module-name A \
+// RUN: %target-swift-frontend -parse-as-library -module-name A \
 // RUN:      %s -g -O -o - -emit-ir \
 // RUN:      | %FileCheck %s --check-prefix=IR
 
@@ -49,10 +49,10 @@ public class C<R> {
     // SIL: debug_value %0 : $*S, let, name "s", argno 1, expr op_deref, {{.*}} scope [[F]]
     // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
     // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
-    // IR: dbg.value(metadata %swift.type* %S, metadata ![[MD_1_0:[0-9]+]]
-    // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[S:[0-9]+]]
-    // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[GS_T:[0-9]+]]
-    // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[GS_U:[0-9]+]]
+    // IR: dbg.value(metadata ptr %S, metadata ![[MD_1_0:[0-9]+]]
+    // IR: dbg.value(metadata ptr %0, metadata ![[S:[0-9]+]]
+    // IR: dbg.value(metadata ptr %0, metadata ![[GS_T:[0-9]+]]
+    // IR: dbg.value(metadata ptr %0, metadata ![[GS_U:[0-9]+]]
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 2)
     g(s)

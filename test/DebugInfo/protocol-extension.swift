@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o -
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 public protocol P {
   var v : Int32 { get };
@@ -9,8 +8,8 @@ public extension P {
   // CHECK: define {{.*}}swiftcc i32 @"$s4main1PPAAE1fs5Int32VyF"
   public func f() -> Int32 {
     // CHECK-NEXT: entry:
-    // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %swift.type*,
-    // CHECK-NEXT: @llvm.dbg.declare(metadata %swift.type** %[[ALLOCA]],
+    // CHECK-NEXT: %[[ALLOCA:.*]] = alloca ptr,
+    // CHECK-NEXT: @llvm.dbg.declare(metadata ptr %[[ALLOCA]],
     // CHECK-SAME:    metadata ![[SELFMETA:.*]], metadata !DIExpression())
     return v
   }

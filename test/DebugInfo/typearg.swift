@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -g -o -
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 protocol AProtocol {
   func f() -> String
@@ -9,7 +8,7 @@ class AClass : AProtocol {
 }
 
 // CHECK: define hidden {{.*}}void @{{.*}}aFunction
-// CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !DIExpression()),
+// CHECK:  call void @llvm.dbg.declare(metadata ptr %{{.*}}, metadata ![[TYPEARG:.*]], metadata !DIExpression()),
 // CHECK: ![[TYPEARG]] = !DILocalVariable(name: "$\CF\84_0_0"
 // CHECK-SAME:                            type: ![[SWIFTMETATYPE:[^,)]+]]
 // CHECK-SAME:                            flags: DIFlagArtificial
