@@ -67,6 +67,8 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+
+  // All dynamically allocated metadata should have been cleaned up.
 }
 
 OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {

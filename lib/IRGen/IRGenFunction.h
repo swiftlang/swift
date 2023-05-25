@@ -18,16 +18,17 @@
 #ifndef SWIFT_IRGEN_IRGENFUNCTION_H
 #define SWIFT_IRGEN_IRGENFUNCTION_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Type.h"
+#include "DominancePoint.h"
+#include "GenPack.h"
+#include "IRBuilder.h"
+#include "LocalTypeDataKind.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/Type.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
-#include "IRBuilder.h"
-#include "LocalTypeDataKind.h"
-#include "DominancePoint.h"
 
 namespace llvm {
   class AllocaInst;
@@ -206,6 +207,9 @@ protected:
   // particular.
   bool packMetadataStackPromotionDisabled = false;
 
+  /// The on-stack pack metadata allocations emitted so far awaiting cleanup.
+  llvm::SmallSetVector<StackPackAlloc, 2> OutstandingStackPackAllocs;
+
 private:
   Address asyncContextLocation;
 
@@ -380,6 +384,12 @@ public:
     llvm::Value *wtable);
 
   llvm::Value *emitPackShapeExpression(CanType type);
+
+  void recordStackPackMetadataAlloc(StackAddress addr, llvm::Value *shape);
+  void eraseStackPackMetadataAlloc(StackAddress addr, llvm::Value *shape);
+
+  void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
+  void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
