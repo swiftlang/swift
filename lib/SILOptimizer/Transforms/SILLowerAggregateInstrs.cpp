@@ -43,12 +43,21 @@ static llvm::cl::opt<bool> EnableExpandAll("sil-lower-agg-instrs-expand-all",
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+/// Expansion of struct-with-deinit is illegal because it drops the deinit. For
+/// now, simply avoid all move-only AST types.
+static bool canExpandType(SILType type) {
+  return !type.isPureMoveOnly();
+}
+
 /// We only expand if we are not in ownership and shouldExpand is true. The
 /// reason why is that this was originally done to help the low level ARC
 /// optimizer. To the high level ARC optimizer, this is just noise and
 /// unnecessary IR. At the same time for testing purposes, we want to provide a
 /// way even with ownership enabled to expand so we can check correctness.
 static bool shouldExpandShim(SILFunction *fn, SILType type) {
+  if (!canExpandType(type))
+    return false;
+
   return EnableExpandAll ||
          (!fn->hasOwnership() && shouldExpand(fn->getModule(), type));
 }
