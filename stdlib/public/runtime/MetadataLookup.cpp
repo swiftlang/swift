@@ -770,6 +770,8 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 
 #include "swift/Demangling/StandardTypesMangling.def"
 
+static const ConcurrencyStandardTypeDescriptors *concurrencyDescriptors;
+
 static const ContextDescriptor *
 _findContextDescriptor(Demangle::NodePointer node,
                        Demangle::Demangler &Dem) {
@@ -797,7 +799,10 @@ _findContextDescriptor(Demangle::NodePointer node,
     }
   // FIXME: When the _Concurrency library gets merged into the Standard Library,
   // we will be able to reference those symbols directly as well.
-#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
+  if (concurrencyDescriptors && name.equals(#TYPENAME)) {                      \
+    return concurrencyDescriptors->TYPENAME;                                   \
+  }
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -849,6 +854,11 @@ _findContextDescriptor(Demangle::NodePointer node,
     });
 
   return foundContext;
+}
+
+void swift::_swift_registerConcurrencyStandardTypeDescriptors(
+    const ConcurrencyStandardTypeDescriptors *descriptors) {
+  concurrencyDescriptors = descriptors;
 }
 
 #pragma mark Protocol descriptor cache
