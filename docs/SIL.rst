@@ -3797,7 +3797,7 @@ address of the allocated memory.
 
 ``alloc_pack`` is a stack allocation instruction.  See the section above
 on stack discipline.  The corresponding stack deallocation instruction is
-``dealloc_stack``.
+``dealloc_pack``.
 
 alloc_ref
 `````````
