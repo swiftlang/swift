@@ -201,10 +201,12 @@ private:
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
+protected:
   // Whether pack metadata stack promotion is disabled for this function in
   // particular.
   bool packMetadataStackPromotionDisabled = false;
 
+private:
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
