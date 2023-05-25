@@ -4770,6 +4770,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createAllocPack(InstLoc, Ty);
     break;
   }
+  case SILInstructionKind::AllocPackMetadataInst: {
+    SILType Ty;
+    if (parseSILType(Ty))
+      return true;
+
+    ResultVal = B.createAllocPackMetadata(InstLoc, Ty);
+    break;
+  }
   case SILInstructionKind::AllocStackInst: {
     bool hasDynamicLifetime = false;
     bool isLexical = false;
@@ -4897,6 +4905,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDeallocPack(InstLoc, Val);
+    break;
+  case SILInstructionKind::DeallocPackMetadataInst:
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDeallocPackMetadata(InstLoc, Val);
     break;
   case SILInstructionKind::DeallocRefInst: {
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))

@@ -1175,6 +1175,7 @@ public:
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocPackInst(AllocPackInst *i);
+  void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
@@ -1364,6 +1365,7 @@ public:
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
   void visitDeallocPackInst(DeallocPackInst *i);
+  void visitDeallocPackMetadataInst(DeallocPackMetadataInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
@@ -5584,6 +5586,8 @@ void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   setLoweredStackAddress(i, addr);
 }
 
+void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {}
+
 static void
 buildTailArrays(IRGenSILFunction &IGF,
                 SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
@@ -5687,6 +5691,10 @@ void IRGenSILFunction::visitDeallocPackInst(swift::DeallocPackInst *i) {
   auto allocatedType = cast<SILPackType>(i->getOperand()->getType().getASTType());
   StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
   deallocatePack(*this, stackAddr, allocatedType);
+}
+
+void IRGenSILFunction::visitDeallocPackMetadataInst(
+    DeallocPackMetadataInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
