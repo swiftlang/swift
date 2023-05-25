@@ -13,16 +13,17 @@
 #include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "FixedTypeInfo.h"
-#include "GenOpaque.h"
-#include "IRGen.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
+#include "GenOpaque.h"
 #include "GenericArguments.h"
+#include "IRGen.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "SwitchBuilder.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/None.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -462,6 +463,10 @@ static std::string scalarToString(ScalarKind kind) {
   case ScalarKind::ExistentialReference: return "ExistentialReference";
   case ScalarKind::CustomReference: return "Custom";
   }
+}
+
+std::string swift::irgen::refcountingToString(ReferenceCounting refCounting) {
+  return scalarToString(refcountingToScalarKind(refCounting));
 }
 
 llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
