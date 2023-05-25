@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir
+// RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
 public protocol P {
   associatedtype DT1
   func getDT() -> DT1
@@ -13,7 +12,7 @@ func foo1<T:P>(_ t: T, _ dt: T.DT1) -> T.DT1 {
 
 // CHECK: define {{.*}}@"$s4main4foo2yyxAA1PRzlF"
 public func foo2<S:P>(_ s: S) {
-  // CHECK: call void @llvm.dbg.value(metadata %swift.type* %S,
+  // CHECK: call void @llvm.dbg.value(metadata ptr %S,
   // CHECK-SAME:                     metadata ![[META:[0-9]+]]
   foo1(s, s.getDT())
   // T should get substituted with S

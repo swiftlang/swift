@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers %s -Onone -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o -
+// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | %FileCheck %s
 
 public class C<T>
 {
@@ -7,7 +6,7 @@ public class C<T>
   {
     // Ensure that the type metadata for T is eagerly loaded at -Onone.
     // CHECK: define {{.*}} @"$s17EagerTypeMetadata1CC1cyyxF"
-    // CHECK: %T = load %swift.type*, %swift.type**
+    // CHECK: %T = load ptr, ptr
     // CHECK-SAME: !dbg ![[LOC:[0-9]+]], !invariant.load
     var x = [i]
   }

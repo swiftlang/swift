@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -g -o -
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 public class ClosureMaker {
     var a : Int
 
@@ -17,4 +16,4 @@ public class ClosureMaker {
 }
 
 // CHECK: define {{.*}} @"$s4main12ClosureMakerC03getB0SiycyFSiycfU_"
-// CHECK: call void @llvm.dbg.declare(metadata %swift.weak** %{{.*}} !DIExpression(DW_OP_deref)),
+// CHECK: call void @llvm.dbg.declare(metadata ptr %{{.*}} !DIExpression(DW_OP_deref)),
