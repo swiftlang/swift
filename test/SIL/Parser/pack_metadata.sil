@@ -12,3 +12,10 @@ entry:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [no_onstack_pack_metadata] @annotation : {{.*}} {
+// CHECK-LABEL: } // end sil function 'annotation'
+sil [no_onstack_pack_metadata] @annotation : $() -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
