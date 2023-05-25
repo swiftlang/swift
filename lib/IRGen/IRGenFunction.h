@@ -201,6 +201,10 @@ private:
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
+  // Whether pack metadata stack promotion is disabled for this function in
+  // particular.
+  bool packMetadataStackPromotionDisabled = false;
+
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -228,6 +232,10 @@ public:
   bool optimizeForSize() const {
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
+
+  /// Whether metadata/wtable packs allocated on the stack must be eagerly
+  /// heapified.
+  bool canStackPromotePackMetadata() const;
 
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }

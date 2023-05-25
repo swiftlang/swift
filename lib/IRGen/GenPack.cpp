@@ -512,10 +512,12 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
   metadata = IGF.Builder.CreatePointerCast(
       metadata, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
 
-  metadata = IGF.Builder.CreateCall(
-      IGF.IGM.getAllocateMetadataPackFunctionPointer(), {metadata, shape});
+  if (!IGF.canStackPromotePackMetadata()) {
+    metadata = IGF.Builder.CreateCall(
+        IGF.IGM.getAllocateMetadataPackFunctionPointer(), {metadata, shape});
 
-  cleanupTypeMetadataPack(IGF, pack, shape);
+    cleanupTypeMetadataPack(IGF, pack, shape);
+  }
 
   auto response = MetadataResponse::forComplete(metadata);
   IGF.setScopedLocalTypeMetadata(packType, response);
@@ -674,10 +676,12 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   result = IGF.Builder.CreatePointerCast(
       result, IGF.IGM.WitnessTablePtrTy->getPointerTo());
 
-  result = IGF.Builder.CreateCall(
-      IGF.IGM.getAllocateWitnessTablePackFunctionPointer(), {result, shape});
+  if (!IGF.canStackPromotePackMetadata()) {
+    result = IGF.Builder.CreateCall(
+        IGF.IGM.getAllocateWitnessTablePackFunctionPointer(), {result, shape});
 
-  cleanupWitnessTablePack(IGF, pack, shape);
+    cleanupWitnessTablePack(IGF, pack, shape);
+  }
 
   IGF.setScopedLocalTypeData(packType, localDataKind, result);
 
