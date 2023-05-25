@@ -732,6 +732,16 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
+#if SWIFT_OBJC_INTEROP
+  // Classes in the __C module are ObjC classes. They never have a
+  // nominal type descriptor, so don't bother to search for one.
+  if (node && node->getKind() == Node::Kind::Class)
+    if (auto child = node->getFirstChild())
+      if (child->getKind() == Node::Kind::Module && child->hasText())
+        if (child->getText() == MANGLING_MODULE_OBJC)
+          return nullptr;
+#endif
+
   for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto context = record.getContextDescriptor()) {
