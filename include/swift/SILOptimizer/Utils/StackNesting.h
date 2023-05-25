@@ -153,8 +153,15 @@ private:
   /// Returns the location bit number for a stack deallocation instruction.
   int bitNumberForDealloc(SILInstruction *DeallocInst) {
     assert(DeallocInst->isDeallocatingStack());
-    auto *AllocInst = cast<SingleValueInstruction>(DeallocInst->getOperand(0));
+    auto *AllocInst = getAllocForDealloc(DeallocInst);
     return bitNumberForAlloc(AllocInst);
+  }
+
+  /// Returns the stack allocation instruction for a stack deallocation
+  /// instruction.
+  SingleValueInstruction *getAllocForDealloc(SILInstruction *Dealloc) const {
+    return cast<SingleValueInstruction>(
+        Dealloc->getOperand(0)->getDefiningInstruction());
   }
 
   /// Insert deallocations at block boundaries.
