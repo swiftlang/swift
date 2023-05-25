@@ -83,10 +83,10 @@ private:
   ///
   /// Each stack location is allocated by a single allocation instruction.
   struct StackLoc {
-    StackLoc(SingleValueInstruction *Alloc) : Alloc(Alloc) { }
+    StackLoc(SILInstruction *Alloc) : Alloc(Alloc) {}
 
     /// Back-link to the allocation instruction.
-    SingleValueInstruction *Alloc;
+    SILInstruction *Alloc;
 
     /// Bit-set which represents all alive locations at this allocation.
     /// It obviously includes this location itself. And it includes all "outer"
@@ -95,7 +95,7 @@ private:
   };
 
   /// Mapping from stack allocations (= locations) to bit numbers.
-  llvm::DenseMap<SingleValueInstruction *, unsigned> StackLoc2BitNumbers;
+  llvm::DenseMap<SILInstruction *, unsigned> StackLoc2BitNumbers;
 
   /// The list of stack locations. The index into this array is also the bit
   /// number in the bit-sets.
@@ -142,7 +142,7 @@ private:
   /// Returns the location bit number for a stack allocation instruction.
   int bitNumberForAlloc(SILInstruction *AllocInst) {
     assert(AllocInst->isAllocatingStack());
-    return StackLoc2BitNumbers[cast<SingleValueInstruction>(AllocInst)];
+    return StackLoc2BitNumbers[AllocInst];
   }
 
   /// Returns the location bit number for a stack deallocation instruction.
@@ -154,9 +154,8 @@ private:
 
   /// Returns the stack allocation instruction for a stack deallocation
   /// instruction.
-  SingleValueInstruction *getAllocForDealloc(SILInstruction *Dealloc) const {
-    return cast<SingleValueInstruction>(
-        Dealloc->getOperand(0)->getDefiningInstruction());
+  SILInstruction *getAllocForDealloc(SILInstruction *Dealloc) const {
+    return Dealloc->getOperand(0)->getDefiningInstruction();
   }
 
   /// Insert deallocations at block boundaries.
