@@ -3134,6 +3134,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (forceEnableLexicalLifetimes()) {
     OS << "[lexical_lifetimes] ";
   }
+  if (!useStackForPackMetadata()) {
+    OS << "[no_onstack_pack_metadata] ";
+  }
 
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
