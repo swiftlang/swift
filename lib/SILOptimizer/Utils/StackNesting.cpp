@@ -36,7 +36,7 @@ void StackNesting::setup() {
     BlockInfo &BI = BlockInfos[Block];
     for (SILInstruction &I : *Block) {
       if (I.isAllocatingStack()) {
-        auto Alloc = cast<SingleValueInstruction>(&I);
+        auto Alloc = &I;
         // Register this stack location.
         unsigned CurrentBitNumber = StackLocs.size();
         StackLoc2BitNumbers[Alloc] = CurrentBitNumber;
@@ -201,7 +201,7 @@ bool StackNesting::solve() {
   return isNested;
 }
 
-static SILInstruction *createDealloc(SingleValueInstruction *Alloc,
+static SILInstruction *createDealloc(SILInstruction *Alloc,
                                      SILInstruction *InsertionPoint,
                                      SILLocation Location) {
   SILBuilderWithScope B(InsertionPoint);
@@ -211,13 +211,14 @@ static SILInstruction *createDealloc(SingleValueInstruction *Alloc,
       assert((isa<AllocStackInst>(Alloc) ||
               cast<PartialApplyInst>(Alloc)->isOnStack()) &&
              "wrong instruction");
-      return B.createDeallocStack(Location, Alloc);
+      return B.createDeallocStack(Location,
+                                  cast<SingleValueInstruction>(Alloc));
     case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocRefInst:
       assert(cast<AllocRefInstBase>(Alloc)->canAllocOnStack());
-      return B.createDeallocStackRef(Location, Alloc);
+      return B.createDeallocStackRef(Location, cast<AllocRefInstBase>(Alloc));
     case SILInstructionKind::AllocPackInst:
-      return B.createDeallocPack(Location, Alloc);
+      return B.createDeallocPack(Location, cast<AllocPackInst>(Alloc));
     default:
       llvm_unreachable("unknown stack allocation");
   }
@@ -368,7 +369,7 @@ void StackNesting::dump() const {
     llvm::dbgs() << '\n';
     for (SILInstruction *StackInst : bd.data.StackInsts) {
       if (StackInst->isAllocatingStack()) {
-        auto AllocInst = cast<SingleValueInstruction>(StackInst);
+        auto AllocInst = StackInst;
         int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
         llvm::dbgs() << "  alloc #" << BitNr << ": alive=";
         dumpBits(StackLocs[BitNr].AliveLocs);
