@@ -1,9 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %use_no_opaque_pointers %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
 // RUN: %FileCheck %s --check-prefix=NEW < %t/new.ir
-// RUN: %target-swift-frontend %use_no_opaque_pointers %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix=OLD < %t/old.ir
 
 // Check that we add extra type metadata accessors for new kinds of functions
@@ -64,25 +62,25 @@ assert(assocIsolated(MyStruct.self) == ActorIsolatedFn.self)
 // NEW-NOT: define linkonce_odr hidden swiftcc %swift.metadata_response @"$syyScMYccMa"
 
 // OLD: call swiftcc %swift.metadata_response @"$syyYbcMa"
-// OLD-NOT: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyYbcMD")
+// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbcMD")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyYbcMa"
-// NEW: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyYbcMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbcMD")
 
 // OLD: call swiftcc %swift.metadata_response @"$syyYacMa"
-// OLD-NOT: %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyYacMD")
+// OLD-NOT: ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYacMD")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyYacMa"
-// NEW: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyYacMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYacMD")
 
 // OLD: call swiftcc %swift.metadata_response @"$syyScMYccMa"
-// OLD-NOT: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyScMYccMD")
+// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyScMYccMD")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyScMYccMa"
-// NEW: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyScMYccMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyScMYccMD")
 
 // OLD: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
-// OLD-NOT: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$sSS4main7MyActorCYicMD")
+// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSS4main7MyActorCYicMD")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
-// NEW: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$sSS4main7MyActorCYicMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSS4main7MyActorCYicMD")
