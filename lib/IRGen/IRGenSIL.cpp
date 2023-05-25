@@ -2355,6 +2355,9 @@ void IRGenSILFunction::emitSILFunction() {
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
 
+  if (!CurSILFn->useStackForPackMetadata())
+    packMetadataStackPromotionDisabled = true;
+
   // Map the entry bb.
   LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&CurFn->back(), {});
   // Create LLVM basic blocks for the other bbs.
