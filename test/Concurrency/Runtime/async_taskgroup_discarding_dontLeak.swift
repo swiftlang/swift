@@ -67,8 +67,8 @@ final class SomeClass: @unchecked Sendable {
         SomeClass(id: "race-boom-class") // will be discarded
       }
       // since values may deinit in any order, we just assert their count basically
-      // CHECK: deinit, id: race-boom-class
-      // CHECK: deinit, id: race-boom-class
+      // CHECK-DAG: deinit, id: race-boom-class
+      // CHECK-DAG: deinit, id: race-boom-class
 
       return 12
     }
@@ -80,12 +80,12 @@ final class SomeClass: @unchecked Sendable {
           SomeClass(id: "many-ok") // will be discarded
         }
         // since values may deinit in any order, we just assert their count basically
-        // CHECK: deinit, id: many-ok
-        // CHECK: deinit, id: many-ok
-        // CHECK: deinit, id: many-ok
-        // CHECK: deinit, id: many-ok
-        // CHECK: deinit, id: many-ok
-        // CHECK: deinit, id: many-ok
+        // CHECK-DAG: deinit, id: many-ok
+        // CHECK-DAG: deinit, id: many-ok
+        // CHECK-DAG: deinit, id: many-ok
+        // CHECK-DAG: deinit, id: many-ok
+        // CHECK-DAG: deinit, id: many-ok
+        // CHECK-DAG: deinit, id: many-ok
       }
 
       return 12
@@ -101,12 +101,12 @@ final class SomeClass: @unchecked Sendable {
         }
 
         // since values may deinit in any order, we just assert their count basically
-        // CHECK: deinit, id: many-error
-        // CHECK: deinit, id: many-error
-        // CHECK: deinit, id: many-error
-        // CHECK: deinit, id: many-error
-        // CHECK: deinit, id: many-error
-        // CHECK: deinit, id: many-error
+        // CHECK-DAG: deinit, id: many-error
+        // CHECK-DAG: deinit, id: many-error
+        // CHECK-DAG: deinit, id: many-error
+        // CHECK-DAG: deinit, id: many-error
+        // CHECK-DAG: deinit, id: many-error
+        // CHECK-DAG: deinit, id: many-error
 
         12 // must be ignored
       }
@@ -138,13 +138,13 @@ final class SomeClass: @unchecked Sendable {
 
       // since values may deinit in any order, we just assert their count basically
       // three ok's
-      // CHECK: deinit, id: mixed
-      // CHECK: deinit, id: mixed
-      // CHECK: deinit, id: mixed
+      // CHECK-DAG: deinit, id: mixed
+      // CHECK-DAG: deinit, id: mixed
+      // CHECK-DAG: deinit, id: mixed
       // three errors
-      // CHECK: deinit, id: mixed
-      // CHECK: deinit, id: mixed
-      // CHECK: deinit, id: mixed
+      // CHECK-DAG: deinit, id: mixed
+      // CHECK-DAG: deinit, id: mixed
+      // CHECK-DAG: deinit, id: mixed
 
       return 12
     }
