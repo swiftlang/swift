@@ -1233,7 +1233,10 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
 
     // Otherwise, we know that either statically or dynamically, we have more than
     // one element. Emit the pack.
-    auto addr = emitTypeMetadataPack(IGF, packType, MetadataState::Abstract);
+    llvm::Value *shape;
+    StackAddress addr;
+    std::tie(addr, shape) =
+        emitTypeMetadataPack(IGF, packType, MetadataState::Abstract);
 
     auto *pointerToFirst = IGF.Builder.CreatePointerCast(
         addr.getAddressPointer(), IGF.IGM.TypeMetadataPtrPtrTy);
@@ -1252,12 +1255,7 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
     call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
-    // Clean up the pack.
-    Optional<unsigned> elementCount = 0;
-    if (auto *constant = dyn_cast<llvm::ConstantInt>(shapeExpression))
-      elementCount = constant->getValue().getZExtValue();
-
-    cleanupTypeMetadataPack(IGF, addr, elementCount);
+    cleanupTypeMetadataPack(IGF, addr, shape);
   }
 
   // Control flow join with the one-element case.
