@@ -376,7 +376,8 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
                            bool hasDynamicLifetime, bool reflection,
-                           bool usesMoveableValueDebugInfo)
+                           bool usesMoveableValueDebugInfo,
+                           bool hasPointerEscape)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -389,21 +390,24 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
 
   sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
       usesMoveableValueDebugInfo;
+
+  sharedUInt8().AllocBoxInst.pointerEscape = hasPointerEscape;
 }
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                                    SILFunction &F,
                                    Optional<SILDebugVariable> Var,
                                    bool hasDynamicLifetime, bool reflection,
-                                   bool usesMoveableValueDebugInfo) {
+                                   bool usesMoveableValueDebugInfo,
+                                   bool hasPointerEscape) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
-  return ::new (Buf)
-      AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
-                   hasDynamicLifetime, reflection, usesMoveableValueDebugInfo);
+  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
+                                  hasDynamicLifetime, reflection,
+                                  usesMoveableValueDebugInfo, hasPointerEscape);
 }
 
 SILType AllocBoxInst::getAddressType() const {

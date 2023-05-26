@@ -131,7 +131,7 @@ public:
     sharedUInt8().SILArgument.reborrow = isReborrow;
   }
 
-  void setEscaping(bool hasPointerEscape) {
+  void setHasPointerEscape(bool hasPointerEscape) {
     sharedUInt8().SILArgument.pointerEscape = hasPointerEscape;
   }
 

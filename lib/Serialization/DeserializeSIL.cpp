@@ -1331,9 +1331,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool hasDynamicLifetime = Attr & 0x1;
     bool reflection = (Attr >> 1) & 0x1;
     bool usesMoveableValueDebugInfo = (Attr >> 2) & 0x1;
+    bool pointerEscape = (Attr >> 3) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
-        hasDynamicLifetime, reflection, usesMoveableValueDebugInfo);
+        hasDynamicLifetime, reflection, usesMoveableValueDebugInfo,
+        /*skipVarDeclAssert*/ false, pointerEscape);
     break;
   }
   case SILInstructionKind::AllocStackInst: {
@@ -2117,11 +2119,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::BeginBorrowInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     bool isLexical = Attr & 0x1;
+    bool hasPointerEscape = (Attr >> 1) & 0x1;
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
-        isLexical);
+        isLexical, hasPointerEscape);
     break;
   }
 
@@ -2207,10 +2210,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto Ty = MF->getType(TyID);
     bool AllowsDiagnostics = Attr & 0x1;
     bool IsLexical = (Attr >> 1) & 0x1;
+    bool IsEscaping = (Attr >> 2) & 0x1;
     auto *MVI = Builder.createMoveValue(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        IsLexical);
+        IsLexical, IsEscaping);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
     break;

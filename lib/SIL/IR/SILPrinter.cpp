@@ -1457,6 +1457,10 @@ public:
       *this << "[reflection] ";
     }
 
+    if (ABI->hasPointerEscape()) {
+      *this << "[pointer_escape] ";
+    }
+
     if (ABI->getUsesMoveableValueDebugInfo() &&
         !ABI->getAddressType().isMoveOnly()) {
       *this << "[moveable_value_debuginfo] ";
@@ -1673,11 +1677,14 @@ public:
     *this << getIDAndType(LBI->getOperand());
   }
 
-  void visitBeginBorrowInst(BeginBorrowInst *LBI) {
-    if (LBI->isLexical()) {
+  void visitBeginBorrowInst(BeginBorrowInst *BBI) {
+    if (BBI->isLexical()) {
       *this << "[lexical] ";
     }
-    *this << getIDAndType(LBI->getOperand());
+    if (BBI->hasPointerEscape()) {
+      *this << "[pointer_escape] ";
+    }
+    *this << getIDAndType(BBI->getOperand());
   }
 
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
@@ -2015,6 +2022,8 @@ public:
       *this << "[allows_diagnostics] ";
     if (I->isLexical())
       *this << "[lexical] ";
+    if (I->hasPointerEscape())
+      *this << "[pointer_escape] ";
     *this << getIDAndType(I->getOperand());
   }
 
