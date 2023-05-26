@@ -6810,10 +6810,10 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         bool foundLexical = false;
         bool foundEagerMove = false;
         bool foundReborrow = false;
-        bool foundEscaping = false;
+        bool hasPointerEscape = false;
         while (auto attributeName = parseOptionalAttribute(
                    {"noImplicitCopy", "_lexical", "_eagerMove",
-                    "closureCapture", "reborrow", "escaping"})) {
+                    "closureCapture", "reborrow", "pointer_escape"})) {
           if (*attributeName == "noImplicitCopy")
             foundNoImplicitCopy = true;
           else if (*attributeName == "_lexical")
@@ -6824,8 +6824,8 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             foundClosureCapture = true;
           else if (*attributeName == "reborrow")
             foundReborrow = true;
-          else if (*attributeName == "escaping")
-            foundEscaping = true;
+          else if (*attributeName == "pointer_escape")
+            hasPointerEscape = true;
           else {
             llvm_unreachable("Unexpected attribute!");
           }
@@ -6857,7 +6857,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           fArg->setClosureCapture(foundClosureCapture);
           fArg->setLifetimeAnnotation(lifetime);
           fArg->setReborrow(foundReborrow);
-          fArg->setEscaping(foundEscaping);
+          fArg->setEscaping(hasPointerEscape);
           Arg = fArg;
 
           // Today, we construct the ownership kind straight from the function
@@ -6874,7 +6874,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           }
         } else {
           Arg = BB->createPhiArgument(Ty, OwnershipKind, /*decl*/ nullptr,
-                                      foundReborrow, foundEscaping);
+                                      foundReborrow, hasPointerEscape);
         }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));

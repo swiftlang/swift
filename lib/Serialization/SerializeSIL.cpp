@@ -644,7 +644,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     packedMetadata |= unsigned(SA->getType().getCategory()); // 8 bits
     packedMetadata |= unsigned(SA->getOwnershipKind()) << 8; // 3 bits
     packedMetadata |= unsigned(SA->isReborrow()) << 11;      // 1 bit
-    packedMetadata |= unsigned(SA->isEscaping()) << 12;      // 1 bit
+    packedMetadata |= unsigned(SA->hasPointerEscape()) << 12; // 1 bit
     if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
       packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 13;      // 1 bit
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 14; // 2 bits

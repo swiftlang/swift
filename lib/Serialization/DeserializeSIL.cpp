@@ -973,7 +973,7 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     SILType SILArgTy = getSILType(ArgTy, ValueCategory, Fn);
     auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0x7);
     auto reborrow = (Args[I + 1] >> 11) & 0x1;
-    auto escaping = (Args[I + 1] >> 12) & 0x1;
+    auto pointerEscape = (Args[I + 1] >> 12) & 0x1;
     if (IsEntry) {
       auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
       bool isNoImplicitCopy = (Args[I + 1] >> 13) & 0x1;
@@ -987,7 +987,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       Arg = fArg;
     } else {
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
-                                         /*decl*/ nullptr, reborrow, escaping);
+                                         /*decl*/ nullptr, reborrow,
+                                         pointerEscape);
     }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);

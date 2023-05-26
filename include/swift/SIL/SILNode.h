@@ -205,7 +205,7 @@ protected:
     SHARED_FIELD(SILArgument, uint8_t
                  valueOwnershipKind : NumVOKindBits,
                  reborrow : 1,
-                 escaping : 1);
+                 pointerEscape : 1);
 
     SHARED_FIELD(DebugValueInst, uint8_t
                  poisonRefs : 1,

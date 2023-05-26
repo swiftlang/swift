@@ -683,7 +683,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (i.IsReborrow)
       *this << "@reborrow ";
     if (i.IsEscaping)
-      *this << "@escaping ";
+      *this << "@pointer_escape ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
@@ -720,7 +720,7 @@ public:
     return {Ctx.getID(arg),          arg->getType(),
             arg->isNoImplicitCopy(), arg->getLifetimeAnnotation(),
             arg->isClosureCapture(), arg->isReborrow(),
-            arg->isEscaping()};
+            arg->hasPointerEscape()};
   }
 
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
@@ -734,11 +734,11 @@ public:
             arg->getLifetimeAnnotation(),
             arg->isClosureCapture(),
             arg->isReborrow(),
-            arg->isEscaping()};
+            arg->hasPointerEscape()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
-            arg->isReborrow(), arg->isEscaping()};
+            arg->isReborrow(), arg->hasPointerEscape()};
   }
 
   //===--------------------------------------------------------------------===//
