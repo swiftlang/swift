@@ -2699,6 +2699,12 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     }
     if (!forDefinition)
       gvar->setComdat(nullptr);
+
+    // Mark as llvm.used if @_used, set section if @_section
+    if (var->markedAsUsed())
+      addUsedGlobal(gvar);
+    if (auto *sectionAttr = var->getSectionAttr())
+      gvar->setSection(sectionAttr->Name);
   }
   if (forDefinition && !gvar->hasInitializer()) {
     if (initVal) {
@@ -3467,6 +3473,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
+
+  // Mark as llvm.used if @_used, set section if @_section
+  if (f->markedAsUsed())
+    addUsedGlobal(fn);
+  if (!f->section().empty())
+    fn->setSection(f->section());
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition

@@ -122,6 +122,9 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 
+// Whether to enable @_used and @_section attributes
+EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
+
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those
 // tests in non-asserts builds too.

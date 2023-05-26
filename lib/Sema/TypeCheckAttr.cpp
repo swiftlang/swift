@@ -253,6 +253,8 @@ public:
 
   void visitCDeclAttr(CDeclAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
+  void visitUsedAttr(UsedAttr *attr);
+  void visitSectionAttr(SectionAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -2066,6 +2068,32 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
                attr->Name);
   }
+}
+
+void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
+    return;
+  }
+  
+  // Only top-level func/var decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    diagnose(attr->getLocation(), diag::used_not_at_top_level);
+}
+
+void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
+    return;
+  }
+
+  // Only top-level func/var decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    diagnose(attr->getLocation(), diag::section_not_at_top_level);
+
+  // The name must not be empty.
+  if (attr->Name.empty())
+    diagnose(attr->getLocation(), diag::section_empty_name);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(

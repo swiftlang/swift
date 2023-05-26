@@ -922,6 +922,21 @@ DECL_MODIFIER_KINDS = [
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
                   code=142),
     DeclAttributeAlias('freestanding', 'MacroRole'),
+
+    SimpleDeclAttribute('_used', 'Used',
+                        OnAbstractFunction, OnVar,
+                        UserInaccessible,
+                        ABIBreakingToAdd, ABIBreakingToRemove,
+                        APIBreakingToAdd, APIBreakingToRemove,
+                        code=143),
+
+    DeclAttribute('_section', 'Section',
+                  OnAbstractFunction, OnVar,
+                  UserInaccessible,
+                  ABIBreakingToAdd, ABIBreakingToRemove,
+                  APIBreakingToAdd, APIBreakingToRemove,
+                  code=144),
+
 ]
 
 DEPRECATED_MODIFIER_KINDS = [

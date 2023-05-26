@@ -332,6 +332,8 @@ ERROR(performance_unknown_callees,none,
       "called function is not known at compile time and can have unpredictable performance", ())
 ERROR(performance_callee_unavailable,none,
       "called function is not available in this module and can have unpredictable performance", ())
+ERROR(section_attr_on_non_const_global,none,
+      "global variable must be a compile-time constant to use @_section attribute", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
