@@ -789,6 +789,15 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (Options.excludeAttrKind(DA->getKind()))
       continue;
 
+    // If we're supposed to suppress expanded macros, check whether this is
+    // a macro.
+    if (Options.SuppressExpandedMacros) {
+      if (auto customAttr = dyn_cast<CustomAttr>(DA)) {
+        if (D->getResolvedMacro(const_cast<CustomAttr *>(customAttr)))
+          continue;
+      }
+    }
+
     // If this attribute is only allowed because this is a Clang decl, don't
     // print it.
     if (D && D->hasClangNode()

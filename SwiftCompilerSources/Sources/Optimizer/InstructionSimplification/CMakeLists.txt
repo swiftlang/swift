@@ -16,9 +16,11 @@ swift_compiler_sources(Optimizer
   SimplifyDebugStep.swift
   SimplifyDestructure.swift
   SimplifyGlobalValue.swift
+  SimplifyInitEnumDataAddr.swift
   SimplifyLoad.swift
   SimplifyPartialApply.swift
   SimplifyStrongRetainRelease.swift
   SimplifyStructExtract.swift
   SimplifyTupleExtract.swift
-  SimplifyUncheckedEnumData.swift)
+  SimplifyUncheckedEnumData.swift
+  SimplifyValueToBridgeObject.swift)
