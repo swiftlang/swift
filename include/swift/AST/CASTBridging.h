@@ -332,12 +332,11 @@ void *UnresolvedDotExpr_create(BridgedASTContext cContext, void *base,
 void *ClosureExpr_create(BridgedASTContext cContext, void *body,
                          BridgedDeclContext cDeclContext);
 
-BridgedDeclContextAndDecl TypeAliasDecl_create(
+void *TypeAliasDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
-    BridgedSourceLoc cEqualLoc);
-void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType);
+    BridgedSourceLoc cEqualLoc, void *opaqueUnderlyingType);
 
 void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members);
 

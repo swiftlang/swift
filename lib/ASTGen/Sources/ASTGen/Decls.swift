@@ -8,24 +8,18 @@ extension ASTGenVisitor {
   public func visit(_ node: TypeAliasDeclSyntax) -> ASTNode {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let out = TypeAliasDecl_create(
-      self.ctx,
-      self.declContext,
-      self.bridgedSourceLoc(for: node.typealiasKeyword),
-      name,
-      nameLoc,
-      self.visit(node.genericParameterClause)?.rawValue,
-      self.bridgedSourceLoc(for: node.initializer.equal)
+    return .decl(
+      TypeAliasDecl_create(
+        self.ctx,
+        self.declContext,
+        self.bridgedSourceLoc(for: node.typealiasKeyword),
+        name,
+        nameLoc,
+        self.visit(node.genericParameterClause)?.rawValue,
+        self.bridgedSourceLoc(for: node.initializer.equal),
+        self.visit(node.initializer.value).rawValue
+      )
     )
-
-    let oldDeclContext = declContext
-    declContext = out.declContext
-    defer { declContext = oldDeclContext }
-
-    let underlying = self.visit(node.initializer.value).rawValue
-    TypeAliasDecl_setUnderlyingTypeRepr(out.nominalDecl, underlying)
-
-    return .decl(out.decl)
   }
 
   public func visit(_ node: StructDeclSyntax) -> ASTNode {

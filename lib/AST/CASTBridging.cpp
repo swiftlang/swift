@@ -500,24 +500,21 @@ void *ClosureExpr_create(BridgedASTContext cContext, void *body,
   return (Expr *)out;
 }
 
-BridgedDeclContextAndDecl TypeAliasDecl_create(
+void *TypeAliasDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
-    BridgedSourceLoc cEqualLoc) {
+    BridgedSourceLoc cEqualLoc, void *opaqueUnderlyingType) {
   ASTContext &context = convertASTContext(cContext);
 
-  auto *out = new (context) TypeAliasDecl(
+  auto *decl = new (context) TypeAliasDecl(
       convertSourceLoc(cAliasKeywordLoc), convertSourceLoc(cEqualLoc),
       convertIdentifier(cName), convertSourceLoc(cNameLoc),
       static_cast<GenericParamList *>(opaqueGenericParamList),
       convertDeclContext(cDeclContext));
-  return {bridgeDeclContext(out), static_cast<TypeAliasDecl *>(out),
-          static_cast<Decl *>(out)};
-}
+  decl->setUnderlyingTypeRepr(static_cast<TypeRepr *>(opaqueUnderlyingType));
 
-void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType) {
-  ((TypeAliasDecl *)decl)->setUnderlyingTypeRepr((TypeRepr *)underlyingType);
+  return static_cast<Decl *>(decl);
 }
 
 void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
