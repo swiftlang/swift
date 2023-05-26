@@ -1,8 +1,8 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 // TODO: move to target-run-simple-leaks-swift once CI is using at least Xcode 14.3
 
-// This test uses `leaks` which is only available on apple platforms; limit it to macOS:
-// REQUIRES: OS=macosx
+// Task group addTask is not supported in freestanding mode
+// UNSUPPORTED: freestanding
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -19,7 +19,7 @@ final class Something {
   }
 
   deinit {
-    print("deinit, Something, int: \(int)")
+    print("deinit, Something, int: \(self.int)")
   }
 }
 
@@ -27,7 +27,7 @@ func test_taskGroup_next() async {
   let tasks = 5
   _ = await withTaskGroup(of: Something.self, returning: Int.self) { group in
     for n in 0..<tasks {
-      group.spawn {
+      group.addTask {
         Something(int: n)
       }
     }
