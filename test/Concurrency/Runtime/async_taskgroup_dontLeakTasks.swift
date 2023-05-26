@@ -10,8 +10,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-import Darwin
-
 final class Something {
   let int: Int
   init(int: Int) {
