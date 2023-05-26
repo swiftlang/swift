@@ -3494,7 +3494,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass)
 
 public func closureVarAndDeferCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
+    // expected-error @-2 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     var f = {}
     f = {// expected-note {{closure capturing 'x2' here}}
         defer {
@@ -3636,8 +3636,8 @@ public func closureVarAndClosureCaptureClassUseAfterConsume3(_ x: borrowing Klas
 
 public func closureVarAndClosureCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    // expected-error @-2 {{'x2' is borrowed and cannot be consumed by closure capture}}
-    // expected-error @-3 {{'x2' is borrowed and cannot be consumed by closure capture}}
+    // expected-error @-2 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
+    // expected-error @-3 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     var f = {}
     f = {// expected-note {{closure capturing 'x2' here}}
         var g = {}
