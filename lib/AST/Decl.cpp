@@ -3973,10 +3973,12 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
       auto srcFile = resultDC->getParentSourceFile();
-      // Check if the file containing package decls is an interface file; if a public
-      // interface contains package decls, they must be inlinable and do not need a
-      // package-name, so don't show diagnostics in that case.
-      if (srcFile && srcFile->Kind != SourceFileKind::Interface) {
+      // Check if the file containing package decls is an interface file; if an
+      // interface file contains package decls, they must be usableFromInline or
+      // inlinable and are accessed within the defining module, so package-name
+      // is not needed; do not show diagnostics in such case.
+      auto shouldSkipDiag = srcFile && srcFile->Kind == SourceFileKind::Interface;
+      if (!shouldSkipDiag) {
         // No package context was found; show diagnostics
         auto &d = VD->getASTContext().Diags;
         d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
@@ -4175,15 +4177,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   }
   case AccessLevel::Package: {
     auto srcFile = sourceDC->getParentSourceFile();
-    if (srcFile && srcFile->Kind != SourceFileKind::Interface) {
-      auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
-      auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
-      return usePkg->isSamePackageAs(srcPkg);
-    } else {
-      // If source file is interface, package decls must be inlinable,
-      // essentially treated public so return true (see AccessLevel::Public)
+
+    // srcFile could be null if VD decl is from an imported .swiftmodule
+    if (srcFile && srcFile->Kind == SourceFileKind::Interface) {
+      // If source file is interface, package decls must be usableFromInline or
+      // inlinable, and are accessed only within the defining module so return true
       return true;
     }
+    auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+    auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+    return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:
   case AccessLevel::Open:
