@@ -42,6 +42,16 @@ ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
   }
 }
 
+bool ProtocolConformanceRef::isInvalid() const {
+  if (!Union)
+    return true;
+
+  if (auto pack = Union.dyn_cast<PackConformance *>())
+    return pack->isInvalid();
+
+  return false;
+}
+
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
   assert(!isInvalid());
 
