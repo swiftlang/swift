@@ -385,7 +385,7 @@ static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
 
 static void insertDebugValueBefore(SILInstruction *insertPt,
                                    DebugVarCarryingInst debugVar,
-                                   SILValue operand) {
+                                   llvm::function_ref<SILValue ()> operand) {
   if (!debugVar) {
     return;
   }
@@ -395,7 +395,7 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   }
   SILBuilderWithScope debugInfoBuilder(insertPt);
   debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
-  debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand,
+  debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand(),
                                     *varInfo, false, true);
 }
 
@@ -423,7 +423,7 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
   // Insert a new debug_value instruction after the reinitialization, so that
   // the debugger knows that the variable is in a usable form again.
   insertDebugValueBefore(memInst->getNextInstruction(), debugVar,
-                         stripAccessMarkers(dest));
+                       [&]{ return debugVar.getOperandForDebugValueClone(); });
 }
 
 static bool memInstMustConsume(Operand *memOper) {
@@ -2345,12 +2345,10 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   // referring to the same debug variable as the original definition, we have to
   // use the same debug scope and location as the original debug var.
   auto insertUndefDebugValue = [&debugVar](SILInstruction *insertPt) {
-    if (!debugVar) {
-      return;
-    }
-    insertDebugValueBefore(insertPt, debugVar,
-      SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
-                    insertPt->getModule()));
+    insertDebugValueBefore(insertPt, debugVar, [&]{
+      return SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
+                           insertPt->getModule());
+    });
   };
 
   for (auto &pair : boundary.getLastUsers()) {

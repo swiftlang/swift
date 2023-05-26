@@ -2805,7 +2805,7 @@ canonical SIL that the value was never copied and thus is a "move only value"
 even though the actual underlying wrapped type is copyable. As an example of
 this, consider the following Swift::
 
-  func doSomething(@_noImplicitCopy _ x: Klass) -> () { // expected-error {{'x' has guaranteed ownership but was consumed}}
+  func doSomething(@_noImplicitCopy _ x: Klass) -> () { // expected-error {{'x' is borrowed and cannot be consumed}}
     x.doSomething()
     let x2 = x // expected-note {{consuming use}}
     x2.doSomething()
