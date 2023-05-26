@@ -146,7 +146,7 @@ static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
 
 static llvm::cl::opt<bool> EnablePackMetadataStackPromotion =
     llvm::cl::opt<bool>(
-        "enable-pack-metadata-stack-promotion", llvm::cl::init(false),
+        "enable-pack-metadata-stack-promotion", llvm::cl::init(true),
         llvm::cl::desc(
             "Whether to skip heapifying stack metadata packs when possible."));
 
