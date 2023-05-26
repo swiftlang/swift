@@ -3047,7 +3047,12 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   // subscript instead.
   SubscriptExpr *subscriptExpr = nullptr;
   if ((subscriptExpr = dyn_cast<SubscriptExpr>(argExpr))) {
-    argExpr = subscriptExpr->getBase();
+    auto *decl = cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl());
+    if (decl->getReadImpl() != ReadImplKind::Read) {
+      subscriptExpr = nullptr;
+    } else {
+      argExpr = subscriptExpr->getBase();
+    }
   }
 
   // If there's a load around the outer part of this arg expr, look past it.
