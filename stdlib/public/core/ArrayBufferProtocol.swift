@@ -172,9 +172,12 @@ extension _ArrayBufferProtocol {
 
     // place the values into the hole we created
     var place = holeStart
-    for element in newValues {
-      place.initialize(to: element)
+    var i = newValues.startIndex
+    while place < holeEnd {
+      place.initialize(to: newValues[i])
       place += 1
+      newValues.formIndex(after: &i)
     }
+    _expectEnd(of: newValues, is: i)
   }
 }
