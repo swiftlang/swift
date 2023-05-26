@@ -3236,6 +3236,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
 
+  if (markedAsUsed())
+    OS << "[used] ";
+
+  if (!section().empty())
+    OS << "[section \"" << section() << "\"] ";
+
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
     OS << "[clang ";
