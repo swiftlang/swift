@@ -2187,6 +2187,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_ARGS="${DOTEST_ARGS};-E;${DOTEST_EXTRA}"
                 fi
 
+                if [[ "${SKIP_TEST_LLDB}" ]]; then
+                    should_configure_tests="FALSE"
+                else
+                    should_configure_tests=$(false_true ${BUILD_TOOLCHAIN_ONLY})
+                fi
+
                 cmake_options=(
                     "${cmake_options[@]}"
                     -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
@@ -2205,7 +2211,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_ENABLE_PYTHON=ON
                     -DLLDB_ENABLE_LZMA=OFF
                     -DLLDB_ENABLE_LUA=OFF
-                    -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
+                    -DLLDB_INCLUDE_TESTS:BOOL="${should_configure_tests}"
                     -DLLDB_TEST_LIBCXX_ROOT_DIR:STRING="${libcxx_build_dir}"
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
