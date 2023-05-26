@@ -8,6 +8,14 @@ func test_invalid_init_accessor_use() {
 
     get { 42 }
   }
+
+  struct X {
+    subscript(x: Int) -> Bool {
+      init(newValue) {} // expected-error {{init accessors could only be associated with properties}}
+
+      get { false }
+    }
+  }
 }
 
 func test_use_of_initializes_accesses_on_non_inits() {

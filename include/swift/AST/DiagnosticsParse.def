@@ -2124,7 +2124,7 @@ ERROR(sil_markuncheckedreferencebinding_invalid_attribute,none,
 // MARK: Init accessors
 //------------------------------------------------------------------------------
 
-ERROR(init_accessor_is_not_in_type_context,none,
+ERROR(init_accessor_is_not_on_property,none,
       "init accessors could only be associated with properties",
       ())
 

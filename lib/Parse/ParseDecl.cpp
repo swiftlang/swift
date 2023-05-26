@@ -7269,13 +7269,6 @@ bool Parser::parseAccessorAfterIntroducer(
                          Kind, storage, this, Loc, asyncLoc, throwsLoc);
   accessor->getAttrs() = Attributes;
 
-  if (Kind == AccessorKind::Init) {
-    if (!storage->getDeclContext()->getSelfNominalTypeDecl()) {
-      diagnose(Loc, diag::init_accessor_is_not_in_type_context);
-      accessor->setInvalid();
-    }
-  }
-
   // Collect this accessor and detect conflicts.
   if (auto existingAccessor = accessors.add(accessor)) {
     diagnoseRedundantAccessors(*this, Loc, Kind,
@@ -7808,6 +7801,13 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     diagnoseConflictingAccessors(P, Set, MutableAddress);
   } else if (Modify) {
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
+  }
+
+  if (Init) {
+    if (!storage->getDeclContext()->getSelfNominalTypeDecl() ||
+        isa<SubscriptDecl>(storage)) {
+      P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
+    }
   }
 }
 
