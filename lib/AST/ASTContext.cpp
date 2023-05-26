@@ -416,6 +416,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::FoldingSet<PackType> PackTypes;
     llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
+    llvm::FoldingSet<PackElementType> PackElementTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -3315,6 +3316,47 @@ void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID,
 
 PackType *PackType::getEmpty(const ASTContext &C) {
   return cast<PackType>(CanType(C.TheEmptyPackType));
+}
+
+PackElementType::PackElementType(Type packType, unsigned level,
+                                 RecursiveTypeProperties properties,
+                                 const ASTContext *canCtx)
+  : TypeBase(TypeKind::PackElement, canCtx, properties),
+    packType(packType), level(level) {
+  assert(packType->isParameterPack() ||
+         packType->is<PackArchetypeType>() ||
+         packType->is<TypeVariableType>());
+  assert(level > 0);
+}
+
+PackElementType *PackElementType::get(Type packType, unsigned level) {
+  auto properties = packType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  auto &context = packType->getASTContext();
+  llvm::FoldingSetNodeID id;
+  PackElementType::Profile(id, packType, level);
+
+  void *insertPos;
+  if (PackElementType *elementType =
+        context.getImpl().getArena(arena)
+          .PackElementTypes.FindNodeOrInsertPos(id, insertPos))
+    return elementType;
+
+  const ASTContext *canCtx = packType->isCanonical()
+      ? &context : nullptr;
+  PackElementType *elementType =
+      new (context, arena) PackElementType(packType, level, properties,
+                                           canCtx);
+  context.getImpl().getArena(arena).PackElementTypes.InsertNode(elementType,
+                                                                insertPos);
+  return elementType;
+}
+
+void PackElementType::Profile(llvm::FoldingSetNodeID &ID,
+                              Type packType, unsigned level) {
+  ID.AddPointer(packType.getPointer());
+  ID.AddInteger(level);
 }
 
 CanPackType CanPackType::get(const ASTContext &C, ArrayRef<CanType> elements) {

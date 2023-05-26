@@ -6999,12 +6999,70 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 
-
 inline CanTypeWrapper<PackExpansionType>
 CanPackType::unwrapSingletonPackExpansion() const {
   return CanPackExpansionType(
       getPointer()->unwrapSingletonPackExpansion());
 }
+
+/// Represents a reference to a pack from an outer expansion. This comes up
+/// after substitution. For example, given these declarations:
+///
+/// typealias A<each T, U> = (repeat (each T, U))
+/// typealias B<each X, repeat each Y> = (repeat A<repeat each X, each Y>)
+///
+/// Naively substituting replacing {T := repeat each X, U := each Y} in the
+/// underlying type of A would give us:
+///
+///   '(repeat (repeat (each X, each Y)))'
+///
+/// However, this is wrong; we're not expanding X and Y in parallel (they
+/// might not even have the same shape). Instead, we're expanding X, and
+/// then on each iteration, expanding Y.
+///
+/// If we annotate each 'repeat' and its corresponding 'each', we instead see
+/// that the above should give us:
+///
+///   '(repeat[1] (repeat[0] (each[0], each[1] U)))'
+///
+/// We number PackExpansionTypes from the innermost one outwards, assigning
+/// a level of 0 to the innermost one. Then, a PackElementType represents a
+/// reference to a parameter pack from an expansion with level > 0.
+class PackElementType : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  Type packType;
+  unsigned level;
+
+  PackElementType(Type packType, unsigned level,
+                  RecursiveTypeProperties properties,
+                  const ASTContext *ctx);
+
+public:
+  static PackElementType *get(Type packType, unsigned level);
+
+  Type getPackType() const { return packType; }
+
+  unsigned getLevel() const { return level; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getPackType(), getLevel());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, Type packType, unsigned level);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PackElement;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackElementType, Type)
+  static CanPackElementType get(CanType pack);
+
+  CanType getPackType() const {
+    return CanType(getPointer()->getPackType());
+  }
+END_CAN_TYPE_WRAPPER(PackElementType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

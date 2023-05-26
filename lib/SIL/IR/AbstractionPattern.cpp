@@ -2168,6 +2168,11 @@ public:
     llvm_unreachable("shouldn't encounter pack expansion by itself");
   }
 
+  CanType visitPackElementType(CanPackElementType packElement,
+                               AbstractionPattern pattern) {
+    llvm_unreachable("shouldn't encounter pack element by itself");
+  }
+
   CanType handlePackExpansion(AbstractionPattern origExpansion,
                               CanType candidateSubstType) {
     // When we're within a pack expansion, pack references matching that
