@@ -41,7 +41,7 @@ static const size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 /// Given a pointer and an offset, read the requested data and increment the
 /// offset
 template <typename T>
-T readBytes(const uint8_t *typeLayout, size_t &i) {
+static T readBytes(const uint8_t *typeLayout, size_t &i) {
   T returnVal;
   memcpy(&returnVal, typeLayout + i, sizeof(T));
   i += sizeof(T);
@@ -51,18 +51,18 @@ T readBytes(const uint8_t *typeLayout, size_t &i) {
 /// Given a pointer, a value, and an offset, write the value at the given
 /// offset and increment offset by the size of T
 template <typename T>
-void writeBytes(uint8_t *typeLayout, size_t &i, T value) {
+static void writeBytes(uint8_t *typeLayout, size_t &i, T value) {
   memcpy(typeLayout + i, &value, sizeof(T));
   i += sizeof(T);
 }
 
-Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
+static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
 
 typedef Metadata* (*MetadataAccessor)(const Metadata* const *);
 
-const Metadata *getResilientTypeMetadata(const Metadata* metadata,
+static const Metadata *getResilientTypeMetadata(const Metadata* metadata,
                                          const uint8_t *layoutStr,
                                          size_t &offset) {
   auto absolute = layoutStr + offset;
@@ -88,9 +88,9 @@ struct DestroyFuncAndMask {
   bool isIndirect;
 };
 
-void skipDestroy(void* ignore) { }
+static void skipDestroy(void* ignore) { }
 
-void existential_destroy(OpaqueValue* object) {
+static void existential_destroy(OpaqueValue* object) {
   auto* metadata = getExistentialTypeMetadata(object);
   if (metadata->getValueWitnesses()->isValueInline()) {
     metadata->vw_destroy(object);
@@ -99,31 +99,47 @@ void existential_destroy(OpaqueValue* object) {
   }
 }
 
-const DestroyFuncAndMask destroyTable[] = {
-  {(DestrFn)&skipDestroy, false},
-  {(DestrFn)&swift_errorRelease, true},
-  {(DestrFn)&swift_release, true},
-  {(DestrFn)&swift_unownedRelease, true},
-  {(DestrFn)&swift_weakDestroy, false},
-  {(DestrFn)&swift_unknownObjectRelease, true},
-  {(DestrFn)&swift_unknownObjectUnownedDestroy, false},
-  {(DestrFn)&swift_unknownObjectWeakDestroy, false},
-  {(DestrFn)&swift_bridgeObjectRelease, true},
-#if SWIFT_OBJC_INTEROP
-  {(DestrFn)&_Block_release, true},
-  {(DestrFn)&swift_unknownObjectRelease, true},
-#else
-  {nullptr, true},
-  {nullptr, true},
-#endif
-  // TODO: how to handle Custom?
-  {nullptr, true},
-  {nullptr, true},
-  {nullptr, true},
-  {(DestrFn)&existential_destroy, false},
-};
+template<typename Handler, typename... Params>
+inline static bool handleNextRefCount(const Metadata *metadata, const uint8_t *typeLayout, size_t &offset, uintptr_t &addrOffset, Params... params) {
+  uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
+  auto tag = static_cast<RefCountingKind>(skip >> 56);
+  skip &= ~(0xffULL << 56);
+  addrOffset += skip;
 
-uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
+  if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
+    return false;
+  } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
+    auto *type = readBytes<const Metadata*>(typeLayout, offset);
+    Handler::handleMetatype(type, addrOffset, std::forward<Params>(params)...);
+  } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
+    auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
+    Handler::handleMetatype(type, addrOffset, std::forward<Params>(params)...);
+  } else if (SWIFT_UNLIKELY(tag ==
+                            RefCountingKind::SinglePayloadEnumSimple)) {
+    Handler::handleSinglePayloadEnumSimple(typeLayout, offset, addrOffset, std::forward<Params>(params)...);
+  } else {
+    Handler::handleReference(tag, addrOffset, std::forward<Params>(params)...);
+  }
+
+  return true;
+}
+
+template<unsigned N, typename Handler, typename... Params>
+inline static void handleRefCounts(const Metadata *metadata, Params... params) {
+  const uint8_t *typeLayout = metadata->getLayoutString();
+  size_t offset = layoutStringHeaderSize;
+  uintptr_t addrOffset = 0;
+
+  if (N == 0) {
+    while (handleNextRefCount<Handler>(metadata, typeLayout, offset, addrOffset, std::forward<Params>(params)...)) {}
+  } else {
+    for (int i = 0; i < N; i++) {
+      handleNextRefCount<Handler>(metadata, typeLayout, offset, addrOffset, std::forward<Params>(params)...);
+    }
+  }
+}
+
+static uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
   switch (byteCount) {
   case 1:
     return addr[0];
@@ -138,7 +154,7 @@ uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
   }
 }
 
-void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
+static void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
                                    uint8_t *addr, size_t &addrOffset) {
   auto byteCountsAndOffset = readBytes<uint64_t>(typeLayout, offset);
   auto extraTagBytesPattern = (uint8_t)(byteCountsAndOffset >> 62);
@@ -182,42 +198,54 @@ noPayload:
   addrOffset += skip;
 }
 
-extern "C" void
-swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
-  uint8_t *addr = (uint8_t *)address;
+const DestroyFuncAndMask destroyTable[] = {
+  {(DestrFn)&skipDestroy, false},
+  {(DestrFn)&swift_errorRelease, true},
+  {(DestrFn)&swift_release, true},
+  {(DestrFn)&swift_unownedRelease, true},
+  {(DestrFn)&swift_weakDestroy, false},
+  {(DestrFn)&swift_unknownObjectRelease, true},
+  {(DestrFn)&swift_unknownObjectUnownedDestroy, false},
+  {(DestrFn)&swift_unknownObjectWeakDestroy, false},
+  {(DestrFn)&swift_bridgeObjectRelease, true},
+#if SWIFT_OBJC_INTEROP
+  {(DestrFn)&_Block_release, true},
+  {(DestrFn)&swift_unknownObjectRelease, true},
+#else
+  {nullptr, true},
+  {nullptr, true},
+#endif
+  // TODO: how to handle Custom?
+  {nullptr, true},
+  {nullptr, true},
+  {nullptr, true},
+  {(DestrFn)&existential_destroy, false},
+};
 
-  const uint8_t *typeLayout = metadata->getLayoutString();
+struct DestroyHandler {
+  static inline void handleMetatype(const Metadata *type, uintptr_t addrOffset, uint8_t *addr) {
+    type->vw_destroy((OpaqueValue *)(addr + addrOffset));
+  }
 
-  size_t offset = layoutStringHeaderSize;
-  uintptr_t addrOffset = 0;
+  static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
+                                                   size_t &addrOffset, uint8_t *addr) {
+    ::handleSinglePayloadEnumSimple(typeLayout, offset, addr, addrOffset);
+  }
 
-  while (true) {
-    uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
-    auto tag = static_cast<RefCountingKind>(skip >> 56);
-    skip &= ~(0xffULL << 56);
-    addrOffset += skip;
-
-    if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
-      return;
-    } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-      auto *type = readBytes<const Metadata*>(typeLayout, offset);
-      type->vw_destroy((OpaqueValue *)(addr + addrOffset));
-    } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-      auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
-      type->vw_destroy((OpaqueValue *)(addr + addrOffset));
-    } else if (SWIFT_UNLIKELY(tag ==
-                              RefCountingKind::SinglePayloadEnumSimple)) {
-      handleSinglePayloadEnumSimple(typeLayout, offset, addr, addrOffset);
+  static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset, uint8_t *addr) {
+    const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
+    if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
+      destroyFunc.fn(
+          (void *)((*(uintptr_t *)(addr + addrOffset))));
     } else {
-      const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
-      if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
-        destroyFunc.fn(
-            (void *)((*(uintptr_t *)(addr + addrOffset))));
-      } else {
-        destroyFunc.fn(((void *)(addr + addrOffset)));
-      }
+      destroyFunc.fn(((void *)(addr + addrOffset)));
     }
   }
+};
+
+extern "C" void
+swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
+  handleRefCounts<0, DestroyHandler>(metadata, (uint8_t *)address);
 }
 
 struct RetainFuncAndMask {
@@ -266,48 +294,37 @@ const RetainFuncAndMask retainTable[] = {
   {(void*)&existential_initializeWithCopy, false},
 };
 
+struct CopyHandler {
+  static inline void handleMetatype(const Metadata *type, uintptr_t addrOffset, uint8_t *dest, uint8_t *src) {
+    type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
+                                (OpaqueValue*)((uintptr_t)src + addrOffset));
+  }
+
+  static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
+                                                   size_t &addrOffset, uint8_t *dest, uint8_t *src) {
+    ::handleSinglePayloadEnumSimple(typeLayout, offset, (uint8_t *)src, addrOffset);
+  }
+
+  static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset, uint8_t *dest, uint8_t *src) {
+    const auto &retainFunc = retainTable[static_cast<uint8_t>(tag)];
+    if (SWIFT_LIKELY(retainFunc.isSingle)) {
+      ((RetainFn)retainFunc.fn)(*(void**)(((uintptr_t)dest + addrOffset)));
+    } else {
+      ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset),
+                                  (void*)((uintptr_t)src + addrOffset));
+    }
+  }
+};
+
 extern "C" swift::OpaqueValue *
 swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                            const Metadata *metadata) {
-  uintptr_t addrOffset = 0;
-  const uint8_t *typeLayout = metadata->getLayoutString();
-
   size_t size = metadata->vw_size();
-
-  auto offset = layoutStringHeaderSize;
-
   memcpy(dest, src, size);
 
-  while (true) {
-    uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
-    auto tag = static_cast<RefCountingKind>(skip >> 56);
-    skip &= ~(0xffULL << 56);
-    addrOffset += skip;
+  handleRefCounts<0, CopyHandler>(metadata, (uint8_t *)dest, (uint8_t *)src);
 
-    if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
-      return dest;
-    } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-      auto *type = readBytes<const Metadata*>(typeLayout, offset);
-      type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
-                                  (OpaqueValue*)((uintptr_t)src + addrOffset));
-    } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-      auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
-      type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
-                                  (OpaqueValue*)((uintptr_t)src + addrOffset));
-    } else if (SWIFT_UNLIKELY(tag ==
-                              RefCountingKind::SinglePayloadEnumSimple)) {
-      handleSinglePayloadEnumSimple(typeLayout, offset, (uint8_t *)src,
-                                    addrOffset);
-    } else {
-      const auto &retainFunc = retainTable[static_cast<uint8_t>(tag)];
-      if (SWIFT_LIKELY(retainFunc.isSingle)) {
-        ((RetainFn)retainFunc.fn)(*(void**)(((uintptr_t)dest + addrOffset)));
-      } else {
-        ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset),
-                                    (void*)((uintptr_t)src + addrOffset));
-      }
-    }
-  }
+  return dest;
 }
 
 extern "C" swift::OpaqueValue *
