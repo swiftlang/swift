@@ -878,7 +878,7 @@ ERROR(modularization_issue_decl_moved,Fatal,
       (bool, DeclName, Identifier, Identifier))
 ERROR(modularization_issue_decl_type_changed,Fatal,
       "reference to %select{top-level|type}0 %1 broken by a context change; "
-      "the details of %1 %select{from %2|}5 changed since building '%3'"
+      "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and is now found in %4}5",
       (bool, DeclName, Identifier, StringRef, Identifier, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,

@@ -393,7 +393,10 @@ def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
 
 def remark_loading_module : Flag<["-"], "Rmodule-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit a remark and file path of each loaded module">;
+  HelpText<"Emit remarks about loaded module">;
+def remark_module_recovery : Flag<["-"], "Rmodule-recovery">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about contextual inconsistencies in loaded modules">;
 
 def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,

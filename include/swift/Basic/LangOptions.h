@@ -244,6 +244,9 @@ namespace swift {
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
 
+    /// Emit remarks about contextual inconsistencies in loaded modules.
+    bool EnableModuleRecoveryRemarks = false;
+
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
     
