@@ -120,10 +120,9 @@ static APInt createElementMask(const llvm::DataLayout &DL,
   return mask;
 }
 
-void EnumPayload::insertValue(IRGenModule &IGM,
-                              IRBuilder &builder, llvm::Value *value,
+void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
                               unsigned payloadOffset) {
-  auto &DL = IGM.DataLayout;
+  auto &DL = IGF.IGM.DataLayout;
 
   // Create a mask for the value we are going to insert.
   auto type = value->getType();
@@ -131,7 +130,7 @@ void EnumPayload::insertValue(IRGenModule &IGM,
   auto mask = createElementMask(DL, type, payloadOffset, payloadSize);
 
   // Scatter the value into the payload.
-  emitScatterBits(IGM, builder, mask, value);
+  emitScatterBits(IGF, mask, value);
 }
 
 llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
@@ -176,14 +175,13 @@ void EnumPayload::explode(IRGenModule &IGM, Explosion &out) const {
   }
 }
 
-void EnumPayload::packIntoEnumPayload(IRGenModule &IGM,
-                                      IRBuilder &builder,
+void EnumPayload::packIntoEnumPayload(IRGenFunction &IGF,
                                       EnumPayload &outerPayload,
                                       unsigned bitOffset) const {
-  auto &DL = IGM.DataLayout;
+  auto &DL = IGF.IGM.DataLayout;
   for (auto &value : PayloadValues) {
     auto v = forcePayloadValue(value);
-    outerPayload.insertValue(IGM, builder, v, bitOffset);
+    outerPayload.insertValue(IGF, v, bitOffset);
     bitOffset += DL.getTypeSizeInBits(v->getType());
   }
 }
@@ -421,13 +419,12 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, const APInt &mask) {
 }
 
 void
-EnumPayload::emitApplyOrMask(IRGenModule &IGM,
-                             IRBuilder &builder, const APInt &mask) {
+EnumPayload::emitApplyOrMask(IRGenFunction &IGF, const APInt &mask) {
   // Early exit if the mask has no effect.
   if (mask == 0)
     return;
 
-  auto &DL = IGM.DataLayout;
+  auto &DL = IGF.IGM.DataLayout;
   auto maskReader = BitPatternReader(mask, DL.isLittleEndian());
 
   for (auto &pv : PayloadValues) {
@@ -441,21 +438,21 @@ EnumPayload::emitApplyOrMask(IRGenModule &IGM,
     if (maskPiece == 0)
       continue;
     
-    auto payloadIntTy = llvm::IntegerType::get(IGM.getLLVMContext(), size);
+    auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
     auto maskConstant = llvm::ConstantInt::get(payloadIntTy, maskPiece);
     
     // If the payload value is vacant, or the mask is all ones,
     // we can adopt the mask value directly.
     if (pv.is<llvm::Type *>() || maskPiece.isAllOnesValue()) {
-      pv = builder.CreateBitOrPointerCast(maskConstant, payloadTy);
+      pv = IGF.Builder.CreateBitOrPointerCast(maskConstant, payloadTy);
       continue;
     }
     
     // Otherwise, apply the mask to the existing value.
     auto v = pv.get<llvm::Value*>();
-    v = builder.CreateBitOrPointerCast(v, payloadIntTy);
-    v = builder.CreateOr(v, maskConstant);
-    v = builder.CreateBitOrPointerCast(v, payloadTy);
+    v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
+    v = IGF.Builder.CreateOr(v, maskConstant);
+    v = IGF.Builder.CreateBitOrPointerCast(v, payloadTy);
     pv = v;
   }
 }
@@ -493,11 +490,11 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
   }
 }
 
-void EnumPayload::emitScatterBits(IRGenModule &IGM,
-                                  IRBuilder &builder,
+void EnumPayload::emitScatterBits(IRGenFunction &IGF,
                                   const APInt &mask,
                                   llvm::Value *value) {
-  auto &DL = IGM.DataLayout;
+  auto &DL = IGF.IGM.DataLayout;
+  auto &B = IGF.Builder;
 
   unsigned valueBits = DL.getTypeSizeInBits(value->getType());
   auto totalBits = std::min(valueBits, mask.countPopulation());
@@ -522,20 +519,20 @@ void EnumPayload::emitScatterBits(IRGenModule &IGM,
     if (DL.isBigEndian()) {
       offset = totalBits - partCount - usedBits;
     }
-    auto partValue = irgen::emitScatterBits(IGM, builder, partMask, value, offset);
+    auto partValue = irgen::emitScatterBits(IGF, partMask, value, offset);
 
     // If necessary OR with the existing value.
     if (auto existingValue = pv.dyn_cast<llvm::Value*>()) {
       if (partType != partValue->getType()) {
-        existingValue = builder.CreateBitOrPointerCast(existingValue,
+        existingValue = B.CreateBitOrPointerCast(existingValue,
                                                  partValue->getType());
       }
-      partValue = builder.CreateOr(partValue, existingValue);
+      partValue = B.CreateOr(partValue, existingValue);
     }
 
     // Convert the integer result to the target type.
     if (partType != partValue->getType()) {
-      partValue = builder.CreateBitOrPointerCast(partValue, partType);
+      partValue = B.CreateBitOrPointerCast(partValue, partType);
     }
 
     // Update this payload element.
@@ -616,28 +613,3 @@ unsigned EnumPayload::getAllocSizeInBits(const llvm::DataLayout &DL) const {
   }
   return size;
 }
-
-void EnumPayload::print(llvm::raw_ostream &OS) {
-  if (StorageType) {
-    OS << "storage-type: ";
-    StorageType->print(OS);
-    OS << '\n';
-  }
-  for (LazyValue pv : PayloadValues) {
-    if (auto *v = pv.dyn_cast<llvm::Value*>()) {
-      OS << "value: ";
-      v->print(OS);
-      OS << '\n';
-    } else {
-      auto *t = pv.get<llvm::Type*>();
-      OS << "type: ";
-      t->print(OS);
-      OS << '\n';
-    }
-  }
-}
-
-void EnumPayload::dump() {
-  print(llvm::errs());
-}
-

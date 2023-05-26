@@ -32,7 +32,6 @@ namespace swiftcall {
 namespace swift {
 namespace irgen {
   class EnumPayload;
-  class IRBuilder;
   using clang::CodeGen::swiftcall::SwiftAggLowering;
 
 struct LoadedRef {
@@ -118,7 +117,7 @@ public:
   /// level and produce them at another.
   ///
   /// Essentially, this is like take-initializing the new explosion.
-  virtual void reexplode(Explosion &sourceExplosion,
+  virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                          Explosion &targetExplosion) const = 0;
 
   /// Shift values from the source explosion to the target explosion
@@ -136,8 +135,7 @@ public:
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
   /// Pack the source explosion into an enum payload.
-  virtual void packIntoEnumPayload(IRGenModule &IGM,
-                                   IRBuilder &builder,
+  virtual void packIntoEnumPayload(IRGenFunction &IGF,
                                    EnumPayload &payload,
                                    Explosion &sourceExplosion,
                                    unsigned offset) const = 0;

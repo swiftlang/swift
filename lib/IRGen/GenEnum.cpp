@@ -408,18 +408,17 @@ namespace {
                           Explosion &out) const override {
       // The projected value is the payload.
       if (getLoadableSingleton())
-        getLoadableSingleton()->reexplode(in, out);
+        getLoadableSingleton()->reexplode(IGF, in, out);
     }
 
-    void emitValueInjection(IRGenModule &IGM,
-                            IRBuilder &builder,
+    void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
                             Explosion &out) const override {
       // If the element carries no data, neither does the injection.
       // Otherwise, the result is identical.
       if (getLoadableSingleton())
-        getLoadableSingleton()->reexplode(params, out);
+        getLoadableSingleton()->reexplode(IGF, params, out);
     }
 
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
@@ -565,9 +564,9 @@ namespace {
       collector.collectTypeMetadataForLayout(T);
     }
 
-    void reexplode(Explosion &src, Explosion &dest)
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
-      if (getLoadableSingleton()) getLoadableSingleton()->reexplode(src, dest);
+      if (getLoadableSingleton()) getLoadableSingleton()->reexplode(IGF, src, dest);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
@@ -611,11 +610,10 @@ namespace {
       }
     }
 
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder, EnumPayload &payload,
+    void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
                              Explosion &in, unsigned offset) const override {
       if (getLoadableSingleton())
-        return getLoadableSingleton()->packIntoEnumPayload(IGM, builder, payload,
+        return getLoadableSingleton()->packIntoEnumPayload(IGF, payload,
                                                            in, offset);
     }
 
@@ -911,8 +909,7 @@ namespace {
       (void)in.claim(getExplosionSize());
     }
 
-    void emitValueInjection(IRGenModule &IGM,
-                            IRBuilder &builder,
+    void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
                             Explosion &out) const override {
@@ -1490,7 +1487,7 @@ namespace {
       assert(TIK >= Loadable);
     }
 
-    void reexplode(Explosion &src, Explosion &dest)
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
       assert(TIK >= Loadable);
       dest.add(src.claim(getExplosionSize()));
@@ -1548,20 +1545,19 @@ namespace {
       return {std::move(payload), extraTag};
     }
     
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder,
+    void packIntoEnumPayload(IRGenFunction &IGF,
                              EnumPayload &outerPayload,
                              Explosion &src,
                              unsigned offset) const override {
       // Pack payload, if any.
-      auto payload = EnumPayload::fromExplosion(IGM, src, PayloadSchema);
-      payload.packIntoEnumPayload(IGM, builder, outerPayload, offset);
+      auto payload = EnumPayload::fromExplosion(IGF.IGM, src, PayloadSchema);
+      payload.packIntoEnumPayload(IGF, outerPayload, offset);
 
       // Pack tag bits, if any.
       if (ExtraTagBitCount > 0) {
         unsigned extraTagOffset = PayloadBitCount + offset;
 
-        outerPayload.insertValue(IGM, builder, src.claimNext(), extraTagOffset);
+        outerPayload.insertValue(IGF, src.claimNext(), extraTagOffset);
       }
     }
 
@@ -2322,20 +2318,19 @@ namespace {
     }
 
   public:
-    void emitValueInjection(IRGenModule &IGM,
-                            IRBuilder &builder,
+    void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
                             Explosion &out) const override {
       // The payload case gets its native representation. If there are extra
       // tag bits, set them to zero.
       if (elt == getPayloadElement()) {
-        auto payload = EnumPayload::zero(IGM, PayloadSchema);
+        auto payload = EnumPayload::zero(IGF.IGM, PayloadSchema);
         auto &loadablePayloadTI = getLoadablePayloadTypeInfo();
-        loadablePayloadTI.packIntoEnumPayload(IGM, builder, payload, params, 0);
-        payload.explode(IGM, out);
+        loadablePayloadTI.packIntoEnumPayload(IGF, payload, params, 0);
+        payload.explode(IGF.IGM, out);
         if (ExtraTagBitCount > 0)
-          out.add(getZeroExtraTagConstant(IGM));
+          out.add(getZeroExtraTagConstant(IGF.IGM));
         return;
       }
 
@@ -2343,11 +2338,11 @@ namespace {
       // by setting the tag bits.
       APInt payloadPattern, extraTag;
       std::tie(payloadPattern, extraTag) = getNoPayloadCaseValue(elt);
-      auto payload = EnumPayload::fromBitPattern(IGM, payloadPattern,
+      auto payload = EnumPayload::fromBitPattern(IGF.IGM, payloadPattern,
                                                  PayloadSchema);
-      payload.explode(IGM, out);
+      payload.explode(IGF.IGM, out);
       if (ExtraTagBitCount > 0) {
-        out.add(llvm::ConstantInt::get(IGM.getLLVMContext(), extraTag));
+        out.add(llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
       }
     }
 
@@ -2546,7 +2541,7 @@ namespace {
                                   Explosion &asEnumOut) const {
       auto &payloadTI = getLoadablePayloadTypeInfo();
       auto payload = EnumPayload::zero(IGF.IGM, PayloadSchema);
-      payloadTI.packIntoEnumPayload(IGF.IGM, IGF.Builder, payload, asPayloadIn, 0);
+      payloadTI.packIntoEnumPayload(IGF, payload, asPayloadIn, 0);
       payload.explode(IGF.IGM, asEnumOut);
     }
 
@@ -2557,7 +2552,7 @@ namespace {
 
       switch (CopyDestroyKind) {
       case TriviallyDestroyable:
-        reexplode(src, dest);
+        reexplode(IGF, src, dest);
         return;
 
       case ABIInaccessible:
@@ -3820,9 +3815,9 @@ namespace {
                                     llvm::Value *tagIndex) const {
       auto result = EnumPayload::zero(IGF.IGM, PayloadSchema);
       if (!CommonSpareBits.empty())
-        result.emitScatterBits(IGF.IGM, IGF.Builder, ~CommonSpareBits.asAPInt(), tagIndex);
+        result.emitScatterBits(IGF, ~CommonSpareBits.asAPInt(), tagIndex);
       if (!PayloadTagBits.empty())
-        result.emitScatterBits(IGF.IGM, IGF.Builder, PayloadTagBits.asAPInt(), tag);
+        result.emitScatterBits(IGF, PayloadTagBits.asAPInt(), tag);
       return result;
     }
 
@@ -4308,18 +4303,17 @@ namespace {
                      cast<LoadableTypeInfo>(*foundPayload->ti), out);
     }
 
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder,
+    void packIntoEnumPayload(IRGenFunction &IGF,
                              EnumPayload &outerPayload,
                              Explosion &src,
                              unsigned offset) const override {
       auto innerPayload = EnumPayload::fromExplosion(IGM, src,
                                                      PayloadSchema);
       // Pack the payload, if any.
-      innerPayload.packIntoEnumPayload(IGM, builder, outerPayload, offset);
+      innerPayload.packIntoEnumPayload(IGF, outerPayload, offset);
       // Pack the extra bits, if any.
       if (ExtraTagBitCount > 0)
-        outerPayload.insertValue(IGM, builder, src.claimNext(),
+        outerPayload.insertValue(IGF, src.claimNext(),
                                  CommonSpareBits.size() + offset);
     }
 
@@ -4339,7 +4333,7 @@ namespace {
     }
 
   private:
-    void emitPayloadInjection(IRBuilder &builder,
+    void emitPayloadInjection(IRGenFunction &IGF,
                               const FixedTypeInfo &payloadTI,
                               Explosion &params, Explosion &out,
                               unsigned tag) const {
@@ -4347,13 +4341,13 @@ namespace {
       auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
       
       auto payload = EnumPayload::zero(IGM, PayloadSchema);
-      loadablePayloadTI.packIntoEnumPayload(IGM, builder, payload, params, 0);
+      loadablePayloadTI.packIntoEnumPayload(IGF, payload, params, 0);
 
       // If we have spare bits, pack tag bits into them.
       unsigned numSpareBits = PayloadTagBits.count();
       if (numSpareBits > 0) {
         APInt tagMaskVal = scatterBits(PayloadTagBits.asAPInt(), tag);
-        payload.emitApplyOrMask(IGM, builder, tagMaskVal);
+        payload.emitApplyOrMask(IGF, tagMaskVal);
       }
 
       payload.explode(IGM, out);
@@ -4440,7 +4434,7 @@ namespace {
         auto mask = APInt::getLowBitsSet(CommonSpareBits.size(),
                                          std::min(32U, numCaseBits));
         payload = EnumPayload::zero(IGM, PayloadSchema);
-        payload.emitScatterBits(IGF.IGM, IGF.Builder, mask, tagIndex);
+        payload.emitScatterBits(IGF, mask, tagIndex);
       }
 
       // If the tag bits do not fit in the spare bits, the remaining tag bits
@@ -4454,7 +4448,8 @@ namespace {
       return {payload, extraTag};
     }
 
-    void emitNoPayloadInjection(Explosion &out, unsigned index) const {
+    void emitNoPayloadInjection(IRGenFunction &IGF, Explosion &out,
+                                unsigned index) const {
       APInt payloadVal, extraTag;
       std::tie(payloadVal, extraTag) = getNoPayloadCaseValue(index);
       
@@ -4531,8 +4526,7 @@ namespace {
     }
 
   public:
-    void emitValueInjection(IRGenModule &IGM,
-                            IRBuilder &builder,
+    void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
                             Explosion &out) const override {
@@ -4541,7 +4535,7 @@ namespace {
                                    ElementsWithPayload.end(),
                                [&](const Element &e) { return e.decl == elt; });
       if (payloadI != ElementsWithPayload.end())
-        return emitPayloadInjection(builder, cast<FixedTypeInfo>(*payloadI->ti),
+        return emitPayloadInjection(IGF, cast<FixedTypeInfo>(*payloadI->ti),
                                     params, out,
                                     payloadI - ElementsWithPayload.begin());
 
@@ -4549,7 +4543,7 @@ namespace {
                                  ElementsWithNoPayload.end(),
                                [&](const Element &e) { return e.decl == elt; });
       assert(emptyI != ElementsWithNoPayload.end() && "case not in enum");
-      emitNoPayloadInjection(out, emptyI - ElementsWithNoPayload.begin());
+      emitNoPayloadInjection(IGF, out, emptyI - ElementsWithNoPayload.begin());
     }
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
@@ -4558,7 +4552,7 @@ namespace {
 
       switch (CopyDestroyKind) {
       case TriviallyDestroyable:
-        reexplode(src, dest);
+        reexplode(IGF, src, dest);
         return;
 
       case ABIInaccessible:
@@ -5036,7 +5030,7 @@ namespace {
         APInt tagBitMask = scatterBits(PayloadTagBits.asAPInt(), spareTagBits);
 
         payload.emitApplyAndMask(IGF, spareBitMask);
-        payload.emitApplyOrMask(IGM, IGF.Builder, tagBitMask);
+        payload.emitApplyOrMask(IGF, tagBitMask);
         payload.store(IGF, payloadAddr);
       }
 
@@ -5076,7 +5070,7 @@ namespace {
         payload.emitApplyAndMask(IGF, spareBitMask);
 
         // Store the tag into the spare bits.
-        payload.emitScatterBits(IGF.IGM, IGF.Builder, PayloadTagBits.asAPInt(), spareTagBits);
+        payload.emitScatterBits(IGF, PayloadTagBits.asAPInt(), spareTagBits);
 
         // Store the payload back.
         payload.store(IGF, payloadAddr);
@@ -5436,7 +5430,7 @@ namespace {
         // Factor the index value into parts to scatter into the payload and
         // to store in the extra tag bits, if any.
         auto payload = EnumPayload::zero(IGM, PayloadSchema);
-        payload.emitScatterBits(IGF.IGM, IGF.Builder, CommonSpareBits.asAPInt(), indexValue);
+        payload.emitScatterBits(IGF, CommonSpareBits.asAPInt(), indexValue);
         payload.store(IGF, projectPayload(IGF, dest));
         if (getExtraTagBitCountForExtraInhabitants() > 0) {
           auto tagBits = IGF.Builder.CreateLShr(indexValue,
@@ -5842,8 +5836,7 @@ namespace {
       llvm_unreachable("resilient enums are always indirect");
     }
   
-    void emitValueInjection(IRGenModule &IGM,
-                            IRBuilder &builder,
+    void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
                             Explosion &params,
                             Explosion &out) const override {
@@ -5895,7 +5888,7 @@ namespace {
       llvm_unreachable("resilient enums are always indirect");
     }
 
-    void reexplode(Explosion &src,
+    void reexplode(IRGenFunction &IGF, Explosion &src,
                            Explosion &dest) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
@@ -5914,8 +5907,7 @@ namespace {
       llvm_unreachable("resilient enums are always indirect");
     }
 
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder,
+    void packIntoEnumPayload(IRGenFunction &IGF,
                              EnumPayload &outerPayload,
                              Explosion &src,
                              unsigned offset) const override {
@@ -6355,9 +6347,9 @@ namespace {
                     bool isOutlined) const override {
       return Strategy.initialize(IGF, e, addr, isOutlined);
     }
-    void reexplode( Explosion &src,
+    void reexplode(IRGenFunction &IGF, Explosion &src,
                    Explosion &dest) const override {
-      return Strategy.reexplode(src, dest);
+      return Strategy.reexplode(IGF, src, dest);
     }
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest, Atomicity atomicity) const override {
@@ -6370,12 +6362,11 @@ namespace {
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
       return Strategy.fixLifetime(IGF, src);
     }
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder,
+    void packIntoEnumPayload(IRGenFunction &IGF,
                              EnumPayload &payload,
                              Explosion &in,
                              unsigned offset) const override {
-      return Strategy.packIntoEnumPayload(IGM, builder, payload, in, offset);
+      return Strategy.packIntoEnumPayload(IGF, payload, in, offset);
     }
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
@@ -7066,7 +7057,7 @@ void irgen::emitInjectLoadableEnum(IRGenFunction &IGF, SILType enumTy,
                                     Explosion &data,
                                     Explosion &out) {
   getEnumImplStrategy(IGF.IGM, enumTy)
-    .emitValueInjection(IGF.IGM, IGF.Builder, theCase, data, out);
+    .emitValueInjection(IGF, theCase, data, out);
 }
 
 void irgen::emitProjectLoadableEnum(IRGenFunction &IGF, SILType enumTy,
@@ -7195,13 +7186,13 @@ llvm::Value *irgen::emitGatherBits(IRGenFunction &IGF,
 /// move them to the bit positions indicated by the mask.
 /// Equivalent to a parallel bit deposit instruction (PDEP),
 /// although we don't currently emit PDEP directly.
-llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
-                                    IRBuilder &builder,
+llvm::Value *irgen::emitScatterBits(IRGenFunction &IGF,
                                     llvm::APInt mask,
                                     llvm::Value *source,
                                     unsigned packedLowBit) {
-  auto &DL = IGM.DataLayout;
-  auto &C = IGM.getLLVMContext();
+  auto &DL = IGF.IGM.DataLayout;
+  auto &B = IGF.Builder;
+  auto &C = IGF.IGM.getLLVMContext();
 
   // Expand or contract the packed bits to the destination type.
   auto bitSize = mask.getBitWidth();
@@ -7209,7 +7200,7 @@ llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
   if (!sourceTy) {
     auto numBits = DL.getTypeSizeInBits(source->getType());
     sourceTy = llvm::IntegerType::get(C, numBits);
-    source = builder.CreateBitOrPointerCast(source, sourceTy);
+    source = B.CreateBitOrPointerCast(source, sourceTy);
   }
   assert(packedLowBit < sourceTy->getBitWidth() &&
       "packedLowBit out of range");
@@ -7219,11 +7210,11 @@ llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
   if (usedBits > 0 && sourceTy->getBitWidth() > bitSize) {
     // Need to shift before truncation if the packed value is wider
     // than the mask.
-    source = builder.CreateLShr(source, uint64_t(usedBits));
+    source = B.CreateLShr(source, uint64_t(usedBits));
     usedBits = 0;
   }
   if (sourceTy->getBitWidth() != bitSize) {
-    source = builder.CreateZExtOrTrunc(source, destTy);
+    source = B.CreateZExtOrTrunc(source, destTy);
   }
 
   // No need to AND with the mask if the whole source can just be
@@ -7249,18 +7240,18 @@ llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
     llvm::Value *part = source;
     int64_t offset = int64_t(partMask.countTrailingZeros()) - usedBits;
     if (offset > 0) {
-      part = builder.CreateShl(part, uint64_t(offset));
+      part = B.CreateShl(part, uint64_t(offset));
     } else if (offset < 0) {
-      part = builder.CreateLShr(part, uint64_t(-offset));
+      part = B.CreateLShr(part, uint64_t(-offset));
     }
 
     // Mask out selected bits.
     if (needMask) {
-      part = builder.CreateAnd(part, partMask);
+      part = B.CreateAnd(part, partMask);
     }
 
     // Accumulate the result.
-    result = result ? builder.CreateOr(result, part) : part;
+    result = result ? B.CreateOr(result, part) : part;
 
     // Update the offset and remaining mask.
     usedBits += partMask.countPopulation();

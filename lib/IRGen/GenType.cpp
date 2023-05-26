@@ -947,11 +947,11 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
   
   // Scatter the occupied bits.
   auto OccupiedBits = ~SpareBits.asAPInt();
-  llvm::Value *occupied = emitScatterBits(IGF.IGM, IGF.Builder, OccupiedBits,
+  llvm::Value *occupied = emitScatterBits(IGF, OccupiedBits,
                                           occupiedIndex, 0);
   
   // Scatter the spare bits.
-  llvm::Value *spare = emitScatterBits(IGF.IGM, IGF.Builder, SpareBits.asAPInt(),
+  llvm::Value *spare = emitScatterBits(IGF, SpareBits.asAPInt(),
                                        spareIndex, 0);
   
   // Combine the values and store to the destination.
@@ -988,8 +988,7 @@ namespace {
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {}
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder, EnumPayload &payload,
+    void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
                              Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
@@ -1201,7 +1200,7 @@ namespace {
       }
     }
     
-    void reexplode(Explosion &sourceExplosion,
+    void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                    Explosion &targetExplosion) const override {
       for (auto scalarTy : ScalarTypes) {
         (void)scalarTy;
@@ -1211,7 +1210,7 @@ namespace {
     
     void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
               Explosion &targetExplosion, Atomicity atomicity) const override {
-      reexplode(sourceExplosion, targetExplosion);
+      reexplode(IGF, sourceExplosion, targetExplosion);
     }
 
     void consume(IRGenFunction &IGF, Explosion &explosion,
@@ -1246,13 +1245,12 @@ namespace {
                              (offset + getFixedSize()).asCharUnits());
     }
     
-    void packIntoEnumPayload(IRGenModule &IGM,
-                             IRBuilder &builder,
+    void packIntoEnumPayload(IRGenFunction &IGF,
                              EnumPayload &payload,
                              Explosion &source,
                              unsigned offset) const override {
       for (auto scalarTy: ScalarTypes) {
-        payload.insertValue(IGM, builder, source.claimNext(), offset);
+        payload.insertValue(IGF, source.claimNext(), offset);
         offset += scalarTy->getIntegerBitWidth();
       }
     }
@@ -2977,7 +2975,7 @@ bool irgen::tryEmitConsumeUsingDeinit(IRGenFunction &IGF, Explosion &explosion,
   return tryEmitDeinitCall(IGF, T,
     // Direct parameter case
     [&](Explosion &arg) {
-      ti->reexplode(explosion, arg);
+      ti->reexplode(IGF, explosion, arg);
     },
     // Indirect parameter setup
     [&]() -> Address {
