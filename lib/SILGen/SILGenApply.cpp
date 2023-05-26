@@ -3029,7 +3029,8 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
       return result.withTransitiveRoot(te);
 
   } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
-    return ioe;
+    if (auto result = findStorageReferenceExprForBorrow(ioe->getSubExpr()))
+      return result.withTransitiveRoot(ioe);
   }
 
   return StorageRefResult();
@@ -3042,6 +3043,13 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
 
   auto argExpr = asKnownExpr();
 
+  // If there's a load around the outer part of this arg expr, look past it.
+  bool sawLoad = false;
+  if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
+    argExpr = li->getSubExpr();
+    sawLoad = true;
+  }
+
   // If we have a subscript, strip it off and make sure that our base is
   // something that we can process. If we do and we succeed below, we return the
   // subscript instead.
@@ -3053,13 +3061,11 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
     } else {
       argExpr = subscriptExpr->getBase();
     }
-  }
 
-  // If there's a load around the outer part of this arg expr, look past it.
-  bool sawLoad = false;
-  if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
-    argExpr = li->getSubExpr();
-    sawLoad = true;
+    // If there's a load on the base of the subscript expr, look past it.
+    if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
+      argExpr = li->getSubExpr();
+    }
   }
 
   // If we're consuming instead, then the load _must_ have been there.

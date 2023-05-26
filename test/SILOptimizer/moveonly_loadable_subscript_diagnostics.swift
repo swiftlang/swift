@@ -198,7 +198,6 @@ public func testSubscriptReadSet_BaseLoadable_ResultLoadable_Var() {
     var m = LoadableSubscriptReadSetTester()
     m = LoadableSubscriptReadSetTester()
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m[0] = LoadableMoveOnlyContainingProtocol()
     m[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
@@ -213,7 +212,6 @@ public func testSubscriptReadSet_BaseLoadable_ResultLoadable_Let() {
 
 public func testSubscriptReadSet_BaseLoadable_ResultLoadable_InOut(m: inout LoadableSubscriptReadSetTester) {
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m[0] = LoadableMoveOnlyContainingProtocol()
     m[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
@@ -222,7 +220,6 @@ public func testSubscriptReadSet_BaseLoadable_ResultLoadable_InOut(m: inout Load
 var globalLoadableSubscriptReadSetTester = LoadableSubscriptReadSetTester()
 public func testSubscriptReadSet_BaseLoadable_ResultLoadable_Global() {
     globalLoadableSubscriptReadSetTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     globalLoadableSubscriptReadSetTester[0] = LoadableMoveOnlyContainingProtocol()
     globalLoadableSubscriptReadSetTester[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
@@ -238,7 +235,6 @@ public func testSubscriptReadSetThroughNonCopyableParentStruct_BaseLoadable_Resu
     var m = LoadableSubscriptReadSetTesterNonCopyableStructParent()
     m = LoadableSubscriptReadSetTesterNonCopyableStructParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.tester[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester[0].nonMutatingFunc()
@@ -251,7 +247,6 @@ public func testSubscriptReadSetThroughNonCopyableParentStruct_BaseLoadable_Resu
 
 public func testSubscriptReadSetThroughNonCopyableParentStruct_BaseLoadable_ResultLoadable_InOut(m: inout LoadableSubscriptReadSetTesterNonCopyableStructParent) {
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.tester[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
 }
@@ -259,7 +254,6 @@ public func testSubscriptReadSetThroughNonCopyableParentStruct_BaseLoadable_Resu
 var globalLoadableSubscriptReadSetTesterNonCopyableStructParent = LoadableSubscriptReadSetTesterNonCopyableStructParent()
 public func testSubscriptReadSetThroughNonCopyableParentStruct_BaseLoadable_ResultLoadable_Global() {
     globalLoadableSubscriptReadSetTesterNonCopyableStructParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     globalLoadableSubscriptReadSetTesterNonCopyableStructParent.tester[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
 }
@@ -278,17 +272,14 @@ public func testSubscriptReadSetThroughParentClass_BaseLoadable_ResultLoadable_V
     var m = LoadableSubscriptReadSetTesterClassParent()
     m = LoadableSubscriptReadSetTesterClassParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.tester[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
     m.testerParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.testerParent.tester[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester[0].nonMutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].mutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
 }
@@ -310,7 +301,6 @@ public func testSubscriptReadModify_BaseLoadable_ResultLoadable_Var() {
     var m = LoadableSubscriptReadModifyTester()
     m = LoadableSubscriptReadModifyTester()
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m[0] = LoadableMoveOnlyContainingProtocol()
     m[0].mutatingFunc()
 }
@@ -323,7 +313,6 @@ public func testSubscriptReadModify_BaseLoadable_ResultLoadable_Let() {
 
 public func testSubscriptReadModify_BaseLoadable_ResultLoadable_InOut(m: inout LoadableSubscriptReadModifyTester) {
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m[0] = LoadableMoveOnlyContainingProtocol()
     m[0].mutatingFunc()
 }
@@ -331,7 +320,6 @@ public func testSubscriptReadModify_BaseLoadable_ResultLoadable_InOut(m: inout L
 var globalLoadableSubscriptReadModifyTester = LoadableSubscriptReadModifyTester()
 public func testSubscriptReadModify_BaseLoadable_ResultLoadable_Global() {
     globalLoadableSubscriptReadModifyTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     globalLoadableSubscriptReadModifyTester[0] = LoadableMoveOnlyContainingProtocol()
     globalLoadableSubscriptReadModifyTester[0].mutatingFunc()
 }
@@ -346,7 +334,6 @@ public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_R
     var m = LoadableSubscriptReadModifyTesterNonCopyableStructParent()
     m = LoadableSubscriptReadModifyTesterNonCopyableStructParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
 }
@@ -359,14 +346,12 @@ public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_R
 
 public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultLoadable_InOut(m: inout LoadableSubscriptReadModifyTesterNonCopyableStructParent) {
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.tester[0].mutatingFunc()
 }
 
 var globalLoadableSubscriptReadModifyTesterNonCopyableStructParent = LoadableSubscriptReadModifyTesterNonCopyableStructParent()
 public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultLoadable_Global() {
     globalLoadableSubscriptReadModifyTesterNonCopyableStructParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     globalLoadableSubscriptReadModifyTesterNonCopyableStructParent.tester[0].mutatingFunc()
 }
 
@@ -384,15 +369,12 @@ public func testSubscriptReadModifyThroughParentClass_BaseLoadable_ResultLoadabl
     var m = LoadableSubscriptReadModifyTesterClassParent()
     m = LoadableSubscriptReadModifyTesterClassParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.tester[0].mutatingFunc()
     m.testerParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].mutatingFunc()
 }
 
