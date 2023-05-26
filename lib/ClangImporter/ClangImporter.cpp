@@ -6574,6 +6574,17 @@ static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
   return false;
 }
 
+static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
+  // std::pair and std::tuple might have copy and move constructors, but that
+  // doesn't mean they are safe to use from Swift, e.g. std::pair<UnsafeType, T>
+  if (decl->isInStdNamespace() &&
+      (decl->getName() == "pair" || decl->getName() == "tuple")) {
+    return false;
+  }
+  return decl->hasUserDeclaredCopyConstructor() ||
+         decl->hasUserDeclaredMoveConstructor();
+}
+
 static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
   // Swift type must be annotated with external_source_symbol attribute.
   auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
@@ -6641,8 +6652,7 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Iterator;
   }
   
-  if (!cxxDecl->hasUserDeclaredCopyConstructor() &&
-      !cxxDecl->hasUserDeclaredMoveConstructor() &&
+  if (!hasCustomCopyOrMoveConstructor(cxxDecl) &&
       hasPointerInSubobjects(cxxDecl)) {
     return CxxRecordSemanticsKind::UnsafePointerMember;
   }
@@ -6730,8 +6740,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return true;
         }
 
-        if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
-            !cxxRecordReturnType->hasUserDeclaredMoveConstructor() &&
+        if (!hasCustomCopyOrMoveConstructor(cxxRecordReturnType) &&
             !hasOwnedValueAttr(cxxRecordReturnType) &&
             hasPointerInSubobjects(cxxRecordReturnType)) {
           return false;
