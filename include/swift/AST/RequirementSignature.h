@@ -73,6 +73,9 @@ public:
   GenericSignatureErrors getErrors() const {
     return Errors;
   }
+
+  void dump(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace swift
