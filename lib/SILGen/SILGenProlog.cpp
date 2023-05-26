@@ -788,6 +788,7 @@ private:
       return;
     }
 
+    SILValue debugOperand = value;
     if (value->getType().isMoveOnly()) {
       switch (pd->getValueOwnership()) {
       case ValueOwnership::Default:
@@ -827,11 +828,14 @@ private:
           }
         }
         break;
-      case ValueOwnership::InOut:
-        assert(isa<MarkMustCheckInst>(value) &&
-               "Expected mark must check inst with inout to be handled in "
-               "emitBBArgs earlier");
+      case ValueOwnership::InOut: {
+        assert(isa<MarkMustCheckInst>(value)
+               && "Expected mark must check inst with inout to be handled in "
+                  "emitBBArgs earlier");
+        auto mark = cast<MarkMustCheckInst>(value);
+        debugOperand = mark->getOperand();
         break;
+      }
       case ValueOwnership::Owned:
         value = SGF.B.createMarkMustCheckInst(
             loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
@@ -843,7 +847,17 @@ private:
       }
     }
 
-    SGF.B.createDebugValueAddr(loc, value, varinfo);
+    DebugValueInst *debugInst
+      = SGF.B.createDebugValueAddr(loc, debugOperand, varinfo);
+    
+    if (value != debugOperand) {
+      if (auto valueInst = dyn_cast<MarkMustCheckInst>(value)) {
+        // Move the debug instruction outside of any marker instruction that might
+        // have been applied to the value, so that analysis doesn't move the
+        // debug_value anywhere it shouldn't be.
+        debugInst->moveBefore(valueInst);
+      }
+    }
     SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
 

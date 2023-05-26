@@ -77,7 +77,7 @@ static void getVariableNameForValue(SILValue value2,
                                     SmallString<64> &resultingString) {
   // Before we do anything, lets see if we have an exact debug_value on our
   // mmci. In such a case, we can end early and are done.
-  if (auto *use = getSingleDebugUse(value2)) {
+  if (auto *use = getAnyDebugUse(value2)) {
     if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
       assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
       resultingString += debugVar.getName();
@@ -112,7 +112,7 @@ static void getVariableNameForValue(SILValue value2,
 
     // If we do not do an exact match, see if we can find a debug_var inst. If
     // we do, we always break since we have a root value.
-    if (auto *use = getSingleDebugUse(searchValue)) {
+    if (auto *use = getAnyDebugUse(searchValue)) {
       if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
         assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
         variableNamePath.push_back(use->getUser());
