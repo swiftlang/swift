@@ -351,6 +351,12 @@ namespace {
       return asImpl().handleAddressOnly(type, props);
     }
 
+    RetTy visitPackElementType(CanPackElementType type,
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("not implemented for PackElementType");
+    }
+
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
                                      AbstractionPattern orig,
                                      IsTypeExpansionSensitive_t isSensitive) {
@@ -2252,6 +2258,12 @@ namespace {
       return handleAddressOnly(packExpansionType, properties);
     }
 
+    TypeLowering *visitPackElementType(CanPackElementType packElementType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("not implemented for PackElementType");
+    }
+
     TypeLowering *visitBuiltinTupleType(CanBuiltinTupleType type,
                                         AbstractionPattern origType,
                                         IsTypeExpansionSensitive_t isSensitive) {
@@ -3056,6 +3068,10 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       return CanType(PackExpansionType::get(loweredSubstPatternType,
                                             loweredSubstCountType));
+    }
+
+    CanType visitPackElementType(CanPackElementType substPackElementType) {
+      llvm_unreachable("not implemented for PackElementType");
     }
 
     CanType visitBuiltinTupleType(CanBuiltinTupleType type) {

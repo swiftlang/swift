@@ -6073,6 +6073,11 @@ public:
     visit(T->getPatternType());
   }
 
+  void visitPackElementType(PackElementType *T) {
+    Printer << "@level(" << T->getLevel() << ") ";
+    visit(T->getPackType());
+  }
+
   void visitTupleType(TupleType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
