@@ -1295,17 +1295,41 @@ bool SILInstruction::isDeallocatingStack() const {
 bool SILInstruction::mayRequirePackMetadata() const {
   switch (getKind()) {
   case SILInstructionKind::AllocPackInst:
+  case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::OpenPackElementInst:
+    return true;
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::DebugValueInst:
-  case SILInstructionKind::MetatypeInst:
-  case SILInstructionKind::TuplePackElementAddrInst:
-  case SILInstructionKind::OpenPackElementInst:
-  case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::WitnessMethodInst:
-    return true;
+  case SILInstructionKind::TryApplyInst: {
+    // Check the function type for packs.
+    auto apply = ApplySite::isa(const_cast<SILInstruction *>(this));
+    if (apply.getCallee()->getType().hasPack())
+      return true;
+    // Check the substituted types for packs.
+    for (auto ty : apply.getSubstitutionMap().getReplacementTypes()) {
+      if (ty->hasPack())
+        return true;
+    }
+    return false;
+  }
+  case SILInstructionKind::DebugValueInst: {
+    auto *dvi = cast<DebugValueInst>(this);
+    return dvi->getOperand()->getType().hasPack();
+  }
+  case SILInstructionKind::MetatypeInst: {
+    auto *mi = cast<MetatypeInst>(this);
+    return mi->getType().hasPack();
+  }
+  case SILInstructionKind::ClassMethodInst: {
+    auto *cmi = cast<ClassMethodInst>(this);
+    return cmi->getOperand()->getType().hasPack();
+  }
+  case SILInstructionKind::WitnessMethodInst: {
+    auto *wmi = cast<WitnessMethodInst>(this);
+    auto ty = wmi->getLookupType();
+    return ty->hasPack();
+  }
   default:
     return false;
   }
