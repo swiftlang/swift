@@ -1962,15 +1962,14 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         errorKind == ModularizationError::Kind::DeclMoved &&
         !values.empty()) {
       // Print the error as a remark and notify of the recovery attempt.
+      getContext().Diags.diagnose(getSourceLoc(),
+                                  diag::modularization_issue_worked_around);
       llvm::handleAllErrors(std::move(error),
         [&](const ModularizationError &modularError) {
-          modularError.diagnose(this, DiagnosticBehavior::Remark);
+          modularError.diagnose(this, DiagnosticBehavior::Note);
         });
-      getContext().Diags.diagnose(getSourceLoc(),
-                                  diag::modularization_issue_worked_around,
-                                  foundIn);
     } else {
-      return error;
+      return std::move(error);
     }
   }
 

@@ -18,8 +18,8 @@
 // RUN: %target-swift-frontend -emit-sil %t/LibWithXRef.swiftmodule -module-name LibWithXRef -I %t \
 // RUN:   -experimental-force-workaround-broken-modules 2>&1 \
 // RUN:   | %FileCheck --check-prefixes CHECK-WORKAROUND %s
-// CHECK-WORKAROUND: remark: reference to type 'MyType' broken by a context change; 'MyType' was expected to be in 'A', but now a candidate is found only in 'B'
-// CHECK-WORKAROUND: note: attempting forced recovery using top-level declaration from 'B'
+// CHECK-WORKAROUND: warning: attempting forced recovery enabled by -experimental-force-workaround-broken-modules
+// CHECK-WORKAROUND: note: reference to type 'MyType' broken by a context change; 'MyType' was expected to be in 'A', but now a candidate is found only in 'B'
 // CHECK-WORKAROUND: func foo() -> some Proto
 
 /// Change MyType into a function.
