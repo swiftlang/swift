@@ -177,7 +177,7 @@ public:
   ///
   /// More accurately, enable skipping mandatory heapification of pack metadata
   /// when possible.
-  bool EnablePackMetadataStackPromotion = false;
+  bool EnablePackMetadataStackPromotion = true;
 
   // The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
