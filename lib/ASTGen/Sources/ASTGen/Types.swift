@@ -13,10 +13,7 @@ extension ASTGenVisitor {
       return .type(EmptyCompositionTypeRepr_create(self.ctx, loc))
     }
 
-    var text = node.name.text
-    let id = text.withBridgedString { bridgedText in
-      return ASTContext_getIdentifier(ctx, bridgedText)
-    }
+    let id = node.name.bridgedIdentifier(in: self)
 
     guard let generics = node.genericArgumentClause else {
       return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
@@ -40,14 +37,8 @@ extension ASTGenVisitor {
 
     var baseType = Syntax(node)
     while let memberType = baseType.as(MemberTypeSyntax.self) {
-      let nameToken = memberType.name
       let generics = memberType.genericArgumentClause
-
-      var nameText = nameToken.text
-      let name = nameText.withBridgedString { bridgedName in
-        return ASTContext_getIdentifier(ctx, bridgedName)
-      }
-      let nameLoc = bridgedSourceLoc(for: nameToken)
+      let (name, nameLoc) = memberType.name.bridgedIdentifierAndSourceLoc(in: self)
 
       if let generics = generics {
         let lAngle = bridgedSourceLoc(for: generics.leftAngle)
@@ -249,16 +240,8 @@ extension ASTGenVisitor {
   ) -> T {
     var elements = [BridgedTupleTypeElement]()
     for element in elementList {
-      var nameText = element.firstName?.text
-      let name = nameText?.withBridgedString { bridgedName in
-        return ASTContext_getIdentifier(ctx, bridgedName)
-      } ?? nil
-      let nameLoc = bridgedSourceLoc(for: element.firstName)
-      var secondNameText = element.secondName?.text
-      let secondName = secondNameText?.withBridgedString { bridgedName in
-        return ASTContext_getIdentifier(ctx, bridgedName)
-      } ?? nil
-      let secondNameLoc = bridgedSourceLoc(for: element.secondName)
+      let (name, nameLoc) = element.firstName.bridgedIdentifierAndSourceLoc(in: self)
+      let (secondName, secondNameLoc) = element.secondName.bridgedIdentifierAndSourceLoc(in: self)
       let colonLoc = bridgedSourceLoc(for: element.colon)
       var type = visit(element.type).rawValue
       if let ellipsis = element.ellipsis {

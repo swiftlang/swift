@@ -17,11 +17,7 @@ extension ASTGenVisitor {
   }
 
   func visit(_ node: GenericParameterSyntax) -> ASTNode {
-    var nodeName = node.name.text
-    let name = nodeName.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
-    let nameLoc = bridgedSourceLoc(for: node.name)
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
     let eachLoc = bridgedSourceLoc(for: node.eachKeyword)
 
     var genericParameterIndex: Int?

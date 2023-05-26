@@ -36,22 +36,14 @@ extension ASTGenVisitor {
 
   public func visit(_ node: DeclReferenceExprSyntax) -> ASTNode {
     let loc = bridgedSourceLoc(for: node)
-
-    var text = node.baseName.text
-    let id = text.withBridgedString { bridgedText in
-      return ASTContext_getIdentifier(ctx, bridgedText)
-    }
+    let id = node.baseName.bridgedIdentifier(in: self)
 
     return .expr(IdentifierExpr_create(ctx, id, loc))
   }
 
   public func visit(_ node: IdentifierPatternSyntax) -> ASTNode {
     let loc = bridgedSourceLoc(for: node)
-
-    var text = node.identifier.text
-    let id = text.withBridgedString { bridgedText in
-      return ASTContext_getIdentifier(ctx, bridgedText)
-    }
+    let id = node.identifier.bridgedIdentifier(in: self)
 
     return .expr(IdentifierExpr_create(ctx, id, loc))
   }
@@ -59,10 +51,7 @@ extension ASTGenVisitor {
   public func visit(_ node: MemberAccessExprSyntax) -> ASTNode {
     let loc = bridgedSourceLoc(for: node)
     let base = visit(node.base!).rawValue
-    var nameText = node.declName.baseName.text
-    let name = nameText.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
+    let name = node.declName.baseName.bridgedIdentifier(in: self)
 
     return .expr(UnresolvedDotExpr_create(ctx, base, loc, name, loc))
   }
@@ -78,13 +67,8 @@ extension ASTGenVisitor {
 
   public func visit(_ node: LabeledExprListSyntax) -> ASTNode {
     let elements = node.map { self.visit($0).rawValue }
-    let labels: [BridgedIdentifier?] = node.map {
-      guard var name = $0.label?.text else {
-        return nil
-      }
-      return name.withBridgedString { bridgedName in
-        ASTContext_getIdentifier(ctx, bridgedName)
-      }
+    let labels: [BridgedIdentifier] = node.map {
+      $0.label.bridgedIdentifier(in: self)
     }
     let labelLocs: [BridgedSourceLoc] = node.map {
       let pos = $0.label?.position ?? $0.position

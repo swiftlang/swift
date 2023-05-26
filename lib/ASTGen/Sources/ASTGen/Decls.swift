@@ -8,11 +8,7 @@ extension ASTGenVisitor {
   public func visit(_ node: TypeAliasDeclSyntax) -> ASTNode {
     let aliasLoc = bridgedSourceLoc(for: node.typealiasKeyword)
     let equalLoc = bridgedSourceLoc(for: node.initializer.equal)
-    var nameText = node.name.text
-    let name = nameText.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
-    let nameLoc = bridgedSourceLoc(for: node.name)
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
     let genericParams = node.genericParameterClause.map { self.visit($0).rawValue }
     let out = TypeAliasDecl_create(
       self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, genericParams)
@@ -29,10 +25,7 @@ extension ASTGenVisitor {
 
   public func visit(_ node: StructDeclSyntax) -> ASTNode {
     let loc = bridgedSourceLoc(for: node)
-    var nameText = node.name.text
-    let name = nameText.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
+    let name = node.name.bridgedIdentifier(in: self)
 
     let genericParams = node.genericParameterClause
       .map { self.visit($0).rawValue }
@@ -52,10 +45,7 @@ extension ASTGenVisitor {
 
   public func visit(_ node: ClassDeclSyntax) -> ASTNode {
     let loc = bridgedSourceLoc(for: node)
-    var nameText = node.name.text
-    let name = nameText.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
+    let name = node.name.bridgedIdentifier(in: self)
 
     let out = ClassDecl_create(ctx, loc, name, loc, declContext)
     let oldDeclContext = declContext
@@ -90,27 +80,14 @@ extension ASTGenVisitor {
     let loc = bridgedSourceLoc(for: node)
 
     let firstName: BridgedIdentifier
-    let secondName: BridgedIdentifier
-
-    let nodeFirstName = node.firstName
-    if nodeFirstName.text != "_" {
+    if node.firstName.text != "_" {
       // Swift AST represents "_" as nil.
-      var text = nodeFirstName.text
-      firstName = text.withBridgedString { bridgedName in
-        ASTContext_getIdentifier(ctx, bridgedName)
-      }
+      firstName = node.firstName.bridgedIdentifier(in: self)
     } else {
       firstName = nil
     }
 
-    if let nodeSecondName = node.secondName {
-      var text = nodeSecondName.text
-      secondName = text.withBridgedString { bridgedName in
-        ASTContext_getIdentifier(ctx, bridgedName)
-      }
-    } else {
-      secondName = nil
-    }
+    let secondName = node.secondName.bridgedIdentifier(in: self)
 
     let type = visit(node.type).rawValue
 
@@ -120,14 +97,9 @@ extension ASTGenVisitor {
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {
     let staticLoc = bridgedSourceLoc(for: node)
     let funcLoc = bridgedSourceLoc(for: node.funcKeyword)
-    let nameLoc = bridgedSourceLoc(for: node.name)
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
     let rParamLoc = bridgedSourceLoc(for: node.signature.parameterClause.leftParen)
     let lParamLoc = bridgedSourceLoc(for: node.signature.parameterClause.rightParen)
-
-    var nameText = node.name.text
-    let name = nameText.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
 
     let returnType: ASTNode?
     if let output = node.signature.returnClause {
