@@ -119,6 +119,12 @@ public:
   /// way to file a bug.
   void emitCheckedMissedCopyError(SILInstruction *copyInst);
 
+  /// Assuming the given instruction represents the implicit destruction of
+  /// 'self', emits an error saying that you needed to explicitly 'consume self'
+  /// here because you're in a discarding context.
+  void emitMissingConsumeInDiscardingContext(SILInstruction *leftoverDestroy,
+                                             SILInstruction *dropDeinit);
+
   void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectOwnedDiagnostic(MarkMustCheckInst *markedValue);

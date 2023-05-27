@@ -691,6 +691,9 @@ struct UseState {
   /// [assign] that are reinits that we will convert to inits and true reinits.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> reinitInsts;
 
+  /// The set of drop_deinits of this mark_must_check
+  SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
+
   /// A "inout terminator use" is an implicit liveness use of the entire value
   /// placed on a terminator. We use this both so we add liveness for the
   /// terminator user and so that we can use the set to quickly identify later
@@ -712,6 +715,31 @@ struct UseState {
     return inoutTermUsers.count(inst);
   }
 
+  /// Returns true if the given instruction is within the same block as a reinit
+  /// and precedes a reinit instruction in that block.
+  bool precedesReinitInSameBlock(SILInstruction *inst) const {
+    SILBasicBlock *block = inst->getParent();
+    SmallSetVector<SILInstruction *, 8> sameBlockReinits;
+
+    // First, search for all reinits that are within the same block.
+    for (auto &reinit : reinitInsts) {
+      if (reinit.first->getParent() != block)
+        continue;
+      sameBlockReinits.insert(reinit.first);
+    }
+
+    if (sameBlockReinits.empty())
+      return false;
+
+    // Walk down from the given instruction to see if we encounter a reinit.
+    for (auto ii = std::next(inst->getIterator()); ii != block->end(); ++ii) {
+      if (sameBlockReinits.contains(&*ii))
+        return true;
+    }
+
+    return false;
+  }
+
   void clear() {
     address = nullptr;
     destroys.clear();
@@ -721,6 +749,7 @@ struct UseState {
     takeInsts.clear();
     initInsts.clear();
     reinitInsts.clear();
+    dropDeinitInsts.clear();
     inoutTermUsers.clear();
     debugValue = nullptr;
   }
@@ -754,6 +783,10 @@ struct UseState {
     llvm::dbgs() << "Reinits:\n";
     for (auto pair : reinitInsts) {
       llvm::dbgs() << *pair.first;
+    }
+    llvm::dbgs() << "DropDeinits:\n";
+    for (auto *inst : dropDeinitInsts) {
+      llvm::dbgs() << *inst;
     }
     llvm::dbgs() << "InOut Term Users:\n";
     for (auto *inst : inoutTermUsers) {
@@ -1737,6 +1770,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     LLVM_DEBUG(llvm::dbgs() << "Running copy propagation!\n");
     moveChecker.changed |= moveChecker.canonicalizer.canonicalize();
 
+    // Export the drop_deinit's discovered by the ObjectChecker into the
+    // AddressChecker to preserve it for later use. We need to do this since
+    // the ObjectChecker's state gets cleared after running on this LoadInst.
+    for (auto *dropDeinit : moveChecker.canonicalizer.getDropDeinitUses())
+      moveChecker.addressUseState.dropDeinitInsts.insert(dropDeinit);
+
     // If we are asked to perform no_consume_or_assign checking or
     // assignable_but_not_consumable checking, if we found any consumes of our
     // load, then we need to emit an error.
@@ -2458,10 +2497,41 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     const FieldSensitivePrunedLivenessBoundary &boundary) {
   LLVM_DEBUG(llvm::dbgs() << "MoveOnlyAddressChecker Rewrite Uses!\n");
-  // First remove all destroy_addr that have not been claimed.
+
+  /// Whether the marked value appeared in a discard statement.
+  const bool isDiscardingContext = !addressUseState.dropDeinitInsts.empty();
+
+  // Process destroys
   for (auto destroyPair : addressUseState.destroys) {
-    if (!consumes.claimConsume(destroyPair.first, destroyPair.second)) {
+    /// Is this destroy instruction a final consuming use?
+    bool isFinalConsume =
+        consumes.claimConsume(destroyPair.first, destroyPair.second);
+
+    // Remove destroys that are not the final consuming use.
+    if (!isFinalConsume) {
       destroyPair.first->eraseFromParent();
+      continue;
+    }
+
+    // Otherwise, if we're in a discarding context, flag this final destroy_addr
+    // as a point where we're missing an explicit `consume self`. The reasoning
+    // here is that if a destroy of self is the final consuming use,
+    // then these are the points where we implicitly destroy self to clean-up
+    // that self var before exiting the scope. An explicit 'consume self'
+    // that is thrown away is a consume of this mark_must_check'd var and not a
+    // destroy of it, according to the use classifier.
+    if (isDiscardingContext) {
+
+      // Since the boundary computations treat a newly-added destroy prior to
+      // a reinit within that same block as a "final consuming use", exclude
+      // such destroys-before-reinit. We are only interested in the final
+      // destroy of a var, not intermediate destroys of the var.
+      if (addressUseState.precedesReinitInSameBlock(destroyPair.first))
+        continue;
+
+      auto *dropDeinit = addressUseState.dropDeinitInsts.front();
+      diagnosticEmitter.emitMissingConsumeInDiscardingContext(destroyPair.first,
+                                                              dropDeinit);
     }
   }
 
