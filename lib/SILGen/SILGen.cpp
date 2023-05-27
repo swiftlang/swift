@@ -1079,11 +1079,6 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f, dd).emitDeallocatingDestructor(dd);
-
-    // If we have a move only type, create the table for this type.
-    if (nom->isMoveOnly())
-      SILMoveOnlyDeinit::create(f->getModule(), nom, IsNotSerialized, f);
-
     postEmitFunction(constant, f);
     return;
   }

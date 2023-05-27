@@ -105,9 +105,13 @@ static bool performTransform(SILFunction &fn) {
           auto *funcRef = builder.createFunctionRef(dai->getLoc(), deinitFunc);
           auto subMap = destroyType.getASTType()->getContextSubstitutionMap(
               nom->getModuleContext(), nom);
-          auto loadedValue = builder.emitLoadValueOperation(
-              dai->getLoc(), dai->getOperand(), LoadOwnershipQualifier::Take);
-          builder.createApply(dai->getLoc(), funcRef, subMap, loadedValue);
+          auto conv = funcRef->getConventions();
+          auto argConv = conv.getSILArgumentConvention(conv.getSILArgIndexOfSelfParam());
+          SILValue value = dai->getOperand();
+          if (!argConv.isIndirectConvention())
+            value = builder.emitLoadValueOperation(
+                dai->getLoc(), dai->getOperand(), LoadOwnershipQualifier::Take);
+          builder.createApply(dai->getLoc(), funcRef, subMap, value);
           dai->eraseFromParent();
           changed = true;
           continue;
