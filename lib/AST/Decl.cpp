@@ -3981,7 +3981,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
       if (!shouldSkipDiag) {
         // No package context was found; show diagnostics
         auto &d = VD->getASTContext().Diags;
-        d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
+        auto filename = srcFile ? srcFile->getFilename() : resultDC->getParentModule()->getBaseIdentifier().str();
+        d.diagnose(VD->getLoc(),
+                   diag::access_control_requires_package_name,
+                   VD->getBaseIdentifier(),
+                   filename);
       }
       // Instead of reporting and failing early, return the scope of resultDC to
       // allow continuation (should still non-zero exit later if in script mode)
