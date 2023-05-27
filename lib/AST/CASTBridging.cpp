@@ -747,6 +747,46 @@ BridgedDeclContextAndDecl ExtensionDecl_create(
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
+void *OperatorDecl_create(BridgedASTContext cContext,
+                          BridgedDeclContext cDeclContext,
+                          BridgedOperatorFixity cFixity,
+                          BridgedSourceLoc cOperatorKeywordLoc,
+                          BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                          BridgedSourceLoc cColonLoc,
+                          BridgedIdentifier cPrecedenceGroupName,
+                          BridgedSourceLoc cPrecedenceGroupLoc) {
+  assert(bool(cColonLoc.raw) == (bool)cPrecedenceGroupName.raw);
+  assert(bool(cColonLoc.raw) == (bool)cPrecedenceGroupLoc.raw);
+
+  ASTContext &context = convertASTContext(cContext);
+  auto operatorKeywordLoc = convertSourceLoc(cOperatorKeywordLoc);
+  auto name = convertIdentifier(cName);
+  auto nameLoc = convertSourceLoc(cNameLoc);
+  auto *declContext = convertDeclContext(cDeclContext);
+
+  OperatorDecl *decl = nullptr;
+  switch (cFixity) {
+  case BridgedOperatorFixityInfix:
+    decl = new (context) InfixOperatorDecl(
+        declContext, operatorKeywordLoc, name, nameLoc,
+        convertSourceLoc(cColonLoc), convertIdentifier(cPrecedenceGroupName),
+        convertSourceLoc(cPrecedenceGroupLoc));
+    break;
+  case BridgedOperatorFixityPrefix:
+    assert(!cColonLoc.raw);
+    decl = new (context)
+        PrefixOperatorDecl(declContext, operatorKeywordLoc, name, nameLoc);
+    break;
+  case BridgedOperatorFixityPostfix:
+    assert(!cColonLoc.raw);
+    decl = new (context)
+        PostfixOperatorDecl(declContext, operatorKeywordLoc, name, nameLoc);
+    break;
+  }
+
+  return static_cast<Decl *>(decl);
+}
+
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,
                               BridgedSourceLoc cQuestionLoc) {
   ASTContext &context = convertASTContext(cContext);

@@ -412,6 +412,21 @@ BridgedDeclContextAndDecl ExtensionDecl_create(
     BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
     BridgedSourceRange cBraceRange);
 
+typedef enum ENUM_EXTENSIBILITY_ATTR(closed) {
+  BridgedOperatorFixityInfix,
+  BridgedOperatorFixityPrefix,
+  BridgedOperatorFixityPostfix,
+} BridgedOperatorFixity;
+
+void *OperatorDecl_create(BridgedASTContext cContext,
+                          BridgedDeclContext cDeclContext,
+                          BridgedOperatorFixity cFixity,
+                          BridgedSourceLoc cOperatorKeywordLoc,
+                          BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                          BridgedSourceLoc cColonLoc,
+                          BridgedIdentifier cPrecedenceGroupName,
+                          BridgedSourceLoc cPrecedenceGroupLoc);
+
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLeftAngleLoc,
                               BridgedArrayRef cParameters,

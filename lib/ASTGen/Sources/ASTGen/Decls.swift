@@ -3,6 +3,7 @@ import CASTBridging
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
 import SwiftSyntax
+import SwiftDiagnostics
 
 // MARK: - TypeDecl
 
@@ -259,6 +260,48 @@ extension ASTGenVisitor {
     }
 
     return .decl(out.decl)
+  }
+}
+
+// MARK: - OperatorDecl
+
+extension BridgedOperatorFixity {
+  fileprivate init?(from tokenKind: TokenKind) {
+    switch tokenKind {
+    case .keyword(.infix): self = .infix
+    case .keyword(.prefix): self = .prefix
+    case .keyword(.postfix): self = .postfix
+    default: return nil
+    }
+  }
+}
+
+extension ASTGenVisitor {
+  func visit(_ node: OperatorDeclSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+    let (precedenceGroupName, precedenceGroupLoc) = (node.operatorPrecedenceAndTypes?.precedenceGroup).bridgedIdentifierAndSourceLoc(in: self)
+
+    let fixity: BridgedOperatorFixity
+    if let value = BridgedOperatorFixity(from: node.fixitySpecifier.tokenKind) {
+      fixity = value
+    } else {
+      fixity = .infix
+      self.diagnose(Diagnostic(node: node.fixitySpecifier, message: UnexpectedTokenKindError(token: node.fixitySpecifier)))
+    }
+
+    return .decl(
+      OperatorDecl_create(
+        self.ctx,
+        self.declContext,
+        fixity,
+        self.bridgedSourceLoc(for: node.operatorKeyword),
+        name,
+        nameLoc,
+        self.bridgedSourceLoc(for: node.operatorPrecedenceAndTypes?.colon),
+        precedenceGroupName,
+        precedenceGroupLoc
+      )
+    )
   }
 }
 

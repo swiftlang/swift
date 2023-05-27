@@ -159,3 +159,15 @@ extension
 Class: Proto2 where T: Proto1 {
   func method2(_ b: Bool) {}
 }
+
+prefix
+operator ⎭^-^⎭
+
+infix
+operator
+  ~^-^~
+  :
+  AdditionPrecedence
+
+postfix
+operator ⎩^-^⎩
