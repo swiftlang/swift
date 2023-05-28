@@ -400,3 +400,12 @@ func testFreestandingWithClosure(i: Int) {
     return x
   }
 }
+
+// Nested macros with closures
+@freestanding(expression) macro coerceToInt<T>(_ value: T) -> Int = #externalMacro(module: "MacroDefinition", type: "CoerceToIntMacro")
+
+func testFreestandingClosureNesting() {
+  _ = #stringify({ () -> Int in
+    #coerceToInt(2)
+  })
+}
