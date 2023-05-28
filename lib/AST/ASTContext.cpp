@@ -403,6 +403,9 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
       NextMacroDiscriminator;
 
+  /// Local and closure discriminators per context.
+  llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -2183,6 +2186,18 @@ unsigned ASTContext::getNextMacroDiscriminator(
   std::pair<const void *, Identifier> key(
       context.getOpaqueValue(), baseName.getIdentifier());
   return getImpl().NextMacroDiscriminator[key]++;
+}
+
+/// Get the next discriminator within the given declaration context.
+unsigned ASTContext::getNextDiscriminator(const DeclContext *dc) {
+  return getImpl().NextDiscriminator[dc];
+}
+
+/// Set the maximum assigned discriminator within the given declaration context.
+void ASTContext::setMaxAssignedDiscriminator(
+    const DeclContext *dc, unsigned discriminator) {
+  assert(discriminator >= getImpl().NextDiscriminator[dc]);
+  getImpl().NextDiscriminator[dc] = discriminator;
 }
 
 void ASTContext::verifyAllLoadedModules() const {
