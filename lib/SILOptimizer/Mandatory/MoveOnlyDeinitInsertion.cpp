@@ -78,9 +78,21 @@ static bool performTransform(SILFunction &fn) {
           auto subMap =
               astType->getContextSubstitutionMap(nom->getModuleContext(), nom);
           SILBuilderWithScope builder(dvi);
+
+          SILValue value = dvi->getOperand();
+          auto conv = deinitFunc->getConventionsInContext();
+          if (conv.getSILArgumentConvention(conv.getSILArgIndexOfSelf())
+                  .isIndirectConvention()) {
+            auto *asi =
+                builder.createAllocStack(dvi->getLoc(), value->getType());
+            builder.emitStoreValueOperation(dvi->getLoc(), value, asi,
+                                            StoreOwnershipQualifier::Init);
+            value = asi;
+          }
           auto *funcRef = builder.createFunctionRef(dvi->getLoc(), deinitFunc);
-          builder.createApply(dvi->getLoc(), funcRef, subMap,
-                              dvi->getOperand());
+          builder.createApply(dvi->getLoc(), funcRef, subMap, value);
+          if (isa<AllocStackInst>(value))
+            builder.createDeallocStack(dvi->getLoc(), value);
           dvi->eraseFromParent();
           changed = true;
           continue;
@@ -105,9 +117,15 @@ static bool performTransform(SILFunction &fn) {
           auto *funcRef = builder.createFunctionRef(dai->getLoc(), deinitFunc);
           auto subMap = destroyType.getASTType()->getContextSubstitutionMap(
               nom->getModuleContext(), nom);
-          auto loadedValue = builder.emitLoadValueOperation(
-              dai->getLoc(), dai->getOperand(), LoadOwnershipQualifier::Take);
-          builder.createApply(dai->getLoc(), funcRef, subMap, loadedValue);
+
+          auto conv = deinitFunc->getConventionsInContext();
+          auto argConv =
+              conv.getSILArgumentConvention(conv.getSILArgIndexOfSelf());
+          SILValue value = dai->getOperand();
+          if (!argConv.isIndirectConvention())
+            value = builder.emitLoadValueOperation(
+                dai->getLoc(), dai->getOperand(), LoadOwnershipQualifier::Take);
+          builder.createApply(dai->getLoc(), funcRef, subMap, value);
           dai->eraseFromParent();
           changed = true;
           continue;
