@@ -473,6 +473,10 @@ class SerializeSILPass : public SILModuleTransform {
     for (auto &VT : M.getVTables()) {
       VT->setSerialized(IsNotSerialized);
     }
+
+    for (auto &Deinit : M.getMoveOnlyDeinits()) {
+      Deinit->setSerialized(IsNotSerialized);
+    }
   }
 
 public:

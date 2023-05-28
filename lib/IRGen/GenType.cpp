@@ -2890,19 +2890,25 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
                           llvm::function_ref<void ()> indirectCleanup) {
   auto ty = T.getASTType();
   auto nominal = ty->getAnyNominal();
+
   // We are only concerned with move-only type deinits here.
   if (!nominal || !nominal->getValueTypeDestructor()) {
     return false;
   }
-  
-  auto deinit = IGF.getSILModule().lookUpMoveOnlyDeinit(nominal);
-  assert(deinit && "type has a deinit declared in AST but SIL deinit record is not present!");
-    
+
+  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinit(nominal);
+
+  // If we do not have a deinit table, call the value witness instead.
+  if (!deinitTable) {
+    irgen::emitDestroyCall(IGF, T, indirect());
+    return true;
+  }
+
   // The deinit should take a single value parameter of the nominal type, either
   // by @owned or indirect @in convention.
-  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinit->getImplementation(),
+  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinitTable->getImplementation(),
                                                NotForDefinition);
-  auto deinitTy = deinit->getImplementation()->getLoweredFunctionType();
+  auto deinitTy = deinitTable->getImplementation()->getLoweredFunctionType();
   auto deinitFP = FunctionPointer::forDirect(IGF.IGM, deinitFn,
                                              nullptr, deinitTy);
   assert(deinitTy->getNumParameters() == 1
