@@ -26,6 +26,7 @@
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -442,6 +443,15 @@ public:
   // A cached dominance analysis.
   std::unique_ptr<DominanceInfo> Dominance;
 
+#ifndef NDEBUG
+  /// For each instruction which might allocate pack metadata on stack, the
+  /// corresponding cleanup instructions.
+  ///
+  /// Used to verify that every instruction on behalf of which on-stack pack
+  /// metadata is emitted has some corresponding cleanup instructions.
+  llvm::DenseMap<SILInstruction *, llvm::SmallVector<SILInstruction *, 2>>
+      DynamicMetadataPackDeallocs;
+#endif
   /// For each instruction which did allocate pack metadata on-stack, the stack
   /// locations at which they were allocated.
   ///
@@ -2399,6 +2409,26 @@ void IRGenSILFunction::emitSILFunction() {
 
   assert(params.empty() && "did not map all llvm params to SIL params?!");
 
+#ifndef NDEBUG
+  for (auto &BB : *CurSILFn) {
+    for (auto &I : BB) {
+      if (auto *DPMI = dyn_cast<DeallocPackMetadataInst>(&I)) {
+        DynamicMetadataPackDeallocs[DPMI->getIntroducer()].push_back(DPMI);
+        continue;
+      }
+      if (auto *DSI = dyn_cast<DeallocStackInst>(&I)) {
+        auto *I = DSI->getOperand()->getDefiningInstruction();
+        if (!I)
+          continue;
+        auto *PAI = dyn_cast<PartialApplyInst>(I);
+        if (!PAI || !PAI->isOnStack())
+          continue;
+        DynamicMetadataPackDeallocs[PAI].push_back(DSI);
+      }
+    }
+  }
+#endif
+
   // It's really nice to be able to assume that we've already emitted
   // all the values from dominating blocks --- it makes simple
   // peepholing more powerful and allows us to avoid the need for
@@ -2560,6 +2590,42 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
     visit(&I);
 
+#ifndef NDEBUG
+    if (!OutstandingStackPackAllocs.empty()) {
+      auto iter = DynamicMetadataPackDeallocs.find(&I);
+      if (iter == DynamicMetadataPackDeallocs.end() ||
+          iter->getSecond().size() == 0) {
+        llvm::errs()
+            << "Instruction missing on-stack pack metadata cleanups!\n";
+        I.print(llvm::errs());
+        llvm::errs() << "\n In function";
+        CurSILFn->print(llvm::errs());
+        llvm::errs() << "Allocated the following on-stack pack metadata:";
+        for (auto pair : OutstandingStackPackAllocs) {
+          StackAddress addr;
+          llvm::Value *shape;
+          uint8_t kind;
+          std::tie(addr, shape, kind) = pair;
+          switch ((GenericRequirement::Kind)kind) {
+          case GenericRequirement::Kind::MetadataPack:
+            llvm::errs() << "Metadata Pack: ";
+            break;
+          case GenericRequirement::Kind::WitnessTablePack:
+            llvm::errs() << "Witness Table Pack: ";
+            break;
+          default:
+            llvm_unreachable("bad requirement in stack pack alloc");
+          }
+          addr.getAddressPointer()->print(llvm::errs());
+          llvm::errs() << "\n";
+        }
+        CurFn->print(llvm::errs());
+        llvm::report_fatal_error(
+            "Instruction resulted in on-stack pack metadata emission but no "
+            "cleanup instructions were added");
+      }
+    }
+#endif
     // Record the on-stack pack allocations emitted on behalf of this SIL
     // instruction.  They will be cleaned up when visiting the corresponding
     // cleanup markers.
