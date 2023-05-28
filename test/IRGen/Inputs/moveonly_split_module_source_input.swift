@@ -7,15 +7,17 @@ class Klass {
 public struct MoveOnly : ~Copyable {
     var k = Klass()
     var k2 = Klass()
+    public init() {}
     deinit {
         print("==> I am in the deinit resiliently!")
         print("==> My name is \(k.name)")
     }
 }
 #else
-struct MoveOnly : ~Copyable {
+public struct MoveOnly : ~Copyable {
     var k = Klass()
     var k2 = Klass()
+    public init() {}
     deinit {
         print("==> I am in the deinit!")
         print("==> My name is \(k.name)")
