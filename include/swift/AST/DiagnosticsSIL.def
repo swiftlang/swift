@@ -758,11 +758,10 @@ ERROR(sil_movechecking_value_used_after_consume, none,
       "'%0' used after consume", (StringRef))
 ERROR(sil_movechecking_guaranteed_value_consumed, none,
       "'%0' is borrowed and cannot be consumed", (StringRef))
-
-// FIXME: this diagnostic shouldn't ever be emitted now. rdar://109742587 (closures may still try to consume captures, e.g., borrowed parameters)
-ERROR(sil_movechecking_guaranteed_value_captured_by_closure, none,
-      "'%0' is borrowed and cannot be consumed by closure capture", (StringRef))
-
+ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
+      "'%0' cannot be captured by an escaping closure since it is a borrowed "
+      "parameter",
+      (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
       "noncopyable '%0' cannot be consumed when captured by a closure", (StringRef))
 ERROR(sil_movechecking_inout_not_reinitialized_before_end_of_function, none,
