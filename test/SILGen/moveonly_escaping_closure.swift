@@ -265,10 +265,11 @@ func testInOutVarClosureCaptureVar(_ f: inout () -> ()) {
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned
-// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
+// CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned
+// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
 // CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
-// CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
+// CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
@@ -277,7 +278,9 @@ func testInOutVarClosureCaptureVar(_ f: inout () -> ()) {
 // CHECK:   mark_function_escape [[PROJECT]]
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[BOX_COPY]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[FUNC_PROJECT]]
-// CHECK:   assign [[PAI]] to [[ACCESS]]
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
+// CHECK:   assign [[PAI]] to [[UNWRAP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnF'
 //
@@ -522,10 +525,11 @@ func testInOutVarClosureCaptureLet(_ f: inout () -> ()) {
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned
-// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
+// CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned
+// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
 // CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
-// CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
+// CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
@@ -534,7 +538,9 @@ func testInOutVarClosureCaptureLet(_ f: inout () -> ()) {
 // CHECK:   mark_function_escape [[PROJECT]]
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[BOX_COPY]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[FUNC_PROJECT]]
-// CHECK:   assign [[PAI]] to [[ACCESS]]
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
+// CHECK:   assign [[PAI]] to [[UNWRAP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnF'
 //
@@ -771,16 +777,19 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztF : $@convention(thin) (@owned @callee_guaranteed () -> (), @inout SingleElt) -> () {
-// CHECK: bb0([[FUNC_ARG:%.*]] : @_eagerMove @owned $@callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
-// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
+// CHECK: bb0([[FUNC_ARG:%.*]] : @noImplicitCopy @_eagerMove @owned $@callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
+// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
 // CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
-// CHECK:   store [[FUNC_ARG]] to [init] [[FUNC_PROJECT]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
+// CHECK:   store [[FUNC_ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[CHECK:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // CHECK:   [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> ()
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[CHECK]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[FUNC_PROJECT]]
-// CHECK:   assign [[PAI]] to [[ACCESS]]
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
+// CHECK:   assign [[PAI]] to [[UNWRAP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztF'
 //
@@ -1019,10 +1028,11 @@ func testLocalVarClosureCaptureConsuming(_ x: consuming SingleElt) {
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntF : $@convention(thin) (@owned @callee_guaranteed () -> (), @owned SingleElt) -> () {
-// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned $@callee_guaranteed () -> (),
-// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
+// CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned $@callee_guaranteed () -> (),
+// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
 // CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
-// CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
+// CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
@@ -1031,7 +1041,9 @@ func testLocalVarClosureCaptureConsuming(_ x: consuming SingleElt) {
 // CHECK:   mark_function_escape [[PROJECT]]
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[BOX_COPY]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[FUNC_PROJECT]]
-// CHECK:   assign [[PAI]] to [[ACCESS]]
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
+// CHECK:   assign [[PAI]] to [[UNWRAP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntF'
 //
@@ -1270,10 +1282,11 @@ func testInOutVarClosureCaptureOwned(_ f: inout () -> (), _ x: __owned SingleElt
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntF : $@convention(thin) (@owned @callee_guaranteed () -> (), @owned SingleElt) -> () {
-// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned $@callee_guaranteed () -> (),
-// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
+// CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned $@callee_guaranteed () -> (),
+// CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
 // CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
-// CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
+// CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
@@ -1282,7 +1295,9 @@ func testInOutVarClosureCaptureOwned(_ f: inout () -> (), _ x: __owned SingleElt
 // CHECK:   mark_function_escape [[PROJECT]]
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[BOX_COPY]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[FUNC_PROJECT]]
-// CHECK:   assign [[PAI]] to [[ACCESS]]
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
+// CHECK:   assign [[PAI]] to [[UNWRAP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntF'
 //

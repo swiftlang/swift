@@ -329,6 +329,9 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
+    // We want to specifically use getASTType() here instead of getRawASTType()
+    // to ensure that we can correctly get our substituted field type. If we
+    // need to rewrap the type layer, we do it below.
     substFieldTy =
         getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
@@ -655,8 +658,8 @@ CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
                             LookUpConformanceInSubstitutionMap(subMap),
                             sig);
   }
-  
-  return fieldTy.getASTType();
+
+  return fieldTy.getRawASTType();
 }
 
 ValueOwnershipKind

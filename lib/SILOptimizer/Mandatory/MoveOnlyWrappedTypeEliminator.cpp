@@ -188,6 +188,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(DestroyAddr)
   NO_UPDATE_NEEDED(DeallocStack)
   NO_UPDATE_NEEDED(Branch)
+  NO_UPDATE_NEEDED(ExplicitCopyAddr)
+  NO_UPDATE_NEEDED(CopyAddr)
   NO_UPDATE_NEEDED(RefElementAddr)
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(Object)
@@ -195,6 +197,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(RefToBridgeObject)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
+  NO_UPDATE_NEEDED(BeginAccess)
+  NO_UPDATE_NEEDED(EndAccess)
   NO_UPDATE_NEEDED(ClassMethod)
 #undef NO_UPDATE_NEEDED
 

@@ -60,15 +60,15 @@ struct MethodModifiers {
     borrowing mutating consuming func tooManyD() {} // expected-error 2 {{method must not be declared both }}
 }
 
-func chalk(_ a: consuming String, // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
-           _ b: borrowing [Int], // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func chalk(_ a: consuming String,
+           _ b: borrowing [Int],
            _ c: __shared [String],
            _ d: __owned Int?)
            {}
 
 struct Stepping {
-    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
-    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
+    consuming func perform() {}
+    borrowing func doIt() {}
   mutating func change() {}
   var ex: Int {
     __consuming get { 0 }
@@ -76,16 +76,16 @@ struct Stepping {
 }
 
 class Clapping {
-    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
-    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
+    consuming func perform() {}
+    borrowing func doIt() {}
   var ex: Int {
     __consuming get { 0 }
   }
 }
 
 protocol Popping {
-    consuming func perform() // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
-    borrowing func doIt() // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
+    consuming func perform()
+    borrowing func doIt()
   mutating func change()
   var ex: Int {
     __consuming get
@@ -93,8 +93,8 @@ protocol Popping {
 }
 
 enum Exercising {
-    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
-    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
+    consuming func perform() {}
+    borrowing func doIt() {}
   mutating func change() {}
   var ex: Int {
     __consuming get { 0 }
@@ -102,8 +102,8 @@ enum Exercising {
 }
 
 func consumingClosure1(_ f: consuming () -> ()) { } // expected-error {{'consuming' cannot be applied to nonescaping closure}}
-func consumingClosure2(_ f: consuming @escaping () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func consumingClosure2(_ f: consuming @escaping () -> ()) { }
 
-func borrowingClosure1(_ f: borrowing () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
-func borrowingClosure2(_ f: borrowing @escaping () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func borrowingClosure1(_ f: borrowing () -> ()) { }
+func borrowingClosure2(_ f: borrowing @escaping () -> ()) { }
 

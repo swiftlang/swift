@@ -752,6 +752,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           B.createCopyValue(loc, ManagedValue::forUnmanaged(val)));
       } else {
         auto addr = getAddressValue(val, /*forceCopy=*/true);
+        // If our address is move only wrapped, unwrap it.
+        if (addr->getType().isMoveOnlyWrapped()) {
+          addr = B.createMoveOnlyWrapperToCopyableAddr(loc, addr);
+        }
         capturedArgs.push_back(ManagedValue::forLValue(addr));
       }
       break;
@@ -760,9 +764,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       assert(!isPack);
 
       auto addr = getAddressValue(val, /*forceCopy=*/false);
+
       // No-escaping stored declarations are captured as the
       // address of the value.
       assert(addr->getType().isAddress() && "no address for captured var!");
+
+      // If we have a moveonlywrapped address type, unwrap it.
+      if (addr->getType().isMoveOnlyWrapped())
+        addr = B.createMoveOnlyWrapperToCopyableAddr(loc, addr);
+
       capturedArgs.push_back(ManagedValue::forLValue(addr));
       break;
     }
@@ -780,13 +790,24 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
           entryValue->getType().getASTType() == minimalLoweredType) {
+        // If our captured value is a box with a moveonlywrapped type inside,
+        // unwrap it.
+        auto box = ManagedValue::forBorrowedObjectRValue(Entry.box);
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
-          capturedArgs.push_back(
-              ManagedValue::forUnmanaged(Entry.box).borrow(*this, loc));
+          box = box.borrow(*this, loc);
         } else {
-          capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
+          box = box.copy(*this, loc);
         }
+
+        if (box.getType().isBoxedMoveOnlyWrappedType(&F)) {
+          CleanupCloner cloner(*this, box);
+          box = cloner.clone(
+              B.createMoveOnlyWrapperToCopyableBox(loc, box.forward(*this)));
+        }
+
+        capturedArgs.push_back(box);
+
         if (captureCanEscape)
           escapesToMark.push_back(entryValue);
       } else {
