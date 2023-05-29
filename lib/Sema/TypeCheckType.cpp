@@ -4287,43 +4287,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   // Remember that we've seen an ownership specifier for this base type.
   options |= TypeResolutionFlags::HasOwnership;
 
-  auto result = resolveType(repr->getBase(), options);
-  if (result->hasError())
-    return result;
-
-  // Check for illegal combinations of ownership specifiers and types.
-  switch (ownershipRepr->getSpecifier()) {
-  case ParamSpecifier::Default:
-  case ParamSpecifier::InOut:
-  case ParamSpecifier::LegacyShared:
-  case ParamSpecifier::LegacyOwned:
-    break;
-
-  case ParamSpecifier::Consuming:
-    if (auto *fnTy = result->getAs<FunctionType>()) {
-      if (fnTy->isNoEscape()) {
-        diagnoseInvalid(ownershipRepr,
-                        ownershipRepr->getLoc(),
-                        diag::ownership_specifier_nonescaping_closure,
-                        ownershipRepr->getSpecifierSpelling());
-        return ErrorType::get(getASTContext());
-      }
-    }
-  SWIFT_FALLTHROUGH;
-  case ParamSpecifier::Borrowing:
-    // Unless we have the experimental no-implicit-copy feature enabled, Copyable
-    // types can't use 'consuming' or 'borrowing' ownership specifiers.
-    if (!getASTContext().LangOpts.hasFeature(Feature::NoImplicitCopy)) {
-      if (!result->isPureMoveOnly()) {
-        diagnoseInvalid(ownershipRepr,
-                        ownershipRepr->getLoc(),
-                        diag::ownership_specifier_copyable);
-        return ErrorType::get(getASTContext());
-      }
-    }
-  }
-
-  return result;
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType
