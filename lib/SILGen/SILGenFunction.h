@@ -453,6 +453,11 @@ public:
   /// need to be emitted inside the next brace statement.
   llvm::SmallVector<VarDecl *, 2> LocalAuxiliaryDecls;
 
+  /// The mappings between instance properties referenced by this init
+  /// accessor (via initializes/accesses attributes) and and argument
+  /// declarations synthesized to access them in the body.
+  llvm::DenseMap<VarDecl *, ParamDecl *> InitAccessorArgumentMappings;
+
   // Context information for tracking an `async let` child task.
   struct AsyncLetChildTask {
     SILValue asyncLet; // RawPointer to the async let state
@@ -2755,6 +2760,10 @@ public:
                                        CanPackType formalPackType,
                                        unsigned componentIndex,
                                        SILValue currentIndexWithinComponent);
+
+  /// If context is init accessor, find a mapping between the given type
+  /// property and argument declaration synthesized for it.
+  ParamDecl *isMappedToInitAccessorArgument(VarDecl *property);
 };
 
 
