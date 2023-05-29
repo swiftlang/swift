@@ -460,7 +460,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (shouldWalkExpansion) {
       MED->visitAuxiliaryDecls([&](Decl *decl) {
         if (alreadyFailed) return;
-        alreadyFailed = inherited::visit(decl);
+        if (!isa<VarDecl>(decl))
+          alreadyFailed = inherited::visit(decl);
       });
       MED->forEachExpandedExprOrStmt([&](ASTNode expandedNode) {
         if (alreadyFailed) return;
