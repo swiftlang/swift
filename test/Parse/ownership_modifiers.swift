@@ -3,7 +3,7 @@
 struct borrowing {}
 struct consuming {}
 
-struct Foo: ~Copyable {}
+struct Foo {}
 
 func foo(x: borrowing Foo) {}
 func bar(x: consuming Foo) {}
@@ -18,13 +18,13 @@ func worst(x: (borrowing consuming Foo) -> ()) {} // expected-error{{at most one
 
 func zim(x: borrowing) {}
 func zang(x: consuming) {}
-func zung(x: borrowing consuming) {} // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
-func zip(x: consuming borrowing) {}  // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func zung(x: borrowing consuming) {}
+func zip(x: consuming borrowing) {}
 func zap(x: (borrowing, consuming) -> ()) {}
-func zoop(x: (borrowing consuming, consuming borrowing) -> ()) {} // expected-error 2{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func zoop(x: (borrowing consuming, consuming borrowing) -> ()) {}
 
-func worster(x: borrowing borrowing borrowing) {} // expected-error{{at most one}} // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
-func worstest(x: (borrowing borrowing borrowing) -> ()) {} // expected-error{{at most one}} // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func worster(x: borrowing borrowing borrowing) {} // expected-error{{at most one}}
+func worstest(x: (borrowing borrowing borrowing) -> ()) {} // expected-error{{at most one}}
 
 // Parameter specifier names are regular identifiers in other positions,
 // including argument labels.
@@ -47,7 +47,7 @@ func argumentLabel(anonConsumingInClosure: (_ consuming: Int) -> ()) {}
 func argumentLabel(anonSharedInClosure: (_ __shared: Int) -> ()) {}
 func argumentLabel(anonOwnedInClosure: (_ __owned: Int) -> ()) {}
 
-struct MethodModifiers: ~Copyable {
+struct MethodModifiers {
     mutating func mutating() {}
     borrowing func borrowing() {}
     consuming func consuming() {}
@@ -59,7 +59,6 @@ struct MethodModifiers: ~Copyable {
     borrowing consuming func tooManyC() {} // expected-error{{method must not be declared both 'borrowing' and 'consuming'}}
     borrowing mutating consuming func tooManyD() {} // expected-error 2 {{method must not be declared both }}
 }
-
 
 func chalk(_ a: consuming String, // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
            _ b: borrowing [Int], // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
@@ -107,3 +106,4 @@ func consumingClosure2(_ f: consuming @escaping () -> ()) { } // expected-error 
 
 func borrowingClosure1(_ f: borrowing () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
 func borrowingClosure2(_ f: borrowing @escaping () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
+
