@@ -3576,12 +3576,31 @@ static bool isCurrentFunctionReadAccess(SILGenFunction &SGF) {
          contextAccessorDecl->getAccessorKind() == AccessorKind::Read;
 }
 
+static bool isCurrentFunctionInitAccessor(SILGenFunction &SGF) {
+  auto *contextAccessorDecl =
+      dyn_cast_or_null<AccessorDecl>(SGF.FunctionDC->getAsDecl());
+  return contextAccessorDecl && contextAccessorDecl->isInitAccessor();
+}
+
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                                         SGFAccessKind accessKind,
                                         LValueOptions options) {
   // MemberRefExpr can refer to type and function members, but the only case
   // that can be an lvalue is a VarDecl.
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
+
+  // A reference to an instance property in init accessor body
+  // has to be remapped into an argument reference because all
+  // of the properties from initialized/accesses lists are passed
+  // to init accessors individually via arguments.
+  if (isCurrentFunctionInitAccessor(SGF)) {
+    if (auto *arg = SGF.isMappedToInitAccessorArgument(var)) {
+      auto subs = e->getMember().getSubstitutions();
+      return emitLValueForNonMemberVarDecl(
+          SGF, e, ConcreteDeclRef(arg, subs), getSubstFormalRValueType(e),
+          accessKind, options, AccessSemantics::Ordinary, None);
+    }
+  }
 
   auto accessSemantics = e->getAccessSemantics();
   AccessStrategy strategy =
