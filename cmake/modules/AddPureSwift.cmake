@@ -261,9 +261,15 @@ function(add_pure_swift_host_tool name)
   add_executable(${name} ${APSHT_SOURCES})
   _add_host_swift_compile_options(${name})
 
-  set_property(TARGET ${name}
-    APPEND PROPERTY INSTALL_RPATH
-      "@executable_path/../lib/swift/host")
+  if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set_property(TARGET ${name}
+      APPEND PROPERTY INSTALL_RPATH
+        "@executable_path/../lib/swift/host")
+  else()
+    set_property(TARGET ${name}
+      APPEND PROPERTY INSTALL_RPATH
+        "$ORIGIN/../lib/swift/host")
+  endif()
 
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)
