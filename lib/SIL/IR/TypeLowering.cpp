@@ -2514,7 +2514,7 @@ TypeConverter::~TypeConverter() {
     // Destroy only the unique entries.
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
-    CanType mappedType = ti.second->getLoweredType().getASTType();
+    CanType mappedType = ti.second->getLoweredType().getRawASTType();
     if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
@@ -4380,10 +4380,11 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       env->mapTypeIntoContext(contextBoxTy)
          ->getCanonicalType());
   }
+
+  auto ty = getSILBoxFieldType(TypeExpansionContext::minimal(), contextBoxTy,
+                               *this, 0);
   assert(contextBoxTy->getLayout()->getFields().size() == 1 &&
-         getSILBoxFieldType(TypeExpansionContext::minimal(), contextBoxTy,
-                            *this, 0)
-                 .getASTType() == loweredContextType &&
+         ty.getRawASTType() == loweredContextType &&
          "box field type doesn't match capture!");
 #endif
   return boxTy;
@@ -4435,7 +4436,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   }
 
   // Use the enum's signature for the box type.
-  auto boundEnum = enumType.getASTType();
+  auto boundEnum = enumType.getRawASTType();
 
   // Lower the enum element's argument in the box's context.
   auto eltIntfTy = elt->getArgumentInterfaceType();

@@ -292,7 +292,7 @@ public:
   }
 
   SILType subst(SILType type) {
-    return SILType::getPrimitiveType(visit(type.getASTType()),
+    return SILType::getPrimitiveType(visit(type.getRawASTType()),
                                      type.getCategory());
   }
 

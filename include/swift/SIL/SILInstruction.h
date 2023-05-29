@@ -8517,10 +8517,21 @@ private:
             DebugLoc, operand, operand->getType().addingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
                                             : OwnershipKind::Owned),
-        initialKind(kind) {}
+        initialKind(kind) {
+    assert(!operand->getType().isMoveOnly() &&
+           "Cannot be moveonly or moveonly wrapped");
+  }
 
 public:
   InitialKind getInitialKind() const { return initialKind; }
+
+  bool hasGuaranteedInitialKind() const {
+    return getInitialKind() == InitialKind::Guaranteed;
+  }
+
+  bool hasOwnedInitialKind() const {
+    return getInitialKind() == InitialKind::Owned;
+  }
 };
 
 /// Convert from an @moveOnly wrapper type to the underlying copyable type. Can
@@ -8569,10 +8580,21 @@ private:
             DebugLoc, operand, operand->getType().removingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
                                             : OwnershipKind::Owned),
-        initialKind(kind) {}
+        initialKind(kind) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "Expected moveonlywrapped argument!");
+  }
 
 public:
   InitialKind getInitialKind() const { return initialKind; }
+
+  bool hasGuaranteedInitialKind() const {
+    return getInitialKind() == InitialKind::Guaranteed;
+  }
+
+  bool hasOwnedInitialKind() const {
+    return getInitialKind() == InitialKind::Owned;
+  }
 };
 
 /// Convert a ${ @moveOnly T } to $T. This is a forwarding instruction that acts
@@ -8606,7 +8628,9 @@ class CopyableToMoveOnlyWrapperAddrInst
 
   CopyableToMoveOnlyWrapperAddrInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().addingMoveOnlyWrapper()) {}
+                             operand->getType().addingMoveOnlyWrapper()) {
+    assert(!operand->getType().isMoveOnly() && "Expected copyable argument");
+  }
 };
 
 class MoveOnlyWrapperToCopyableAddrInst
@@ -8617,7 +8641,10 @@ class MoveOnlyWrapperToCopyableAddrInst
 
   MoveOnlyWrapperToCopyableAddrInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().removingMoveOnlyWrapper()) {}
+                             operand->getType().removingMoveOnlyWrapper()) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "Expected moveonlywrapped argument");
+  }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers

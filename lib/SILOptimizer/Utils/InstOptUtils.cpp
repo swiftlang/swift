@@ -1469,7 +1469,10 @@ void swift::insertDestroyOfCapturedArguments(
   auto loc = CleanupLocation(origLoc);
   for (auto &arg : pai->getArgumentOperands()) {
     SILValue argValue = arg.get();
-    BeginBorrowInst *argBorrow = dyn_cast<BeginBorrowInst>(argValue);
+    if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(argValue))
+      if (m->hasGuaranteedInitialKind())
+        argValue = m->getOperand();
+    auto *argBorrow = dyn_cast<BeginBorrowInst>(argValue);
     if (argBorrow) {
       argValue = argBorrow->getOperand();
       builder.createEndBorrow(loc, argBorrow);
@@ -1491,18 +1494,19 @@ void swift::insertDeallocOfCapturedArguments(PartialApplyInst *pai,
   SILFunctionConventions calleeConv(site.getSubstCalleeType(),
                                     pai->getModule());
   for (auto &arg : pai->getArgumentOperands()) {
-    SILValue argValue = arg.get();
-    if (auto argBorrow = dyn_cast<BeginBorrowInst>(argValue)) {
-      argValue = argBorrow->getOperand();
-    }
     unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
     assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
     auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
     if (!paramInfo.isIndirectInGuaranteed())
       continue;
 
+    SILValue argValue = arg.get();
+    if (auto moveWrapper =
+            dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(argValue))
+      argValue = moveWrapper->getOperand();
+
     SmallVector<SILBasicBlock *, 4> boundary;
-    auto *asi = cast<AllocStackInst>(arg.get());
+    auto *asi = cast<AllocStackInst>(argValue);
     computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
 
     SmallVector<Operand *, 2> uses;

@@ -98,24 +98,44 @@ struct OSSACanonicalizer {
 
   bool foundFinalConsumingUses() const { return consumingBoundaryUsers.size(); }
 
+  /// Helper method for hasPartialApplyConsumingUse and
+  /// hasNonPartialApplyConsumingUse.
+  static bool isPartialApplyUser(SILInstruction *user) {
+    // If our user is an owned moveonlywrapper to copyable value inst, search
+    // through it for a partial_apply user.
+    if (auto *mtci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (mtci->hasOwnedInitialKind()) {
+        return llvm::any_of(mtci->getUses(), [](Operand *use) {
+          return isa<PartialApplyInst>(use->getUser());
+        });
+      }
+    }
+    return isa<PartialApplyInst>(user);
+  }
+
+  static bool isNotPartialApplyUser(SILInstruction *user) {
+    // If our user is an owned moveonlywrapper to copyable value inst, search
+    // through it for a partial_apply user.
+    if (auto *mtci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (mtci->hasOwnedInitialKind()) {
+        return llvm::any_of(mtci->getUses(), [](Operand *use) {
+          return !isa<PartialApplyInst>(use->getUser());
+        });
+      }
+    }
+    return !isa<PartialApplyInst>(user);
+  }
+
   bool hasPartialApplyConsumingUse() const {
-    return llvm::any_of(consumingUsesNeedingCopy,
-                        [](SILInstruction *user) {
-                          return isa<PartialApplyInst>(user);
-                        }) ||
-           llvm::any_of(consumingBoundaryUsers, [](SILInstruction *user) {
-             return isa<PartialApplyInst>(user);
-           });
+    auto test = OSSACanonicalizer::isPartialApplyUser;
+    return llvm::any_of(consumingUsesNeedingCopy, test) ||
+           llvm::any_of(consumingBoundaryUsers, test);
   }
 
   bool hasNonPartialApplyConsumingUse() const {
-    return llvm::any_of(consumingUsesNeedingCopy,
-                        [](SILInstruction *user) {
-                          return !isa<PartialApplyInst>(user);
-                        }) ||
-           llvm::any_of(consumingBoundaryUsers, [](SILInstruction *user) {
-             return !isa<PartialApplyInst>(user);
-           });
+    auto test = OSSACanonicalizer::isNotPartialApplyUser;
+    return llvm::any_of(consumingUsesNeedingCopy, test) ||
+           llvm::any_of(consumingBoundaryUsers, test);
   }
 
   struct DropDeinitFilter {

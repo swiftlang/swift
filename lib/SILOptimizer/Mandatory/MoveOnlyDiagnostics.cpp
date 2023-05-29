@@ -499,14 +499,15 @@ void DiagnosticEmitter::emitObjectDiagnosticsForGuaranteedUses(
   auto &astContext = fn->getASTContext();
 
   for (auto *consumingUser : getCanonicalizer().consumingUsesNeedingCopy) {
-    if (ignorePartialApplyUses && isa<PartialApplyInst>(consumingUser))
+    if (ignorePartialApplyUses &&
+        OSSACanonicalizer::isPartialApplyUser(consumingUser))
       continue;
     diagnose(astContext, consumingUser,
              diag::sil_movechecking_consuming_use_here);
   }
 
   for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
-    if (ignorePartialApplyUses && isa<PartialApplyInst>(user))
+    if (ignorePartialApplyUses && OSSACanonicalizer::isPartialApplyUser(user))
       continue;
 
     diagnose(astContext, user, diag::sil_movechecking_consuming_use_here);
@@ -518,7 +519,7 @@ void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses(
   auto &astContext = fn->getASTContext();
 
   for (auto *user : getCanonicalizer().consumingUsesNeedingCopy) {
-    if (!isa<PartialApplyInst>(user))
+    if (!OSSACanonicalizer::isPartialApplyUser(user))
       continue;
     diagnose(astContext,
              user,
@@ -527,7 +528,7 @@ void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses(
   }
 
   for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
-    if (!isa<PartialApplyInst>(user))
+    if (!OSSACanonicalizer::isPartialApplyUser(user))
       continue;
 
     diagnose(astContext,

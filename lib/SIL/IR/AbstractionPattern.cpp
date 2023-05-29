@@ -815,6 +815,8 @@ AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   case Kind::Tuple:
     llvm_unreachable("cannot apply move-only wrappers to open-coded patterns");
   case Kind::Opaque:
+    // Opaque is opaque. We do not remove anything.
+    return *this;
   case Kind::Type:
     if (auto mvi = dyn_cast<SILMoveOnlyWrappedType>(getType())) {
       return AbstractionPattern(getGenericSubstitutions(),

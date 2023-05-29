@@ -653,7 +653,19 @@ private:
     // - @noImplicitCopy
     // - @_eagerMove
     // - @_noEagerMove
-    auto isNoImplicitCopy = pd->isNoImplicitCopy();
+    bool isNoImplicitCopy = pd->isNoImplicitCopy();
+    if (!argrv.getType().isPureMoveOnly()) {
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+      if (pd->isSelfParameter()) {
+        auto *dc = pd->getDeclContext();
+        if (auto *fn = dyn_cast<FuncDecl>(dc)) {
+          auto accessKind = fn->getSelfAccessKind();
+          isNoImplicitCopy |= accessKind == SelfAccessKind::Borrowing;
+          isNoImplicitCopy |= accessKind == SelfAccessKind::Consuming;
+        }
+      }
+    }
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only
@@ -782,6 +794,25 @@ private:
         allocStack->setIsLexical();
       SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(allocStack);
       return;
+    }
+
+    if (auto *arg = dyn_cast<SILFunctionArgument>(argrv.getValue())) {
+      if (arg->isNoImplicitCopy()) {
+        switch (pd->getSpecifier()) {
+        case swift::ParamSpecifier::Borrowing:
+          // Shouldn't have any cleanups on this.
+          assert(!argrv.hasCleanup());
+          argrv = ManagedValue::forBorrowedAddressRValue(
+              SGF.B.createCopyableToMoveOnlyWrapperAddr(pd, argrv.getValue()));
+          break;
+        case swift::ParamSpecifier::Consuming:
+        case swift::ParamSpecifier::Default:
+        case swift::ParamSpecifier::InOut:
+        case swift::ParamSpecifier::LegacyOwned:
+        case swift::ParamSpecifier::LegacyShared:
+          break;
+        }
+      }
     }
 
     SILValue debugOperand = argrv.getValue();
