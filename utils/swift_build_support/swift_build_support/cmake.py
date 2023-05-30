@@ -16,6 +16,7 @@
 
 
 import os
+import multiprocessing
 import platform
 import re
 from numbers import Number
@@ -273,9 +274,11 @@ class CMake(object):
 
         cwd = os.getcwd()
         os.chdir(cmake_build_dir)
-        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui', '--',
+        build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
+        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui', 
+                                    '--parallel=%s' % build_jobs, '--',
                                     '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
-        shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
+        shell.call_without_sleeping(['make', '-j%s' % build_jobs],
                                     echo=True)
         os.chdir(cwd)
         return os.path.join(cmake_build_dir, 'bin', 'cmake')
