@@ -1436,7 +1436,18 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // If this is an initialization or a normal assignment, upgrade the store to
   // an initialization or assign in the uses list so that clients know about it.
   if (isFullyUninitialized) {
-    Use.Kind = DIUseKind::Initialization;
+    // If this is a placeholder use of `assign_or_init` instruction,
+    // check whether all of the fields are initialized - if so, call a setter,
+    // otherwise call init accessor.
+    if (isa<AssignOrInitInst>(Use.Inst) && Use.NumElements == 0) {
+      auto allFieldsInitialized =
+          getAnyUninitializedMemberAtInst(Use.Inst, 0,
+                                          TheMemory.getNumElements()) == -1;
+      Use.Kind =
+          allFieldsInitialized ? DIUseKind::Set : DIUseKind::Initialization;
+    } else {
+      Use.Kind = DIUseKind::Initialization;
+    }
   } else if (isFullyInitialized && isa<AssignByWrapperInst>(Use.Inst)) {
     // If some fields are uninitialized, re-write assign_by_wrapper to assignment
     // of the backing wrapper. If all fields are initialized, assign to the wrapped

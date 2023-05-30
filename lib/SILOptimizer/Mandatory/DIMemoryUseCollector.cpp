@@ -1209,8 +1209,16 @@ ElementUseCollector::collectAssignOrInitUses(PartialApplyInst *pai,
                      useKind);
     };
 
-    for (auto *property : inst->getInitializedProperties())
-      addUse(property, DIUseKind::InitOrAssign);
+    auto initializedElts = inst->getInitializedProperties();
+    if (initializedElts.empty()) {
+      // Add a placeholder use that doesn't touch elements to make sure that
+      // the `assign_or_init` instruction gets the kind set when `initializes`
+      // list is empty.
+      trackUse(DIMemoryUse(User, DIUseKind::InitOrAssign, BaseEltNo, 0));
+    } else {
+      for (auto *property : initializedElts)
+        addUse(property, DIUseKind::InitOrAssign);
+    }
 
     for (auto *property : inst->getAccessedProperties())
       addUse(property, DIUseKind::Load);
