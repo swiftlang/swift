@@ -1885,8 +1885,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   }
 
   auto getXRefDeclNameForError = [&]() -> DeclName {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
     DeclName result = pathTrace.getLastName();
-    while (--pathLen) {
+    uint32_t namePathLen = pathLen;
+    while (--namePathLen) {
       llvm::BitstreamEntry entry =
           fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
@@ -1951,8 +1953,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     // up to the caller to recover if possible.
 
     // Look for types and value decls in other modules. This extra information
-    // is mostly for compiler engineers to understand a likely solution at a
-    // quick glance.
+    // will be used for diagnostics by the caller logic.
     SmallVector<char, 64> strScratch;
 
     auto errorKind = ModularizationError::Kind::DeclNotFound;
@@ -2027,13 +2028,31 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     auto declName = getXRefDeclNameForError();
     auto expectedIn = baseModule->getName();
     auto referencedFrom = getName();
-    return llvm::make_error<ModularizationError>(declName,
-                                                 isType,
-                                                 errorKind,
-                                                 expectedIn,
-                                                 referencedFrom,
-                                                 foundIn,
-                                                 pathTrace);
+    auto error = llvm::make_error<ModularizationError>(declName,
+                                                       isType,
+                                                       errorKind,
+                                                       expectedIn,
+                                                       referencedFrom,
+                                                       foundIn,
+                                                       pathTrace);
+
+    // If we want to workaround broken modularization, we can keep going if
+    // we found a matching top-level decl in a different module. This is
+    // obviously dangerous as it could just be some other decl that happens to
+    // match.
+    if (getContext().LangOpts.ForceWorkaroundBrokenModules &&
+        errorKind == ModularizationError::Kind::DeclMoved &&
+        !values.empty()) {
+      // Print the error as a remark and notify of the recovery attempt.
+      getContext().Diags.diagnose(getSourceLoc(),
+                                  diag::modularization_issue_worked_around);
+      llvm::handleAllErrors(std::move(error),
+        [&](const ModularizationError &modularError) {
+          modularError.diagnose(this, DiagnosticBehavior::Note);
+        });
+    } else {
+      return std::move(error);
+    }
   }
 
   // Filters for values discovered in the remaining path pieces.

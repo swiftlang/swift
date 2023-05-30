@@ -893,6 +893,10 @@ NOTE(modularization_issue_side_effect_type_error,none,
      "could not deserialize type for %0",
      (DeclName))
 
+WARNING(modularization_issue_worked_around,none,
+        "attempting forced recovery enabled by -experimental-force-workaround-broken-modules",
+        ())
+
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))

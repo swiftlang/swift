@@ -600,6 +600,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableAccessControl
       = A->getOption().matches(OPT_enable_access_control);
   }
+  Opts.ForceWorkaroundBrokenModules
+    |= Args.hasArg(OPT_force_workaround_broken_modules);
 
   // Whether '/.../' regex literals are enabled. This implies experimental
   // string processing.
