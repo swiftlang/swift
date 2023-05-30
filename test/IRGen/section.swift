@@ -24,13 +24,13 @@
 // SIL: sil [global_init] @$s7section2g3Sbvau : $@convention(thin)
 // SIL: sil hidden [section "__TEXT,__mysection"] @$s7section3fooyyF : $@convention(thin)
 
-// IR:  @"$s7section2g0_Wz" = internal global i64 0
-// IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ i64 1 }>, section "__TEXT,__mysection"
-// IR:  @"$s7section2g1_Wz" = internal global i64 0
-// IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ i64 42 }>, %TSi <{ i64 43 }> }>, section "__TEXT,__mysection"
-// IR:  @"$s7section2g2_Wz" = internal global i64 0
+// IR:  @"$s7section2g0_Wz" = internal global {{(i64|i32)}} 0
+// IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__TEXT,__mysection"
+// IR:  @"$s7section2g1_Wz" = internal global {{(i64|i32)}} 0
+// IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ {{(i64|i32)}} 42 }>, %TSi <{ {{(i64|i32)}} 43 }> }>, section "__TEXT,__mysection"
+// IR:  @"$s7section2g2_Wz" = internal global {{(i64|i32)}} 0
 // IR:  @"$s7section2g2Sbvp" = hidden global %TSb <{ i1 true }>, section "__TEXT,__mysection"
-// IR:  @"$s7section2g3_Wz" = internal global i64 0
+// IR:  @"$s7section2g3_Wz" = internal global {{(i64|i32)}} 0
 // IR:  @"$s7section2g3Sbvp" = {{.*}}global %TSb <{ i1 true }>, section "__TEXT,__mysection"
 // IR:  define {{.*}}@"$s7section3fooyyF"(){{.*}} section "__TEXT,__mysection"
 
