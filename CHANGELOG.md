@@ -28,10 +28,10 @@
     module: "ConcurrencyHelperMacros",
     type: "AddCompletionHandlerMacro"
   )
-  
+
   @AddCompletionHandler
   func fetchAvatar(from url: URL) throws -> Image { ... }
-  
+
   // expands to...
   func fetchAvatar(from url: URL, completionHandler: @escaping (Result<Image, Error>) -> Void) {
     Task.detached {
@@ -50,7 +50,7 @@
   ```swift
   import PackageDescription
   import CompilerPluginSupport
-  
+
   let package = Package(
       name: "ConcurrencyHelpers",
       dependencies: [
