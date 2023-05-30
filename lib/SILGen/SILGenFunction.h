@@ -804,6 +804,12 @@ public:
   /// Emit a method that destroys the ivars of a class.
   void emitIVarDestroyer(SILDeclRef ivarDestroyer);
 
+  /// Generates code for the given init accessor represented by AccessorDecl.
+  /// This emits the body code and replaces all `self.<property>` references
+  /// with either argument (if property appears in `acesses` list`) or result
+  /// value assignment.
+  void emitInitAccessor(AccessorDecl *accessor);
+
   /// Generates code to destroy the instance variables of a class.
   ///
   /// \param selfValue The 'self' value.
