@@ -1187,22 +1187,20 @@ ElementUseCollector::collectAssignOrInitUses(PartialApplyInst *pai,
                                              unsigned BaseEltNo) {
   for (Operand *Op : pai->getUses()) {
     SILInstruction *User = Op->getUser();
-    if (!isa<AssignOrInitInst>(User) || Op->getOperandNumber() != 1) {
+    if (!isa<AssignOrInitInst>(User) || Op->getOperandNumber() != 2) {
       continue;
     }
 
-    auto instLoc = User->getLoc();
-    auto *assignment = instLoc.getAsASTNode<AssignExpr>();
-    assert(assignment);
+    /// AssignOrInit doesn't operate on `self` so we need to make sure
+    /// that the flag is dropped before calling \c addElementUses.
+    llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
 
-    auto propertyRef = cast<MemberRefExpr>(assignment->getDest())->getDecl();
-
-    auto initAccessor =
-        cast<VarDecl>(propertyRef.getDecl())->getAccessor(AccessorKind::Init);
+    auto *inst = cast<AssignOrInitInst>(User);
+    auto *typeDC = inst->getReferencedInitAccessor()
+                       ->getDeclContext()
+                       ->getSelfNominalTypeDecl();
 
     auto selfTy = pai->getOperand(1)->getType();
-    auto *typeDC =
-        propertyRef.getDecl()->getDeclContext()->getSelfNominalTypeDecl();
 
     auto addUse = [&](VarDecl *property, DIUseKind useKind) {
       auto expansionContext = TypeExpansionContext(*pai->getFunction());
@@ -1211,17 +1209,11 @@ ElementUseCollector::collectAssignOrInitUses(PartialApplyInst *pai,
                      useKind);
     };
 
-    if (auto *initializes =
-            initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
-      for (auto *property : initializes->getPropertyDecls(initAccessor))
-        addUse(property, DIUseKind::InitOrAssign);
-    }
+    for (auto *property : inst->getInitializedProperties())
+      addUse(property, DIUseKind::InitOrAssign);
 
-    if (auto *initializes =
-            initAccessor->getAttrs().getAttribute<AccessesAttr>()) {
-      for (auto *property : initializes->getPropertyDecls(initAccessor))
-        addUse(property, DIUseKind::Load);
-    }
+    for (auto *property : inst->getAccessedProperties())
+      addUse(property, DIUseKind::Load);
   }
 }
 

@@ -1265,6 +1265,29 @@ AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Src,
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
 }
 
+AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
+  auto *initRef =
+      cast<FunctionRefInst>(getInitializer()->getDefiningInstruction());
+  auto *accessorRef = initRef->getReferencedFunction();
+  return cast<AccessorDecl>(accessorRef->getDeclContext());
+}
+
+ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
+  auto *accessor = getReferencedInitAccessor();
+  if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>()) {
+    return initAttr->getPropertyDecls(accessor);
+  }
+  return {};
+}
+
+ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
+  auto *accessor = getReferencedInitAccessor();
+  if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>()) {
+    return accessAttr->getPropertyDecls(accessor);
+  }
+  return {};
+}
+
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,
                                ArrayRef<SILValue> Elements, SILFunction &F) {

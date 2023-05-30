@@ -4935,15 +4935,16 @@ public:
   }
 };
 
-/// AssignByWrapperInst - Represents an abstract assignment via a wrapper,
-/// which may either be an initialization or a store sequence.  This is only
-/// valid in Raw SIL.
+/// AssignOrInitInst - Represents an abstract assignment via a init accessor
+/// or a setter, which may either be an initialization or a store sequence.
+/// This is only valid in Raw SIL.
 ///
 /// Note that this instruction does not inherit from AssignInstBase because
 /// there is no physical destination of the assignment. Both the init
 /// and the setter are factored into functions.
 class AssignOrInitInst
-    : public InstructionBase<SILInstructionKind::AssignOrInitInst, NonValueInstruction>,
+    : public InstructionBase<SILInstructionKind::AssignOrInitInst,
+                             NonValueInstruction>,
       public CopyLikeInstruction {
   friend SILBuilder;
   USE_SHARED_UINT8;
@@ -4969,7 +4970,7 @@ private:
 
 public:
   SILValue getSrc() const { return Operands[0].get(); }
-  SILValue getInitializer() { return Operands[1].get(); }
+  SILValue getInitializer() const { return Operands[1].get(); }
   SILValue getSetter() { return  Operands[2].get(); }
 
   Mode getMode() const {
@@ -4980,8 +4981,13 @@ public:
     sharedUInt8().AssignOrInitInst.mode = uint8_t(mode);
   }
 
+  ArrayRef<VarDecl *> getInitializedProperties() const;
+  ArrayRef<VarDecl *> getAccessedProperties() const;
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  AccessorDecl *getReferencedInitAccessor() const;
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to
