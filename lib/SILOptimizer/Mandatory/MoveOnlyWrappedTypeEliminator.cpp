@@ -129,6 +129,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     return eraseFromParent(inst);                                              \
   }
   RAUW_ALWAYS(MoveOnlyWrapperToCopyableValue)
+  RAUW_ALWAYS(MoveOnlyWrapperToCopyableAddr)
   RAUW_ALWAYS(CopyableToMoveOnlyWrapperValue)
 #undef RAUW_ALWAYS
 
