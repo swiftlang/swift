@@ -3847,6 +3847,20 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
+
+    if (!Val->getType().isObject()) {
+      P.diagnose(InstLoc.getSourceLoc(),
+                 diag::sil_operand_not_object, "operand", OpcodeName);
+      return true;
+    }
+
+    if (Val->getType().isMoveOnlyWrapped()) {
+      P.diagnose(InstLoc.getSourceLoc(),
+                 diag::sil_operand_has_incorrect_moveonlywrapped,
+                 "operand", OpcodeName, 1);
+      return true;
+    }
+
     if (OwnershipKind == OwnershipKind::Owned)
       ResultVal = B.createOwnedCopyableToMoveOnlyWrapperValue(InstLoc, Val);
     else
@@ -3879,6 +3893,20 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
+
+    if (!Val->getType().isObject()) {
+      P.diagnose(InstLoc.getSourceLoc(),
+                 diag::sil_operand_not_object, "operand", OpcodeName);
+      return true;
+    }
+
+    if (!Val->getType().isMoveOnlyWrapped()) {
+      P.diagnose(InstLoc.getSourceLoc(),
+                 diag::sil_operand_has_incorrect_moveonlywrapped,
+                 "operand", OpcodeName, 0);
+      return true;
+    }
+
     if (OwnershipKind == OwnershipKind::Owned)
       ResultVal = B.createOwnedMoveOnlyWrapperToCopyableValue(InstLoc, Val);
     else
@@ -4575,6 +4603,29 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst: {
+    SILValue addrVal;
+    SourceLoc addrLoc;
+    if (parseTypedValueRef(addrVal, addrLoc, B))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!addrVal->getType().isAddress()) {
+      P.diagnose(addrLoc, diag::sil_operand_not_address, "operand", OpcodeName);
+      return true;
+    }
+
+    if (!addrVal->getType().isMoveOnlyWrapped()) {
+      P.diagnose(addrLoc, diag::sil_operand_has_incorrect_moveonlywrapped,
+                 "operand", OpcodeName, 0);
+      return true;
+    }
+
+    ResultVal = B.createMoveOnlyWrapperToCopyableAddr(InstLoc, addrVal);
+    break;
+  }
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::EndAccessInst:

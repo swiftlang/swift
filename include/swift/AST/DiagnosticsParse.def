@@ -603,7 +603,11 @@ ERROR(sil_ref_inst_wrong_field,none,
 ERROR(sil_invalid_instr_operands,none,
       "invalid instruction operands", ())
 ERROR(sil_operand_not_address,none,
-      "%0 operand of '%1' must have address type", (StringRef, StringRef))
+      "%0 of '%1' must have address type", (StringRef, StringRef))
+ERROR(sil_operand_not_object,none,
+      "%0 of '%1' must have object type", (StringRef, StringRef))
+ERROR(sil_operand_has_incorrect_moveonlywrapped,none,
+      "%0 of '%1' %select{must|must not}2 be of moveonlywrapped type", (StringRef, StringRef, unsigned))
 ERROR(sil_operand_not_ref_storage_address,none,
       "%0 operand of '%1' must have address of %2 type",
       (StringRef, StringRef, ReferenceOwnership))
