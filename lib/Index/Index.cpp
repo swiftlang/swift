@@ -857,9 +857,13 @@ private:
     if (Data.isImplicit)
       Info.roles |= (unsigned)SymbolRole::Implicit;
 
-    if (CtorTyRef)
-      if (!reportRef(CtorTyRef, Loc, Info, Data.AccKind))
+    if (CtorTyRef) {
+      IndexSymbol CtorInfo(Info);
+      if (Data.isImplicitCtorType)
+        CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
+      if (!reportRef(CtorTyRef, Loc, CtorInfo, Data.AccKind))
         return false;
+    }
 
     if (auto *GenParam = dyn_cast<GenericTypeParamDecl>(D)) {
       D = canonicalizeGenericTypeParamDeclForIndex(GenParam);
