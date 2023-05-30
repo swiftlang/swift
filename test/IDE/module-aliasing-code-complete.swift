@@ -2,7 +2,7 @@
 /// When -module-alias <alias_name>=<real_name> is applied, code completion should show
 /// the <alias_name> as that's the name which should appear in source files including import statements,
 /// decls, expressions, etc. while getting visible decls come from the module of <real_name>.
-/// Below, XLogging is the alias and mapped to the real name AppleLogging. Note that the real name
+/// Below, XLogging is the alias and mapped to the binary name AppleLogging. Note that the binary name
 /// AppleLogging should not appear in the code completion results.
 ///
 // RUN: %empty-directory(%t)
@@ -42,7 +42,7 @@
 // CHECK4-DAG: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
 // CHECK4-DAG: Decl[FreeFunction]/OtherModule[XLogging]: setupLogger()[#Logger?#]; name=setupLogger()
 
-/// In the following, the module alias name should be shown as a module that can be imported instead of the real name
+/// In the following, the module alias name should be shown as a module that can be imported instead of the binary name
 ///
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=MODULE_NAME -source-filename %t/FileLib5.swift -module-alias XLogging=AppleLogging -I %t > %t/result5.txt
 // RUN: %FileCheck %s -check-prefix CHECK5 < %t/result5.txt

@@ -1,4 +1,4 @@
-/// Test a serialized interface contains the module real names when -module-alias flag is passed.
+/// Test a serialized interface contains the module binary names when -module-alias flag is passed.
 ///
 /// 'Lib' imports module 'XLogging', and 'XLogging' is aliased 'AppleLogging'.
 

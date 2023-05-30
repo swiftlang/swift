@@ -17,11 +17,11 @@
 /// Check Foo.swiftmodule is created
 // RUN: test -f %t/Foo.swiftmodule
 
-/// Check the mangled name for func meow contains the real module name Bar
+/// Check the mangled name for func meow contains the binary module name Bar
 // RUN: llvm-objdump -t %t/ResultFoo.o | %FileCheck %s -check-prefix=CHECK-A
 // CHECK-A: s3Foo4meow3Bar5KlassCSgyF
 
-/// Check demangling shows the real module name Bar
+/// Check demangling shows the binary module name Bar
 // RUN: llvm-objdump -t %t/ResultFoo.o | swift-demangle | %FileCheck %s -check-prefix=CHECK-B
 // CHECK-B: Foo.meow() -> Bar.Klass?
 

@@ -340,11 +340,11 @@ void CompletionLookup::addModuleName(
   // `import ...`, and `-module-alias Foo=Bar` was passed, we want to show
   // Foo as an option to import, instead of Bar (name of the binary), as
   // Foo is the name that should appear in source files.
-  auto aliasedName = Ctx.getRealModuleName(
-      moduleName, ASTContext::ModuleAliasLookupOption::aliasFromRealName);
+  auto aliasedName = Ctx.getBinaryModuleName(
+      moduleName, ASTContext::ModuleAliasLookupOption::syntaxNameWithBinaryNameKey);
   if (aliasedName != moduleName && // check if module aliasing was applied
-      !aliasedName.empty()) { // check an alias mapped to the binary name exists
-    moduleName = aliasedName; // if so, use the aliased name
+      !aliasedName.empty()) { // check a syntax name mapped to the binary name exists
+    moduleName = aliasedName; // if so, use the syntax name
   }
   Builder.addBaseName(moduleName.str());
   Builder.addTypeAnnotation("Module");

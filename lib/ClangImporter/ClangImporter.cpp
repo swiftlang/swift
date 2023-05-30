@@ -1994,7 +1994,7 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     SourceLoc importLoc, ImportPath::Module path) {
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
-  auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
+  auto realModuleName = SwiftContext.getBinaryModuleName(path.front().Item).str();
 
   // For explicit module build, module should always exist but module map might
   // not be exist. Go straight to module loader.
@@ -3880,8 +3880,8 @@ StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 
-  // Return module real name (see FileUnit::getExportedModuleName)
-  return getParentModule()->getRealName().str();
+  // Return module binary name (see FileUnit::getExportedModuleName)
+  return getParentModule()->getBinaryName().str();
 }
 
 ModuleDecl *ClangModuleUnit::getOverlayModule() const {

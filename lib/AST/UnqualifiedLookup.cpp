@@ -578,14 +578,14 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   ModuleDecl *desiredModule = nullptr;
   auto givenName = Name.getBaseIdentifier();
   // Check if the given name appearing in the source file is a module
-  // real name or alias; for example, if `-module-alias Foo=Bar` was
+  // binary name or alias; for example, if `-module-alias Foo=Bar` was
   // passed, the alias 'Foo' should appear in source files, not 'Bar'.
-  // If the real name 'Bar' was used, looking up getRealModuleName with
-  // the real name 'Bar' and realNameFromAlias option should return
+  // If the binary name 'Bar' was used, looking up getBinaryModuleName with
+  // the binary name 'Bar' and binaryNameWithSyntaxNameKey option should return
   // an empty Identifier.
-  if (!Ctx.getRealModuleName(givenName, ASTContext::ModuleAliasLookupOption::realNameFromAlias).empty()) {
+  if (!Ctx.getBinaryModuleName(givenName, ASTContext::ModuleAliasLookupOption::binaryNameWithSyntaxNameKey).empty()) {
     // Only load the module if the lookup value is not empty, i.e. given
-    // name is a module alias, not a real module name.
+    // name is a module alias, not a binary module name.
     desiredModule = Ctx.getLoadedModule(givenName);
   }
 

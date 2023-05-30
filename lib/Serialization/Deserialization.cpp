@@ -2608,7 +2608,7 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
   // FIXME: duplicated from ImportResolver::getModule
   Identifier parentName = FileContext->getParentModule()->getName();
   if (name.size() == 1 &&
-      name.front().Item == getContext().getRealModuleName(parentName)) {
+      name.front().Item == getContext().getBinaryModuleName(parentName)) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");

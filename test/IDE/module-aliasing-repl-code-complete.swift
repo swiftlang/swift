@@ -3,7 +3,7 @@
 /// the <alias_name> as that's the name which should appear in source files including import statements,
 /// decls, expressions, etc. while getting visible decls come from the module of <real_name>, which
 /// is the name of the binary.
-/// Below, XLogging is the alias and mapped to the real name AppleLogging. Note that the binary name
+/// Below, XLogging is the alias and mapped to the binary name AppleLogging. Note that the binary name
 /// AppleLogging should not appear in the code completion results.
 ///
 // RUN: %empty-directory(%t)

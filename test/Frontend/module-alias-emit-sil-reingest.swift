@@ -9,7 +9,7 @@
 /// Emit SIL with module aliasing
 // RUN: %target-swift-frontend -emit-sil %t/FileBar.swift  -module-alias Coffee=Tea -I %t -o %t/Bar-output1.sil
 
-/// Verify the module real name 'Tea' is contained in the generated SIL
+/// Verify the module binary name 'Tea' is contained in the generated SIL
 // RUN: %FileCheck %s -input-file %t/Bar-output1.sil
 
 /// Reingest the SIL file and verify it contains the same result

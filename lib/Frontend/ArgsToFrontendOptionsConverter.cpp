@@ -831,7 +831,7 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     
     for (auto item: args) {
       auto str = StringRef(item);
-      // splits to an alias and the underlying name
+      // splits to a syntax name (original name) and a binary name (alias)
       auto pair = str.split('=');
       auto lhs = pair.first;
       auto rhs = pair.second;
@@ -844,13 +844,13 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
         return false;
       }
       
-      // First, add the underlying name as a key to prevent it from being
-      // used as an alias
+      // First, add the binary name as a key to prevent it from being
+      // used as a syntax name
       if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
         return false;
       }
-      // Next, add the alias as a key and the underlying name as a value to the map
+      // Next, add the syntax name as a key and the binary name as a value to the map
       auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
       if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);

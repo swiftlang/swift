@@ -334,17 +334,17 @@ public:
     return nullptr;
   }
 
-  /// Returns the real name of the enclosing module to use when referencing entities in this file.
-  /// The 'real name' is the actual binary name of the module, which can be different from the 'name'
+  /// Returns the binary name of the enclosing module to use when referencing entities in this file.
+  /// The 'binary name' is the actual binary name of the module, which can be different from the 'name'
   /// if module aliasing was used (via -module-alias flag).
   ///
-  /// This is usually the module real name which can be overriden by an
+  /// This is usually the module binary name which can be overriden by an
   /// `export_as` definition of a clang module, or `-export-as` flag on an
   /// imported Swift module. Swift modules built from source do not apply
   /// their own `-export-as` flag, this way the swiftinterface can be
   /// verified.
   virtual StringRef getExportedModuleName() const {
-    return getParentModule()->getRealName().str();
+    return getParentModule()->getBinaryName().str();
   }
 
   SWIFT_DEBUG_DUMPER(dumpDisplayDecls());

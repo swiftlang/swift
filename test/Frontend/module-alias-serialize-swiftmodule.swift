@@ -1,4 +1,4 @@
-/// Test a serialized module contains the module real names when -module-alias flag is passed.
+/// Test a serialized module contains the module binary names when -module-alias flag is passed.
 ///
 /// Module 'ClientN' imports 'Lib', and 'Lib' imports module 'XLogging'.
 /// 'XLogging' needs to be aliased due to a collision, so it's aliased 'AppleLogging'.

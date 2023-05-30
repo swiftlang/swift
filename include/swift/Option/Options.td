@@ -520,8 +520,8 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
 
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
-  MetaVarName<"<alias_name=underlying_name>">,
-  HelpText<"If a source file imports or references module <alias_name>, the <underlying_name> is used for the contents of the file">;
+  MetaVarName<"<name=new_name>">,
+  HelpText<"If a source file imports or references module <name>, the <new_name> is used for the contents of the file">;
 
 def module_link_name : Separate<["-"], "module-link-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,

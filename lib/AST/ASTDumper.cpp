@@ -591,7 +591,7 @@ namespace {
       OS << " '";
       // Check if module aliasing was used for the given imported module; for
       // example, if '-module-alias Foo=Bar' was passed and this module has
-      // 'import Foo', its corresponding real module name 'Bar' should be printed.
+      // 'import Foo', its corresponding binary module name 'Bar' should be printed.
       ImportPath::Builder scratch;
       ID->getRealImportPath(scratch).print(OS);
       OS << "')";
@@ -1361,7 +1361,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::Module:
-    printName(os, cast<ModuleDecl>(dc)->getRealName());
+    printName(os, cast<ModuleDecl>(dc)->getBinaryName());
     break;
 
   case DeclContextKind::FileUnit:
@@ -1457,7 +1457,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     // Print name.
     getName().printPretty(os);
   } else {
-    auto moduleName = cast<ModuleDecl>(this)->getRealName();
+    auto moduleName = cast<ModuleDecl>(this)->getBinaryName();
     os << moduleName;
   }
 

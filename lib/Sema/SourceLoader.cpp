@@ -42,9 +42,9 @@ static FileOrError findModule(ASTContext &ctx, Identifier moduleID,
   // -module-alias is used (otherwise same).
   //
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
-  // and a source file has 'import Foo', a module called Bar (real name)
+  // and a source file has 'import Foo', a module called Bar (binary name)
   // should be searched.
-  StringRef moduleNameRef = ctx.getRealModuleName(moduleID).str();
+  StringRef moduleNameRef = ctx.getBinaryModuleName(moduleID).str();
 
   for (const auto &Path : ctx.SearchPathOpts.getImportSearchPaths()) {
     inputFilename = Path;

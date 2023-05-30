@@ -873,7 +873,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   llvm::AttributeList attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);
-  // FIXME: Give the thunk a real name.
+  // FIXME: Give the thunk a binary name.
   // FIXME: Maybe cache the thunk by function and closure types?
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
