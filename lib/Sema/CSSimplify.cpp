@@ -127,6 +127,14 @@ static bool isPackExpansionType(Type type) {
   return false;
 }
 
+bool constraints::isSingleUnlabeledPackExpansionTuple(Type type) {
+  auto *tuple = type->getRValueType()->getAs<TupleType>();
+  // TODO: drop no name requirement
+  return tuple && (tuple->getNumElements() == 1) &&
+         isPackExpansionType(tuple->getElementType(0)) &&
+         !tuple->getElement(0).hasName();
+}
+
 static bool containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
   return llvm::any_of(params, [&](const auto &param) {
     return isPackExpansionType(param.getPlainType());
@@ -9121,6 +9129,16 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
       return SolutionKind::Solved;
   }
 
+  if (isSingleUnlabeledPackExpansionTuple(patternType)) {
+    auto *elementVar =
+        createTypeVariable(getConstraintLocator(locator), /*options=*/0);
+    addValueMemberConstraint(
+        patternType, DeclNameRef(getASTContext().Id_element), elementVar, DC,
+        FunctionRefKind::Unapplied, {},
+        getConstraintLocator(locator, {ConstraintLocator::Member}));
+    patternType = elementVar;
+  }
+
   // Let's try to resolve element type based on the pattern type.
   if (!patternType->hasTypeVariable()) {
     auto *loc = getConstraintLocator(locator);
@@ -9338,6 +9356,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     if (!memberName.isSpecial()) {
       StringRef nameStr = memberName.getBaseIdentifier().str();
       // Accessing `.element` on an abstract tuple materializes a pack.
+      // (deprecated behavior)
       if (nameStr == "element" && baseTuple->getNumElements() == 1 &&
           isPackExpansionType(baseTuple->getElementType(0))) {
         auto elementType = baseTuple->getElementType(0);
@@ -13310,6 +13329,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
 
     recordTypeVariablesAsHoles(shapeTy);
     return SolutionKind::Solved;
+  }
+
+  // Map element archetypes to the pack context to check for equality.
+  if (packTy->hasElementArchetype()) {
+    auto *packEnv = DC->getGenericEnvironmentOfContext();
+    packTy = packEnv->mapElementTypeIntoPackContext(packTy);
   }
 
   auto shape = packTy->getReducedShape();

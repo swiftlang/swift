@@ -3148,10 +3148,11 @@ namespace {
             if (type->is<ElementArchetypeType>() &&
                 CS.hasFixFor(CS.getConstraintLocator(declRef),
                              FixKind::IgnoreMissingEachKeyword)) {
-              Packs.push_back(PackElementExpr::create(CS.getASTContext(),
-                                                      /*eachLoc=*/SourceLoc(),
-                                                      declRef,
-                                                      /*implicit=*/true));
+              auto *packElementExpr =
+                  PackElementExpr::create(CS.getASTContext(),
+                                          /*eachLoc=*/{}, declRef,
+                                          /*implicit=*/true, type);
+              Packs.push_back(CS.cacheType(packElementExpr));
             }
           }
 
@@ -3230,8 +3231,17 @@ namespace {
     }
 
     Type visitPackElementExpr(PackElementExpr *expr) {
-      return openPackElement(CS.getType(expr->getPackRefExpr()),
-                             CS.getConstraintLocator(expr));
+      auto packType = CS.getType(expr->getPackRefExpr());
+
+      if (isSingleUnlabeledPackExpansionTuple(packType)) {
+        packType =
+            addMemberRefConstraints(expr, expr->getPackRefExpr(),
+                                    DeclNameRef(CS.getASTContext().Id_element),
+                                    FunctionRefKind::Unapplied, {});
+        CS.setType(expr->getPackRefExpr(), packType);
+      }
+
+      return openPackElement(packType, CS.getConstraintLocator(expr));
     }
 
     Type visitMaterializePackExpr(MaterializePackExpr *expr) {
