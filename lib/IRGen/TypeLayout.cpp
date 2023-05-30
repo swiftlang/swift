@@ -218,8 +218,8 @@ public:
                                  nestedRefCountBytes);
         B.fillPlaceholderWithInt(skipBytesPlaceholder, IGM.SizeTy, nestedSkip);
 
-        refCountBytes += (4 * sizeof(uint64_t)) +
-                         (3 * IGM.getPointerSize().getValue()) +
+        refCountBytes += (3 * sizeof(uint64_t)) +
+                         (4 * IGM.getPointerSize().getValue()) +
                          nestedRefCountBytes;
         break;
       }
