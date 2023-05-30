@@ -245,7 +245,7 @@ namespace swift {
     bool EnableModuleLoadingRemarks = false;
 
     /// Emit remarks about contextual inconsistencies in loaded modules.
-    bool EnableModuleRecoveryRemarks = false;
+    bool EnableModuleRecoveryRemarks = true;
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
@@ -402,7 +402,7 @@ namespace swift {
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
-    bool ForceWorkaroundBrokenModules = false;
+    bool ForceWorkaroundBrokenModules = true;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
