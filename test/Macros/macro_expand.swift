@@ -98,7 +98,8 @@ struct Bad {}
 
 // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
 // CHECK-DIAGS: import Swift
-// CHECK-DIAGS: precedencegroup MyPrecedence {}
+// CHECK-DIAGS: precedencegroup MyPrecedence {
+// CHECK-DIAGS: }
 // CHECK-DIAGS: @attached(member) macro myMacro()
 // CHECK-DIAGS: extension Int {
 // CHECK-DIAGS: }
