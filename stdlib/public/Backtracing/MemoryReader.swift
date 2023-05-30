@@ -27,8 +27,8 @@ import Swift
 @_implementationOnly import Runtime
 
 @_spi(MemoryReaders) public protocol MemoryReader {
-  associatedtype Address: FixedWidthInteger
-  associatedtype Size: FixedWidthInteger
+  typealias Address = UInt64
+  typealias Size = UInt64
 
   /// Fill the specified buffer with data from the specified location in
   /// the source.
@@ -94,14 +94,11 @@ extension MemoryReader {
 }
 
 @_spi(MemoryReaders) public struct UnsafeLocalMemoryReader: MemoryReader {
-  public typealias Address = UInt
-  public typealias Size = UInt
-
   public init() {}
 
   public func fetch<T>(from address: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
-    buffer.baseAddress!.update(from: UnsafePointer<T>(bitPattern: address)!,
+    buffer.baseAddress!.update(from: UnsafePointer<T>(bitPattern: UInt(address))!,
                                count: buffer.count)
   }
 }
@@ -112,9 +109,6 @@ extension MemoryReader {
 }
 
 @_spi(MemoryReaders) public struct RemoteMemoryReader: MemoryReader {
-  public typealias Address = UInt64
-  public typealias Size = UInt64
-
   private var task: task_t
 
   // Sadly we can't expose the type of this argument
@@ -160,9 +154,6 @@ extension MemoryReader {
 }
 
 @_spi(MemoryReaders) public struct MemserverMemoryReader: MemoryReader {
-  public typealias Address = UInt64
-  public typealias Size = UInt64
-
   private var fd: CInt
 
   public init(fd: CInt) {
@@ -222,9 +213,6 @@ extension MemoryReader {
 }
 
 @_spi(MemoryReaders) public struct RemoteMemoryReader: MemoryReader {
-  public typealias Address = UInt64
-  public typealias Size = UInt64
-
   private var pid: pid_t
 
   public init(pid: Any) {
@@ -246,9 +234,6 @@ extension MemoryReader {
 }
 
 @_spi(MemoryReaders) public struct LocalMemoryReader: MemoryReader {
-  public typealias Address = UInt64
-  public typealias Size = UInt64
-
   private var reader: RemoteMemoryReader
 
   init() {

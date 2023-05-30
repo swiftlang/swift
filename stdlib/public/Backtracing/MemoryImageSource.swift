@@ -18,9 +18,6 @@
 import Swift
 
 class MemoryImageSource<M: MemoryReader>: ImageSource {
-  typealias Address = M.Address
-  typealias Size = M.Size
-
   private var reader: M
 
   public var isMappedImage: Bool { return true }

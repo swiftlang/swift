@@ -35,7 +35,7 @@ import Swift
 
 enum CompressedImageSourceError: Error {
   case unboundedImageSource
-  case outOfRangeFetch(Int, Int)
+  case outOfRangeFetch(UInt64, Int)
   case badCompressedData
   case unsupportedFormat
   case libraryNotFound(String)
@@ -393,14 +393,11 @@ fileprivate func decompress<S: CompressedStream, I: ImageSource>(
 
 internal struct ElfCompressedImageSource<Traits: ElfTraits>: ImageSource {
 
-  typealias Address = Int
-  typealias Size = Int
-
   private var data: [UInt8]
 
   var isMappedImage: Bool { return false }
   var path: String? { return nil }
-  var bounds: Bounds? { return Bounds(base: 0, size: data.count) }
+  var bounds: Bounds? { return Bounds(base: Address(0), size: Size(data.count)) }
 
   init(source: some ImageSource) throws {
     guard let bounds = source.bounds else {
@@ -433,13 +430,13 @@ internal struct ElfCompressedImageSource<Traits: ElfTraits>: ImageSource {
   public func fetch<T>(from addr: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
     let toFetch = buffer.count * MemoryLayout<T>.stride
-    if addr < 0 || addr > data.count || data.count - addr < toFetch {
+    if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
       throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
     }
 
     buffer.withMemoryRebound(to: UInt8.self) { outBuf in
       for n in 0..<toFetch {
-        outBuf[n] = data[addr + n]
+        outBuf[n] = data[Int(addr) + n]
       }
     }
   }
@@ -448,14 +445,11 @@ internal struct ElfCompressedImageSource<Traits: ElfTraits>: ImageSource {
 
 internal struct ElfGNUCompressedImageSource: ImageSource {
 
-  typealias Address = Int
-  typealias Size = Int
-
   private var data: [UInt8]
 
   var isMappedImage: Bool { return false }
   var path: String? { return nil }
-  var bounds: Bounds? { return Bounds(base: 0, size: data.count) }
+  var bounds: Bounds? { return Bounds(base: Address(0), size: Size(data.count)) }
 
   init(source: some ImageSource) throws {
     guard let bounds = source.bounds else {
@@ -483,13 +477,13 @@ internal struct ElfGNUCompressedImageSource: ImageSource {
   public func fetch<T>(from addr: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
     let toFetch = buffer.count * MemoryLayout<T>.stride
-    if addr < 0 || addr > data.count || data.count - addr < toFetch {
+    if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
       throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
     }
 
     buffer.withMemoryRebound(to: UInt8.self) { outBuf in
       for n in 0..<toFetch {
-        outBuf[n] = data[addr + n]
+        outBuf[n] = data[Int(addr) + n]
       }
     }
   }
@@ -498,14 +492,11 @@ internal struct ElfGNUCompressedImageSource: ImageSource {
 
 internal struct LZMACompressedImageSource: ImageSource {
 
-  typealias Address = Int
-  typealias Size = Int
-
   private var data: [UInt8]
 
   var isMappedImage: Bool { return false }
   var path: String? { return nil }
-  var bounds: Bounds? { return Bounds(base: 0, size: data.count) }
+  var bounds: Bounds? { return Bounds(base: Address(0), size: Size(data.count)) }
 
   init(source: some ImageSource) throws {
     // Only supported for bounded image sources
@@ -521,13 +512,13 @@ internal struct LZMACompressedImageSource: ImageSource {
   public func fetch<T>(from addr: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
     let toFetch = buffer.count * MemoryLayout<T>.stride
-    if addr < 0 || addr > data.count || data.count - addr < toFetch {
+    if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
       throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
     }
 
     buffer.withMemoryRebound(to: UInt8.self) { outBuf in
       for n in 0..<toFetch {
-        outBuf[n] = data[addr + n]
+        outBuf[n] = data[Int(addr) + n]
       }
     }
   }

@@ -35,7 +35,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// This is intentionally _not_ a pointer, because you shouldn't be
   /// dereferencing them; they may refer to some other process, for
   /// example.
-  public typealias Address = UInt
+  public typealias Address = UInt64
 
   /// The unwind algorithm to use.
   public enum UnwindAlgorithm {
@@ -133,17 +133,22 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     }
 
     /// A textual description of this frame.
-    public var description: String {
+    public func description(width: Int) -> String {
       switch self {
         case let .programCounter(addr):
-          return "\(hex(addr))"
+          return "\(hex(addr, width: width))"
         case let .returnAddress(addr):
-          return "\(hex(addr)) [ra]"
+          return "\(hex(addr, width: width)) [ra]"
         case let .asyncResumePoint(addr):
-          return "\(hex(addr)) [async]"
+          return "\(hex(addr, width: width)) [async]"
         case .omittedFrames(_), .truncated:
           return "..."
       }
+    }
+
+    /// A textual description of this frame.
+    public var description: String {
+      return description(width: MemoryLayout<Address>.size * 2)
     }
   }
 
@@ -166,14 +171,25 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     public var endOfText: Backtrace.Address
 
     /// Provide a textual description of an Image.
-    public var description: String {
+    public func description(width: Int) -> String {
       if let buildID = self.buildID {
-        return "\(hex(baseAddress))-\(hex(endOfText)) \(hex(buildID)) \(name) \(path)"
+        return "\(hex(baseAddress, width: width))-\(hex(endOfText, width: width)) \(hex(buildID)) \(name) \(path)"
       } else {
-        return "\(hex(baseAddress))-\(hex(endOfText)) <no build ID> \(name) \(path)"
+        return "\(hex(baseAddress, width: width))-\(hex(endOfText, width: width)) <no build ID> \(name) \(path)"
       }
     }
+
+    /// A textual description of an Image.
+    public var description: String {
+      return description(width: MemoryLayout<Address>.size * 2)
+    }
   }
+
+  /// The architecture of the system that captured this backtrace.
+  public var architecture: String
+
+  /// The width of an address in this backtrace, in bits.
+  public var addressWidth: Int
 
   /// A list of captured frame information.
   public var frames: [Frame]
@@ -204,6 +220,17 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// required for symbolication.  On non-Darwin platforms it will always
   /// be `nil`.
   public var sharedCacheInfo: SharedCacheInfo?
+
+  /// Format an address according to the addressWidth.
+  ///
+  /// @param address     The address to format.
+  /// @param prefix      Whether to include a "0x" prefix.
+  ///
+  /// @returns A String containing the formatted Address.
+  public func formatAddress(_ address: Address,
+                            prefix: Bool = true) -> String {
+    return hex(address, prefix: prefix, width: (addressWidth + 3) / 4)
+  }
 
   /// Capture a backtrace from the current program location.
   ///
@@ -250,13 +277,17 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   }
 
   @_spi(Internal)
-  public static func capture(from context: some Context,
-                             using memoryReader: some MemoryReader,
-                             images: [Image]?,
-                             algorithm: UnwindAlgorithm = .auto,
-                             limit: Int? = 64,
-                             offset: Int = 0,
-                             top: Int = 16) throws -> Backtrace {
+  public static func capture<Ctx: Context, Rdr: MemoryReader>(
+    from context: Ctx,
+    using memoryReader: Rdr,
+    images: [Image]?,
+    algorithm: UnwindAlgorithm = .auto,
+    limit: Int? = 64,
+    offset: Int = 0,
+    top: Int = 16
+  ) throws -> Backtrace {
+    let addressWidth = 8 * MemoryLayout<Ctx.Address>.size
+
     switch algorithm {
       // All of them, for now, use the frame pointer unwinder.  In the long
       // run, we should be using DWARF EH frame data for .precise.
@@ -269,7 +300,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
         if let limit = limit {
           if limit <= 0 {
-            return Backtrace(frames: [.truncated])
+            return Backtrace(architecture: context.architecture,
+                             addressWidth: addressWidth,
+                             frames: [.truncated])
           }
 
           let realTop = top < limit ? top : limit - 1
@@ -293,7 +326,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
               frames[limit - 1] = .truncated
             }
 
-            return Backtrace(frames: frames)
+            return Backtrace(architecture: context.architecture,
+                             addressWidth: addressWidth,
+                             frames: frames)
           } else {
 
             // If we still have frames at this point, start tracking the
@@ -329,10 +364,16 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                                      with: topFrames.prefix(secondPart))
             }
 
-            return Backtrace(frames: frames, images: images)
+            return Backtrace(architecture: context.architecture,
+                             addressWidth: addressWidth,
+                             frames: frames,
+                             images: images)
           }
         } else {
-          return Backtrace(frames: Array(unwinder), images: images)
+          return Backtrace(architecture: context.architecture,
+                           addressWidth: addressWidth,
+                           frames: Array(unwinder),
+                           images: images)
         }
     }
   }
@@ -607,10 +648,11 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// Provide a textual version of the backtrace.
   public var description: String {
     var lines: [String] = []
+    let addressChars = (addressWidth + 3) / 4
 
     var n = 0
     for frame in frames {
-      lines.append("\(n)\t\(frame)")
+      lines.append("\(n)\t\(frame.description(width: addressChars))")
       switch frame {
         case let .omittedFrames(count):
           n += count
@@ -624,7 +666,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
       lines.append("Images:")
       lines.append("")
       for (n, image) in images.enumerated() {
-        lines.append("\(n)\t\(image)")
+        lines.append("\(n)\t\(image.description(width: addressChars))")
       }
     }
 
@@ -633,8 +675,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
       lines.append("")
       lines.append("Shared Cache:")
       lines.append("")
-      lines.append("  UUID: \(hex(sharedCacheInfo.uuid))")
-      lines.append("  Base: \(hex(sharedCacheInfo.baseAddress))")
+      lines.append("    UUID: \(hex(sharedCacheInfo.uuid))")
+      lines.append("    Base: \(hex(sharedCacheInfo.baseAddress, width: addressChars))")
+      lines.append("  Active: \(!sharedCacheInfo.noCache)")
     }
     #endif
 

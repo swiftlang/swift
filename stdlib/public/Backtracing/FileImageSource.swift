@@ -24,9 +24,6 @@ enum FileImageSourceError: Error {
 }
 
 class FileImageSource: ImageSource {
-  typealias Address = UInt64
-  typealias Size = UInt64
-
   private var fd: Int32
 
   public var isMappedImage: Bool { return false }

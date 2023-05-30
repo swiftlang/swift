@@ -45,6 +45,9 @@ import Swift
   /// from the architecture specific DWARF specification).
   associatedtype Register: RawRepresentable where Register.RawValue == Int
 
+  /// The architecture tag for this context (e.g. arm64, x86_64)
+  var architecture: String { get }
+
   /// The program counter; this is likely a return address
   var programCounter: GPRValue { get set }
 
@@ -193,6 +196,8 @@ extension arm_gprs {
   public typealias Register = X86_64Register
 
   var gprs = x86_64_gprs()
+
+  public var architecture: String { "x86_64" }
 
   public var programCounter: Address {
     get { return gprs.rip }
@@ -433,6 +438,8 @@ extension arm_gprs {
 
   var gprs = i386_gprs()
 
+  public var architecture: String { "i386" }
+
   public var programCounter: GPRValue {
     get { return gprs.eip }
     set {
@@ -613,6 +620,8 @@ extension arm_gprs {
   public typealias Register = ARM64Register
 
   var gprs = arm64_gprs()
+
+  public var architecture: String { "arm64" }
 
   public var programCounter: GPRValue {
     get { return gprs.pc }
@@ -829,6 +838,8 @@ extension arm_gprs {
   public typealias Register = ARMRegister
 
   var gprs = arm_gprs()
+
+  public var architecture: String { "arm" }
 
   public var programCounter: GPRValue {
     get { return gprs.getR(ARMRegister.r15.rawValue) }

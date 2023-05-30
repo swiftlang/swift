@@ -816,7 +816,7 @@ protocol ElfSymbolTableProtocol {
   func lookupSymbol(address: Traits.Address) -> Symbol?
 }
 
-protocol ElfImageProtocol: Image, ElfGetSectionProtocol {
+protocol ElfImageProtocol: Image, ElfGetSectionProtocol, DwarfSource {
   associatedtype Traits: ElfTraits
   associatedtype SymbolTable: ElfSymbolTableProtocol
     where SymbolTable.Traits == Traits
@@ -974,9 +974,6 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
         max = mid
       }
     }
-
-    print("Failed to find \(hex(address))")
-    print("  Symbols: \(_symbols)")
 
     return nil
   }
@@ -1590,6 +1587,74 @@ class ElfImage<SomeImageSource: ImageSource,
 
     return ImageSymbol(name: symbol.name,
                        offset: Int(relativeAddress - symbol.value))
+  }
+
+  func getDwarfSection(_ section: DwarfSection) -> (any ImageSource)? {
+    switch section {
+      case .debugAbbrev: return getSection(".debug_abbrev")
+      case .debugAddr: return getSection(".debug_addr")
+      case .debugARanges: return getSection(".debug_aranges")
+      case .debugFrame: return getSection(".debug_frame")
+      case .debugInfo: return getSection(".debug_info")
+      case .debugLine: return getSection(".debug_line")
+      case .debugLineStr: return getSection(".debug_line_str")
+      case .debugLoc: return getSection(".debug_loc")
+      case .debugLocLists: return getSection(".debug_loclists")
+      case .debugMacInfo: return getSection(".debug_macinfo")
+      case .debugMacro: return getSection(".debug_macro")
+      case .debugNames: return getSection(".debug_names")
+      case .debugPubNames: return getSection(".debug_pubnames")
+      case .debugPubTypes: return getSection(".debug_pubtypes")
+      case .debugRanges: return getSection(".debug_ranges")
+      case .debugRngLists: return getSection(".debug_rnglists")
+      case .debugStr: return getSection(".debug_str")
+      case .debugStrOffsets: return getSection(".debug_str_offsets")
+      case .debugSup: return getSection(".debug_sup")
+      case .debugTypes: return getSection(".debug_types")
+      case .debugCuIndex: return getSection(".debug_cu_index")
+      case .debugTuIndex: return getSection(".debug_tu_index")
+    }
+  }
+
+  private lazy var dwarfReader
+    = try? DwarfReader(source: self, shouldSwap: header.shouldByteSwap)
+
+  typealias CallSiteInfo = DwarfReader<ElfImage>.CallSiteInfo
+
+  func inlineCallSites(at address: Address) -> ArraySlice<CallSiteInfo> {
+    guard let callSiteInfo = dwarfReader?.inlineCallSites else {
+      return [][0..<0]
+    }
+
+    var min = 0
+    var max = callSiteInfo.count
+
+    while min < max {
+      let mid = min + (max - min) / 2
+      let callSite = callSiteInfo[mid]
+
+      if callSite.lowPC <= address && callSite.highPC >= address {
+        var first = mid, last = mid
+        while first > 0
+                && callSiteInfo[first - 1].lowPC <= address
+                && callSiteInfo[first - 1].highPC >= address {
+          first -= 1
+        }
+        while last < callSiteInfo.count - 1
+                && callSiteInfo[last + 1].lowPC <= address
+                && callSiteInfo[last + 1].highPC >= address {
+          last += 1
+        }
+
+        return callSiteInfo[first...last]
+      } else if callSite.highPC < address {
+        min = mid + 1
+      } else if callSite.lowPC > address {
+        max = mid
+      }
+    }
+
+    return []
   }
 }
 

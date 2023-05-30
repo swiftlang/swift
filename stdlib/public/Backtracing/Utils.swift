@@ -19,18 +19,19 @@ import Swift
 @_implementationOnly import OS.Libc
 
 internal func hex<T: FixedWidthInteger>(_ value: T,
-                                        withPrefix: Bool = true) -> String {
+                                        prefix shouldPrefix: Bool = true,
+                                        width: Int = MemoryLayout<T>.size * 2)
+  -> String {
   let digits = String(value, radix: 16)
-  let padTo = value.bitWidth / 4
-  let padding = digits.count >= padTo ? "" : String(repeating: "0",
-                                                    count: padTo - digits.count)
-  let prefix = withPrefix ? "0x" : ""
+  let padding = digits.count >= width ? "" : String(repeating: "0",
+                                                    count: width - digits.count)
+  let prefix = shouldPrefix ? "0x" : ""
 
   return "\(prefix)\(padding)\(digits)"
 }
 
 internal func hex(_ bytes: [UInt8]) -> String {
-  return bytes.map{ hex($0, withPrefix: false) }.joined(separator: "")
+  return bytes.map{ hex($0, prefix: false) }.joined(separator: "")
 }
 
 @_spi(Utils)

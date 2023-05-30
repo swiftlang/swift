@@ -660,6 +660,7 @@ Generate a backtrace for the parent process.
       }
     }
 
+    let addressWidthInChars = (crashingThread.backtrace.addressWidth + 3) / 4
     switch args.showImages! {
       case .none:
         break
@@ -671,10 +672,12 @@ Generate a backtrace for the parent process.
         } else {
           writeln("\n\nImages:\n")
         }
-        writeln(formatter.format(images: images))
+        writeln(formatter.format(images: images,
+                                 addressWidth: addressWidthInChars))
       case .all:
         writeln("\n\nImages:\n")
-        writeln(formatter.format(images: target.images))
+        writeln(formatter.format(images: target.images,
+                                 addressWidth: addressWidthInChars))
     }
   }
 
@@ -750,11 +753,14 @@ Generate a backtrace for the parent process.
           let name = thread.name.isEmpty ? "" : " \(thread.name)"
           writeln("Thread \(currentThread) id=\(thread.id)\(name)\(crashed)\n")
 
+          let addressWidthInChars = (backtrace.addressWidth + 3) / 4
+
           if let frame = backtrace.frames.drop(while: {
             $0.isSwiftRuntimeFailure
           }).first {
             let formatter = backtraceFormatter()
-            let formatted = formatter.format(frame: frame)
+            let formatted = formatter.format(frame: frame,
+                                             addressWidth: addressWidthInChars)
             writeln("\(formatted)")
           }
           break
@@ -809,6 +815,7 @@ Generate a backtrace for the parent process.
           var rows: [BacktraceFormatter.TableRow] = []
           for (n, thread) in target.threads.enumerated() {
             let backtrace = thread.backtrace
+            let addressWidthInChars = (backtrace.addressWidth + 3) / 4
 
             let crashed: String
             if n == target.crashingThreadNdx {
@@ -827,7 +834,10 @@ Generate a backtrace for the parent process.
               $0.isSwiftRuntimeFailure
             }).first {
 
-              rows += formatter.formatRows(frame: frame).map{ row in
+              rows += formatter.formatRows(
+                frame: frame,
+                addressWidth: addressWidthInChars).map{ row in
+
                 switch row {
                   case let .columns(columns):
                     return .columns([ "", "" ] + columns)
@@ -846,8 +856,11 @@ Generate a backtrace for the parent process.
           writeln(output)
         case "images":
           let formatter = backtraceFormatter()
-          let images = target.threads[currentThread].backtrace.images
-          let output = formatter.format(images: images)
+          let backtrace = target.threads[currentThread].backtrace
+          let images = backtrace.images
+          let addressWidthInChars = (backtrace.addressWidth + 3) / 4
+          let output = formatter.format(images: images,
+                                        addressWidth: addressWidthInChars)
 
           writeln(output)
         case "set":

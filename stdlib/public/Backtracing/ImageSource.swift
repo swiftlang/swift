@@ -47,6 +47,58 @@ protocol ImageSource: MemoryReader {
   var bounds: Bounds? { get }
 }
 
+struct ImageSourceCursor {
+  typealias Address = UInt64
+  typealias Size = UInt64
+  typealias Bounds = ImageBounds<Address, Size>
+
+  var source: any ImageSource
+  var pos: Address
+
+  init(source: any ImageSource, offset: Address = 0) {
+    self.source = source
+    self.pos = offset
+  }
+
+  public mutating func read<T>(into buffer: UnsafeMutableBufferPointer<T>) throws {
+    try source.fetch(from: pos, into: buffer)
+    pos += UInt64(MemoryLayout<T>.stride * buffer.count)
+  }
+
+  public mutating func read<T>(into pointer: UnsafeMutablePointer<T>) throws {
+    try source.fetch(from: pos, into: pointer)
+    pos += UInt64(MemoryLayout<T>.stride)
+  }
+
+  public mutating func read<T>(as type: T.Type) throws -> T {
+    let stride = MemoryLayout<T>.stride
+    let result = try source.fetch(from: pos, as: type)
+    pos += UInt64(stride)
+    return result
+  }
+
+  public mutating func read<T>(count: Int, as type: T.Type) throws -> [T] {
+    let stride = MemoryLayout<T>.stride
+    let result = try source.fetch(from: pos, count: count, as: type)
+    pos += UInt64(stride * count)
+    return result
+  }
+
+  public mutating func readString() throws -> String? {
+    var bytes: [UInt8] = []
+    while true {
+      let ch = try read(as: UInt8.self)
+      if ch == 0 {
+        break
+      }
+      bytes.append(ch)
+    }
+
+    return String(decoding: bytes, as: UTF8.self)
+  }
+
+}
+
 extension ImageSource {
   /// Fetch all the data from this image source (which must be bounded)
   func fetchAllBytes() -> [UInt8]? {
@@ -67,19 +119,16 @@ enum SubImageSourceError: Error {
 }
 
 struct SubImageSource<S: ImageSource>: ImageSource {
-  typealias Address = S.Address
-  typealias Size = S.Size
-
   var parent: S
-  var baseAddress: S.Address
-  var length: S.Size
+  var baseAddress: Address
+  var length: Size
   var path: String? { return parent.path }
 
   var bounds: Bounds? {
     return Bounds(base: 0, size: length)
   }
 
-  public init(parent: S, baseAddress: S.Address, length: S.Size) {
+  public init(parent: S, baseAddress: Address, length: Size) {
     self.parent = parent
     self.baseAddress = baseAddress
     self.length = length
@@ -95,7 +144,7 @@ struct SubImageSource<S: ImageSource>: ImageSource {
     if addr < 0 || addr > length {
       throw SubImageSourceError.outOfRangeFetch(UInt64(addr), toFetch)
     }
-    if S.Address(length) - addr < toFetch {
+    if Address(length) - addr < toFetch {
       throw SubImageSourceError.outOfRangeFetch(UInt64(addr), toFetch)
     }
 
