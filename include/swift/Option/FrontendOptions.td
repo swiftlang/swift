@@ -588,6 +588,10 @@ def disable_deserialization_safety :
   Flag<["-"], "disable-deserialization-safety">,
   HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
 
+def force_workaround_broken_modules :
+  Flag<["-"], "experimental-force-workaround-broken-modules">,
+  HelpText<"Attempt unsafe recovery for imported modules with broken modularization">;
+
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
