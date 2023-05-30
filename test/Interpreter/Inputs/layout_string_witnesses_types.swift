@@ -317,6 +317,7 @@ public enum MultiPayloadEnum {
     case b(Int, String)
     case c(Bool)
     case d
+    case e(SimpleClass)
 }
 
 public struct MultiPayloadEnumWrapper {
@@ -324,6 +325,26 @@ public struct MultiPayloadEnumWrapper {
     let y: AnyObject
 
     public init(x: MultiPayloadEnum, y: AnyObject) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public struct MixedEnumWrapper {
+    let x: SinglePayloadSimpleClassEnum
+    let y: MultiPayloadEnum
+
+    public init(x: SinglePayloadSimpleClassEnum, y: MultiPayloadEnum) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public struct MixedEnumWrapperWrapperGeneric<T> {
+    let x: MixedEnumWrapper
+    let y: T
+
+    public init(x: MixedEnumWrapper, y: T) {
         self.x = x
         self.y = y
     }
