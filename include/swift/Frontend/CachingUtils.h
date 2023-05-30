@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_CACHINGUTILS_H
 #define SWIFT_FRONTEND_CACHINGUTILS_H
 
+#include "swift/Frontend/CachedDiagnostics.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/CAS/ActionCache.h"
@@ -30,6 +31,14 @@ createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs);
+
+/// Replay the output of the compilation from cache.
+/// Return true if outputs are replayed, false otherwise.
+bool replayCachedCompilerOutputs(
+    llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
+    llvm::cas::ObjectRef BaseKey, DiagnosticEngine &Diag,
+    const FrontendInputsAndOutputs &InputsAndOutputs,
+    CachingDiagnosticsProcessor &CDP);
 
 /// Load the cached compile result from cache.
 std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(
