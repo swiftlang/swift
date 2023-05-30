@@ -2059,13 +2059,13 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     if (getContext().LangOpts.ForceWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
         !values.empty()) {
-      // Print the error as a remark and notify of the recovery attempt.
-      getContext().Diags.diagnose(getSourceLoc(),
-                                  diag::modularization_issue_worked_around);
+      // Print the error as a warning and notify of the recovery attempt.
       llvm::handleAllErrors(std::move(error),
         [&](const ModularizationError &modularError) {
-          modularError.diagnose(this, DiagnosticBehavior::Note);
+          modularError.diagnose(this, DiagnosticBehavior::Warning);
         });
+      getContext().Diags.diagnose(getSourceLoc(),
+                                  diag::modularization_issue_worked_around);
     } else {
       return std::move(error);
     }
