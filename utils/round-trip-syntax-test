@@ -74,7 +74,7 @@ class RoundTripTask(object):
                 logging.error(self.stderr.decode('utf-8', errors='replace'))
                 raise RuntimeError()
 
-        contents = ''.join(map(lambda l: l.decode('utf-8', errors='replace'),
+        contents = ''.join(map(lambda _: _.decode('utf-8', errors='replace'),
                                open(self.input_filename, 'rb').readlines()))
         stdout_contents = self.stdout.decode('utf-8', errors='replace')
 
