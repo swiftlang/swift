@@ -997,7 +997,7 @@ void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
 struct ConcurrencyStandardTypeDescriptors {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
-  const ContextDescriptor *TYPENAME;
+  const ContextDescriptor * __ptrauth_swift_type_descriptor TYPENAME;
 #include "swift/Demangling/StandardTypesMangling.def"
 };
 
