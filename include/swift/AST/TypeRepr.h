@@ -1145,11 +1145,10 @@ public:
 class FixedTypeRepr : public TypeRepr {
   Type Ty;
   SourceLoc Loc;
-  bool IsSelf;
 
 public:
-  FixedTypeRepr(Type Ty, SourceLoc Loc, bool IsSelf = false)
-    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc), IsSelf(IsSelf) {}
+  FixedTypeRepr(Type Ty, SourceLoc Loc)
+    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
@@ -1160,9 +1159,6 @@ public:
   /// Retrieve the location.
   SourceLoc getLoc() const { return Loc; }
 
-  /// Retrieve whether this was written as 'Self'.
-  bool getIsSelf() const { return IsSelf; }
-
   /// Retrieve the fixed type.
   Type getType() const { return Ty; }
 
@@ -1170,6 +1166,33 @@ public:
     return T->getKind() == TypeReprKind::Fixed;
   }
   static bool classof(const FixedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Loc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for uses of 'Self' in the type of a declaration.
+class SelfTypeRepr : public TypeRepr {
+  Type Ty;
+  SourceLoc Loc;
+
+public:
+  SelfTypeRepr(Type Ty, SourceLoc Loc)
+    : TypeRepr(TypeReprKind::Self), Ty(Ty), Loc(Loc) {}
+
+  /// Retrieve the location.
+  SourceLoc getLoc() const { return Loc; }
+
+  /// Retrieve the fixed type.
+  Type getType() const { return Ty; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Self;
+  }
+  static bool classof(const SelfTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return Loc; }
@@ -1438,6 +1461,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Pack:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
+  case TypeReprKind::Self:
   case TypeReprKind::Array:
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
