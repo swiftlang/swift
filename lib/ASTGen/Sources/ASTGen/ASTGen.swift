@@ -217,6 +217,15 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
+  func visit(_ node: GenericWhereClauseSyntax?) -> ASTNode? {
+    guard let node else {
+      return nil
+    }
+
+    return self.visit(node)
+  }
+
+  @inline(__always)
   func visit(_ node: InheritedTypeListSyntax?) -> BridgedArrayRef {
     guard let node else {
       return .init()

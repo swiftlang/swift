@@ -7,13 +7,15 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   func visit(_ node: GenericParameterClauseSyntax) -> ASTNode {
-    let lAngleLoc = bridgedSourceLoc(for: node.leftAngle)
-    let whereLoc = bridgedSourceLoc(for: node.genericWhereClause?.whereKeyword)
-    let rAngleLoc = bridgedSourceLoc(for: node.rightAngle)
-    return .misc(
-      self.withBridgedParametersAndRequirements(node) { params, reqs in
-        return GenericParamList_create(self.ctx, lAngleLoc, params, whereLoc, reqs, rAngleLoc)
-      })
+    .misc(
+      GenericParamList_create(
+        self.ctx,
+        bridgedSourceLoc(for: node.leftAngle),
+        node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
+        self.visit(node.genericWhereClause)?.rawValue,
+        bridgedSourceLoc(for: node.rightAngle)
+      )
+    )
   }
 
   func visit(_ node: GenericParameterSyntax) -> ASTNode {
@@ -42,16 +44,9 @@ extension ASTGenVisitor {
       )
     )
   }
-}
 
-extension ASTGenVisitor {
-  private func withBridgedParametersAndRequirements<T>(
-    _ node: GenericParameterClauseSyntax,
-    action: (BridgedArrayRef, BridgedArrayRef) -> T
-  ) -> T {
-    let parameters = node.parameters.lazy.map { self.visit($0).rawValue }
-
-    let requirements = node.genericWhereClause?.requirements.lazy.map {
+  func visit(_ node: GenericWhereClauseSyntax) -> ASTNode {
+    let requirements = node.requirements.lazy.map {
       switch $0.requirement {
       case .conformanceRequirement(let conformance):
         return BridgedRequirementRepr(
@@ -68,10 +63,17 @@ extension ASTGenVisitor {
           SecondType: self.visit(sameType.rightType).rawValue
         )
       case .layoutRequirement(_):
-        fatalError("Cannot handle layout requirements!")
+        // FIXME: Implement layout requirement translation.
+        fatalError("Translation of layout requirements not implemented!")
       }
     }
 
-    return action(parameters.bridgedArray(in: self), requirements.bridgedArray(in: self))
+    return .misc(
+      TrailingWhereClause_create(
+        self.ctx,
+        self.bridgedSourceLoc(for: node.whereKeyword),
+        requirements.bridgedArray(in: self)
+      )
+    )
   }
 }

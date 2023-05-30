@@ -79,7 +79,7 @@ func test8(_ i: _const Int) {
 
 func test9(_ value: Any) { }
 
-func test10<T>(t: T) {}
+func test10<T>(t: T) where T: Proto1 {}
 
 protocol Proto1 {}
 protocol Proto2 {}
@@ -89,9 +89,9 @@ Proto3
 <
   A,
   B
->: Proto1 {
+>: Proto1 where Self: Proto2 {
   associatedtype
-    A
+    A where B: Proto1
   associatedtype B: Equatable
     =
     Int
@@ -102,7 +102,7 @@ Proto3
 typealias
 Alias<T>
 =
-String
+String where T: Proto1
 
 struct
 Struct
@@ -114,11 +114,18 @@ Struct
 >
 :
 Proto1, Proto2, @unchecked Sendable
+where
+  T1
+  :
+  Proto3,
+  T1.A
+  ==
+  Int
 {
   /*static*/ func method(_ b: Bool) {}
 }
 
 class
-Class<T>: Proto1 {
+Class<T>: Proto1 where T: Proto3 {
   func method(_ b: Bool) {}
 }

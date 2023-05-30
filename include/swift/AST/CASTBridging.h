@@ -332,7 +332,8 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
                 void *_Nullable opaqueGenericParamList,
                 void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
-                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType);
+                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType,
+                void *_Nullable opaqueGenericWhereClause);
 void FuncDecl_setBody(void *fn, void *body);
 
 void *SimpleIdentTypeRepr_create(BridgedASTContext cContext,
@@ -345,11 +346,14 @@ void *UnresolvedDotExpr_create(BridgedASTContext cContext, void *base,
 void *ClosureExpr_create(BridgedASTContext cContext, void *body,
                          BridgedDeclContext cDeclContext);
 
-void *TypeAliasDecl_create(
-    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
-    BridgedSourceLoc cEqualLoc, void *opaqueUnderlyingType);
+void *TypeAliasDecl_create(BridgedASTContext cContext,
+                           BridgedDeclContext cDeclContext,
+                           BridgedSourceLoc cAliasKeywordLoc,
+                           BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                           void *_Nullable opaqueGenericParamList,
+                           BridgedSourceLoc cEqualLoc,
+                           void *opaqueUnderlyingType,
+                           void *_Nullable opaqueGenericWhereClause);
 
 void IterableDeclContext_setParsedMembers(BridgedArrayRef members,
                                           void *opaqueDecl);
@@ -358,19 +362,22 @@ BridgedDeclContextAndDecl StructDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
-    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange);
 
 BridgedDeclContextAndDecl ClassDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
-    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange);
 
 BridgedDeclContextAndDecl ProtocolDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
-    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange);
 
 void *AssociatedTypeDecl_create(BridgedASTContext cContext,
                                 BridgedDeclContext cDeclContext,
@@ -378,13 +385,14 @@ void *AssociatedTypeDecl_create(BridgedASTContext cContext,
                                 BridgedIdentifier cName,
                                 BridgedSourceLoc cNameLoc,
                                 BridgedArrayRef cInheritedTypes,
-                                void *_Nullable opaqueDefaultType);
+                                void *_Nullable opaqueDefaultType,
+                                void *_Nullable opaqueGenericWhereClause);
 
 void *GenericParamList_create(BridgedASTContext cContext,
-                              BridgedSourceLoc cLAngleLoc,
-                              BridgedArrayRef params,
-                              BridgedSourceLoc cWhereLoc, BridgedArrayRef reqs,
-                              BridgedSourceLoc cRAngleLoc);
+                              BridgedSourceLoc cLeftAngleLoc,
+                              BridgedArrayRef cParameters,
+                              void *_Nullable opaqueGenericWhereClause,
+                              BridgedSourceLoc cRightAngleLoc);
 
 void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
@@ -393,6 +401,10 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedSourceLoc cNameLoc,
                                   void *_Nullable opaqueInheritedType,
                                   SwiftInt index);
+
+void *TrailingWhereClause_create(BridgedASTContext cContext,
+                                 BridgedSourceLoc cWhereKeywordLoc,
+                                 BridgedArrayRef cRequirements);
 
 void *ParameterList_create(BridgedASTContext cContext,
                            BridgedSourceLoc cLeftParenLoc,

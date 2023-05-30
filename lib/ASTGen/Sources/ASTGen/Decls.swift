@@ -19,7 +19,8 @@ extension ASTGenVisitor {
         nameLoc,
         self.visit(node.genericParameterClause)?.rawValue,
         self.bridgedSourceLoc(for: node.initializer.equal),
-        self.visit(node.initializer.value).rawValue
+        self.visit(node.initializer.value).rawValue,
+        self.visit(node.genericWhereClause)?.rawValue
       )
     )
   }
@@ -35,6 +36,7 @@ extension ASTGenVisitor {
       nameLoc,
       self.visit(node.genericParameterClause)?.rawValue,
       self.visit(node.inheritanceClause?.inheritedTypes),
+      self.visit(node.genericWhereClause)?.rawValue,
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
@@ -56,6 +58,7 @@ extension ASTGenVisitor {
       nameLoc,
       self.visit(node.genericParameterClause)?.rawValue,
       self.visit(node.inheritanceClause?.inheritedTypes),
+      self.visit(node.genericWhereClause)?.rawValue,
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
@@ -80,6 +83,7 @@ extension ASTGenVisitor {
       nameLoc,
       primaryAssociatedTypeNames.bridgedArray(in: self),
       self.visit(node.inheritanceClause?.inheritedTypes),
+      self.visit(node.genericWhereClause)?.rawValue,
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
@@ -101,7 +105,8 @@ extension ASTGenVisitor {
         name,
         nameLoc,
         self.visit(node.inheritanceClause?.inheritedTypes),
-        self.visit(node.initializer?.value)?.rawValue
+        self.visit(node.initializer?.value)?.rawValue,
+        self.visit(node.genericWhereClause)?.rawValue
       )
     )
   }
@@ -145,7 +150,8 @@ extension ASTGenVisitor {
       self.visit(node.signature.parameterClause).rawValue,
       self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
       self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),
-      self.visit(node.signature.returnClause?.type)?.rawValue
+      self.visit(node.signature.returnClause?.type)?.rawValue,
+      self.visit(node.genericWhereClause)?.rawValue
     )
 
     if let body = node.body {
