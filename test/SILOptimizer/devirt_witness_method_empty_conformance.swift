@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -O -emit-ir  -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -O -emit-ir  -primary-file %s
+// RUN: %target-swift-frontend -O -emit-ir  -primary-file %s | %FileCheck %s
 
 public struct PublicStruct {
 }
@@ -77,7 +76,7 @@ extension ApplyRegStruct {
         from space: PublicEnum, transform: RegStruct
     ) {
         transform.funcInStructAndProtAndExt(.case2, space: space) {
-// CHECK-LABEL: define hidden swiftcc void @"$sSa39devirt_witness_method_empty_conformanceAA12PublicStructVRszlE14applyTransformyyF"(%TSa* nocapture {{.*}}swiftself dereferenceable
+// CHECK-LABEL: define hidden swiftcc void @"$sSa39devirt_witness_method_empty_conformanceAA12PublicStructVRszlE14applyTransformyyF"(ptr nocapture {{.*}}swiftself dereferenceable
 // CHECK-NEXT: entry
 // CHECK-NEXT: ret void
             applyTransform()
