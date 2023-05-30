@@ -3559,7 +3559,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     break;
 
   case OverloadChoiceKind::MaterializePack: {
-    // Since `.element` is only applicable to single element tuples at the
+    // Since pack expansion is only applicable to single element tuples at the
     // moment we can just look through l-value base to load it.
     //
     // In the future, _if_ the syntax allows for multiple expansions

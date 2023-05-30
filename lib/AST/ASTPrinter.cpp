@@ -5223,7 +5223,6 @@ void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
 
 void PrintAST::visitMaterializePackExpr(MaterializePackExpr *expr) {
   visit(expr->getFromExpr());
-  Printer << ".element";
 }
 
 void PrintAST::visitPackElementExpr(PackElementExpr *expr) {

@@ -6100,6 +6100,8 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
 
+bool isSingleUnlabeledPackExpansionTuple(Type type);
+
 } // end namespace constraints
 
 template<typename ...Args>
