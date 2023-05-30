@@ -3679,7 +3679,7 @@ public:
 };
 
 /// An expression to materialize a pack from a tuple containing a pack
-/// expansion, spelled \c tuple.element.
+/// expansion.
 ///
 /// These nodes are created by CSApply and should only appear in a
 /// type-checked AST in the context of a \c PackExpansionExpr .
@@ -3687,7 +3687,7 @@ class MaterializePackExpr final : public Expr {
   /// The expression from which to materialize a pack.
   Expr *FromExpr;
 
-  /// The source location of \c .element
+  /// The source location of (deprecated) \c .element
   SourceLoc ElementLoc;
 
   MaterializePackExpr(Expr *fromExpr, SourceLoc elementLoc,
@@ -3711,7 +3711,7 @@ public:
   }
 
   SourceLoc getEndLoc() const {
-    return ElementLoc;
+    return ElementLoc.isInvalid() ? ElementLoc : FromExpr->getEndLoc();
   }
 
   static bool classof(const Expr *E) {
