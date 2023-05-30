@@ -3569,17 +3569,12 @@ static bool isCallToSelfOfCurrentFunction(SILGenFunction &SGF, LookupExpr *e) {
              cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false);
 }
 
-static bool isCurrentFunctionReadAccess(SILGenFunction &SGF) {
+static bool isCurrentFunctionAccessor(SILGenFunction &SGF,
+                                      AccessorKind accessorKind) {
   auto *contextAccessorDecl =
       dyn_cast_or_null<AccessorDecl>(SGF.FunctionDC->getAsDecl());
   return contextAccessorDecl &&
-         contextAccessorDecl->getAccessorKind() == AccessorKind::Read;
-}
-
-static bool isCurrentFunctionInitAccessor(SILGenFunction &SGF) {
-  auto *contextAccessorDecl =
-      dyn_cast_or_null<AccessorDecl>(SGF.FunctionDC->getAsDecl());
-  return contextAccessorDecl && contextAccessorDecl->isInitAccessor();
+         contextAccessorDecl->getAccessorKind() == accessorKind;
 }
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
@@ -3593,7 +3588,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // has to be remapped into an argument reference because all
   // of the properties from initialized/accesses lists are passed
   // to init accessors individually via arguments.
-  if (isCurrentFunctionInitAccessor(SGF)) {
+  if (isCurrentFunctionAccessor(SGF, AccessorKind::Init)) {
     if (auto *arg = SGF.isMappedToInitAccessorArgument(var)) {
       auto subs = e->getMember().getSubstitutions();
       return emitLValueForNonMemberVarDecl(
@@ -3611,7 +3606,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
-  bool isContextRead = isCurrentFunctionReadAccess(SGF);
+  bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
 
   // If we are inside _read, calling self.get, and the _read we are inside of is
   // the same as the as self's variable and the current function is a
@@ -3812,7 +3807,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
                             SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
-  bool isContextRead = isCurrentFunctionReadAccess(SGF);
+  bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
 
   // If we are inside _read, calling self.get, and the _read we are inside of is
   // the same as the as self's variable and the current function is a
