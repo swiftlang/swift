@@ -1718,16 +1718,6 @@ namespace {
         auto initConstant = SGF.getAccessorDeclRef(initAccessor);
         SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
 
-        SmallVector<SILValue, 1> capturedArgs;
-        SILValue capturedBase = base.getValue();
-        capturedArgs.push_back(capturedBase);
-
-        PartialApplyInst *initPAI =
-          SGF.B.createPartialApply(loc, initFRef,
-                                   Substitutions, capturedArgs,
-                                   ParameterConvention::Direct_Guaranteed);
-        ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
-
         // Emit the set accessor function partially applied to the base.
         auto setterFRef = getSetterFRef();
         auto setterTy = getSetterType(setterFRef);
@@ -1736,9 +1726,9 @@ namespace {
 
         // Create the assign_or_init with the initializer and setter.
         auto value = emitValue(field, FieldType, setterTy, setterConv);
-        SGF.B.createAssignOrInit(
-            loc, value.forward(SGF), initFn.getValue(), setterFn.getValue(),
-            AssignOrInitInst::Unknown);
+        SGF.B.createAssignOrInit(loc, value.forward(SGF), initFRef,
+                                 setterFn.getValue(),
+                                 AssignOrInitInst::Unknown);
         return;
       }
 

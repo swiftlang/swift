@@ -2722,6 +2722,12 @@ public:
     checkAssignByWrapperArgs(Src->getType(), setterConv);
   }
 
+  void checkAssigOrInitInstAccessorArgs(SILType argTy,
+                                        SILFunctionConventions &conv) {
+    unsigned argIdx = conv.getSILArgIndexOfFirstParam();
+    checkAssignByWrapperArgsRecursively(argTy, conv, argIdx);
+  }
+
   void checkAssignOrInitInst(AssignOrInitInst *AI) {
     SILValue Src = AI->getSrc();
     require(AI->getModule().getStage() == SILStage::Raw,
@@ -2732,9 +2738,10 @@ public:
     SILValue initFn = AI->getInitializer();
     CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
     SILFunctionConventions initConv(initTy, AI->getModule());
-    require(initConv.getNumIndirectSILResults() == 0,
-            "init function has indirect results");
-    checkAssignByWrapperArgs(Src->getType(), initConv);
+    require(initConv.getNumIndirectSILResults() ==
+                AI->getInitializedProperties().size(),
+            "init function has invalid number of indirect results");
+    checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
 
     SILValue setterFn = AI->getSetter();
     CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
