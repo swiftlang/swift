@@ -20,4 +20,5 @@ func test() {
 
     let _ = CxxStdlib.abs(x) // expected-error {{module 'CxxStdlib' has no member named 'abs'}}
     let _ = CxxStdlib.div(x) // expected-error {{module 'CxxStdlib' has no member named 'div'}}
+    let _ = CxxStdlib.strstr("a", "aaa") // expected-error {{module 'CxxStdlib' has no member named 'strstr'}}
 }
