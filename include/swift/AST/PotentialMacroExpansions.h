@@ -91,6 +91,9 @@ public:
   }
 
   /// Whether there are any expanded macros in this context.
+  explicit operator bool() const { return hasAnyExpandedMacro(); }
+
+  /// Whether there are any expanded macros in this context.
   bool hasAnyExpandedMacro() const {
     return Storage.getInt() & AnyExpandedMacros;
   }
