@@ -30,6 +30,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1254,6 +1255,10 @@ public:
     LazilyCompleteNames.clear();
   }
 
+  /// Determine whether the given container has any macro-introduced names that
+  /// match the given declaration.
+  bool hasAnyMacroNamesMatching(TypeOrExtensionDecl container, DeclName name);
+
   bool isLazilyCompleteForMacroExpansion(DeclName name) const {
     assert(!MacroDecl::isUniqueMacroName(name.getBaseName()));
     // If we've already expanded macros for a simple name, we must have expanded
@@ -1587,32 +1592,71 @@ namespace {
   struct MacroIntroducedNameTracker {
     ValueDecl *attachedTo = nullptr;
 
-    llvm::SmallSet<DeclName, 4> allIntroducedNames;
-    bool introducesArbitraryNames = false;
+    PotentialMacroExpansions potentialExpansions;
 
     /// Augment the set of names with those introduced by the given macro.
     void operator()(MacroDecl *macro, const MacroRoleAttr *attr) {
+      potentialExpansions.noteExpandedMacro();
+
       // First check for arbitrary names.
       if (attr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
-        introducesArbitraryNames = true;
+        potentialExpansions.noteIntroducesArbitraryNames();
       }
 
       // If this introduces arbitrary names, there's nothing more to do.
-      if (introducesArbitraryNames)
+      if (potentialExpansions.introducesArbitraryNames())
         return;
 
       SmallVector<DeclName, 4> introducedNames;
       macro->getIntroducedNames(
           attr->getMacroRole(), attachedTo, introducedNames);
       for (auto name : introducedNames)
-        allIntroducedNames.insert(name.getBaseName());
+        potentialExpansions.addIntroducedMacroName(name);
     }
 
     bool shouldExpandForName(DeclName name) const {
-      return introducesArbitraryNames ||
-          allIntroducedNames.contains(name.getBaseName());
+      return potentialExpansions.shouldExpandForName(name);
     }
   };
+}
+
+PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
+    Evaluator &evaluator, TypeOrExtensionDecl container) const {
+  /// The implementation here needs to be kept in sync with
+  /// populateLookupTableEntryFromMacroExpansions.
+  MacroIntroducedNameTracker nameTracker;
+
+  // Member macros on the type or extension.
+  auto containerDecl = container.getAsDecl();
+  forEachPotentialAttachedMacro(containerDecl, MacroRole::Member, nameTracker);
+
+  // Peer and freestanding declaration macros.
+  auto dc = container.getAsDeclContext();
+  auto idc = container.getAsIterableDeclContext();
+  for (auto *member : idc->getCurrentMembersWithoutLoading()) {
+    if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
+      nameTracker.attachedTo = nullptr;
+      forEachPotentialResolvedMacro(
+          dc->getModuleScopeContext(), med->getMacroName(),
+          MacroRole::Declaration, nameTracker);
+    } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
+      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+      forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
+    }
+  }
+
+  nameTracker.attachedTo = nullptr;
+  return nameTracker.potentialExpansions;
+}
+
+bool MemberLookupTable::hasAnyMacroNamesMatching(
+    TypeOrExtensionDecl container, DeclName name) {
+  ASTContext &ctx = container.getAsDecl()->getASTContext();
+  auto potentialExpansions = evaluateOrDefault(
+      ctx.evaluator, PotentialMacroExpansionsInContextRequest{container},
+      PotentialMacroExpansions());
+
+  return potentialExpansions.shouldExpandForName(name);
 }
 
 static void
@@ -1620,6 +1664,12 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
                                             MemberLookupTable &table,
                                             DeclName name,
                                             TypeOrExtensionDecl container) {
+  // If there are no macro-introduced names in this container that match the
+  // given name, do nothing. This avoids an expensive walk over the members
+  // and attributes for the common case where there are no macros.
+  if (!table.hasAnyMacroNamesMatching(container, name))
+    return;
+
   // Trigger the expansion of member macros on the container, if any of the
   // names match.
   {
