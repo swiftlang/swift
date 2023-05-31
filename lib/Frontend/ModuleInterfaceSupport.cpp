@@ -122,6 +122,10 @@ llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
                      ": (.+)$", llvm::Regex::Newline);
 }
 
+llvm::Regex swift::getSwiftInterfaceCompilerToolsVersionRegex() {
+  return llvm::Regex("Swift version ([0-9\\.]+)", llvm::Regex::Newline);
+}
+
 // MARK(https://github.com/apple/swift/issues/43510): Module name shadowing warnings
 //
 // When swiftc emits a module interface, it qualifies most types with their
