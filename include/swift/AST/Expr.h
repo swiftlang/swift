@@ -3711,7 +3711,7 @@ public:
   }
 
   SourceLoc getEndLoc() const {
-    return ElementLoc.isInvalid() ? ElementLoc : FromExpr->getEndLoc();
+    return ElementLoc.isValid() ? ElementLoc : FromExpr->getEndLoc();
   }
 
   static bool classof(const Expr *E) {
