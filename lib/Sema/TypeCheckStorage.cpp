@@ -616,17 +616,6 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
-/*
- // An accessor that uses borrowed ownership cannot have effects, as the
-   // coroutine accessor doesn't support `async` or `throws`
-   if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-     if (accessor->hasThrows() || accessor->hasAsync())
-       if (accessor->)
-       if (accessor->getResultInterfaceType()->isPureMoveOnly())
-         accessor->diagnose(diag::moveonly_effectful_getter);
-   }
- */
-
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
@@ -640,7 +629,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     if (auto *getter = storage->getEffectfulGetAccessor()) {
       switch (kind) {
       case DiagKind::NoncopyableType:
-        getter->diagnose(diag::moveonly_effectful_getter,
+        getter->diagnose(diag::noncopyable_effectful_getter,
                          getter->getDescriptiveKind());
         break;
       case DiagKind::BorrowedAttr:

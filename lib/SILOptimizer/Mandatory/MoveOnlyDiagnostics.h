@@ -166,7 +166,7 @@ private:
   /// the caller processed it correctly. false, then we continue to process it.
   void
   emitObjectDiagnosticsForGuaranteedUses(bool ignorePartialApply = false) const;
-  void emitObjectDiagnosticsForPartialApplyUses() const;
+  void emitObjectDiagnosticsForPartialApplyUses(StringRef capturedVarName) const;
 
   void registerDiagnosticEmitted(MarkMustCheckInst *value) {
     ++diagnosticCount;
