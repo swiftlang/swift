@@ -832,7 +832,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   //  the async context to get at the parameters.
   //  See e.g. FutureAsyncContextPrefix.
 
-  if (!futureResultType) {
+  if (!futureResultType || taskCreateFlags.isDiscardingTask()) {
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(AsyncContextPrefix));
