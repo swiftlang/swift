@@ -52,6 +52,9 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
 @freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+@freestanding(declaration, names: named(value)) macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
 #endif
 
 #if TEST_DIAGNOSTICS
@@ -399,4 +402,18 @@ func testFreestandingWithClosure(i: Int) {
     let x = $0
     return x
   }
+}
+
+// Nested macros with closures
+@freestanding(expression) macro coerceToInt<T>(_ value: T) -> Int = #externalMacro(module: "MacroDefinition", type: "CoerceToIntMacro")
+
+func testFreestandingClosureNesting() {
+  _ = #stringify({ () -> Int in
+    #coerceToInt(2)
+  })
+}
+
+// Freestanding declaration macros that produce local variables
+func testLocalVarsFromDeclarationMacros() {
+  #varValue
 }

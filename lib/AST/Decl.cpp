@@ -2934,9 +2934,25 @@ unsigned ValueDecl::getLocalDiscriminator() const {
     return 0;
 
   // Assign local discriminators in this context.
+  ASTContext &ctx = getASTContext();
   evaluateOrDefault(
-      getASTContext().evaluator,
+      ctx.evaluator,
       LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
+
+  // If we don't have a discriminator, and either
+  //   1. We have ill-formed code and we're able to assign a discriminator, or
+  //   2. We are in a macro expansion buffer
+  //
+  // then assign the next discriminator now.
+  if (LocalDiscriminator == InvalidDiscriminator &&
+      (ctx.Diags.hadAnyError() ||
+       (getLoc().isValid() &&
+        getModuleContext()->getSourceFileContainingLocation(getLoc())
+          ->getFulfilledMacroRole() != None))) {
+    auto discriminator = ctx.getNextDiscriminator(getDeclContext());
+    ctx.setMaxAssignedDiscriminator(getDeclContext(), discriminator + 1);
+    const_cast<ValueDecl *>(this)->LocalDiscriminator = discriminator;
+  }
 
   assert(LocalDiscriminator != InvalidDiscriminator);
 

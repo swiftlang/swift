@@ -1901,16 +1901,22 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   if (raw != InvalidDiscriminator)
     return raw;
 
+  ASTContext &ctx = getASTContext();
   evaluateOrDefault(
-      getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+      ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
 
-  // Ill-formed code might not be able to assign discriminators, so assign
-  // a new one now.
+  // If we don't have a discriminator, and either
+  //   1. We have ill-formed code and we're able to assign a discriminator, or
+  //   2. We are in a macro expansion buffer
+  //
+  // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
-      getASTContext().Diags.hadAnyError()) {
+      (ctx.Diags.hadAnyError() ||
+       getParentSourceFile()->getFulfilledMacroRole() != None)) {
+    auto discriminator = ctx.getNextDiscriminator(getParent());
+    ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
-        Bits.AbstractClosureExpr.Discriminator =
-          getASTContext().NextAutoClosureDiscriminator++;
+        Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
