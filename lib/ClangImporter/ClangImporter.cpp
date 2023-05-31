@@ -6641,9 +6641,7 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Iterator;
   }
   
-  if (!cxxDecl->hasUserDeclaredCopyConstructor() &&
-      !cxxDecl->hasUserDeclaredMoveConstructor() &&
-      hasPointerInSubobjects(cxxDecl)) {
+  if (hasPointerInSubobjects(cxxDecl)) {
     return CxxRecordSemanticsKind::UnsafePointerMember;
   }
 
@@ -6730,9 +6728,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return true;
         }
 
-        if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
-            !cxxRecordReturnType->hasUserDeclaredMoveConstructor() &&
-            !hasOwnedValueAttr(cxxRecordReturnType) &&
+        if (!hasOwnedValueAttr(cxxRecordReturnType) &&
             hasPointerInSubobjects(cxxRecordReturnType)) {
           return false;
         }
