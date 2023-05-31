@@ -134,6 +134,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       }
 
       return symName.hasPrefix("Swift runtime failure: ")
+        && sourceLocation.line == 0
+        && sourceLocation.column == 0
         && sourceLocation.path.hasSuffix("<compiler-generated>")
     }
 
@@ -463,9 +465,17 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       }
     }
     #elseif os(Linux)
+
     if let images = images {
       var elf32Cache: [Int:Elf32Image<FileImageSource>] = [:]
       var elf64Cache: [Int:Elf64Image<FileImageSource>] = [:]
+
+      // This could be more efficient; for instance, right now, we open the
+      // images up once per frame, and we'll execute the line number programs
+      // once per frame too.
+      //
+      // If we instead grabbed all the addresses, sorted and uniqued them,
+      // we could then load the images and run the line programs once.
 
       for frame in backtrace.frames {
         let address = FileImageSource.Address(frame.adjustedProgramCounter)
@@ -495,10 +505,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
           }
 
           if let theSymbol = elf32Image?.lookupSymbol(address: relativeAddress) {
+            var location = try? elf32Image!.sourceLocation(for: relativeAddress)
+
             for inline in elf32Image!.inlineCallSites(at: relativeAddress) {
-              let location = SourceLocation(path: inline.filename,
-                                            line: inline.line,
-                                            column: inline.column)
               let fakeSymbol = Symbol(imageIndex: imageNdx,
                                       imageName: images[imageNdx].name,
                                       rawName: inline.rawName ?? "<unknown>",
@@ -508,18 +517,21 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                 fakeSymbol.name = name
               }
               frames.append(Frame(captured: frame, symbol: fakeSymbol))
+
+              location = SourceLocation(path: inline.filename,
+                                        line: inline.line,
+                                        column: inline.column)
             }
 
             symbol = Symbol(imageIndex: imageNdx,
                             imageName: images[imageNdx].name,
                             rawName: theSymbol.name,
                             offset: theSymbol.offset,
-                            sourceLocation: nil)
+                            sourceLocation: location)
           } else if let theSymbol = elf64Image?.lookupSymbol(address: relativeAddress) {
+            var location = try? elf64Image!.sourceLocation(for: relativeAddress)
+
             for inline in elf64Image!.inlineCallSites(at: relativeAddress) {
-              let location = SourceLocation(path: inline.filename,
-                                            line: inline.line,
-                                            column: inline.column)
               let fakeSymbol = Symbol(imageIndex: imageNdx,
                                       imageName: images[imageNdx].name,
                                       rawName: inline.rawName ?? "<unknown>",
@@ -529,13 +541,17 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                 fakeSymbol.name = name
               }
               frames.append(Frame(captured: frame, symbol: fakeSymbol))
+
+              location = SourceLocation(path: inline.filename,
+                                        line: inline.line,
+                                        column: inline.column)
             }
 
             symbol = Symbol(imageIndex: imageNdx,
                             imageName: images[imageNdx].name,
                             rawName: theSymbol.name,
                             offset: theSymbol.offset,
-                            sourceLocation: nil)
+                            sourceLocation: location)
           } else {
             symbol = Symbol(imageIndex: imageNdx,
                             imageName: images[imageNdx].name,

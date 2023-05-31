@@ -544,7 +544,7 @@ enum DWARF_BYTECODE {
 /* .. Line Number Information ............................................... */
 
 // Table 7.25
-enum DWARF_BYTECODE {
+typedef DWARF_ENUM(Dwarf_Byte, Dwarf_LNS_Opcode) {
   DW_LNS_extended           = 0x00,
   DW_LNS_copy               = 0x01,
   DW_LNS_advance_pc         = 0x02,
@@ -558,17 +558,17 @@ enum DWARF_BYTECODE {
   DW_LNS_set_prologue_end   = 0x0a,
   DW_LNS_set_epilogue_begin = 0x0b,
   DW_LNS_set_isa            = 0x0c,
-};
+} Dwarf_LNS_Opcode;
 
 // Table 7.26
-enum DWARF_BYTECODE {
+typedef DWARF_ENUM(Dwarf_Byte, Dwarf_LNE_Opcode) {
   DW_LNE_end_sequence      = 0x01,
   DW_LNE_set_address       = 0x02,
-  // Reserved              = 0x03,
+  DW_LNE_define_file       = 0x03,
   DW_LNE_set_discriminator = 0x04,
   DW_LNE_lo_user           = 0x80,
   DW_LNE_hi_user           = 0xff,
-};
+} Dwarf_LNE_Opcode;
 
 // Table 7.27
 typedef DWARF_ENUM(Dwarf_Half, Dwarf_Lhdr_Format) {

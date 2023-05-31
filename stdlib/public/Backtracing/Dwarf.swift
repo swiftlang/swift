@@ -18,6 +18,7 @@
 import Swift
 
 @_implementationOnly import ImageFormats.Dwarf
+@_implementationOnly import Runtime
 
 // .. Dwarf specific errors ....................................................
 
@@ -45,6 +46,7 @@ private enum DwarfError: Error {
   case missingStrOffsetsBase
   case missingRngListsBase
   case missingLocListsBase
+  case unspecifiedAddressSize
 }
 
 // .. Dwarf utilities for ImageSource ..........................................
@@ -262,7 +264,7 @@ struct DwarfReader<S: DwarfSource> {
 
   var source: Source
 
-  struct DwarfAbbrevInfo {
+  struct AbbrevInfo {
     var tag: Dwarf_Tag
     var hasChildren: Bool
     var attributes: [(Dwarf_Attribute, Dwarf_Form, Int64?)]
@@ -279,7 +281,7 @@ struct DwarfReader<S: DwarfSource> {
 
   typealias DwarfAbbrev = UInt64
 
-  struct DwarfUnit {
+  struct Unit {
     var baseOffset: Address
     var version: Int
     var isDwarf64: Bool
@@ -294,13 +296,13 @@ struct DwarfReader<S: DwarfSource> {
     var loclistsBase: UInt64?
     var rnglistsBase: UInt64?
 
-    var abbrevs: [DwarfAbbrev: DwarfAbbrevInfo]
+    var abbrevs: [DwarfAbbrev: AbbrevInfo]
 
     var tag: Dwarf_Tag
     var attributes: [Dwarf_Attribute:DwarfValue] = [:]
   }
 
-  struct DwarfFileInfo {
+  struct FileInfo {
     var path: String
     var directoryIndex: Int?
     var timestamp: Int?
@@ -308,24 +310,69 @@ struct DwarfReader<S: DwarfSource> {
     var md5sum: [UInt8]?
   }
 
-  struct DwarfLineNumberInfo {
+  struct LineNumberState: CustomStringConvertible {
+    var address: Address
+    var opIndex: UInt
+    var file: Int
+    var path: String
+    var line: Int
+    var column: Int
+    var isStmt: Bool
+    var basicBlock: Bool
+    var endSequence: Bool
+    var prologueEnd: Bool
+    var epilogueBegin: Bool
+    var isa: UInt
+    var discriminator: UInt
+
+    var description: String {
+      var flags: [String] = []
+      if isStmt {
+        flags.append("is_stmt")
+      }
+      if basicBlock {
+        flags.append("basic_block")
+      }
+      if endSequence {
+        flags.append("end_sequence")
+      }
+      if prologueEnd {
+        flags.append("prologue_end")
+      }
+      if epilogueBegin {
+        flags.append("epilogue_begin")
+      }
+
+      let flagsString = flags.joined(separator:" ")
+
+      return """
+        \(hex(address)) \(pad(line, 6)) \(pad(column, 6)) \(pad(file, 6)) \
+        \(pad(isa, 3)) \(pad(discriminator, 13)) \(flagsString)
+        """
+    }
+  }
+
+  struct LineNumberInfo {
     var baseOffset: Address
     var version: Int
     var addressSize: Int?
     var selectorSize: Int?
     var headerLength: UInt64
-    var minimumInstructionLength: Int
-    var maximumOpsPerInstruction: Int
+    var minimumInstructionLength: UInt
+    var maximumOpsPerInstruction: UInt
     var defaultIsStmt: Bool
     var lineBase: Int8
     var lineRange: UInt8
     var opcodeBase: UInt8
     var standardOpcodeLengths: [UInt64]
     var directories: [String] = []
-    var files: [DwarfFileInfo] = []
+    var files: [FileInfo] = []
+    var program: [UInt8] = []
+    var shouldSwap: Bool
 
+    /// Compute the full path for a file, given its index in the file table.
     func fullPathForFile(index: Int) -> String {
-      if index > files.count {
+      if index >= files.count {
         return "<unknown>"
       }
 
@@ -344,13 +391,178 @@ struct DwarfReader<S: DwarfSource> {
 
       return "\(dirName)/\(info.path)"
     }
+
+    /// Execute the line number program, calling a closure for every line
+    /// table entry.
+    mutating func executeProgram(
+      line: (LineNumberState, inout Bool) -> ()
+    ) throws {
+      let source = ArrayImageSource(array: program)
+      let bounds = source.bounds!
+      var cursor = ImageSourceCursor(source: source)
+
+      func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
+        if shouldSwap {
+          return x.byteSwapped
+        }
+        return x
+      }
+
+      // Table 6.4: Line number program initial state
+      let initialState = LineNumberState(
+        address: 0,
+        opIndex: 0,
+        file: 1,
+        path: fullPathForFile(index: 1),
+        line: 1,
+        column: 0,
+        isStmt: defaultIsStmt,
+        basicBlock: false,
+        endSequence: false,
+        prologueEnd: false,
+        epilogueBegin: false,
+        isa: 0,
+        discriminator: 0
+      )
+
+      var state = initialState
+
+      // Flag to allow fast exit
+      var done = false
+
+      while !done && cursor.pos < bounds.end {
+        let opcode = try cursor.read(as: Dwarf_LNS_Opcode.self)
+
+        if opcode.rawValue >= opcodeBase {
+          // Special opcode
+          let adjustedOpcode = UInt(opcode.rawValue - opcodeBase)
+          let advance = adjustedOpcode / UInt(lineRange)
+          let lineAdvance = adjustedOpcode % UInt(lineRange)
+          let instrAdvance
+            = (state.opIndex + advance) / maximumOpsPerInstruction
+          let newOp = (state.opIndex + advance) % maximumOpsPerInstruction
+          state.address += Address(instrAdvance)
+          state.opIndex = newOp
+          state.line += Int(lineBase) + Int(lineAdvance)
+
+          line(state, &done)
+
+          state.discriminator = 0
+          state.basicBlock = false
+          state.prologueEnd = false
+          state.epilogueBegin = false
+        } else if opcode == .DW_LNS_extended {
+          // Extended opcode
+          let length = try cursor.readULEB128()
+          let opcode = try cursor.read(as: Dwarf_LNE_Opcode.self)
+
+          switch opcode {
+            case .DW_LNE_end_sequence:
+              state.endSequence = true
+              line(state, &done)
+              state = initialState
+            case .DW_LNE_set_address:
+              let address: UInt64
+              guard let addressSize = addressSize else {
+                throw DwarfError.unspecifiedAddressSize
+              }
+              switch addressSize {
+                case 4:
+                  address = UInt64(maybeSwap(try cursor.read(as: UInt32.self)))
+                case 8:
+                  address = maybeSwap(try cursor.read(as: UInt64.self))
+                default:
+                  throw DwarfError.badAddressSize(addressSize)
+              }
+              state.address = Address(address)
+            case .DW_LNE_define_file:
+              guard let path = try cursor.readString() else {
+                throw DwarfError.badString
+              }
+              let directoryIndex = try cursor.readULEB128()
+              let timestamp = try cursor.readULEB128()
+              let size = try cursor.readULEB128()
+              files.append(FileInfo(
+                             path: path,
+                             directoryIndex: Int(directoryIndex),
+                             timestamp: timestamp != 0 ? Int(timestamp) : nil,
+                             size: size != 0 ? size : nil,
+                             md5sum: nil
+                           ))
+            case .DW_LNE_set_discriminator:
+              let discriminator = try cursor.readULEB128()
+              state.discriminator = UInt(discriminator)
+            default:
+              cursor.pos += length - 1
+          }
+        } else {
+          // Standard opcode
+          switch opcode {
+            case .DW_LNS_copy:
+              line(state, &done)
+              state.discriminator = 0
+              state.basicBlock = false
+              state.prologueEnd = false
+              state.epilogueBegin = false
+            case .DW_LNS_advance_pc:
+              let advance = UInt(try cursor.readULEB128())
+              let instrAdvance
+                = (state.opIndex + advance) / maximumOpsPerInstruction
+              let newOp = (state.opIndex + advance) % maximumOpsPerInstruction
+              state.address += Address(instrAdvance)
+              state.opIndex = newOp
+            case .DW_LNS_advance_line:
+              let advance = try cursor.readSLEB128()
+              state.line += Int(advance)
+            case .DW_LNS_set_file:
+              let file = Int(try cursor.readULEB128())
+              state.file = file
+              state.path = fullPathForFile(index: state.file)
+            case .DW_LNS_set_column:
+              let column = Int(try cursor.readULEB128())
+              state.column = column
+            case .DW_LNS_negate_stmt:
+              state.isStmt = !state.isStmt
+            case .DW_LNS_set_basic_block:
+              state.basicBlock = true
+            case .DW_LNS_const_add_pc:
+              let adjustedOpcode = UInt(255 - opcodeBase)
+              let advance = adjustedOpcode / UInt(lineRange)
+              let instrAdvance
+                = (state.opIndex + advance) / maximumOpsPerInstruction
+              let newOp = (state.opIndex + advance) % maximumOpsPerInstruction
+              state.address += Address(instrAdvance)
+              state.opIndex = newOp
+            case .DW_LNS_fixed_advance_pc:
+              let advance = try cursor.read(as: Dwarf_Half.self)
+              state.address += Address(advance)
+              state.opIndex = 0
+            case .DW_LNS_set_prologue_end:
+              state.prologueEnd = true
+            case .DW_LNS_set_epilogue_begin:
+              state.epilogueBegin = true
+            case .DW_LNS_set_isa:
+              let isa = UInt(try cursor.readULEB128())
+              state.isa = isa
+            default:
+              // Skip this unknown opcode
+              let length = standardOpcodeLengths[Int(opcode.rawValue)]
+              for _ in 0..<length {
+                _ = try cursor.readULEB128()
+              }
+          }
+        }
+      }
+    }
   }
 
-  var units: [DwarfUnit] = []
+  var units: [Unit] = []
 
-  var lineNumberInfo: [DwarfLineNumberInfo] = []
+  var lineNumberInfo: [LineNumberInfo] = []
 
   init(source: Source, shouldSwap: Bool = false) throws {
+    // ###TODO: This should be optional, because we can have just line number
+    //          information.  We should test that, too.
     guard let abbrevSection = source.getDwarfSection(.debugAbbrev),
           let infoSection = source.getDwarfSection(.debugInfo) else {
       throw DwarfError.noDebugInformation
@@ -369,6 +581,42 @@ struct DwarfReader<S: DwarfSource> {
     self.shouldSwap = shouldSwap
     self.lineNumberInfo = try readLineNumberInfo()
     self.units = try readUnits()
+
+    // On DWARF 4 and earlier, we need to fix up a couple of things in the
+    // line number info; these are explicitly included in DWARF 5 so that
+    // we can strip everything except line number information.
+    for n in 0..<lineNumberInfo.count {
+      if lineNumberInfo[n].version >= 5 {
+        continue
+      }
+
+      for unit in self.units {
+        if let lineBase = unit.lineBase,
+           lineNumberInfo[n].baseOffset == lineBase {
+          var filename = "<unknown>"
+          if let nameVal = unit.attributes[.DW_AT_name],
+             case let .string(theName) = nameVal {
+            filename = theName
+          }
+          var dirname = "."
+          if let dirVal = unit.attributes[.DW_AT_comp_dir],
+             case let .string(theDir) = dirVal {
+            dirname = theDir
+          }
+
+          lineNumberInfo[n].directories[0] = dirname
+          lineNumberInfo[n].files[0] = FileInfo(
+            path: filename,
+            directoryIndex: 0,
+            timestamp: nil,
+            size: nil,
+            md5sum: nil
+          )
+          lineNumberInfo[n].addressSize = unit.addressSize
+          break
+        }
+      }
+    }
   }
 
   private func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
@@ -379,13 +627,13 @@ struct DwarfReader<S: DwarfSource> {
     }
   }
 
-  private func readUnits() throws -> [DwarfUnit] {
+  private func readUnits() throws -> [Unit] {
     guard let bounds = infoSection.bounds else {
       return []
     }
 
-    var units: [DwarfUnit] = []
-    var cursor = ImageSourceCursor(source: infoSection, offset: 0)
+    var units: [Unit] = []
+    var cursor = ImageSourceCursor(source: infoSection)
 
     while cursor.pos < bounds.end {
       // See 7.5.1.1 Full and Partial Compilation Unit Headers
@@ -475,7 +723,7 @@ struct DwarfReader<S: DwarfSource> {
       }
       let tag = abbrevInfo.tag
 
-      var unit = DwarfUnit(baseOffset: base,
+      var unit = Unit(baseOffset: base,
                            version: Int(version),
                            isDwarf64: dwarf64,
                            unitType: unitType,
@@ -537,13 +785,13 @@ struct DwarfReader<S: DwarfSource> {
     return units
   }
 
-  private func readLineNumberInfo() throws -> [DwarfLineNumberInfo] {
+  private func readLineNumberInfo() throws -> [LineNumberInfo] {
     guard let lineSection = lineSection,
           let bounds = lineSection.bounds else {
       return []
     }
 
-    var result: [DwarfLineNumberInfo] = []
+    var result: [LineNumberInfo] = []
     var cursor = ImageSourceCursor(source: lineSection, offset: 0)
 
     while cursor.pos < bounds.end {
@@ -586,10 +834,10 @@ struct DwarfReader<S: DwarfSource> {
       }
 
       // .6 minimum_instruction_length
-      let minimumInstructionLength = Int(try cursor.read(as: Dwarf_Byte.self))
+      let minimumInstructionLength = UInt(try cursor.read(as: Dwarf_Byte.self))
 
       // .7 maximum_operations_per_instruction
-      let maximumOpsPerInstruction = Int(try cursor.read(as: Dwarf_Byte.self))
+      let maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
 
       // .8 default_is_stmt
       let defaultIsStmt = try cursor.read(as: Dwarf_Byte.self) != 0
@@ -611,12 +859,13 @@ struct DwarfReader<S: DwarfSource> {
       }
 
       var dirNames: [String] = []
-      var fileInfo: [DwarfFileInfo] = []
+      var fileInfo: [FileInfo] = []
 
       if version == 3 || version == 4 {
         // .11 include_directories
 
-        // Prior to version 5, the compilation directory is not included
+        // Prior to version 5, the compilation directory is not included; put
+        // a placeholder here for now, which we'll fix later.
         dirNames.append(".")
 
         while true {
@@ -632,6 +881,16 @@ struct DwarfReader<S: DwarfSource> {
         }
 
         // .12 file_names
+
+        // Prior to version 5, the compilation unit's filename is not included;
+        // put a placeholder here for now, which we'll fix up later.
+        fileInfo.append(FileInfo(
+                          path: "<unknown>",
+                          directoryIndex: 0,
+                          timestamp: nil,
+                          size: nil,
+                          md5sum: nil))
+
         while true {
           guard let path = try cursor.readString() else {
             throw DwarfError.badString
@@ -645,7 +904,7 @@ struct DwarfReader<S: DwarfSource> {
           let timestamp = try cursor.readULEB128()
           let size = try cursor.readULEB128()
 
-          fileInfo.append(DwarfFileInfo(
+          fileInfo.append(FileInfo(
                             path: path,
                             directoryIndex: Int(dirIndex),
                             timestamp: timestamp != 0 ? Int(timestamp) : nil,
@@ -748,7 +1007,7 @@ struct DwarfReader<S: DwarfSource> {
             md5sum = nil
           }
 
-          fileInfo.append(DwarfFileInfo(
+          fileInfo.append(FileInfo(
                             path: path,
                             directoryIndex: dirIndex,
                             timestamp: timestamp,
@@ -757,9 +1016,13 @@ struct DwarfReader<S: DwarfSource> {
         }
       }
 
+      // The actual program comes next
+      let program = try cursor.read(count: Int(nextOffset - cursor.pos),
+                                    as: UInt8.self)
+
       cursor.pos = nextOffset
 
-      result.append(DwarfLineNumberInfo(
+      result.append(LineNumberInfo(
                       baseOffset: baseOffset,
                       version: version,
                       addressSize: addressSize,
@@ -773,7 +1036,9 @@ struct DwarfReader<S: DwarfSource> {
                       opcodeBase: opcodeBase,
                       standardOpcodeLengths: standardOpcodeLengths,
                       directories: dirNames,
-                      files: fileInfo
+                      files: fileInfo,
+                      program: program,
+                      shouldSwap: shouldSwap
                     ))
     }
 
@@ -782,8 +1047,8 @@ struct DwarfReader<S: DwarfSource> {
 
   private func readAbbrevs(
     at offset: UInt64
-  ) throws -> [DwarfAbbrev: DwarfAbbrevInfo] {
-    var abbrevs: [DwarfAbbrev: DwarfAbbrevInfo] = [:]
+  ) throws -> [DwarfAbbrev: AbbrevInfo] {
+    var abbrevs: [DwarfAbbrev: AbbrevInfo] = [:]
     var cursor = ImageSourceCursor(source: abbrevSection, offset: offset)
     while true {
       let abbrev = try cursor.readULEB128()
@@ -825,7 +1090,7 @@ struct DwarfReader<S: DwarfSource> {
         }
       }
 
-      abbrevs[abbrev] = DwarfAbbrevInfo(tag: tag,
+      abbrevs[abbrev] = AbbrevInfo(tag: tag,
                                      hasChildren: children != .DW_CHILDREN_no,
                                      attributes: attributes)
     }
@@ -902,7 +1167,7 @@ struct DwarfReader<S: DwarfSource> {
   private func read(form theForm: Dwarf_Form,
                     at cursor: inout ImageSourceCursor,
                     addressSize: Int, isDwarf64: Bool,
-                    unit: DwarfUnit?,
+                    unit: Unit?,
                     shouldFetchIndirect: Bool,
                     constantValue: Int64? = nil) throws -> DwarfValue {
     let form: Dwarf_Form
@@ -1211,8 +1476,8 @@ struct DwarfReader<S: DwarfSource> {
 
   private func readDieAttributes(
     at cursor: inout ImageSourceCursor,
-    unit: DwarfUnit,
-    abbrevInfo: DwarfAbbrevInfo,
+    unit: Unit,
+    abbrevInfo: AbbrevInfo,
     shouldFetchIndirect: Bool
   ) throws -> [Dwarf_Attribute:DwarfValue] {
     var attributes: [Dwarf_Attribute:DwarfValue] = [:]
@@ -1243,7 +1508,7 @@ struct DwarfReader<S: DwarfSource> {
 
   private func buildCallSiteInfo(
     depth: Int,
-    unit: DwarfUnit,
+    unit: Unit,
     attributes: [Dwarf_Attribute:DwarfValue]
   ) throws -> CallSiteInfo? {
     guard let abstractOriginVal = attributes[.DW_AT_abstract_origin],
@@ -1380,7 +1645,11 @@ struct DwarfReader<S: DwarfSource> {
         } else {
           name = "<unknown at \(hex(unit.baseOffset))>"
         }
-        print("swift-runtime: warning: unable to fetch inline frame data for DWARF unit \(name): \(error)")
+        swift_reportWarning(0,
+                            """
+                              swift-runtime: warning: unable to fetch inline \
+                              frame data for DWARF unit \(name): \(error)
+                              """)
       }
     }
 

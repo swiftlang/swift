@@ -1656,6 +1656,34 @@ class ElfImage<SomeImageSource: ImageSource,
 
     return []
   }
+
+  typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
+
+  func sourceLocation(for address: Address) throws -> SourceLocation? {
+    var result: SourceLocation? = nil
+    var prevState: DwarfReader<ElfImage>.LineNumberState? = nil
+    guard let dwarfReader = dwarfReader else {
+      return nil
+    }
+    for ndx in 0..<dwarfReader.lineNumberInfo.count {
+      var info = dwarfReader.lineNumberInfo[ndx]
+      try info.executeProgram { (state, done) in
+        if let oldState = prevState,
+           address >= oldState.address && address < state.address {
+          result = SourceLocation(
+            path: oldState.path,
+            line: oldState.line,
+            column: oldState.column
+          )
+          done = true
+        }
+
+        prevState = state
+      }
+    }
+
+    return result
+  }
 }
 
 typealias Elf32Image<S: ImageSource> = ElfImage<S, Elf32Traits>

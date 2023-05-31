@@ -34,6 +34,23 @@ internal func hex(_ bytes: [UInt8]) -> String {
   return bytes.map{ hex($0, prefix: false) }.joined(separator: "")
 }
 
+enum PadAlignment {
+  case left
+  case right
+}
+
+func pad<T>(_ value: T, _ width: Int, align: PadAlignment = .left) -> String {
+  let string = String(describing: value)
+  let padding = string.count >= width ? "" : String(repeating: " ",
+                                                    count: width - string.count)
+  switch align {
+    case .left:
+      return string + padding
+    case .right:
+      return padding + string
+  }
+}
+
 @_spi(Utils)
 public func readString(from file: String) -> String? {
   let fd = _swift_open(file, O_RDONLY, 0)

@@ -21,6 +21,7 @@ if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 endif()
 
 set(BACKTRACING_SOURCES
+  ArrayImageSource.swift
   Backtrace.swift
   BacktraceFormatter.swift
   ByteSwapping.swift
