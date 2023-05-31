@@ -161,6 +161,16 @@ func getStringGen(_ s: StringGen) -> String {
   }
 }
 
+public enum R {
+    case success(Int)
+    case failure(Error)
+}
+
+public let success: R = .success(27)
+
+// CHECK-LABEL: sil_global hidden @$s4test10optSuccessAA1ROSgvp : $Optional<R> = {
+var optSuccess: R? = success
+
 // CHECK-LABEL: sil_global private @$s4test9createArrSaySiSgGyFTv_ : $_ContiguousArrayStorage<Optional<Int>> = {
 @inline(never)
 func createArr() -> [Int?] {
@@ -234,6 +244,8 @@ struct Main {
     print("stringGen2: \(getStringGen(sg2))")
     // CHECK-OUTPUT: stringGen3: str
     print("stringGen3: \(getStringGen(sg3))")
+    // CHECK-OUTPUT: optSuccess: Optional(test.R.success(27))
+    print("optSuccess:", optSuccess as Any)
   }
 }
 
