@@ -1695,6 +1695,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Read:
       break;
 
+    case AccessorKind::Init:
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
@@ -1710,9 +1711,6 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 
       break;
     }
-
-    case AccessorKind::Init:
-      return SelfAccessKind::Mutating;
     }
   }
 
