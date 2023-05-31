@@ -2757,7 +2757,7 @@ ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
                                    clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
 
-  if (sema.LookupName(lookupResult, /*scope=*/nullptr)) {
+  if (sema.LookupName(lookupResult, sema.TUScope)) {
     for (auto decl : lookupResult) {
       if (auto typedefDecl =
           dyn_cast<clang::TypedefNameDecl>(decl->getUnderlyingDecl()))
