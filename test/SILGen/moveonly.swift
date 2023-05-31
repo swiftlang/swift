@@ -988,9 +988,9 @@ func testConditionallyInitializedLet() {
     consumeVal(x)
 }
 
-/////////////////////////////
-// MARK: AddressOnlySetter //
-/////////////////////////////
+////////////////////////
+// MARK: Setter Tests //
+////////////////////////
 
 struct AddressOnlySetterTester : ~Copyable {
     var a: AddressOnlyProtocol {
@@ -1003,6 +1003,24 @@ struct AddressOnlySetterTester : ~Copyable {
         // CHECK: } // end sil function '$s8moveonly23AddressOnlySetterTesterV1aAA0bC8ProtocolVvs'
         set { fatalError() }
     }
+}
+
+public class NonFinalClassTest {
+    // CHECK: sil hidden [transparent] [ossa] @$s8moveonly17NonFinalClassTestC1xAA19AddressOnlyProtocolVvs : $@convention(method) (@in AddressOnlyProtocol, @guaranteed NonFinalClassTest) -> () {
+    // CHECK: bb0([[INPUT:%.*]] : $*AddressOnlyProtocol, [[SELF:%.*]] : @guaranteed
+    // CHECK:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[INPUT]]
+    // CHECK:   [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
+    // CHECK:   copy_addr [[MARK]] to [init] [[TEMP]]
+    // CHECK:   [[REF:%.*]] = ref_element_addr [[SELF]]
+    // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]
+    // CHECK:   [[MARK2:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+    // CHECK:   copy_addr [take] [[TEMP]] to [[MARK2]]
+    // CHECK:   end_access [[ACCESS]]
+    // CHECK:   dealloc_stack [[TEMP]]
+    // CHECK:   destroy_addr [[MARK]]
+    // CHECK: } // end sil function '$s8moveonly17NonFinalClassTestC1xAA19AddressOnlyProtocolVvs'
+    var x: AddressOnlyProtocol
+    init(y: consuming AddressOnlyProtocol) { self.x = y }
 }
 
 /////////////////////
@@ -3071,3 +3089,4 @@ public func testSubscriptGetModifyThroughParentClass_BaseLoadable_ResultAddressO
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
+
