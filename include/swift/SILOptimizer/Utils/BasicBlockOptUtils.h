@@ -135,7 +135,7 @@ bool canCloneTerminator(TermInst *termInst);
 /// BasicBlockCloner handles this internally.
 class SinkAddressProjections {
   // Projections ordered from last to first in the chain.
-  SmallVector<SingleValueInstruction *, 4> projections;
+  SmallVector<SingleValueInstruction *, 4> oldProjections;
   SmallSetVector<SILValue, 4> inBlockDefs;
 
   // Transient per-projection data for use during cloning.
