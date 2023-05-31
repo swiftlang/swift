@@ -3203,7 +3203,9 @@ namespace {
           // instead of checking if they come from the `std` module.
           if (!d->getDeclName().isIdentifier())
             return false;
-          return d->getName() == "abs" || d->getName() == "div";
+          return d->getName() == "abs" || d->getName() == "div" ||
+              d->getName() == "strstr" || d->getName() == "sin" ||
+              d->getName() == "cos";
         };
         if (decl->getOwningModule() &&
             (decl->getOwningModule()
@@ -3214,7 +3216,8 @@ namespace {
               Impl.getClangPreprocessor().getSourceManager().getFilename(
                   decl->getLocation());
           if (filename.endswith("cmath") || filename.endswith("math.h") ||
-              filename.endswith("stdlib.h") || filename.endswith("cstdlib")) {
+              filename.endswith("stdlib.h") || filename.endswith("cstdlib") ||
+              filename.endswith("string.h")) {
             return nullptr;
           }
         }
