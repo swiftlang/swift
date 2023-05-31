@@ -395,6 +395,42 @@ func testGenericResilient() {
 
 testGenericResilient()
 
+func testMixedEnumWrapperWrapperGeneric() {
+    let ptr = allocateInternalGenericPtr(of: MixedEnumWrapperWrapperGeneric<TestClass>.self)
+
+    do {
+        let x = MixedEnumWrapperWrapperGeneric(x: MixedEnumWrapper(x: .nonEmpty(SimpleClass(x: 23)),
+                                                                   y: .e(SimpleClass(x: 32))),
+                                               y: TestClass())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = MixedEnumWrapperWrapperGeneric(x: MixedEnumWrapper(x: .nonEmpty(SimpleClass(x: 28)),
+                                                                   y: .e(SimpleClass(x: 82))),
+                                               y: TestClass())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: MixedEnumWrapperWrapperGeneric<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testMixedEnumWrapperWrapperGeneric()
+
 #if os(macOS)
 
 import Foundation
