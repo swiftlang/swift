@@ -14778,8 +14778,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // means that result would attempt a type from each side if
       // one is available and that would result in two fixes - one for
       // each mismatched branch.
-      if (branchElt->forElse())
+      if (branchElt->forElse()) {
         impact = 10;
+      } else {
+        // Also increase impact for `then` branch lower than `else` to still
+        // eliminate ambiguity, but slightly worst than the average fix to avoid
+        // so the solution which record this fix wouldn't be picked over one
+        // that has contextual mismatch fix on the result of ternary expression.
+        impact = 5;
+      }
     }
     using SingleValueStmtBranch = LocatorPathElt::SingleValueStmtBranch;
     if (auto branchElt = locator->getLastElementAs<SingleValueStmtBranch>()) {
