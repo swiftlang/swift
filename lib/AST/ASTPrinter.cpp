@@ -3203,10 +3203,6 @@ static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureVariadicGenerics(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureTupleConformances(Decl *decl) {
   return false;
 }
