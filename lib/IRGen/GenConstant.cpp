@@ -336,7 +336,7 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     return llvm::ConstantExpr::getIntToPtr(val, sTy);
 
   } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand)) {
-    return emitConstantValue(IGM, CFI->getOperand()).claimNextConstant();
+    return emitConstantValue(IGM, CFI->getOperand());
 
   } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
     SILType type = operand->getType();
@@ -349,7 +349,12 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     auto *context = llvm::ConstantExpr::getBitCast(
         llvm::ConstantPointerNull::get(IGM.OpaquePtrTy),
         sTy->getTypeAtIndex((unsigned)1));
-    
+
+    if (flatten) {
+      Explosion out;
+      out.add({function, context});
+      return out;
+    }
     return llvm::ConstantStruct::get(sTy, {function, context});
 
   } else if (auto *FRI = dyn_cast<FunctionRefInst>(operand)) {
