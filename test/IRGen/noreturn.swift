@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name A -emit-ir -primary-file %s -import-objc-header %S/Inputs/noreturn.h | %FileCheck %s
-// RUN: %target-swift-frontend -module-name A -emit-ir -primary-file %s -import-objc-header %S/Inputs/noreturn.h
+// RUN: %target-swift-frontend -module-name A -emit-ir -primary-file %s -import-objc-header %S/Inputs/noreturn.h | %FileCheck %s
 
 
 // CHECK-LABEL: define {{.*}} void @"$s1A018testDirectReturnNoC0yyF"()
@@ -18,7 +17,7 @@ public func testDirect2ReturnNoReturn() {
 
 // CHECK-LABEL: define {{.*}} void @"$s1A020testIndirectReturnNoC0yyF"()
 // CHECK:   [[INDIRECT_RESULT:%.*]] = alloca %struct.Large
-// CHECK:   call void @largeStructNoReturn(%struct.Large* {{.*}}[[INDIRECT_RESULT]])
+// CHECK:   call void @largeStructNoReturn(ptr {{.*}}[[INDIRECT_RESULT]])
 // CHECK:   unreachable
 public func testIndirectReturnNoReturn() {
   largeStructNoReturn()

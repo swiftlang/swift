@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test | %FileCheck %s
-// RUN: %target-swift-frontend -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test
+// RUN: %target-swift-frontend -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -12,4 +11,4 @@ public func testClassTypes() {
 }
 
 // CHECK: define linkonce_odr hidden i1 @"$sSo9ObjCClassCTwS"()
-// CHECK:   ret i1 icmp ne (%objc_class* @"OBJC_CLASS_$_ObjCClass", %objc_class* null)
+// CHECK:   ret i1 icmp ne (ptr @"OBJC_CLASS_$_ObjCClass", ptr null)

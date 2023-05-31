@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-objc-attr-requires-foundation-module -enable-objc-interop -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -enable-objc-interop -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -enable-objc-interop -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
 
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
-// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -module-name main -primary-file %s -I %t -DIMPORT -emit-ir
+// RUN: %target-swift-frontend -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
 
 #if IMPORT
 import objc_enum_multi_file_helper
@@ -36,7 +34,7 @@ func useFoo(_ x: Foo) -> Int32 {
   }
 
   // CHECK: [[DEFAULT]]:
-  // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$s{{.+}}3FooON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$ss5Int32VN")
+  // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(ptr @"$s{{.+}}3FooON", ptr noalias nocapture %{{.+}}, ptr @"$ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: [[FINAL]]:
@@ -70,7 +68,7 @@ func useBar(_ x: Bar) -> Int32 {
   }
 
   // CHECK: [[DEFAULT]]:
-  // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$s{{.+}}3BarON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$ss5Int32VN")
+  // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(ptr @"$s{{.+}}3BarON", ptr noalias nocapture %{{.+}}, ptr @"$ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: [[FINAL]]:

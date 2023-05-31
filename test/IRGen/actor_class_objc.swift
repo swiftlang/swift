@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx12.0 | %IRGenFileCheck %s
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx12.0
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx12.0 | %IRGenFileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -7,11 +6,11 @@
 import Foundation
 
 // CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
-// CHECK: %swift.defaultactor = type { [12 x i8*] }
+// CHECK: %swift.defaultactor = type { [12 x ptr] }
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass" = global
 //   Metaclass is an instance of the root class.
-// CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_SwiftNativeNSObject{{(.ptrauth)?}}"
+// CHECK-SAME: ptr {{.*}}@"OBJC_METACLASS_$_SwiftNativeNSObject{{(.ptrauth)?}}"
 
 // CHECK: @"$s16actor_class_objc7MyClassCMf" = internal global
 // CHECK-SAME: @"$s16actor_class_objc7MyClassCfD{{(.ptrauth)?}}"
@@ -35,12 +34,12 @@ import Foundation
 }
 
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"
-// CHECK: [[T0:%.*]] = getelementptr inbounds %T16actor_class_objc7MyClassC, %T16actor_class_objc7MyClassC* %0, i32 0, i32 2
-// CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, %TSi* [[T0]], i32 0, i32 0
-// CHECK: load [[INT]], [[INT]]* [[T1]], align
+// CHECK: [[T0:%.*]] = getelementptr inbounds %T16actor_class_objc7MyClassC, ptr %0, i32 0, i32 2
+// CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, ptr [[T0]], i32 0, i32 0
+// CHECK: load [[INT]], ptr [[T1]], align
 
-// CHECK-LABEL: define {{.*}}swiftcc %T16actor_class_objc7MyClassC* @"$s16actor_class_objc7MyClassCACycfc"
+// CHECK-LABEL: define {{.*}}swiftcc ptr @"$s16actor_class_objc7MyClassCACycfc"
 // CHECK: swift_defaultActor_initialize
-// CHECK-LABEL: ret %T16actor_class_objc7MyClassC*
+// CHECK-LABEL: ret ptr
 
 // CHECK: swift_defaultActor_destroy
