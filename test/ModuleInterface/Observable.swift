@@ -4,6 +4,7 @@
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
 // REQUIRES: swift_swift_parser
+// REQUIRES: observation
 
 import _Observation
 

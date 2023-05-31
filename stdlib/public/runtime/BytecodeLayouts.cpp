@@ -436,6 +436,9 @@ void swift::swift_resolve_resilientAccessors(
     case RefCountingKind::Metatype:
       i += sizeof(uintptr_t);
       break;
+    case RefCountingKind::SinglePayloadEnumSimple:
+      i += (3 * sizeof(uint64_t)) + (4 * sizeof(size_t));
+      break;
     default:
       break;
     }
