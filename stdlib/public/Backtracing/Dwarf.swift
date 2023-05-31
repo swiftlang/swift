@@ -44,7 +44,6 @@ private enum DwarfError: Error {
   case missingStrOffsetsSection
   case missingAddrBase
   case missingStrOffsetsBase
-  case missingRngListsBase
   case missingLocListsBase
   case unspecifiedAddressSize
 }
@@ -277,6 +276,7 @@ struct DwarfReader<S: DwarfSource> {
   var strSection: (any ImageSource)?
   var lineStrSection: (any ImageSource)?
   var strOffsetsSection: (any ImageSource)?
+  var rangesSection: (any ImageSource)?
   var shouldSwap: Bool
 
   typealias DwarfAbbrev = UInt64
@@ -290,11 +290,12 @@ struct DwarfReader<S: DwarfSource> {
     var abbrevOffset: Address
     var dieBounds: Bounds
 
+    var lowPC: Address?
+
     var lineBase: UInt64?
     var addrBase: UInt64?
     var strOffsetsBase: UInt64?
     var loclistsBase: UInt64?
-    var rnglistsBase: UInt64?
 
     var abbrevs: [DwarfAbbrev: AbbrevInfo]
 
@@ -560,6 +561,18 @@ struct DwarfReader<S: DwarfSource> {
 
   var lineNumberInfo: [LineNumberInfo] = []
 
+  struct RangeListInfo {
+    var length: UInt64
+    var isDwarf64: Bool
+    var version: Int
+    var addressSize: Int
+    var segmentSelectorSize: Int
+    var offsetEntryCount: Int
+    var offsetEntryBase: Address
+  }
+
+  var rangeListInfo: RangeListInfo?
+
   init(source: Source, shouldSwap: Bool = false) throws {
     // ###TODO: This should be optional, because we can have just line number
     //          information.  We should test that, too.
@@ -576,6 +589,7 @@ struct DwarfReader<S: DwarfSource> {
     lineSection = source.getDwarfSection(.debugLine)
     lineStrSection = source.getDwarfSection(.debugLineStr)
     strOffsetsSection = source.getDwarfSection(.debugStrOffsets)
+    rangesSection = source.getDwarfSection(.debugRanges)
 
     self.source = source
     self.shouldSwap = shouldSwap
@@ -749,10 +763,6 @@ struct DwarfReader<S: DwarfSource> {
          case let .sectionOffset(offset) = value {
         unit.strOffsetsBase = offset
       }
-      if let value = firstPass[.DW_AT_rnglists_base],
-         case let .sectionOffset(offset) = value {
-        unit.rnglistsBase = offset
-      }
       if let value = firstPass[.DW_AT_loclists_base],
          case let .sectionOffset(offset) = value {
         unit.loclistsBase = offset
@@ -760,6 +770,10 @@ struct DwarfReader<S: DwarfSource> {
       if let value = firstPass[.DW_AT_stmt_list],
          case let .sectionOffset(offset) = value {
         unit.lineBase = offset
+      }
+      if let value = firstPass[.DW_AT_low_pc],
+         case let .address(lowPC) = value {
+        unit.lowPC = lowPC
       }
 
       // Re-read the attributes, with indirect fetching enabled;
@@ -1509,33 +1523,22 @@ struct DwarfReader<S: DwarfSource> {
   private func buildCallSiteInfo(
     depth: Int,
     unit: Unit,
-    attributes: [Dwarf_Attribute:DwarfValue]
-  ) throws -> CallSiteInfo? {
+    attributes: [Dwarf_Attribute:DwarfValue],
+    _ fn: (CallSiteInfo) -> ()
+  ) throws {
     guard let abstractOriginVal = attributes[.DW_AT_abstract_origin],
-          let lowPCVal = attributes[.DW_AT_low_pc],
-          let highPCVal = attributes[.DW_AT_high_pc],
           let callFile = attributes[.DW_AT_call_file]?.uint64Value(),
           let callLine = attributes[.DW_AT_call_line]?.uint64Value(),
           let callColumn = attributes[.DW_AT_call_column]?.uint64Value(),
-          case let .reference(abstractOrigin) = abstractOriginVal,
-          case let .address(lowPC) = lowPCVal else {
-      return nil
-    }
-
-    let highPC: Address
-    if case let .address(highPCAddr) = highPCVal {
-      highPC = highPCAddr
-    } else if let highPCOffset = highPCVal.uint64Value() {
-      highPC = lowPC + highPCOffset
-    } else {
-      return nil
+          case let .reference(abstractOrigin) = abstractOriginVal else {
+      return
     }
 
     var cursor = ImageSourceCursor(source: infoSection,
                                    offset: abstractOrigin)
     let abbrev = try cursor.readULEB128()
     if abbrev == 0 {
-      return nil
+      return
     }
 
     guard let abbrevInfo = unit.abbrevs[abbrev] else {
@@ -1545,7 +1548,7 @@ struct DwarfReader<S: DwarfSource> {
     let tag = abbrevInfo.tag
 
     if tag != .DW_TAG_subprogram {
-      return nil
+      return
     }
 
     let refAttrs = try readDieAttributes(
@@ -1578,16 +1581,75 @@ struct DwarfReader<S: DwarfSource> {
       }
     }
 
-    return CallSiteInfo(
-      depth: depth,
-      rawName: rawName,
-      name: name,
-      lowPC: lowPC,
-      highPC: highPC,
-      filename: filename,
-      line: Int(callLine),
-      column: Int(callColumn)
-    )
+    if let lowPCVal = attributes[.DW_AT_low_pc],
+       let highPCVal = attributes[.DW_AT_high_pc],
+       case let .address(lowPC) = lowPCVal {
+      let highPC: Address
+      if case let .address(highPCAddr) = highPCVal {
+        highPC = highPCAddr
+      } else if let highPCOffset = highPCVal.uint64Value() {
+        highPC = lowPC + highPCOffset
+      } else {
+        return
+      }
+
+      fn(CallSiteInfo(
+           depth: depth,
+           rawName: rawName,
+           name: name,
+           lowPC: lowPC,
+           highPC: highPC,
+           filename: filename,
+           line: Int(callLine),
+           column: Int(callColumn)))
+    } else if let rangeVal = attributes[.DW_AT_ranges],
+              let rangesSection = rangesSection,
+              case let .sectionOffset(offset) = rangeVal,
+              unit.version < 5 {
+      // We don't support .debug_rnglists at present (which is what we'd
+      // have if unit.version is 5 or higher).
+      var rangeCursor = ImageSourceCursor(source: rangesSection,
+                                          offset: offset)
+      var rangeBase: Address = unit.lowPC ?? 0
+
+      while true {
+        let beginning: Address
+        let ending: Address
+
+        switch unit.addressSize {
+          case 4:
+            beginning = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
+            ending = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
+            if beginning == 0xffffffff {
+              rangeBase = ending
+              continue
+            }
+          case 8:
+            beginning = maybeSwap(try rangeCursor.read(as: UInt64.self))
+            ending = maybeSwap(try rangeCursor.read(as: UInt64.self))
+            if beginning == 0xffffffffffffffff {
+              rangeBase = ending
+              continue
+            }
+          default:
+            throw DwarfError.badAddressSize(unit.addressSize)
+        }
+
+        if beginning == 0 && ending == 0 {
+          break
+        }
+
+        fn(CallSiteInfo(
+             depth: depth,
+             rawName: rawName,
+             name: name,
+             lowPC: beginning + rangeBase,
+             highPC: ending + rangeBase,
+             filename: filename,
+             line: Int(callLine),
+             column: Int(callColumn)))
+      }
+    }
   }
 
   lazy var inlineCallSites: [CallSiteInfo] = _buildCallSiteList()
@@ -1626,10 +1688,10 @@ struct DwarfReader<S: DwarfSource> {
           )
 
           if tag == .DW_TAG_inlined_subroutine {
-            if let callSiteInfo = try buildCallSiteInfo(depth: depth,
-                                                        unit: unit,
-                                                        attributes: attributes) {
-              callSites.append(callSiteInfo)
+            try buildCallSiteInfo(depth: depth,
+                                  unit: unit,
+                                  attributes: attributes) {
+              callSites.append($0)
             }
           }
 
@@ -1655,7 +1717,7 @@ struct DwarfReader<S: DwarfSource> {
 
     callSites.sort(
       by: { (a, b) in
-        a.lowPC < b.lowPC || (a.lowPC == b.lowPC) && a.depth < b.depth
+        a.lowPC < b.lowPC || (a.lowPC == b.lowPC) && a.depth > b.depth
       })
 
     return callSites

@@ -179,7 +179,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
         return true
       }
       if let location = sourceLocation,
-         location.line == 0 && location.column == 0
+         ((location.line == 0 && location.column == 0)
+            || location.path.hasSuffix("<compiler-generated>"))
            && !_swift_backtrace_isThunkFunction(rawName) {
         return true
       }
@@ -465,109 +466,102 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       }
     }
     #elseif os(Linux)
+    var elf32Cache: [Int:Elf32Image<FileImageSource>] = [:]
+    var elf64Cache: [Int:Elf64Image<FileImageSource>] = [:]
 
-    if let images = images {
-      var elf32Cache: [Int:Elf32Image<FileImageSource>] = [:]
-      var elf64Cache: [Int:Elf64Image<FileImageSource>] = [:]
+    // This could be more efficient; for instance, right now, we open the
+    // images up once per frame, and we'll execute the line number programs
+    // once per frame too.
+    //
+    // If we instead grabbed all the addresses, sorted and uniqued them,
+    // we could then load the images and run the line programs once.
 
-      // This could be more efficient; for instance, right now, we open the
-      // images up once per frame, and we'll execute the line number programs
-      // once per frame too.
-      //
-      // If we instead grabbed all the addresses, sorted and uniqued them,
-      // we could then load the images and run the line programs once.
+    for frame in backtrace.frames {
+      let address = FileImageSource.Address(frame.adjustedProgramCounter)
+      if let imageNdx = theImages.firstIndex(
+           where: { address >= $0.baseAddress
+                      && address < $0.endOfText }
+         ) {
+        let relativeAddress = address - FileImageSource.Address(theImages[imageNdx].baseAddress)
+        var symbol: Symbol = Symbol(imageIndex: imageNdx,
+                                    imageName: theImages[imageNdx].name,
+                                    rawName: "<unknown>",
+                                    offset: 0,
+                                    sourceLocation: nil)
+        var elf32Image = elf32Cache[imageNdx]
+        var elf64Image = elf64Cache[imageNdx]
 
-      for frame in backtrace.frames {
-        let address = FileImageSource.Address(frame.adjustedProgramCounter)
-        if let imageNdx = images.firstIndex(
-             where: { address >= $0.baseAddress
-                        && address < $0.endOfText }
-           ) {
-          let relativeAddress = address - FileImageSource.Address(images[imageNdx].baseAddress)
-          var symbol: Symbol = Symbol(imageIndex: imageNdx,
-                            imageName: images[imageNdx].name,
-                            rawName: "<unknown>",
-                            offset: 0,
-                            sourceLocation: nil)
-          var elf32Image = elf32Cache[imageNdx]
-          var elf64Image = elf64Cache[imageNdx]
-
-          if elf32Image == nil && elf64Image == nil {
-            if let source = try? FileImageSource(path: images[imageNdx].path) {
-              if let elfImage = try? Elf32Image(source: source) {
-                elf32Image = elfImage
-                elf32Cache[imageNdx] = elfImage
-              } else if let elfImage = try? Elf64Image(source: source) {
-                elf64Image = elfImage
-                elf64Cache[imageNdx] = elfImage
-              }
+        if elf32Image == nil && elf64Image == nil {
+          if let source = try? FileImageSource(path: theImages[imageNdx].path) {
+            if let elfImage = try? Elf32Image(source: source) {
+              elf32Image = elfImage
+              elf32Cache[imageNdx] = elfImage
+            } else if let elfImage = try? Elf64Image(source: source) {
+              elf64Image = elfImage
+              elf64Cache[imageNdx] = elfImage
             }
           }
-
-          if let theSymbol = elf32Image?.lookupSymbol(address: relativeAddress) {
-            var location = try? elf32Image!.sourceLocation(for: relativeAddress)
-
-            for inline in elf32Image!.inlineCallSites(at: relativeAddress) {
-              let fakeSymbol = Symbol(imageIndex: imageNdx,
-                                      imageName: images[imageNdx].name,
-                                      rawName: inline.rawName ?? "<unknown>",
-                                      offset: 0,
-                                      sourceLocation: location)
-              if let name = inline.name {
-                fakeSymbol.name = name
-              }
-              frames.append(Frame(captured: frame, symbol: fakeSymbol))
-
-              location = SourceLocation(path: inline.filename,
-                                        line: inline.line,
-                                        column: inline.column)
-            }
-
-            symbol = Symbol(imageIndex: imageNdx,
-                            imageName: images[imageNdx].name,
-                            rawName: theSymbol.name,
-                            offset: theSymbol.offset,
-                            sourceLocation: location)
-          } else if let theSymbol = elf64Image?.lookupSymbol(address: relativeAddress) {
-            var location = try? elf64Image!.sourceLocation(for: relativeAddress)
-
-            for inline in elf64Image!.inlineCallSites(at: relativeAddress) {
-              let fakeSymbol = Symbol(imageIndex: imageNdx,
-                                      imageName: images[imageNdx].name,
-                                      rawName: inline.rawName ?? "<unknown>",
-                                      offset: 0,
-                                      sourceLocation: location)
-              if let name = inline.name {
-                fakeSymbol.name = name
-              }
-              frames.append(Frame(captured: frame, symbol: fakeSymbol))
-
-              location = SourceLocation(path: inline.filename,
-                                        line: inline.line,
-                                        column: inline.column)
-            }
-
-            symbol = Symbol(imageIndex: imageNdx,
-                            imageName: images[imageNdx].name,
-                            rawName: theSymbol.name,
-                            offset: theSymbol.offset,
-                            sourceLocation: location)
-          } else {
-            symbol = Symbol(imageIndex: imageNdx,
-                            imageName: images[imageNdx].name,
-                            rawName: "<unknown>",
-                            offset: 0,
-                            sourceLocation: nil)
-          }
-
-          frames.append(Frame(captured: frame, symbol: symbol))
-          continue
         }
 
-        frames.append(Frame(captured: frame, symbol: nil))
+        if let theSymbol = elf32Image?.lookupSymbol(address: relativeAddress) {
+          var location = try? elf32Image!.sourceLocation(for: relativeAddress)
+
+          for inline in elf32Image!.inlineCallSites(at: relativeAddress) {
+            let fakeSymbol = Symbol(imageIndex: imageNdx,
+                                    imageName: theImages[imageNdx].name,
+                                    rawName: inline.rawName ?? "<unknown>",
+                                    offset: 0,
+                                    sourceLocation: location)
+            frames.append(Frame(captured: frame,
+                                symbol: fakeSymbol,
+                                inlined: true))
+
+            location = SourceLocation(path: inline.filename,
+                                      line: inline.line,
+                                      column: inline.column)
+          }
+
+          symbol = Symbol(imageIndex: imageNdx,
+                          imageName: theImages[imageNdx].name,
+                          rawName: theSymbol.name,
+                          offset: theSymbol.offset,
+                          sourceLocation: location)
+        } else if let theSymbol = elf64Image?.lookupSymbol(address: relativeAddress) {
+          var location = try? elf64Image!.sourceLocation(for: relativeAddress)
+
+          for inline in elf64Image!.inlineCallSites(at: relativeAddress) {
+            let fakeSymbol = Symbol(imageIndex: imageNdx,
+                                    imageName: theImages[imageNdx].name,
+                                    rawName: inline.rawName ?? "<unknown>",
+                                    offset: 0,
+                                    sourceLocation: location)
+            frames.append(Frame(captured: frame,
+                                symbol: fakeSymbol,
+                                inlined: true))
+
+            location = SourceLocation(path: inline.filename,
+                                      line: inline.line,
+                                      column: inline.column)
+          }
+
+          symbol = Symbol(imageIndex: imageNdx,
+                          imageName: theImages[imageNdx].name,
+                          rawName: theSymbol.name,
+                          offset: theSymbol.offset,
+                          sourceLocation: location)
+        } else {
+          symbol = Symbol(imageIndex: imageNdx,
+                          imageName: theImages[imageNdx].name,
+                          rawName: "<unknown>",
+                          offset: 0,
+                          sourceLocation: nil)
+        }
+
+        frames.append(Frame(captured: frame, symbol: symbol))
+        continue
       }
-    } else {
-      frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }
+
+      frames.append(Frame(captured: frame, symbol: nil))
     }
     #else
     frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }

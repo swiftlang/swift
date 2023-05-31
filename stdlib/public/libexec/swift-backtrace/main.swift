@@ -607,7 +607,6 @@ Generate a backtrace for the parent process.
 
     writeln("")
     writeln(theme.crashReason(description))
-    writeln("")
 
     var mentionedImages = Set<Int>()
     let formatter = backtraceFormatter()
@@ -615,7 +614,7 @@ Generate a backtrace for the parent process.
     func dump(ndx: Int, thread: TargetThread) {
       let crashed = thread.id == target.crashingThread ? " crashed" : ""
       let name = !thread.name.isEmpty ? " \"\(thread.name)\"" : ""
-      writeln("Thread \(ndx)\(name)\(crashed):\n")
+      writeln("\nThread \(ndx)\(name)\(crashed):\n")
 
       if args.registers! == .all {
         if let context = thread.context {
