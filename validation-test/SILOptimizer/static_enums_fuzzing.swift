@@ -22,7 +22,7 @@ func createTestfile() {
 
   print()
 
-  for (idx, t) in globals.enumerated() {
+  for (idx, _) in globals.enumerated() {
     print("""
           @inline(never) func printGlobal\(idx)() {
             print("global\(idx)var: \", global\(idx)var as Any)
@@ -78,6 +78,10 @@ var typeDefinitions: String {
       case B(V)
       case C
     }
+
+    public func fn() {}
+
+    public typealias Func = () -> ()
 
   """
 }
@@ -149,6 +153,16 @@ struct LargeString : Value {
   func getType() -> String { "String" }
   func getInitValue() -> String  { "\"large string which exceeds the inline buffer\"" }
   func getRuntimeTypeName(topLevel: Bool) -> String { topLevel ? "String" : "Swift.String" }
+}
+
+struct Function : Value {
+
+  init(generator: inout RandomGenerator, depth: Int) {}
+
+  func getType() -> String { "Func" }
+  func getInitValue() -> String  { "fn" }
+  func getRuntimeTypeName(topLevel: Bool) -> String { "() -> ()" }
+  func getExpectedOutput(topLevel: Bool) -> String { "(Function)" }
 }
 
 struct OptionalValue : Value {
@@ -340,23 +354,19 @@ struct RandomGenerator : RandomNumberGenerator {
     }
   }
 
-  private static let allValueTypes: [any Value.Type] = [
-    SmallInt.self,
-    LargeInt.self,
-    SmallString.self,
-    LargeString.self,
-    Enum.self,
-    OptionalValue.self,
-    Struct.self,
-    MultiPayloadEnum.self
-  ]
-
   private static let allTerminalTypes: [any Value.Type] = [
     SmallInt.self,
     LargeInt.self,
     SmallString.self,
     LargeString.self,
+    Function.self,
     Enum.self
   ]
+  private static let allValueTypes: [any Value.Type] = allTerminalTypes + [
+    OptionalValue.self,
+    Struct.self,
+    MultiPayloadEnum.self
+  ]
+
 }
 

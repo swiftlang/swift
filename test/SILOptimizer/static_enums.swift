@@ -130,6 +130,47 @@ var outer: Outer? = Outer(i: Inner(x: 2, y: 3), z: 4)
 // CHECK-LABEL: sil_global hidden @$s4test8optionalSiSgvp : $Optional<Int> = {
 var optional: Int? = Optional(42)
 
+struct StringGen {
+  enum E {
+    case none
+    case str(String)
+    case gen(() -> String)
+  }
+
+  var source: E
+}
+
+// CHECK-LABEL: sil_global hidden @$s4test3sg1AA9StringGenVvp : $StringGen = {
+var sg1 = StringGen(source: .gen({ "gen" }))
+
+// CHECK-LABEL: sil_global hidden @$s4test3sg2AA9StringGenVvp : $StringGen = {
+var sg2 = StringGen(source: .none)
+
+// CHECK-LABEL: sil_global hidden @$s4test3sg3AA9StringGenVvp : $StringGen = {
+var sg3 = StringGen(source: .str("str"))
+
+@inline(never)
+func getStringGen(_ s: StringGen) -> String {
+  switch s.source {
+    case .gen(let f):
+      return f()
+    case .str(let s):
+      return s
+    case .none:
+      return "none"
+  }
+}
+
+public enum R {
+    case success(Int)
+    case failure(Error)
+}
+
+public let success: R = .success(27)
+
+// CHECK-LABEL: sil_global hidden @$s4test10optSuccessAA1ROSgvp : $Optional<R> = {
+var optSuccess: R? = success
+
 // CHECK-LABEL: sil_global private @$s4test9createArrSaySiSgGyFTv_ : $_ContiguousArrayStorage<Optional<Int>> = {
 @inline(never)
 func createArr() -> [Int?] {
@@ -197,6 +238,14 @@ struct Main {
     print("optional:", optional as Any)
     // CHECK-OUTPUT: createArr: [Optional(27), Optional(42), nil, Optional(103)]
     print("createArr:", createArr())
+    // CHECK-OUTPUT: stringGen1: gen
+    print("stringGen1: \(getStringGen(sg1))")
+    // CHECK-OUTPUT: stringGen2: none
+    print("stringGen2: \(getStringGen(sg2))")
+    // CHECK-OUTPUT: stringGen3: str
+    print("stringGen3: \(getStringGen(sg3))")
+    // CHECK-OUTPUT: optSuccess: Optional(test.R.success(27))
+    print("optSuccess:", optSuccess as Any)
   }
 }
 
