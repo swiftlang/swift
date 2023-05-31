@@ -1223,10 +1223,19 @@ class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
   /// parent nominal type.
   llvm::DenseSet<DeclBaseName> LazilyCompleteNames;
 
-  /// The set of names for which we have expanded relevant macros for in the
-  /// parent nominal type.
-  llvm::DenseSet<DeclName> LazilyCompleteNamesForMacroExpansion;
+  struct {
+    /// Whether we have computed the `containersWithMacroExpansions`.
+    bool ComputedContainersWithMacroExpansions = false;
 
+    /// The nominal type and any extensions that have macro expansions, which
+    /// is used to restrict the set of places one will lookup for a member
+    /// produced by a macro expansion.
+    llvm::SmallVector<TypeOrExtensionDecl, 2> ContainersWithMacroExpansions;
+
+    /// The set of names for which we have expanded relevant macros for in the
+    /// parent nominal type.
+    llvm::DenseSet<DeclName> LazilyCompleteNames;
+  } LazyMacroExpansionState;
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
@@ -1255,6 +1264,32 @@ public:
     LazilyCompleteNames.clear();
   }
 
+  /// Retrieve an array containing the set of containers for this type (
+  /// i.e., the nominal type and any extensions) that can produce members via
+  /// macro expansion.
+  ArrayRef<TypeOrExtensionDecl> getContainersWithMacroExpansions(
+      NominalTypeDecl *nominal) {
+    if (LazyMacroExpansionState.ComputedContainersWithMacroExpansions)
+      return LazyMacroExpansionState.ContainersWithMacroExpansions;
+
+    Evaluator &evaluator = nominal->getASTContext().evaluator;
+
+    // Does the type have macro expansions?
+    if (evaluateOrDefault(
+            evaluator, PotentialMacroExpansionsInContextRequest{nominal}, {}))
+      LazyMacroExpansionState.ContainersWithMacroExpansions.push_back(nominal);
+
+    // Check each extension for macro expansions.
+    for (auto ext : nominal->getExtensions()) {
+      if (evaluateOrDefault(
+              evaluator, PotentialMacroExpansionsInContextRequest{ext}, {}))
+        LazyMacroExpansionState.ContainersWithMacroExpansions.push_back(ext);
+    }
+
+    LazyMacroExpansionState.ComputedContainersWithMacroExpansions = true;
+    return LazyMacroExpansionState.ContainersWithMacroExpansions;
+  }
+
   /// Determine whether the given container has any macro-introduced names that
   /// match the given declaration.
   bool hasAnyMacroNamesMatching(TypeOrExtensionDecl container, DeclName name);
@@ -1266,16 +1301,16 @@ public:
     bool isBaseNameComplete = name.isCompoundName() &&
         isLazilyCompleteForMacroExpansion(DeclName(name.getBaseName()));
     return isBaseNameComplete ||
-        LazilyCompleteNamesForMacroExpansion.contains(name);
+        LazyMacroExpansionState.LazilyCompleteNames.contains(name);
   }
 
   void markLazilyCompleteForMacroExpansion(DeclName name) {
     assert(!MacroDecl::isUniqueMacroName(name.getBaseName()));
-    LazilyCompleteNamesForMacroExpansion.insert(name);
+    LazyMacroExpansionState.LazilyCompleteNames.insert(name);
   }
 
   void clearLazilyCompleteForMacroExpansionCache() {
-    LazilyCompleteNamesForMacroExpansion.clear();
+    LazyMacroExpansionState.LazilyCompleteNames.clear();
   }
 
   /// Iterator into the lookup table.
@@ -1895,11 +1930,9 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   DeclName macroExpansionKey = adjustLazyMacroExpansionNameKey(ctx, name);
   if (!excludeMacroExpansions &&
       !Table.isLazilyCompleteForMacroExpansion(macroExpansionKey)) {
-    populateLookupTableEntryFromMacroExpansions(
-        ctx, Table, macroExpansionKey, decl);
-    for (auto ext : decl->getExtensions()) {
+    for (auto container : Table.getContainersWithMacroExpansions(decl)) {
       populateLookupTableEntryFromMacroExpansions(
-          ctx, Table, macroExpansionKey, ext);
+          ctx, Table, macroExpansionKey, container);
     }
     Table.markLazilyCompleteForMacroExpansion(macroExpansionKey);
   }
