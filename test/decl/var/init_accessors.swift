@@ -3,7 +3,7 @@
 func test_invalid_init_accessor_use() {
   var other: String = "" // expected-warning {{}}
   var x: Int {
-    init(newValue) initializes(other) {}
+    init(initialValue) initializes(other) {}
     // expected-error@-1 {{init accessors could only be associated with properties}}
 
     get { 42 }
@@ -11,7 +11,7 @@ func test_invalid_init_accessor_use() {
 
   struct X {
     subscript(x: Int) -> Bool {
-      init(newValue) {} // expected-error {{init accessors could only be associated with properties}}
+      init(initialValue) {} // expected-error {{init accessors could only be associated with properties}}
 
       get { false }
     }
@@ -24,7 +24,7 @@ func test_use_of_initializes_accesses_on_non_inits() {
     var y: String
 
     var _x: Int {
-      init(newValue) initializes(x) accesses(y) { // Ok
+      init(initialValue) initializes(x) accesses(y) { // Ok
       }
 
       get { x }
@@ -32,13 +32,13 @@ func test_use_of_initializes_accesses_on_non_inits() {
 
     var _y: String {
       get { y }
-      set(newValue) initializes(y) {}
+      set(initialValue) initializes(y) {}
       // expected-error@-1 {{initalizes(...) attribute could only be used with init accessors}}
     }
 
     var _q: String {
       get { y }
-      set(newValue) accesses(x) {}
+      set(initialValue) accesses(x) {}
       // expected-error@-1 {{accesses(...) attribute could only be used with init accessors}}
     }
   }
@@ -48,18 +48,39 @@ func test_invalid_refs_in_init_attrs() {
   struct Test {
     var c: Int { get { 42 } }
     var x: Int {
-      init(newValue) initializes(a) accesses(b c) {}
+      init(initialValue) initializes(a) accesses(b c) {}
       // expected-error@-1 {{find type 'a' in scope}}
       // expected-error@-2 {{find type 'b' in scope}}
       // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
     }
 
     var y: String {
-      init(newValue) initializes(test) {}
+      init(initialValue) initializes(test) {}
       // expected-error@-1 {{ambiguous reference to member 'test'}}
     }
 
     func test(_: Int) {} // expected-note {{'test' declared here}}
     func test(_: String) -> Int { 42 } // expected-note {{'test' declared here}}
+  }
+}
+
+func test_assignment_to_let_properties() {
+  struct Test {
+    let x: Int
+    let y: Int // expected-note {{change 'let' to 'var' to make it mutable}}
+
+    var pointX: Int {
+      init(initialValue) initializes(x) accesses(y) {
+        self.x = initialValue // Ok
+        self.y = 42 // expected-error {{cannot assign to property: 'y' is a 'let' constant}}
+      }
+    }
+
+    var point: (Int, Int) {
+      init(initialValue) initializes(x y) {
+        self.x = initialValue.0 // Ok
+        self.y = initialValue.1 // Ok
+      }
+    }
   }
 }

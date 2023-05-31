@@ -6703,10 +6703,28 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // 'let's are only ever settable from a specific DeclContext.
   if (UseDC == nullptr)
     return false;
-  
+
   // 'let' properties in structs/classes are only ever settable in their
-  // designated initializer(s).
+  // designated initializer(s) or by init accessors.
   if (isInstanceMember()) {
+    // Init accessors allow assignments to `let` properties if a
+    // property is part of `initializes(...)` list.
+    if (auto *accessor =
+            dyn_cast<AccessorDecl>(const_cast<DeclContext *>(UseDC))) {
+      // Check whether this property is part of `initializes(...)` list,
+      // and allow assignment/mutation if so. DI would be responsible
+      // for checking for re-assignment.
+      if (auto *initAttr =
+              accessor->getAttrs().getAttribute<InitializesAttr>()) {
+        return llvm::is_contained(initAttr->getPropertyDecls(accessor),
+                                  const_cast<VarDecl *>(this));
+      }
+
+      // If there is no `initializes` attribute, no referenced properties
+      // can be assignment to or mutated.
+      return false;
+    }
+
     auto *CD = dyn_cast<ConstructorDecl>(UseDC);
     if (!CD) return false;
     
