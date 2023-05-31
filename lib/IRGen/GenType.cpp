@@ -2008,7 +2008,8 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
         return type;
       },
       MakeAbstractConformanceForGenericType(),
-      SubstFlags::AllowLoweredTypes);
+      SubstFlags::AllowLoweredTypes |
+      SubstFlags::PreservePackExpansionLevel);
     return CanType(exemplified);
   }
 }
