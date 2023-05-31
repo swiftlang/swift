@@ -200,6 +200,7 @@ public:
   bool isNonDelegatingInit() const {
     switch (MemoryInst->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var:
+    case MarkUninitializedInst::Out:
       return false;
     case MarkUninitializedInst::RootSelf:
     case MarkUninitializedInst::CrossModuleRootSelf:

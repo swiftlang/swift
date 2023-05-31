@@ -4489,6 +4489,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       Kind = MarkUninitializedInst::DelegatingSelf;
     else if (KindId.str() == "delegatingselfallocated")
       Kind = MarkUninitializedInst::DelegatingSelfAllocated;
+    else if (KindId.str() == "out")
+      Kind = MarkUninitializedInst::Out;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
                  "var, rootself, crossmodulerootself, derivedself, "

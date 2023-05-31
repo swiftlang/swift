@@ -1797,6 +1797,9 @@ public:
     case MarkUninitializedInst::DelegatingSelfAllocated:
       *this << "[delegatingselfallocated] ";
       break;
+    case MarkUninitializedInst::Out:
+      *this << "[out] ";
+      break;
     }
     *this << getIDAndType(MU->getOperand());
     printForwardingOwnershipKind(MU, MU->getOperand());

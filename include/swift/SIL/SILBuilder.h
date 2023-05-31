@@ -1018,7 +1018,11 @@ public:
                                                          SILValue src) {
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
-  
+  MarkUninitializedInst *createMarkUninitializedOut(SILLocation Loc,
+                                                    SILValue src) {
+    return createMarkUninitialized(Loc, src, MarkUninitializedInst::Out);
+  }
+
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation Loc,
                                                    ArrayRef<SILValue> vars) {
     return insert(

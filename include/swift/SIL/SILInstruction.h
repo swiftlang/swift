@@ -5029,6 +5029,10 @@ public:
     /// DelegatingSelfAllocated designates "self" in a delegating class
     /// initializer where memory has already been allocated.
     DelegatingSelfAllocated,
+
+    /// Out designates an indirectly returned result.
+    /// This is the result that has to be checked for initialization.
+    Out,
   };
 private:
   Kind ThisKind;
@@ -5043,6 +5047,7 @@ public:
   Kind getMarkUninitializedKind() const { return ThisKind; }
 
   bool isVar() const { return ThisKind == Var; }
+  bool isOut() const { return ThisKind == Out; }
   bool isRootSelf() const {
     return ThisKind == RootSelf;
   }
