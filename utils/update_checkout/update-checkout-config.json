@@ -254,7 +254,7 @@
                 "cmake": "v3.19.6",
                 "indexstore-db": "release/5.9",
                 "sourcekit-lsp": "release/5.9",
-                "swift-format": "release/5.9",
+                "swift-format": "release/5.9-20230510",
                 "swift-installer-scripts": "release/5.9",
                 "swift-docc": "release/5.9",
                 "swift-lmdb": "release/5.9",
