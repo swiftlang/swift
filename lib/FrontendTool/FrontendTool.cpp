@@ -806,7 +806,8 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
+  return writeTBD(Instance.getMainModule(), TBDPath,
+                  Instance.getOutputBackend(), tbdOpts);
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
