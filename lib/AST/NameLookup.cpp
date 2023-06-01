@@ -1272,22 +1272,25 @@ public:
     if (LazyMacroExpansionState.ComputedContainersWithMacroExpansions)
       return LazyMacroExpansionState.ContainersWithMacroExpansions;
 
-    Evaluator &evaluator = nominal->getASTContext().evaluator;
+    LazyMacroExpansionState.ComputedContainersWithMacroExpansions = true;
 
     // Does the type have macro expansions?
-    if (evaluateOrDefault(
-            evaluator, PotentialMacroExpansionsInContextRequest{nominal}, {}))
-      LazyMacroExpansionState.ContainersWithMacroExpansions.push_back(nominal);
+    addContainerWithMacroExpansions(nominal);
 
     // Check each extension for macro expansions.
-    for (auto ext : nominal->getExtensions()) {
-      if (evaluateOrDefault(
-              evaluator, PotentialMacroExpansionsInContextRequest{ext}, {}))
-        LazyMacroExpansionState.ContainersWithMacroExpansions.push_back(ext);
-    }
+    for (auto ext : nominal->getExtensions())
+      addContainerWithMacroExpansions(ext);
 
-    LazyMacroExpansionState.ComputedContainersWithMacroExpansions = true;
     return LazyMacroExpansionState.ContainersWithMacroExpansions;
+  }
+
+  void addContainerWithMacroExpansions(TypeOrExtensionDecl container){
+    if (LazyMacroExpansionState.ComputedContainersWithMacroExpansions &&
+        evaluateOrDefault(
+                container.getAsDecl()->getASTContext().evaluator,
+                PotentialMacroExpansionsInContextRequest{container}, {}))
+      LazyMacroExpansionState.ContainersWithMacroExpansions.push_back(
+          container);
   }
 
   /// Determine whether the given container has any macro-introduced names that
@@ -1439,6 +1442,8 @@ void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
   } else {
     table->addMembers(ext->getMembers());
   }
+
+  table->addContainerWithMacroExpansions(ext);
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
