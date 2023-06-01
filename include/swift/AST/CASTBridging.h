@@ -321,8 +321,7 @@ struct BridgedFuncDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-                BridgedSourceLoc cLeftParenLoc, BridgedArrayRef params,
-                BridgedSourceLoc cRightParenLoc, BridgedSourceLoc cAsyncLoc,
+                void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
                 BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType);
 void FuncDecl_setBody(void *fn, void *body);
 
@@ -370,6 +369,11 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   _Bool isParameterPack);
 void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
                                            void *Param, void *ty);
+
+void *ParameterList_create(BridgedASTContext cContext,
+                           BridgedSourceLoc cLeftParenLoc,
+                           BridgedArrayRef cParameters,
+                           BridgedSourceLoc cRightParenLoc);
 
 BridgedTypeAttrKind TypeAttrKind_fromString(BridgedString cStr);
 BridgedTypeAttributes TypeAttributes_create(void);

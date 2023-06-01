@@ -85,40 +85,12 @@ extension ASTGenVisitor {
     )
   }
 
-  public func visit(_ node: FunctionParameterSyntax) -> ASTNode {
-    // FIXME: This location should be derived from the type repr.
-    let specifierLoc: BridgedSourceLoc = nil
-
-    let firstName: BridgedIdentifier
-    if node.firstName.text != "_" {
-      // Swift AST represents "_" as nil.
-      firstName = node.firstName.bridgedIdentifier(in: self)
-    } else {
-      firstName = nil
-    }
-    let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
-
-    return .decl(
-      ParamDecl_create(
-        self.ctx,
-        self.declContext,
-        specifierLoc,
-        firstName,
-        self.bridgedSourceLoc(for: node.firstName),
-        secondName,
-        secondNameLoc,
-        self.visit(node.type).rawValue
-      )
-    )
-  }
-
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {
     // FIXME: Compute this location
     let staticLoc: BridgedSourceLoc = nil
 
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let parameters = node.signature.parameterClause.parameters.lazy.map { visit($0).rawValue }
     let out = FuncDecl_create(
       self.ctx,
       self.declContext,
@@ -126,9 +98,7 @@ extension ASTGenVisitor {
       self.bridgedSourceLoc(for: node.funcKeyword),
       name,
       nameLoc,
-      self.bridgedSourceLoc(for: node.signature.parameterClause.leftParen),
-      parameters.bridgedArray(in: self),
-      self.bridgedSourceLoc(for: node.signature.parameterClause.rightParen),
+      self.visit(node.signature.parameterClause).rawValue,
       self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
       self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),
       self.visit(node.signature.returnClause?.type)?.rawValue

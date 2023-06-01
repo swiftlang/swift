@@ -424,14 +424,11 @@ BridgedFuncDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-                BridgedSourceLoc cLeftParenLoc, BridgedArrayRef params,
-                BridgedSourceLoc cRightParenLoc, BridgedSourceLoc cAsyncLoc,
+                void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
                 BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType) {
   ASTContext &context = convertASTContext(cContext);
 
-  auto *paramList = ParameterList::create(
-      context, convertSourceLoc(cLeftParenLoc),
-      convertArrayRef<ParamDecl *>(params), convertSourceLoc(cRightParenLoc));
+  auto *paramList = static_cast<ParameterList *>(opaqueParameterList);
   auto declName = DeclName(context, convertIdentifier(cName), paramList);
   auto asyncLoc = convertSourceLoc(cAsyncLoc);
   auto throwsLoc = convertSourceLoc(cThrowsLoc);
@@ -831,6 +828,16 @@ void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
   auto entries = context.AllocateCopy(
       ArrayRef<InheritedEntry>{InheritedEntry{(TypeRepr *)ty}});
   ((GenericTypeParamDecl *)param)->setInherited(entries);
+}
+
+void *ParameterList_create(BridgedASTContext cContext,
+                           BridgedSourceLoc cLeftParenLoc,
+                           BridgedArrayRef cParameters,
+                           BridgedSourceLoc cRightParenLoc) {
+  ASTContext &context = convertASTContext(cContext);
+  return ParameterList::create(context, convertSourceLoc(cLeftParenLoc),
+                               convertArrayRef<ParamDecl *>(cParameters),
+                               convertSourceLoc(cRightParenLoc));
 }
 
 #pragma clang diagnostic push

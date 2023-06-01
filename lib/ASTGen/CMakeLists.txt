@@ -15,6 +15,7 @@ add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/Generics.swift
   Sources/ASTGen/Literals.swift
   Sources/ASTGen/Macros.swift
+  Sources/ASTGen/ParameterClause.swift
   Sources/ASTGen/PluginHost.swift
   Sources/ASTGen/SourceFile.swift
   Sources/ASTGen/SourceManager.swift
