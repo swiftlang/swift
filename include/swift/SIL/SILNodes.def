@@ -461,8 +461,15 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // effects relative to other OSSA values like copy_value.
   SINGLE_VALUE_INST(MoveValueInst, move_value, SingleValueInstruction, None,
                     DoesNotRelease)
-  SINGLE_VALUE_INST(DropDeinitInst, drop_deinit, SingleValueInstruction, None,
-                    DoesNotRelease)
+  // A drop_deinit has no user-level side effects. It does, however, change the
+  // information about the owenership of its operand, and therefore cannot be
+  // arbitrarily deleted. It effectively wraps the type of the operand so that
+  // the resulting value is an equivalent type without a user-defined deinit.
+  //
+  // TODO: Add an OwnershipEffect type of side effect for instructions like
+  // drop_deinit to indicate their ownership effects.
+  SINGLE_VALUE_INST(DropDeinitInst, drop_deinit, SingleValueInstruction,
+                    MayHaveSideEffects, DoesNotRelease)
   // A canary value inserted by a SIL generating frontend to signal to the move
   // checker to check a specific value.  Valid only in Raw SIL. The relevant
   // checkers should remove the mark_must_check instruction after successfully
