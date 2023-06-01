@@ -218,17 +218,6 @@ extension ObservableMacro: MemberMacro {
     declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType), to: &declarations)
     declaration.addIfNeeded(ObservableMacro.accessFunction(observableType), to: &declarations)
     declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType), to: &declarations)
-    
-    let storedInstanceVariables = declaration.definedVariables.filter { $0.isValidForObservation }
-    for property in storedInstanceVariables {
-      if property.hasMacroApplication(ObservableMacro.ignoredMacroName) { continue }
-      if property.initializer == nil {
-        context.addDiagnostics(from: DiagnosticsError(syntax: property, message: "@Observable requires property '\(property.identifier?.text ?? "")' to have an initial value", id: .missingInitializer), node: property)
-      }
-      let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
-      declaration.addIfNeeded(storage, to: &declarations)
-      
-    }
 
     return declarations
   }
@@ -343,8 +332,9 @@ extension ObservationTrackedMacro: PeerMacro {
           property.isValidForObservation else {
       return []
     }
-
-    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
+    
+    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
+       property.hasMacroApplication(ObservableMacro.trackedMacroName) {
       return []
     }
     
