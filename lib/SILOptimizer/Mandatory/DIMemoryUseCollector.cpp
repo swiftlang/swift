@@ -31,6 +31,10 @@ using namespace ownership;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+static bool isVariableOrResult(MarkUninitializedInst *MUI) {
+  return MUI->isVar() || MUI->isOut();
+}
+
 static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
                                       DIElementUseInfo &useInfo) {
   auto *uninitMemory = memoryInfo.getUninitializedValue();
@@ -106,7 +110,7 @@ computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
 
   // If this is a let variable we're initializing, remember this so we don't
   // allow reassignment.
-  if (!MUI->isVar())
+  if (!isVariableOrResult(MUI))
     return {MemorySILType, false};
 
   auto *VDecl = MUI->getLoc().getAsASTNode<VarDecl>();
@@ -459,7 +463,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
-  if (MemoryInst->isVar())
+  if (isVariableOrResult(MemoryInst))
     return MemoryInst->getLoc().getAsASTNode<VarDecl>();
 
   // Otherwise, we can't.
@@ -516,7 +520,7 @@ SingleValueInstruction *DIMemoryObjectInfo::findUninitializedSelfValue() const {
       // If instruction is not a local variable, it could only
       // be some kind of `self` (root, delegating, derived etc.)
       // see \c MarkUninitializedInst::Kind for more details.
-      if (!MUI->isVar())
+      if (!isVariableOrResult(MUI))
         return ::getUninitializedValue(MUI);
     }
   }
@@ -525,7 +529,7 @@ SingleValueInstruction *DIMemoryObjectInfo::findUninitializedSelfValue() const {
 
 ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
   // is it 'self'?
-  if (!MemoryInst->isVar())
+  if (!isVariableOrResult(MemoryInst)) {
     if (auto decl =
         dyn_cast_or_null<ClassDecl>(getASTType()->getAnyNominal()))
       // is it for an actor?
@@ -535,6 +539,7 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
                             silFn->getDeclContext()->getAsDecl()))
             return ctor;
+  }
 
   return nullptr;
 }

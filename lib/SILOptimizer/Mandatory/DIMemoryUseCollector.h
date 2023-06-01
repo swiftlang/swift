@@ -116,7 +116,9 @@ public:
   unsigned getNumElements() const { return NumElements; }
 
   /// Return true if this is 'self' in any kind of initializer.
-  bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
+  bool isAnyInitSelf() const {
+    return !MemoryInst->isVar() && !MemoryInst->isOut();
+  }
 
   /// Return uninitialized value of 'self' if current memory object
   /// is located in an initializer (of any kind).
@@ -150,7 +152,7 @@ public:
     if (MemoryInst->isDelegatingSelf())
       return false;
 
-    if (!MemoryInst->isVar()) {
+    if (!MemoryInst->isVar() && !MemoryInst->isOut()) {
       if (auto decl = getASTType()->getAnyNominal()) {
         if (isa<ClassDecl>(decl)) {
           return true;
@@ -222,6 +224,8 @@ public:
   bool isDelegatingSelfAllocated() const {
     return MemoryInst->isDelegatingSelfAllocated();
   }
+
+  bool isOut() const { return MemoryInst->isOut(); }
 
   enum class EndScopeKind { Borrow, Access };
 

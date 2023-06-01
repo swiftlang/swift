@@ -1152,6 +1152,18 @@ void LifetimeChecker::doIt() {
     return;
   }
 
+  // All of the indirect results marked as "out" have to be fully initialized
+  // before their lifetime ends.
+  if (TheMemory.isOut() && Uses.empty()) {
+    auto loc = TheMemory.getLoc();
+
+    std::string propertyName;
+    auto *property = TheMemory.getPathStringToElement(0, propertyName);
+    diagnose(Module, F.getLocation(),
+             diag::ivar_not_initialized_by_init_accessor, property->getName());
+    EmittedErrorLocs.push_back(loc);
+  }
+
   // If the memory object has nontrivial type, then any destroy/release of the
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
