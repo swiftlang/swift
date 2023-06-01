@@ -207,7 +207,8 @@ UID_KEYS = [
     # in this time. For cancellation testing purposes.
     KEY('SimulateLongRequest', 'key.simulate_long_request'),
     KEY('IsSynthesized', 'key.is_synthesized'),
-    KEY('BufferName', 'key.buffer_name')
+    KEY('BufferName', 'key.buffer_name'),
+    KEY('BarriersEnabled', 'key.barriers_enabled'),
 ]
 
 
@@ -272,6 +273,7 @@ UID_REQUESTS = [
     REQUEST('Diagnostics', 'source.request.diagnostics'),
     REQUEST('Compile', 'source.request.compile'),
     REQUEST('CompileClose', 'source.request.compile.close'),
+    REQUEST('EnableRequestBarriers', 'source.request.enable_request_barriers'),
 ]
 
 
