@@ -16,7 +16,7 @@
 #if $Macros && hasAttribute(attached)
 
 @available(SwiftStdlib 5.9, *)
-@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation), arbitrary)
+@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation))
 @attached(memberAttribute)
 @attached(conformance)
 public macro Observable() = 
@@ -24,7 +24,7 @@ public macro Observable() =
 
 @available(SwiftStdlib 5.9, *)
 @attached(accessor)
-// @attached(peer, names: prefixed(_))
+@attached(peer, names: prefixed(_))
 public macro ObservationTracked() =
   #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")
 
