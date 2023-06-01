@@ -20,6 +20,9 @@ struct Test1 {
     init(initialValue) initializes(y) {
       self.y = initialValue // Ok
     }
+
+    get { y }
+    set {}
   }
 
   var errorPoint1: (Int, Int) {
@@ -27,6 +30,9 @@ struct Test1 {
       // expected-error@-1 {{property 'x' not initialized by init accessor}}
       // expected-error@-2 {{property 'y' not initialized by init accessor}}
     }
+
+    get { (x, y) }
+    set { }
   }
 
   var errorPoint2: (Int, Int) {
@@ -34,6 +40,9 @@ struct Test1 {
       // expected-error@-1 {{property 'y' not initialized by init accessor}}
       self.x = initialValue.0
     }
+
+    get { (x, y) }
+    set { }
   }
 
   var errorPoint3: (Int, Int) {
@@ -42,6 +51,15 @@ struct Test1 {
       print(y) // Ok
       print(x) // expected-error {{variable 'x' used before being initialized}}
     }
+
+    get { (x, y) }
+    set { }
+  }
+
+  init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+    self.full = (x, y)
   }
 }
 
@@ -79,21 +97,27 @@ struct TestDoubleInit1 {
       self.x = initialValue
       self.x = 42 // expected-error {{immutable value 'x' may only be initialized once}}
     }
+
+    get { x }
+    set { }
   }
 }
 
 struct TestDoubleInit2 {
-  let x: Int
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
 
   var pointX: Int {
     init(initialValue) initializes(x) {
       self.x = initialValue
     }
+
+    get { x }
+    set { }
   }
 
   init(x: Int) {
     self.pointX = x
-    self.x = 0 // FIXME: should be an error because `x` is a `let` property
+    self.x = 0 // expected-error {{immutable value 'self.x' may only be initialized once}}
   }
 }
 
