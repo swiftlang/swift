@@ -631,23 +631,23 @@ private:
   }
 
   void updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
-                                     ParamDecl *pd, SILValue value,
+                                     ParamDecl *pd,
                                      const SILDebugVariable &varinfo) {
     bool calledCompletedUpdate = false;
     SWIFT_DEFER {
       assert(calledCompletedUpdate && "Forgot to call completed update along "
                                       "all paths or manually turn it off");
     };
-    auto completeUpdate = [&](SILValue value) -> void {
-      SGF.B.createDebugValue(loc, value, varinfo);
-      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
+    auto completeUpdate = [&](ManagedValue value) -> void {
+      SGF.B.createDebugValue(loc, value.getValue(), varinfo);
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value.getValue());
       calledCompletedUpdate = true;
     };
 
     // If we do not need to support lexical lifetimes, just return value as the
     // updated value.
     if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
-      return completeUpdate(value);
+      return completeUpdate(argrv);
 
     // Look for the following annotations on the function argument:
     // - @noImplicitCopy
@@ -659,15 +659,15 @@ private:
     // we need to use copyable to move only to convert it to its move only
     // form.
     if (!isNoImplicitCopy) {
-      if (!value->getType().isMoveOnly()) {
+      if (!argrv.getType().isMoveOnly()) {
         // Follow the normal path.  The value's lifetime will be enforced based
         // on its ownership.
-        return completeUpdate(value);
+        return completeUpdate(argrv);
       }
 
       // At this point, we have a noncopyable type. If it is owned, create an
       // alloc_box for it.
-      if (value->getOwnershipKind() == OwnershipKind::Owned) {
+      if (argrv.getOwnershipKind() == OwnershipKind::Owned) {
         // TODO: Once owned values are mutable, this needs to become mutable.
         auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
             pd,
@@ -696,17 +696,18 @@ private:
       // misleading consuming message. We still are able to pass it to
       // non-escaping closures though since the onstack partial_apply does not
       // consume the value.
-      assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
-      value = SGF.B.createCopyValue(loc, value);
-      value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
-      SGF.emitManagedRValueWithCleanup(value);
-      return completeUpdate(value);
+      assert(argrv.getOwnershipKind() == OwnershipKind::Guaranteed);
+      argrv = argrv.copy(SGF, loc);
+      argrv = SGF.B.createMarkMustCheckInst(
+          loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+      return completeUpdate(argrv);
     }
 
-    if (value->getType().isTrivial(SGF.F)) {
-      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
-      value = SGF.B.createMoveValue(loc, value, /*isLexical=*/true);
+    if (argrv.getType().isTrivial(SGF.F)) {
+      SILValue value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
+          loc, argrv.getValue());
+      argrv = SGF.emitManagedRValueWithCleanup(value);
+      argrv = SGF.B.createMoveValue(loc, argrv, /*isLexical=*/true);
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
@@ -723,40 +724,35 @@ private:
         break;
       }
 
-      value = SGF.B.createMarkMustCheckInst(loc, value, kind);
-      SGF.emitManagedRValueWithCleanup(value);
-      return completeUpdate(value);
+      argrv = SGF.B.createMarkMustCheckInst(loc, argrv, kind);
+      return completeUpdate(argrv);
     }
 
-    if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value);
-      value = SGF.B.createCopyValue(loc, value);
-      value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
-      SGF.emitManagedRValueWithCleanup(value);
-      return completeUpdate(value);
+    if (argrv.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      argrv = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, argrv);
+      argrv = argrv.copy(SGF, loc);
+      argrv = SGF.B.createMarkMustCheckInst(
+          loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+      return completeUpdate(argrv);
     }
 
-    if (value->getOwnershipKind() == OwnershipKind::Owned) {
+    if (argrv.getOwnershipKind() == OwnershipKind::Owned) {
       // If we have an owned value, forward it into the mark_must_check to
       // avoid an extra destroy_value.
-      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
-          loc, argrv.forward(SGF));
-      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
-      value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-      SGF.emitManagedRValueWithCleanup(value);
-      return completeUpdate(value);
+      argrv = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, argrv);
+      argrv = SGF.B.createMoveValue(loc, argrv, true /*is lexical*/);
+      argrv = SGF.B.createMarkMustCheckInst(
+          loc, argrv, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+      return completeUpdate(argrv);
     }
 
-    return completeUpdate(value);
+    return completeUpdate(argrv);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
   void makeArgumentIntoBinding(SILLocation loc, ParamDecl *pd) {
     ManagedValue argrv = makeArgument(loc, pd);
-    SILValue value = argrv.getValue();
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
     } else if (!pd->isImmutableInFunctionBody()) {
@@ -774,33 +770,34 @@ private:
     SILDebugVariable varinfo(pd->isImmutableInFunctionBody(), ArgNo);
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
-      updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
+      updateArgumentValueForBinding(argrv, loc, pd, varinfo);
       return;
     }
 
-    if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
+    if (auto *allocStack = dyn_cast<AllocStackInst>(argrv.getValue())) {
       allocStack->setArgNo(ArgNo);
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
               SGF.getModule()) &&
-          SGF.F.getLifetime(pd, value->getType()).isLexical())
+          SGF.F.getLifetime(pd, allocStack->getType()).isLexical())
         allocStack->setIsLexical();
-      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(allocStack);
       return;
     }
 
-    SILValue debugOperand = value;
-    if (value->getType().isMoveOnly()) {
+    SILValue debugOperand = argrv.getValue();
+
+    if (argrv.getType().isMoveOnly()) {
       switch (pd->getValueOwnership()) {
       case ValueOwnership::Default:
         if (pd->isSelfParameter()) {
-          assert(!isa<MarkMustCheckInst>(value) &&
+          assert(!isa<MarkMustCheckInst>(argrv.getValue()) &&
                  "Should not have inserted mark must check inst in EmitBBArgs");
           if (!pd->isInOut()) {
-            value = SGF.B.createMarkMustCheckInst(
-                loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+            argrv = SGF.B.createMarkMustCheckInst(
+                loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
           }
         } else {
-          if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
+          if (auto *fArg = dyn_cast<SILFunctionArgument>(argrv.getValue())) {
             switch (fArg->getArgumentConvention()) {
             case SILArgumentConvention::Direct_Guaranteed:
             case SILArgumentConvention::Direct_Owned:
@@ -814,51 +811,51 @@ private:
             case SILArgumentConvention::Pack_Out:
               llvm_unreachable("Should have been handled elsewhere");
             case SILArgumentConvention::Indirect_In:
-              value = SGF.B.createMarkMustCheckInst(
-                  loc, value,
+              argrv = SGF.B.createMarkMustCheckInst(
+                  loc, argrv,
                   MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
               break;
             case SILArgumentConvention::Indirect_In_Guaranteed:
-              value = SGF.B.createMarkMustCheckInst(
-                  loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+              argrv = SGF.B.createMarkMustCheckInst(
+                  loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
             }
           } else {
-            assert(isa<MarkMustCheckInst>(value) &&
+            assert(isa<MarkMustCheckInst>(argrv.getValue()) &&
                    "Should have inserted mark must check inst in EmitBBArgs");
           }
         }
         break;
       case ValueOwnership::InOut: {
-        assert(isa<MarkMustCheckInst>(value)
-               && "Expected mark must check inst with inout to be handled in "
-                  "emitBBArgs earlier");
-        auto mark = cast<MarkMustCheckInst>(value);
+        assert(isa<MarkMustCheckInst>(argrv.getValue()) &&
+               "Expected mark must check inst with inout to be handled in "
+               "emitBBArgs earlier");
+        auto mark = cast<MarkMustCheckInst>(argrv.getValue());
         debugOperand = mark->getOperand();
         break;
       }
       case ValueOwnership::Owned:
-        value = SGF.B.createMarkMustCheckInst(
-            loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+        argrv = SGF.B.createMarkMustCheckInst(
+            loc, argrv, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
         break;
       case ValueOwnership::Shared:
-        value = SGF.B.createMarkMustCheckInst(
-            loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+        argrv = SGF.B.createMarkMustCheckInst(
+            loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
         break;
       }
     }
 
     DebugValueInst *debugInst
       = SGF.B.createDebugValueAddr(loc, debugOperand, varinfo);
-    
-    if (value != debugOperand) {
-      if (auto valueInst = dyn_cast<MarkMustCheckInst>(value)) {
+
+    if (argrv.getValue() != debugOperand) {
+      if (auto valueInst = dyn_cast<MarkMustCheckInst>(argrv.getValue())) {
         // Move the debug instruction outside of any marker instruction that might
         // have been applied to the value, so that analysis doesn't move the
         // debug_value anywhere it shouldn't be.
         debugInst->moveBefore(valueInst);
       }
     }
-    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
   }
 
   void emitParam(ParamDecl *PD) {
