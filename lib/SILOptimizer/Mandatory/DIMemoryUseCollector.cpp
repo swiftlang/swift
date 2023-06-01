@@ -656,7 +656,7 @@ private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
   bool addClosureElementUses(PartialApplyInst *pai, Operand *argUse);
   void collectAssignOrInitUses(PartialApplyInst *pai, Operand *argUse,
-                               unsigned BaseEltNo);
+                               unsigned BaseEltNo = 0);
 
   void collectClassSelfUses(SILValue ClassPointer);
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
@@ -1631,6 +1631,11 @@ void ElementUseCollector::collectClassSelfUses(
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
       if (onlyUsedByAssignByWrapper(PAI))
         continue;
+
+      if (onlyUsedByAssignOrInit(PAI)) {
+        collectAssignOrInitUses(PAI, Op);
+        continue;
+      }
 
       if (addClosureElementUses(PAI, Op))
         continue;

@@ -290,10 +290,21 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       auto selfValue = setterPA->getOperand(1);
       auto isRefSelf = selfValue->getType().getASTType()->mayHaveSuperclass();
 
+      SILValue selfRef;
+      if (isRefSelf) {
+        selfRef = b.emitBeginBorrowOperation(loc, selfValue);
+      } else {
+        selfRef = b.createBeginAccess(loc, selfValue, SILAccessKind::Modify,
+                                      SILAccessEnforcement::Dynamic,
+                                      /*noNestedConflict=*/false,
+                                      /*fromBuiltin=*/false);
+      }
+
       auto emitFieldReference = [&](VarDecl *field) -> SILValue {
-        if (isRefSelf)
-          return b.createRefElementAddr(loc, selfValue, field);
-        return b.createStructElementAddr(loc, selfValue, field);
+        if (isRefSelf) {
+          return b.createRefElementAddr(loc, selfRef, field);
+        }
+        return b.createStructElementAddr(loc, selfRef, field);
       };
 
       SmallVector<SILValue> arguments;
@@ -313,6 +324,12 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
         arguments.push_back(emitFieldReference(property));
 
       b.createApply(loc, initFn, setterPA->getSubstitutionMap(), arguments);
+
+      if (isRefSelf) {
+        b.emitEndBorrowOperation(loc, selfRef);
+      } else {
+        b.createEndAccess(loc, selfRef, /*aborted=*/false);
+      }
 
       // The unused partial_apply violates memory lifetime rules in case "self"
       // is an inout. Therefore we cannot keep it as a dead closure to be
