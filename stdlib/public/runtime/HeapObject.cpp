@@ -360,7 +360,6 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry, BoxesTag> Boxes;
 
-SWIFT_CC(swift)
 BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
   auto *inlineBuffer = reinterpret_cast<ValueBuffer*>(buffer);
@@ -386,7 +385,6 @@ BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
   }
 }
 
-SWIFT_CC(swift)
 BoxPair swift::swift_allocBox(const Metadata *type) {
   // Get the heap metadata for the box.
   auto metadata = &Boxes.getOrInsert(type).first->Data;
@@ -557,19 +555,16 @@ void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
     object->refCounts.decrementAndMaybeDeinitNonAtomic(n);
 }
 
-SWIFT_CC(swift)
 size_t swift::swift_retainCount(HeapObject *object) {
   if (isValidPointerForNativeRetain(object))
     return object->refCounts.getCount();
   return 0;
 }
 
-SWIFT_CC(swift)
 size_t swift::swift_unownedRetainCount(HeapObject *object) {
   return object->refCounts.getUnownedCount();
 }
 
-SWIFT_CC(swift)
 size_t swift::swift_weakRetainCount(HeapObject *object) {
   return object->refCounts.getWeakCount();
 }
@@ -1093,7 +1088,6 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
 /// Returns true if the "immutable" flag is set on \p object.
 ///
 /// Used for runtime consistency checking of COW buffers.
-SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 bool _swift_isImmutableCOWBuffer(HeapObject *object) {
   return object->refCounts.isImmutableCOWBuffer();
@@ -1103,7 +1097,6 @@ bool _swift_isImmutableCOWBuffer(HeapObject *object) {
 /// value of the flag.
 ///
 /// Used for runtime consistency checking of COW buffers.
-SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 bool _swift_setImmutableCOWBuffer(HeapObject *object, bool immutable) {
   return object->refCounts.setIsImmutableCOWBuffer(immutable);
