@@ -527,8 +527,8 @@ do {
 func test_pack_expansion_to_void_conv_for_closure_result<each T>(x: repeat each T) {
   let _: () -> Void = { repeat print(each x) } // Ok
   let _: () -> Void = { (repeat print(each x)) } // Ok
-  let _: (Int) -> Void = { repeat ($0, print(each x)) } // expected-warning {{'repeat (Int, ())' is unused}}
-  let _: (Int, String) -> Void = { ($0, repeat ($1, print(each x))) } // expected-warning {{'(Int, repeat (String, ()))' is unused}}
+  let _: (Int) -> Void = { repeat ($0, print(each x)) } // expected-warning {{expression of type '/* shape: each T */ repeat (Int, ())' is unused}}
+  let _: (Int, String) -> Void = { ($0, repeat ($1, print(each x))) } // expected-warning {{expression of type '(Int, /* shape: each T */ repeat (String, ()))' is unused}}
 }
 
 // rdar://109539394 - crash on passing multiple variadic lists to singly variadic callee
