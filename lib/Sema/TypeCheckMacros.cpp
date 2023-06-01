@@ -496,6 +496,10 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   if (decl->isImplicit())
     return { };
 
+  // Member attribute macros do not apply to macro-expanded members.
+  if (decl->isInMacroExpansionInContext())
+    return { };
+
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
   if (!parentDecl || !isa<IterableDeclContext>(parentDecl))
     return { };

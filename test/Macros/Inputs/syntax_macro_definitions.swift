@@ -1488,3 +1488,20 @@ public struct VarValueMacro: DeclarationMacro, PeerMacro {
     ]
   }
 }
+
+public struct SingleMemberMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let member: DeclSyntax =
+      """
+      var expandedMember: Int = 10
+      """
+
+    return [
+      member,
+    ]
+  }
+}
