@@ -221,6 +221,9 @@ public:
         refCountBytes += (3 * sizeof(uint64_t)) +
                          (4 * IGM.getPointerSize().getValue()) +
                          nestedRefCountBytes;
+
+        skip += enumData.extraTagByteCount;
+
         break;
       }
 
