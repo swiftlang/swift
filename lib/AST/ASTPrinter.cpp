@@ -6075,12 +6075,24 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
+    SmallVector<Type, 2> rootParameterPacks;
+    T->getPatternType()->getTypeParameterPacks(rootParameterPacks);
+
+    if (rootParameterPacks.empty() &&
+        (T->getCountType()->isParameterPack() ||
+         T->getCountType()->is<PackArchetypeType>())) {
+      Printer << "/* shape: ";
+      visit(T->getCountType());
+      Printer << " */ ";
+    }
+
     Printer << "repeat ";
+
     visit(T->getPatternType());
   }
 
   void visitPackElementType(PackElementType *T) {
-    Printer << "@level(" << T->getLevel() << ") ";
+    Printer << "/* level: " << T->getLevel() << " */ ";
     visit(T->getPackType());
   }
 
