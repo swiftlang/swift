@@ -22,6 +22,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/TypeOrExtensionDecl.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -37,6 +38,7 @@ class GenericContext;
 class GenericParamList;
 class LookupResult;
 enum class NLKind;
+class PotentialMacroExpansions;
 class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
@@ -884,6 +886,27 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Determine the potential macro expansions for a given type or extension
+/// context.
+class PotentialMacroExpansionsInContextRequest
+    : public SimpleRequest<
+          PotentialMacroExpansionsInContextRequest,
+          PotentialMacroExpansions(TypeOrExtensionDecl),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  PotentialMacroExpansions evaluate(
+      Evaluator &evaluator, TypeOrExtensionDecl container) const;
 
 public:
   bool isCached() const { return true; }
