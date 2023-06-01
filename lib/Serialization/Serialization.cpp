@@ -3047,6 +3047,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_Section: {
+      auto *theAttr = cast<SectionAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
+      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           theAttr->isImplicit(),
+                                           theAttr->Name);
+      return;
+    }
+
     case DAK_Documentation: {
       auto *theAttr = cast<DocumentationAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[DocumentationDeclAttrLayout::Code];
@@ -5066,6 +5075,14 @@ public:
     PackExpansionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                         S.addTypeRef(expansionTy->getPatternType()),
                                         S.addTypeRef(expansionTy->getCountType()));
+  }
+
+  void visitPackElementType(const PackElementType *elementType) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PackElementTypeLayout::Code];
+    PackElementTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(elementType->getPackType()),
+                                      elementType->getLevel());
   }
 
   void visitPackType(const PackType *packTy) {

@@ -1330,10 +1330,12 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                         SearchPathOpts.CandidateCompiledModules);
 }
 
-static bool readSwiftInterfaceVersionAndArgs(
-    SourceManager &SM, DiagnosticEngine &Diags, llvm::StringSaver &ArgSaver,
-    SmallVectorImpl<const char *> &SubArgs, std::string &CompilerVersion,
-    StringRef interfacePath, SourceLoc diagnosticLoc) {
+static bool readSwiftInterfaceVersionAndArgs(SourceManager &SM,
+                                             DiagnosticEngine &Diags,
+                                             llvm::StringSaver &ArgSaver,
+                                             SwiftInterfaceInfo &interfaceInfo,
+                                             StringRef interfacePath,
+                                             SourceLoc diagnosticLoc) {
   llvm::vfs::FileSystem &fs = *SM.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
@@ -1346,7 +1348,7 @@ static bool readSwiftInterfaceVersionAndArgs(
   auto SB = FileOrError.get()->getBuffer();
   auto VersRe = getSwiftInterfaceFormatVersionRegex();
   auto CompRe = getSwiftInterfaceCompilerVersionRegex();
-  SmallVector<StringRef, 1> VersMatches, CompMatches;
+  SmallVector<StringRef, 2> VersMatches, CompMatches;
 
   if (!VersRe.match(SB, &VersMatches)) {
     InterfaceSubContextDelegateImpl::diagnose(
@@ -1355,7 +1357,8 @@ static bool readSwiftInterfaceVersionAndArgs(
     return true;
   }
 
-  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
+  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver,
+                                        interfaceInfo.Arguments)) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);
@@ -1375,10 +1378,20 @@ static bool readSwiftInterfaceVersionAndArgs(
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
-    CompilerVersion = ArgSaver.save(CompMatches[1]).str();
+    interfaceInfo.CompilerVersion = ArgSaver.save(CompMatches[1]).str();
+
+    // For now, successfully parsing the tools version out of the interface is
+    // optional.
+    auto ToolsVersRe = getSwiftInterfaceCompilerToolsVersionRegex();
+    SmallVector<StringRef, 2> VendorToolsVersMatches;
+    if (ToolsVersRe.match(interfaceInfo.CompilerVersion,
+                          &VendorToolsVersMatches)) {
+      interfaceInfo.CompilerToolsVersion = VersionParser::parseVersionString(
+          VendorToolsVersMatches[1], SourceLoc(), nullptr);
+    }
   } else {
     // Don't diagnose; handwritten module interfaces don't include this field.
-    CompilerVersion = "(unspecified, file possibly handwritten)";
+    interfaceInfo.CompilerVersion = "(unspecified, file possibly handwritten)";
   }
 
   // For now: we support anything with the same "major version" and assume
@@ -1425,23 +1438,18 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
   // Read out the compiler version.
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver ArgSaver(alloc);
-  std::string CompilerVersion;
-  SmallVector<const char *, 64> InterfaceArgs;
-  readSwiftInterfaceVersionAndArgs(Instance.getSourceMgr(),
-                                   Instance.getDiags(),
-                                   ArgSaver,
-                                   InterfaceArgs,
-                                   CompilerVersion,
-                                   interfacePath,
+  SwiftInterfaceInfo InterfaceInfo;
+  readSwiftInterfaceVersionAndArgs(Instance.getSourceMgr(), Instance.getDiags(),
+                                   ArgSaver, InterfaceInfo, interfacePath,
                                    SourceLoc());
-  
+
   auto Builder = ExplicitModuleInterfaceBuilder(
       Instance, &Instance.getDiags(), Instance.getSourceMgr(),
       moduleCachePath, backupInterfaceDir, prebuiltCachePath,
       ABIDescriptorPath, {});
   auto error = Builder.buildSwiftModuleFromInterface(
       interfacePath, outputPath, ShouldSerializeDeps, /*ModuleBuffer*/nullptr,
-      CompiledCandidates, CompilerVersion);
+      CompiledCandidates, InterfaceInfo.CompilerVersion);
   if (!error)
     return false;
   else
@@ -1567,18 +1575,14 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
-    CompilerInvocation &subInvocation,
-    SmallVectorImpl<const char *> &SubArgs,
-    std::string &CompilerVersion,
-    StringRef interfacePath,
-    SourceLoc diagnosticLoc) {
-  if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, SubArgs,
-                                       CompilerVersion, interfacePath,
-                                       diagnosticLoc))
+    CompilerInvocation &subInvocation, SwiftInterfaceInfo &interfaceInfo,
+    StringRef interfacePath, SourceLoc diagnosticLoc) {
+  if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
+                                       interfacePath, diagnosticLoc))
     return true;
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-  if (subInvocation.parseArgs(SubArgs, *Diags)) {
+  if (subInvocation.parseArgs(interfaceInfo.Arguments, *Diags)) {
     return true;
   }
 
@@ -1845,23 +1849,27 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
   SmallVector<const char *, 64> SubArgs;
-
-  // If the interface was emitted by a compiler that didn't print
-  // `-target-min-inlining-version` into it, default to using the version from
-  // the target triple, emulating previous behavior.
-  SubArgs.push_back("-target-min-inlining-version");
-  SubArgs.push_back("target");
-
-  std::string CompilerVersion;
+  SwiftInterfaceInfo interfaceInfo;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.
-  if (extractSwiftInterfaceVersionAndArgs(subInvocation,
-                                          SubArgs,
-                                          CompilerVersion,
-                                          interfacePath,
-                                          diagLoc)) {
+  if (extractSwiftInterfaceVersionAndArgs(subInvocation, interfaceInfo,
+                                          interfacePath, diagLoc)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
+  // Prior to Swift 5.9, swiftinterfaces were always built (accidentally) with
+  // `-target-min-inlining-version target` prepended to the argument list. To
+  // preserve compatibility we must continue to prepend those flags to the
+  // invocation when the interface was generated by an older compiler.
+  if (auto toolsVersion = interfaceInfo.CompilerToolsVersion) {
+    if (toolsVersion < version::Version{5, 9}) {
+      SubArgs.push_back("-target-min-inlining-version");
+      SubArgs.push_back("target");
+    }
+  }
+
+  SubArgs.insert(SubArgs.end(), interfaceInfo.Arguments.begin(),
+                 interfaceInfo.Arguments.end());
 
   // Insert arguments collected from the interface file.
   BuildArgs.insert(BuildArgs.end(), SubArgs.begin(), SubArgs.end());
@@ -1891,7 +1899,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
-  info.CompilerVersion = CompilerVersion;
+  info.CompilerVersion = interfaceInfo.CompilerVersion;
 
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 

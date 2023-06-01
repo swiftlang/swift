@@ -2937,6 +2937,46 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DAK_Section: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return makeParserSuccess();
+    }
+
+    auto Name = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
+
+    consumeToken(tok::string_literal);
+
+    if (Name.has_value())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    // @_section in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext()) {
+      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) SectionAttr(Name.value(), AtLoc,
+                                               AttrRange, /*Implicit=*/false));
+
+    break;
+  }
   
   case DAK_Alignment: {
     if (!consumeIf(tok::l_paren)) {

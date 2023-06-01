@@ -502,6 +502,24 @@ public:
   }
 };
 
+/// Defines the @_section attribute.
+class SectionAttr : public DeclAttribute {
+public:
+  SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_Section, AtLoc, Range, Implicit),
+      Name(Name) {}
+
+  SectionAttr(StringRef Name, bool Implicit)
+    : SectionAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The section name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Section;
+  }
+};
+
 /// Defines the @_cdecl attribute.
 class CDeclAttr : public DeclAttribute {
 public:

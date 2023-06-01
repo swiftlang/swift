@@ -203,7 +203,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
   // See if we have any closure capture uses and emit a better diagnostic.
   if (getCanonicalizer().hasPartialApplyConsumingUse()) {
     diagnose(astContext, markedValue,
-             diag::sil_movechecking_guaranteed_value_captured_by_closure,
+             diag::sil_movechecking_borrowed_parameter_captured_by_closure,
              varName);
     emitObjectDiagnosticsForPartialApplyUses(varName);
     registerDiagnosticEmitted(markedValue);

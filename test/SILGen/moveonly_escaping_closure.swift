@@ -13,6 +13,7 @@ struct SingleElt {
 }
 
 func consumeVal(_ x: consuming SingleElt) {}
+func consumeVal(_ x: consuming Empty) {}
 func borrowVal(_ x: borrowing SingleElt) {}
 func borrowConsumeVal(_ x: borrowing SingleElt, _ y: consuming SingleElt) {}
 
@@ -1339,7 +1340,7 @@ struct ClosureHolder {
     }
 }
 
-func closureCoroutineAssignmentLetBorrowingArgument(_ e: borrowing Empty) { // expected-error {{'e' is borrowed and cannot be consumed by closure capture}}
+func closureCoroutineAssignmentLetBorrowingArgument(_ e: borrowing Empty) { // expected-error {{'e' cannot be captured by an escaping closure since it is a borrowed parameter}}
     let f: () -> () = { // expected-note {{closure capturing 'e' here}}
         _ = e
     }

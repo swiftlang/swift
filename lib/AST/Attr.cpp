@@ -789,6 +789,15 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (Options.excludeAttrKind(DA->getKind()))
       continue;
 
+    // If we're supposed to suppress expanded macros, check whether this is
+    // a macro.
+    if (Options.SuppressExpandedMacros) {
+      if (auto customAttr = dyn_cast<CustomAttr>(DA)) {
+        if (D->getResolvedMacro(const_cast<CustomAttr *>(customAttr)))
+          continue;
+      }
+    }
+
     // If this attribute is only allowed because this is a Clang decl, don't
     // print it.
     if (D && D->hasClangNode()
@@ -1119,6 +1128,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!cast<ExposeAttr>(this)->Name.empty())
       Printer << ", \"" << cast<ExposeAttr>(this)->Name << "\"";
     Printer << ")";
+    break;
+
+  case DAK_Section:
+    Printer.printAttrName("@_section");
+    Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
     break;
 
   case DAK_ObjC: {
@@ -1593,6 +1607,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "backDeployed";
   case DAK_Expose:
     return "_expose";
+  case DAK_Section:
+    return "_section";
   case DAK_Documentation:
     return "_documentation";
   case DAK_MacroRole:

@@ -340,6 +340,7 @@ private:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
     case Node::Kind::ConstrainedExistential:
+    case Node::Kind::PackElement:
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorAttachedMacroExpansion:
@@ -1625,6 +1626,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::PackExpansion: {
     Printer << "repeat ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::PackElement: {
+    Printer << "each ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   }

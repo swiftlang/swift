@@ -1285,6 +1285,15 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return;
     }
 
+    case TypeKind::PackElement: {
+      auto elementType = cast<PackElementType>(tybase);
+      appendType(elementType->getPackType(), sig, forDecl);
+
+      // FIXME: append expansion depth
+
+      return;
+    }
+
     case TypeKind::Pack: {
       auto packTy = cast<PackType>(tybase);
 

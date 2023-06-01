@@ -244,6 +244,9 @@ namespace swift {
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
 
+    /// Emit remarks about contextual inconsistencies in loaded modules.
+    bool EnableModuleRecoveryRemarks = false;
+
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
     
@@ -395,6 +398,11 @@ namespace swift {
     /// unsafe to read.
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
+
+    /// Attempt to recover for imported modules with broken modularization
+    /// in an unsafe way. Currently applies only to xrefs where the target
+    /// decl moved to a different module that is already loaded.
+    bool ForceWorkaroundBrokenModules = false;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.

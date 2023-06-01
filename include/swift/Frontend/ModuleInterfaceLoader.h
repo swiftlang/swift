@@ -532,6 +532,18 @@ public:
       DependencyTracker *tracker = nullptr);
 };
 
+struct SwiftInterfaceInfo {
+  /// The compiler arguments that were encoded in the swiftinterface.
+  SmallVector<const char *, 64> Arguments;
+
+  /// The string following `swift-compiler-version:` in the swiftinterface.
+  std::string CompilerVersion;
+
+  /// The tools version of the compiler (e.g. 5.8) that emitted the
+  /// swiftinterface. This is extracted from the `CompilerVersion` string.
+  llvm::Optional<version::Version> CompilerToolsVersion;
+};
+
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
@@ -558,8 +570,7 @@ private:
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
-                                           SmallVectorImpl<const char *> &SubArgs,
-                                           std::string &CompilerVersion,
+                                           SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
 public:

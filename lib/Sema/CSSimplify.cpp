@@ -127,6 +127,14 @@ static bool isPackExpansionType(Type type) {
   return false;
 }
 
+bool constraints::isSingleUnlabeledPackExpansionTuple(Type type) {
+  auto *tuple = type->getRValueType()->getAs<TupleType>();
+  // TODO: drop no name requirement
+  return tuple && (tuple->getNumElements() == 1) &&
+         isPackExpansionType(tuple->getElementType(0)) &&
+         !tuple->getElement(0).hasName();
+}
+
 static bool containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
   return llvm::any_of(params, [&](const auto &param) {
     return isPackExpansionType(param.getPlainType());
@@ -7308,6 +7316,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchPackExpansionTypes(expansion1, expansion2, kind, subflags,
                                      locator);
     }
+
+    case TypeKind::PackElement: {
+      auto pack1 = cast<PackElementType>(desugar1)->getPackType();
+      auto pack2 = cast<PackElementType>(desugar2)->getPackType();
+
+      return matchTypes(pack1, pack2, kind, subflags, locator);
+    }
     }
   }
 
@@ -7962,7 +7977,8 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::InOut:
   case TypeKind::Module:
   case TypeKind::Pack:
-  case TypeKind::PackExpansion: {
+  case TypeKind::PackExpansion:
+  case TypeKind::PackElement: {
     // If solver is in the diagnostic mode and this is an invalid base,
     // let's give solver a chance to repair it to produce a good diagnostic.
     if (shouldAttemptFixes())
@@ -9113,6 +9129,16 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
       return SolutionKind::Solved;
   }
 
+  if (isSingleUnlabeledPackExpansionTuple(patternType)) {
+    auto *elementVar =
+        createTypeVariable(getConstraintLocator(locator), /*options=*/0);
+    addValueMemberConstraint(
+        patternType, DeclNameRef(getASTContext().Id_element), elementVar, DC,
+        FunctionRefKind::Unapplied, {},
+        getConstraintLocator(locator, {ConstraintLocator::Member}));
+    patternType = elementVar;
+  }
+
   // Let's try to resolve element type based on the pattern type.
   if (!patternType->hasTypeVariable()) {
     auto *loc = getConstraintLocator(locator);
@@ -9330,6 +9356,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     if (!memberName.isSpecial()) {
       StringRef nameStr = memberName.getBaseIdentifier().str();
       // Accessing `.element` on an abstract tuple materializes a pack.
+      // (deprecated behavior)
       if (nameStr == "element" && baseTuple->getNumElements() == 1 &&
           isPackExpansionType(baseTuple->getElementType(0))) {
         auto elementType = baseTuple->getElementType(0);
@@ -13304,6 +13331,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     return SolutionKind::Solved;
   }
 
+  // Map element archetypes to the pack context to check for equality.
+  if (packTy->hasElementArchetype()) {
+    auto *packEnv = DC->getGenericEnvironmentOfContext();
+    packTy = packEnv->mapElementTypeIntoPackContext(packTy);
+  }
+
   auto shape = packTy->getReducedShape();
   addConstraint(ConstraintKind::Bind, shapeTy, shape, locator);
   return SolutionKind::Solved;
@@ -14745,8 +14778,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // means that result would attempt a type from each side if
       // one is available and that would result in two fixes - one for
       // each mismatched branch.
-      if (branchElt->forElse())
+      if (branchElt->forElse()) {
         impact = 10;
+      } else {
+        // Also increase impact for `then` branch lower than `else` to still
+        // eliminate ambiguity, but slightly worst than the average fix to avoid
+        // so the solution which record this fix wouldn't be picked over one
+        // that has contextual mismatch fix on the result of ternary expression.
+        impact = 5;
+      }
     }
     using SingleValueStmtBranch = LocatorPathElt::SingleValueStmtBranch;
     if (auto branchElt = locator->getLastElementAs<SingleValueStmtBranch>()) {

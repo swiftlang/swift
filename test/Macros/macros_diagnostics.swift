@@ -189,3 +189,14 @@ struct MyStruct<T: MyProto> {
 #undefinedMacro { definitelyNotDefined }
 // expected-error@-1{{cannot find 'definitelyNotDefined' in scope}}
 // expected-error@-2{{no macro named 'undefinedMacro'}}
+
+@freestanding(declaration) macro genericUnary<T>(_: T) = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}
+// expected-note@-2{{'genericUnary' declared here}}
+
+struct SomeType {
+  #genericUnary<Equatable>(0 as Hashable)
+  // expected-error@-1{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
+  // expected-error@-2{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
+  // expected-error@-3{{external macro implementation type}}
+}

@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -DIMPORT_MACRO_LIBRARY -swift-version 5  %S/Inputs/top_level_freestanding_other.swift -I %t
 
 // Check diagnostic buffer names
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift 2> %t.diags
+// RUN: not %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift 2> %t.diags
 // RUN: %FileCheck -check-prefix DIAG_BUFFERS %s < %t.diags
 
 // Execution testing
@@ -27,7 +27,9 @@ import freestanding_macro_library
 @freestanding(declaration, names: named(StructWithUnqualifiedLookup))
 macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
 @freestanding(declaration)
-macro anonymousTypes(public: Bool = false, _: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+macro anonymousTypes(public: Bool = false, causeErrors: Bool = false, _: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+@freestanding(declaration)
+macro introduceTypeCheckingErrors() = #externalMacro(module: "MacroDefinition", type: "IntroduceTypeCheckingErrorsMacro")
 @freestanding(declaration)
 macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
 @freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
@@ -78,11 +80,27 @@ func testArbitraryAtGlobal() {
   _ = MyIntGlobal16()
 }
 
-// DIAG_BUFFERS: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf1_{{.*}}warning: 'deprecated()' is deprecated
-// DIAG_BUFFERS: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf2_{{.*}}warning: 'deprecated()' is deprecated
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf1_{{.*}}warning: 'deprecated()' is deprecated
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf2_{{.*}}warning: 'deprecated()' is deprecated
 
 #varValue
 
 func testGlobalVariable() {
   _ = value
 }
+
+#if TEST_DIAGNOSTICS
+
+// expected-note @+1 6 {{in expansion of macro 'anonymousTypes' here}}
+#anonymousTypes(causeErrors: true) { "foo" }
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33{{.*}}anonymousTypesfMf2_{{.*}}error: use of protocol 'Equatable' as a type must be written 'any Equatable'
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser03{{.*}}anonymousTypes{{.*}}introduceTypeCheckingErrorsfMf0_{{.*}}error: use of protocol 'Hashable' as a type must be written 'any Hashable'
+
+// expected-note @+1 2 {{in expansion of macro 'anonymousTypes' here}}
+#anonymousTypes { () -> String in
+  // expected-error @+1 {{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
+  _ = 0 as Equatable
+  return "foo"
+}
+
+#endif

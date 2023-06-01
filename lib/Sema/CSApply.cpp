@@ -3846,6 +3846,21 @@ namespace {
     }
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
+      if (auto *packRefExpr = expr->getPackRefExpr()) {
+        packRefExpr = cs.coerceToRValue(packRefExpr);
+        auto packRefType = cs.getType(packRefExpr);
+        if (auto *tuple = packRefType->getRValueType()->getAs<TupleType>();
+            tuple && tuple->isSingleUnlabeledPackExpansion()) {
+          auto *expansion =
+              tuple->getElementType(0)->castTo<PackExpansionType>();
+          auto patternType = expansion->getPatternType();
+          auto *materializedPackExpr = MaterializePackExpr::create(
+              cs.getASTContext(), packRefExpr, packRefExpr->getLoc(),
+              patternType, /*implicit*/ true);
+          cs.cacheType(materializedPackExpr);
+          expr->setPackRefExpr(materializedPackExpr);
+        }
+      }
       return simplifyExprType(expr);
     }
 
@@ -7219,7 +7234,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                             /*isImplicit*/ true));
   }
 
-  case TypeKind::Pack: {
+  case TypeKind::Pack:
+  case TypeKind::PackElement: {
     llvm_unreachable("Unimplemented!");
   }
 
@@ -7600,6 +7616,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::InOut:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
     break;
 
   case TypeKind::BuiltinTuple:

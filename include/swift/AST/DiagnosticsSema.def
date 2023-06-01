@@ -878,7 +878,7 @@ ERROR(modularization_issue_decl_moved,Fatal,
       (bool, DeclName, Identifier, Identifier))
 ERROR(modularization_issue_decl_type_changed,Fatal,
       "reference to %select{top-level|type}0 %1 broken by a context change; "
-      "the details of %1 %select{from %2|}5 changed since building '%3'"
+      "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and is now found in %4}5",
       (bool, DeclName, Identifier, StringRef, Identifier, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
@@ -892,6 +892,10 @@ NOTE(modularization_issue_side_effect_extension_error,none,
 NOTE(modularization_issue_side_effect_type_error,none,
      "could not deserialize type for %0",
      (DeclName))
+
+WARNING(modularization_issue_worked_around,none,
+        "attempting forced recovery enabled by -experimental-force-workaround-broken-modules",
+        ())
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -1702,6 +1706,16 @@ ERROR(cdecl_empty_name,none,
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
 
+// @_used and @_section
+ERROR(section_linkage_markers_disabled,none,
+      "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
+ERROR(used_not_at_top_level,none,
+      "@_used can only be applied to global functions and variables", ())
+ERROR(section_not_at_top_level,none,
+      "@_section can only be applied to global functions and variables", ())
+ERROR(section_empty_name,none,
+      "@_section section name cannot be empty", ())
+
 ERROR(expose_only_non_other_attr,none,
       "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
 ERROR(expose_inside_unexposed_decl,none,
@@ -1796,8 +1810,8 @@ WARNING(access_control_non_objc_open_member,none,
       "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
       (DescriptiveDeclKind))
 ERROR(access_control_requires_package_name, none,
-      "decl has a package access level but no -package-name was passed",
-      ())
+      "%0 has a package access level but no -package-name was specified: %1",
+      (Identifier, StringRef))
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,

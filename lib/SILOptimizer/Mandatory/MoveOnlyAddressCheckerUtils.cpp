@@ -2523,29 +2523,27 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
   // scope, we would have emitted the scope expansion error during diagnostics.
   for (auto pair : addressUseState.borrows) {
     if (auto *li = dyn_cast<LoadInst>(pair.first)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-        // If we had a load [copy], borrow then we know that all of its destroys
-        // must have been destroy_value. So we can just gather up those
-        // destroy_value and use then to create a new load_borrow scope.
-        SILBuilderWithScope builder(li);
-        auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
-        // We use this auxillary list to avoid iterator invalidation of
-        // li->getConsumingUse();
-        StackList<DestroyValueInst *> toDelete(lbi->getFunction());
-        for (auto *consumeUse : li->getConsumingUses()) {
-          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-          SILBuilderWithScope destroyBuilder(dvi);
-          destroyBuilder.createEndBorrow(dvi->getLoc(), lbi);
-          toDelete.push_back(dvi);
-          changed = true;
-        }
-        while (!toDelete.empty())
-          toDelete.pop_back_val()->eraseFromParent();
-
-        li->replaceAllUsesWith(lbi);
-        li->eraseFromParent();
-        continue;
+      // If we had a load -> load_borrow then we know that all of its destroys
+      // must have been destroy_value. So we can just gather up those
+      // destroy_value and use then to create a new load_borrow scope.
+      SILBuilderWithScope builder(li);
+      auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
+      // We use this auxillary list to avoid iterator invalidation of
+      // li->getConsumingUse();
+      StackList<DestroyValueInst *> toDelete(lbi->getFunction());
+      for (auto *consumeUse : li->getConsumingUses()) {
+        auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+        SILBuilderWithScope destroyBuilder(dvi);
+        destroyBuilder.createEndBorrow(dvi->getLoc(), lbi);
+        toDelete.push_back(dvi);
+        changed = true;
       }
+      while (!toDelete.empty())
+        toDelete.pop_back_val()->eraseFromParent();
+
+      li->replaceAllUsesWith(lbi);
+      li->eraseFromParent();
+      continue;
     }
 
     llvm::dbgs() << "Borrow: " << *pair.first;

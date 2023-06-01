@@ -291,6 +291,9 @@ private:
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
+  /// Name of a section if @_section attribute was used, otherwise empty.
+  StringRef Section;
+
   /// Has value if there's a profile for this function
   /// Contains Function Entry Count
   ProfileCounter EntryCount;
@@ -345,6 +348,9 @@ private:
   /// preserved and exported more widely than its Swift linkage and usage
   /// would indicate.
   unsigned HasCReferences : 1;
+
+  /// Whether attribute @_used was present
+  unsigned MarkedAsUsed : 1;
 
   /// Whether cross-module references to this function should always use weak
   /// linking.
@@ -1233,6 +1239,14 @@ public:
     auto *V = getLocation().getAsASTNode<ValueDecl>();
     return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
   }
+
+  /// Return whether this function has attribute @_used on it
+  bool markedAsUsed() const { return MarkedAsUsed; }
+  void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
+
+  /// Return custom section name if @_section was used, otherwise empty
+  StringRef section() const { return Section; }
+  void setSection(StringRef value) { Section = value; }
 
   /// Returns true if this function belongs to a declaration that returns
   /// an opaque result type with one or more availability conditions that are

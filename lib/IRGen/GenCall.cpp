@@ -3860,7 +3860,7 @@ bool irgen::addNativeArgument(IRGenFunction &IGF,
     // Pass the argument explosion directly, mapping into the native swift
     // calling convention.
     Explosion nonNativeParam;
-    ti.reexplode(IGF, in, nonNativeParam);
+    ti.reexplode(in, nonNativeParam);
     Explosion nativeParam = nativeSchema.mapIntoNative(
         IGF.IGM, IGF, nonNativeParam, paramType, isOutlined);
     nativeParam.transferInto(out, nativeParam.size());

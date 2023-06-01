@@ -3211,6 +3211,17 @@ static bool usesFeatureTupleConformances(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
+  auto &attrs = decl->getAttrs();
+  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
+    if (isa<UsedAttr>(attr))
+      return true;
+    if (isa<SectionAttr>(attr))
+      return true;
+    return false;
+  });
+}
+
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   auto &attrs = decl->getAttrs();
   return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
@@ -5212,7 +5223,6 @@ void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
 
 void PrintAST::visitMaterializePackExpr(MaterializePackExpr *expr) {
   visit(expr->getFromExpr());
-  Printer << ".element";
 }
 
 void PrintAST::visitPackElementExpr(PackElementExpr *expr) {
@@ -6071,6 +6081,11 @@ public:
   void visitPackExpansionType(PackExpansionType *T) {
     Printer << "repeat ";
     visit(T->getPatternType());
+  }
+
+  void visitPackElementType(PackElementType *T) {
+    Printer << "@level(" << T->getLevel() << ") ";
+    visit(T->getPackType());
   }
 
   void visitTupleType(TupleType *T) {
