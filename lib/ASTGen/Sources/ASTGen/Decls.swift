@@ -211,6 +211,8 @@ extension ASTGenVisitor {
   }
 }
 
+// MARK: - AbstractStorageDecl
+
 extension ASTGenVisitor {
   public func visit(_ node: VariableDeclSyntax) -> ASTNode {
     let pattern = visit(node.bindings.first!.pattern).rawValue
@@ -231,14 +233,18 @@ extension ASTGenVisitor {
       )
     )
   }
+}
 
+// MARK: - AbstractFunctionDecl
+
+extension ASTGenVisitor {
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {
     // FIXME: Compute this location
     let staticLoc: BridgedSourceLoc = nil
 
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let out = FuncDecl_create(
+    let decl = FuncDecl_create(
       self.ctx,
       self.declContext,
       staticLoc,
@@ -254,12 +260,28 @@ extension ASTGenVisitor {
     )
 
     if let body = node.body {
-      self.withDeclContext(out.declContext) {
-        FuncDecl_setBody(out.funcDecl, self.visit(body).rawValue)
+      self.withDeclContext(decl.asDeclContext) {
+        AbstractFunctionDecl_setBody(self.visit(body).rawValue, decl.asDecl)
       }
     }
 
-    return .decl(out.decl)
+    return .decl(decl.asDecl)
+  }
+
+  func visit(_ node: DeinitializerDeclSyntax) -> ASTNode {
+    let decl = DestructorDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.deinitKeyword)
+    )
+
+    if let body = node.body {
+      self.withDeclContext(decl.asDeclContext) {
+        AbstractFunctionDecl_setBody(self.visit(body).rawValue, decl.asDecl)
+      }
+    }
+
+    return .decl(decl.asDecl)
   }
 }
 

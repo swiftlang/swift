@@ -442,7 +442,14 @@ ParamDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   return paramDecl;
 }
 
-BridgedFuncDecl
+void AbstractFunctionDecl_setBody(void *opaqueBody, void *opaqueDecl) {
+  auto *decl = static_cast<Decl *>(opaqueDecl);
+
+  cast<AbstractFunctionDecl>(decl)->setBody(
+      static_cast<BraceStmt *>(opaqueBody), FuncDecl::BodyKind::Parsed);
+}
+
+BridgedDeclContextAndDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
@@ -457,22 +464,28 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   auto asyncLoc = convertSourceLoc(cAsyncLoc);
   auto throwsLoc = convertSourceLoc(cThrowsLoc);
 
-  auto *out = FuncDecl::create(
+  auto *decl = FuncDecl::create(
       context, convertSourceLoc(cStaticLoc), StaticSpellingKind::None,
       convertSourceLoc(cFuncKeywordLoc), declName, convertSourceLoc(cNameLoc),
       asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc,
       static_cast<GenericParamList *>(opaqueGenericParamList), paramList,
       static_cast<TypeRepr *>(opaqueReturnType),
       convertDeclContext(cDeclContext));
-  out->setTrailingWhereClause(
+  decl->setTrailingWhereClause(
       static_cast<TrailingWhereClause *>(opaqueGenericWhereClause));
 
-  return {bridgeDeclContext(out), static_cast<FuncDecl *>(out),
-          static_cast<Decl *>(out)};
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
-void FuncDecl_setBody(void *fn, void *body) {
-  ((FuncDecl *)fn)->setBody((BraceStmt *)body, FuncDecl::BodyKind::Parsed);
+BridgedDeclContextAndDecl
+DestructorDecl_create(BridgedASTContext cContext,
+                      BridgedDeclContext cDeclContext,
+                      BridgedSourceLoc cDeinitKeywordLoc) {
+  ASTContext &context = convertASTContext(cContext);
+  auto *decl = new (context) DestructorDecl(convertSourceLoc(cDeinitKeywordLoc),
+                                            convertDeclContext(cDeclContext));
+
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
 void *SimpleIdentTypeRepr_create(BridgedASTContext cContext,

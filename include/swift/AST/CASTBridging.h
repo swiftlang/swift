@@ -326,7 +326,9 @@ ParamDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType,
                  void *_Nullable opaqueDefaultValue);
 
-struct BridgedFuncDecl
+void AbstractFunctionDecl_setBody(void *opaqueBody, void *opaqueDecl);
+
+struct BridgedDeclContextAndDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
@@ -334,7 +336,11 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
                 BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType,
                 void *_Nullable opaqueGenericWhereClause);
-void FuncDecl_setBody(void *fn, void *body);
+
+BridgedDeclContextAndDecl
+DestructorDecl_create(BridgedASTContext cContext,
+                      BridgedDeclContext cDeclContext,
+                      BridgedSourceLoc cDeinitKeywordLoc);
 
 void *SimpleIdentTypeRepr_create(BridgedASTContext cContext,
                                  BridgedSourceLoc cLoc, BridgedIdentifier id);
