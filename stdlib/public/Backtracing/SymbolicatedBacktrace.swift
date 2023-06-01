@@ -469,12 +469,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     var elf32Cache: [Int:Elf32Image<FileImageSource>] = [:]
     var elf64Cache: [Int:Elf64Image<FileImageSource>] = [:]
 
-    // This could be more efficient; for instance, right now, we open the
-    // images up once per frame, and we'll execute the line number programs
-    // once per frame too.
-    //
-    // If we instead grabbed all the addresses, sorted and uniqued them,
-    // we could then load the images and run the line programs once.
+    // This could be more efficient; at the moment we execute the line
+    // number programs once per frame, whereas we could just run them once
+    // for all the addresses we're interested in.
 
     for frame in backtrace.frames {
       let address = FileImageSource.Address(frame.adjustedProgramCounter)
