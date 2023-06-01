@@ -1,6 +1,5 @@
-// REQUIRES: asserts
 // RUN: %target-swift-frontend -emit-ir %s -g -o - \
-// RUN:    -parse-as-library -module-name a -enable-experimental-feature VariadicGenerics -disable-availability-checking | %FileCheck %s
+// RUN:    -parse-as-library -module-name a -disable-availability-checking | %FileCheck %s
 
 public func f1<each T>(ts: repeat each T) {
   // CHECK: define {{.*}} @"$s1a2f12tsyxxQp_tRvzlF"(%swift.opaque** {{.*}}, i{{32|64}} [[COUNT1_1:.*]], %swift.type** {{.*}})
