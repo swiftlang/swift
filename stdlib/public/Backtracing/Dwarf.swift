@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(Linux)
+
 import Swift
 
 @_implementationOnly import ImageFormats.Dwarf
@@ -1780,3 +1782,5 @@ public func testDwarfReaderFor(path: String) -> Bool {
     return false
   }
 }
+
+#endif // os(Linux)

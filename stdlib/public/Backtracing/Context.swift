@@ -978,9 +978,9 @@ extension arm_gprs {
 private func thread_get_state<T>(_ thread: thread_t,
                                  _ flavor: CInt,
                                  _ result: inout T) -> kern_return_t {
-  var count: msg_type_number_t
-    = msg_type_number_t(MemoryLayout<T>.stride
-                          / MemoryLayout<natural_t>.stride)
+  var count: mach_msg_type_number_t
+    = mach_msg_type_number_t(MemoryLayout<T>.stride
+                               / MemoryLayout<natural_t>.stride)
 
   return withUnsafeMutablePointer(to: &result) { ptr in
     ptr.withMemoryRebound(to: natural_t.self,

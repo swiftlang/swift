@@ -17,6 +17,8 @@
 
 // ###FIXME: We shouldn't really use String for paths.
 
+#if os(Linux)
+
 import Swift
 
 @_implementationOnly import OS.Libc
@@ -1763,3 +1765,5 @@ public func testElfImageAt(path: String) -> Bool {
     return false
   }
 }
+
+#endif // os(Linux)

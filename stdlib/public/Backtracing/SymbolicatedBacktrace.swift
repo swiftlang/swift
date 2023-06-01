@@ -378,7 +378,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     let theSymbol = Symbol(imageIndex: imageIndex,
                            imageName: imageName,
                            rawName: rawName,
-                           offset: Int(address - UInt(range.location)),
+                           offset: Int(address - UInt64(range.location)),
                            sourceLocation: location)
     theSymbol.name = name
 

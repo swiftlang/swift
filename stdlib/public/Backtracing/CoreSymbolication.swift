@@ -31,7 +31,7 @@ private let coreFoundationHandle = dlopen(coreFoundationPath, RTLD_LAZY)!
 
 private let coreSymbolicationPath =
   "/System/Library/PrivateFrameworks/CoreSymbolication.framework/CoreSymbolication"
-private let coreSymbolicationHandle = dlopen(coreSymbolicationPath, RTLDLAZY)!
+private let coreSymbolicationHandle = dlopen(coreSymbolicationPath, RTLD_LAZY)!
 
 private let crashReporterSupportPath =
   "/System/Library/PrivateFrameworks/CrashReporterSupport.framework/CrashReporterSupport"
@@ -48,7 +48,7 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
 
 private enum Sym {
   // CRCopySanitizedPath
-  static let CRCopySanitizedPath: @convention(c) (CFStringRef, CFIndex) -> CFStringRef =
+  static let CRCopySanitizedPath: @convention(c) (CFString, CFIndex) -> CFString =
     symbol(crashReporterSupportHandle, "CRCopySanitizedPath")
 
   // Base functionality
@@ -116,17 +116,17 @@ private enum Sym {
 
   // CFString
   static let CFStringCreateWithBytes:
-    @convention(c) (CFAllocatorRef?, UnsafeRawPointer?, CFIndex,
-                    CFStringEncoding, Bool) -> CFStringRef? =
+    @convention(c) (CFAllocator?, UnsafeRawPointer?, CFIndex,
+                    CFStringEncoding, Bool) -> CFString? =
     symbol(coreFoundationHandle, "CFStringCreateWithBytes")
   static let CFStringGetLength:
-    @convention(c) (CFStringRef) -> CFIndex =
+    @convention(c) (CFString) -> CFIndex =
     symbol(coreFoundationHandle, "CFStringGetLength")
   static let CFStringGetCStringPtr:
-    @convention(c) (CFStringRef, CFStringEncoding) -> UnsafePointer<CChar>? =
+    @convention(c) (CFString, CFStringEncoding) -> UnsafePointer<CChar>? =
     symbol(coreFoundationHandle, "CFStringGetCStringPtr")
   static let CFStringGetBytes:
-    @convention(c) (CFStringRef, CFRange, CFStringEncoding, UInt8, Bool,
+    @convention(c) (CFString, CFRange, CFStringEncoding, UInt8, Bool,
                     UnsafeMutableRawPointer?, CFIndex,
                     UnsafeMutablePointer<CFIndex>?) -> CFIndex =
     symbol(coreFoundationHandle, "CFStringGetBytes")
@@ -138,12 +138,12 @@ internal func CFRangeMake(_ location: CFIndex, _ length: CFIndex) -> CFRange {
   return CFRange(location: location, length: length)
 }
 
-internal func CFStringCreateWithBytes(_ allocator: CFAllocatorRef?,
+internal func CFStringCreateWithBytes(_ allocator: CFAllocator?,
                                       _ bytes: UnsafeRawPointer?,
                                       _ length: CFIndex,
                                       _ encoding: CFStringEncoding,
                                       _ isExternalRepresentation: Bool)
-  -> CFStringRef? {
+  -> CFString? {
   return Sym.CFStringCreateWithBytes(allocator,
                                      bytes,
                                      length,
@@ -151,17 +151,17 @@ internal func CFStringCreateWithBytes(_ allocator: CFAllocatorRef?,
                                      isExternalRepresentation)
 }
 
-internal func CFStringGetLength(_ s: CFStringRef) -> CFIndex {
+internal func CFStringGetLength(_ s: CFString) -> CFIndex {
   return Sym.CFStringGetLength(s)
 }
 
-internal func CFStringGetCStringPtr(_ s: CFStringRef,
+internal func CFStringGetCStringPtr(_ s: CFString,
                                     _ encoding: CFStringEncoding)
   -> UnsafePointer<CChar>? {
   return Sym.CFStringGetCStringPtr(s, encoding)
 }
 
-internal func CFStringGetBytes(_ s: CFStringRef,
+internal func CFStringGetBytes(_ s: CFString,
                                _ range: CFRange,
                                _ encoding: CFStringEncoding,
                                _ lossByte: UInt8,
@@ -180,7 +180,7 @@ internal func CFStringGetBytes(_ s: CFStringRef,
 // We can't import swiftFoundation here, so there's no automatic bridging for
 // CFString.  As a result, we need to do the dance manually.
 
-private func toCFString(_ s: String) -> CFStringRef! {
+private func toCFString(_ s: String) -> CFString! {
   var s = s
   return s.withUTF8 {
     return CFStringCreateWithBytes(nil,
@@ -191,7 +191,7 @@ private func toCFString(_ s: String) -> CFStringRef! {
   }
 }
 
-private func fromCFString(_ cf: CFStringRef) -> String {
+private func fromCFString(_ cf: CFString) -> String {
   let length = CFStringGetLength(cf)
   if length == 0 {
     return ""

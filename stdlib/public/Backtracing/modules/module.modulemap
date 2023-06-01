@@ -9,6 +9,6 @@ module FixedLayout {
   header "FixedLayout.h"
 }
 
-module Compression {
+module CompressionLibs {
   header "Compression.h"
 }

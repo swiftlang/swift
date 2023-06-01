@@ -30,7 +30,7 @@
 import Swift
 
 @_implementationOnly import OS.Libc
-@_implementationOnly import Compression
+@_implementationOnly import CompressionLibs
 @_implementationOnly import ImageFormats.Elf
 
 enum CompressedImageSourceError: Error {

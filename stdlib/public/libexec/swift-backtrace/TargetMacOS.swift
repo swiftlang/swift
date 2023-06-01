@@ -26,6 +26,7 @@ import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 
 @_implementationOnly import Runtime
+@_implementationOnly import OS.Darwin
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext
@@ -157,7 +158,7 @@ class Target {
 
     task = parentTask
 
-    reader = RemoteMemoryReader(task: __swift_task_t(task))
+    reader = RemoteMemoryReader(task: task_t(task))
 
     name = Self.getProcessName(pid: pid)
 

@@ -524,7 +524,13 @@ Generate a backtrace for the parent process.
     tcgetattr(0, &oldAttrs)
 
     var newAttrs = oldAttrs
-    newAttrs.c_lflag &= ~(UInt32(ICANON) | UInt32(ECHO))
+
+    #if os(Linux)
+    newAttrs.c_lflag &= ~UInt32(ICANON | ECHO)
+    #else
+    newAttrs.c_lflag &= ~UInt(ICANON | ECHO)
+    #endif
+
     tcsetattr(0, TCSANOW, &newAttrs)
 
     return oldAttrs

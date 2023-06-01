@@ -123,7 +123,9 @@ extension MemoryReader {
     let result = mach_vm_read_overwrite(task,
                                         UInt64(address),
                                         UInt64(size),
-                                        buffer.baseAddress,
+                                        mach_vm_address_t(
+                                          Int(bitPattern: buffer.baseAddress)
+                                        ),
                                         &sizeOut)
 
     if result != KERN_SUCCESS {

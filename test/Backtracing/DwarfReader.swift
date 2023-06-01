@@ -3,6 +3,8 @@
 // RUN: %target-build-swift %s -parse-as-library -g -o %t/DwarfReader
 // RUN: %target-run %t/DwarfReader %t/Inlining | %FileCheck %s
 
+// REQUIRES: OS=linux-gnu
+
 @_spi(DwarfTest) import _Backtracing
 
 @main
