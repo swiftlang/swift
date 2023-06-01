@@ -513,6 +513,35 @@ func testInternalEnumWrapper() {
 
 testInternalEnumWrapper()
 
+func testSinglePayloadEnumExtraTagBytesWrapper() {
+    let ptr = UnsafeMutablePointer<SinglePayloadEnumExtraTagBytesWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadEnumExtraTagBytesWrapper(x: .empty0, y: SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadEnumExtraTagBytesWrapper(x: .empty0, y: SimpleClass(x: 28))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadEnumExtraTagBytesWrapper()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)
