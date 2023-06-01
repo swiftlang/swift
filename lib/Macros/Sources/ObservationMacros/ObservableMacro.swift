@@ -298,6 +298,14 @@ public struct ObservationTrackedMacro: AccessorMacro {
       return []
     }
 
+    let initAccessor: AccessorDeclSyntax = {
+      """
+      init(initialValue) initializes(_\(identifier)) {
+        _\(identifier) = initialValue
+      }
+      """
+    }
+
     let getAccessor: AccessorDeclSyntax =
       """
       get {
@@ -315,7 +323,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
       }
       """
 
-    return [getAccessor, setAccessor]
+    return [initAccessor, getAccessor, setAccessor]
   }
 }
 
