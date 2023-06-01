@@ -644,7 +644,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     packedMetadata |= unsigned(SA->getType().getCategory()); // 8 bits
     packedMetadata |= unsigned(SA->getOwnershipKind()) << 8; // 3 bits
     packedMetadata |= unsigned(SA->isReborrow()) << 11;      // 1 bit
-    packedMetadata |= unsigned(SA->isEscaping()) << 12;      // 1 bit
+    packedMetadata |= unsigned(SA->hasPointerEscape()) << 12; // 1 bit
     if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
       packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 13;      // 1 bit
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 14; // 2 bits
@@ -1041,6 +1041,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     flags |= unsigned(ABI->hasDynamicLifetime());
     flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
     flags |= unsigned(ABI->getUsesMoveableValueDebugInfo()) << 2;
+    flags |= unsigned(ABI->hasPointerEscape()) << 3;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());
@@ -1545,10 +1546,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
       Attr = ECMI->doKeepUnique();
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
-      Attr = BBI->isLexical();
+      Attr =
+          unsigned(BBI->isLexical()) | unsigned(BBI->hasPointerEscape() << 1);
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
-             (unsigned(MVI->isLexical() << 1));
+             (unsigned(MVI->isLexical() << 1)) |
+             (unsigned(MVI->hasPointerEscape() << 2));
     } else if (auto *I = dyn_cast<MarkMustCheckInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
     } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {

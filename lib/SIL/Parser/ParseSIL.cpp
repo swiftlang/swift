@@ -2874,6 +2874,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool hasDynamicLifetime = false;
     bool hasReflection = false;
     bool usesMoveableValueDebugInfo = false;
+    bool hasPointerEscape = false;
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
@@ -2883,10 +2884,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         hasReflection = true;
       } else if (attrName.equals("moveable_value_debuginfo")) {
         usesMoveableValueDebugInfo = true;
+      } else if (attrName.equals("pointer_escape")) {
+        hasPointerEscape = true;
       } else {
-        P.diagnose(
-            attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
-            "dynamic_lifetime, reflection, or usesMoveableValueDebugInfo");
+        P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
+                   "dynamic_lifetime, reflection, pointer_escape or "
+                   "usesMoveableValueDebugInfo");
       }
     }
 
@@ -2904,7 +2907,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
                                  hasDynamicLifetime, hasReflection,
-                                 usesMoveableValueDebugInfo);
+                                 usesMoveableValueDebugInfo,
+                                 /*skipVarDeclAssert*/ false, hasPointerEscape);
     break;
   }
   case SILInstructionKind::ApplyInst:
@@ -3712,6 +3716,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
     bool isLexical = false;
+    bool hasPointerEscape = false;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
@@ -3720,6 +3725,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         allowsDiagnostics = true;
       else if (AttrName == "lexical")
         isLexical = true;
+      else if (AttrName == "pointer_escape")
+        hasPointerEscape = true;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,
@@ -3732,7 +3739,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    auto *MVI = B.createMoveValue(InstLoc, Val, isLexical);
+    auto *MVI = B.createMoveValue(InstLoc, Val, isLexical, hasPointerEscape);
     MVI->setAllowsDiagnostics(allowsDiagnostics);
     ResultVal = MVI;
     break;
@@ -3912,14 +3919,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc AddrLoc;
 
     bool isLexical = false;
-    if (parseSILOptional(isLexical, *this, "lexical"))
-      return true;
+    bool hasPointerEscape = false;
+
+    StringRef AttrName;
+    SourceLoc AttrLoc;
+    while (parseSILOptional(AttrName, AttrLoc, *this)) {
+      if (AttrName == "lexical")
+        isLexical = true;
+      else if (AttrName == "pointer_escape")
+        hasPointerEscape = true;
+      else {
+        P.diagnose(InstLoc.getSourceLoc(),
+                   diag::sil_invalid_attribute_for_instruction, AttrName,
+                   "begin_borrow");
+        return true;
+      }
+    }
 
     if (parseTypedValueRef(Val, AddrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createBeginBorrow(InstLoc, Val, isLexical);
+    ResultVal = B.createBeginBorrow(InstLoc, Val, isLexical, hasPointerEscape);
     break;
   }
 
@@ -6810,10 +6831,10 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         bool foundLexical = false;
         bool foundEagerMove = false;
         bool foundReborrow = false;
-        bool foundEscaping = false;
+        bool hasPointerEscape = false;
         while (auto attributeName = parseOptionalAttribute(
                    {"noImplicitCopy", "_lexical", "_eagerMove",
-                    "closureCapture", "reborrow", "escaping"})) {
+                    "closureCapture", "reborrow", "pointer_escape"})) {
           if (*attributeName == "noImplicitCopy")
             foundNoImplicitCopy = true;
           else if (*attributeName == "_lexical")
@@ -6824,8 +6845,8 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             foundClosureCapture = true;
           else if (*attributeName == "reborrow")
             foundReborrow = true;
-          else if (*attributeName == "escaping")
-            foundEscaping = true;
+          else if (*attributeName == "pointer_escape")
+            hasPointerEscape = true;
           else {
             llvm_unreachable("Unexpected attribute!");
           }
@@ -6857,7 +6878,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           fArg->setClosureCapture(foundClosureCapture);
           fArg->setLifetimeAnnotation(lifetime);
           fArg->setReborrow(foundReborrow);
-          fArg->setEscaping(foundEscaping);
+          fArg->setHasPointerEscape(hasPointerEscape);
           Arg = fArg;
 
           // Today, we construct the ownership kind straight from the function
@@ -6874,7 +6895,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           }
         } else {
           Arg = BB->createPhiArgument(Ty, OwnershipKind, /*decl*/ nullptr,
-                                      foundReborrow, foundEscaping);
+                                      foundReborrow, hasPointerEscape);
         }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
