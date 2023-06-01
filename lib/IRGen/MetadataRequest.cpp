@@ -539,7 +539,7 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
         getSILModule().isWholeModule());
     auto underlyingTy =
         type.subst(getSILModule(), replacer, replacer, genericSig,
-                   /*substitute opaque*/ true);
+                   SubstFlags::SubstituteOpaqueArchetypes);
     return underlyingTy;
   }
 
