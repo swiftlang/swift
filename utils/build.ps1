@@ -35,6 +35,9 @@ An array of architectures for which the Swift SDK should be built.
 The product version to be used when building the installer.
 Supports semantic version strings.
 
+.PARAMETER SkipBuild
+If set, does not run the build phase.
+
 .PARAMETER SkipRedistInstall
 If set, does not create S:\Program Files to mimic an installed redistributable.
 
@@ -69,6 +72,7 @@ param(
   [string] $BuildType = "Release",
   [string[]] $SDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
+  [switch] $SkipBuild = $false,
   [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
   [bool] $DefaultsLLD = $true,
@@ -255,8 +259,17 @@ function Invoke-Program()
 
     if ($LastExitCode -ne 0)
     {
-      $callstack = @(Get-PSCallStack) -Join "`n"
-      throw "Command execution returned $LastExitCode. Call stack:`n$callstack"
+      $ErrorMessage = "Error: $([IO.Path]::GetFileName($Executable)) exited with code $($LastExitCode).`n"
+
+      $ErrorMessage += "Invocation:`n"
+      $ErrorMessage += "  $Executable $Args`n"
+
+      $ErrorMessage += "Call stack:`n"
+      foreach ($Frame in @(Get-PSCallStack)) {
+        $ErrorMessage += "  $Frame`n"
+      }
+
+      throw $ErrorMessage
     }
   }
 }
@@ -355,6 +368,14 @@ function Build-CMakeProject
   $Defines = $Defines.Clone()
   TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE $BuildType
   TryAdd-KeyValue $Defines CMAKE_MT "mt"
+
+  # Workaround for running into MAX_PATH with CMake-generated output directory paths.
+  # CMake has logic to shorten output directory paths if they approach MAX_PATH,
+  # but when appending the filename we can still exceed MAX_PATH.
+  # The specific issue this solves is rc.exe writing windows_version_resource.rc.res
+  $MAX_PATH = 260
+  $LONG_FILENAME_LENGTH = 40
+  TryAdd-KeyValue $Defines CMAKE_OBJECT_PATH_MAX ($MAX_PATH - $LONG_FILENAME_LENGTH)
 
   $CFlags = "/GS- /Gw /Gy /Oi /Oy /Zi /Zc:inline"
   $CXXFlags = "/GS- /Gw /Gy /Oi /Oy /Zi /Zc:inline /Zc:__cplusplus"
@@ -1350,22 +1371,29 @@ function Build-Installer()
 
 #-------------------------------------------------------------------
 
-Build-BuildTools $HostArch
-Build-Compilers $HostArch
+if (-not $SkipBuild)
+{
+  Build-BuildTools $HostArch
+  Build-Compilers $HostArch
+}
+
 
 foreach ($Arch in $SDKArchs)
 {
-  Build-ZLib $Arch
-  Build-XML2 $Arch
-  Build-CURL $Arch
-  Build-ICU $Arch
-  Build-LLVM $Arch
+  if (-not $SkipBuild)
+  {
+    Build-ZLib $Arch
+    Build-XML2 $Arch
+    Build-CURL $Arch
+    Build-ICU $Arch
+    Build-LLVM $Arch
 
-  # Build platform: SDK, Redist and XCTest
-  Build-Runtime $Arch
-  Build-Dispatch $Arch
-  Build-Foundation $Arch
-  Build-XCTest $Arch
+    # Build platform: SDK, Redist and XCTest
+    Build-Runtime $Arch
+    Build-Dispatch $Arch
+    Build-Foundation $Arch
+    Build-XCTest $Arch
+  }
 
   if (-not $SkipRedistInstall)
   {
@@ -1382,21 +1410,24 @@ if (-not $ToBatch)
   }
 }
 
-Build-SQLite $HostArch
-Build-System $HostArch
-Build-ToolsSupportCore $HostArch
-Build-LLBuild $HostArch
-Build-Yams $HostArch
-Build-ArgumentParser $HostArch
-Build-Driver $HostArch
-Build-Crypto $HostArch
-Build-Collections $HostArch
-Build-ASN1 $HostArch
-Build-Certificates $HostArch
-Build-PackageManager $HostArch
-Build-IndexStoreDB $HostArch
-Build-Syntax $HostArch
-Build-SourceKitLSP $HostArch
+if (-not $SkipBuild)
+{
+  Build-SQLite $HostArch
+  Build-System $HostArch
+  Build-ToolsSupportCore $HostArch
+  Build-LLBuild $HostArch
+  Build-Yams $HostArch
+  Build-ArgumentParser $HostArch
+  Build-Driver $HostArch
+  Build-Crypto $HostArch
+  Build-Collections $HostArch
+  Build-ASN1 $HostArch
+  Build-Certificates $HostArch
+  Build-PackageManager $HostArch
+  Build-IndexStoreDB $HostArch
+  Build-Syntax $HostArch
+  Build-SourceKitLSP $HostArch
+}
 
 Install-HostToolchain
 
