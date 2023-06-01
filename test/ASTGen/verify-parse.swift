@@ -152,6 +152,12 @@ Class<T>: Proto1 where T: Proto3 {
   deinit {
     if true {}
   }
+
+  init?<U>(_ u: U) where U: Proto1 {
+    if true {}
+  }
+
+  init!(i: Int) {}
 }
 
 actor

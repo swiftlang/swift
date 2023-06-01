@@ -268,6 +268,29 @@ extension ASTGenVisitor {
     return .decl(decl.asDecl)
   }
 
+  func visit(_ node: InitializerDeclSyntax) -> ASTNode {
+    let decl = ConstructorDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.initKeyword),
+      self.bridgedSourceLoc(for: node.optionalMark),
+      node.optionalMark?.tokenKind == .exclamationMark,
+      self.visit(node.genericParameterClause)?.rawValue,
+      self.visit(node.signature.parameterClause).rawValue,
+      self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
+      self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),
+      self.visit(node.genericWhereClause)?.rawValue
+    )
+
+    if let body = node.body {
+      self.withDeclContext(decl.asDeclContext) {
+        AbstractFunctionDecl_setBody(self.visit(body).rawValue, decl.asDecl)
+      }
+    }
+
+    return .decl(decl.asDecl)
+  }
+
   func visit(_ node: DeinitializerDeclSyntax) -> ASTNode {
     let decl = DestructorDecl_create(
       self.ctx,

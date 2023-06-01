@@ -477,6 +477,36 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
+BridgedDeclContextAndDecl ConstructorDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cInitKeywordLoc, BridgedSourceLoc cFailabilityMarkLoc,
+    bool isIUO, void *_Nullable opaqueGenericParams, void *opaqueParameterList,
+    BridgedSourceLoc cAsyncLoc, BridgedSourceLoc cThrowsLoc,
+    void *_Nullable opaqueGenericWhereClause) {
+  assert((bool)cFailabilityMarkLoc.raw || !isIUO);
+
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *parameterList = static_cast<ParameterList *>(opaqueParameterList);
+  auto declName =
+      DeclName(context, DeclBaseName::createConstructor(), parameterList);
+  auto asyncLoc = convertSourceLoc(cAsyncLoc);
+  auto throwsLoc = convertSourceLoc(cThrowsLoc);
+  auto failabilityMarkLoc = convertSourceLoc(cFailabilityMarkLoc);
+
+  auto *decl = new (context) ConstructorDecl(
+      declName, convertSourceLoc(cInitKeywordLoc), failabilityMarkLoc.isValid(),
+      failabilityMarkLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(),
+      throwsLoc, parameterList,
+      static_cast<GenericParamList *>(opaqueGenericParams),
+      convertDeclContext(cDeclContext));
+  decl->setTrailingWhereClause(
+      static_cast<TrailingWhereClause *>(opaqueGenericWhereClause));
+  decl->setImplicitlyUnwrappedOptional(isIUO);
+
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
+}
+
 BridgedDeclContextAndDecl
 DestructorDecl_create(BridgedASTContext cContext,
                       BridgedDeclContext cDeclContext,

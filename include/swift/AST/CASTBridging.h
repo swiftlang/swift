@@ -337,6 +337,13 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType,
                 void *_Nullable opaqueGenericWhereClause);
 
+BridgedDeclContextAndDecl ConstructorDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cInitKeywordLoc, BridgedSourceLoc cFailabilityMarkLoc,
+    _Bool isIUO, void *_Nullable opaqueGenericParams, void *opaqueParameterList,
+    BridgedSourceLoc cAsyncLoc, BridgedSourceLoc cThrowsLoc,
+    void *_Nullable opaqueGenericWhereClause);
+
 BridgedDeclContextAndDecl
 DestructorDecl_create(BridgedASTContext cContext,
                       BridgedDeclContext cDeclContext,
