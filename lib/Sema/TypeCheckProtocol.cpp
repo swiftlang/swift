@@ -5733,9 +5733,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 
   // If we have a conditional requirements that we need to check, do so now.
   if (!condReqs->empty()) {
-    auto conditionalCheckResult = checkGenericArguments(
-        M, *condReqs,
-        [](SubstitutableType *dependentType) { return Type(dependentType); });
+    auto conditionalCheckResult = checkGenericArguments(*condReqs);
     switch (conditionalCheckResult) {
     case CheckGenericArgumentsResult::Success:
       break;
