@@ -2733,17 +2733,28 @@ public:
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign_or_init can only exist in raw SIL");
 
-    // The init and set functions have the same type: (Src type) -> Void
-
     SILValue initFn = AI->getInitializer();
-    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions initConv(initTy, AI->getModule());
-    require(initConv.getNumIndirectSILResults() ==
-                AI->getInitializedProperties().size(),
-            "init function has invalid number of indirect results");
-    checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
-
     SILValue setterFn = AI->getSetter();
+
+    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+    // Check init - it's an unapplied reference that takes property addresses
+    // and `initialValue`.
+    {
+      // We need to map un-applied function reference into context before
+      // check `initialValue` argument.
+      auto subs = cast<PartialApplyInst>(setterFn)->getSubstitutionMap();
+      initTy = initTy->substGenericArgs(F.getModule(), subs,
+                                        F.getTypeExpansionContext());
+
+      SILFunctionConventions initConv(initTy, AI->getModule());
+      require(initConv.getNumIndirectSILResults() ==
+                  AI->getInitializedProperties().size(),
+              "init function has invalid number of indirect results");
+      checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
+    }
+
+    // Check setter - it's a partially applied reference which takes
+    // `initialValue`.
     CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
     SILFunctionConventions setterConv(setterTy, AI->getModule());
     require(setterConv.getNumIndirectSILResults() == 0,
