@@ -132,7 +132,7 @@ class Target {
       try fetchThreads(threadListHead: Address(crashInfo.thread_list),
                        limit: limit, top: top, cache: cache)
     } catch {
-      print("swift-backtrace: failed to fetch thread information")
+      print("swift-backtrace: failed to fetch thread information: \(error)")
       exit(1)
     }
   }
@@ -141,34 +141,20 @@ class Target {
   /// structure contains a linked list of thread ucontexts, which may not
   /// include every thread.  In particular, if a thread was stuck in an
   /// uninterruptible wait, we won't have a ucontext for it.
-  func fetchThreads(threadListHead: Address,
-                    limit: Int?, top: Int, cache: Bool) throws {
-    var t = try reader.fetch(from: threadListHead, as: thread.self)
+  func fetchThreads(
+    threadListHead: Address,
+    limit: Int?, top: Int, cache: Bool
+  ) throws {
+    var next = threadListHead
 
-    let context = HostContext.fromHostMContext(
-      try reader.fetch(from: t.uctx, as: ucontext_t.self).uc_mcontext)
+    while next != 0 {
+      let t = try reader.fetch(from: next, as: thread.self)
 
-    let backtrace = try Backtrace.capture(from: context,
-                                          using: reader,
-                                          images: images,
-                                          limit: limit,
-                                          top: top)
-    guard let symbolicated = backtrace.symbolicated(with: images,
-                                                    sharedCacheInfo: nil,
-                                                    useSymbolCache: cache) else {
-      print("unable to symbolicate backtrace for crashing thread")
-      exit(1)
-    }
-
-    threads.append(TargetThread(id: TargetThread.ThreadID(t.tid),
-                                context: context,
-                                name: getThreadName(tid: t.tid),
-                                backtrace: symbolicated))
-    while t.next != 0 {
-      t = try reader.fetch(from: t.next, as: thread.self)
+      next = t.next
 
       guard let ucontext
               = try? reader.fetch(from: t.uctx, as: ucontext_t.self) else {
+	// This can happen if a thread is in an uninterruptible wait
         continue
       }
 

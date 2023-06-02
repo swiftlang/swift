@@ -51,7 +51,7 @@ internal func parseUInt64<S: StringProtocol>(_ s: S) -> UInt64? {
   }
 }
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 
 struct PosixError: Error {
   var errno: Int32

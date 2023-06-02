@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/StackOverflow
 // RUN: %target-codesign %t/StackOverflow
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/StackOverflow || true) | %FileCheck %s
-// RUN: (env SWIFT_BACKTRACE=limit=16,top=4,enable=yes,cache=no %target-run %t/StackOverflow || true) | %FileCheck %s --check-prefix LIMITED
+// RUN: (env SWIFT_BACKTRACE=limit=17,top=5,enable=yes,cache=no %target-run %t/StackOverflow || true) | %FileCheck %s --check-prefix LIMITED
 // RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/StackOverflow || true) | %FileCheck %s --check-prefix FRIENDLY
 
 // UNSUPPORTED: use_os_stdlib
@@ -93,11 +93,10 @@ struct StackOverflow {
 // CHECK-NEXT: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // CHECK-NEXT: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // CHECK-NEXT: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
-// CHECK-NEXT: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 
-// On macOS, there is a hidden dyld frame at the very top, which takes up one of
-// our 16 frames in the limit.  Linux doesn't have this, so will have an extra
-// level of recursion at this point.
+// The exact number of recursion frames varies from platform to platform;
+// on macOS, there is a hidden dyld frame at the very top, which takes up one
+// of the 16 frames.  On Linux, we may have a couple of libc frames as well.
 
 // CHECK: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} static StackOverflow.main() + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:25:5
 // CHECK-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} static StackOverflow.$main() + {{[0-9]+}} in StackOverflow at {{.*}}/<compiler-generated>
@@ -126,7 +125,7 @@ struct StackOverflow {
 // LIMITED-NEXT:    10 [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // LIMITED-NEXT:   ...
 
-// On macOS, a hidden dyld frame takes up one of these; that is not so on Linux.
+// N.B. There can be platform differences surrounding the exact frame counts
 
 // LIMITED: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} static StackOverflow.main() + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:25:5
 // LIMITED-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} static StackOverflow.$main() + {{[0-9]+}} in StackOverflow at {{.*}}/<compiler-generated>
@@ -211,11 +210,8 @@ struct StackOverflow {
 // FRIENDLY-NEXT: {{[0-9]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // FRIENDLY-NEXT: {{[0-9]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // FRIENDLY-NEXT: {{[0-9]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
-// FRIENDLY-NEXT: {{[0-9]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 
-// On macOS, the hidden dyld frame takes up a slot in the top limit; this differs
-// on Linux, where there is no such frame, so there will be an extra recursion
-// visible here.
+// N.B. There can be platform differences surrounding the exact frame counts
 
 // FRIENDLY: {{[0-9]+}} static StackOverflow.main() + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:25:5
 

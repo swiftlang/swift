@@ -779,8 +779,6 @@ _swift_backtraceSetupEnvironment()
   *penv = 0;
 }
 
-#endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
-
 #ifdef __linux__
 struct spawn_info {
   const char *path;
@@ -828,6 +826,8 @@ safe_spawn(pid_t *ppid, const char *path, int memserver,
   return 0;
 }
 #endif // defined(__linux__)
+
+#endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
 } // namespace
 
@@ -950,7 +950,9 @@ _swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd)
 _swift_spawnBacktracer(const ArgChar * const *argv)
 #endif
 {
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
+#if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+  return false;
+#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   pid_t child;
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
@@ -990,8 +992,6 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
   return false;
 
   // ###TODO: Windows
-#else
-  return false;
 #endif
 }
 

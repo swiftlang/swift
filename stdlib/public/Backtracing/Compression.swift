@@ -54,9 +54,9 @@ protocol CompressedStream {
 
 // .. Compression library bindings .............................................
 
-private var lzmaHandle = dlopen("liblzma.so", RTLD_LAZY)
-private var zlibHandle = dlopen("libz.so", RTLD_LAZY)
-private var zstdHandle = dlopen("libzstd.so", RTLD_LAZY)
+private var lzmaHandle = dlopen("liblzma.so.5", RTLD_LAZY)
+private var zlibHandle = dlopen("libz.so.1", RTLD_LAZY)
+private var zstdHandle = dlopen("libzstd.so.1", RTLD_LAZY)
 
 private func symbol<T>(_ handle: UnsafeMutableRawPointer?, _ name: String) -> T? {
   guard let handle = handle, let result = dlsym(handle, name) else {
@@ -142,7 +142,7 @@ struct ZLibStream: CompressedStream {
 
         // Not really mutable; this is just an issue with z_const
         stream.next_in = UnsafeMutablePointer(mutating: buffer.baseAddress)
-        stream.avail_in = uInt(buffer.count)
+        stream.avail_in = CUnsignedInt(buffer.count)
       }
 
       if stream.avail_out == 0 {
@@ -151,7 +151,7 @@ struct ZLibStream: CompressedStream {
         }
 
         stream.next_out = buffer.baseAddress
-        stream.avail_out = uInt(buffer.count)
+        stream.avail_out = CUnsignedInt(buffer.count)
         outputBufferSize = UInt(buffer.count)
       }
 

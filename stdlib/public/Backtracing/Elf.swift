@@ -871,7 +871,7 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
       $0.withMemoryRebound(to: Traits.Sym.self) { symbols in
         for symbol in symbols {
           // Ignore things that are not functions
-          if symbol.st_type != .STT_FUNC && symbol.st_type != .STT_NOTYPE {
+          if symbol.st_type != .STT_FUNC {
             continue
           }
 
@@ -1635,21 +1635,21 @@ class ElfImage<SomeImageSource: ImageSource,
       let mid = min + (max - min) / 2
       let callSite = callSiteInfo[mid]
 
-      if callSite.lowPC <= address && callSite.highPC >= address {
+      if callSite.lowPC <= address && callSite.highPC > address {
         var first = mid, last = mid
         while first > 0
                 && callSiteInfo[first - 1].lowPC <= address
-                && callSiteInfo[first - 1].highPC >= address {
+                && callSiteInfo[first - 1].highPC > address {
           first -= 1
         }
         while last < callSiteInfo.count - 1
                 && callSiteInfo[last + 1].lowPC <= address
-                && callSiteInfo[last + 1].highPC >= address {
+                && callSiteInfo[last + 1].highPC > address {
           last += 1
         }
 
         return callSiteInfo[first...last]
-      } else if callSite.highPC < address {
+      } else if callSite.highPC <= address {
         min = mid + 1
       } else if callSite.lowPC > address {
         max = mid

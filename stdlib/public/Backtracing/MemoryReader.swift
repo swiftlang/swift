@@ -193,11 +193,11 @@ extension MemoryReader {
         let reply = try receiveReply()
 
         if reply.len < 0 {
-          throw MemserverError(message: "Unreadable")
+          throw MemserverError(message: "Unreadable at \(hex(addr))")
         }
 
         if done + Int(reply.len) > bytes.count {
-          throw MemserverError(message: "Overrun")
+          throw MemserverError(message: "Overrun at \(hex(addr)) trying to read \(bytes.count) bytes")
         }
 
         let ret = read(fd,
