@@ -6414,7 +6414,7 @@ public:
       LayoutConstraint Layout);
 
   // Returns the reduced shape type for this pack archetype.
-  CanType getReducedShape() const;
+  CanType getReducedShape();
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PackArchetype;
@@ -7096,16 +7096,6 @@ inline bool TypeBase::isTypeParameter() {
     t = memberTy->getBase();
 
   return t->is<GenericTypeParamType>();
-}
-
-inline bool TypeBase::isParameterPack() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<GenericTypeParamType>() &&
-         t->castTo<GenericTypeParamType>()->isParameterPack();
 }
 
 // TODO: This will become redundant once InOutType is removed.

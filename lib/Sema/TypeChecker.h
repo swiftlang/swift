@@ -535,6 +535,10 @@ checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
                       TypeSubstitutionFn substitutions,
                       SubstOptions options = None);
 
+/// Check the given requirements without applying substitutions.
+CheckGenericArgumentsResult::Kind
+checkGenericArguments(ArrayRef<Requirement> requirements);
+
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
 /// that are needed to spell it as a member of the given parent type
