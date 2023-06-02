@@ -912,6 +912,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolves the protocol referenced by an @_implements attribute.
+class ImplementsAttrProtocolRequest
+    : public SimpleRequest<ImplementsAttrProtocolRequest,
+                           ProtocolDecl *(const ImplementsAttr *, DeclContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ProtocolDecl *evaluate(Evaluator &evaluator, const ImplementsAttr *attr,
+                         DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

@@ -1239,7 +1239,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_implements");
     Printer << "(";
     auto *attr = cast<ImplementsAttr>(this);
-    attr->getProtocolType().print(Printer, Options);
+    if (auto *proto = attr->getProtocol(D->getDeclContext()))
+      proto->getDeclaredInterfaceType()->print(Printer, Options);
+    else
+      attr->getProtocolTypeRepr()->print(Printer, Options);
     Printer << ", " << attr->getMemberName() << ")";
     break;
   }
@@ -2360,37 +2363,41 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeExpr *ProtocolType,
+                               TypeRepr *TyR,
                                DeclName MemberName,
                                DeclNameLoc MemberNameLoc)
     : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
-      ProtocolType(ProtocolType),
+      TyR(TyR),
       MemberName(MemberName),
       MemberNameLoc(MemberNameLoc) {
 }
 
-
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
-                                       TypeExpr *ProtocolType,
+                                       TypeRepr *TyR,
                                        DeclName MemberName,
                                        DeclNameLoc MemberNameLoc) {
   void *mem = Ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
-  return new (mem) ImplementsAttr(atLoc, range, ProtocolType,
+  return new (mem) ImplementsAttr(atLoc, range, TyR,
                                   MemberName, MemberNameLoc);
 }
 
-void ImplementsAttr::setProtocolType(Type ty) {
-  assert(ty);
-  ProtocolType->setType(MetatypeType::get(ty));
+ImplementsAttr *ImplementsAttr::create(DeclContext *DC,
+                                       ProtocolDecl *Proto,
+                                       DeclName MemberName) {
+  auto &ctx = DC->getASTContext();
+  void *mem = ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
+  auto *attr = new (mem) ImplementsAttr(
+      SourceLoc(), SourceRange(), nullptr,
+      MemberName, DeclNameLoc());
+  ctx.evaluator.cacheOutput(ImplementsAttrProtocolRequest{attr, DC},
+                            std::move(Proto));
+  return attr;
 }
 
-Type ImplementsAttr::getProtocolType() const {
-  return ProtocolType->getInstanceType();
-}
-
-TypeRepr *ImplementsAttr::getProtocolTypeRepr() const {
-  return ProtocolType->getTypeRepr();
+ProtocolDecl *ImplementsAttr::getProtocol(DeclContext *dc) const {
+  return evaluateOrDefault(dc->getASTContext().evaluator,
+        ImplementsAttrProtocolRequest{this, dc}, nullptr);
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
