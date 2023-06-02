@@ -686,12 +686,12 @@ public:
   SILType subst(Lowering::TypeConverter &tc, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                bool shouldSubstituteOpaqueArchetypes = false) const;
+                SubstOptions options = None) const;
 
   SILType subst(SILModule &M, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                bool shouldSubstituteOpaqueArchetypes = false) const;
+                SubstOptions options = None) const;
 
   SILType subst(Lowering::TypeConverter &tc,
                 InFlightSubstitution &IFS,

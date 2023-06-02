@@ -31,10 +31,18 @@ namespace {
 /// skipping those captured by nested pack expansion types.
 struct PackTypeParameterCollector: TypeWalker {
   llvm::SetVector<Type> typeParams;
+  unsigned expansionLevel;
+  SmallVector<unsigned, 2> elementLevel;
+
+  PackTypeParameterCollector() : expansionLevel(0) {
+    elementLevel.push_back(0);
+  }
 
   Action walkToTypePre(Type t) override {
-    if (t->is<PackExpansionType>())
-      return Action::SkipChildren;
+    if (t->is<PackExpansionType>()) {
+      ++expansionLevel;
+      return Action::Continue;
+    }
 
     if (auto *boundGenericType = dyn_cast<BoundGenericType>(t.getPointer())) {
       if (auto parentType = boundGenericType->getParent())
@@ -58,12 +66,29 @@ struct PackTypeParameterCollector: TypeWalker {
       }
     }
 
-    if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-      if (paramTy->isParameterPack())
-        typeParams.insert(paramTy);
-    } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      typeParams.insert(archetypeTy->getRoot());
+    if (auto *eltType = t->getAs<PackElementType>()) {
+      elementLevel.push_back(eltType->getLevel());
+      return Action::Continue;
     }
+
+    if (elementLevel.back() == expansionLevel) {
+      if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+        if (paramTy->isParameterPack())
+          typeParams.insert(paramTy);
+      } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
+        typeParams.insert(archetypeTy->getRoot());
+      }
+    }
+
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type t) override {
+    if (t->is<PackExpansionType>())
+      --expansionLevel;
+
+    if (t->is<PackElementType>())
+      elementLevel.pop_back();
 
     return Action::Continue;
   }
@@ -88,6 +113,16 @@ bool GenericTypeParamType::isParameterPack() const {
   auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return (fixedNum & GenericTypeParamType::TYPE_SEQUENCE_BIT) ==
          GenericTypeParamType::TYPE_SEQUENCE_BIT;
+}
+
+bool TypeBase::isParameterPack() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isParameterPack();
 }
 
 PackType *TypeBase::getPackSubstitutionAsPackType() {
