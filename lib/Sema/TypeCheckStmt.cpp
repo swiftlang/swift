@@ -876,6 +876,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
   elt.setPattern(pattern);
   elt.setInitializer(init);
+  
   isFalsable |= pattern->isRefutablePattern();
   return hadError;
 }
