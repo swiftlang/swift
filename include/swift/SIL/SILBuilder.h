@@ -480,14 +480,14 @@ public:
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false,
                                bool reflection = false,
-                               bool usesMoveableValueDebugInfo = false
-#ifndef NDEBUG
-                               ,
+                               bool usesMoveableValueDebugInfo = false,
                                bool skipVarDeclAssert = false,
-#endif
                                bool hasPointerEscape = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
+#if defined(NDEBUG)
+    (void) skipVarDeclAssert;
+#endif
     assert((skipVarDeclAssert ||
             !dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
