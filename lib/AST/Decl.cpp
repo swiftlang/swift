@@ -10120,6 +10120,11 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << " }";
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           TypeOrExtensionDecl container) {
+  simple_display(out, container.getAsDecl());
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   if (decl) decl->dumpRef(out);
   else out << "(null)";
@@ -10151,6 +10156,11 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
 
   return extractNearestSourceLoc(decl->getDeclContext());
 }
+
+SourceLoc swift::extractNearestSourceLoc(TypeOrExtensionDecl container) {
+  return extractNearestSourceLoc(container.Decl);
+}
+
 
 Optional<BodyAndFingerprint>
 ParseAbstractFunctionBodyRequest::getCachedResult() const {
