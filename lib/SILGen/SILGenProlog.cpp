@@ -907,19 +907,25 @@ static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
   
-  // Destructure tuple value arguments.
-  if (TupleType *tupleTy = decl->isInOut() ? nullptr : ty->getAs<TupleType>()) {
-    for (auto fieldType : tupleTy->getElementTypes())
-      makeArgument(fieldType, decl, args, SGF);
-  } else {
-    auto loweredTy = SGF.getLoweredTypeForFunctionArgument(ty);
-    if (decl->isInOut())
-      loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
-    auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
-    args.push_back(arg);
+  if (ty->is<PackExpansionType>()) {
+    ty = PackType::get(SGF.getASTContext(), {ty});
   }
-}
 
+  // Destructure tuple value arguments.
+  if (!decl->isInOut()) {
+    if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+      for (auto fieldType : tupleTy->getElementTypes())
+        makeArgument(fieldType, decl, args, SGF);
+      return;
+    }
+  }
+
+  auto loweredTy = SGF.getLoweredTypeForFunctionArgument(ty);
+  if (decl->isInOut())
+    loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
+  auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
+  args.push_back(arg);
+}
 
 void SILGenFunction::bindParameterForForwarding(ParamDecl *param,
                                      SmallVectorImpl<SILValue> &parameters) {
