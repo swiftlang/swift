@@ -2677,7 +2677,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       SmallVector<IdentifierID, 4> spis;
       for (auto spi : theAttr->getSPIGroups()) {
-        assert(!spi.empty() && "Empty SPI name");
+        // SPI group name in source code can be '_', a specifier that allows
+        // implicit import of the SPI. It gets converted to to an empty identifier
+        // during parsing to match the existing AST node representation. An empty
+        // identifier is printed as '_' at serialization.
         spis.push_back(S.addDeclBaseNameRef(spi));
       }
 
