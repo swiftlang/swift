@@ -3572,58 +3572,45 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   DeclContext *DC = D->getDeclContext();
 
-  Type T = attr->getProtocolType();
-  if (!T && attr->getProtocolTypeRepr()) {
-    auto context = TypeResolverContext::GenericRequirement;
-    T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
-                                              TypeResolutionOptions(context),
-                                              /*unboundTyOpener*/ nullptr,
-                                              /*placeholderHandler*/ nullptr,
-                                              /*packElementOpener*/ nullptr);
-  }
+  ProtocolDecl *PD = attr->getProtocol(DC);
 
-  // Definite error-types were already diagnosed in resolveType.
-  if (T->hasError())
-    return;
-  attr->setProtocolType(T);
-
-  // Check that we got a ProtocolType.
-  if (auto PT = T->getAs<ProtocolType>()) {
-    ProtocolDecl *PD = PT->getDecl();
-
-    // Check that the ProtocolType has the specified member.
-    LookupResult R =
-        TypeChecker::lookupMember(PD->getDeclContext(), PT,
-                                  DeclNameRef(attr->getMemberName()));
-    if (!R) {
-      diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_lacks_member,
-               PD->getName(), attr->getMemberName())
-        .highlight(attr->getMemberNameLoc().getSourceRange());
-    }
-
-    // Check that the decl we're decorating is a member of a type that actually
-    // conforms to the specified protocol.
-    NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
-    if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
-      if (!OtherPD->inheritsFrom(PD)) {
-        diagnose(attr->getLocation(),
-                 diag::implements_attr_protocol_not_conformed_to,
-                 NTD->getName(), PD->getName())
-          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
-      }
-    } else {
-      SmallVector<ProtocolConformance *, 2> conformances;
-      if (!NTD->lookupConformance(PD, conformances)) {
-        diagnose(attr->getLocation(),
-                 diag::implements_attr_protocol_not_conformed_to,
-                 NTD->getName(), PD->getName())
-          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
-      }
-    }
-  } else {
+  if (!PD) {
     diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
       .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    return;
+  }
+
+  // Check that the ProtocolType has the specified member.
+  LookupResult R =
+      TypeChecker::lookupMember(PD->getDeclContext(),
+                                PD->getDeclaredInterfaceType(),
+                                DeclNameRef(attr->getMemberName()));
+  if (!R) {
+    diagnose(attr->getLocation(),
+             diag::implements_attr_protocol_lacks_member,
+             PD->getName(), attr->getMemberName())
+      .highlight(attr->getMemberNameLoc().getSourceRange());
+    return;
+  }
+
+  // Check that the decl we're decorating is a member of a type that actually
+  // conforms to the specified protocol.
+  NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
+  if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
+    if (!OtherPD->inheritsFrom(PD)) {
+      diagnose(attr->getLocation(),
+               diag::implements_attr_protocol_not_conformed_to,
+               NTD->getName(), PD->getName())
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    }
+  } else {
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!NTD->lookupConformance(PD, conformances)) {
+      diagnose(attr->getLocation(),
+               diag::implements_attr_protocol_not_conformed_to,
+               NTD->getName(), PD->getName())
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    }
   }
 }
 
