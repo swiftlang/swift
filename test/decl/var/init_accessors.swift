@@ -84,3 +84,33 @@ func test_assignment_to_let_properties() {
     }
   }
 }
+
+func test_duplicate_and_computed_lazy_properties() {
+  struct Test1 {
+    var _a: Int
+    var _b: Int
+
+    var a: Int {
+      init(initialValue) initializes(_b _a) accesses(_a) {
+        // expected-error@-1 {{property '_a' cannot be both initialized and accessed}}
+      }
+    }
+  }
+
+  struct Test2 {
+    var _a: Int
+
+    var a: Int {
+      init(initialValue) initializes(a c) accesses(_a b) {}
+      // expected-error@-1 {{init accessor cannot refer to property 'a'; init accessors can refer only to stored properties}}
+      // expected-error@-2 {{init accessor cannot refer to property 'b'; init accessors can refer only to stored properties}}
+      // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
+    }
+
+    var b: Int {
+      get { 42 }
+    }
+
+    lazy var c: Int = 42
+  }
+}

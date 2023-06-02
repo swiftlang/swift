@@ -3569,7 +3569,23 @@ void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
     return;
   }
 
-  (void)attr->getPropertyDecls(accessor);
+  // Check whether there are any intersections between initializes(...) and
+  // accesses(...) attributes.
+
+  Optional<ArrayRef<VarDecl *>> initializedProperties;
+  if (auto *initAttr = D->getAttrs().getAttribute<InitializesAttr>()) {
+    initializedProperties.emplace(initAttr->getPropertyDecls(accessor));
+  }
+
+  if (initializedProperties) {
+    for (auto *property : attr->getPropertyDecls(accessor)) {
+      if (llvm::is_contained(*initializedProperties, property)) {
+        diagnose(attr->getLocation(),
+                 diag::init_accessor_property_both_init_and_accessed,
+                 property->getName());
+      }
+    }
+  }
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
