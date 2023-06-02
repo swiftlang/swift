@@ -2461,13 +2461,14 @@ class AllocBoxInst final
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false,
-               bool usesMoveableValueDebugInfo = false);
+               bool reflection = false, bool usesMoveableValueDebugInfo = false,
+               bool hasPointerEscape = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F, Optional<SILDebugVariable> Var,
                               bool hasDynamicLifetime, bool reflection = false,
-                              bool usesMoveableValueDebugInfo = false);
+                              bool usesMoveableValueDebugInfo = false,
+                              bool hasPointerEscape = false);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -2480,6 +2481,14 @@ public:
 
   bool hasDynamicLifetime() const {
     return sharedUInt8().AllocBoxInst.dynamicLifetime;
+  }
+
+  void setHasPointerEscape(bool pointerEscape) {
+    sharedUInt8().AllocBoxInst.pointerEscape = pointerEscape;
+  }
+
+  bool hasPointerEscape() const {
+    return sharedUInt8().AllocBoxInst.pointerEscape;
   }
 
   /// True if the box should be emitted with reflection metadata for its
@@ -4421,12 +4430,15 @@ class BeginBorrowInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
-  bool lexical;
+  USE_SHARED_UINT8;
 
-  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical)
+  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical,
+                  bool hasPointerEscape)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()),
-        lexical(isLexical) {}
+                             LValue->getType().getObjectType()) {
+    sharedUInt8().BeginBorrowInst.lexical = isLexical;
+    sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
+  }
 
 public:
   // FIXME: this does not return all instructions that end a local borrow
@@ -4438,11 +4450,18 @@ public:
 
   /// Whether the borrow scope introduced by this instruction corresponds to a
   /// source-level lexical scope.
-  bool isLexical() const { return lexical; }
+  bool isLexical() const { return sharedUInt8().BeginBorrowInst.lexical; }
 
   /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
   /// doesn't have a lexical bit, do not do anything.
-  void removeIsLexical() { lexical = false; }
+  void removeIsLexical() { sharedUInt8().BeginBorrowInst.lexical = false; }
+
+  bool hasPointerEscape() const {
+    return sharedUInt8().BeginBorrowInst.pointerEscape;
+  }
+  void setHasPointerEscape(bool pointerEscape) {
+    sharedUInt8().BeginBorrowInst.pointerEscape = pointerEscape;
+  }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
@@ -8260,22 +8279,35 @@ class MoveValueInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
+  USE_SHARED_UINT8;
+
+  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical,
+                bool hasPointerEscape)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    sharedUInt8().MoveValueInst.lexical = isLexical;
+    sharedUInt8().MoveValueInst.pointerEscape = hasPointerEscape;
+  }
+
+public:
   /// If set to true, we should emit the kill diagnostic for this move_value. If
   /// set to false, we shouldn't emit such a diagnostic. This is a short term
   /// addition until we get MoveOnly wrapper types into the SIL type system.
-  bool allowDiagnostics = false;
-  bool lexical = false;
+  bool getAllowDiagnostics() const {
+    return sharedUInt8().MoveValueInst.allowDiagnostics;
+  }
+  void setAllowsDiagnostics(bool newValue) {
+    sharedUInt8().MoveValueInst.allowDiagnostics = newValue;
+  }
 
-  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
-        lexical(isLexical) {}
+  bool isLexical() const { return sharedUInt8().MoveValueInst.lexical; }
+  void removeIsLexical() { sharedUInt8().MoveValueInst.lexical = false; }
 
-public:
-  bool getAllowDiagnostics() const { return allowDiagnostics; }
-  void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
-
-  bool isLexical() const { return lexical; };
-  void removeIsLexical() { lexical = false; }
+  bool hasPointerEscape() const {
+    return sharedUInt8().MoveValueInst.pointerEscape;
+  }
+  void setHasPointerEscape(bool pointerEscape) {
+    sharedUInt8().MoveValueInst.pointerEscape = pointerEscape;
+  }
 };
 
 class DropDeinitInst
