@@ -328,6 +328,7 @@ do {
   while case let _ as [Derived] = arr {}
   // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
 
+  // https://github.com/apple/swift/issues/61850
   for case _ as [Derived] in [arr] {}
 
   if case is [Derived] = arr {}
