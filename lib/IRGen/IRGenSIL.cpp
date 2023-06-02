@@ -1249,8 +1249,7 @@ public:
     setLoweredExplosion(i, e);
   }
   void visitDropDeinitInst(DropDeinitInst *i) {
-    auto e = getLoweredExplosion(i->getOperand());
-    setLoweredExplosion(i, e);
+    llvm_unreachable("only valid in ownership SIL");
   }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
