@@ -14,6 +14,16 @@
 
 // NB: Ridiculous formatting to test that we do not include leading trivia in locations.
 
+import
+Swift
+import typealias Swift.Codable
+import enum Swift.Optional
+import struct Swift.Array
+import class Swift.KeyPath
+import protocol Swift.Sequence
+import func Swift.max
+import var Swift._playgroundPrintHook
+
 func
 test1
 (

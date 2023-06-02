@@ -350,6 +350,52 @@ extension ASTGenVisitor {
   }
 }
 
+// MARK: - ImportDecl
+
+extension BridgedImportKind {
+  fileprivate init?(from tokenKind: TokenKind) {
+    switch tokenKind {
+    case .keyword(.typealias): self = .type
+    case .keyword(.struct): self = .struct
+    case .keyword(.class): self = .class
+    case .keyword(.enum): self = .enum
+    case .keyword(.protocol): self = .protocol
+    case .keyword(.var), .keyword(.let): self = .var
+    case .keyword(.func): self = .func
+    default: return nil
+    }
+  }
+}
+
+extension ASTGenVisitor {
+  func visit(_ node: ImportDeclSyntax) -> ASTNode {
+    let importKind: BridgedImportKind
+    if let specifier = node.importKindSpecifier {
+      if let value = BridgedImportKind(from: specifier.tokenKind) {
+        importKind = value
+      } else {
+        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+        importKind = .module
+      }
+    } else {
+      importKind = .module
+    }
+
+    return .decl(
+      ImportDecl_create(
+        self.ctx,
+        self.declContext,
+        self.bridgedSourceLoc(for: node.importKeyword),
+        importKind,
+        self.bridgedSourceLoc(for: node.importKindSpecifier),
+        node.path.lazy.map {
+          $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
+        }.bridgedArray(in: self)
+      )
+    )
+  }
+}
+
 extension ASTGenVisitor {
   @inline(__always)
   func visit(_ node: MemberBlockItemListSyntax) -> BridgedArrayRef {

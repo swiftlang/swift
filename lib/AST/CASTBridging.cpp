@@ -192,29 +192,6 @@ bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
   return convertASTContext(cContext).LangOpts.hasFeature((Feature)feature);
 }
 
-void *ImportDecl_create(BridgedASTContext cContext,
-                        BridgedDeclContext cDeclContext,
-                        BridgedSourceLoc cImportLoc, char kind,
-                        BridgedSourceLoc cKindLoc, BridgedArrayRef path,
-                        BridgedArrayRef cPathLocs) {
-  assert(path.numElements == cPathLocs.numElements);
-  ASTContext &context = convertASTContext(cContext);
-  DeclContext *declContext = convertDeclContext(cDeclContext);
-
-  ImportPath::Builder importPath;
-  for (auto p : llvm::zip(convertArrayRef<Identifier>(path),
-                          convertArrayRef<SourceLoc>(cPathLocs))) {
-    Identifier ident;
-    SourceLoc loc;
-    std::tie(ident, loc) = p;
-    importPath.push_back(ident, loc);
-  }
-  return ImportDecl::create(context, declContext, convertSourceLoc(cImportLoc),
-                            static_cast<ImportKind>(kind),
-                            convertSourceLoc(cKindLoc),
-                            std::move(importPath).get());
-}
-
 BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, SwiftInt len) {
   SourceLoc loc = convertSourceLoc(cLoc).getAdvancedLoc(len);
   return {loc.getOpaquePointerValue()};
@@ -826,6 +803,28 @@ void *OperatorDecl_create(BridgedASTContext cContext,
         PostfixOperatorDecl(declContext, operatorKeywordLoc, name, nameLoc);
     break;
   }
+
+  return static_cast<Decl *>(decl);
+}
+
+void *ImportDecl_create(BridgedASTContext cContext,
+                        BridgedDeclContext cDeclContext,
+                        BridgedSourceLoc cImportKeywordLoc,
+                        BridgedImportKind cImportKind,
+                        BridgedSourceLoc cImportKindLoc,
+                        BridgedArrayRef cImportPathElements) {
+  ImportPath::Builder builder;
+  for (auto &element :
+       convertArrayRef<BridgedIdentifierAndSourceLoc>(cImportPathElements)) {
+    builder.push_back(convertIdentifier(element.name),
+                      convertSourceLoc(element.nameLoc));
+  }
+
+  ASTContext &context = convertASTContext(cContext);
+  auto *decl = ImportDecl::create(
+      context, convertDeclContext(cDeclContext),
+      convertSourceLoc(cImportKeywordLoc), static_cast<ImportKind>(cImportKind),
+      convertSourceLoc(cImportKindLoc), std::move(builder).get());
 
   return static_cast<Decl *>(decl);
 }

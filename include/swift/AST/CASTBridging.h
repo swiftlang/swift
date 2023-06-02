@@ -256,12 +256,6 @@ BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
 _Bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                     BridgedFeature feature);
 
-void *ImportDecl_create(BridgedASTContext cContext,
-                        BridgedDeclContext cDeclContext,
-                        BridgedSourceLoc cImportLoc, char kind,
-                        BridgedSourceLoc cKindLoc, BridgedArrayRef path,
-                        BridgedArrayRef cPathLocs);
-
 void *TopLevelCodeDecl_createStmt(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
                                   BridgedSourceLoc cStartLoc, void *element,
@@ -439,6 +433,24 @@ void *OperatorDecl_create(BridgedASTContext cContext,
                           BridgedSourceLoc cColonLoc,
                           BridgedIdentifier cPrecedenceGroupName,
                           BridgedSourceLoc cPrecedenceGroupLoc);
+
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) {
+  BridgedImportKindModule,
+  BridgedImportKindType,
+  BridgedImportKindStruct,
+  BridgedImportKindClass,
+  BridgedImportKindEnum,
+  BridgedImportKindProtocol,
+  BridgedImportKindVar,
+  BridgedImportKindFunc,
+} BridgedImportKind;
+
+void *ImportDecl_create(BridgedASTContext cContext,
+                        BridgedDeclContext cDeclContext,
+                        BridgedSourceLoc cImportKeywordLoc,
+                        BridgedImportKind cImportKind,
+                        BridgedSourceLoc cImportKindLoc,
+                        BridgedArrayRef cImportPathElements);
 
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLeftAngleLoc,
