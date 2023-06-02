@@ -6610,6 +6610,11 @@ RValue SILGenFunction::emitGetAccessor(
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
+  // Calls to getters are implicit because the compiler inserts them on a
+  // property access, but the location is useful in backtraces so it should be
+  // preserved.
+  loc.markExplicit();
+
   Callee getter = emitSpecializedAccessorFunctionRef(
       *this, loc, get, substitutions, selfValue, isSuper, isDirectUse,
       isOnSelfParameter);
