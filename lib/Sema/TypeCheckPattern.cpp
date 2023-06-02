@@ -1570,9 +1570,8 @@ Pattern *TypeChecker::coercePatternToType(
             type, parentTy, CheckedCastContextKind::EnumElementPattern, dc);
         // If the cast failed, we can't resolve the pattern.
         if (foundCastKind < CheckedCastKind::First_Resolved) {
-          diags
-              .diagnose(EEP->getLoc(), diag::downcast_to_unrelated, type,
-                        parentTy)
+          diags.diagnose(EEP->getLoc(), diag::cannot_match_value_with_pattern,
+                         type, parentTy)
               .highlight(EEP->getSourceRange());
           return nullptr;
         }
@@ -1582,9 +1581,9 @@ Pattern *TypeChecker::coercePatternToType(
         castKind = foundCastKind;
         enumTy = parentTy;
       } else {
-        diags.diagnose(EEP->getLoc(),
-                       diag::enum_element_pattern_not_member_of_enum,
-                       EEP->getName(), type);
+        diags.diagnose(EEP->getLoc(), diag::cannot_match_value_with_pattern,
+                       type, parentTy)
+            .highlight(EEP->getSourceRange());
         return nullptr;
       }
     }
