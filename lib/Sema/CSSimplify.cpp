@@ -6363,8 +6363,20 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::EnumPatternImplicitCastMatch: {
+    // If either type is a placeholder, consider this fixed.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   case ConstraintLocator::PatternMatch: {
     auto *pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
+
+    // TODO: We ought to introduce a new locator element for this.
     bool isMemberMatch =
         lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern);
 
@@ -6379,13 +6391,12 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
-    // If member reference didn't match expected pattern,
-    // let's consider that a contextual mismatch.
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
       conversionsOrFixes.push_back(AllowAssociatedValueMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+      break;
     }
 
     // `weak` declaration with an explicit non-optional type e.g.
@@ -6406,6 +6417,9 @@ bool ConstraintSystem::repairFailures(
         }
       }
     }
+
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
 
     break;
   }
