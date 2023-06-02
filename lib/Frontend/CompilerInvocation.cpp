@@ -602,6 +602,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     else
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
+  } else {
+    Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
   }
 
   Opts.WeakLinkAtTarget |= Args.hasArg(OPT_weak_link_at_target);
