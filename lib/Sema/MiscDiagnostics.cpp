@@ -4052,9 +4052,40 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   }
 }
 
+static void
+diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
+                                    Expr *subjectExpr) {
+  // For now, move-only types must use the `consume` operator to be
+  // pattern matched. Pattern matching is only implemented as a consuming
+  // operation today, but we don't want to be stuck with that as the default
+  // in the fullness of time when we get borrowing pattern matching later.
+  
+  // Don't bother if the subject wasn't given a valid type, or is a copyable
+  // type.
+  auto subjectType = subjectExpr->getType();
+  if (!subjectType
+      || subjectType->hasError()
+      || !subjectType->isPureMoveOnly()) {
+    return;
+  }
+
+  // A bare reference to, or load from, a move-only binding must be consumed.
+  subjectExpr = subjectExpr->getSemanticsProvidingExpr();
+  if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
+    subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
+  }
+  if (isa<DeclRefExpr>(subjectExpr)) {
+    C.Diags.diagnose(subjectExpr->getLoc(),
+                           diag::move_only_pattern_match_not_consumed)
+      .fixItInsert(subjectExpr->getStartLoc(), "consume ");
+  }
+}
+
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
                         DeclContext *DC) {
+  diagnoseMoveOnlyPatternMatchSubject(ctx, stmt->getSubjectExpr());
+                        
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
@@ -4816,7 +4847,9 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
 
     switch (elt.getKind()) {
     case StmtConditionElement::CK_Boolean:
+      break;
     case StmtConditionElement::CK_PatternBinding:
+      diagnoseMoveOnlyPatternMatchSubject(ctx, elt.getInitializer());
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();

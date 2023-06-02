@@ -1741,10 +1741,10 @@ public func enumAssignToVar5Arg2(_ x2: inout EnumTy) { // expected-error {{missi
 public func enumPatternMatchIfLet1() {
     var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(Klass())
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed again here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed again here}}
         borrowVal(x)
     }
 }
@@ -1752,10 +1752,10 @@ public func enumPatternMatchIfLet1() {
 public func enumPatternMatchIfLet1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
         borrowVal(x)
     }
@@ -1765,7 +1765,7 @@ public func enumPatternMatchIfLet2() {
     var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' consumed in a loop}}
     x2 = EnumTy.klass(Klass())
     for _ in 0..<1024 {
-        if case let EnumTy.klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let EnumTy.klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1773,7 +1773,7 @@ public func enumPatternMatchIfLet2() {
 
 public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        if case let EnumTy.klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let EnumTy.klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1782,7 +1782,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{
 public func enumPatternMatchSwitch1() {
     var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(Klass())
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
         borrowVal(x2) // expected-note {{used here}}
@@ -1792,7 +1792,7 @@ public func enumPatternMatchSwitch1() {
 }
 
 public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
         borrowVal(x2)
@@ -1804,7 +1804,7 @@ public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {
 public func enumPatternMatchSwitch2() {
     var x2 = EnumTy.klass(Klass())
     x2 = EnumTy.klass(Klass())
-    switch x2 {
+    switch consume x2 {
     case let EnumTy.klass(k):
         borrowVal(k)
     case .int:
@@ -1813,7 +1813,7 @@ public func enumPatternMatchSwitch2() {
 }
 
 public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
     case .int:
@@ -1825,7 +1825,7 @@ public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {
 public func enumPatternMatchSwitch2WhereClause() {
     var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(Klass())
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
@@ -1837,7 +1837,7 @@ public func enumPatternMatchSwitch2WhereClause() {
 }
 
 public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where x2.doSomething():
         borrowVal(k)
@@ -1851,7 +1851,7 @@ public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expec
 public func enumPatternMatchSwitch2WhereClause2() {
     var x2 = EnumTy.klass(Klass())
     x2 = EnumTy.klass(Klass())
-    switch x2 {
+    switch consume x2 {
     case let EnumTy.klass(k)
            where boolValue:
         borrowVal(k)
@@ -1863,7 +1863,7 @@ public func enumPatternMatchSwitch2WhereClause2() {
 }
 
 public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where boolValue:
         borrowVal(k)
@@ -3968,7 +3968,7 @@ func fieldSensitiveTestReinitFieldMultiBlock4() {
 func fieldSensitiveTestReinitEnumMultiBlock() {
     var e = NonTrivialEnum.first // expected-error {{'e' used after consume}}
     e = NonTrivialEnum.second(Klass())
-    switch e { // expected-note {{consumed here}}
+    switch consume e { // expected-note {{consumed here}}
     case .second:
         e = NonTrivialEnum.third(NonTrivialStruct())
     default:
@@ -3980,7 +3980,7 @@ func fieldSensitiveTestReinitEnumMultiBlock() {
 func fieldSensitiveTestReinitEnumMultiBlock1() {
     var e = NonTrivialEnum.first
     e = NonTrivialEnum.second(Klass())
-    switch e {
+    switch consume e {
     case .second:
         e = NonTrivialEnum.third(NonTrivialStruct())
     default:
@@ -3993,7 +3993,7 @@ func fieldSensitiveTestReinitEnumMultiBlock2() {
     var e = NonTrivialEnum.first
     e = NonTrivialEnum.second(Klass())
     if boolValue {
-        switch e {
+        switch consume e {
         case .second:
             e = NonTrivialEnum.third(NonTrivialStruct())
         default:
@@ -4398,54 +4398,54 @@ func borrow(_ x: borrowing MyEnum) {}
 
 func testMyEnum() {
   func test1(_ x: consuming MyEnum) {
-    if case let .first(y) = x {
+    if case let .first(y) = consume x {
       _ = y
     }
   }
 
   func test1a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
-    if case let .first(y) = x { // expected-note {{consumed here}}
+    if case let .first(y) = consume x { // expected-note {{consumed here}}
       _ = consume x // expected-note {{consumed again here}}
       _ = y
     }
   }
 
   func test1b(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
-    if case let .first(y) = x { // expected-note {{consumed here}}
+    if case let .first(y) = consume x { // expected-note {{consumed here}}
       _ = y
     }
     _ = consume x // expected-note {{consumed again here}}
   }
 
   func test2(_ x: consuming MyEnum) {
-    if case let .third(.first(y)) = x {
+    if case let .third(.first(y)) = consume x {
       _ = y
     }
   }
 
   func test2a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
-    if case let .third(.first(y)) = x { // expected-note {{consumed here}}
+    if case let .third(.first(y)) = consume x { // expected-note {{consumed here}}
       _ = consume x // expected-note {{consumed again here}}
       _ = y
     }
   }
 
   func test2b(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
-    if case let .third(.first(y)) = x { // expected-note {{consumed here}}
+    if case let .third(.first(y)) = consume x { // expected-note {{consumed here}}
       _ = y
     }
     _ = consume x // expected-note {{consumed again here}}
   }
 
   func test2c(_ x: consuming MyEnum) { // expected-error {{'x' used after consume}}
-    if case let .third(.first(y)) = x { // expected-note {{consumed here}}
+    if case let .third(.first(y)) = consume x { // expected-note {{consumed here}}
       _ = y
     }
     borrow(x) // expected-note {{used here}}
   }
 
   func test3(_ x: consuming MyEnum) {
-    switch x {
+    switch consume x {
     case let .first(y):
       _ = y
       break
@@ -4455,7 +4455,7 @@ func testMyEnum() {
   }
 
   func test3a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
-    switch x { // expected-note {{consumed here}}
+    switch consume x { // expected-note {{consumed here}}
     case let .first(y):
       _ = y
       break
@@ -4466,7 +4466,7 @@ func testMyEnum() {
   }
 
   func test4(_ x: consuming MyEnum) {
-    switch x {
+    switch consume x {
     case let .third(.first(y)):
       _ = y
       break
@@ -4476,7 +4476,7 @@ func testMyEnum() {
   }
 
   func test4a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
-    switch x { // expected-note {{consumed here}}
+    switch consume x { // expected-note {{consumed here}}
     case let .third(.first(y)):
       _ = y
       break

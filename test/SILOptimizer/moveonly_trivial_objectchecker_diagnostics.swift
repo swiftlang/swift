@@ -1472,37 +1472,37 @@ public func enumAssignToVar5OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming Enu
 public func enumPatternMatchIfLet1(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consumed here}}
-    if case let .klass(x) = x2 { // expected-note {{consumed here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x.i)
     }
-    if case let .klass(x) = x2 { // expected-note {{consumed again here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed again here}}
         borrowVal(x.i)
     }
 }
 
 public func enumPatternMatchIfLet1Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    if case let .klass(x) = x2 { // expected-note {{consumed here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x.i)
     }
-    if case let .klass(x) = x2 { // expected-note {{consumed here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x.i)
     }
 }
 
 public func enumPatternMatchIfLet1OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
-    if case let .klass(x) = x2 { // expected-note {{consumed here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let .klass(x) = x2 { // expected-note {{consumed again here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed again here}}
         borrowVal(x)
     }
 }
 
 public func enumPatternMatchIfLet1OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
-    if case let .klass(x) = x2 { // expected-note {{consumed here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let .klass(x) = x2 { // expected-note {{consumed again here}}
+    if case let .klass(x) = consume x2 { // expected-note {{consumed again here}}
         borrowVal(x)
     }
 }
@@ -1511,7 +1511,7 @@ public func enumPatternMatchIfLet2(_ x: borrowing EnumTy) { // expected-error {{
     let x2 = x // expected-error {{'x2' consumed in a loop}}
                // expected-note @-1 {{consumed here}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let .klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1519,7 +1519,7 @@ public func enumPatternMatchIfLet2(_ x: borrowing EnumTy) { // expected-error {{
 
 public func enumPatternMatchIfLet2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let .klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1527,7 +1527,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: borrowing EnumTy) { // expected-erro
 
 public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let .klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1535,7 +1535,7 @@ public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-e
 
 public func enumPatternMatchIfLet2OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let .klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1544,7 +1544,7 @@ public func enumPatternMatchIfLet2OwnedArg2(_ x2: consuming EnumTy) { // expecte
 public func enumPatternMatchSwitch1(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consumed here}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
         borrowVal(x2) // expected-note {{used here}}
@@ -1554,7 +1554,7 @@ public func enumPatternMatchSwitch1(_ x: borrowing EnumTy) { // expected-error {
 }
 
 public func enumPatternMatchSwitch1Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
@@ -1566,7 +1566,7 @@ public func enumPatternMatchSwitch1Arg(_ x2: borrowing EnumTy) { // expected-err
 }
 
 public func enumPatternMatchSwitch1OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
         borrowVal(x2) // expected-note {{used here}}
@@ -1576,7 +1576,7 @@ public func enumPatternMatchSwitch1OwnedArg(_ x2: __owned EnumTy) { // expected-
 }
 
 public func enumPatternMatchSwitch1OwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
         borrowVal(x2) // expected-note {{used here}}
@@ -1587,7 +1587,7 @@ public func enumPatternMatchSwitch1OwnedArg2(_ x2: consuming EnumTy) { // expect
 
 public func enumPatternMatchSwitch2(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-note {{consumed here}}
-    switch x2 {
+    switch consume x2 {
     case let .klass(k):
         borrowVal(k)
     case .int:
@@ -1596,7 +1596,7 @@ public func enumPatternMatchSwitch2(_ x: borrowing EnumTy) { // expected-error {
 }
 
 public func enumPatternMatchSwitch2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k):
         borrowVal(k)
     case .int:
@@ -1605,7 +1605,7 @@ public func enumPatternMatchSwitch2Arg(_ x2: borrowing EnumTy) { // expected-err
 }
 
 public func enumPatternMatchSwitch2OwnedArg(_ x2: __owned EnumTy) {
-    switch x2 {
+    switch consume x2 {
     case let .klass(k):
         borrowVal(k)
     case .int:
@@ -1614,7 +1614,7 @@ public func enumPatternMatchSwitch2OwnedArg(_ x2: __owned EnumTy) {
 }
 
 public func enumPatternMatchSwitch2OwnedArg2(_ x2: consuming EnumTy) {
-    switch x2 {
+    switch consume x2 {
     case let .klass(k):
         borrowVal(k)
     case .int:
@@ -1626,7 +1626,7 @@ public func enumPatternMatchSwitch2OwnedArg2(_ x2: consuming EnumTy) {
 public func enumPatternMatchSwitch2WhereClause(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consumed here}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
@@ -1638,7 +1638,7 @@ public func enumPatternMatchSwitch2WhereClause(_ x: borrowing EnumTy) { // expec
 }
 
 public func enumPatternMatchSwitch2WhereClauseArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where x2.doSomething():
         borrowVal(k)
@@ -1650,7 +1650,7 @@ public func enumPatternMatchSwitch2WhereClauseArg(_ x2: borrowing EnumTy) { // e
 }
 
 public func enumPatternMatchSwitch2WhereClauseOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
@@ -1662,7 +1662,7 @@ public func enumPatternMatchSwitch2WhereClauseOwnedArg(_ x2: __owned EnumTy) { /
 }
 
 public func enumPatternMatchSwitch2WhereClauseOwnedArg2(_ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
@@ -1675,7 +1675,7 @@ public func enumPatternMatchSwitch2WhereClauseOwnedArg2(_ x2: consuming EnumTy) 
 
 public func enumPatternMatchSwitch2WhereClause2(_ x: borrowing EnumTy) { // expected-error {{'x' is borrowed and cannot be consumed}}
     let x2 = x // expected-note {{consumed here}}
-    switch x2 {
+    switch consume x2 {
     case let .klass(k)
            where boolValue:
         borrowVal(k)
@@ -1687,7 +1687,7 @@ public func enumPatternMatchSwitch2WhereClause2(_ x: borrowing EnumTy) { // expe
 }
 
 public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let .klass(k)
            where boolValue:
         borrowVal(k)
@@ -1699,7 +1699,7 @@ public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: borrowing EnumTy) { // 
 }
 
 public func enumPatternMatchSwitch2WhereClause2OwnedArg(_ x2: __owned EnumTy) {
-    switch x2 {
+    switch consume x2 {
     case let .klass(k)
            where boolValue:
         borrowVal(k)
@@ -1711,7 +1711,7 @@ public func enumPatternMatchSwitch2WhereClause2OwnedArg(_ x2: __owned EnumTy) {
 }
 
 public func enumPatternMatchSwitch2WhereClause2OwnedArg2(_ x2: consuming EnumTy) {
-    switch x2 {
+    switch consume x2 {
     case let .klass(k)
            where boolValue:
         borrowVal(k)
