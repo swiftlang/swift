@@ -1,4 +1,4 @@
-//===--- MoveOnlyDeinitInsertion.cpp --------------------------------------===//
+//===--- MoveOnlyDeinitDevirtualization.cpp --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -143,7 +143,7 @@ static bool performTransform(SILFunction &fn) {
 
 namespace {
 
-class SILMoveOnlyDeinitInsertionPass : public SILFunctionTransform {
+class SILMoveOnlyDeinitDevirtualizationPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
@@ -153,7 +153,7 @@ class SILMoveOnlyDeinitInsertionPass : public SILFunctionTransform {
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
-    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Deinit Insertion. Visiting: "
+    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Deinit Devirtualization. Visiting: "
                             << fn->getName() << '\n');
     if (performTransform(*fn)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
@@ -163,6 +163,6 @@ class SILMoveOnlyDeinitInsertionPass : public SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createMoveOnlyDeinitInsertion() {
-  return new SILMoveOnlyDeinitInsertionPass();
+SILTransform *swift::createMoveOnlyDeinitDevirtualization() {
+  return new SILMoveOnlyDeinitDevirtualizationPass();
 }

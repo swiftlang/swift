@@ -20,6 +20,7 @@ target_sources(swiftSILOptimizer PRIVATE
   DifferentiabilityWitnessDevirtualizer.cpp
   EagerSpecializer.cpp
   GenericSpecializer.cpp
+  MoveOnlyDeinitDevirtualization.cpp
   Outliner.cpp
   ObjectOutliner.cpp
   AssemblyVisionRemarkGenerator.cpp
