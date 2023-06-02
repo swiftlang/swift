@@ -499,6 +499,8 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
                                                    NominalTypeDecl *nom,
                                                    CleanupLocation cleanupLoc,
                                                    SILBasicBlock *finishBB) {
+  // drop_deinit must be used to invalidate any user-defined struct/enum deinit
+  // before the individual members can be destroyed.
   selfValue = B.createDropDeinit(cleanupLoc, selfValue);
   if (selfValue->getType().isAddress()) {
     if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
