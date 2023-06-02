@@ -419,8 +419,12 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
                                        const EnumTypeLayoutEntry &entry) {
   assert(entry.isFixedSize(IGM));
 
+  IRGenMangler mangler;
+  auto symbol = mangler.mangleSymbolNameForMangledGetEnumTagForLayoutString(
+      entry.ty.getASTType());
+
   auto helperFn = IGM.getOrCreateHelperFunction(
-      "", IGM.Int32Ty /*retTy*/, IGM.Int8PtrTy /*argTys*/,
+      symbol, IGM.Int32Ty /*retTy*/, IGM.Int8PtrTy /*argTys*/,
       [&](IRGenFunction &IGF) {
         auto enumPtr = IGF.collectParameters().claimNext();
         auto *typeInfo = *entry.fixedTypeInfo;
