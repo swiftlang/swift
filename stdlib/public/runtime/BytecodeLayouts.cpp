@@ -26,6 +26,7 @@
 #include "llvm/Support/SwapByteOrder.h"
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include <Block.h>
@@ -60,24 +61,33 @@ static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
 
-typedef Metadata* (*MetadataAccessor)(const Metadata* const *);
+template <typename FnTy>
+static const FnTy readRelativeFunctionPointer(const uint8_t *layoutStr,
+                                              size_t &offset) {
+  static_assert(std::is_pointer<FnTy>::value);
 
-static const Metadata *getResilientTypeMetadata(const Metadata* metadata,
-                                         const uint8_t *layoutStr,
-                                         size_t &offset) {
   auto absolute = layoutStr + offset;
   auto relativeOffset =
       (uintptr_t)(intptr_t)(int32_t)readBytes<intptr_t>(layoutStr, offset);
-  MetadataAccessor fn;
+  FnTy fn;
 
 #if SWIFT_PTRAUTH
-  fn = (MetadataAccessor)ptrauth_sign_unauthenticated(
+  fn = (FnTy)ptrauth_sign_unauthenticated(
       (void *)((uintptr_t)absolute + relativeOffset),
       ptrauth_key_function_pointer, 0);
 #else
-  fn = (MetadataAccessor)((uintptr_t)absolute + relativeOffset);
+  fn = (FnTy)((uintptr_t)absolute + relativeOffset);
 #endif
 
+  return fn;
+}
+
+typedef Metadata *(*MetadataAccessor)(const Metadata *const *);
+
+static const Metadata *getResilientTypeMetadata(const Metadata *metadata,
+                                                const uint8_t *layoutStr,
+                                                size_t &offset) {
+  auto fn = readRelativeFunctionPointer<MetadataAccessor>(layoutStr, offset);
   return fn(metadata->getGenericArgs());
 }
 
@@ -117,6 +127,13 @@ inline static bool handleNextRefCount(const Metadata *metadata, const uint8_t *t
   } else if (SWIFT_UNLIKELY(tag ==
                             RefCountingKind::SinglePayloadEnumSimple)) {
     Handler::handleSinglePayloadEnumSimple(typeLayout, offset, addrOffset, std::forward<Params>(params)...);
+  } else if (SWIFT_UNLIKELY(tag == RefCountingKind::SinglePayloadEnumFN)) {
+    Handler::handleSinglePayloadEnumFN(typeLayout, offset, false, addrOffset,
+                                       std::forward<Params>(params)...);
+  } else if (SWIFT_UNLIKELY(tag ==
+                            RefCountingKind::SinglePayloadEnumFNResolved)) {
+    Handler::handleSinglePayloadEnumFN(typeLayout, offset, true, addrOffset,
+                                       std::forward<Params>(params)...);
   } else {
     Handler::handleReference(tag, addrOffset, std::forward<Params>(params)...);
   }
@@ -154,8 +171,9 @@ static uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
   }
 }
 
-static void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
-                                   uint8_t *addr, size_t &addrOffset) {
+static void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
+                                          size_t &offset, uint8_t *addr,
+                                          size_t &addrOffset) {
   auto byteCountsAndOffset = readBytes<uint64_t>(typeLayout, offset);
   auto extraTagBytesPattern = (uint8_t)(byteCountsAndOffset >> 62);
   auto xiTagBytesPattern = ((uint8_t)(byteCountsAndOffset >> 59)) & 0x7;
@@ -198,6 +216,30 @@ noPayload:
   addrOffset += skip;
 }
 
+typedef unsigned (*GetEnumTagFn)(const uint8_t *);
+
+static void handleSinglePayloadEnumFN(const uint8_t *typeLayout, size_t &offset,
+                                      bool resolved, uint8_t *addr,
+                                      size_t &addrOffset) {
+  GetEnumTagFn getEnumTag;
+  if (resolved) {
+    getEnumTag = readBytes<GetEnumTagFn>(typeLayout, offset);
+  } else {
+    getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(typeLayout, offset);
+  }
+
+  unsigned enumTag = getEnumTag(addr + addrOffset);
+
+  if (enumTag == 0) {
+    offset += sizeof(size_t) * 2;
+  } else {
+    auto refCountBytes = readBytes<size_t>(typeLayout, offset);
+    auto skip = readBytes<size_t>(typeLayout, offset);
+    offset += refCountBytes;
+    addrOffset += skip;
+  }
+}
+
 const DestroyFuncAndMask destroyTable[] = {
   {(DestrFn)&skipDestroy, false},
   {(DestrFn)&swift_errorRelease, true},
@@ -230,6 +272,13 @@ struct DestroyHandler {
   static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
                                                    size_t &addrOffset, uint8_t *addr) {
     ::handleSinglePayloadEnumSimple(typeLayout, offset, addr, addrOffset);
+  }
+
+  static inline void handleSinglePayloadEnumFN(const uint8_t *typeLayout,
+                                               size_t &offset, bool resolved,
+                                               size_t &addrOffset,
+                                               uint8_t *addr) {
+    ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, addr, addrOffset);
   }
 
   static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset, uint8_t *addr) {
@@ -303,6 +352,14 @@ struct CopyHandler {
   static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout, size_t &offset,
                                                    size_t &addrOffset, uint8_t *dest, uint8_t *src) {
     ::handleSinglePayloadEnumSimple(typeLayout, offset, (uint8_t *)src, addrOffset);
+  }
+
+  static inline void handleSinglePayloadEnumFN(const uint8_t *typeLayout,
+                                               size_t &offset, bool resolved,
+                                               size_t &addrOffset,
+                                               uint8_t *dest, uint8_t *src) {
+    ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, (uint8_t *)src,
+                                addrOffset);
   }
 
   static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset, uint8_t *dest, uint8_t *src) {
@@ -388,6 +445,18 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
       break;
     }
 
+    case RefCountingKind::SinglePayloadEnumFN: {
+      handleSinglePayloadEnumFN(typeLayout, offset, false, (uint8_t *)src,
+                                addrOffset);
+      break;
+    }
+
+    case RefCountingKind::SinglePayloadEnumFNResolved: {
+      handleSinglePayloadEnumFN(typeLayout, offset, true, (uint8_t *)src,
+                                addrOffset);
+      break;
+    }
+
     case RefCountingKind::End:
       return dest;
     default:
@@ -439,6 +508,25 @@ void swift::swift_resolve_resilientAccessors(
     case RefCountingKind::SinglePayloadEnumSimple:
       i += (3 * sizeof(uint64_t)) + (4 * sizeof(size_t));
       break;
+
+    case RefCountingKind::SinglePayloadEnumFN: {
+      auto getEnumTag =
+          readRelativeFunctionPointer<GetEnumTagFn>(fieldLayoutStr, i);
+      size_t writeOffset =
+          layoutStrOffset + currentOffset - layoutStringHeaderSize;
+      uint64_t tagAndOffset =
+          (((uint64_t)RefCountingKind::SinglePayloadEnumFNResolved) << 56) |
+          size;
+      writeBytes(layoutStr, writeOffset, tagAndOffset);
+      writeBytes(layoutStr, writeOffset, getEnumTag);
+      i += 2 * sizeof(size_t);
+      break;
+    }
+
+    case RefCountingKind::SinglePayloadEnumFNResolved:
+      i += 3 * sizeof(size_t);
+      break;
+
     default:
       break;
     }

@@ -542,6 +542,62 @@ func testSinglePayloadEnumExtraTagBytesWrapper() {
 
 testSinglePayloadEnumExtraTagBytesWrapper()
 
+func testSinglePayloadEnumManyXI() {
+    let ptr = UnsafeMutablePointer<SinglePayloadEnumManyXI>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadEnumManyXI.nonEmpty(Builtin.zeroInitializer(), SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadEnumManyXI.nonEmpty(Builtin.zeroInitializer(), SimpleClass(x: 28))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadEnumManyXI()
+
+func testSinglePayloadEnumManyXIEmpty() {
+    let ptr = UnsafeMutablePointer<SinglePayloadEnumManyXI>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadEnumManyXI.empty0
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadEnumManyXI.empty1
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadEnumManyXIEmpty()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)

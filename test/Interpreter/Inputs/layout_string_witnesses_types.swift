@@ -442,6 +442,17 @@ public struct InternalEnumWrapper {
   }
 }
 
+public enum SinglePayloadEnumManyXI {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(Builtin.Int127, SimpleClass)
+}
+
 public struct PrespecializedStruct<T> {
     let y: Int = 0
     let x: T
