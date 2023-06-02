@@ -964,7 +964,7 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
         nextValue = _symbols[mid + 1].value
       }
 
-      if symbol.value <= address && nextValue >= address {
+      if symbol.value <= address && nextValue > address {
         var ndx = mid
         while ndx > 0 && _symbols[ndx - 1].value == address {
           ndx -= 1
