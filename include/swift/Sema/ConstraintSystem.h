@@ -1500,6 +1500,10 @@ public:
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
 
+  /// A map of expressions to the ExprPatterns that they are being solved as
+  /// a part of.
+  llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
+
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallVector<ParamDecl *, 2> isolatedParams;
 
@@ -1683,6 +1687,16 @@ public:
     return known != resultBuilderTransformed.end()
         ? &known->second
         : nullptr;
+  }
+
+  /// Retrieve the solved ExprPattern that corresponds to provided
+  /// sub-expression.
+  NullablePtr<ExprPattern> getExprPatternFor(Expr *E) const {
+    auto result = exprPatterns.find(E);
+    if (result == exprPatterns.end())
+      return nullptr;
+
+    return result->second;
   }
 
   /// This method implements functionality of `Expr::isTypeReference`
@@ -2147,6 +2161,10 @@ private:
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
+
+  /// A map of expressions to the ExprPatterns that they are being solved as
+  /// a part of.
+  llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
@@ -2745,6 +2763,9 @@ public:
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
 
+    /// The length of \c exprPatterns.
+    unsigned numExprPatterns;
+
     /// The length of \c isolatedParams.
     unsigned numIsolatedParams;
 
@@ -3164,6 +3185,15 @@ public:
     assert(item != nullptr);
     assert(caseLabelItems.count(item) == 0);
     caseLabelItems[item] = info;
+  }
+
+  /// Record a given ExprPattern as the parent of its sub-expression.
+  void setExprPatternFor(Expr *E, ExprPattern *EP) {
+    assert(E);
+    assert(EP);
+    auto inserted = exprPatterns.insert({E, EP}).second;
+    assert(inserted && "Mapping already defined?");
+    (void)inserted;
   }
 
   Optional<CaseLabelItemInfo> getCaseLabelItemInfo(
@@ -4314,6 +4344,11 @@ public:
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
   bool generateConstraints(SingleValueStmtExpr *E);
+
+  /// Generate constraints for an array of ExprPatterns, forming a conjunction
+  /// that solves each expression in turn.
+  void generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
+                           ConstraintLocatorBuilder locator);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
