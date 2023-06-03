@@ -413,11 +413,9 @@ public:
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false,
-                                   bool isLexical = false, bool wasMoved = false
-#ifndef NDEBUG
-                                   ,
+                                   bool isLexical = false,
+                                   bool wasMoved = false,
                                    bool skipVarDeclAssert = false
-#endif
   ) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
@@ -425,6 +423,8 @@ public:
     if (dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()))
       assert((skipVarDeclAssert || Loc.isSynthesizedAST() || Var) &&
              "location is a VarDecl, but SILDebugVariable is empty");
+#else
+    (void)skipVarDeclAssert;
 #endif
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
@@ -473,19 +473,20 @@ public:
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
                           usesMoveableValueDebugInfo,
-                          /*skipVarDeclAssert*/ false, hasPointerEscape);
+                          /*skipVarDeclAssert*/ false,
+                          hasPointerEscape);
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false,
                                bool reflection = false,
-                               bool usesMoveableValueDebugInfo = false
-#ifndef NDEBUG
-                               ,
+                               bool usesMoveableValueDebugInfo = false,
                                bool skipVarDeclAssert = false,
-#endif
                                bool hasPointerEscape = false) {
+#if NDEBUG
+    (void)skipVarDeclAssert;
+#endif
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((skipVarDeclAssert ||
