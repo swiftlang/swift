@@ -403,6 +403,13 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     for (auto macroNames : introducedNames) {
       auto macroRef = macroNames.getFirst();
       for (auto name : macroNames.getSecond()) {
+
+        // If this macro isn't in a module-scope context, and the introduced
+        // name isn't an operator, we shouldn't be able to see it.
+        if (!decl->getDeclContext()->isModuleScopeContext() &&
+            !name.getBaseName().isOperator())
+          continue;
+
         auto *placeholder = MissingDecl::forUnexpandedMacro(macroRef, decl);
         name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
       }
@@ -485,6 +492,12 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   for (auto *unexpandedDecl : unexpandedDecls) {
     unexpandedDecl->forEachMacroExpandedDecl(
         [&](ValueDecl *decl) {
+          // If the declaration is not a module-scope declaration, and
+          // isn't an operator, ignore it.
+          if (!decl->getDeclContext()->isModuleScopeContext() &&
+              !decl->getName().getBaseName().isOperator())
+            return;
+
           if (decl->getName().matchesRef(Name)) {
             if (macroExpandedDecls.insert(decl).second)
               Result.push_back(decl);
