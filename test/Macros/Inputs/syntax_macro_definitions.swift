@@ -1531,3 +1531,25 @@ public struct UseIdentifierMacro: DeclarationMacro {
     ]
   }
 }
+
+public struct StaticFooFuncMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func foo() {}",
+    ]
+  }
+}
+
+public struct SelfAlwaysEqualOperator: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func ==(lhs: Self, rhs: Bool) -> Bool { true }",
+    ]
+  }
+}

@@ -425,3 +425,37 @@ func testLocalVarsFromDeclarationMacros() {
 struct TakesVariadic {
   #emptyDecl("foo", "bar")
 }
+
+// Funkiness with static functions introduced via macro expansions.
+@freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+@freestanding(declaration, names: arbitrary) public macro staticFooFuncArbitrary() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+
+class HasAnExpandedStatic {
+  #staticFooFunc()
+}
+
+class HasAnExpandedStatic2 {
+  #staticFooFuncArbitrary()
+}
+
+func testHasAnExpandedStatic() {
+#if TEST_DIAGNOSTICS
+  foo() // expected-error{{cannot find 'foo' in scope}}
+#endif
+}
+
+@freestanding(declaration, names: named(==)) public macro addSelfEqualsOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@freestanding(declaration, names: arbitrary) public macro addSelfEqualsOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+
+struct HasEqualsSelf {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2 {
+  #addSelfEqualsOperatorArbitrary
+}
+
+func testHasEqualsSelf(x: HasEqualsSelf, y: HasEqualsSelf2) {
+  _ = (x == true)
+  _ = (y == true)
+}
