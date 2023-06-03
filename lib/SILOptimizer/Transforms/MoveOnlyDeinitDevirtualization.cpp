@@ -15,6 +15,13 @@
 /// This pass runs after move only checking has occurred and transforms last
 /// destroy_value of move only types into a call to the move only types deinit.
 ///
+/// TODO: This pass is disabled because it hides bugs in the common case in
+/// which optimization passes incorrectly remove the deinit, for example, by
+/// destructuring the aggregate rather than destroying it as a whole. Consider
+/// reeabling this pass later in the pipeline, after all other OSSA function
+/// passes have run. Also consider removing bailouts from this pass. If it's
+/// possible to devirtualize, then it should do it.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-move-only-checker"
