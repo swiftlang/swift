@@ -468,10 +468,12 @@ public:
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false,
                                bool reflection = false,
-                               bool usesMoveableValueDebugInfo = false) {
+                               bool usesMoveableValueDebugInfo = false,
+                               bool hasPointerEscape = false) {
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
-                          usesMoveableValueDebugInfo);
+                          usesMoveableValueDebugInfo,
+                          /*skipVarDeclAssert*/ false, hasPointerEscape);
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
@@ -480,9 +482,10 @@ public:
                                bool reflection = false,
                                bool usesMoveableValueDebugInfo = false
 #ifndef NDEBUG
-                               , bool skipVarDeclAssert = false
+                               ,
+                               bool skipVarDeclAssert = false,
 #endif
-                               ) {
+                               bool hasPointerEscape = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((skipVarDeclAssert ||
@@ -491,7 +494,7 @@ public:
     return insert(AllocBoxInst::create(
         getSILDebugLocation(Loc, true), BoxType, *F,
         substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, reflection,
-        usesMoveableValueDebugInfo));
+        usesMoveableValueDebugInfo, hasPointerEscape));
   }
 
   AllocExistentialBoxInst *
@@ -794,11 +797,12 @@ public:
   }
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
-                                     bool isLexical = false) {
+                                     bool isLexical = false,
+                                     bool hasPointerEscape = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
-    return insert(new (getModule())
-                      BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical));
+    return insert(new (getModule()) BeginBorrowInst(getSILDebugLocation(Loc),
+                                                    LV, isLexical, hasPointerEscape));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
@@ -1340,13 +1344,14 @@ public:
   }
 
   MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
-                                 bool isLexical = false) {
+                                 bool isLexical = false,
+                                 bool hasPointerEscape = false) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitMoveValueOperation");
-    return insert(new (getModule()) MoveValueInst(getSILDebugLocation(loc),
-                                                  operand, isLexical));
+    return insert(new (getModule()) MoveValueInst(
+        getSILDebugLocation(loc), operand, isLexical, hasPointerEscape));
   }
 
   DropDeinitInst *createDropDeinit(SILLocation loc, SILValue operand) {

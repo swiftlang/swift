@@ -417,16 +417,12 @@ deriveEquatable_eq(
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableTy = equatableProto->getDeclaredInterfaceType();
-    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
-    eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                  SourceRange(),
-                                                  equatableTyExpr,
-                                                  equalsDeclName,
-                                                  DeclNameLoc()));
+    eqDecl->getAttrs().add(ImplementsAttr::create(parentDC,
+                                                  equatableProto,
+                                                  equalsDeclName));
   }
 
   if (!C.getEqualIntDecl()) {

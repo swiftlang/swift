@@ -3304,6 +3304,14 @@ void SourceFile::lookupImportedSPIGroups(
   }
 }
 
+bool shouldImplicitImportAsSPI(ArrayRef<Identifier> spiGroups) {
+  for (auto group : spiGroups) {
+    if (group.empty())
+      return true;
+  }
+  return false;
+}
+
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
@@ -3311,6 +3319,8 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   // Objective-C SPIs are always imported implicitly.
   if (targetDecl->hasClangNode())
     return !targetDecl->getSPIGroups().empty();
+  if (shouldImplicitImportAsSPI(targetDecl->getSPIGroups()))
+    return true;
 
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty())
@@ -3345,12 +3355,14 @@ bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
 
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
+  auto declSPIGroups = attr->getSPIGroups();
+  if (shouldImplicitImportAsSPI(declSPIGroups))
+    return true;
+
   auto targetModule = targetDecl->getModuleContext();
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty()) return false;
-
-  auto declSPIGroups = attr->getSPIGroups();
 
   for (auto declSPI : declSPIGroups)
     if (importedSPIGroups.count(declSPI))
@@ -3361,6 +3373,9 @@ bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
 
 bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
                                  const ModuleDecl *fromModule) const {
+  if (shouldImplicitImportAsSPI({spiGroup}))
+    return true;
+
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
   lookupImportedSPIGroups(fromModule, importedSPIGroups);
   if (importedSPIGroups.empty())

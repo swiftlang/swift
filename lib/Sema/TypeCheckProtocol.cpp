@@ -1237,11 +1237,9 @@ witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
   assert(requirement->isProtocolRequirement());
   auto *PD = cast<ProtocolDecl>(requirement->getDeclContext());
   if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
-    if (Type T = A->getProtocolType()) {
-      if (auto ProtoTy = T->getAs<ProtocolType>()) {
-        if (ProtoTy->getDecl() == PD) {
-          return A->getMemberName() == requirement->getName();
-        }
+    if (auto *OtherPD = A->getProtocol(witness->getDeclContext())) {
+      if (OtherPD == PD) {
+        return A->getMemberName() == requirement->getName();
       }
     }
   }
@@ -5733,9 +5731,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 
   // If we have a conditional requirements that we need to check, do so now.
   if (!condReqs->empty()) {
-    auto conditionalCheckResult = checkGenericArguments(
-        M, *condReqs,
-        [](SubstitutableType *dependentType) { return Type(dependentType); });
+    auto conditionalCheckResult = checkGenericArguments(*condReqs);
     switch (conditionalCheckResult) {
     case CheckGenericArgumentsResult::Success:
       break;

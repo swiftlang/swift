@@ -350,6 +350,27 @@ public struct MixedEnumWrapperWrapperGeneric<T> {
     }
 }
 
+public struct SinglePayloadEnumExtraTagBytesWrapper {
+    let x: SinglePayloadEnumExtraTagBytes
+    let y: SimpleClass
+
+    public init(x: SinglePayloadEnumExtraTagBytes, y: SimpleClass) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public enum SinglePayloadEnumExtraTagBytes {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(WeakNativeWrapper)
+}
+
 public struct ComplexNesting<A, B, C, D> {
     let pre: Filler = Filler()
     let a: NestedA<A>
@@ -419,6 +440,17 @@ public struct InternalEnumWrapper {
   public init(x: AnyObject) {
     self.x = .a(23, x)
   }
+}
+
+public enum SinglePayloadEnumManyXI {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(Builtin.Int127, SimpleClass)
 }
 
 public struct PrespecializedStruct<T> {
