@@ -5006,7 +5006,8 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
   return attrs;
 }
 
-ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
+static ValueDecl *
+cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
     // TODO: function templates are specialized during type checking so to
     // support these we need to tell Swift to type check the synthesized bodies.
@@ -6290,16 +6291,23 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
-ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
-                                               DeclContext *newContext) {
+ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
+    ValueDecl *decl, DeclContext *newContext) {
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
-  if (!Impl.clonedBaseMembers.count(key)) {
+  auto known = clonedBaseMembers.find(key);
+  if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext);
-    Impl.clonedBaseMembers[key] = cloned;
+    known = clonedBaseMembers.insert({key, cloned}).first;
   }
-  return Impl.clonedBaseMembers[key];
+
+  return known->second;
+}
+
+ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
+                                               DeclContext *newContext) {
+  return Impl.importBaseMemberDecl(decl, newContext);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
