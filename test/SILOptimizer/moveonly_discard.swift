@@ -84,7 +84,7 @@ final class Wallet {
   }
 
   __consuming func inspect() { // expected-error {{'self' consumed more than once}}
-    switch self { // expected-note {{consumed here}}
+    switch consume self { // expected-note {{consumed here}}
     case .green, .yellow, .red:
       discard self // expected-note {{consumed again here}}
     default:
