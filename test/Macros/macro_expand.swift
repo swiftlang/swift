@@ -425,3 +425,58 @@ func testLocalVarsFromDeclarationMacros() {
 struct TakesVariadic {
   #emptyDecl("foo", "bar")
 }
+
+// Funkiness with static functions introduced via macro expansions.
+@freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+@freestanding(declaration, names: arbitrary) public macro staticFooFuncArbitrary() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+
+class HasAnExpandedStatic {
+  #staticFooFunc()
+}
+
+class HasAnExpandedStatic2 {
+  #staticFooFuncArbitrary()
+}
+
+func testHasAnExpandedStatic() {
+#if TEST_DIAGNOSTICS
+  foo() // expected-error{{cannot find 'foo' in scope}}
+#endif
+}
+
+@freestanding(declaration, names: named(==)) public macro addSelfEqualsOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@freestanding(declaration, names: arbitrary) public macro addSelfEqualsOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: named(==)) public macro AddSelfEqualsMemberOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: arbitrary) public macro AddSelfEqualsMemberOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+
+struct HasEqualsSelf {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2 {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3 {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4 {
+}
+
+func testHasEqualsSelf(
+  x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4
+) {
+  _ = (x == true)
+  _ = (y == true)
+#if TEST_DIAGNOSTICS
+  // FIXME: This is technically a bug, because we should be able to find the
+  // == operator introduced through a member operator. However, we might
+  // want to change the rule rather than implement this.
+  _ = (z == true) // expected-error{{binary operator '==' cannot be applied to operands}}
+  // expected-note@-1{{overloads for '==' exist with these partially matching parameter lists}}
+  _ = (w == true) // expected-error{{binary operator '==' cannot be applied to operands}}
+  // expected-note@-1{{overloads for '==' exist with these partially matching parameter lists}}
+  #endif
+}
