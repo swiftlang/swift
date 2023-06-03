@@ -53,6 +53,10 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
+/// Given a pointer to a potentially heap-allocated pack of metadata/wtables,
+/// mask off the bit that indicates whether it is heap allocated.
+llvm::Value *maskMetadataPackPointer(IRGenFunction &IGF, llvm::Value *);
+
 void bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
                                         GenericEnvironment *env,
                                         llvm::Value *index);
