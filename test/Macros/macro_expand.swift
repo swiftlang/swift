@@ -417,3 +417,10 @@ func testFreestandingClosureNesting() {
 func testLocalVarsFromDeclarationMacros() {
   #varValue
 }
+
+// Variadic macro
+@freestanding(declaration, names: arbitrary) macro emptyDecl(_: String...) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+struct TakesVariadic {
+  #emptyDecl("foo", "bar")
+}
