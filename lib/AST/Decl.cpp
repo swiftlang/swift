@@ -4894,6 +4894,18 @@ NominalTypeDecl::getInitAccessorProperties() const {
       {});
 }
 
+void NominalTypeDecl::collectPropertiesInitializableByInitAccessors(
+    std::multimap<VarDecl *, VarDecl *> &result) const {
+  for (auto *property : getInitAccessorProperties()) {
+    auto *initAccessor = property->getAccessor(AccessorKind::Init);
+    if (auto *initAttr =
+            initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
+      for (auto *subsumed : initAttr->getPropertyDecls(initAccessor))
+        result.insert({subsumed, property});
+    }
+  }
+}
+
 ArrayRef<Decl *>
 NominalTypeDecl::getStoredPropertiesAndMissingMemberPlaceholders() const {
   auto &ctx = getASTContext();

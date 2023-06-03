@@ -303,3 +303,79 @@ struct TestGeneric<T, U> {
     self.data = (b, a)
   }
 }
+
+func test_local_with_memberwise() {
+  class MyValue {}
+
+  struct TestMemberwiseConcrete {
+    var a: Int
+    var b: String
+
+    var pair: (Int, String) {
+      init(initialValue) initializes(a b) {
+        a = initialValue.0
+        b = initialValue.1
+      }
+
+      get { (a, b) }
+      set { }
+    }
+
+    var c: [MyValue]
+
+    // CHECK-LABEL: sil private @$s14init_accessors26test_local_with_memberwiseyyF22TestMemberwiseConcreteL_V4pair1cADSi_SSt_SayAaByyF7MyValueL_CGtcfC : $@convention(method) (Int, @owned String, @owned Array<MyValue>, @thin TestMemberwiseConcrete.Type) -> @owned TestMemberwiseConcrete
+    // CHECK:  [[SELF_VALUE:%.*]] = alloc_stack $TestMemberwiseConcrete
+    // CHECK-NEXT: [[A_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestMemberwiseConcrete, #<abstract function>TestMemberwiseConcrete.a
+    // CHECK-NEXT: [[B_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestMemberwiseConcrete, #<abstract function>TestMemberwiseConcrete.b
+    // CHECK:  [[INIT_ACCESSOR_REF:%.*]] = function_ref @$s14init_accessors26test_local_with_memberwiseyyF22TestMemberwiseConcreteL_V4pairSi_SStvi : $@convention(thin) (Int, @owned String) -> (@out Int, @out String)
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR_REF]]([[A_REF]], [[B_REF]], %0, %1) : $@convention(thin) (Int, @owned String) -> (@out Int, @out String)
+    // CHECK-NEXT: [[C_REF:%.*]] = struct_element_addr %4 : $*TestMemberwiseConcrete, #<abstract function>TestMemberwiseConcrete.c
+    // CHECK-NEXT: store %2 to [[C_REF]] : $*Array<MyValue>
+    // CHECK-NEXT: [[RESULT:%.*]] = load [[SELF_VALUE]] : $*TestMemberwiseConcrete
+    // CHECK-NEXT: dealloc_stack [[SELF_VALUE]] : $*TestMemberwiseConcrete
+    // CHECK-NEXT: return [[RESULT]] : $TestMemberwiseConcrete
+  }
+
+  _ = TestMemberwiseConcrete(pair: (0, "a"), c: [])
+
+  struct TestMemberwiseGeneric<T, C> where C: RangeReplaceableCollection, C.Element == T {
+    var _a: T
+    var _b: String
+    var _c: C
+
+    var a: T {
+      init(initialValue) initializes(_a) {
+        _a = initialValue
+      }
+
+      get { _a }
+      set { }
+    }
+
+    var pair: (String, C) {
+      init(initialValue) initializes(_b _c) accesses(_a) {
+        _b = initialValue.0
+        _c = initialValue.1
+        _c.append(_a)
+      }
+
+      get { (_b, _c) }
+      set { }
+    }
+
+    // CHECK-LABEL: sil private @$s14init_accessors26test_local_with_memberwiseyyF21TestMemberwiseGenericL_V1a4pairADyxq_Gx_SS_q_ttcfC : $@convention(method) <T, C where T == C.Element, C : RangeReplaceableCollection> (@in T, @owned String, @in C, @thin TestMemberwiseGeneric<T, C>.Type) -> @out TestMemberwiseGeneric<T, C>
+    // CHECK: bb0([[SELF_VALUE:%.*]]  : $*TestMemberwiseGeneric<T, C>, [[A_VALUE:%*.]] : $*T, [[B_VALUE:%.*]] : $String, [[C_VALUE:%.*]] : $*C, [[METATYPE:%.*]] : $@thin TestMemberwiseGeneric<T, C>.Type):
+    // CHECK-NEXT: [[A_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestMemberwiseGeneric<T, C>, #<abstract function>TestMemberwiseGeneric._a
+    // CHECK: [[INIT_ACCESSOR_REF:%.*]] = function_ref @$s14init_accessors26test_local_with_memberwiseyyF21TestMemberwiseGenericL_V1axvi : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1.Element, τ_0_1 : RangeReplaceableCollection> (@in τ_0_0) -> @out τ_0_0 // user: %7
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR_REF]]<T, C>([[A_REF]], [[A_VALUE]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1.Element, τ_0_1 : RangeReplaceableCollection> (@in τ_0_0) -> @out τ_0_0
+    // CHECK-NEXT: [[B_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestMemberwiseGeneric<T, C>, #<abstract function>TestMemberwiseGeneric._b
+    // CHECK-NEXT: [[C_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestMemberwiseGeneric<T, C>, #<abstract function>TestMemberwiseGeneric._c
+    // CHECK-NEXT: [[A_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestMemberwiseGeneric<T, C>, #<abstract function>TestMemberwiseGeneric._a
+    // CHECK: [[INIT_ACCESSOR_REF:%.*]] = function_ref @$s14init_accessors26test_local_with_memberwiseyyF21TestMemberwiseGenericL_V4pairSS_q_tvi : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1.Element, τ_0_1 : RangeReplaceableCollection> (@owned String, @in τ_0_1, @inout τ_0_0) -> (@out String, @out τ_0_1)
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR_REF]]<T, C>([[B_REF]], [[C_REF]], [[B_VALUE]], [[C_VALUE]], [[A_REF]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1.Element, τ_0_1 : RangeReplaceableCollection> (@owned String, @in τ_0_1, @inout τ_0_0) -> (@out String, @out τ_0_1)
+    // CHECK-NEXT: [[VOID:%.*]] = tuple ()
+    // CHECK-NEXT: return [[VOID]] : $()
+  }
+
+  _ = TestMemberwiseGeneric(a: 1, pair: ("a", [0]))
+}
