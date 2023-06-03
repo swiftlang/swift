@@ -4616,6 +4616,9 @@ ERROR(unknown_case_multiple_patterns,none,
 ERROR(unknown_case_must_be_last,none,
       "'@unknown' can only be applied to the last case in a switch", ())
 
+WARNING(move_only_pattern_match_not_consumed,none,
+        "noncopyable binding being pattern-matched must have the 'consume' operator applied", ())
+
 WARNING(where_on_one_item, none,
         "'where' only applies to the second pattern match in this case", ())
 
