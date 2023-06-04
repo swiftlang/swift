@@ -167,3 +167,14 @@ bb0(%0 : $*Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_copyable_to_moveonlywrapper_addr : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: copyable_to_moveonlywrapper_addr
+// CHECK: } // end sil function 'test_copyable_to_moveonlywrapper_addr'
+sil [ossa] @test_copyable_to_moveonlywrapper_addr : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = copyable_to_moveonlywrapper_addr %0 : $*Builtin.NativeObject
+  destroy_addr %0a : $*@moveOnly Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

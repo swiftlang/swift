@@ -131,6 +131,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   RAUW_ALWAYS(MoveOnlyWrapperToCopyableValue)
   RAUW_ALWAYS(MoveOnlyWrapperToCopyableAddr)
   RAUW_ALWAYS(CopyableToMoveOnlyWrapperValue)
+  RAUW_ALWAYS(CopyableToMoveOnlyWrapperAddr)
 #undef RAUW_ALWAYS
 
 #define DELETE_IF_TRIVIAL_OP(CLS)                                              \

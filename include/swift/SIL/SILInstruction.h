@@ -8540,17 +8540,26 @@ public:
   InitialKind getInitialKind() const { return initialKind; }
 };
 
+class CopyableToMoveOnlyWrapperAddrInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst,
+          SingleValueInstruction> {
+  friend class SILBuilder;
+
+  CopyableToMoveOnlyWrapperAddrInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().addingMoveOnlyWrapper()) {}
+};
+
 class MoveOnlyWrapperToCopyableAddrInst
     : public UnaryInstructionBase<
           SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst,
           SingleValueInstruction> {
   friend class SILBuilder;
 
-  MoveOnlyWrapperToCopyableAddrInst(const SILFunction &fn,
-                                    SILDebugLocation DebugLoc, SILValue operand)
+  MoveOnlyWrapperToCopyableAddrInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().removingMoveOnlyWrapper()) {
-  }
+                             operand->getType().removingMoveOnlyWrapper()) {}
 };
 
 /// Given an object reference, return true iff it is non-nil and refers

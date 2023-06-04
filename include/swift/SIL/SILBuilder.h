@@ -1416,6 +1416,12 @@ public:
         getSILDebugLocation(loc), src));
   }
 
+  CopyableToMoveOnlyWrapperAddrInst *
+  createCopyableToMoveOnlyWrapperAddr(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) CopyableToMoveOnlyWrapperAddrInst(
+        getSILDebugLocation(loc), src));
+  }
+
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(

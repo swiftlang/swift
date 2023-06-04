@@ -2463,6 +2463,10 @@ public:
       MoveOnlyWrapperToCopyableAddrInst *BAI) {
     *this << getIDAndType(BAI->getOperand());
   }
+  void visitCopyableToMoveOnlyWrapperAddrInst(
+      CopyableToMoveOnlyWrapperAddrInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
+  }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
           << getIDAndType(EAI->getOperand());
