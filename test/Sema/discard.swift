@@ -127,7 +127,7 @@ enum E: Error { case err }
   }
 
   __consuming func take() throws -> File {
-    if case let .valid(f) = self {
+    if case let .valid(f) = consume self {
       return f
     }
     discard self
@@ -136,7 +136,7 @@ enum E: Error { case err }
 
   var validFile: File {
     __consuming get {
-      if case let .valid(f) = self {
+      if case let .valid(f) = consume self {
         return f
       }
       discard self
