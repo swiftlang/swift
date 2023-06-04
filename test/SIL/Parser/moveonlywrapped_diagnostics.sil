@@ -61,3 +61,19 @@ bb0(%0 : $*Klass, %1 : @owned $@moveOnly Klass):
   destroy_value %3 : $Klass
   %9999 = tuple()
 }
+
+sil [ossa] @copyable_to_moveonlywrapper_addr_test_1 : $@convention(thin) (@in @moveOnly Klass) -> () {
+bb0(%0 : $*@moveOnly Klass):
+  %0a = copyable_to_moveonlywrapper_addr %0 : $*@moveOnly Klass
+  // expected-error @-1 {{operand of 'copyable_to_moveonlywrapper_addr' must not be of moveonlywrapped type}}
+  destroy_addr %0a : $*@moveOnly Klass
+  %9999 = tuple()
+}
+
+sil [ossa] @copyable_to_moveonlywrapper_addr_test_2 : $@convention(thin) (@owned @moveOnly Klass) -> () {
+bb0(%1 : @owned $@moveOnly Klass):
+  %2 = copyable_to_moveonlywrapper_addr %1 : $@moveOnly Klass
+  // expected-error @-1 {{operand of 'copyable_to_moveonlywrapper_addr' must have address type}}
+  destroy_value %2 : $@moveOnly Klass
+  %9999 = tuple()
+}

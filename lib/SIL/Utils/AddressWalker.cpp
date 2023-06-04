@@ -160,6 +160,7 @@ AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) && {
         isa<MarkUninitializedInst>(user) || isa<DropDeinitInst>(user) ||
         isa<ProjectBlockStorageInst>(user) || isa<UpcastInst>(user) ||
         isa<TuplePackElementAddrInst>(user) ||
+        isa<CopyableToMoveOnlyWrapperAddrInst>(user) ||
         isa<MoveOnlyWrapperToCopyableAddrInst>(user)) {
       transitiveResultUses(op);
       continue;

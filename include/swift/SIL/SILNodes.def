@@ -500,6 +500,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableAddrInst,
                     moveonlywrapper_to_copyable_addr, SingleValueInstruction,
                     None, DoesNotRelease)
+  // Convert a $*T to $*@moveOnly T. Acts just as a cast.
+  SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperAddrInst,
+                    copyable_to_moveonlywrapper_addr, SingleValueInstruction,
+                    None, DoesNotRelease)
   // A move_addr is a Raw SIL only instruction that is equivalent to a copy_addr
   // [init]. It is lowered during the diagnostic passes to a copy_addr [init] if
   // the move checker found uses that prevented us from converting this to a

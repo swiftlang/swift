@@ -670,6 +670,7 @@ struct ImmutableAddressUseVerifier {
           return true;
         LLVM_FALLTHROUGH;
       case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+      case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
       case SILInstructionKind::StructElementAddrInst:
       case SILInstructionKind::TupleElementAddrInst:
       case SILInstructionKind::IndexAddrInst:
@@ -6062,6 +6063,17 @@ public:
     require(cvt->getType() ==
                 cvt->getOperand()->getType().removingMoveOnlyWrapper(),
             "Result and operand must have the same type.");
+  }
+
+  void checkCopyableToMoveOnlyWrapperAddrInst(
+      CopyableToMoveOnlyWrapperAddrInst *cvt) {
+    require(cvt->getType().isAddress(), "Output should be an address");
+    require(!cvt->getOperand()->getType().isMoveOnlyWrapped(),
+            "Input should not be move only wrapped");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().addingMoveOnlyWrapper(),
+            "Result and operand must have the same underlying type ignoring "
+            "move only wrappedness.");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {

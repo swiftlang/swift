@@ -28,6 +28,17 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_copyable_to_moveonlywrapper_addr : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: copyable_to_moveonlywrapper_addr
+// CHECK: } // end sil function 'test_copyable_to_moveonlywrapper_addr'
+sil [ossa] @test_copyable_to_moveonlywrapper_addr : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = copyable_to_moveonlywrapper_addr %0 : $*Builtin.NativeObject
+  destroy_addr %0a : $*@moveOnly Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // We don't serialize debug_value today... but we should.
 //
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
