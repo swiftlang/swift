@@ -467,15 +467,11 @@ struct HasEqualsSelf4 {
 func testHasEqualsSelf(
   x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4
 ) {
-  _ = (x == true)
-  _ = (y == true)
 #if TEST_DIAGNOSTICS
-  // FIXME: This is technically a bug, because we should be able to find the
-  // == operator introduced through a member operator. However, we might
-  // want to change the rule rather than implement this.
-  _ = (z == true) // expected-error{{binary operator '==' cannot be applied to operands}}
-  // expected-note@-1{{overloads for '==' exist with these partially matching parameter lists}}
-  _ = (w == true) // expected-error{{binary operator '==' cannot be applied to operands}}
-  // expected-note@-1{{overloads for '==' exist with these partially matching parameter lists}}
+  // Global operator lookup doesn't find member operators introduced by macros.
+  _ = (x == true) // expected-error{{cannot convert value of type}}
+  _ = (y == true) // expected-error{{cannot convert value of type}}
+  _ = (z == true) // expected-error{{cannot convert value of type}}
+  _ = (w == true) // expected-error{{cannot convert value of type}}
   #endif
 }
