@@ -24,7 +24,8 @@ func invokedDeinit() {}
   // CHECK:    store {{.*}} to [init]
   // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*MaybeFile
   // CHECK:    [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*MaybeFile
-  // CHECK:    switch_enum [[SELF_VAL]] : $MaybeFile, case #MaybeFile.some!enumelt: bb1, case #MaybeFile.none!enumelt: bb2
+  // CHECK:    [[DD:%.*]] = drop_deinit [[SELF_VAL]] : $MaybeFile
+  // CHECK:    switch_enum [[DD]] : $MaybeFile, case #MaybeFile.some!enumelt: bb1, case #MaybeFile.none!enumelt: bb2
   //
   // CHECK:  bb1([[FILE:%.*]] : @owned $File):
   // CHECK:    destroy_value [[FILE]] : $File
@@ -52,7 +53,8 @@ func invokedDeinit() {}
   // CHECK:  load_borrow {{.*}} : $*File
   // CHECK:  [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*File
   // CHECK:  [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*File
-  // CHECK:  end_lifetime [[SELF_VAL]] : $File
+  // CHECK:  [[DD:%.*]] = drop_deinit [[SELF_VAL]] : $File
+  // CHECK:  end_lifetime [[DD]] : $File
 
   deinit {
     invokedDeinit()
@@ -87,7 +89,8 @@ func invokedDeinit() {}
 // CHECK:     [[MMC:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]] : $*PointerTree
 // CHECK:     [[COPIED_SELF:%.*]] = load [copy] [[MMC]] : $*PointerTree
 // CHECK:     end_access [[ACCESS]] : $*PointerTree
-// CHECK:     end_lifetime [[COPIED_SELF]]
+// CHECK:     [[DD:%.*]] = drop_deinit [[COPIED_SELF]]
+// CHECK:     end_lifetime [[DD]]
 // CHECK:     br bb3
 //
 // CHECK:   bb2:
@@ -155,7 +158,8 @@ final class Wallet {
   // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_ACCESS]]
   // CHECK:    [[SELF_COPY:%.*]] = load [copy] [[SELF_MMC]] : $*Ticket
   // CHECK:    end_access [[SELF_ACCESS:%.*]] : $*Ticket
-  // CHECK:    switch_enum [[SELF_COPY]] : $Ticket, case #Ticket.empty!enumelt: [[TICKET_EMPTY:bb[0-9]+]], case #Ticket.within!enumelt: [[TICKET_WITHIN:bb[0-9]+]]
+  // CHECK:    [[DD:%.*]] = drop_deinit [[SELF_COPY]] : $Ticket
+  // CHECK:    switch_enum [[DD]] : $Ticket, case #Ticket.empty!enumelt: [[TICKET_EMPTY:bb[0-9]+]], case #Ticket.within!enumelt: [[TICKET_WITHIN:bb[0-9]+]]
   // CHECK:  [[TICKET_EMPTY]]:
   // CHECK:    br [[JOIN_POINT:bb[0-9]+]]
   // CHECK:  [[TICKET_WITHIN]]([[PREV_SELF_WALLET:%.*]] : @owned $Wallet):
