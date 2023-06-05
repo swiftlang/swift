@@ -5162,7 +5162,7 @@ void Parser::recordLocalType(TypeDecl *TD) {
     return;
 
   if (!InInactiveClauseEnvironment)
-    SF.LocalTypeDecls.insert(TD);
+    SF.getOutermostParentSourceFile()->LocalTypeDecls.insert(TD);
 }
 
 /// Set the original declaration in `@differentiable` attributes.
