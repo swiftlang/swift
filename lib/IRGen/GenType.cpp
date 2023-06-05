@@ -2901,6 +2901,7 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
   // If we do not have a deinit table, call the value witness instead.
   if (!deinitTable) {
     irgen::emitDestroyCall(IGF, T, indirect());
+    indirectCleanup();
     return true;
   }
 
