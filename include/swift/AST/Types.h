@@ -724,8 +724,10 @@ public:
       SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
   /// Retrieve the set of type parameter packs that occur within this type.
-  void getTypeParameterPacks(
-      SmallVectorImpl<Type> &rootParameterPacks);
+  void getTypeParameterPacks(SmallVectorImpl<Type> &rootParameterPacks);
+
+  /// Retrieve the set of type parameter packs that occur within this type.
+  void walkPackReferences(llvm::function_ref<bool (Type)> fn);
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
