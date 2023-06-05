@@ -379,3 +379,62 @@ func test_local_with_memberwise() {
 
   _ = TestMemberwiseGeneric(a: 1, pair: ("a", [0]))
 }
+
+func test_assignments() {
+  struct Test {
+    var _a: Int
+    var _b: Int
+
+    var a: Int {
+      init(initialValue) initializes(_a) {
+        self._a = initialValue
+      }
+      get { _a }
+      set { _a = newValue  }
+    }
+
+    var pair: (Int, Int) {
+      init(initialValue) initializes(_a, _b) {
+        _a = initialValue.0
+        _b = initialValue.1
+      }
+
+      get { (_a, _b) }
+      set { }
+    }
+
+    // CHECK-LABEL: sil private @$s14init_accessors16test_assignmentsyyF4TestL_V1aADSi_tcfC : $@convention(method) (Int, @thin Test.Type) -> Test
+    // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors16test_assignmentsyyF4TestL_V1aSivi : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[A_REF:%.*]] = struct_element_addr {{.*}} : $*Test, #<abstract function>Test._a
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[A_REF]], %0) : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors16test_assignmentsyyF4TestL_V1aSivi : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[A_REF:%.*]] = struct_element_addr {{.*}} : $*Test, #<abstract function>Test._a
+    // CHECK-NEXT: destroy_addr [[A_REF]] : $*Int
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[A_REF]], %0) : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[B_REF:%.*]] = struct_element_addr %23 : $*Test, #<abstract function>Test._b
+    // CHECK-NEXT: store {{.*}} to [[B_REF]] : $*Int
+    // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors16test_assignmentsyyF4TestL_V1aSivs : $@convention(method) (Int, @inout Test) -> ()
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, @inout Test) -> ()
+    // CHECK: {{.*}} = apply [[SETTER_CLOSURE]](%0) : $@callee_guaranteed (Int) -> ()
+    init(a: Int) {
+      self.a = a
+      self.a = a
+      self._b = 42
+      self.a = a
+    }
+
+    // CHECK-LABEL: sil private @$s14init_accessors16test_assignmentsyyF4TestL_V1a1bADSi_SitcfC : $@convention(method) (Int, Int, @thin Test.Type) -> Test
+    // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors16test_assignmentsyyF4TestL_V1aSivi : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[A_REF:%.*]] = struct_element_addr {{.*}} : $*Test, #<abstract function>Test._a
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[A_REF]], %0) : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors16test_assignmentsyyF4TestL_V4pairSi_Sitvi : $@convention(thin) (Int, Int) -> (@out Int, @out Int)
+    // CHECK: [[A_REF:%.*]] = struct_element_addr [[SELF_VALUE:%.*]] : $*Test, #<abstract function>Test._a
+    // CHECK-NEXT: destroy_addr [[A_REF]] : $*Int
+    // CHECK-NEXT: [[B_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*Test, #<abstract function>Test._b
+    // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[A_REF]], [[B_REF]], {{.*}}) : $@convention(thin) (Int, Int) -> (@out Int, @out Int)
+    init(a: Int, b: Int) {
+      self.a = a
+      self.pair = (0, b)
+    }
+  }
+}

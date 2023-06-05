@@ -314,9 +314,12 @@ struct DIMemoryUse {
   /// track of which tuple elements are affected.
   unsigned FirstElement, NumElements;
 
-  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
-      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-  }
+  NullablePtr<VarDecl> Field;
+
+  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE,
+              NullablePtr<VarDecl> Field = 0)
+      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE),
+        Field(Field) {}
 
   DIMemoryUse() : Inst(nullptr) {}
 

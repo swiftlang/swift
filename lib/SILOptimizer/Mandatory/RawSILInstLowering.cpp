@@ -300,19 +300,33 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
                                       /*fromBuiltin=*/false);
       }
 
-      auto emitFieldReference = [&](VarDecl *field) -> SILValue {
+      auto emitFieldReference = [&](VarDecl *field,
+                                    bool emitDestroy = false) -> SILValue {
+        SILValue fieldRef;
         if (isRefSelf) {
-          return b.createRefElementAddr(loc, selfRef, field);
+          fieldRef = b.createRefElementAddr(loc, selfRef, field);
+        } else {
+          fieldRef = b.createStructElementAddr(loc, selfRef, field);
         }
-        return b.createStructElementAddr(loc, selfRef, field);
+
+        if (emitDestroy)
+          b.createDestroyAddr(loc, fieldRef);
+
+        return fieldRef;
       };
 
       SmallVector<SILValue> arguments;
 
       // First, emit all of the properties listed in `initializes(...)`. They
       // are passed as indirect results.
-      for (auto *property : inst->getInitializedProperties())
-        arguments.push_back(emitFieldReference(property));
+      {
+        auto toInitialize = inst->getInitializedProperties();
+        for (unsigned index : indices(toInitialize)) {
+          arguments.push_back(emitFieldReference(
+              toInitialize[index],
+              /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
+        }
+      }
 
       // Now emit `initialValue` which is the only argument specified
       // by the user.

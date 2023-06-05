@@ -663,7 +663,7 @@ private:
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
 
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
-                      DIUseKind Kind);
+                      DIUseKind Kind, NullablePtr<VarDecl> Field = 0);
   void collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo);
   void collectStructElementUses(StructElementAddrInst *SEAI,
                                 unsigned BaseEltNo);
@@ -675,7 +675,8 @@ private:
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
 void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
-                                         SILInstruction *User, DIUseKind Kind) {
+                                         SILInstruction *User, DIUseKind Kind,
+                                         NullablePtr<VarDecl> Field) {
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
@@ -685,7 +686,7 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
         getElementCountRec(TypeExpansionContext(*User->getFunction()), Module,
                            UseTy, IsSelfOfNonDelegatingInitializer);
 
-  trackUse(DIMemoryUse(User, Kind, BaseEltNo, NumElements));
+  trackUse(DIMemoryUse(User, Kind, BaseEltNo, NumElements, Field));
 }
 
 /// Given a tuple_element_addr or struct_element_addr, compute the new
@@ -1211,7 +1212,7 @@ ElementUseCollector::collectAssignOrInitUses(PartialApplyInst *pai,
       auto expansionContext = TypeExpansionContext(*pai->getFunction());
       auto type = selfTy.getFieldType(property, Module, expansionContext);
       addElementUses(Module.getFieldIndex(typeDC, property), type, User,
-                     useKind);
+                     useKind, property);
     };
 
     auto initializedElts = inst->getInitializedProperties();

@@ -1471,12 +1471,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     auto allFieldsInitialized =
         getAnyUninitializedMemberAtInst(Use.Inst, 0,
                                         TheMemory.getNumElements()) == -1;
-    if (allFieldsInitialized) {
-      Use.Kind = DIUseKind::Set;
-    } else {
-      diagnose(Module, Use.Inst->getLoc(), diag::use_of_self_before_fully_init);
-      return;
-    }
+    Use.Kind = allFieldsInitialized ? DIUseKind::Set : DIUseKind::Assign;
   } else if (isFullyInitialized) {
     Use.Kind = DIUseKind::Assign;
   } else {
@@ -2399,6 +2394,9 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
 
     switch (Use.Kind) {
+    case DIUseKind::Assign:
+      AI->markAsInitialized(Use.Field.get());
+      LLVM_FALLTHROUGH;
     case DIUseKind::Initialization:
       AI->setMode(AssignOrInitInst::Init);
       break;

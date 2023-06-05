@@ -79,7 +79,7 @@ struct TestPartial {
 
   init(x: Int, y: Int) {
     self.x = x
-    self.point = (x, y) // expected-error {{'self' used before all stored properties are initialized}}
+    self.point = (x, y) // Ok (x is going to get `destroy_addr`)
   }
 
   init(_ x: Int, _ y: Int) {
