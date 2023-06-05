@@ -163,21 +163,28 @@ extension _ArrayBufferProtocol {
     // erase all the elements we're replacing to create a hole
     let holeStart = elements + subrange.lowerBound
     let holeEnd = holeStart + newCount
-    holeStart.deinitialize(count: eraseCount)
+
+    if eraseCount > 0 {
+      holeStart.deinitialize(count: eraseCount)
+    }
 
     // resize the hole to make it the correct size
-    let tailStart = elements + subrange.upperBound
-    let tailCount = oldCount - subrange.upperBound
-    holeEnd.moveInitialize(from: tailStart, count: tailCount)
+    if growth != 0 {
+      let tailStart = elements + subrange.upperBound
+      let tailCount = oldCount - subrange.upperBound
+      holeEnd.moveInitialize(from: tailStart, count: tailCount)
+    }
 
     // place the values into the hole we created
-    var place = holeStart
-    var i = newValues.startIndex
-    while place < holeEnd {
-      place.initialize(to: newValues[i])
-      place += 1
-      newValues.formIndex(after: &i)
+    if newCount > 0 {
+      var place = holeStart
+      var i = newValues.startIndex
+      while place < holeEnd {
+        place.initialize(to: newValues[i])
+        place += 1
+        newValues.formIndex(after: &i)
+      }
+      _expectEnd(of: newValues, is: i)
     }
-    _expectEnd(of: newValues, is: i)
   }
 }
