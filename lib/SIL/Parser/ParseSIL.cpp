@@ -4701,8 +4701,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SILValue Src, InitFn, SetFn;
     AssignOrInitInst::Mode Mode;
 
-    if (parseTypedValueRef(Src, B) ||
-        parseAssignOrInitMode(Mode, *this) ||
+    if (parseAssignOrInitMode(Mode, *this) || parseTypedValueRef(Src, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||

@@ -1777,6 +1777,16 @@ public:
   }
 
   void visitAssignOrInitInst(AssignOrInitInst *AI) {
+    switch (AI->getMode()) {
+    case AssignOrInitInst::Unknown:
+      break;
+    case AssignOrInitInst::Init:
+      *this << "[init] ";
+      break;
+    case AssignOrInitInst::Set:
+      *this << "[set] ";
+      break;
+    }
     *this << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
