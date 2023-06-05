@@ -24,7 +24,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
-// RUN: %target-build-swift -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -Xfrontend -emit-dependencies-path -Xfrontend %t/main.d -Xfrontend -emit-reference-dependencies-path -Xfrontend %t/main.swiftdeps
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -416,4 +416,90 @@ func testFreestandingClosureNesting() {
 // Freestanding declaration macros that produce local variables
 func testLocalVarsFromDeclarationMacros() {
   #varValue
+}
+
+// Variadic macro
+@freestanding(declaration, names: arbitrary) macro emptyDecl(_: String...) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+struct TakesVariadic {
+  #emptyDecl("foo", "bar")
+}
+
+// Funkiness with static functions introduced via macro expansions.
+@freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+@freestanding(declaration, names: arbitrary) public macro staticFooFuncArbitrary() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+
+class HasAnExpandedStatic {
+  #staticFooFunc()
+}
+
+class HasAnExpandedStatic2 {
+  #staticFooFuncArbitrary()
+}
+
+func testHasAnExpandedStatic() {
+#if TEST_DIAGNOSTICS
+  foo() // expected-error{{cannot find 'foo' in scope}}
+#endif
+}
+
+@freestanding(declaration, names: named(==)) public macro addSelfEqualsOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@freestanding(declaration, names: arbitrary) public macro addSelfEqualsOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: named(==)) public macro AddSelfEqualsMemberOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: arbitrary) public macro AddSelfEqualsMemberOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+
+struct HasEqualsSelf {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2 {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3 {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4 {
+}
+
+protocol SelfEqualsBoolProto { // expected-note 4{{where 'Self' =}}
+  static func ==(lhs: Self, rhs: Bool) -> Bool
+}
+
+struct HasEqualsSelfP: SelfEqualsBoolProto {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2P: SelfEqualsBoolProto {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3P: SelfEqualsBoolProto {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4P: SelfEqualsBoolProto {
+}
+
+func testHasEqualsSelf(
+  x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4,
+  xP: HasEqualsSelfP, yP: HasEqualsSelf2P, zP: HasEqualsSelf3P,
+  wP: HasEqualsSelf4P
+) {
+#if TEST_DIAGNOSTICS
+  // Global operator lookup doesn't find member operators introduced by macros.
+  _ = (x == true) // expected-error{{referencing operator function '=='}}
+  _ = (y == true) // expected-error{{referencing operator function '=='}}
+  _ = (z == true) // expected-error{{referencing operator function '=='}}
+  _ = (w == true) // expected-error{{referencing operator function '=='}}
+  #endif
+
+  // These should be found through the protocol.
+  _ = (xP == true)
+  _ = (yP == true)
+  _ = (zP == true)
+  _ = (wP == true)
 }

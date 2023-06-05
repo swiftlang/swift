@@ -1505,3 +1505,63 @@ public struct SingleMemberMacro: MemberMacro {
     ]
   }
 }
+
+public struct UseIdentifierMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let argument = node.argumentList.first?.expression.as(StringLiteralExprSyntax.self) else {
+      fatalError("boom")
+    }
+    return [
+      """
+      func \(context.makeUniqueName("name"))() {
+        _ = \(raw: argument.segments.first!)
+      }
+      """,
+      """
+      struct Foo {
+        var \(context.makeUniqueName("name")): Int {
+          _ = \(raw: argument.segments.first!)
+          return 0
+        }
+      }
+      """
+    ]
+  }
+}
+
+public struct StaticFooFuncMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func foo() {}",
+    ]
+  }
+}
+
+public struct SelfAlwaysEqualOperator: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func ==(lhs: Self, rhs: Bool) -> Bool { true }",
+    ]
+  }
+}
+
+extension SelfAlwaysEqualOperator: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func ==(lhs: Self, rhs: Bool) -> Bool { true }",
+    ]
+  }
+}

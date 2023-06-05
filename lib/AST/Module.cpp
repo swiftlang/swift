@@ -249,7 +249,7 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
 
-        if (VD->getAttrs().hasAttribute<CustomAttr>()) {
+        if (!onlyOperators && VD->getAttrs().hasAttribute<CustomAttr>()) {
           MayHaveAuxiliaryDecls.push_back(VD);
         }
       }
@@ -279,8 +279,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
     else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
 
-    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
-      MayHaveAuxiliaryDecls.push_back(MED);
+    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D)) {
+      if (!onlyOperators)
+        MayHaveAuxiliaryDecls.push_back(MED);
+    }
   }
 }
 
