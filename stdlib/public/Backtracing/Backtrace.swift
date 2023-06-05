@@ -480,7 +480,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     ^(?<start>[A-Fa-f0-9]+)-(?<end>[A-Fa-f0-9]+)\s+
     (?<perms>[-rwxsp]{4})\s+
     (?<offset>[A-Fa-f0-9]+)\s+
-    (?<major>[A-Fa-f0-9]{2}):(?<minor>[A-Fa-f0-9]{2})\s+
+    (?<major>[A-Fa-f0-9]+):(?<minor>[A-Fa-f0-9]+)\s+
     (?<inode>\d+)\s+
     (?<pathname>.*)\s*$
     /#
