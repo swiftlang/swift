@@ -11,6 +11,10 @@
 setlocal enableextensions enabledelayedexpansion
 path %PATH%;%PYTHON_HOME%
 
+:: Versioning
+set ProductVersion=5.9.0
+set ProductTag=
+
 :: Identify the SourceRoot
 :: Normalize the SourceRoot to make it easier to read the output.
 cd %~dp0\..\..
@@ -929,6 +933,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj
   -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\toolchain\ ^
+  -p:ProductVersion=%ProductVersion% ^
   -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
   -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
@@ -940,6 +945,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
   -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\sdk\ ^
+  -p:ProductVersion=%ProductVersion% ^
   -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
   -p:PLATFORM_ROOT=%PlatformRoot%\ ^
   -p:SDK_ROOT=%SDKInstallRoot%\
@@ -951,6 +957,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
   -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\runtime\ ^
+  -p:ProductVersion=%ProductVersion% ^
   -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
   -p:SDK_ROOT=%SDKInstallRoot%\
 :: TODO(compnerd) actually perform the code-signing
@@ -961,6 +968,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj 
   -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\devtools\ ^
+  -p:ProductVersion=%ProductVersion% ^
   -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
   -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
 :: TODO(compnerd) actually perform the code-signing
@@ -977,6 +985,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj
   -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\installer\ ^
+  -p:ProductVersion=%ProductVersion%%ProductTag% ^
   -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
   -p:MSI_LOCATION=%PackageRoot%\
 :: TODO(compnerd) actually perform the code-signing
