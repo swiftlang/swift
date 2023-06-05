@@ -2206,7 +2206,18 @@ public:
     auto patternTy = visit(substPatternType, origPatternType);
 
     // Find a pack parameter from the pattern to expand over.
-    auto countParam = findExpandedPackParameter(patternTy);
+    CanType countParam;
+    patternTy->walkPackReferences([&](Type t) {
+      if (t->isTypeParameter()) {
+        auto param = t->getRootGenericParam();
+        if (param->isParameterPack()) {
+          countParam = CanType(param);
+          return true;
+        }
+      }
+
+      return false;
+    });
 
     // If that didn't work, we should be able to find an expansion
     // to use from either the substituted type or the subs.  At worst,
@@ -2214,37 +2225,6 @@ public:
     assert(countParam && "implementable but lazy");
 
     return CanPackExpansionType::get(patternTy, countParam);
-  }
-
-  static CanType findExpandedPackParameter(CanType patternType) {
-    struct Walker : public TypeWalker {
-      CanType Result;
-      Action walkToTypePre(Type _ty) override {
-        auto ty = CanType(_ty);
-
-        // Don't recurse inside pack expansions.
-        if (isa<PackExpansionType>(ty)) {
-          return Action::SkipChildren;
-        }
-
-        // Consider type parameters.
-        if (ty->isTypeParameter()) {
-          auto param = ty->getRootGenericParam();
-          if (param->isParameterPack()) {
-            Result = CanType(param);
-            return Action::Stop;
-          }
-          return Action::SkipChildren;
-        }
-
-        // Otherwise continue.
-        return Action::Continue;
-      }
-    };
-
-    Walker walker;
-    patternType.walk(walker);
-    return walker.Result;
   }
 
   CanType visitExistentialType(CanExistentialType exist,
