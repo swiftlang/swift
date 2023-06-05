@@ -210,10 +210,8 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
   return pack;
 }
 
-/// Use this to index into packs to correctly handle on-heap packs.
-static llvm::Value *loadMetadataAtIndex(IRGenFunction &IGF,
-                                        llvm::Value *patternPack,
-                                        llvm::Value *index) {
+llvm::Value *irgen::maskMetadataPackPointer(IRGenFunction &IGF,
+                                            llvm::Value *patternPack) {
   // If the pack is on the heap, the LSB is set, so mask it off.
   patternPack =
       IGF.Builder.CreatePtrToInt(patternPack, IGF.IGM.SizeTy);
@@ -221,6 +219,14 @@ static llvm::Value *loadMetadataAtIndex(IRGenFunction &IGF,
       IGF.Builder.CreateAnd(patternPack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
   patternPack =
       IGF.Builder.CreateIntToPtr(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
+  return patternPack;
+}
+
+/// Use this to index into packs to correctly handle on-heap packs.
+static llvm::Value *loadMetadataAtIndex(IRGenFunction &IGF,
+                                        llvm::Value *patternPack,
+                                        llvm::Value *index) {
+  patternPack = maskMetadataPackPointer(IGF, patternPack);
 
   Address patternPackAddress(patternPack, IGF.IGM.TypeMetadataPtrTy,
                              IGF.IGM.getPointerAlignment());
