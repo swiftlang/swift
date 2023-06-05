@@ -235,11 +235,17 @@ func testStringifyWithThrows() throws {
 
     // CHECK-DIAGS: @__swiftmacro_9MacroUser23testStringifyWithThrowsyyKF9stringifyfMf1_.swift:1:2: error: call can throw but is not marked with 'try'
 #endif
-  
+
   // The macro adds the 'try' for us.
   _ = #stringifyAndTry(maybeThrowing())
 }
 
+func testStringifyWithLocalType() throws {
+  _ =  #stringify({
+    struct QuailError: Error {}
+    throw QuailError()
+    })
+}
 
 @freestanding(expression) macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
 
@@ -496,7 +502,7 @@ func testHasEqualsSelf(
   _ = (y == true) // expected-error{{referencing operator function '=='}}
   _ = (z == true) // expected-error{{referencing operator function '=='}}
   _ = (w == true) // expected-error{{referencing operator function '=='}}
-  #endif
+#endif
 
   // These should be found through the protocol.
   _ = (xP == true)
