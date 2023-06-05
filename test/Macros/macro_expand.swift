@@ -235,11 +235,17 @@ func testStringifyWithThrows() throws {
 
     // CHECK-DIAGS: @__swiftmacro_9MacroUser23testStringifyWithThrowsyyKF9stringifyfMf1_.swift:1:2: error: call can throw but is not marked with 'try'
 #endif
-  
+
   // The macro adds the 'try' for us.
   _ = #stringifyAndTry(maybeThrowing())
 }
 
+func testStringifyWithLocalType() throws {
+  _ =  #stringify({
+    struct QuailError: Error {}
+    throw QuailError()
+    })
+}
 
 @freestanding(expression) macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
 
@@ -465,18 +471,42 @@ struct HasEqualsSelf3 {
 struct HasEqualsSelf4 {
 }
 
+protocol SelfEqualsBoolProto { // expected-note 4{{where 'Self' =}}
+  static func ==(lhs: Self, rhs: Bool) -> Bool
+}
+
+struct HasEqualsSelfP: SelfEqualsBoolProto {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2P: SelfEqualsBoolProto {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3P: SelfEqualsBoolProto {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4P: SelfEqualsBoolProto {
+}
+
 func testHasEqualsSelf(
-  x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4
+  x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4,
+  xP: HasEqualsSelfP, yP: HasEqualsSelf2P, zP: HasEqualsSelf3P,
+  wP: HasEqualsSelf4P
 ) {
-  _ = (x == true)
-  _ = (y == true)
 #if TEST_DIAGNOSTICS
-  // FIXME: This is technically a bug, because we should be able to find the
-  // == operator introduced through a member operator. However, we might
-  // want to change the rule rather than implement this.
-  _ = (z == true) // expected-error{{binary operator '==' cannot be applied to operands}}
-  // expected-note@-1{{overloads for '==' exist with these partially matching parameter lists}}
-  _ = (w == true) // expected-error{{binary operator '==' cannot be applied to operands}}
-  // expected-note@-1{{overloads for '==' exist with these partially matching parameter lists}}
-  #endif
+  // Global operator lookup doesn't find member operators introduced by macros.
+  _ = (x == true) // expected-error{{referencing operator function '=='}}
+  _ = (y == true) // expected-error{{referencing operator function '=='}}
+  _ = (z == true) // expected-error{{referencing operator function '=='}}
+  _ = (w == true) // expected-error{{referencing operator function '=='}}
+#endif
+
+  // These should be found through the protocol.
+  _ = (xP == true)
+  _ = (yP == true)
+  _ = (zP == true)
+  _ = (wP == true)
 }

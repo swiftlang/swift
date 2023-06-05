@@ -117,6 +117,20 @@ struct OSSACanonicalizer {
              return !isa<PartialApplyInst>(user);
            });
   }
+
+  struct DropDeinitFilter {
+    bool operator()(SILInstruction *inst) const {
+      return isa<DropDeinitInst>(inst);
+    }
+  };
+  using DropDeinitIter =
+      llvm::filter_iterator<SILInstruction *const *, DropDeinitFilter>;
+  using DropDeinitRange = iterator_range<DropDeinitIter>;
+
+  /// Returns a range of final uses of the mark_must_check that are drop_deinit
+  DropDeinitRange getDropDeinitUses() const {
+    return llvm::make_filter_range(consumingBoundaryUsers, DropDeinitFilter());
+  }
 };
 
 /// Search for candidate object mark_must_checks. If we find one that does not

@@ -776,7 +776,11 @@ ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
 ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       "cannot partially consume '%0' when it has a deinitializer",
       (StringRef))
+ERROR(sil_movechecking_discard_missing_consume_self, none,
+      "must consume 'self' before exiting method that discards self", ())
 
+NOTE(sil_movechecking_discard_self_here, none,
+     "discarded self here", ())
 NOTE(sil_movechecking_partial_consume_here, none,
      "partially consumed here", ())
 NOTE(sil_movechecking_consuming_use_here, none,
