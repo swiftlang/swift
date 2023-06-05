@@ -2680,34 +2680,20 @@ TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
   return createImpl(ctx, joinType.getPointer(), /*elements*/ {}, arena, SVE);
 }
 
-MacroExpansionExpr::MacroExpansionExpr(
+MacroExpansionExpr *MacroExpansionExpr::create(
     DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
     DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
     ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
     ArgumentList *argList, MacroRoles roles, bool isImplicit,
     Type ty
-) : Expr(ExprKind::MacroExpansion, isImplicit, ty), DC(dc),
-    Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
+) {
   ASTContext &ctx = dc->getASTContext();
-  info = new (ctx) MacroExpansionInfo{
+  MacroExpansionInfo *info = new (ctx) MacroExpansionInfo{
       sigilLoc, macroName, macroNameLoc,
       leftAngleLoc, rightAngleLoc, genericArgs,
       argList ? argList : ArgumentList::createImplicit(ctx, {})
   };
-
-  Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
-}
-
-SourceRange MacroExpansionExpr::getSourceRange() const {
-  SourceLoc endLoc;
-  if (info->ArgList && !info->ArgList->isImplicit())
-    endLoc = info->ArgList->getEndLoc();
-  else if (info->RightAngleLoc.isValid())
-    endLoc = info->RightAngleLoc;
-  else
-    endLoc = info->MacroNameLoc.getEndLoc();
-
-  return SourceRange(info->SigilLoc, endLoc);
+  return new (ctx) MacroExpansionExpr(dc, info, roles, isImplicit, ty);
 }
 
 unsigned MacroExpansionExpr::getDiscriminator() const {
@@ -2731,7 +2717,8 @@ MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() {
   auto dc = DC;
   if (auto *tlcd = dyn_cast_or_null<TopLevelCodeDecl>(dc->getAsDecl()))
     dc = tlcd->getDeclContext();
-  SubstituteDecl = new (DC->getASTContext()) MacroExpansionDecl(dc, info);
+  SubstituteDecl =
+      new (DC->getASTContext()) MacroExpansionDecl(dc, getExpansionInfo());
   return SubstituteDecl;
 }
 

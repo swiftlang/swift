@@ -9915,7 +9915,7 @@ Parser::parseDeclMacroExpansion(ParseDeclOptions flags,
   if (!macroNameRef)
     return status;
 
-  auto *med = new (Context) MacroExpansionDecl(
+  auto *med = MacroExpansionDecl::create(
       CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
       Context.AllocateCopy(genericArgs), rightAngleLoc, argList);
   med->getAttrs() = attributes;
