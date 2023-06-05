@@ -35,8 +35,10 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
@@ -1316,6 +1318,25 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   removeShadowedDecls(witnesses, DC);
 }
 
+/// Determine whether the given context may expand an operator with the given name.
+static bool contextMayExpandOperator(
+    DeclContext *dc, DeclBaseName operatorName
+) {
+  TypeOrExtensionDecl decl;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+    decl = nominal;
+  else if (auto ext = dyn_cast<ExtensionDecl>(dc))
+    decl = ext;
+  else
+    return false;
+
+  ASTContext &ctx = dc->getASTContext();
+  auto potentialExpansions = evaluateOrDefault(
+      ctx.evaluator, PotentialMacroExpansionsInContextRequest{decl},
+      PotentialMacroExpansions());
+  return potentialExpansions.shouldExpandForName(operatorName);
+}
+
 SmallVector<ValueDecl *, 4>
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
@@ -1333,10 +1354,12 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   // An operator function is the only kind of witness that requires global
   // lookup. However, because global lookup doesn't enter local contexts,
   // an additional, qualified lookup is warranted when the conforming type
-  // is declared in a local context.
+  // is declared in a local context or when the operator could come from a
+  // macro expansion.
   const bool doUnqualifiedLookup = req->isOperator();
   const bool doQualifiedLookup =
-      !req->isOperator() || DC->getParent()->getLocalContext();
+      !req->isOperator() || DC->getParent()->getLocalContext() ||
+      contextMayExpandOperator(DC, req->getName().getBaseName());
 
   if (doUnqualifiedLookup) {
     auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
