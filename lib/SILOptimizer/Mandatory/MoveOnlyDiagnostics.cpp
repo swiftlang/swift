@@ -15,6 +15,7 @@
 #include "MoveOnlyDiagnostics.h"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -188,6 +189,125 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
 void DiagnosticEmitter::emitCheckedMissedCopyError(SILInstruction *copyInst) {
   diagnose(copyInst->getFunction()->getASTContext(), copyInst,
            diag::sil_movechecking_bug_missed_copy);
+}
+
+void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
+    SILInstruction *leftoverDestroy,
+    SILInstruction *discard) {
+  assert(isa<DropDeinitInst>(discard));
+
+  // A good location is one that has some connection with the original source
+  // and corresponds to an exit of the function.
+  auto hasGoodLocation = [](SILInstruction *si) -> bool {
+    if (!si)
+      return false;
+
+    SILLocation loc = si->getLoc();
+    if (loc.isNull())
+      return false;
+
+    switch (loc.getKind()) {
+    case SILLocation::ReturnKind:
+    case SILLocation::ImplicitReturnKind:
+      return true;
+
+    case SILLocation::RegularKind: {
+      Stmt *stmt = loc.getAsASTNode<Stmt>();
+      if (!stmt)
+        return true; // For non-statements, assume it is exiting the func.
+
+      // Prefer statements that can possibly lead to an exit of the function.
+      // This is determined by whether the statement causes an exit of a
+      // lexical scope; so a 'break' counts but not a 'continue'.
+      switch (stmt->getKind()) {
+      case StmtKind::Throw:
+      case StmtKind::Return:
+      case StmtKind::Yield:
+      case StmtKind::Break:
+      case StmtKind::Fail:
+      case StmtKind::PoundAssert:
+        return true;
+
+      case StmtKind::Continue:
+      case StmtKind::Brace:
+      case StmtKind::Defer:
+      case StmtKind::If:
+      case StmtKind::Guard:
+      case StmtKind::While:
+      case StmtKind::Do:
+      case StmtKind::DoCatch:
+      case StmtKind::RepeatWhile:
+      case StmtKind::ForEach:
+      case StmtKind::Switch:
+      case StmtKind::Case:
+      case StmtKind::Fallthrough:
+      case StmtKind::Discard:
+        return false;
+      };
+    }
+
+    case SILLocation::InlinedKind:
+    case SILLocation::MandatoryInlinedKind:
+    case SILLocation::CleanupKind:
+    case SILLocation::ArtificialUnreachableKind:
+      return false;
+    };
+  };
+
+  // An instruction corresponding to the logical place where the value is
+  // destroyed. Ideally an exit point of the function reachable from here or
+  // some relevant statement.
+  SILInstruction *destroyPoint = leftoverDestroy;
+  if (!hasGoodLocation(destroyPoint)) {
+    // Search for a nearby function exit reachable from this destroy. We do this
+    // because the move checker may have injected or hoisted an existing
+    // destroy from leaf blocks to some earlier point. For example, if 'd'
+    // represents a destroy of self, then we may have this CFG:
+    //
+    //        before:      after:
+    //           .          d
+    //          / \        / \
+    //         d   d      .   .
+    //
+    BasicBlockSet visited(destroyPoint->getFunction());
+    std::deque<SILBasicBlock *> bfsWorklist = {destroyPoint->getParent()};
+    while (auto *bb = bfsWorklist.front()) {
+      visited.insert(bb);
+      bfsWorklist.pop_front();
+
+      TermInst *term = bb->getTerminator();
+
+      // Looking for a block that exits the function or terminates the program.
+      if (term->isFunctionExiting() || term->isProgramTerminating()) {
+        SILInstruction *candidate = term;
+
+        // Walk backwards until we find an instruction with any source location.
+        // Sometimes a terminator like 'unreachable' may not have one, but one
+        // of the preceding instructions will.
+        while (candidate && candidate->getLoc().isNull())
+          candidate = candidate->getPreviousInstruction();
+
+        if (candidate && candidate->getLoc()) {
+          destroyPoint = candidate;
+          break;
+        }
+      }
+
+      for (auto *nextBB : term->getSuccessorBlocks())
+        if (!visited.contains(nextBB))
+          bfsWorklist.push_back(nextBB);
+    }
+  }
+
+  assert(destroyPoint->getLoc() && "missing loc!");
+  assert(discard->getLoc() && "missing loc!");
+
+  diagnose(leftoverDestroy->getFunction()->getASTContext(),
+           destroyPoint,
+           diag::sil_movechecking_discard_missing_consume_self);
+
+  diagnose(discard->getFunction()->getASTContext(), discard,
+            diag::sil_movechecking_discard_self_here);
 }
 
 //===----------------------------------------------------------------------===//
