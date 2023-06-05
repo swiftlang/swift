@@ -1,4 +1,4 @@
-# swift_build_support/products/zlib.py ------------------------------------
+# swift_build_support/products/zstd.py ------------------------------------
 #
 # This source file is part of the Swift.org open source project
 #
@@ -16,7 +16,14 @@ from . import cmake_product
 from . import earlyswiftdriver
 
 
-class Zlib(cmake_product.CMakeProduct):
+class Zstd(cmake_product.CMakeProduct):
+    def __init__(self, args, toolchain, source_dir, build_dir):
+        # We need to modify the source dir because the CMakeLists.txt is in
+        # a subdirectory
+        super().__init__(args, toolchain,
+                         os.path.join(source_dir, 'build', 'cmake'),
+                         build_dir)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -44,14 +51,14 @@ class Zlib(cmake_product.CMakeProduct):
     def should_build(self, host_target):
         """should_build() -> Bool
 
-        Return True if zlib should be built
+        Return True if zstd should be built
         """
-        return self.args.build_zlib
+        return self.args.build_zstd
 
     def should_test(self, host_target):
         """should_test() -> Bool
 
-        Returns True if zlib should be tested.
+        Returns True if zstd should be tested.
         Currently is set to false
         """
         return False
@@ -60,35 +67,29 @@ class Zlib(cmake_product.CMakeProduct):
         """should_install() -> Bool
 
         Returns True
-        If we're building zlib, you're going to need it
+        If we're building zstd, you're going to need it
         """
-        return self.args.build_zlib
+        return self.args.build_zstd
 
     def install(self, host_target):
         """
-        Install zlib to the target location
+        Install zstd to the target location
         """
         path = self.host_install_destdir(host_target)
         self.install_with_cmake(['install'], path)
 
-        # Remove the unwanted shared libraries
-        for (root, dirs, files) in os.walk(os.path.join(path, 'usr', 'lib')):
-            for file in files:
-                if file.startswith('libz.so') or (file.startswith('zlib')
-                                                  and file.endswith('.dll')):
-                    os.unlink(os.path.join(root, file))
-
     def build(self, host_target):
-        self.cmake_options.define('BUILD_SHARED_LIBS', 'NO')
+        self.cmake_options.define('ZSTD_BUILD_SHARED', 'NO')
+        self.cmake_options.define('ZSTD_BUILD_STATIC', 'YES')
+        self.cmake_options.define('ZSTD_BUILD_PROGRAMS', 'NO')
         self.cmake_options.define('CMAKE_POSITION_INDEPENDENT_CODE', 'YES')
 
-        if self.args.zlib_build_variant is None:
-            self.args.zlib_build_variant = "Release"
+        if self.args.zstd_build_variant is None:
+            self.args.zstd_build_variant = "Release"
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
-                                  self.args.zlib_build_variant)
+                                  self.args.zstd_build_variant)
         self.cmake_options.define('CMAKE_BUILD_TYPE', 'RELEASE')
-        self.cmake_options.define('SKIP_INSTALL_FILES', 'YES')
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '/usr')
 
         self.generate_toolchain_file_for_darwin_or_linux(host_target)
-        self.build_with_cmake(["all"], self.args.zlib_build_variant, [])
+        self.build_with_cmake(["all"], self.args.zstd_build_variant, [])
