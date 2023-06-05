@@ -523,7 +523,7 @@ public struct BacktraceFormatter {
   ///
   /// @result An array of strings, one per column.
   public func formatColumns(frame: Backtrace.Frame,
-                            addressWidth: Int = 64,
+                            addressWidth: Int,
                             index: Int? = nil) -> [String] {
     let pc: String
     var attrs: [String] = []
@@ -563,7 +563,7 @@ public struct BacktraceFormatter {
   ///
   /// @result An array of table rows.
   public func formatRows(frame: Backtrace.Frame,
-                         addressWidth: Int = 64,
+                         addressWidth: Int,
                          index: Int? = nil) -> [TableRow] {
     return [.columns(formatColumns(frame: frame,
                                    addressWidth: addressWidth,
@@ -578,7 +578,7 @@ public struct BacktraceFormatter {
   ///
   /// @result A `String` containing the formatted data.
   public func format(frame: Backtrace.Frame,
-                     addressWidth: Int = 64,
+                     addressWidth: Int,
                      index: Int? = nil) -> String {
     let rows = formatRows(frame: frame,
                           addressWidth: addressWidth,
@@ -593,7 +593,7 @@ public struct BacktraceFormatter {
   ///
   /// @result A `String` containing the formatted data.
   public func format(frames: some Sequence<Backtrace.Frame>,
-                     addressWidth: Int = 64) -> String {
+                     addressWidth: Int) -> String {
     var rows: [TableRow] = []
 
     var n = 0
@@ -734,7 +734,7 @@ public struct BacktraceFormatter {
   ///
   /// @result An array of strings, one per column.
   public func formatColumns(frame: SymbolicatedBacktrace.Frame,
-                            addressWidth: Int = 64,
+                            addressWidth: Int,
                             index: Int? = nil) -> [String] {
     let pc: String
     var attrs: [String] = []
@@ -851,7 +851,7 @@ public struct BacktraceFormatter {
   ///
   /// @result An array of table rows.
   public func formatRows(frame: SymbolicatedBacktrace.Frame,
-                         addressWidth: Int = 64,
+                         addressWidth: Int,
                          index: Int? = nil,
                          showSource: Bool = true) -> [TableRow] {
     let columns = formatColumns(frame: frame,
@@ -880,7 +880,7 @@ public struct BacktraceFormatter {
   ///
   /// @result A `String` containing the formatted data.
   public func format(frame: SymbolicatedBacktrace.Frame,
-                     addressWidth: Int = 64,
+                     addressWidth: Int,
                      index: Int? = nil,
                      showSource: Bool = true) -> String {
     let rows = formatRows(frame: frame, addressWidth: addressWidth,
@@ -902,7 +902,7 @@ public struct BacktraceFormatter {
   ///
   /// @result A `String` containing the formatted data.
   public func format(frames: some Sequence<SymbolicatedBacktrace.Frame>,
-                     addressWidth: Int = 64) -> String {
+                     addressWidth: Int) -> String {
     var rows: [TableRow] = []
     var sourceLocationsShown = Set<SymbolicatedBacktrace.SourceLocation>()
 
@@ -982,7 +982,7 @@ public struct BacktraceFormatter {
   ///
   /// @result An array of strings, one per column.
   public func formatColumns(image: Backtrace.Image,
-                            addressWidth: Int = 64) -> [String] {
+                            addressWidth: Int) -> [String] {
     let addressRange = "\(hex(image.baseAddress, width: addressWidth))–\(hex(image.endOfText, width: addressWidth))"
     let buildID: String
     if let bytes = image.buildID {
@@ -1011,7 +1011,7 @@ public struct BacktraceFormatter {
   ///
   /// @result A string containing the formatted data.
   public func format(images: some Sequence<Backtrace.Image>,
-                     addressWidth: Int = 64) -> String {
+                     addressWidth: Int) -> String {
     let rows = images.map{
       TableRow.columns(
         formatColumns(image: $0,
