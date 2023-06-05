@@ -1844,21 +1844,21 @@ handleRequestDiagnostics(const RequestDict &Req,
 ///
 /// Sends the results as a 'CategorizedEdits'. Each edit object has
 /// 'key.buffer_name' that can be used for recursive expansion. If the
-/// client founds nested macro expansion in the expanded source, it can send
+/// client finds nested macro expansion in the expanded source, it can send
 /// another request using the buffer name and the source text in the subsequent
 /// request.
 static void handleRequestExpandMacroSyntactically(
-    const RequestDict &Req, SourceKitCancellationToken CancellationToken,
-    ResponseReceiver Rec) {
+    const RequestDict &req, SourceKitCancellationToken cancellationToken,
+    ResponseReceiver rec) {
 
-  Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+  Optional<VFSOptions> vfsOptions = getVFSOptions(req);
   std::unique_ptr<llvm::MemoryBuffer> inputBuf =
-      getInputBufForRequestOrEmitError(Req, vfsOptions, Rec);
+      getInputBufForRequestOrEmitError(req, vfsOptions, rec);
   if (!inputBuf)
     return;
 
   SmallVector<const char *, 16> args;
-  if (getCompilerArgumentsForRequestOrEmitError(Req, args, Rec))
+  if (getCompilerArgumentsForRequestOrEmitError(req, args, rec))
     return;
 
   // key.expansions: [
@@ -1876,7 +1876,7 @@ static void handleRequestExpandMacroSyntactically(
   //       {key.offset: 9, key.length: 3, key.argindex: 1}]}
   // ]
   std::vector<MacroExpansionInfo> expansions;
-  bool failed = Req.dictionaryArrayApply(KeyExpansions, [&](RequestDict dict) {
+  bool failed = req.dictionaryArrayApply(KeyExpansions, [&](RequestDict dict) {
     // offset.
     int64_t offset;
     dict.getInt64(KeyOffset, offset, false);
@@ -1884,7 +1884,7 @@ static void handleRequestExpandMacroSyntactically(
     // macro roles.
     SmallVector<sourcekitd_uid_t, 1> macroRoleUIDs;
     if (dict.getUIDArray(KeyMacroRoles, macroRoleUIDs, false)) {
-      Rec(createErrorRequestInvalid(
+      rec(createErrorRequestInvalid(
           "missing 'key.macro_roles' for expansion specifier"));
       return true;
     }
@@ -1912,7 +1912,7 @@ static void handleRequestExpandMacroSyntactically(
     if (auto moduleName = dict.getString(KeyModuleName)) {
       auto typeName = dict.getString(KeyTypeName);
       if (!typeName) {
-        Rec(createErrorRequestInvalid(
+        rec(createErrorRequestInvalid(
             "missing 'key.typename' for external macro definition"));
         return true;
       }
@@ -1929,7 +1929,7 @@ static void handleRequestExpandMacroSyntactically(
             failed |= dict.getInt64(KeyLength, length, false);
             failed |= dict.getInt64(KeyArgIndex, paramIndex, false);
             if (failed) {
-              Rec(createErrorRequestInvalid(
+              rec(createErrorRequestInvalid(
                   "macro replacement should have key.offset, key.length, and "
                   "key.argindex"));
               return true;
@@ -1951,7 +1951,7 @@ static void handleRequestExpandMacroSyntactically(
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.expandMacroSyntactically(
       inputBuf.get(), args, expansions,
-      [&](const auto &Result) { Rec(createCategorizedEditsResponse(Result)); });
+      [&](const auto &Result) { rec(createCategorizedEditsResponse(Result)); });
 }
 
 void handleRequestImpl(sourcekitd_object_t ReqObj,

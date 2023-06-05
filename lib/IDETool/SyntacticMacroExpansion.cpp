@@ -306,18 +306,18 @@ struct ExpansionNode {
 };
 class MacroExpansionFinder : public ASTWalker {
   SourceManager &SM;
-  SourceLoc LocToResolve;
-  llvm::Optional<ExpansionNode> Result;
+  SourceLoc locToResolve;
+  llvm::Optional<ExpansionNode> result;
 
   bool rangeContainsLocToResolve(SourceRange Range) const {
-    return SM.rangeContainsTokenLoc(Range, LocToResolve);
+    return SM.rangeContainsTokenLoc(Range, locToResolve);
   }
 
 public:
-  MacroExpansionFinder(SourceManager &SM, SourceLoc LocToResolve)
-      : SM(SM), LocToResolve(LocToResolve) {}
+  MacroExpansionFinder(SourceManager &SM, SourceLoc locToResolve)
+      : SM(SM), locToResolve(locToResolve) {}
 
-  llvm::Optional<ExpansionNode> getResult() const { return Result; }
+  llvm::Optional<ExpansionNode> getResult() const { return result; }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::None;
@@ -337,7 +337,7 @@ public:
         SourceRange nameRange(customAttr->getRangeWithAt().Start,
                               customAttr->getTypeExpr()->getEndLoc());
         if (rangeContainsLocToResolve(nameRange)) {
-          Result = ExpansionNode{customAttr, ASTNode(D)};
+          result = ExpansionNode{customAttr, ASTNode(D)};
           return Action::Stop();
         }
       }
@@ -348,7 +348,7 @@ public:
       SourceRange nameRange(med->getExpansionInfo()->SigilLoc,
                             med->getMacroNameLoc().getEndLoc());
       if (rangeContainsLocToResolve(nameRange)) {
-        Result = ExpansionNode{nullptr, ASTNode(med)};
+        result = ExpansionNode{nullptr, ASTNode(med)};
         return Action::Stop();
       }
     }
@@ -366,7 +366,7 @@ public:
       SourceRange nameRange(mee->getExpansionInfo()->SigilLoc,
                             mee->getMacroNameLoc().getEndLoc());
       if (rangeContainsLocToResolve(nameRange)) {
-        Result = ExpansionNode{nullptr, ASTNode(mee)};
+        result = ExpansionNode{nullptr, ASTNode(mee)};
         return Action::Stop();
       }
     }
