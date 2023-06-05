@@ -3029,7 +3029,8 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
       return result.withTransitiveRoot(te);
 
   } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
-    return ioe;
+    if (auto result = findStorageReferenceExprForBorrow(ioe->getSubExpr()))
+      return result.withTransitiveRoot(ioe);
   }
 
   return StorageRefResult();
@@ -3047,6 +3048,24 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
     argExpr = li->getSubExpr();
     sawLoad = true;
+  }
+
+  // If we have a subscript, strip it off and make sure that our base is
+  // something that we can process. If we do and we succeed below, we return the
+  // subscript instead.
+  SubscriptExpr *subscriptExpr = nullptr;
+  if ((subscriptExpr = dyn_cast<SubscriptExpr>(argExpr))) {
+    auto *decl = cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl());
+    if (decl->getReadImpl() != ReadImplKind::Read) {
+      subscriptExpr = nullptr;
+    } else {
+      argExpr = subscriptExpr->getBase();
+    }
+
+    // If there's a load on the base of the subscript expr, look past it.
+    if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
+      argExpr = li->getSubExpr();
+    }
   }
 
   // If we're consuming instead, then the load _must_ have been there.
@@ -3096,6 +3115,12 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   // Claim the value of this argument since we found a storage reference that
   // has a move only base.
   (void)std::move(*this).asKnownExpr();
+
+  // If we saw a subscript expr and the base of the subscript expr passed our
+  // tests above, we can emit the call to the subscript directly as a borrowed
+  // lvalue. Return the subscript expr here so that we emit it appropriately.
+  if (subscriptExpr)
+    return subscriptExpr;
 
   return result.getTransitiveRoot();
 }

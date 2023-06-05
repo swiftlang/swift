@@ -319,10 +319,9 @@ public:
     liveness->initializeDef(getCurrentDef());
   }
 
-  void invalidateLiveness() {
+  void clear() {
     consumingBlocks.clear();
     debugValues.clear();
-    liveness->invalidate();
     discoveredBlocks.clear();
   }
 
