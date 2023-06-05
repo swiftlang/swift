@@ -177,14 +177,19 @@ extension _ArrayBufferProtocol {
 
     // place the values into the hole we created
     if newCount > 0 {
-      var place = holeStart
-      var i = newValues.startIndex
-      while place < holeEnd {
-        place.initialize(to: newValues[i])
-        place += 1
-        newValues.formIndex(after: &i)
+      let done: Void? = newValues.withContiguousStorageIfAvailable {
+        holeStart.initialize(from: $0.baseAddress!, count: newCount)
       }
-      _expectEnd(of: newValues, is: i)
+      if done == nil {
+        var place = holeStart
+        var i = newValues.startIndex
+        while place < holeEnd {
+          place.initialize(to: newValues[i])
+          place += 1
+          newValues.formIndex(after: &i)
+        }
+        _expectEnd(of: newValues, is: i)
+      }
     }
   }
 }
