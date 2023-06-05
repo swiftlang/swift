@@ -4951,6 +4951,11 @@ class AssignOrInitInst
 
   FixedOperandList<3> Operands;
 
+  /// Marks all of the properties in `initializes(...)` list that
+  /// have been initialized before this intruction to help Raw SIL
+  /// lowering to emit destroys.
+  llvm::BitVector Assignments;
+
 public:
   enum Mode {
     /// The mode is not decided yet (by DefiniteInitialization).
@@ -4980,6 +4985,17 @@ public:
   void setMode(Mode mode) {
     sharedUInt8().AssignOrInitInst.mode = uint8_t(mode);
   }
+
+  /// Mark a property from `initializes(...)` list as initialized
+  /// before this instruction.
+  void markAsInitialized(VarDecl *property);
+
+  /// Check whether a property from `initializes(...)` list with
+  /// the given index has already been initialized and requires
+  /// destroy before it could be re-initialized.
+  bool isPropertyAlreadyInitialized(unsigned propertyIdx);
+
+  unsigned getNumInitializedProperties() const;
 
   ArrayRef<VarDecl *> getInitializedProperties() const;
   ArrayRef<VarDecl *> getAccessedProperties() const;

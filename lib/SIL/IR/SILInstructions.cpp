@@ -1263,27 +1263,51 @@ AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Src,
       Operands(this, Src, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
+  Assignments.resize(getNumInitializedProperties());
+}
+
+void AssignOrInitInst::markAsInitialized(VarDecl *property) {
+  auto toInitProperties = getInitializedProperties();
+  for (unsigned index : indices(toInitProperties)) {
+    if (toInitProperties[index] == property) {
+      Assignments.set(index);
+      break;
+    }
+  }
+}
+
+bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {
+  assert(propertyIdx < Assignments.size());
+  return Assignments.test(propertyIdx);
 }
 
 AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
-  auto *initRef =
-      cast<FunctionRefInst>(getInitializer()->getDefiningInstruction());
-  auto *accessorRef = initRef->getReferencedFunction();
-  return cast<AccessorDecl>(accessorRef->getDeclContext());
+  auto *initRef = cast<FunctionRefInst>(getInitializer());
+  auto *accessorRef = initRef->getReferencedFunctionOrNull();
+  assert(accessorRef);
+  return dyn_cast_or_null<AccessorDecl>(accessorRef->getDeclContext());
+}
+
+unsigned AssignOrInitInst::getNumInitializedProperties() const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>();
+    return initAttr ? initAttr->getNumProperties() : 0;
+  }
+  return 0;
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
-  auto *accessor = getReferencedInitAccessor();
-  if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>()) {
-    return initAttr->getPropertyDecls(accessor);
+  if (auto *accessor = getReferencedInitAccessor()) {
+    if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>())
+      return initAttr->getPropertyDecls(accessor);
   }
   return {};
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
-  auto *accessor = getReferencedInitAccessor();
-  if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>()) {
-    return accessAttr->getPropertyDecls(accessor);
+  if (auto *accessor = getReferencedInitAccessor()) {
+    if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>())
+      return accessAttr->getPropertyDecls(accessor);
   }
   return {};
 }

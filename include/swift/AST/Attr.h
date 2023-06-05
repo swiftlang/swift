@@ -1568,6 +1568,8 @@ public:
     return numProperties;
   }
 
+  unsigned getNumProperties() const { return numProperties; }
+
   ArrayRef<Identifier> getProperties() const {
     return {getTrailingObjects<Identifier>(), numProperties};
   }
