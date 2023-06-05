@@ -1,4 +1,4 @@
-//===--- CrashInfo.h - Swift Backtracing Crash Information ------*- C++ -*-===//
+//===--- Windows.h - Windows specifics --------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,31 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  Defines the CrashInfo type that holds information about why the program
-//  crashed.
+//  Windows specific includes and declarations.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CRASHINFO_H
-#define SWIFT_CRASHINFO_H
-
-#include "SwiftStdint.h"
+#ifndef SWIFT_BACKTRACING_WINDOWS_H
+#define SWIFT_BACKTRACING_WINDOWS_H
+#ifdef _WIN32
 
 #ifdef __cplusplus
-namespace swift {
 extern "C" {
 #endif
 
-struct CrashInfo {
-  __swift_uint64_t crashing_thread;
-  __swift_uint64_t signal;
-  __swift_uint64_t fault_address;
-  __swift_uint64_t mctx;
-};
+  // Nothing yet
 
 #ifdef __cplusplus
 } // extern "C"
-} // namespace swift
 #endif
 
-#endif // SWIFT_CRASHINFO_H
+#endif // _WIN32
+#endif // SWIFT_BACKTRACING_WINDOWS_H
+
