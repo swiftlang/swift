@@ -1446,6 +1446,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::UnresolvedMemberChainBase: {
     auto binding = inferFromRelational(constraint);
     if (!binding)

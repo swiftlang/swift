@@ -954,7 +954,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 /// "repair" the pattern if needed. This ensures that the pattern engine
 /// receives well-formed input, avoiding the need to implement an additional
 /// compatibility hack there, as doing that is lot more tricky due to the
-/// different cases that need to handled.
+/// different cases that need to be handled.
 ///
 /// We also emit diagnostics and potentially a fix-it to help the user.
 ///
@@ -1011,12 +1011,16 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
         addDeclNote = true;
       }
     }
-  } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
+  } else if (auto *tupleType = enumPayloadType
+                                   // Account for implicit optional promotion.
+                                   ->lookThroughAllOptionalTypes()
+                                   ->getAs<TupleType>()) {
     if (tupleType->getNumElements() >= 2) {
       if (auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat)) {
         DE.diagnose(enumElementInnerPat->getLoc(),
                     diag::converting_several_associated_values_into_tuple,
                     enumCase->getNameStr(),
+                    enumPayloadType->isOptional(),
                     tupleType->getNumElements())
           .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
           .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
@@ -1204,17 +1208,25 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   // TODO: permit implicit conversions?
   case PatternKind::Tuple: {
     TuplePattern *TP = cast<TuplePattern>(P);
-    bool hadError = type->hasError();
-    
+
+    TupleType *tupleTy = type->getAs<TupleType>();
+
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
-    bool canDecayToParen = TP->getNumElements() == 1;
-    auto decayToParen = [&]() -> Pattern * {
-      assert(canDecayToParen);
-      Pattern *sub = TP->getElement(0).getPattern();
-      sub = TypeChecker::coercePatternToType(
-          pattern.forSubPattern(sub, /*retainTopLevel=*/false), type,
-          subOptions);
+    //
+    // FIXME: This condition is rather loose, e.g. it makes the following compile:
+    // switch 0 {
+    //   case (int: 0): break
+    //   default: break
+    // }
+    // Do we really want/need to support this?
+    //
+    if (TP->getNumElements() == 1 &&
+        (!tupleTy || tupleTy->getNumElements() != 1)) {
+      auto *sub = TypeChecker::coercePatternToType(
+          pattern.forSubPattern(TP->getElement(0).getPattern(),
+                                /*retainTopLevel=*/false),
+          type, subOptions);
       if (!sub)
         return nullptr;
 
@@ -1225,62 +1237,80 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       } else {
         P = sub;
       }
-      return P;
-    };
 
-    // The context type must be a tuple.
-    TupleType *tupleTy = type->getAs<TupleType>();
-    if (!tupleTy && !hadError) {
-      if (canDecayToParen)
-        return decayToParen();
+      return P;
+    }
+
+    // Allow optional promotion only when pattern matching is allowed to
+    // fail (in statement conditions, 'switch' case items, but not pattern
+    // binding declarations).
+    const bool allowOptionalPromotion = !pattern.getPatternBindingDecl();
+
+    const auto origTy = type;
+    if (allowOptionalPromotion) {
+      // Peel away any optionality. If the coercion succeeds, we will promote
+      // the resulting pattern to the original type by wrapping it in
+      // 'OptionalSome' patterns.
+      type = type->lookThroughAllOptionalTypes();
+    }
+
+    tupleTy = type->getAs<TupleType>();
+
+    if (!tupleTy) {
       diags.diagnose(TP->getStartLoc(),
                      diag::tuple_pattern_in_non_tuple_context, type);
-      hadError = true;
+
+      return nullptr;
     }
 
     // The number of elements must match exactly.
-    if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
-      if (canDecayToParen)
-        return decayToParen();
-      
+    if (tupleTy->getNumElements() != TP->getNumElements()) {
       diags.diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch,
                      type);
-      hadError = true;
+
+      return nullptr;
     }
 
     // Coerce each tuple element to the respective type.
-    P->setType(type);
-
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
-      TuplePatternElt &elt = TP->getElement(i);
+      TuplePatternElt &patternElt = TP->getElement(i);
+      const auto &typeElt = tupleTy->getElement(i);
 
-      Type CoercionType;
-      if (hadError)
-        CoercionType = ErrorType::get(Context);
-      else
-        CoercionType = tupleTy->getElement(i).getType();
-      
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
-      if (!hadError && !elt.getLabel().empty() &&
-          elt.getLabel() != tupleTy->getElement(i).getName()) {
-        diags.diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
-                       elt.getLabel(), tupleTy->getElement(i).getName());
-        hadError = true;
+      if (!patternElt.getLabel().empty() &&
+          patternElt.getLabel() != typeElt.getName()) {
+        diags.diagnose(patternElt.getLabelLoc(),
+                       diag::tuple_pattern_label_mismatch,
+                       patternElt.getLabel(), typeElt.getName());
+        return nullptr;
       }
 
-      auto sub = coercePatternToType(
-          pattern.forSubPattern(elt.getPattern(), /*retainTopLevel=*/false),
-          CoercionType, subOptions);
+      auto *sub =
+          coercePatternToType(pattern.forSubPattern(patternElt.getPattern(),
+                                                    /*retainTopLevel=*/false),
+                              typeElt.getType(), subOptions);
       if (!sub)
         return nullptr;
 
-      if (!hadError)
-        elt.setPattern(sub);
+      patternElt.setPattern(sub);
     }
 
-    if (hadError)
-      return nullptr;
+    P->setType(type);
+
+    if (allowOptionalPromotion) {
+      // If the original coercion type is optional, promote the resulting
+      // pattern to a matching optionality.
+      if (auto wrappedTy = origTy->getOptionalObjectType()) {
+        do {
+          auto *OSP =
+              OptionalSomePattern::createImplicit(Context, P, P->getEndLoc());
+          OSP->setType(OptionalType::get(P->getType()));
+          P = OSP;
+          wrappedTy = wrappedTy->getOptionalObjectType();
+        } while (wrappedTy);
+      }
+    }
 
     return P;
   }
@@ -1566,10 +1596,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       }
     }
 
+    Type elementType;
+    Pattern *sub = EEP->getSubPattern();
+
     // If there is a subpattern, push the enum element type down onto it.
     auto argType = elt->getArgumentInterfaceType();
-    if (EEP->hasSubPattern()) {
-      Pattern *sub = EEP->getSubPattern();
+    if (sub) {
       if (!elt->hasAssociatedValues()) {
         diags.diagnose(EEP->getLoc(),
                        diag::enum_element_pattern_assoc_values_mismatch,
@@ -1579,33 +1611,21 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           .fixItRemove(sub->getSourceRange());
         return nullptr;
       }
-      
-      Type elementType;
+
       if (argType)
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
-      auto newSubOptions = subOptions;
-      newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
-      newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
 
       ::repairTupleOrAssociatedValuePatternIfApplicable(
         Context, sub, elementType, elt);
-
-      sub = coercePatternToType(
-          pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
-          newSubOptions);
-      if (!sub)
-        return nullptr;
-
-      EEP->setSubPattern(sub);
     } else if (argType) {
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                                 elt, argType);
+      elementType =
+          enumTy->getTypeOfMember(elt->getModuleContext(), elt, argType);
       SmallVector<TuplePatternElt, 8> elements;
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {
@@ -1622,17 +1642,22 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
                                            subPattern));
       }
-      Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
-                                                elements, SourceLoc());
+      sub = TuplePattern::createSimple(Context, SourceLoc(), elements,
+                                       SourceLoc());
       sub->setImplicit();
+    }
+
+    if (sub) {
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
           newSubOptions);
       if (!sub)
         return nullptr;
+
       EEP->setSubPattern(sub);
     }
 

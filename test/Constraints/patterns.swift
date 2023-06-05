@@ -564,3 +564,19 @@ struct TestIUOMatchOp {
     if case self = self {}
   }
 }
+
+// Tuple patterns cannot match existentials without an explicit cast pattern.
+do {
+  enum E {
+    case e
+  }
+
+  let a: Any
+  let i: Int
+
+  // FIXME: Bad diagnostic when matching tuple pattern to existential (https://github.com/apple/swift/issues/65243)
+  if case (i, i) = a {} // expected-error {{type of expression is ambiguous without more context}}
+  if case (0, 0) = a {} // expected-error {{type of expression is ambiguous without more context}}
+
+  if case (E.e, E.e) = a {} // expected-error {{cannot convert value of type 'Any' to specified type '(E, E)'}}
+}

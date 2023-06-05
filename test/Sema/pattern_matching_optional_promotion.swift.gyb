@@ -1,0 +1,308 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/generated.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/generated.swift
+
+// Test that implicit optional promotion works for refutable patterns in
+// statement conditions and 'switch' case items. In 'switch' statements, rely on
+// redundant case diagnostics (if applicable) to additionally verify that an
+// implicitly promoted pattern has the same space projection as the explicit
+// counterpart.
+//
+// Note: We do not test 'catch' statements because patterns there are always
+// matched against a non-optional.
+
+%{
+  contexts = ['do_block', 'closure', 'result_builder_closure']
+  def get_test_case_introducer(context):
+    if context == 'do_block':
+      return 'do'
+    elif context == 'closure':
+      return 'let _: () -> Void ='
+    elif context == 'result_builder_closure':
+      return '@DummyBuilder var x: Void'
+
+    assert False, 'unhandled context!'
+}%
+
+indirect enum E {
+  case a
+  case b(e: E)
+  case ot((E, E)?)       // expected-note 13 {{'ot' declared here}}
+  case oot((((E, E))?)?) // expected-note 13 {{'oot' declared here}}
+}
+
+@resultBuilder
+struct DummyBuilder {
+  static func buildBlock(_ components: Void...) -> Void { () }
+  static func buildOptional(_ component: Void?) -> Void { () }
+  static func buildEither(first: Void) -> Void { () }
+  static func buildEither(second: Void) -> Void { () }
+  static func buildArray(_ components: [Void]) -> Void { () }
+}
+
+// Enum element patterns.
+do {
+  let oe: E?
+  let ooe: E??
+
+% for context in contexts:
+%   test_case_introducer = get_test_case_introducer(context)
+%   for case in ['.a', '.b', '.b(e: .a)']:
+  do {
+    ${test_case_introducer} {
+      if case ${case} = oe {}
+      if case ${case} = ooe {}
+      if case ${case}? = ooe {}
+      if case .some(${case}) = ooe {}
+
+%     if context != 'result_builder_closure':
+      guard case ${case} = oe else {}
+      guard case ${case} = ooe else {}
+      guard case ${case}? = ooe else {}
+      guard case .some(${case}) = ooe else {}
+
+      while case ${case} = oe {}
+      while case ${case} = ooe {}
+      while case ${case}? = ooe {}
+      while case .some(${case}) = ooe {}
+%     end
+
+      for case ${case} in [oe] {}
+      for case ${case} in [ooe] {}
+      for case ${case}? in [ooe] {}
+      for case .some(${case}) in [ooe] {}
+
+      switch oe {
+        case ${case}?: ()
+        case ${case}: () // expected-warning {{case is already handled}}
+        default: ()
+      }
+      switch ooe {
+        case ${case}??: ()
+        case ${case}?: () // expected-warning {{case is already handled}}
+        case .some(${case}): () // expected-warning {{case is already handled}}
+        case ${case}: () // expected-warning {{case is already handled}}
+        default: ()
+      }
+    }
+  }
+%   end
+
+  do {
+    ${test_case_introducer} {
+      switch oe {
+        // FIXME: '.a' is OK but 'E.a' is not?
+        case E.a: () // expected-error {{enum case 'a' is not a member of type 'E?'}}
+        default: ()
+      }
+    }
+  }
+
+% end
+}
+
+// Tuple patterns.
+do {
+  let ot: (E, E)?
+  let oot: (E, E)??
+  let tot: ((E, E)?, E)
+  let splat: E
+
+% for context in contexts:
+%   test_case_introducer = get_test_case_introducer(context)
+  do {
+    // FIXME: This should compile.
+    ${test_case_introducer} {
+      for case (.a, .a) in [ot] {}
+%   if context == 'do_block':
+      // expected-error@-2 {{conflicting arguments to generic parameter 'Elements' ('[(E, E)?]' vs. '[(E, E)]')}}
+      // expected-error@-3 {{conflicting arguments to generic parameter 'Element' ('(E, E)?' vs. '(E, E)')}}
+      // expected-error@-4 {{conflicting arguments to generic parameter 'Self' ('[(E, E)?]' vs. '[(E, E)]')}}
+%   else:
+      // expected-error@-2 {{cannot convert value of type '(E, E)?' to expected element type '(E, E)'}}
+%   end
+    }
+  }
+
+  do {
+    ${test_case_introducer} {
+      if case (.a, .a) = ot {}
+      if case let (x, y) = ot {}
+      if case (.a, .a) = oot {}
+      if case (.a, .a)? = oot {}
+      if case ((.a, .a), .a) = tot {}
+      if case .ot(.a, .a) = splat {}
+      // expected-warning@-1 {{enum case 'ot' has one associated value that is a optional tuple of 2 elements}}
+      if case .oot(.a, .a) = splat {}
+      // expected-warning@-1 {{enum case 'oot' has one associated value that is a optional tuple of 2 elements}}
+
+%   if context != 'result_builder_closure':
+      guard case (.a, .a) = ot else {}
+      guard case let (x, y) = ot else {}
+      guard case (.a, .a) = oot else {}
+      guard case (.a, .a)? = oot else {}
+      guard case ((.a, .a), .a) = tot else {}
+      guard case .ot(.a, .a) = splat else {}
+      // expected-warning@-1 {{enum case 'ot' has one associated value that is a optional tuple of 2 elements}}
+      guard case .oot(.a, .a) = splat else {}
+      // expected-warning@-1 {{enum case 'oot' has one associated value that is a optional tuple of 2 elements}}
+
+      while case (.a, .a) = ot {}
+      while case let (x, y) = ot {}
+      while case (.a, .a) = oot {}
+      while case (.a, .a)? = oot {}
+      while case ((.a, .a), .a) = tot {}
+      while case .ot(.a, .a) = splat {}
+      // expected-warning@-1 {{enum case 'ot' has one associated value that is a optional tuple of 2 elements}}
+      while case .oot(.a, .a) = splat {}
+      // expected-warning@-1 {{enum case 'oot' has one associated value that is a optional tuple of 2 elements}}
+%   end
+
+      // FIXME: Make these for-in loops work directly with array literals.
+      let otArr = [ot]
+      let ootArr = [oot]
+      let totArr = [tot]
+      let splatArr = [splat]
+
+      for case (.a, .a) in otArr {}
+      for case let (x, y) in otArr {}
+      for case (.a, .a) in ootArr {}
+      for case (.a, .a)? in ootArr {}
+      for case ((.a, .a), .a) in totArr {}
+      for case .ot(.a, .a) in splatArr {}
+      // expected-warning@-1 {{enum case 'ot' has one associated value that is a optional tuple of 2 elements}}
+      for case .oot(.a, .a) in splatArr {}
+      // expected-warning@-1 {{enum case 'oot' has one associated value that is a optional tuple of 2 elements}}
+
+      switch ot {
+        case (.a, .a)?: ()
+        case (.a, .a): () // expected-warning {{case is already handled}}
+        default: ()
+      }
+      switch ot {
+        case let (x, y)?: ()
+        case let (x, y): () // expected-warning {{case is already handled}}
+        default: ()
+      }
+      switch oot {
+        case (.a, .a)??: ()
+        case (.a, .a)?: () // expected-warning {{case is already handled}}
+        case .some((.a, .a)): () // expected-warning {{case is already handled}}
+        case (.a, .a): () // expected-warning {{case is already handled}}
+        default: ()
+      }
+      switch tot {
+        case ((.a, .a)?, .a): ()
+        case ((.a, .a), .a): () // expected-warning {{case is already handled}}
+        default: ()
+      }
+      switch splat {
+        case .ot((.a, .a)?): ()
+        case .ot(.a, .a): () // expected-warning {{case is already handled}}
+        // expected-warning@-1 {{enum case 'ot' has one associated value that is a optional tuple of 2 elements}}
+        default: ()
+      }
+      switch splat {
+        case .oot((.a, .a)??): ()
+        case .oot(.a, .a): () // expected-warning {{case is already handled}}
+        // expected-warning@-1 {{enum case 'oot' has one associated value that is a optional tuple of 2 elements}}
+        default: ()
+      }
+    }
+  }
+
+% end
+}
+
+// Boolean patterns.
+do {
+  let ob: Bool?
+
+% for context in contexts:
+%   test_case_introducer = get_test_case_introducer(context)
+  do {
+    ${test_case_introducer} {
+      // FIXME: Works but the literal resolves to an expression pattern.
+      if case true = ob {}
+
+      // FIXME(https://github.com/apple/swift/issues/61817): This should be exhaustive
+      switch ob { // expected-error {{switch must be exhaustive}}
+        // expected-note@-1 {{add missing case: '.some(_)'}}
+        case nil: ()
+        case true: ()
+        case false: ()
+      }
+    }
+  }
+
+% end
+}
+
+// 'is' patterns.
+do {
+  class A {}
+  class B: A {}
+
+  let oa: A?
+  let ooa: A??
+  let oaooa: (A?, A??)
+
+% for context in contexts:
+  ${get_test_case_introducer(context)} {
+    if case is B = oa {}
+    if case is B = ooa {}
+    if case (is B)? = ooa {}
+    if case .some(is B) = ooa {}
+    if case (is B, is B) = oaooa {}
+    if case (is B, (is B)?) = oaooa {}
+    if case (is B, .some(is B)) = oaooa {}
+
+%   if context != 'result_builder_closure':
+    guard case is B = oa else {}
+    guard case is B = ooa else {}
+    guard case (is B)? = ooa else {}
+    guard case .some(is B) = ooa else {}
+    guard case (is B, is B) = oaooa else {}
+    guard case (is B, (is B)?) = oaooa else {}
+    guard case (is B, .some(is B)) = oaooa else {}
+
+    while case is B = oa {}
+    while case is B = ooa {}
+    while case (is B)? = ooa {}
+    while case .some(is B) = ooa {}
+    while case (is B, is B) = oaooa {}
+    while case (is B, (is B)?) = oaooa {}
+    while case (is B, .some(is B)) = oaooa {}
+%   end
+
+    for case is B in [oa] {}
+    for case is B in [ooa] {}
+    for case (is B)? in [ooa] {}
+    for case .some(is B) in [ooa] {}
+    for case (is B, is B) in [oaooa] {}
+    for case (is B, (is B)?) in [oaooa] {}
+    for case (is B, .some(is B)) in [oaooa] {}
+
+    switch oa {
+      case (is B)?: ()
+      case is B: ()
+      default: ()
+    }
+    switch ooa {
+      case (is B)??: ()
+      case .some(is B): ()
+      case (is B)?: ()
+      case is B: ()
+      default: ()
+    }
+    switch oaooa {
+      case ((is B)?, (is B)??): ()
+      case (is B, .some(is B)): ()
+      case (is B, (is B)?): ()
+      case (is B, is B): ()
+      default: ()
+    }
+  }
+
+% end
+}
