@@ -12,6 +12,9 @@
 // REFERRING_MODULE: [[DESTROY:%.*]] = bitcast i8* [[VALUE_WITNESS]]
 // REFERRING_MODULE: [[CAST_SERVER:%.*]] = bitcast %T6server8MoveOnlyV* [[SERVER]]
 // REFERRING_MODULE: call void [[DESTROY]]({{%.*}} [[CAST_SERVER]], {{%.*}} @"$s6server8MoveOnlyVN")
+// REFERRING_MODULE: [[CAST_SERVER:%.*]] = bitcast %T6server8MoveOnlyV* [[SERVER]]
+// REFERRING_MODULE: call void @llvm.lifetime.end.p0i8({{.*}}, i8* [[CAST_SERVER]])
+// REFERRING_MODULE-NEXT: ret void
 
 // Make sure that in the other module, we do call the deinit directly from the value witness.
 // DEFINING_MODULE-LABEL: define internal void @"$s6server8MoveOnlyVwxx"(%swift.opaque* noalias %object, %swift.type* %MoveOnly) {{.*}} {
