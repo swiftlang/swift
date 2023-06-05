@@ -17,10 +17,17 @@
 #ifndef SWIFT_RUNTIME_BACKTRACE_H
 #define SWIFT_RUNTIME_BACKTRACE_H
 
+#ifdef __linux__
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#include <signal.h>
+#endif // defined(__linux__)
+
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/CrashInfo.h"
 
 #include "swift/shims/Visibility.h"
-#include "swift/shims/CrashInfo.h"
 
 #include <inttypes.h>
 
@@ -50,7 +57,11 @@ typedef int ErrorCode;
 
 SWIFT_RUNTIME_STDLIB_INTERNAL ErrorCode _swift_installCrashHandler();
 
+#ifdef __linux__
+SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd);
+#else
 SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv);
+#endif
 
 enum class UnwindAlgorithm {
   Auto = 0,
@@ -125,6 +136,12 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;
 
 SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift) bool _swift_isThunkFunction(const char *mangledName);
 
+SWIFT_RUNTIME_STDLIB_SPI
+char *_swift_backtrace_demangle(const char *mangledName,
+                                size_t mangledNameLength,
+                                char *outputBuffer,
+                                size_t *outputBufferSize,
+                                int *status);
 #ifdef __cplusplus
 } // namespace backtrace
 } // namespace runtime
