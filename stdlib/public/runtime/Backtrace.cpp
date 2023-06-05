@@ -843,8 +843,8 @@ namespace backtrace {
 /// @param mangledName is the symbol name to be tested.
 ///
 /// @returns `true` if `mangledName` represents a thunk function.
-SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift) bool
-_swift_isThunkFunction(const char *mangledName) {
+SWIFT_RUNTIME_STDLIB_SPI bool
+_swift_backtrace_isThunkFunction(const char *mangledName) {
   swift::Demangle::Context ctx;
 
   return ctx.isThunkSymbol(mangledName);

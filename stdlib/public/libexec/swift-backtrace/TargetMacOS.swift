@@ -1,4 +1,4 @@
-//===--- Target.swift - Represents a process we are inspecting ------------===//
+//===--- TargetMacOS.swift - Represents a process we are inspecting -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  Defines `Target`, which represents the process we are inspecting.
-//  There are a lot of system specifics in this file!
+//  This is the macOS version.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,7 +25,8 @@ import _Backtracing
 @_spi(Contexts) import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 
-import _SwiftBacktracingShims
+@_implementationOnly import Runtime
+@_implementationOnly import OS.Darwin
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext
@@ -157,7 +158,7 @@ class Target {
 
     task = parentTask
 
-    reader = RemoteMemoryReader(task: __swift_task_t(task))
+    reader = RemoteMemoryReader(task: task_t(task))
 
     name = Self.getProcessName(pid: pid)
 
@@ -251,6 +252,7 @@ class Target {
 
       guard let backtrace = try? Backtrace.capture(from: ctx,
                                                    using: reader,
+                                                   images: nil,
                                                    limit: limit,
                                                    top: top) else {
         print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",
@@ -283,6 +285,7 @@ class Target {
 
       guard let backtrace = try? Backtrace.capture(from: context,
                                                    using: reader,
+                                                   images: nil,
                                                    limit: limit,
                                                    top: top) else {
         print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",

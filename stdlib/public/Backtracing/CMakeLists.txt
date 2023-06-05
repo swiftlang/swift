@@ -21,11 +21,20 @@ if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 endif()
 
 set(BACKTRACING_SOURCES
+  ArrayImageSource.swift
   Backtrace.swift
   BacktraceFormatter.swift
+  ByteSwapping.swift
   Context.swift
+  Compression.swift
   CoreSymbolication.swift
+  Dwarf.swift
+  Elf.swift
+  FileImageSource.swift
   FramePointerUnwinder.swift
+  Image.swift
+  ImageSource.swift
+  MemoryImageSource.swift
   MemoryReader.swift
   Registers.swift
   SymbolicatedBacktrace.swift
@@ -81,5 +90,5 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
 
-  TARGET_SDKS OSX
+  TARGET_SDKS OSX LINUX
 )

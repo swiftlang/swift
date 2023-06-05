@@ -134,7 +134,8 @@ struct BacktraceSettings {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;
 
-SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift) bool _swift_isThunkFunction(const char *mangledName);
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_backtrace_isThunkFunction(const char *mangledName);
 
 /// Try to demangle a symbol.
 ///
