@@ -484,6 +484,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocPackInst:
+  // This instruction just destroys stack allocations where metadata pointers
+  // have been stored.
+  case SILInstructionKind::DeallocPackMetadataInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -630,6 +633,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
   case SILInstructionKind::AllocPackInst:
     // Just conservatively assume this has metadata impact.
+    return RuntimeEffect::MetaData;
+  case SILInstructionKind::AllocPackMetadataInst:
+    // Currently this instruction has no effect but in the fullness of time it
+    // will have a metadata effect.
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:

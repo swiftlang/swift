@@ -882,6 +882,16 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // boundaries as required by the ABI.
   P.addLoadableByAddress();
 
+  if (Options.EnablePackMetadataStackPromotion) {
+    // Insert marker instructions indicating where on-stack pack metadata
+    // deallocation must occur.
+    //
+    // No code motion may occur after this pass: alloc_pack_metadata must
+    // directly precede the instruction on behalf of which metadata will
+    // actually be emitted (e.g. apply).
+    P.addPackMetadataMarkerInserter();
+  }
+
   return P;
 }
 

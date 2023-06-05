@@ -76,6 +76,11 @@ enum ForceEnableLexicalLifetimes_t {
   DoForceEnableLexicalLifetimes
 };
 
+enum UseStackForPackMetadata_t {
+  DoNotUseStackForPackMetadata,
+  DoUseStackForPackMetadata,
+};
+
 enum class PerformanceConstraints : uint8_t {
   None = 0,
   NoAllocation = 1,
@@ -418,6 +423,10 @@ private:
   /// If true, the function has lexical lifetimes even if the module does not.
   unsigned ForceEnableLexicalLifetimes : 1;
 
+  /// If true, the function contains an instruction that prevents stack nesting
+  /// from running with pack metadata markers in place.
+  unsigned UseStackForPackMetadata : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -691,6 +700,14 @@ public:
 
   void setForceEnableLexicalLifetimes(ForceEnableLexicalLifetimes_t value) {
     ForceEnableLexicalLifetimes = value;
+  }
+
+  UseStackForPackMetadata_t useStackForPackMetadata() const {
+    return UseStackForPackMetadata_t(UseStackForPackMetadata);
+  }
+
+  void setUseStackForPackMetadata(UseStackForPackMetadata_t value) {
+    UseStackForPackMetadata = value;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type

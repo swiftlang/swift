@@ -353,6 +353,8 @@ IRGEN_PASS(LoadableByAddress, "loadable-address",
      "SIL Large Loadable type by-address lowering.")
 PASS(MandatorySILLinker, "mandatory-linker",
      "Deserialize all referenced SIL functions that are shared or transparent")
+IRGEN_PASS(PackMetadataMarkerInserter, "pack-metadata-marker-inserter",
+     "Insert markers where pack metadata might be de/allocated.")
 PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",

@@ -821,6 +821,10 @@ public:
   /// The first operand must be the allocating instruction.
   bool isDeallocatingStack() const;
 
+  /// Whether IRGen lowering of this instruction may result in emitting packs of
+  /// metadata or witness tables.
+  bool mayRequirePackMetadata() const;
+
   /// Create a new copy of this instruction, which retains all of the operands
   /// and other information of this one.  If an insertion point is specified,
   /// then the new instruction is inserted before the specified point, otherwise
@@ -2273,6 +2277,27 @@ public:
   CanSILPackType getPackType() const {
     return getType().castTo<SILPackType>();
   }
+};
+
+/// AllocPackMetadataInst - Marker instruction indicating that the next
+///                         instruction might allocate on-stack pack metadata
+///                         during IRGen.
+///
+/// Only valid in lowered SIL.
+class AllocPackMetadataInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::AllocPackMetadataInst, AllocPackMetadataInst,
+          AllocationInst> {
+  friend SILBuilder;
+
+  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType)
+      : NullaryInstructionWithTypeDependentOperandsBase(
+            loc, {}, elementType.getAddressType()) {}
+
+public:
+  /// The instruction which may trigger on-stack pack metadata when IRGen
+  /// lowering.
+  SILInstruction *getIntroducer() { return getNextInstruction(); }
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
@@ -8683,6 +8708,27 @@ class DeallocPackInst :
 
   DeallocPackInst(SILDebugLocation debugLoc, SILValue operand)
       : UnaryInstructionBase(debugLoc, operand) {}
+};
+
+/// DeallocPackMetadataInst - Deallocate stack memory allocated on behalf of the
+///                           operand by IRGen.
+///
+/// Only valid in lowered SIL.
+class DeallocPackMetadataInst final
+    : public UnaryInstructionBase<SILInstructionKind::DeallocPackMetadataInst,
+                                  DeallocationInst> {
+  friend SILBuilder;
+
+  DeallocPackMetadataInst(SILDebugLocation debugLoc, SILValue alloc)
+      : UnaryInstructionBase(debugLoc, alloc) {}
+
+public:
+  AllocPackMetadataInst *getAllocation() {
+    return cast<AllocPackMetadataInst>(getOperand().getDefiningInstruction());
+  }
+  /// The instruction which may trigger on-stack pack metadata when IRGen
+  /// lowering.
+  SILInstruction *getIntroducer() { return getAllocation()->getIntroducer(); }
 };
 
 /// Like DeallocStackInst, but for `alloc_ref [stack]`.

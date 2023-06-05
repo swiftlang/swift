@@ -1028,6 +1028,16 @@ def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
 def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
   HelpText<"Enable layout string based value witnesses">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_pack_metadata_stack_promotion :
+    Joined<["-"], "enable-pack-metadata-stack-promotion=">,
+    HelpText<"Whether to skip heapifying stack metadata packs when possible.">,
+    MetaVarName<"true|false">;
+  def enable_pack_metadata_stack_promotion_noArg :
+    Flag<["-"], "enable-pack-metadata-stack-promotion">,
+    HelpText<"Skip heapifying stack metadata packs when possible.">;
+}
+
 def disable_layout_string_value_witnesses : Flag<["-"], "disable-layout-string-value-witnesses">,
   HelpText<"Disable layout string based value witnesses">;
 
