@@ -15,28 +15,28 @@ struct Generic<Element> {
 
 //--- DelegatedConformance.json
 {
-  key.macro_roles: [source.lang.swift.macrorole.conformance, source.lang.swift.macrorole.member],
+  key.macro_roles: [source.lang.swift.macro_role.conformance, source.lang.swift.macro_role.member],
   key.modulename: "MacroDefinition",
   key.typename: "DelegatedConformanceMacro",
 }
 
 //--- myPropertyWrapper.json
 {
-  key.macro_roles: [source.lang.swift.macrorole.accessor, source.lang.swift.macrorole.peer],
+  key.macro_roles: [source.lang.swift.macro_role.accessor, source.lang.swift.macro_role.peer],
   key.modulename: "MacroDefinition",
   key.typename: "PropertyWrapperMacro",
 }
 
 //--- wrapAllProperties.json
 {
-  key.macro_roles: [source.lang.swift.macrorole.memberattribute],
+  key.macro_roles: [source.lang.swift.macro_role.member_attribute],
   key.modulename: "MacroDefinition",
   key.typename: "WrapAllProperties",
 }
 
 //--- bitwidthNumberedStructs.json
 {
-  key.macro_roles: [source.lang.swift.macrorole.declaration],
+  key.macro_roles: [source.lang.swift.macro_role.declaration],
   key.modulename: "MacroDefinition",
   key.typename: "DefineBitwidthNumberedStructsMacro",
 }
