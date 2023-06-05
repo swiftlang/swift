@@ -76,7 +76,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // enabled
 #if TARGET_OS_OSX
   OnOffTty::TTY,
-#elif 0 // defined(__linux__) || defined(_WIN32)
+#elif defined(__linux__) // || defined(_WIN32)
   OnOffTty::On,
 #else
   OnOffTty::Off,
@@ -86,7 +86,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   true,
 
   // interactive
-#if TARGET_OS_OSX // || defined(__linux__) || defined(_WIN32)
+#if TARGET_OS_OSX || defined(__linux__) // || defined(_WIN32)
   OnOffTty::TTY,
 #else
   OnOffTty::Off,
