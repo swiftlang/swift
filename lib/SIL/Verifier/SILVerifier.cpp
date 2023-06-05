@@ -5757,8 +5757,15 @@ public:
       // Provide substitution functions that replace the pack archetypes
       // we found above with the corresponding lane of the pack substitution.
       auto substTypes = [&](SubstitutableType *type) -> Type {
+        auto archetype = dyn_cast<ElementArchetypeType>(type);
+        if (!archetype)
+          return type;
+        if (!archetype->isRoot())
+          return Type();
+
         auto it = allOpened.find(type->getCanonicalType());
-        if (it == allOpened.end()) return Type();
+        assert(it != allOpened.end());
+
         auto pack = it->second;
         auto packElementType = pack.getElementType(componentIndex);
         if (auto exp = dyn_cast<PackExpansionType>(packElementType)) {
