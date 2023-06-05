@@ -1,5 +1,25 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature InitAccessors
 
+func test_empty_init_accessor() {
+  struct Test {
+    var empty: Int {
+      init { // Ok
+      }
+
+      get { 42 }
+      set { }
+    }
+
+    var noArgs: Int {
+      init(initialValue) { // Ok
+      }
+
+      get { 42 }
+      set { }
+    }
+  }
+}
+
 func test_invalid_init_accessor_use() {
   var other: String = "" // expected-warning {{}}
   var x: Int {
@@ -48,7 +68,7 @@ func test_invalid_refs_in_init_attrs() {
   struct Test {
     var c: Int { get { 42 } }
     var x: Int {
-      init(initialValue) initializes(a) accesses(b c) {}
+      init(initialValue) initializes(a) accesses(b, c) {}
       // expected-error@-1 {{find type 'a' in scope}}
       // expected-error@-2 {{find type 'b' in scope}}
       // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
@@ -77,7 +97,7 @@ func test_assignment_to_let_properties() {
     }
 
     var point: (Int, Int) {
-      init(initialValue) initializes(x y) {
+      init(initialValue) initializes(x, y) {
         self.x = initialValue.0 // Ok
         self.y = initialValue.1 // Ok
       }
@@ -91,7 +111,7 @@ func test_duplicate_and_computed_lazy_properties() {
     var _b: Int
 
     var a: Int {
-      init(initialValue) initializes(_b _a) accesses(_a) {
+      init(initialValue) initializes(_b, _a) accesses(_a) {
         // expected-error@-1 {{property '_a' cannot be both initialized and accessed}}
       }
     }
@@ -101,7 +121,7 @@ func test_duplicate_and_computed_lazy_properties() {
     var _a: Int
 
     var a: Int {
-      init(initialValue) initializes(a c) accesses(_a b) {}
+      init(initialValue) initializes(a, c) accesses(_a, b) {}
       // expected-error@-1 {{init accessor cannot refer to property 'a'; init accessors can refer only to stored properties}}
       // expected-error@-2 {{init accessor cannot refer to property 'b'; init accessors can refer only to stored properties}}
       // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}

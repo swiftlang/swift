@@ -27,7 +27,7 @@ struct TestInit {
     // CHECK-NEXT: [[FULL_ELT_1:%.*]] = tuple_element_addr [[FULL_ACCESS]] : $*(Int, Int), 1
     // CHECK-NEXT: store [[Y_VAL]] to [[FULL_ELT_1]] : $*Int
     // CHECK-NEXT: end_access [[FULL_ACCESS]] : $*(Int, Int)
-    init(initialValue) initializes(y full) accesses(x) {
+    init(initialValue) initializes(y, full) accesses(x) {
       self.y = initialValue.1
       self.full = (self.x, self.y)
     }
@@ -56,7 +56,7 @@ struct TestSetter {
   var y: Int
 
   var point: (Int, Int) {
-    init(initialValue) accesses(x y) {
+    init(initialValue) accesses(x, y) {
     }
 
     get { (x, y) }
@@ -79,7 +79,7 @@ struct TestInitThenSetter {
   var y: Int
 
   var point: (Int, Int) {
-    init(initialValue) initializes(x y) {
+    init(initialValue) initializes(x, y) {
       self.x = initialValue.0
       self.y = initialValue.1
     }
@@ -230,7 +230,7 @@ class TestClass {
     // CHECK-NEXT: [[Y_ELT_1:%.*]] = tuple_element_addr [[Y_ACCESS]] : $*(Int, Array<String>), 1
     // CHECK-NEXT: store [[Y_VAL_1]] to [[Y_ELT_1]] : $*Array<String>
     // CHECK-NEXT: end_access [[Y_ACCESS]] : $*(Int, Array<String>)
-    init(initialValue) initializes(x y) {
+    init(initialValue) initializes(x, y) {
       x = initialValue.0
       y = initialValue.1
     }
@@ -278,7 +278,7 @@ struct TestGeneric<T, U> {
   // CHECK-NEXT: copy_addr [[C_ACCESS]] to [init] [[C_AS_ANY]] : $*U
   // CHECK-NEXT: end_access [[C_ACCESS]] : $*U
   var data: (T, T) {
-    init(initialValue) initializes(a b) accesses(c) {
+    init(initialValue) initializes(a, b) accesses(c) {
       a = initialValue.0
       b = initialValue.1
       print(c)
@@ -312,7 +312,7 @@ func test_local_with_memberwise() {
     var b: String
 
     var pair: (Int, String) {
-      init(initialValue) initializes(a b) {
+      init(initialValue) initializes(a, b) {
         a = initialValue.0
         b = initialValue.1
       }
@@ -353,7 +353,7 @@ func test_local_with_memberwise() {
     }
 
     var pair: (String, C) {
-      init(initialValue) initializes(_b _c) accesses(_a) {
+      init(initialValue) initializes(_b, _c) accesses(_a) {
         _b = initialValue.0
         _c = initialValue.1
         _c.append(_a)

@@ -7204,9 +7204,10 @@ static ParserStatus parseInitAccessorEffect(Parser &P,
     // Consume '('
     P.consumeToken();
 
+    bool hasNextProperty = false;
     // Consume the identifier list
     SmallVector<Identifier, 4> properties;
-    while (!P.Tok.is(tok::r_paren)) {
+    do {
       Identifier propertyName;
       SourceLoc propertyNameLoc;
       if (P.parseIdentifier(propertyName, propertyNameLoc,
@@ -7217,7 +7218,10 @@ static ParserStatus parseInitAccessorEffect(Parser &P,
       }
 
       properties.push_back(propertyName);
-    }
+
+      // Parse the comma, if the list continues.
+      hasNextProperty = P.consumeIf(tok::comma);
+    } while (hasNextProperty);
 
     if (!P.Tok.is(tok::r_paren)) {
       P.diagnose(P.Tok.getLoc(), diag::attr_expected_rparen,

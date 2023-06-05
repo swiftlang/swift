@@ -8,7 +8,7 @@ struct Test1 {
   var full: (Int, Int)
 
   var test1: (Int, Int) {
-    init(initialValue) initializes(y full) accesses(x) {
+    init(initialValue) initializes(y, full) accesses(x) {
       self.full = (self.x, self.y) // expected-error {{variable 'y' used before being initialized}}
     }
 
@@ -26,7 +26,7 @@ struct Test1 {
   }
 
   var errorPoint1: (Int, Int) {
-    init(initialValue) initializes(x y) {
+    init(initialValue) initializes(x, y) {
       // expected-error@-1 {{property 'x' not initialized by init accessor}}
       // expected-error@-2 {{property 'y' not initialized by init accessor}}
     }
@@ -36,7 +36,7 @@ struct Test1 {
   }
 
   var errorPoint2: (Int, Int) {
-    init(initialValue) initializes(x y) {
+    init(initialValue) initializes(x, y) {
       // expected-error@-1 {{property 'y' not initialized by init accessor}}
       self.x = initialValue.0
     }
@@ -46,7 +46,7 @@ struct Test1 {
   }
 
   var errorPoint3: (Int, Int) {
-    init(initialValue) initializes(x y) {
+    init(initialValue) initializes(x, y) {
       self.y = initialValue.1
       print(y) // Ok
       print(x) // expected-error {{variable 'x' used before being initialized}}
@@ -68,7 +68,7 @@ struct TestPartial {
   var y: Int
 
   var point: (Int, Int) {
-    init(initialValue) initializes(x y) {
+    init(initialValue) initializes(x, y) {
       self.x = initialValue.0
       self.y = initialValue.1
     }
