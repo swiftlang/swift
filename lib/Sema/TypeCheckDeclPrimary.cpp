@@ -472,20 +472,25 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   auto *decl = ownerCtx->getAsDecl();
-  bool isGenericType = isa<GenericTypeDecl>(decl);
+  bool isGenericType = isa<NominalTypeDecl>(decl);
   bool hasPack = false;
 
   for (auto gp : *genericParams) {
     // Diagnose generic types with a parameter packs if VariadicGenerics
     // is not enabled.
-    if (gp->isParameterPack() && isGenericType) {
-      TypeChecker::checkAvailability(
-          gp->getSourceRange(),
-          ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
-          diag::availability_variadic_type_only_version_newer,
-          ownerCtx);
+    if (gp->isParameterPack()) {
+      // Variadic nominal types require runtime support.
+      if (isa<NominalTypeDecl>(decl)) {
+        TypeChecker::checkAvailability(
+            gp->getSourceRange(),
+            ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
+            diag::availability_variadic_type_only_version_newer,
+            ownerCtx);
+      }
 
-      if (hasPack) {
+      // Variadic nominal and type alias types can only have a single
+      // parameter pack.
+      if (hasPack && isa<GenericTypeDecl>(decl)) {
         gp->diagnose(diag::more_than_one_pack_in_type);
       }
 
