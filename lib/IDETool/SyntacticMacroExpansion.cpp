@@ -71,16 +71,6 @@ bool SyntacticMacroExpansionInstance::setup(
     return true;
   }
 
-  // Setup filesystem.
-  auto FS = invocation.getSearchPathOptions().makeOverlayFileSystem(
-      SourceMgr.getFileSystem());
-  if (!FS) {
-    llvm::consumeError(FS.takeError());
-    error = "failed to setup overlay filesystem";
-    return true;
-  }
-  SourceMgr.setFileSystem(FS.get());
-
   // Setup ASTContext.
   Ctx.reset(ASTContext::get(
       invocation.getLangOptions(), invocation.getTypeCheckerOptions(),
@@ -132,9 +122,34 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
     Identifier name, const MacroExpansionSpecifier &expansion) {
   auto &ctx = getASTContext();
 
+  std::string macroID;
+
+  switch (expansion.macroDefinition.kind) {
+  case MacroDefinition::Kind::External: {
+    // '<module name>.<type name>'
+    // It's safe to use without 'kind' because 'Expanded' always starts with a
+    // sigil '#' which can't be valid in a module name.
+    auto external = expansion.macroDefinition.getExternalMacro();
+    macroID += external.moduleName.str();
+    macroID += ".";
+    macroID += external.macroTypeName.str();
+    break;
+  }
+  case MacroDefinition::Kind::Expanded: {
+    auto expanded = expansion.macroDefinition.getExpanded();
+    macroID += expanded.getExpansionText();
+    break;
+  }
+  case MacroDefinition::Kind::Builtin:
+  case MacroDefinition::Kind::Invalid:
+  case MacroDefinition::Kind::Undefined:
+    assert(false && "invalid macro definition for syntactic expansion");
+    macroID += name.str();
+  }
+
   // Reuse cached MacroDecl of the same name if it's already created.
   MacroDecl *macro;
-  auto found = MacroDecls.find(name);
+  auto found = MacroDecls.find(macroID);
   if (found != MacroDecls.end()) {
     macro = found->second;
   } else {
@@ -144,7 +159,7 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
         /*arrowLoc=*/{}, /*resultType=*/nullptr,
         /*definition=*/nullptr, /*parent=*/TheModule);
     macro->setImplicit();
-    MacroDecls.insert({name, macro});
+    MacroDecls.insert({macroID, macro});
   }
 
   // Add missing role attributes to MacroDecl.
@@ -175,16 +190,11 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
 /// Create a unique name of the expansion. The result is *appended* to \p out.
 static void addExpansionDiscriminator(SmallString<32> &out,
                                       const SourceFile *SF, SourceLoc loc,
-                                      MacroDecl *macro,
+                                      Optional<SourceLoc> supplementalLoc = None,
                                       Optional<MacroRole> role = None) {
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  auto lineColumn = SM.getLineAndColumnInBuffer(loc);
 
   StableHasher hasher = StableHasher::defaultHasher();
-
-  // Macro name.
-  hasher.combine(macro->getName().getBaseIdentifier().str());
-  hasher.combine(uint8_t{0});
 
   // Module name.
   hasher.combine(SF->getParentModule()->getName().str());
@@ -195,12 +205,20 @@ static void addExpansionDiscriminator(SmallString<32> &out,
   hasher.combine(llvm::sys::path::filename(SF->getFilename()));
   hasher.combine(uint8_t{0});
 
-  // Line/column
+  // Line/column.
+  auto lineColumn = SM.getLineAndColumnInBuffer(loc);
   hasher.combine(lineColumn.first);
   hasher.combine(lineColumn.second);
 
+  // Supplemental line/column.
+  if (supplementalLoc.has_value()) {
+    auto supLineColumn = SM.getLineAndColumnInBuffer(*supplementalLoc);
+    hasher.combine(supLineColumn.first);
+    hasher.combine(supLineColumn.second);
+  }
+
   // Macro role.
-  if (role) {
+  if (role.has_value()) {
     hasher.combine(*role);
   }
 
@@ -218,7 +236,7 @@ expandFreestandingMacro(MacroDecl *macro,
   discriminator.append("macro_");
   addExpansionDiscriminator(discriminator,
                             expansion->getDeclContext()->getParentSourceFile(),
-                            expansion->getPoundLoc(), macro);
+                            expansion->getPoundLoc());
 
   expansion->setMacroRef(macro);
 
@@ -243,7 +261,7 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     discriminator.append("macro_");
     addExpansionDiscriminator(discriminator,
                               target->getDeclContext()->getParentSourceFile(),
-                              target->getLoc(), macro, role);
+                              target->getLoc(), attr->getLocation(), role);
 
     SourceFile *expandedSource = swift::evaluateAttachedMacro(
         macro, target, attr, passParent, role, discriminator);
@@ -267,13 +285,15 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     }
   }
   if (roles.contains(MacroRole::Member)) {
-    evaluate(attachedDecl, /*passParent=*/false, MacroRole::Member);
+    if (isa<IterableDeclContext>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Member);
   }
   if (roles.contains(MacroRole::Peer)) {
     evaluate(attachedDecl, /*passParent=*/false, MacroRole::Peer);
   }
   if (roles.contains(MacroRole::Conformance)) {
-    evaluate(attachedDecl, /*passParent=*/false, MacroRole::Conformance);
+    if (isa<NominalTypeDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Conformance);
   }
   return bufferIDs;
 }
@@ -325,7 +345,7 @@ public:
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     // Visit all 'VarDecl' because 'getSourceRangeIncludingAttrs()' doesn't
-    // include attribute its ranges.
+    // include its attribute ranges (because attributes are part of PBD.)
     if (!isa<VarDecl>(D) &&
         !rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
       return Action::SkipChildren();

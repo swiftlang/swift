@@ -20,7 +20,7 @@
           key.endline: 13,
           key.endcolumn: 1,
           key.text: "static func requirement() where Element : P {\n  Element.requirement()\n}",
-          key.buffer_name: "macro_185a888f5c6c1a9445a25edf7028dc75.swift"
+          key.buffer_name: "macro_565056f2d01a68bdc1cc2ee8aa618595.swift"
         }
       ],
       key.category: source.edit.kind.active
@@ -33,7 +33,7 @@
           key.endline: 13,
           key.endcolumn: 2,
           key.text: "extension Generic : P where Element: P {}",
-          key.buffer_name: "macro_c5de351c406a933f1a952846b34e0639.swift"
+          key.buffer_name: "macro_a05c1290cb88fd731ba683e5aa86fdb7.swift"
         }
       ],
       key.category: source.edit.kind.active
@@ -58,7 +58,7 @@
           key.endline: 7,
           key.endcolumn: 17,
           key.text: "{\n    get {\n            _value.wrappedValue\n      }\n\n    set {\n            _value.wrappedValue = newValue\n      }\n}",
-          key.buffer_name: "macro_695ff4226d699e531ba7bb4cc103005a.swift"
+          key.buffer_name: "macro_f51f41c03929a32f838d53f437ec0a36.swift"
         }
       ],
       key.category: source.edit.kind.active
@@ -71,7 +71,7 @@
           key.endline: 7,
           key.endcolumn: 12,
           key.text: "var _value: MyWrapperThingy<Int>",
-          key.buffer_name: "macro_629ec828bcb8e81543f19a16c7f1ac1d.swift"
+          key.buffer_name: "macro_4cb3f1a23406c36f4ca3076cfc889d56.swift"
         }
       ],
       key.category: source.edit.kind.active
@@ -96,7 +96,7 @@
           key.endline: 7,
           key.endcolumn: 3,
           key.text: "@Wrapper",
-          key.buffer_name: "macro_cf98ea58703480a8a577ab40e66fb8e1.swift"
+          key.buffer_name: "macro_a4c2cd1a73caad3b1eb8f265e55461ee.swift"
         }
       ],
       key.category: source.edit.kind.active
@@ -109,7 +109,7 @@
           key.endline: 10,
           key.endcolumn: 3,
           key.text: "@Wrapper",
-          key.buffer_name: "macro_3ac1e34ba8396a85fb44db3e6f52cc26.swift"
+          key.buffer_name: "macro_8bd5a8e09442bf0ec36f456f59a93687.swift"
         }
       ],
       key.category: source.edit.kind.active
@@ -121,8 +121,8 @@
           key.column: 3,
           key.endline: 12,
           key.endcolumn: 35,
-          key.text: "struct blah8 {\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu_() {\n  }\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu0_() {\n  }\n}\nstruct blah16 {\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu1_() {\n  }\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu2_() {\n  }\n}\nstruct blah32 {\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu3_() {\n  }\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu4_() {\n  }\n}\nstruct blah64 {\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu5_() {\n  }\n  func macro_373e16cc0bde29e604b8bfcf27292b376methodfMu6_() {\n  }\n}",
-          key.buffer_name: "macro_373e16cc0bde29e604b8bfcf27292b37.swift"
+          key.text: "struct blah8 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {\n  }\n}\nstruct blah16 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {\n  }\n}\nstruct blah32 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {\n  }\n}\nstruct blah64 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {\n  }\n}",
+          key.buffer_name: "macro_a01f07de3e9ee8585adf794ccd6dec8c.swift"
         }
       ],
       key.category: source.edit.kind.active

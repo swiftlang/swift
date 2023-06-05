@@ -46,7 +46,7 @@ class SyntacticMacroExpansionInstance {
   DiagnosticEngine Diags{SourceMgr};
   std::unique_ptr<ASTContext> Ctx;
   ModuleDecl *TheModule = nullptr;
-  llvm::DenseMap<Identifier, MacroDecl *> MacroDecls;
+  llvm::StringMap<MacroDecl *> MacroDecls;
 
   std::mutex mtx;
 
