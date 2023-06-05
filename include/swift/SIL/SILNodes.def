@@ -310,6 +310,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
+                      AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
@@ -726,6 +728,8 @@ ABSTRACT_INST(DeallocationInst, SILInstruction)
   NON_VALUE_INST(DeallocStackInst, dealloc_stack,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocPackInst, dealloc_pack,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocPackMetadataInst, dealloc_pack_metadata,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocStackRefInst, dealloc_stack_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)

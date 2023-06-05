@@ -6026,6 +6026,19 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
+    require(apmi->getIntroducer()->mayRequirePackMetadata(),
+            "Introduces instruction of kind which cannot emit on-stack pack "
+            "metadata");
+  }
+
+  void checkDeallocPackMetadataInst(DeallocPackMetadataInst *dpmi) {
+    auto *apmi = dpmi->getOperand()->getDefiningInstruction();
+    require(apmi, "Must have instruction operand.");
+    require(isa<AllocPackMetadataInst>(apmi),
+            "Must have alloc_pack_metadata operand");
+  }
+
   void verifyEpilogBlocks(SILFunction *F) {
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;

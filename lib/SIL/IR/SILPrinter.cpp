@@ -1424,6 +1424,9 @@ public:
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }
+  void visitAllocPackMetadataInst(AllocPackMetadataInst *APMI) {
+    *this << APMI->getType().getObjectType();
+  }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
@@ -2453,6 +2456,9 @@ public:
   void visitDeallocPackInst(DeallocPackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
+  void visitDeallocPackMetadataInst(DeallocPackMetadataInst *DPMI) {
+    *this << getIDAndType(DPMI->getOperand());
+  }
   void visitDeallocStackRefInst(DeallocStackRefInst *ESRL) {
     *this << getIDAndType(ESRL->getOperand());
   }
@@ -3162,6 +3168,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   if (forceEnableLexicalLifetimes()) {
     OS << "[lexical_lifetimes] ";
+  }
+  if (!useStackForPackMetadata()) {
+    OS << "[no_onstack_pack_metadata] ";
   }
 
   if (isExactSelfClass()) {

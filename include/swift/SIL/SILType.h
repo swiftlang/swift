@@ -373,6 +373,16 @@ public:
   /// An efficient implementation of `!isTrivial() && isOrContainsRawPointer()`.
   bool isNonTrivialOrContainsRawPointer(const SILFunction *f) const;
 
+  /// Whether the type contains a generic parameter declared as a parameter
+  /// pack.
+  bool hasParameterPack() const { return getASTType()->hasParameterPack(); }
+
+  /// Whether the type contains a concrete pack.
+  bool hasConcretePack() const { return getASTType()->hasConcretePack(); }
+
+  /// Whether the type contains some flavor of pack.
+  bool hasPack() const { return getASTType()->hasPack(); }
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
