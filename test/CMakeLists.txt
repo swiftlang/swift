@@ -407,7 +407,8 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
 
         # Enable on-crash backtracing if supported
-        if("${SDK}" STREQUAL "OSX" AND NOT SWIFT_ASAN_BUILD)
+        if(("${SDK}" STREQUAL "OSX" OR "${SDK}" STREQUAL "LINUX")
+            AND NOT SWIFT_ASAN_BUILD)
           list(APPEND LIT_ARGS "--param" "backtrace_on_crash")
         endif()
 
