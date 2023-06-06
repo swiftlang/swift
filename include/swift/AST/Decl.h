@@ -883,7 +883,13 @@ public:
   ///
   /// Auxiliary declarations can be property wrapper backing variables,
   /// backing variables for 'lazy' vars, or peer macro expansions.
-  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const;
+  ///
+  /// When \p visitFreestandingExpanded is true (the default), this will also
+  /// visit the declarations produced by a freestanding macro expansion.
+  void visitAuxiliaryDecls(
+      AuxiliaryDeclCallback callback,
+      bool visitFreestandingExpanded = true
+  ) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 

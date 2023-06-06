@@ -50,7 +50,7 @@ func lookupGlobalFreestandingExpansion() {
 
 #anonymousTypes(public: true) { "hello" }
 
-// CHECK-SIL: sil @$s9MacroUser03$s9A71User33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_4namefMu_C5helloSSyF
+// CHECK-SIL: sil @$s9MacroUser03$s9A70User33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf_4namefMu_C5helloSSyF
 
 @main
 struct Main {
