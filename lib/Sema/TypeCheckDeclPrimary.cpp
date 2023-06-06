@@ -2066,8 +2066,11 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-    // Decls in expansion already visited as auxiliary decls.
-    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+    MED->forEachExpandedNode([&](ASTNode node) {
+      // Decls in expansion already visited as auxiliary decls.
+      if (node.is<Decl *>())
+        return;
+
       TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
     });
   }
