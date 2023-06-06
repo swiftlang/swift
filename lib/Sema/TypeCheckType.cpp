@@ -4288,7 +4288,31 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   // Remember that we've seen an ownership specifier for this base type.
   options |= TypeResolutionFlags::HasOwnership;
 
-  return resolveType(repr->getBase(), options);
+  auto result = resolveType(repr->getBase(), options);
+  if (result->hasError())
+    return result;
+
+  // Check for illegal combinations of ownership specifiers and types.
+  switch (ownershipRepr->getSpecifier()) {
+  case ParamSpecifier::Default:
+  case ParamSpecifier::InOut:
+  case ParamSpecifier::LegacyShared:
+  case ParamSpecifier::LegacyOwned:
+  case ParamSpecifier::Borrowing:
+    break;
+  case ParamSpecifier::Consuming:
+    if (auto *fnTy = result->getAs<FunctionType>()) {
+      if (fnTy->isNoEscape()) {
+        diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),
+                        diag::ownership_specifier_nonescaping_closure,
+                        ownershipRepr->getSpecifierSpelling());
+        return ErrorType::get(getASTContext());
+      }
+    }
+    break;
+  }
+
+  return result;
 }
 
 NeverNullType
