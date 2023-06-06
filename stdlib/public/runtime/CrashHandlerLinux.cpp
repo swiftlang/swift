@@ -67,22 +67,44 @@ int  memserver_start();
 int  memserver_entry(void *);
 bool run_backtracer(int fd);
 
-int safe_read(int fd, void *buf, size_t len) {
-  int ret;
-  do {
-    ret = read(fd, buf, len);
-  } while (ret < 0 && errno == EINTR);
+ssize_t safe_read(int fd, void *buf, size_t len) {
+  uint8_t *ptr = (uint8_t *)buf;
+  uint8_t *end = ptr + len;
+  ssize_t total = 0;
 
-  return ret;
+  while (ptr < end) {
+    ssize_t ret;
+    do {
+      ret = read(fd, buf, len);
+    } while (ret < 0 && errno == EINTR);
+    if (ret < 0)
+      return ret;
+    total += ret;
+    ptr += ret;
+    len -= ret;
+  }
+
+  return total;
 }
 
-int safe_write(int fd, const void *buf, size_t len) {
-  int ret;
-  do {
-    ret = write(fd, buf, len);
-  } while (ret < 0 && errno == EINTR);
+ssize_t safe_write(int fd, const void *buf, size_t len) {
+  const uint8_t *ptr = (uint8_t *)buf;
+  const uint8_t *end = ptr + len;
+  ssize_t total = 0;
 
-  return ret;
+  while (ptr < end) {
+    ssize_t ret;
+    do {
+      ret = write(fd, buf, len);
+    } while (ret < 0 && errno == EINTR);
+    if (ret < 0)
+      return ret;
+    total += ret;
+    ptr += ret;
+    len -= ret;
+  }
+
+  return total;
 }
 
 CrashInfo crashInfo;
@@ -195,8 +217,7 @@ handle_fatal_signal(int signum,
   // Start the memory server
   int fd = memserver_start();
 
-  /* Start the backtracer; this will suspend the process, so there's no need
-     to try to suspend other threads from here. */
+  // Actually start the backtracer
   run_backtracer(fd);
 
 #if !MEMSERVER_USE_PROCESS
@@ -276,15 +297,15 @@ getdents(int fd, void *buf, size_t bufsiz)
 }
 
 /* Stop all other threads in this process; we do this by establishing a
-   signal handler for SIGUSR1, then iterating through the threads sending
-   SIGUSR1.
+   signal handler for SIGPROF, then iterating through the threads sending
+   SIGPROF.
 
    Finding the other threads is a pain, because Linux has no actual API
    for that; instead, you have to read /proc.  Unfortunately, opendir()
    and readdir() are not async signal safe, so we get to do this with
    the getdents system call instead.
 
-   The SIGUSR1 signals also serve to build the thread list. */
+   The SIGPROF signals also serve to build the thread list. */
 void
 suspend_other_threads(struct thread *self)
 {

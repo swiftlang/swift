@@ -857,15 +857,15 @@ _swift_isThunkFunction(const char *mangledName) {
 /// @param mangledName is the symbol name to be demangled.
 /// @param mangledNameLength is the length of this name.
 /// @param outputBuffer is a pointer to a buffer in which to place the result.
-/// @param outputBufferSize points to a variable that will be filled in with
-/// the size of the allocated buffer (NOT the length of the result).
+/// @param outputBufferSize points to a variable that contains the size of the
+/// output buffer.
 /// @param status returns the status codes defined in the C++ ABI.
 ///
-/// If outputBuffer and outputBufferSize are both nullptr, this function will
-/// allocate memory for the result using malloc().
-///
-/// If outputBuffer is nullptr but outputBufferSize is not, the function will
-/// fill outputBufferSize with the required buffer size and return nullptr.
+/// If outputBuffer is nullptr, the function will allocate memory for the
+/// result using malloc().  In this case, outputBufferSize may be nullptr;
+/// if it is *not* nullptr, it will be set to the size of buffer that was
+/// allocated.  This is not necessarily the length of the string (it may be
+/// somewhat higher).
 ///
 /// Otherwise, the result will be written into the output buffer, and the
 /// size of the result will be written into outputBufferSize.  If the buffer
@@ -873,7 +873,10 @@ _swift_isThunkFunction(const char *mangledName) {
 /// still be set to the number of bytes that would have been required to
 /// copy out the full result (including a trailing NUL).
 ///
-/// @returns `true` if demangling was successful.
+/// The unusual behaviour here is a consequence of the way the C++ ABI's
+/// demangling function works.
+///
+/// @returns a pointer to the output if demangling was successful.
 SWIFT_RUNTIME_STDLIB_SPI char *
 _swift_backtrace_demangle(const char *mangledName,
                           size_t mangledNameLength,
@@ -881,6 +884,11 @@ _swift_backtrace_demangle(const char *mangledName,
                           size_t *outputBufferSize,
                           int *status) {
   llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
+
+  // You must provide buffer size if you're providing your own output buffer
+  if (outputBuffer && !outputBufferSize) {
+    return nullptr;
+  }
 
   if (Demangle::isSwiftSymbol(name)) {
     // This is a Swift mangling
@@ -925,6 +933,8 @@ _swift_backtrace_demangle(const char *mangledName,
       size_t toCopy = std::min(bufferSize - 1, resultLen - 1);
       ::memcpy(outputBuffer, result, toCopy);
       outputBuffer[toCopy] = '\0';
+
+      free(result);
 
       *status = 0;
       return outputBuffer;
