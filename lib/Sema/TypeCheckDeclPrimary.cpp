@@ -1850,7 +1850,7 @@ public:
     if (!isa<ClassDecl>(decl->getDeclContext())) {
       decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
         this->visit(auxiliaryDecl);
-      });
+      }, /*visitFreestandingExpanded=*/false);
     }
 
     if (auto *Stats = getASTContext().Stats)
@@ -2067,10 +2067,6 @@ public:
     // Assign a discriminator.
     (void)MED->getDiscriminator();
     MED->forEachExpandedNode([&](ASTNode node) {
-      // Decls in expansion already visited as auxiliary decls.
-      if (node.is<Decl *>())
-        return;
-
       TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
     });
   }
