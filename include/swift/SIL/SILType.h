@@ -394,6 +394,8 @@ public:
 
   bool isReferenceCounted(SILFunction *f) const;
 
+  bool isUnownedStorageType() const { return is<UnownedStorageType>(); }
+
   /// Returns true if the referenced type is a function type that never
   /// returns.
   bool isNoReturnFunction(SILModule &M, TypeExpansionContext context) const;
@@ -744,6 +746,10 @@ public:
   /// Is this a type that is a first class move only type. This returns false
   /// for a move only wrapped type.
   bool isPureMoveOnly() const;
+
+  /// Return true if this is a value type (struct/enum) that requires
+  /// deinitialization beyond destruction of its members.
+  bool isValueTypeWithDeinit() const;
 
   /// Returns true if and only if this type is a first class move only
   /// type. NOTE: Returns false if the type is a move only wrapped type.
