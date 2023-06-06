@@ -35,6 +35,11 @@
 using namespace swift;
 using namespace irgen;
 
+static void cleanupTypeMetadataPackImpl(IRGenFunction &IGF, StackAddress pack,
+                                        llvm::Value *shape);
+static void cleanupWitnessTablePackImpl(IRGenFunction &IGF, StackAddress pack,
+                                        llvm::Value *shape);
+
 static CanPackArchetypeType
 getForwardedPackArchetypeType(CanPackType packType) {
   if (auto expansion = packType.unwrapSingletonPackExpansion())
@@ -454,6 +459,7 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
     assert(packType->getNumElements() == constantInt->getValue());
     auto pack =
         StackAddress(emitFixedSizeMetadataPackRef(IGF, packType, request));
+    IGF.recordStackPackMetadataAlloc(pack, constantInt);
     return {pack, constantInt};
   }
 
@@ -488,6 +494,7 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
     };
 
   visitPackExplosion(IGF, packType, visitFn);
+  IGF.recordStackPackMetadataAlloc(pack, shape);
 
   return {pack, shape};
 }
@@ -512,10 +519,12 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
   metadata = IGF.Builder.CreatePointerCast(
       metadata, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
 
-  metadata = IGF.Builder.CreateCall(
-      IGF.IGM.getAllocateMetadataPackFunctionPointer(), {metadata, shape});
+  if (!IGF.canStackPromotePackMetadata()) {
+    metadata = IGF.Builder.CreateCall(
+        IGF.IGM.getAllocateMetadataPackFunctionPointer(), {metadata, shape});
 
-  cleanupTypeMetadataPack(IGF, pack, shape);
+    cleanupTypeMetadataPack(IGF, pack, shape);
+  }
 
   auto response = MetadataResponse::forComplete(metadata);
   IGF.setScopedLocalTypeMetadata(packType, response);
@@ -597,6 +606,7 @@ irgen::emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
     assert(packType->getNumElements() == constantInt->getValue());
     auto pack = StackAddress(
         emitFixedSizeWitnessTablePack(IGF, packType, packConformance));
+    IGF.recordStackPackWitnessTableAlloc(pack, constantInt);
     return {pack, constantInt};
   }
 
@@ -633,18 +643,75 @@ irgen::emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
   };
 
   visitPackExplosion(IGF, packType, visitFn);
+  IGF.recordStackPackWitnessTableAlloc(pack, shape);
 
   return {pack, shape};
 }
 
-void irgen::cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
-                                    llvm::Value *shape) {
+static void cleanupWitnessTablePackImpl(IRGenFunction &IGF, StackAddress pack,
+                                        llvm::Value *shape) {
+
   if (pack.getExtraInfo()) {
     IGF.emitDeallocateDynamicAlloca(pack);
   } else if (auto count = countForShape(shape)) {
     IGF.Builder.CreateLifetimeEnd(pack.getAddress(),
                                   IGF.IGM.getPointerSize() * (count.value()));
   }
+}
+
+void irgen::cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
+                                    llvm::Value *shape) {
+  cleanupWitnessTablePackImpl(IGF, pack, shape);
+  IGF.eraseStackPackWitnessTableAlloc(pack, shape);
+}
+
+void irgen::cleanupStackAllocPacks(IRGenFunction &IGF,
+                                   ArrayRef<StackPackAlloc> allocs) {
+  for (auto alloc : llvm::reverse(allocs)) {
+    StackAddress addr;
+    uint8_t kind;
+    llvm::Value *shape;
+    std::tie(addr, shape, kind) = alloc;
+
+    switch ((GenericRequirement::Kind)kind) {
+    case GenericRequirement::Kind::MetadataPack:
+      cleanupTypeMetadataPackImpl(IGF, addr, shape);
+      break;
+    case GenericRequirement::Kind::WitnessTablePack:
+      cleanupWitnessTablePackImpl(IGF, addr, shape);
+      break;
+    default:
+      llvm_unreachable("bad requirement in stack pack alloc");
+    }
+  }
+}
+
+void IRGenFunction::recordStackPackMetadataAlloc(StackAddress addr,
+                                                 llvm::Value *shape) {
+  OutstandingStackPackAllocs.insert(
+      {addr, shape, (uint8_t)GenericRequirement::Kind::MetadataPack});
+}
+
+void IRGenFunction::eraseStackPackMetadataAlloc(StackAddress addr,
+                                                llvm::Value *shape) {
+  auto removed = OutstandingStackPackAllocs.remove(
+      {addr, shape, (uint8_t)GenericRequirement::Kind::MetadataPack});
+  assert(removed && "erased stack pack metadata addr that wasn't recorded!?");
+  (void)removed;
+}
+
+void IRGenFunction::recordStackPackWitnessTableAlloc(StackAddress addr,
+                                                     llvm::Value *shape) {
+  OutstandingStackPackAllocs.insert(
+      {addr, shape, (uint8_t)GenericRequirement::Kind::WitnessTablePack});
+}
+
+void IRGenFunction::eraseStackPackWitnessTableAlloc(StackAddress addr,
+                                                    llvm::Value *shape) {
+  auto removed = OutstandingStackPackAllocs.remove(
+      {addr, shape, (uint8_t)GenericRequirement::Kind::WitnessTablePack});
+  assert(removed && "erased stack pack metadata addr that wasn't recorded!?");
+  (void)removed;
 }
 
 llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
@@ -674,10 +741,12 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   result = IGF.Builder.CreatePointerCast(
       result, IGF.IGM.WitnessTablePtrTy->getPointerTo());
 
-  result = IGF.Builder.CreateCall(
-      IGF.IGM.getAllocateWitnessTablePackFunctionPointer(), {result, shape});
+  if (!IGF.canStackPromotePackMetadata()) {
+    result = IGF.Builder.CreateCall(
+        IGF.IGM.getAllocateWitnessTablePackFunctionPointer(), {result, shape});
 
-  cleanupWitnessTablePack(IGF, pack, shape);
+    cleanupWitnessTablePack(IGF, pack, shape);
+  }
 
   IGF.setScopedLocalTypeData(packType, localDataKind, result);
 
@@ -1041,14 +1110,20 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
   }
 }
 
-void irgen::cleanupTypeMetadataPack(IRGenFunction &IGF, StackAddress pack,
-                                    llvm::Value *shape) {
+static void cleanupTypeMetadataPackImpl(IRGenFunction &IGF, StackAddress pack,
+                                        llvm::Value *shape) {
   if (pack.getExtraInfo()) {
     IGF.emitDeallocateDynamicAlloca(pack);
   } else if (auto count = countForShape(shape)) {
     IGF.Builder.CreateLifetimeEnd(pack.getAddress(),
                                   IGF.IGM.getPointerSize() * (*count));
   }
+}
+
+void irgen::cleanupTypeMetadataPack(IRGenFunction &IGF, StackAddress pack,
+                                    llvm::Value *shape) {
+  cleanupTypeMetadataPackImpl(IGF, pack, shape);
+  IGF.eraseStackPackMetadataAlloc(pack, shape);
 }
 
 Address irgen::emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,

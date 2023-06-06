@@ -210,6 +210,7 @@ void SILFunction::init(
   this->IsDistributed = isDistributed;
   this->IsRuntimeAccessible = isRuntimeAccessible;
   this->ForceEnableLexicalLifetimes = DoNotForceEnableLexicalLifetimes;
+  this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;

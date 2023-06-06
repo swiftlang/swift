@@ -443,6 +443,15 @@ public:
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
   }
+  AllocPackMetadataInst *
+  createAllocPackMetadata(SILLocation loc,
+                          Optional<SILType> elementType = llvm::None) {
+    return insert(new (getModule()) AllocPackMetadataInst(
+        getSILDebugLocation(loc),
+        elementType.value_or(
+            SILType::getEmptyTupleType(getModule().getASTContext())
+                .getAddressType())));
+  }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
                                bool objc, bool canAllocOnStack,
@@ -2214,6 +2223,11 @@ public:
   DeallocPackInst *createDeallocPack(SILLocation loc, SILValue operand) {
     return insert(new (getModule())
                       DeallocPackInst(getSILDebugLocation(loc), operand));
+  }
+  DeallocPackMetadataInst *createDeallocPackMetadata(SILLocation loc,
+                                                     SILValue alloc) {
+    return insert(new (getModule())
+                      DeallocPackMetadataInst(getSILDebugLocation(loc), alloc));
   }
   DeallocStackRefInst *createDeallocStackRef(SILLocation Loc,
                                                      SILValue operand) {

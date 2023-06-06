@@ -80,6 +80,18 @@ llvm::Value *emitWitnessTablePackRef(IRGenFunction &IGF, CanPackType packType,
 void cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
                              llvm::Value *shape);
 
+/// An on-stack pack metadata/wtable allocation.
+///
+/// Includes the stack address, the element count, and the kind of requirement
+/// (a GenericRequirement::Kind represented as a raw uint8_t).
+using StackPackAlloc =
+    std::tuple<StackAddress, /*shape*/ llvm::Value *, /*kind*/ uint8_t>;
+
+/// Emits cleanups for an array of on-stack pack metadata/wtable allocations in
+/// reverse order.
+void cleanupStackAllocPacks(IRGenFunction &IGF,
+                            ArrayRef<StackPackAlloc> allocs);
+
 /// Emit the dynamic index of a particular structural component
 /// of the given pack type.  If the component is a pack expansion, this
 /// is the index of the first element of the pack (or where it would be

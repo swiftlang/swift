@@ -144,6 +144,12 @@ static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
     "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
     llvm::cl::desc("Enable experimental move-only semantics."));
 
+static llvm::cl::opt<bool> EnablePackMetadataStackPromotion =
+    llvm::cl::opt<bool>(
+        "enable-pack-metadata-stack-promotion", llvm::cl::init(true),
+        llvm::cl::desc(
+            "Whether to skip heapifying stack metadata packs when possible."));
+
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
@@ -707,6 +713,8 @@ int main(int argc, char **argv) {
         *enableLexicalBorrowScopes
             ? LexicalLifetimesOption::DiagnosticMarkersOnly
             : LexicalLifetimesOption::Off;
+
+  SILOpts.EnablePackMetadataStackPromotion = EnablePackMetadataStackPromotion;
 
   if (OptModeFlag == OptimizationMode::NotSet) {
     if (OptimizationGroup == OptGroup::Diagnostics)
