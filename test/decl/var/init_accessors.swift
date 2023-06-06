@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature InitAccessors
 
+// REQUIRES: asserts
+
 func test_empty_init_accessor() {
   struct Test {
     var empty: Int {

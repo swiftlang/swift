@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature InitAccessors -Xllvm -sil-print-after=definite-init -emit-sil -module-name assign_or_init_lowering %s -o /dev/null 2>&1 | %FileCheck %s
 
+// REQUIRES: asserts
+
 struct Test1 {
   var _a: Int
   var _b: String
