@@ -915,6 +915,8 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+ERROR(sil_box_expected,none,
+      "%0 expects its operand to be of SIL box field type", (StringRef))
 
 // SIL function types
 ERROR(sil_function_subst_expected_l_angle,none,

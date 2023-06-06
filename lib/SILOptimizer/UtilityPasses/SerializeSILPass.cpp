@@ -226,6 +226,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)       \
   case SILInstructionKind::Load##Name##Inst:
