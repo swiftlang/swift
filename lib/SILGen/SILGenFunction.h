@@ -815,12 +815,8 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param nd The nominal declaration whose members are being destroyed.
-  /// \param finishBB If set, used as the basic block after members have been
-  ///                 destroyed, and we're ready to perform final cleanups
-  ///                 before returning.
   void emitMoveOnlyMemberDestruction(SILValue selfValue, NominalTypeDecl *nd,
-                                     CleanupLocation cleanupLoc,
-                                     SILBasicBlock *finishBB);
+                                     CleanupLocation cleanupLoc);
 
   /// Generates code to destroy linearly recursive data structures, without
   /// building up the call stack.

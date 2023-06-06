@@ -40,6 +40,12 @@ SILValue stripCastsWithoutMarkDependence(SILValue V);
 /// begin_borrow instructions.
 SILValue lookThroughOwnershipInsts(SILValue v);
 
+/// Reverse of lookThroughOwnershipInsts.
+///
+/// Return true if \p visitor returned true for all uses.
+bool visitNonOwnershipUses(SILValue value,
+                           function_ref<bool(Operand *)> visitor);
+
 /// Return the underlying SILValue after looking through all copy_value
 /// instructions.
 SILValue lookThroughCopyValueInsts(SILValue v);

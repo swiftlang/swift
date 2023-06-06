@@ -464,7 +464,7 @@ PASS(PartialApplySimplification, "partial-apply-simplification",
      "Transform partial_apply instructions into explicit closure box constructions")
 PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
-PASS(MoveOnlyDeinitInsertion, "sil-move-only-deinit-insertion",
+PASS(MoveOnlyDeinitDevirtualization, "sil-move-only-deinit-devirtualization",
      "After running move only checking, convert last destroy_values to deinit calls")
 PASS(MoveOnlyBorrowToDestructureTransform,
      "sil-move-only-borrow-to-destructure",
