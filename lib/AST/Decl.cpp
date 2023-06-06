@@ -381,7 +381,10 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
-void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
+void Decl::visitAuxiliaryDecls(
+    AuxiliaryDeclCallback callback,
+    bool visitFreestandingExpanded
+) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<Decl *>(this);
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -414,13 +417,15 @@ void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
     }
   }
 
-  else if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
-    if (auto bufferID = evaluateOrDefault(
-            ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
-      auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
-      auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
-      for (auto *decl : sourceFile->getTopLevelDecls())
-        callback(decl);
+  if (visitFreestandingExpanded) {
+    if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
+      if (auto bufferID = evaluateOrDefault(
+              ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
+        auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
+        auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+        for (auto *decl : sourceFile->getTopLevelDecls())
+          callback(decl);
+      }
     }
   }
 

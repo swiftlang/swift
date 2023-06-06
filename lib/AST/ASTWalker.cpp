@@ -455,7 +455,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
     }
-    // Visit auxiliary decls, which may be decls from macro expansions.
     bool alreadyFailed = false;
     if (shouldWalkExpansion) {
       MED->forEachExpandedNode([&](ASTNode expandedNode) {

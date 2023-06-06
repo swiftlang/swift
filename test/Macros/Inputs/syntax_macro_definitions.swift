@@ -299,18 +299,19 @@ public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
   }
 }
 
-public struct VarDeclMacro: DeclarationMacro {
+public struct VarDeclMacro: CodeItemMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
-  ) throws -> [DeclSyntax] {
+  ) throws -> [CodeBlockItemSyntax] {
+    let name = context.makeUniqueName("fromMacro")
     return [
+      "let \(name) = 23",
+      "use(\(name))",
       """
-      let fromMacro = 23
-      use(fromMacro)
       if true {
-        let fromMacro = "string"
-        use(fromMacro)
+        let \(name) = "string"
+        use(\(name))
       }
       """
     ]
