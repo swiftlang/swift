@@ -867,13 +867,13 @@ namespace {
 
       if (!force && record.Depth < ExprStack.size() - 1)
         return false;
-
       // If we had a return type of 'Self', erase it.
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
-        Type erasedTy = resultTy->typeEraseOpenedArchetypesWithRoot(
-            record.Archetype, dc);
+          Type erasedTy = ConstraintSystem::typeEraseExistentialSelfReferences(resultTy, record.Archetype->getExistentialType(),
+                                                             TypePosition::Covariant);
+
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion

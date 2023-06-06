@@ -2047,14 +2047,7 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
   return true;
 }
 
-/// Type-erase occurrences of covariant 'Self'-rooted type parameters to their
-/// most specific non-dependent bounds throughout the given type, using
-/// \p baseTy as the existential base object type.
-///
-/// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
-/// routine will recurse into the concrete type.
-static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
-                                               TypePosition outermostPosition) {
+Type ConstraintSystem::typeEraseExistentialSelfReferences(Type refTy, Type baseTy, TypePosition outermostPosition) {
   assert(baseTy->isExistentialType());
   if (!refTy->hasTypeParameter()) {
     return refTy;
@@ -2190,7 +2183,7 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 
   // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseExistentialSelfReferences(type, existentialBaseType,
+  type = ConstraintSystem::typeEraseExistentialSelfReferences(type, existentialBaseType,
                                             outermostPosition);
 
   // Finally, swap the 'Self'-corresponding type variable back in.
@@ -2299,7 +2292,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
                                                TypePosition::Covariant);
-
     Type contextualTy;
 
     if (auto *anchor = getAsExpr(simplifyLocatorToAnchor(locator))) {

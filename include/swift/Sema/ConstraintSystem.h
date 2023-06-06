@@ -4136,6 +4136,15 @@ public:
         [](const ClosureExpr *closure) {
           return closure->isIsolatedByPreconcurrency();
         });
+  
+  /// Type-erase occurrences of covariant 'Self'-rooted type parameters to their
+  /// most specific non-dependent bounds throughout the given type, using
+  /// \p baseTy as the existential base object type.
+  ///
+  /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
+  /// routine will recurse into the concrete type.
+  static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
+                                                 TypePosition outermostPosition);
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
