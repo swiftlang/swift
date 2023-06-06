@@ -2307,9 +2307,14 @@ ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::manglePackElement(Node *node, unsigned depth) {
- // FIXME
-  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
-//  Buffer << "Qp";
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  Buffer << "Qe";
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePackElementLevel(Node *node, unsigned depth) {
+  mangleIndex(node->getIndex());
   return ManglingError::Success;
 }
 

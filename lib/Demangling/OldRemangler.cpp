@@ -1934,6 +1934,10 @@ ManglingError Remangler::manglePackElement(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::manglePackElementLevel(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleDependentGenericType(Node *node,
                                                     unsigned depth) {
   Buffer << 'u';
