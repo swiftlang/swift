@@ -867,13 +867,15 @@ namespace {
 
       if (!force && record.Depth < ExprStack.size() - 1)
         return false;
-
       // If we had a return type of 'Self', erase it.
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
-        Type erasedTy = resultTy->typeEraseOpenedArchetypesWithRoot(
-            record.Archetype, dc);
+      Type erasedTy = ConstraintSystem::typeEraseExistentialSelfReferences(resultTy,
+                                                                            record.Archetype,TypePosition::Covariant);
+//      Type erasedTy = resultTy->typeEraseOpenedArchetypesWithRoot(
+//             record.Archetype, dc);
+
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
@@ -1585,7 +1587,7 @@ namespace {
           containerTy = containerTy->typeEraseOpenedArchetypesWithRoot(
               knownOpened->second, dc);
           selfTy = containerTy;
-        }
+        } 
       }
 
       // References to properties with accessors and storage usually go

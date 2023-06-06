@@ -524,7 +524,7 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
     return type;
 
   const auto sig = root->getASTContext().getOpenedExistentialSignature(
-      root->getExistentialType(), useDC->getGenericSignatureOfContext());
+      root->getExistentialType(), useDC->getGenericSignatureOfContext()/*GenericSignature()*/);
 
   unsigned metatypeDepth = 0;
 

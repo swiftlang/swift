@@ -369,3 +369,48 @@ func testPrimaryAssocReturn(p: any P4<Int>) {
 func testPrimaryAssocCollection(p: any P4<Float>) {
   let _: any Collection<Float> = p.returnAssocTypeCollection()
 }
+
+protocol P5<X> {
+  associatedtype X = Void
+}
+
+struct K<T>: P5 {
+  typealias X = T
+}
+
+extension P5 {
+  func foo() -> some P<X>{
+    K<X>()
+  }
+  func bar(_ handler: @escaping (X) -> Void) -> some P<X> {
+    K<X>()
+  }
+}
+
+func test<T>(_ p: any P5<Result<T, Error>>) {
+  p.bar { _ in }
+}
+
+func testFoo<T,U>(_ p: any P5<Result<U, Error>>) -> any P5<T> {
+  p.foo() //expected-error {{cannot convert return expression of type 'T' to return type 'Result<U, any Error>'}} {{7-7=as! Result<U, any Error>)}}
+}
+
+func testBar<U>(_ p: any P5<Result<U, Error>>) -> any P5 {
+  p.bar { _ in }
+}
+
+enum Node<T> {
+  case e(any P5)
+  case f(any P5<Result<T, Error>>)
+}
+
+struct S<T, U> {
+  func foo(_ elt: Node<U>) -> Node<T>? {
+    switch elt {
+    case let .e(p):
+      return .e(p)
+    case let .f(p):
+      return .e(p.bar { _ in })
+    }
+  }
+}
