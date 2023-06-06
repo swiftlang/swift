@@ -25,6 +25,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "clang/AST/ASTContext.h"
@@ -234,6 +235,8 @@ bool AbstractionPattern::requiresClass() const {
   case Kind::Discard:
   case Kind::ClangType: {
     auto type = getType();
+    if (auto element = dyn_cast<PackElementType>(type))
+      type = element.getPackType();
     if (auto archetype = dyn_cast<ArchetypeType>(type))
       return archetype->requiresClass();
     if (type->isTypeParameter()) {
@@ -614,6 +617,40 @@ void AbstractionPattern::forEachExpandedTupleElement(CanType substType,
     }
   }
   assert(substEltIndex == substEltTypes.size());
+}
+
+AbstractionPattern
+AbstractionPattern::getPackElementPackType() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+  case Kind::ClangType:
+  case Kind::Tuple:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("not a pack type");
+  case Kind::Opaque:
+    return *this;
+  case Kind::Discard:
+    llvm_unreachable("operation not needed on discarded abstractions yet");
+  case Kind::Type:
+    if (isTypeParameterOrOpaqueArchetype())
+      return AbstractionPattern::getOpaque();
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignature(),
+                              cast<PackElementType>(getType()).getPackType());
+  }
+  llvm_unreachable("bad kind");
 }
 
 static CanType getCanPackElementType(CanType type, unsigned index) {
@@ -1905,23 +1942,26 @@ public:
   SmallVector<Requirement, 2> substRequirements;
   SmallVector<Type, 2> substReplacementTypes;
   CanType substYieldType;
-  bool WithinExpansion = false;
+  unsigned packExpansionLevel;
   
   SubstFunctionTypePatternVisitor(TypeConverter &TC)
-    : TC(TC) {}
+    : TC(TC), packExpansionLevel(0) {}
 
   // Creates and returns a fresh type parameter in the substituted generic
   // signature if `pattern` is a type parameter or opaque archetype. Returns
   // null otherwise.
-  CanType handleTypeParameter(AbstractionPattern pattern, CanType substTy) {
+  CanType handleTypeParameter(AbstractionPattern pattern, CanType substTy,
+                              unsigned level) {
     if (!pattern.isTypeParameterOrOpaqueArchetype())
       return CanType();
 
     unsigned paramIndex = substGenericParams.size();
 
+    bool withinExpansion = (level < packExpansionLevel);
+
     // Pack parameters that aren't within expansions should just be
     // abstracted as scalars.
-    bool isParameterPack = (WithinExpansion && pattern.isTypeParameterPack());
+    bool isParameterPack = (withinExpansion && pattern.isTypeParameterPack());
 
     auto gp = GenericTypeParamType::get(isParameterPack, 0, paramIndex,
                                         TC.Context);
@@ -1929,7 +1969,7 @@ public:
 
     CanType replacement;
 
-    if (WithinExpansion) {
+    if (withinExpansion) {
       // If we're within an expansion, and there are substitutions in the
       // abstraction pattern, use those instead of substTy.  substTy is not
       // contextually meaningful in this case; see handlePackExpansion.
@@ -2005,11 +2045,21 @@ public:
       }
     }
     
+    if (level > 0)
+      return CanType(PackElementType::get(gp, level));
+
     return CanType(gp);
   }
 
   CanType visit(CanType t, AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameter(pattern, t))
+    unsigned level = 0;
+    if (auto elementType = dyn_cast<PackElementType>(t)) {
+      level = elementType->getLevel();
+      t = elementType.getPackType();
+      pattern = pattern.getPackElementPackType();
+    }
+
+    if (auto gp = handleTypeParameter(pattern, t, level))
       return gp;
 
     return CanTypeVisitor::visit(t, pattern);
@@ -2180,9 +2230,11 @@ public:
     // the pack substitution for that parameter recorded in the pattern.
 
     // Remember that we're within an expansion.
-    // FIXME: when we introduce PackElementType we'll need to be clear
-    // about which pack expansions to treat this way.
-    llvm::SaveAndRestore<bool> scope(WithinExpansion, true);
+    ++packExpansionLevel;
+
+    SWIFT_DEFER {
+      --packExpansionLevel;
+    };
 
     auto origPatternType = origExpansion.getPackExpansionPatternType();
 
