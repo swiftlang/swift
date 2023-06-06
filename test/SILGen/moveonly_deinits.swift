@@ -66,16 +66,14 @@ var value: Bool { false }
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[DD]]
-// SILGEN:   destroy_value [[LHS]]
-// SILGEN:   destroy_value [[RHS]]
+// SILGEN:   destroy_value [[DD]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARKED]]
-// SILGEN:   end_lifetime [[DD]]
+// SILGEN:   destroy_value [[DD]]
 // SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
 
 ////////////////////////
@@ -165,11 +163,7 @@ public func testIntPairWithoutDeinit() {
 // SIL:   br bb3
 //
 // SIL: bb2:
-// SIL:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> ()
-// SIL:   [[VALUE:%.*]] = load [[STACK]]
-// SIL:   apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned IntPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: destroy_addr
+// SIL:   destroy_addr [[STACK]] : $*IntPairWithDeinit 
 // SIL:   br bb3
 //
 // SIL: bb3:
@@ -266,11 +260,7 @@ public func testKlassPairWithoutDeinit() {
 // SIL:   br bb3
 //
 // SIL: bb2:
-// SIL:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> ()
-// SIL:   [[VALUE:%.*]] = load [[STACK]]
-// SIL:   apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned KlassPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: destroy_addr
+// SIL:   destroy_addr [[STACK]] : $*KlassPairWithDeinit
 // SIL:   br bb3
 //
 // SIL: bb3:
@@ -332,17 +322,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   switch_enum [[DD]] : $KlassEnumPairWithDeinit, case #KlassEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #KlassEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
-//
-// SILGEN: [[BB_LHS]]([[ARG:%.*]] :
-// SILGEN-NEXT: destroy_value [[ARG]]
-// SILGEN-NEXT: br [[BB_CONT:bb[0-9]+]]
-//
-// SILGEN: [[BB_RHS]]([[ARG:%.*]] :
-// SILGEN-NEXT: destroy_value [[ARG]]
-// SILGEN-NEXT: br [[BB_CONT]]
-//
-// SILGEN: [[BB_CONT]]:
+// SILGEN:   destroy_value [[DD]] : $KlassEnumPairWithDeinit
 // SILGEN-NEXT: tuple ()
 // SILGEN-NEXT: return
 // SILGEN: } // end sil function '$s16moveonly_deinits23KlassEnumPairWithDeinitOfD'
@@ -351,15 +331,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   switch_enum [[DD]] : $IntEnumPairWithDeinit, case #IntEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #IntEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
-//
-// SILGEN: [[BB_LHS]]([[ARG:%.*]] :
-// SILGEN-NEXT: br [[BB_CONT:bb[0-9]+]]
-//
-// SILGEN: [[BB_RHS]]([[ARG:%.*]] :
-// SILGEN-NEXT: br [[BB_CONT]]
-//
-// SILGEN: [[BB_CONT]]:
+// SILGEN:   destroy_value [[DD]] : $IntEnumPairWithDeinit
 // SILGEN-NEXT: tuple ()
 // SILGEN-NEXT: return
 // SILGEN: } // end sil function '$s16moveonly_deinits21IntEnumPairWithDeinitOfD'
@@ -449,11 +421,7 @@ public func testIntEnumPairWithoutDeinit() {
 // SIL:   br bb3
 //
 // SIL: bb2:
-// SIL:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> ()
-// SIL:   [[VALUE:%.*]] = load [[STACK]]
-// SIL:   apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned IntEnumPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: destroy_addr
+// SIL:   destroy_addr [[STACK]] : $*IntEnumPairWithDeinit
 // SIL:   br bb3
 //
 // SIL: bb3:
@@ -547,11 +515,7 @@ public func testKlassEnumPairWithoutDeinit() {
 // SIL:   br bb3
 //
 // SIL: bb2:
-// SIL:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> ()
-// SIL:   [[VALUE:%.*]] = load [[STACK]]
-// SIL:   apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned KlassEnumPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: destroy_addr
+// SIL:   destroy_addr [[STACK]] : $*KlassEnumPairWithDeinit
 // SIL:   br bb3
 //
 // SIL: bb3:

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name main -enable-sil-verify-all -sil-move-only-deinit-insertion -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name main -enable-sil-verify-all -sil-move-only-deinit-devirtualization -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck %s
 
 sil_stage raw
 
@@ -16,6 +16,13 @@ class Klass {
 @_moveOnly
 struct TrivialStruct {
   var i: Builtin.Int32
+}
+
+@_moveOnly
+struct StructDeinit {
+  var i: Builtin.Int32
+
+  deinit
 }
 
 @_moveOnly
@@ -69,14 +76,14 @@ bb0(%0 : @owned $Klass):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @trivialStructTest : $@convention(thin) (@owned TrivialStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $TrivialStruct):
-// CHECK:   [[FUNC:%.*]] = function_ref @$s4main13TrivialStructVfD :
+// CHECK-LABEL: sil [ossa] @structDeinitTest : $@convention(thin) (@owned StructDeinit) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $StructDeinit):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s4main12StructDeinitVfD :
 // CHECK:   apply [[FUNC]]([[ARG]])
-// CHECK: } // end sil function 'trivialStructTest'
-sil [ossa] @trivialStructTest : $@convention(thin) (@owned TrivialStruct) -> () {
-bb0(%0 : @owned $TrivialStruct):
-  destroy_value %0 : $TrivialStruct
+// CHECK: } // end sil function 'structDeinitTest'
+sil [ossa] @structDeinitTest : $@convention(thin) (@owned StructDeinit) -> () {
+bb0(%0 : @owned $StructDeinit):
+  destroy_value %0 : $StructDeinit
   %9999 = tuple()
   return %9999 : $()
 }
@@ -125,15 +132,15 @@ bb0(%0 : @owned $NonTrivialMoveOnlyEnum):
 //                                 Var Tests
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil [ossa] @trivialStructAddrTest : $@convention(thin) (@in TrivialStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : $*TrivialStruct):
-// CHECK:   [[FUNC:%.*]] = function_ref @$s4main13TrivialStructVfD :
+// CHECK-LABEL: sil [ossa] @trivialStructAddrTest : $@convention(thin) (@in StructDeinit) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*StructDeinit):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s4main12StructDeinitVfD :
 // CHECK:   [[LOADED_VALUE:%.*]] = load [take] [[ARG]]
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
 // CHECK: } // end sil function 'trivialStructAddrTest'
-sil [ossa] @trivialStructAddrTest : $@convention(thin) (@in TrivialStruct) -> () {
-bb0(%0 : $*TrivialStruct):
-  destroy_addr %0 : $*TrivialStruct
+sil [ossa] @trivialStructAddrTest : $@convention(thin) (@in StructDeinit) -> () {
+bb0(%0 : $*StructDeinit):
+  destroy_addr %0 : $*StructDeinit
   %9999 = tuple()
   return %9999 : $()
 }
@@ -216,12 +223,13 @@ bb0(%0 : $*ThreeNonTrivialNoDeinit):
 //                                Destructors
 //===----------------------------------------------------------------------===//
 
-sil hidden [ossa] @$s4main13TrivialStructVfD : $@convention(method) (@owned TrivialStruct) -> () {
-bb0(%0 : @owned $TrivialStruct):
-  debug_value %0 : $TrivialStruct, let, name "self", argno 1, implicit
-  %2 = destructure_struct %0 : $TrivialStruct
-  %3 = tuple ()
-  return %3 : $()
+sil hidden [ossa] @$s4main12StructDeinitVfD : $@convention(method) (@owned StructDeinit) -> () {
+bb0(%0 : @owned $StructDeinit):
+  debug_value %0 : $StructDeinit, let, name "self", argno 1, implicit
+  %2 = drop_deinit %0 : $StructDeinit
+  %3 = destructure_struct %2 : $StructDeinit
+  %4 = tuple ()
+  return %4 : $()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main21SingleFieldNonTrivialVfD : $@convention(method) (@owned SingleFieldNonTrivial) -> () {
@@ -313,40 +321,40 @@ bb6:
 //                              drop_deinit Tests
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil [ossa] @dropDeinitOnStruct : $@convention(thin) (@owned TrivialStruct) -> () {
+// CHECK-LABEL: sil [ossa] @dropDeinitOnStruct : $@convention(thin) (@owned StructDeinit) -> () {
 // CHECK:         %1 = drop_deinit %0
 // CHECK-NEXT:    destroy_value %1
 // CHECK:       } // end sil function 'dropDeinitOnStruct'
-sil [ossa] @dropDeinitOnStruct : $@convention(thin) (@owned TrivialStruct) -> () {
-bb0(%0 : @owned $TrivialStruct):
-  %1 = drop_deinit %0 : $TrivialStruct
-  destroy_value %1 : $TrivialStruct
+sil [ossa] @dropDeinitOnStruct : $@convention(thin) (@owned StructDeinit) -> () {
+bb0(%0 : @owned $StructDeinit):
+  %1 = drop_deinit %0 : $StructDeinit
+  destroy_value %1 : $StructDeinit
   %9999 = tuple()
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dropDeinitOnMovedStruct : $@convention(thin) (@owned TrivialStruct) -> () {
+// CHECK-LABEL: sil [ossa] @dropDeinitOnMovedStruct : $@convention(thin) (@owned StructDeinit) -> () {
 // CHECK:         %1 = drop_deinit %0
 // CHECK-NEXT:    %2 = move_value %1
 // CHECK-NEXT:    destroy_value %2
 // CHECK:       } // end sil function 'dropDeinitOnMovedStruct'
-sil [ossa] @dropDeinitOnMovedStruct : $@convention(thin) (@owned TrivialStruct) -> () {
-bb0(%0 : @owned $TrivialStruct):
-  %1 = drop_deinit %0 : $TrivialStruct
-  %2 = move_value %1 : $TrivialStruct
-  destroy_value %2 : $TrivialStruct
+sil [ossa] @dropDeinitOnMovedStruct : $@convention(thin) (@owned StructDeinit) -> () {
+bb0(%0 : @owned $StructDeinit):
+  %1 = drop_deinit %0 : $StructDeinit
+  %2 = move_value %1 : $StructDeinit
+  destroy_value %2 : $StructDeinit
   %9999 = tuple()
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dropDeinitOnIndirectStruct : $@convention(thin) (@in TrivialStruct) -> () {
+// CHECK-LABEL: sil [ossa] @dropDeinitOnIndirectStruct : $@convention(thin) (@in StructDeinit) -> () {
 // CHECK:         %1 = drop_deinit %0
 // CHECK-NEXT:    destroy_addr %1
 // CHECK:       } // end sil function 'dropDeinitOnIndirectStruct'
-sil [ossa] @dropDeinitOnIndirectStruct : $@convention(thin) (@in TrivialStruct) -> () {
-bb0(%0 : $*TrivialStruct):
-  %1 = drop_deinit %0 : $*TrivialStruct
-  destroy_addr %1 : $*TrivialStruct
+sil [ossa] @dropDeinitOnIndirectStruct : $@convention(thin) (@in StructDeinit) -> () {
+bb0(%0 : $*StructDeinit):
+  %1 = drop_deinit %0 : $*StructDeinit
+  destroy_addr %1 : $*StructDeinit
   %9999 = tuple()
   return %9999 : $()
 }
@@ -359,8 +367,8 @@ sil_moveonlydeinit Klass {
   @$s4main5KlassCfD
 }
 
-sil_moveonlydeinit TrivialStruct {
-  @$s4main13TrivialStructVfD	// TrivialStruct.deinit
+sil_moveonlydeinit StructDeinit {
+  @$s4main12StructDeinitVfD	// StructDeinit.deinit
 }
 
 sil_moveonlydeinit SingleFieldNonTrivial {

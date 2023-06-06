@@ -156,8 +156,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
-  // Convert last destroy_value to deinits.
-  P.addMoveOnlyDeinitInsertion();
   // Lower move only wrapped trivial types.
   P.addTrivialMoveOnlyTypeEliminator();
   // Check no uses after consume operator of a value in an address.

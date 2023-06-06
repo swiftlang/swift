@@ -39,6 +39,30 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
   }
 }
 
+bool swift::visitNonOwnershipUses(SILValue value,
+                                  function_ref<bool(Operand *)> visitor) {
+  // All ownership insts have a single operand, so a recursive walk is
+  // sufficient and cannot revisit operands.
+  for (Operand *use : value->getUses()) {
+    auto *user = use->getUser();
+    switch (user->getKind()) {
+    default:
+      if (!visitor(use))
+        return false;
+
+      break;
+    case SILInstructionKind::MoveValueInst:
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::BeginBorrowInst:
+      if (!visitNonOwnershipUses(cast<SingleValueInstruction>(user), visitor))
+        return false;
+
+      break;
+    }
+  }
+  return true;
+}
+
 SILValue swift::lookThroughCopyValueInsts(SILValue val) {
   while (auto *cvi =
              dyn_cast_or_null<CopyValueInst>(val->getDefiningInstruction())) {
