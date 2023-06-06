@@ -963,9 +963,13 @@ public:
   }
 
   bool shouldShadowStorage(llvm::Value *Storage) {
-    return !isa<llvm::AllocaInst>(Storage)
-      && !isa<llvm::UndefValue>(Storage)
-      && needsShadowCopy(Storage);
+    Storage = Storage->stripPointerCasts();
+    if (isa<llvm::UndefValue>(Storage))
+      return false;
+    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage);
+        Alloca && Alloca->isStaticAlloca())
+      return false;
+    return needsShadowCopy(Storage);
   }
 
   /// At -Onone, emit a shadow copy of an Address in an alloca, so the
