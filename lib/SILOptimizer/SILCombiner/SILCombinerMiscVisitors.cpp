@@ -858,6 +858,10 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand->getType();
 
+  // Do not remove a release that calls a value deinit.
+  if (hasValueDeinit(OperandTy))
+    return nullptr;
+
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||

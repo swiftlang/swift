@@ -57,3 +57,17 @@ bb0:
   %42 = tuple ()
   return %42 : $()
 }
+
+// Test that a release of a trivial payload is not removed.
+//
+// CHECK-LABEL: sil hidden [noinline] @testEnumDeinitTrivialPayload : $@convention(thin) () -> () {
+// CHECK:   release_value %{{.*}} : $MaybeFileDescriptor
+// CHECK-LABEL: } // end sil function 'testEnumDeinitTrivialPayload'
+sil hidden [noinline] @testEnumDeinitTrivialPayload : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $MaybeFileDescriptor, #MaybeFileDescriptor.nothing!enumelt // users: %2, %1
+  debug_value %0 : $MaybeFileDescriptor, var, name "maybe" // id: %1
+  release_value %0 : $MaybeFileDescriptor
+  %9 = tuple ()
+  return %9 : $()
+}
