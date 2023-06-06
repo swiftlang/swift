@@ -193,7 +193,7 @@ class Target {
     }
   }
 
-  public func redoBacktraces(limit: Int?, top: Int, cache: Bool) {
+  func redoBacktraces(limit: Int?, top: Int, cache: Bool) {
     for (ndx, thread) in threads.enumerated() {
       guard let context = thread.context else {
         continue
@@ -219,7 +219,7 @@ class Target {
     }
   }
 
-  public func withDebugger(_ body: () -> ()) throws {
+  func withDebugger(_ body: () -> ()) throws {
     print("""
             From another shell, please run
 
