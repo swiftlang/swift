@@ -1,12 +1,12 @@
 // RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
- sil_stage canonical
+sil_stage canonical
 
- import Builtin
+import Builtin
 
- struct S : ~Copyable {
-   deinit {}
- }
+struct S : ~Copyable {
+  deinit {}
+}
 
 struct FileDescriptor: ~Copyable {
   var fd: Builtin.Int64
