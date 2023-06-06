@@ -341,6 +341,7 @@ private:
 
     case Node::Kind::ConstrainedExistential:
     case Node::Kind::PackElement:
+    case Node::Kind::PackElementLevel:
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorAttachedMacroExpansion:
@@ -1630,10 +1631,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::PackElement: {
+    Printer << "/* level: " << Node->getChild(1)->getIndex() << " */ ";
     Printer << "each ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   }
+  case Node::Kind::PackElementLevel:
+    printer_unreachable("should be handled in Node::Kind::PackElement");
+
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
       Printer << " -> " << Node->getText();

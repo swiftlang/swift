@@ -92,11 +92,13 @@ CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
   return cast<FunctionType>(
            getPointer()->substGenericArgs(subs)->getCanonicalType());
 }
+
 static Type getMemberForBaseType(InFlightSubstitution &IFS,
                                  Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
-                                 Identifier name) {
+                                 Identifier name,
+                                 unsigned level) {
   // Produce a dependent member type for the given base type.
   auto getDependentMemberType = [&](Type baseType) {
     if (assocType)
@@ -144,7 +146,8 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
 
   auto proto = assocType->getProtocol();
   ProtocolConformanceRef conformance =
-    IFS.lookupConformance(origBase->getCanonicalType(), substBase, proto);
+    IFS.lookupConformance(origBase->getCanonicalType(), substBase,
+                          proto, level);
 
   if (conformance.isInvalid())
     return failed();
@@ -273,7 +276,8 @@ Type DependentMemberType::substBaseType(Type substBase,
 
   InFlightSubstitution IFS(nullptr, lookupConformance, None);
   return getMemberForBaseType(IFS, getBase(), substBase,
-                              getAssocType(), getName());
+                              getAssocType(), getName(),
+                              /*level=*/0);
 }
 
 Type DependentMemberType::substRootParam(Type newRoot,
@@ -386,16 +390,44 @@ void InFlightSubstitution::expandPackExpansionShape(Type origShape,
   ActivePackExpansions.pop_back();
 }
 
-Type InFlightSubstitution::substType(SubstitutableType *origType) {
+Type InFlightSubstitution::substType(SubstitutableType *origType,
+                                     unsigned level) {
   auto substType = BaselineSubstType(origType);
-  if (!substType || ActivePackExpansions.empty())
-    return substType;
+  if (!substType)
+    return Type();
+
+  // FIXME: All the logic around 'level' is probably slightly wrong, and in
+  // the unlikely event that it is correct, at the very least warrants a
+  // detailed explanation.
+
+  if (ActivePackExpansions.empty())
+    return substType->increasePackElementLevel(level);
+
+  auto outerExpansions = ArrayRef(ActivePackExpansions).drop_back(level);
+  auto innerExpansions = ArrayRef(ActivePackExpansions).take_back(level);
+
+  unsigned outerLevel = 0;
+  if (!getOptions().contains(SubstFlags::PreservePackExpansionLevel)) {
+    for (const auto &activeExpansion : outerExpansions) {
+      if (activeExpansion.isSubstExpansion)
+        ++outerLevel;
+    }
+  } else {
+    outerLevel = level;
+  }
+
+  unsigned innerLevel = 0;
+  for (const auto &activeExpansion : innerExpansions) {
+    if (activeExpansion.isSubstExpansion)
+      ++innerLevel;
+  }
 
   auto substPackType = substType->getAs<PackType>();
   if (!substPackType)
-    return substType;
+    return substType->increasePackElementLevel(outerLevel);
 
-  auto &activeExpansion = ActivePackExpansions.back();
+  auto &activeExpansion = outerExpansions.back();
+
   auto index = activeExpansion.expansionIndex;
   assert(index < substPackType->getNumElements() &&
          "replacement for pack parameter did not have the right "
@@ -404,18 +436,21 @@ Type InFlightSubstitution::substType(SubstitutableType *origType) {
   if (activeExpansion.isSubstExpansion) {
     assert(substEltType->is<PackExpansionType>() &&
            "substituted shape mismatch: expected an expansion component");
-    substEltType = substEltType->castTo<PackExpansionType>()->getPatternType();
+    return substEltType->increasePackElementLevel(outerLevel)
+                       ->castTo<PackExpansionType>()->getPatternType()
+                       ->increasePackElementLevel(innerLevel);
   } else {
     assert(!substEltType->is<PackExpansionType>() &&
            "substituted shape mismatch: expected a scalar component");
+    return substEltType->increasePackElementLevel(outerLevel);
   }
-  return substEltType;
 }
 
 ProtocolConformanceRef
 InFlightSubstitution::lookupConformance(CanType dependentType,
                                         Type conformingReplacementType,
-                                        ProtocolDecl *conformedProtocol) {
+                                        ProtocolDecl *conformedProtocol,
+                                        unsigned level) {
   auto substConfRef = BaselineLookupConformance(dependentType,
                                                 conformingReplacementType,
                                                 conformedProtocol);
@@ -426,7 +461,9 @@ InFlightSubstitution::lookupConformance(CanType dependentType,
 
   auto substPackConf = substConfRef.getPack();
   auto substPackPatterns = substPackConf->getPatternConformances();
-  auto index = ActivePackExpansions.back().expansionIndex;
+  assert(level < ActivePackExpansions.size() && "too deep");
+  auto index = ActivePackExpansions[ActivePackExpansions.size() - level - 1]
+      .expansionIndex;
   assert(index < substPackPatterns.size() &&
          "replacement for pack parameter did not have the right "
          "size for expansion");
@@ -440,7 +477,8 @@ bool InFlightSubstitution::isInvariant(Type derivedType) const {
           || !derivedType->hasOpaqueArchetype());
 }
 
-static Type substType(Type derivedType, InFlightSubstitution &IFS) {
+static Type substType(Type derivedType, unsigned level,
+                      InFlightSubstitution &IFS) {
   // Handle substitutions into generic function types.
   if (auto genericFnType = derivedType->getAs<GenericFunctionType>()) {
     return substGenericFunctionType(genericFnType, IFS);
@@ -493,8 +531,9 @@ static Type substType(Type derivedType, InFlightSubstitution &IFS) {
     if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
       Type parentTy;
       if (auto origParentTy = aliasTy->getParent())
-        parentTy = substType(origParentTy, IFS);
-      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(), IFS);
+        parentTy = substType(origParentTy, level, IFS);
+      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
+                                    level, IFS);
       if (parentTy && parentTy->isExistentialType())
         return underlyingTy;
       auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
@@ -502,16 +541,23 @@ static Type substType(Type derivedType, InFlightSubstitution &IFS) {
                                      subMap, underlyingTy));
     }
 
+    unsigned currentLevel = level;
+    if (auto elementTy = dyn_cast<PackElementType>(type)) {
+      type = elementTy->getPackType().getPointer();
+      currentLevel += elementTy->getLevel();
+    }
+
     // We only substitute for substitutable types and dependent member types.
     
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-      auto newBase = substType(depMemTy->getBase(), IFS);
+      auto newBase = substType(depMemTy->getBase(), currentLevel, IFS);
       return getMemberForBaseType(IFS,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
-                                  depMemTy->getName());
+                                  depMemTy->getName(),
+                                  currentLevel);
     }
     
     auto substOrig = dyn_cast<SubstitutableType>(type);
@@ -525,7 +571,7 @@ static Type substType(Type derivedType, InFlightSubstitution &IFS) {
       return None;
 
     // If we have a substitution for this type, use it.
-    if (auto known = IFS.substType(substOrig)) {
+    if (auto known = IFS.substType(substOrig, currentLevel)) {
       if (IFS.shouldSubstituteOpaqueArchetypes() &&
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
@@ -550,40 +596,41 @@ static Type substType(Type derivedType, InFlightSubstitution &IFS) {
     }
 
     // For nested archetypes, we can substitute the parent.
-    auto parent = origArchetype->getParent();
-    assert(parent && "Not a nested archetype");
+    Type origParent = origArchetype->getParent();
+    assert(origParent && "Not a nested archetype");
 
     // Substitute into the parent type.
-    Type substParent = substType(parent, IFS);
+    Type substParent = substType(origParent, currentLevel, IFS);
 
     // If the parent didn't change, we won't change.
-    if (substParent.getPointer() == parent)
+    if (substParent.getPointer() == origArchetype->getParent())
       return Type(type);
 
     // Get the associated type reference from a child archetype.
     AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
         ->castTo<DependentMemberType>()->getAssocType();
 
-    return getMemberForBaseType(IFS, parent, substParent,
-                                assocType, assocType->getName());
+    return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
+                                assocType, assocType->getName(),
+                                currentLevel);
   });
 }
 
 Type Type::subst(SubstitutionMap substitutions,
                  SubstOptions options) const {
   InFlightSubstitutionViaSubMap IFS(substitutions, options);
-  return substType(*this, IFS);
+  return substType(*this, /*level=*/0, IFS);
 }
 
 Type Type::subst(TypeSubstitutionFn substitutions,
                  LookupConformanceFn conformances,
                  SubstOptions options) const {
   InFlightSubstitution IFS(substitutions, conformances, options);
-  return substType(*this, IFS);
+  return substType(*this, /*level=*/0, IFS);
 }
 
 Type Type::subst(InFlightSubstitution &IFS) const {
-  return substType(*this, IFS);
+  return substType(*this, /*level=*/0, IFS);
 }
 
 //===----------------------------------------------------------------------===//

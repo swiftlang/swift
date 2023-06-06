@@ -452,7 +452,8 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(genericSig.getPointer()),
-                    genericSig);
+                    genericSig,
+                    SubstFlags::PreservePackExpansionLevel);
 }
 
 bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {

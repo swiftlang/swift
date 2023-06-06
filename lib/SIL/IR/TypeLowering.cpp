@@ -79,6 +79,9 @@ namespace {
     bool visitDependentMemberType(CanDependentMemberType type) {
       return false;
     }
+    bool visitPackElementType(CanPackElementType type) {
+      return false;
+    }
     
     /// Archetype metatypes have non-trivial representation in case
     /// they instantiate to a class metatype.
@@ -351,12 +354,6 @@ namespace {
       return asImpl().handleAddressOnly(type, props);
     }
 
-    RetTy visitPackElementType(CanPackElementType type,
-                               AbstractionPattern origType,
-                               IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("not implemented for PackElementType");
-    }
-
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
                                      AbstractionPattern orig,
                                      IsTypeExpansionSensitive_t isSensitive) {
@@ -556,6 +553,12 @@ namespace {
     RetTy visitDependentMemberType(CanDependentMemberType type,
                                    AbstractionPattern origType,
                                    IsTypeExpansionSensitive_t isSensitive) {
+      return visitAbstractTypeParamType(type, origType, isSensitive);
+    }
+
+    RetTy visitPackElementType(CanPackElementType type,
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
@@ -2271,12 +2274,6 @@ namespace {
       return handleAddressOnly(packExpansionType, properties);
     }
 
-    TypeLowering *visitPackElementType(CanPackElementType packElementType,
-                                       AbstractionPattern origType,
-                                       IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("not implemented for PackElementType");
-    }
-
     TypeLowering *visitBuiltinTupleType(CanBuiltinTupleType type,
                                         AbstractionPattern origType,
                                         IsTypeExpansionSensitive_t isSensitive) {
@@ -3088,7 +3085,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     }
 
     CanType visitPackElementType(CanPackElementType substPackElementType) {
-      llvm_unreachable("not implemented for PackElementType");
+      return substPackElementType;
     }
 
     CanType visitBuiltinTupleType(CanBuiltinTupleType type) {
@@ -4179,6 +4176,10 @@ public:
   }
   bool visitDependentMemberType(CanDependentMemberType type1,
                                 CanDependentMemberType type2) {
+    return false;
+  }
+  bool visitPackElementType(CanPackElementType type1,
+                            CanPackElementType type2) {
     return false;
   }
 
