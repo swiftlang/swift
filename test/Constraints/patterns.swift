@@ -651,3 +651,10 @@ func testExprPatternIsolation() {
   var opt: Int?
   if case opt = 0 {}
 }
+
+enum LotsOfOptional {
+  case yup(Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?)
+}
+func testLotsOfNil(_ x: LotsOfOptional) {
+  if case .yup(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil) = x {}
+}
