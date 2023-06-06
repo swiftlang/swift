@@ -8767,7 +8767,7 @@ static bool expandMacro(SourceManager &SM, ResolvedCursorInfoPtr cursorInfo,
   // Send all of the rewritten buffer snippets.
   for (auto bufferID: bufferIDs) {
     editConsumer.acceptMacroExpansionBuffer(SM, bufferID, containingSF,
-                                            adjustExpansion);
+                                            adjustExpansion, /*includeBufferName=*/true);
   }
 
   // For an attached macro, remove the custom attribute; it's been fully

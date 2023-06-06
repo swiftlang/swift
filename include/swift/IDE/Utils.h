@@ -580,7 +580,7 @@ public:
   void remove(SourceManager &SM, CharSourceRange Range);
   void acceptMacroExpansionBuffer(SourceManager &SM, unsigned bufferID,
                                   SourceFile *containingSF,
-                                  bool adjustExpansion);
+                                  bool adjustExpansion, bool includeBufferName);
 };
 
 /// This helper stream inserts text into a SourceLoc by calling functions in

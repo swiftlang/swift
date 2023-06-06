@@ -19,8 +19,7 @@
           key.column: 1,
           key.endline: 13,
           key.endcolumn: 1,
-          key.text: "static func requirement() where Element : P {\n  Element.requirement()\n}",
-          key.buffer_name: "macro_565056f2d01a68bdc1cc2ee8aa618595.swift"
+          key.text: "static func requirement() where Element : P {\n  Element.requirement()\n}"
         }
       ],
       key.category: source.edit.kind.active
@@ -32,8 +31,7 @@
           key.column: 2,
           key.endline: 13,
           key.endcolumn: 2,
-          key.text: "extension Generic : P where Element: P {}",
-          key.buffer_name: "macro_a05c1290cb88fd731ba683e5aa86fdb7.swift"
+          key.text: "extension Generic : P where Element: P {}"
         }
       ],
       key.category: source.edit.kind.active
@@ -57,8 +55,7 @@
           key.column: 17,
           key.endline: 7,
           key.endcolumn: 17,
-          key.text: "{\n    get {\n            _value.wrappedValue\n      }\n\n    set {\n            _value.wrappedValue = newValue\n      }\n}",
-          key.buffer_name: "macro_f51f41c03929a32f838d53f437ec0a36.swift"
+          key.text: "{\n    get {\n            _value.wrappedValue\n      }\n\n    set {\n            _value.wrappedValue = newValue\n      }\n}"
         }
       ],
       key.category: source.edit.kind.active
@@ -70,8 +67,7 @@
           key.column: 12,
           key.endline: 7,
           key.endcolumn: 12,
-          key.text: "var _value: MyWrapperThingy<Int>",
-          key.buffer_name: "macro_4cb3f1a23406c36f4ca3076cfc889d56.swift"
+          key.text: "var _value: MyWrapperThingy<Int>"
         }
       ],
       key.category: source.edit.kind.active
@@ -95,8 +91,7 @@
           key.column: 3,
           key.endline: 7,
           key.endcolumn: 3,
-          key.text: "@Wrapper",
-          key.buffer_name: "macro_a4c2cd1a73caad3b1eb8f265e55461ee.swift"
+          key.text: "@Wrapper"
         }
       ],
       key.category: source.edit.kind.active
@@ -108,8 +103,7 @@
           key.column: 3,
           key.endline: 10,
           key.endcolumn: 3,
-          key.text: "@Wrapper",
-          key.buffer_name: "macro_8bd5a8e09442bf0ec36f456f59a93687.swift"
+          key.text: "@Wrapper"
         }
       ],
       key.category: source.edit.kind.active
@@ -121,8 +115,7 @@
           key.column: 3,
           key.endline: 12,
           key.endcolumn: 35,
-          key.text: "struct blah8 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {\n  }\n}\nstruct blah16 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {\n  }\n}\nstruct blah32 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {\n  }\n}\nstruct blah64 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {\n  }\n}",
-          key.buffer_name: "macro_a01f07de3e9ee8585adf794ccd6dec8c.swift"
+          key.text: "struct blah8 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {\n  }\n}\nstruct blah16 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {\n  }\n}\nstruct blah32 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {\n  }\n}\nstruct blah64 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {\n  }\n}"
         }
       ],
       key.category: source.edit.kind.active

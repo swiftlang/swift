@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Utils.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -659,7 +660,7 @@ adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
 
 void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
     SourceManager &SM, unsigned bufferID, SourceFile *containingSF,
-    bool adjustExpansion) {
+    bool adjustExpansion, bool includeBufferName) {
   auto generatedInfo = SM.getGeneratedSourceInfo(bufferID);
   if (!generatedInfo || generatedInfo->originalSourceRange.isInvalid())
     return;
@@ -706,9 +707,14 @@ void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
     originalPath = SM.getIdentifierForBuffer(*originalFile->getBufferID());
   }
 
+  StringRef bufferName;
+  if (includeBufferName) {
+    bufferName = SM.getIdentifierForBuffer(bufferID);
+  }
+
   accept(SM, {originalPath,
               originalSourceRange,
-              SM.getIdentifierForBuffer(bufferID),
+              bufferName,
               rewrittenBuffer,
               {}});
 }

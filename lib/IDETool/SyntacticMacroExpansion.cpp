@@ -465,7 +465,8 @@ bool SyntacticMacroExpansionInstance::getExpansion(
   // Send all edits to the consumer.
   for (unsigned bufferID : bufferIDs) {
     consumer.acceptMacroExpansionBuffer(SourceMgr, bufferID, SF,
-                                        /*adjust=*/false);
+                                        /*adjust=*/false,
+                                        /*includeBufferName=*/false);
   }
 
   return false;
