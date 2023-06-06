@@ -1041,7 +1041,12 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
 /// operation for \p value is required. This differs from a simple `isTrivial`
 /// check, because it treats a value_to_bridge_object instruction as "trivial".
 /// It can also handle non-trivial enums with trivial cases.
-static bool isTrivial(SILValue value, SILFunction *function) {
+///
+/// TODO: Define this as a top-level SILValue API. It needs to be updated
+/// whenever we refine the specification of isTrivial. For example, in the
+/// future we will check for the existence of a user-defined deinitializer and
+/// handle C++ types specially.
+static bool isValueTrivial(SILValue value, SILFunction *function) {
   SmallVector<ValueBase *, 32> workList;
   SmallPtrSet<ValueBase *, 16> visited;
   workList.push_back(value);
@@ -1051,6 +1056,11 @@ static bool isTrivial(SILValue value, SILFunction *function) {
       continue;
     if (isa<ValueToBridgeObjectInst>(v))
       continue;
+
+    // MoveOnly types may have a user-defined deinit.
+    if (v->getType().isPureMoveOnly())
+      return false;
+
     if (isa<StructInst>(v) || isa<TupleInst>(v)) {
       for (SILValue op : cast<SingleValueInstruction>(v)->getOperandValues()) {
         if (visited.insert(op).second)
@@ -1102,7 +1112,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (isTrivial(Operand, RVI->getFunction()))
+  if (isValueTrivial(Operand, RVI->getFunction()))
     return eraseInstFromFunction(*RVI);
 
   // Do nothing for non-trivial non-reference types.
