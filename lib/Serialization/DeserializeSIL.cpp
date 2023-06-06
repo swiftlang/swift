@@ -2337,6 +2337,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createMoveOnlyWrapperToCopyableAddr(Loc, op);
     break;
   }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createMoveOnlyWrapperToCopyableBox(Loc, op);
+    break;
+  }
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
     assert(RecordKind == SIL_ONE_OPERAND);
     SILValue op = getLocalValue(

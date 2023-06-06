@@ -6059,6 +6059,17 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkMoveOnlyWrapperToCopyableBoxInst(
+      MoveOnlyWrapperToCopyableBoxInst *cvt) {
+    require(cvt->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(cvt->getOperand()->getType().isBoxedMoveOnlyWrappedType(cvt->getFunction()),
+            "Operand should be move only wrapped");
+    require(cvt->getType() ==
+            cvt->getOperand()->getType().removingMoveOnlyWrapperToBoxedType(cvt->getFunction()),
+            "Result and operand must have the same type, today.");
+  }
+
   void checkCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *cvt) {
     require(cvt->getInitialKind() ==

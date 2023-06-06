@@ -2049,6 +2049,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)operand->getType().getCategory(), addValueRef(operand));
     break;
   }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst: {
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    auto *BAI = cast<MoveOnlyWrapperToCopyableBoxInst>(&SI);
+    SILValue operand = BAI->getOperand();
+
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), 0,
+        S.addTypeRef(operand->getType().getRawASTType()),
+        (unsigned)operand->getType().getCategory(), addValueRef(operand));
+    break;
+  }
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     auto *BAI = cast<CopyableToMoveOnlyWrapperAddrInst>(&SI);

@@ -1145,10 +1145,46 @@ intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
 }
 
 std::string SILType::getDebugDescription() const {
-    std::string str;
-    llvm::raw_string_ostream os(str);
-    print(os);
-    str.pop_back(); // Remove trailing newline.
-    return str;
-  }
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
 
+SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+  auto boxTy = castTo<SILBoxType>();
+  auto *oldLayout = boxTy->getLayout();
+  auto oldField = oldLayout->getFields()[0];
+  if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
+    return *this;
+  assert(!oldField.getLoweredType()->isPureMoveOnly() &&
+         "Cannot moveonlywrapped in a moveonly type");
+  auto newField =
+      SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),
+               oldField.isMutable());
+  auto *newLayout =
+      SILLayout::get(fn->getASTContext(), oldLayout->getGenericSignature(),
+                     {newField}, oldLayout->capturesGenericEnvironment());
+  auto newBoxType = SILBoxType::get(fn->getASTContext(), newLayout,
+                                    boxTy->getSubstitutions());
+  return SILType::getPrimitiveObjectType(newBoxType);
+}
+
+SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+  auto boxTy = castTo<SILBoxType>();
+  auto *oldLayout = boxTy->getLayout();
+  auto oldField = oldLayout->getFields()[0];
+  auto *moveOnlyWrapped =
+      oldField.getLoweredType()->getAs<SILMoveOnlyWrappedType>();
+  if (!moveOnlyWrapped)
+    return *this;
+  auto newField =
+      SILField(moveOnlyWrapped->getInnerType(), oldField.isMutable());
+  auto *newLayout =
+      SILLayout::get(fn->getASTContext(), oldLayout->getGenericSignature(),
+                     {newField}, oldLayout->capturesGenericEnvironment());
+  auto newBoxType = SILBoxType::get(fn->getASTContext(), newLayout,
+                                    boxTy->getSubstitutions());
+  return SILType::getPrimitiveObjectType(newBoxType);
+}

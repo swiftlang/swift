@@ -496,6 +496,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableValueInst,
                     moveonlywrapper_to_copyable, SingleValueInstruction, None,
                     DoesNotRelease)
+  // Convert a ${ @moveOnly T } to $T. This is a forwarding instruction that
+  // acts similarly to an object cast, unlike MoveOnlyWrapperToCopyableValue.
+  SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableBoxInst,
+                    moveonlywrapper_to_copyable_box, SingleValueInstruction, None,
+                    DoesNotRelease)
   // Convert a $*@moveOnly T to $*T. Acts just as a cast.
   SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableAddrInst,
                     moveonlywrapper_to_copyable_addr, SingleValueInstruction,

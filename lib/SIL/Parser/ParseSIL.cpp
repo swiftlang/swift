@@ -4565,6 +4565,30 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createMoveOnlyWrapperToCopyableAddr(InstLoc, addrVal);
     break;
   }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst: {
+    SILValue addrVal;
+    SourceLoc addrLoc;
+    if (parseTypedValueRef(addrVal, addrLoc, B))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!addrVal->getType().is<SILBoxType>()) {
+      P.diagnose(addrLoc, diag::sil_box_expected, OpcodeName);
+      return true;
+    }
+
+    if (!addrVal->getType().isBoxedMoveOnlyWrappedType(
+            addrVal->getFunction())) {
+      P.diagnose(addrLoc, diag::sil_operand_has_incorrect_moveonlywrapped,
+                 "operand", OpcodeName, 0);
+      return true;
+    }
+
+    ResultVal = B.createMoveOnlyWrapperToCopyableBox(InstLoc, addrVal);
+    break;
+  }
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
     SILValue addrVal;
     SourceLoc addrLoc;

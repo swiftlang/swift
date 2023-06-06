@@ -374,6 +374,7 @@ FORWARDING_OWNERSHIP(MarkMustCheck)
 FORWARDING_OWNERSHIP(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP(CopyableToMoveOnlyWrapperValue)
+FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableBox)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to
