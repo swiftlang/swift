@@ -458,12 +458,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     // Visit auxiliary decls, which may be decls from macro expansions.
     bool alreadyFailed = false;
     if (shouldWalkExpansion) {
-      MED->visitAuxiliaryDecls([&](Decl *decl) {
-        if (alreadyFailed) return;
-        if (!isa<VarDecl>(decl))
-          alreadyFailed = inherited::visit(decl);
-      });
-      MED->forEachExpandedExprOrStmt([&](ASTNode expandedNode) {
+      MED->forEachExpandedNode([&](ASTNode expandedNode) {
         if (alreadyFailed) return;
         if (auto *expr = expandedNode.dyn_cast<Expr *>()) {
           if (!doIt(expr))
@@ -471,6 +466,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
           if (!doIt(stmt))
             alreadyFailed = true;
+        } else {
+          auto decl = expandedNode.get<Decl *>();
+          if (!isa<VarDecl>(decl))
+            alreadyFailed = inherited::visit(decl);
         }
       });
     }

@@ -8643,10 +8643,11 @@ public:
   DeclNameRef getMacroName() const { return info->MacroName; }
   ArgumentList *getArgs() const { return info->ArgList; }
   void setArgs(ArgumentList *args) { info->ArgList = args; }
-  using ExprOrStmtExpansionCallback = llvm::function_ref<void(ASTNode)>;
-  void forEachExpandedExprOrStmt(ExprOrStmtExpansionCallback) const;
   ConcreteDeclRef getMacroRef() const { return info->macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { info->macroRef = ref; }
+
+  /// Enumerate the nodes produced by expanding this macro expansion.
+  void forEachExpandedNode(llvm::function_ref<void(ASTNode)> callback) const;
 
   MacroExpansionInfo *getExpansionInfo() const { return info; }
 

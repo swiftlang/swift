@@ -299,6 +299,24 @@ public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
   }
 }
 
+public struct VarDeclMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      let fromMacro = 23
+      use(fromMacro)
+      if true {
+        let fromMacro = "string"
+        use(fromMacro)
+      }
+      """
+    ]
+  }
+}
+
 public struct WarningMacro: ExpressionMacro {
    public static func expansion(
      of macro: some FreestandingMacroExpansionSyntax,

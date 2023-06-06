@@ -150,6 +150,13 @@ func testFileID(a: Int, b: Int) {
 
 testFileID(a: 1, b: 2)
 
+@freestanding(declaration, names: named(fromMacro)) macro varDecl() = #externalMacro(module: "MacroDefinition", type: "VarDeclMacro")
+
+func testVarDecl() {
+  func use<T>(_ t: T) {}
+  #varDecl()
+}
+
 @freestanding(expression) macro stringifyAndTry<T>(_ value: T) -> (T, String) =
     #externalMacro(module: "MacroDefinition", type: "StringifyAndTryMacro")
 
