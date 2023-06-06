@@ -162,12 +162,50 @@ extension MemoryReader {
     self.fd = fd
   }
 
+  private func safeRead(_ fd: CInt, _ buffer: UnsafeMutableRawBufferPointer) throws -> Int {
+    var done = 0
+    while done < buffer.count {
+      var ret: ssize_t = 0
+      repeat {
+        ret = read(fd, buffer.baseAddress! + done, buffer.count - done)
+      } while ret < 0 && _swift_get_errno() == EINTR
+      if ret < 0 {
+        throw POSIXError(errno: _swift_get_errno())
+      }
+      if ret == 0 {
+        break
+      }
+      done += Int(ret)
+    }
+
+    return done
+  }
+
+  private func safeWrite(_ fd: CInt, _ buffer: UnsafeRawBufferPointer) throws -> Int {
+    var done = 0
+    while done < buffer.count {
+      var ret: ssize_t = 0
+      repeat {
+        ret = write(fd, buffer.baseAddress! + done, buffer.count - done)
+      } while ret < 0 && _swift_get_errno() == EINTR
+      if ret < 0 {
+        throw POSIXError(errno: _swift_get_errno())
+      }
+      if ret == 0 {
+        break
+      }
+      done += Int(ret)
+    }
+
+    return done
+  }
+
   private func sendRequest(for bytes: Size, from addr: Address) throws {
     var request = memserver_req(addr: addr, len: bytes)
     try withUnsafeBytes(of: &request){ ptr in
-      let ret = write(fd, ptr.baseAddress, ptr.count)
-      if ret < 0 || ret != ptr.count {
-        throw POSIXError(errno: _swift_get_errno())
+      let ret = try safeWrite(fd, ptr)
+      if ret != ptr.count {
+        throw MemserverError(message: "Channel closed prematurely")
       }
     }
   }
@@ -175,9 +213,9 @@ extension MemoryReader {
   private func receiveReply() throws -> memserver_resp {
     var response = memserver_resp(addr: 0, len: 0)
     try withUnsafeMutableBytes(of: &response){ ptr in
-      let ret = read(fd, ptr.baseAddress, ptr.count)
-      if ret < 0 || ret != ptr.count {
-        throw POSIXError(errno: _swift_get_errno())
+      let ret = try safeRead(fd, ptr)
+      if ret != ptr.count {
+        throw MemserverError(message: "Channel closed prematurely")
       }
     }
     return response
@@ -185,7 +223,8 @@ extension MemoryReader {
 
   public func fetch<T>(from addr: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
-    try buffer.withMemoryRebound(to: UInt8.self) { bytes in
+    try buffer.withMemoryRebound(to: UInt8.self) {
+      let bytes = UnsafeMutableRawBufferPointer($0)
       try sendRequest(for: Size(bytes.count), from: addr)
 
       var done = 0
@@ -200,12 +239,12 @@ extension MemoryReader {
           throw MemserverError(message: "Overrun at \(hex(addr)) trying to read \(bytes.count) bytes")
         }
 
-        let ret = read(fd,
-                       bytes.baseAddress!.advanced(by: done),
-                       Int(reply.len))
+        let ret = try safeRead(fd,
+                               UnsafeMutableRawBufferPointer(
+                                 rebasing: bytes[done..<done+Int(reply.len)]))
 
-        if ret < 0 || ret != reply.len {
-          throw POSIXError(errno: _swift_get_errno())
+        if ret != reply.len {
+          throw MemserverError(message: "Channel closed prematurely")
         }
 
         done += Int(reply.len)
