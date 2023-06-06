@@ -850,33 +850,7 @@ _swift_isThunkFunction(const char *mangledName) {
   return ctx.isThunkSymbol(mangledName);
 }
 
-/// Try to demangle a symbol.
-///
-/// Unlike other entry points that do this, we try both Swift and C++ here.
-///
-/// @param mangledName is the symbol name to be demangled.
-/// @param mangledNameLength is the length of this name.
-/// @param outputBuffer is a pointer to a buffer in which to place the result.
-/// @param outputBufferSize points to a variable that contains the size of the
-/// output buffer.
-/// @param status returns the status codes defined in the C++ ABI.
-///
-/// If outputBuffer is nullptr, the function will allocate memory for the
-/// result using malloc().  In this case, outputBufferSize may be nullptr;
-/// if it is *not* nullptr, it will be set to the size of buffer that was
-/// allocated.  This is not necessarily the length of the string (it may be
-/// somewhat higher).
-///
-/// Otherwise, the result will be written into the output buffer, and the
-/// size of the result will be written into outputBufferSize.  If the buffer
-/// is too small, the result will be truncated, but outputBufferSize will
-/// still be set to the number of bytes that would have been required to
-/// copy out the full result (including a trailing NUL).
-///
-/// The unusual behaviour here is a consequence of the way the C++ ABI's
-/// demangling function works.
-///
-/// @returns a pointer to the output if demangling was successful.
+// Try to demangle a symbol.
 SWIFT_RUNTIME_STDLIB_SPI char *
 _swift_backtrace_demangle(const char *mangledName,
                           size_t mangledNameLength,
