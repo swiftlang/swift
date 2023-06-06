@@ -2219,7 +2219,19 @@ StmtConditionElement *StmtConditionElement::walk(ASTWalker &walker) {
 }
 
 bool Decl::walk(ASTWalker &walker) {
-  return Traversal(walker).doIt(this);
+  bool failed = Traversal(walker).doIt(this);
+  if (failed || isa<MacroExpansionDecl>(this) ||
+      !walker.shouldWalkMacroArgumentsAndExpansion().second)
+    return failed;
+
+  // Walk into peer and conformance expansions if walking expansions
+  visitAuxiliaryDecls([&](Decl *D) {
+    if (failed)
+      return;
+    failed = D->walk(walker);
+  });
+
+  return failed;
 }
 
 bool GenericParamList::walk(ASTWalker &walker) {
