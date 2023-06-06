@@ -1606,11 +1606,13 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
 }
 
 void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
-  D->forEachExpandedExprOrStmt([&](ASTNode node) {
+  D->forEachExpandedNode([&](ASTNode node) {
     if (auto *expr = node.dyn_cast<Expr *>())
       emitIgnoredExpr(expr);
     else if (auto *stmt = node.dyn_cast<Stmt *>())
       emitStmt(stmt);
+    else
+      visit(node.get<Decl *>());
   });
 }
 

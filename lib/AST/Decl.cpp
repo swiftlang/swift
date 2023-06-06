@@ -10637,8 +10637,9 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
   return getRawDiscriminator();
 }
 
-void MacroExpansionDecl::forEachExpandedExprOrStmt(
-    ExprOrStmtExpansionCallback callback) const {
+void MacroExpansionDecl::forEachExpandedNode(
+    llvm::function_ref<void(ASTNode)> callback
+) const {
   auto mutableThis = const_cast<MacroExpansionDecl *>(this);
   auto bufferID = evaluateOrDefault(
       getASTContext().evaluator,
@@ -10650,8 +10651,7 @@ void MacroExpansionDecl::forEachExpandedExprOrStmt(
   auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
   auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
   for (auto node : sourceFile->getTopLevelItems())
-    if (node.is<Expr *>() || node.is<Stmt *>())
-      callback(node);
+    callback(node);
 }
 
 NominalTypeDecl *
