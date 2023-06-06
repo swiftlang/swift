@@ -179,7 +179,10 @@ public:
     /// they have a type variable originator.
     SolverAllocated = 0x8000,
 
-    Last_Property = SolverAllocated
+    /// This type contains a concrete pack.
+    HasConcretePack = 0x10000,
+
+    Last_Property = HasConcretePack
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -254,6 +257,8 @@ public:
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   bool hasParameterPack() const { return Bits & HasParameterPack; }
+
+  bool hasConcretePack() const { return Bits & HasConcretePack; }
 
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
@@ -412,12 +417,12 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+31,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+30,
     /// Type variable options.
     Options : 7,
     : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 31
+    ID : 30
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
@@ -683,6 +688,13 @@ public:
   bool hasParameterPack() const {
     return getRecursiveProperties().hasParameterPack();
   }
+
+  bool hasConcretePack() const {
+    return getRecursiveProperties().hasConcretePack();
+  }
+
+  /// Whether the type has some flavor of pack.
+  bool hasPack() const { return hasParameterPack() || hasConcretePack(); }
 
   /// Determine whether the type involves a parameterized existential type.
   bool hasParameterizedExistential() const {

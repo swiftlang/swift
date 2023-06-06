@@ -3797,7 +3797,21 @@ address of the allocated memory.
 
 ``alloc_pack`` is a stack allocation instruction.  See the section above
 on stack discipline.  The corresponding stack deallocation instruction is
-``dealloc_stack``.
+``dealloc_pack``.
+
+alloc_pack_metadata
+```````````````````
+
+::
+
+  sil-instruction ::= 'alloc_pack_metadata' $()
+
+Inserted as the last SIL lowering pass of IRGen, indicates that the next instruction
+may have on-stack pack metadata allocated on its behalf.
+
+Notionally, ``alloc_pack_metadata`` is a stack allocation instruction.  See the
+section above on stack discipline.  The corresponding stack deallocation
+instruction is ``dealloc_pack_metadata``.
 
 alloc_ref
 `````````
@@ -4054,6 +4068,23 @@ prior to being deallocated.
 
 ``dealloc_pack`` is a stack deallocation instruction.  See the section
 on Stack Discipline above.  The operand must be an ``alloc_pack``
+instruction.
+
+dealloc_pack_metadata
+`````````````````````
+
+::
+
+  sil-instruction ::= 'dealloc_pack_metadata' sil-operand
+
+  dealloc_pack_metadata $0 : $*()
+
+Inserted as the last SIL lowering pass of IRGen, indicates that the on-stack
+pack metadata emitted on behalf of its operand (actually on behalf of the
+instruction after its operand) must be cleaned up here.
+
+``dealloc_pack_metadata`` is a stack deallocation instruction.  See the section
+on Stack Discipline above.  The operand must be an ``alloc_pack_metadata``
 instruction.
 
 dealloc_box

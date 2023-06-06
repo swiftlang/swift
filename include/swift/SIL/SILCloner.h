@@ -892,6 +892,14 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   recordClonedInstruction(Inst, NewInst);
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitAllocPackMetadataInst(
+    AllocPackMetadataInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createAllocPackMetadata(
+                                    getOpLocation(Inst->getLoc())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAllocPackInst(AllocPackInst *Inst) {
@@ -2852,6 +2860,15 @@ SILCloner<ImplClass>::visitDeallocPackInst(DeallocPackInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createDeallocPack(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDeallocPackMetadataInst(
+    DeallocPackMetadataInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDeallocPackMetadata(
+                getOpLocation(Inst->getLoc()), Inst->getOperand()));
 }
 
 template<typename ImplClass>

@@ -925,6 +925,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::TestSpecificationInst:
     // Instruction exists only for tests.  Ignore it.
     return;
+  case SILInstructionKind::AllocPackMetadataInst:
+  case SILInstructionKind::DeallocPackMetadataInst:
+    // Shoulud never be serialized: only introduced in an IRGen pass
+    // (PackMetadataMarkerInserter).
+    return;
 
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UnreachableInst: {

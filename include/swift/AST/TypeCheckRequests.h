@@ -3204,19 +3204,15 @@ public:
 
 class UnresolvedMacroReference {
 private:
-  llvm::PointerUnion<MacroExpansionDecl *, MacroExpansionExpr *, CustomAttr *>
+  llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *>
     pointer;
 
 public:
-  UnresolvedMacroReference(MacroExpansionDecl *decl) : pointer(decl) {}
-  UnresolvedMacroReference(MacroExpansionExpr *expr) : pointer(expr) {}
+  UnresolvedMacroReference(FreestandingMacroExpansion *exp) : pointer(exp) {}
   UnresolvedMacroReference(CustomAttr *attr) : pointer(attr) {}
 
-  MacroExpansionDecl *getDecl() const {
-    return pointer.dyn_cast<MacroExpansionDecl *>();
-  }
-  MacroExpansionExpr *getExpr() const {
-    return pointer.dyn_cast<MacroExpansionExpr *>();
+  FreestandingMacroExpansion *getFreestanding() const {
+    return pointer.dyn_cast<FreestandingMacroExpansion *>();
   }
   CustomAttr *getAttr() const {
     return pointer.dyn_cast<CustomAttr *>();
