@@ -119,6 +119,11 @@ public:
   /// way to file a bug.
   void emitCheckedMissedCopyError(SILInstruction *copyInst);
 
+  /// Given a drop_deinit of self and an instruction reinitializing self,
+  /// emits an error saying that you cannot reinitialize self after a discard.
+  void emitReinitAfterDiscardError(SILInstruction *badReinit,
+                                   SILInstruction *dropDeinit);
+
   /// Assuming the given instruction represents the implicit destruction of
   /// 'self', emits an error saying that you needed to explicitly 'consume self'
   /// here because you're in a discarding context.
