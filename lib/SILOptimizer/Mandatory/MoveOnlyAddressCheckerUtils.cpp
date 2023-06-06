@@ -1300,6 +1300,10 @@ struct MoveOnlyAddressCheckerPImpl {
                    FieldSensitiveMultiDefPrunedLiveRange &liveness,
                    const FieldSensitivePrunedLivenessBoundary &boundary);
 
+  /// Identifies and diagnoses reinitializations that are reachable from a
+  /// discard statement.
+  void checkForReinitAfterDiscard();
+
   void handleSingleBlockDestroy(SILInstruction *destroy, bool isReinit);
 };
 
@@ -2629,6 +2633,80 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
 #endif
 }
 
+void MoveOnlyAddressCheckerPImpl::checkForReinitAfterDiscard() {
+  auto const &dropDeinits = addressUseState.dropDeinitInsts;
+  auto const &reinits = addressUseState.reinitInsts;
+
+  if (dropDeinits.empty() || reinits.empty())
+    return;
+
+  using BasicBlockMap = llvm::DenseMap<SILBasicBlock *,
+                                       llvm::SmallPtrSet<SILInstruction *, 2>>;
+  BasicBlockMap blocksWithReinit;
+  for (auto const &info : reinits) {
+    auto *reinit = info.first;
+    blocksWithReinit[reinit->getParent()].insert(reinit);
+  }
+
+  // Starting from each drop_deinit instruction, can we reach a reinit of self?
+  for (auto *dropInst : dropDeinits) {
+    auto *dropBB = dropInst->getParent();
+
+    // First, if the block containing this drop_deinit also contains a reinit,
+    // check if that reinit happens after this drop_deinit.
+    auto result = blocksWithReinit.find(dropBB);
+    if (result != blocksWithReinit.end()) {
+      auto &blockReinits = result->second;
+      for (auto ii = std::next(dropInst->getIterator()); ii != dropBB->end();
+           ++ii) {
+        SILInstruction *current = &*ii;
+        if (blockReinits.contains(current)) {
+          // Then the drop_deinit can reach a reinit immediately after it in the
+          // same block.
+          diagnosticEmitter.emitReinitAfterDiscardError(current, dropInst);
+          return;
+        }
+      }
+    }
+
+    BasicBlockWorklist worklist(fn);
+
+    // Seed the search with the successors of the drop_init block, so that if we
+    // visit the drop_deinit block again, we'll know the reinits _before_ the
+    // drop_deinit are reachable via some back-edge / cycle.
+    for (auto *succ : dropBB->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succ);
+
+    // Determine reachability across blocks.
+    while (auto *bb = worklist.pop()) {
+      // Set-up next iteration.
+      for (auto *succ : bb->getSuccessorBlocks())
+        worklist.pushIfNotVisited(succ);
+
+      auto result = blocksWithReinit.find(bb);
+      if (result == blocksWithReinit.end())
+        continue;
+
+      // We found a reachable reinit! Identify the earliest reinit in this block
+      // for diagnosis.
+      auto &blockReinits = result->second;
+      SILInstruction *firstBadReinit = nullptr;
+      for (auto &inst : *bb) {
+        if (blockReinits.contains(&inst)) {
+          firstBadReinit = &inst;
+          break;
+        }
+      }
+
+      if (!firstBadReinit)
+        llvm_unreachable("bug");
+
+      diagnosticEmitter.emitReinitAfterDiscardError(firstBadReinit, dropInst);
+      return;
+    }
+  }
+}
+
 bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     MarkMustCheckInst *markedAddress) {
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
@@ -2724,6 +2802,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
   insertDestroysOnBoundary(markedAddress, liveness, boundary);
+  checkForReinitAfterDiscard();
   rewriteUses(markedAddress, liveness, boundary);
 
   return true;

@@ -10,6 +10,7 @@ enum E: Error {
 }
 
 func globalConsumingFn(_ b: consuming Basics) {}
+func globalThrowingFn() throws {}
 
 struct Basics: ~Copyable {
   consuming func test1(_ b: Bool) {
@@ -439,6 +440,110 @@ struct Basics: ~Copyable {
 
     _ = consume self
     return
+  }
+
+
+  ////////////////////////////////////////
+  /// Checking for reinit-after-discard
+  ////////////////////////////////////////
+  consuming func reinitAfterDiscard1(_ c: Color) throws {
+    discard self // expected-note {{discarded self here}}
+    self = Basics() // expected-error {{cannot reinitialize 'self' after 'discard self'}}
+    _ = consume self
+  }
+
+  consuming func reinitAfterDiscard2_bad(_ c: Color) throws {
+    discard self // expected-note {{discarded self here}}
+
+    if case .red = c {
+      throw E.someError
+    }
+
+    self = Basics() // expected-error {{cannot reinitialize 'self' after 'discard self'}}
+    _ = consume self
+  }
+
+  consuming func reinitAfterDiscard2_ok(_ c: Color) throws {
+    if case .red = c {
+      discard self
+      throw E.someError
+    }
+
+    self = Basics()
+    _ = consume self
+  }
+
+  consuming func reinitAfterDiscard3_bad(_ c: Color) throws {
+    // expected-error@-1 {{must consume 'self' before exiting method that discards self}}
+    // FIXME: ^ this error is related to rdar://110239087
+
+    repeat {
+      self = Basics() // expected-error {{cannot reinitialize 'self' after 'discard self'}}
+      discard self // expected-note 2{{discarded self here}}
+    } while false
+  }
+
+  consuming func reinitAfterDiscard3_ok(_ c: Color) throws {
+    self = Basics()
+    discard self
+  }
+
+  consuming func reinitAfterDiscard4_bad(_ c: Color) throws {
+    do {
+      discard self // expected-note {{discarded self here}}
+      if case .red = c {
+        try globalThrowingFn()
+      }
+    } catch {
+      self = Basics() // expected-error {{cannot reinitialize 'self' after 'discard self'}}
+      _ = consume self
+    }
+  }
+
+  consuming func reinitAfterDiscard4_ok(_ c: Color) throws {
+    do {
+      if case .red = c {
+        try globalThrowingFn()
+      }
+      discard self
+    } catch {
+      self = Basics()
+      _ = consume self
+    }
+  }
+
+  consuming func reinitAfterDiscard4_ok_v2(_ c: Color) throws {
+    do {
+      if case .red = c {
+        try? globalThrowingFn()
+      }
+      discard self
+    } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+      self = Basics()
+      _ = consume self
+    }
+  }
+
+  // FIXME move checker is treating the defer like a closure capture (rdar://100468597)
+  // There is a different expected error here, where this reinit in a defer
+  // should be illegal because it's a reinit after discard.
+  consuming func reinitAfterDiscard5(_ c: Color) throws {
+    // expected-error@-1 {{'self' used after consume}}
+
+    defer { self = Basics() } // expected-note {{used here}}
+    discard self // expected-note {{consumed here}}
+  }
+
+  consuming func reinitAfterDiscard6(_ c: Color) throws {
+    self = Basics()
+    discard self // expected-note 3{{discarded self here}}
+    switch c {
+    case .red, .blue:
+      self = Basics()  // expected-error {{must consume 'self' before exiting method that discards self}}
+    default:
+      self = Basics()  // expected-error {{must consume 'self' before exiting method that discards self}}
+                       // expected-error@-1 {{cannot reinitialize 'self' after 'discard self'}}
+    }
   }
 
   mutating func mutator() { self = Basics() }

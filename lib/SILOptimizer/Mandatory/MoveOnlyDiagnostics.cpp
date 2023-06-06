@@ -191,6 +191,20 @@ void DiagnosticEmitter::emitCheckedMissedCopyError(SILInstruction *copyInst) {
            diag::sil_movechecking_bug_missed_copy);
 }
 
+void DiagnosticEmitter::emitReinitAfterDiscardError(SILInstruction *badReinit,
+                                                    SILInstruction *discard) {
+  assert(isa<DropDeinitInst>(discard));
+  assert(badReinit->getLoc() && "missing loc!");
+  assert(discard->getLoc() && "missing loc!");
+
+  diagnose(badReinit->getFunction()->getASTContext(),
+           badReinit,
+           diag::sil_movechecking_reinit_after_discard);
+
+  diagnose(discard->getFunction()->getASTContext(), discard,
+           diag::sil_movechecking_discard_self_here);
+}
+
 void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
     SILInstruction *leftoverDestroy,
     SILInstruction *discard) {
