@@ -547,12 +547,8 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // only users that modify memory are the copy_addr [initialization] and
   // destroy_addr.
   InstructionSetWithSize loadInsts(getFunction());
-  // Set of tempObj users
-  InstructionSet userSet(getFunction());
   for (auto *useOper : tempObj->getUses()) {
     SILInstruction *user = useOper->getUser();
-
-    userSet.insert(user);
 
     if (user == copyInst)
       continue;
@@ -578,20 +574,6 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
     if (!collectLoads(useOper, copyInst, loadInsts))
       return;
-  }
-
-  // Check and return without optimization if we have any users of tempObj that
-  // precede the copyInst.
-  // This can happen with projections.
-  // TODO: We can enable this case if we clone the projections at "load" uses
-
-  // All instructions in userSet are in the same block as copyInst. collectLoads
-  // ensures of this.
-  for (SILInstruction &inst : llvm::make_range(copyInst->getParent()->begin(),
-                                               copyInst->getIterator())) {
-    if (userSet.contains(&inst)) {
-      return;
-    }
   }
 
   AliasAnalysis *aa = getPassManager()->getAnalysis<AliasAnalysis>(getFunction());
