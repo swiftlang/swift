@@ -173,10 +173,7 @@ public:
     /// This type contains an ElementArchetype.
     HasElementArchetype = 0x4000,
 
-    /// This type contains a concrete pack.
-    HasConcretePack = 0x8000,
-
-    Last_Property = HasConcretePack
+    Last_Property = HasElementArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -245,8 +242,6 @@ public:
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   bool hasParameterPack() const { return Bits & HasParameterPack; }
-
-  bool hasConcretePack() const { return Bits & HasConcretePack; }
 
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
@@ -674,13 +669,6 @@ public:
   bool hasParameterPack() const {
     return getRecursiveProperties().hasParameterPack();
   }
-
-  bool hasConcretePack() const {
-    return getRecursiveProperties().hasConcretePack();
-  }
-
-  /// Whether the type has some flavor of pack.
-  bool hasPack() const { return hasParameterPack() || hasConcretePack(); }
 
   /// Determine whether the type involves a parameterized existential type.
   bool hasParameterizedExistential() const {
