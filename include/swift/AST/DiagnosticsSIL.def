@@ -778,6 +778,8 @@ ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       (StringRef))
 ERROR(sil_movechecking_discard_missing_consume_self, none,
       "must consume 'self' before exiting method that discards self", ())
+ERROR(sil_movechecking_reinit_after_discard, none,
+      "cannot reinitialize 'self' after 'discard self'", ())
 
 NOTE(sil_movechecking_discard_self_here, none,
      "discarded self here", ())
