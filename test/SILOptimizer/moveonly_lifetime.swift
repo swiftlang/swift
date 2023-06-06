@@ -38,9 +38,7 @@ func something()
 // CHECK:         apply [[BORROW_C]]([[INSTANCE]])
 //
 // TODO: Once we maximize lifetimes this should be below something.
-// CHECK:         [[DESTROY_C:%[^,]+]] = function_ref @$s17moveonly_lifetime1CVfD
-// CHECK:         [[INSTANCE:%.*]] = load [take] [[STACK]]
-// CHECK:         apply [[DESTROY_C]]([[INSTANCE]])
+// CHECK:         destroy_addr [[STACK]]
 //
 // CHECK:         [[SOMETHING:%[^,]+]] = function_ref @something
 // CHECK:         apply [[SOMETHING]]

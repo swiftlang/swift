@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -1249,8 +1250,7 @@ public:
     setLoweredExplosion(i, e);
   }
   void visitDropDeinitInst(DropDeinitInst *i) {
-    auto e = getLoweredExplosion(i->getOperand());
-    setLoweredExplosion(i, e);
+    llvm_unreachable("only valid in ownership SIL");
   }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
@@ -1853,6 +1853,11 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
       CurFn->addFnAttr(llvm::Attribute::SanitizeThread);
     }
   }
+
+  // If we have @_semantics("use_frame_pointer"), force the use of a
+  // frame pointer for this function.
+  if (f->hasSemanticsAttr(semantics::USE_FRAME_POINTER))
+    CurFn->addFnAttr("frame-pointer", "all");
 
   // Disable inlining of coroutine functions until we split.
   if (f->getLoweredFunctionType()->isCoroutine()) {

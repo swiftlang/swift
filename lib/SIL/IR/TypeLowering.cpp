@@ -1581,6 +1581,19 @@ namespace {
       return B.createStruct(loc, getLoweredType(), values);
     }
 
+    void
+    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
+                            TypeExpansionKind loweringStyle) const override {
+      // A value type with a deinit cannot be memberwise destroyed.
+      if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
+        if (nominal->getValueTypeDestructor()) {
+          emitDestroyValue(B, loc, aggValue);
+          return;
+        }
+      }
+      Super::emitLoweredDestroyValue(B, loc, aggValue, loweringStyle);
+    }
+
   private:
     void lowerChildren(TypeConverter &TC,
                        SmallVectorImpl<Child> &children) const override {

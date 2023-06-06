@@ -1,4 +1,4 @@
-//===--- MoveOnlyDeinitInsertion.cpp --------------------------------------===//
+//===--- MoveOnlyDeinitDevirtualization.cpp --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,6 +14,13 @@
 ///
 /// This pass runs after move only checking has occurred and transforms last
 /// destroy_value of move only types into a call to the move only types deinit.
+///
+/// TODO: This pass is disabled because it hides bugs in the common case in
+/// which optimization passes incorrectly remove the deinit, for example, by
+/// destructuring the aggregate rather than destroying it as a whole. Consider
+/// reeabling this pass later in the pipeline, after all other OSSA function
+/// passes have run. Also consider removing bailouts from this pass. If it's
+/// possible to devirtualize, then it should do it.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -143,7 +150,7 @@ static bool performTransform(SILFunction &fn) {
 
 namespace {
 
-class SILMoveOnlyDeinitInsertionPass : public SILFunctionTransform {
+class SILMoveOnlyDeinitDevirtualizationPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
@@ -153,7 +160,7 @@ class SILMoveOnlyDeinitInsertionPass : public SILFunctionTransform {
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
-    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Deinit Insertion. Visiting: "
+    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Deinit Devirtualization. Visiting: "
                             << fn->getName() << '\n');
     if (performTransform(*fn)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
@@ -163,6 +170,6 @@ class SILMoveOnlyDeinitInsertionPass : public SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createMoveOnlyDeinitInsertion() {
-  return new SILMoveOnlyDeinitInsertionPass();
+SILTransform *swift::createMoveOnlyDeinitDevirtualization() {
+  return new SILMoveOnlyDeinitDevirtualizationPass();
 }
