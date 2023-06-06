@@ -832,7 +832,7 @@ static bool isValueTrivial(SILValue value, SILFunction *function) {
       continue;
 
     // MoveOnly types may have a user-defined deinit.
-    if (v->getType().isPureMoveOnly())
+    if (hasValueDeinit(v))
       return false;
 
     if (isa<StructInst>(v) || isa<TupleInst>(v)) {
@@ -870,7 +870,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
 
     // retain_value of an enum_inst where we know that it has a payload can be
     // reduced to a retain_value on the payload.
-    if (EI->hasOperand() && !hasValueDeinit(EI)) {
+    if (EI->hasOperand()) {
       return Builder.createReleaseValue(RVI->getLoc(), EI->getOperand(),
                                         RVI->getAtomicity());
     }
