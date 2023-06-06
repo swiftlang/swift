@@ -1270,10 +1270,15 @@ void AssignOrInitInst::markAsInitialized(VarDecl *property) {
   auto toInitProperties = getInitializedProperties();
   for (unsigned index : indices(toInitProperties)) {
     if (toInitProperties[index] == property) {
-      Assignments.set(index);
+      markAsInitialized(index);
       break;
     }
   }
+}
+
+void AssignOrInitInst::markAsInitialized(unsigned propertyIdx) {
+  assert(propertyIdx < getNumInitializedProperties());
+  Assignments.set(propertyIdx);
 }
 
 bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {

@@ -4989,6 +4989,7 @@ public:
   /// Mark a property from `initializes(...)` list as initialized
   /// before this instruction.
   void markAsInitialized(VarDecl *property);
+  void markAsInitialized(unsigned propertyIdx);
 
   /// Check whether a property from `initializes(...)` list with
   /// the given index has already been initialized and requires

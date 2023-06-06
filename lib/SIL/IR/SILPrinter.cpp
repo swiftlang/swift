@@ -1771,6 +1771,7 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
+
     *this << getIDAndType(AI->getDest())
           << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
@@ -1787,6 +1788,14 @@ public:
       *this << "[set] ";
       break;
     }
+
+    // Print all of the properties that have been previously initialized.
+    for (unsigned i = 0, n = AI->getNumInitializedProperties(); i != n; ++i) {
+      if (AI->isPropertyAlreadyInitialized(i)) {
+        *this << "[assign=" << i << "] ";
+      }
+    }
+
     *this << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
