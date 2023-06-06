@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature InitAccessors %s | %FileCheck %s
+// RUN: %target-swift-frontend -Onone -emit-sil -enable-experimental-feature InitAccessors %s | %FileCheck %s
+
+// REQUIRES: asserts
 
 struct TestInit {
   var x: Int
@@ -66,7 +68,7 @@ struct TestSetter {
   // CHECK-LABEL: sil hidden @$s14init_accessors10TestSetterV1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestSetter.Type) -> TestSetter
   // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors10TestSetterV5pointSi_Sitvs : $@convention(method) (Int, Int, @inout TestSetter) -> ()
   // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, Int, @inout TestSetter) -> ()
-  // CHECk-NEXT: %18 = apply [[SETTER_CLOSURE]](%0, %1) : $@callee_guaranteed (Int, Int) -> ()
+  // CHECK-NEXT: {{.*}} = apply [[SETTER_CLOSURE]](%0, %1) : $@callee_guaranteed (Int, Int) -> ()
   init(x: Int, y: Int) {
     self.x = x
     self.y = y
