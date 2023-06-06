@@ -24,7 +24,8 @@ func invokedDeinit() {}
   // CHECK:    store {{.*}} to [init]
   // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*MaybeFile
   // CHECK:    [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*MaybeFile
-  // CHECK:    switch_enum [[SELF_VAL]] : $MaybeFile, case #MaybeFile.some!enumelt: bb1, case #MaybeFile.none!enumelt: bb2
+  // CHECK:    [[DD:%.*]] = drop_deinit [[SELF_VAL]] : $MaybeFile
+  // CHECK:    switch_enum [[DD]] : $MaybeFile, case #MaybeFile.some!enumelt: bb1, case #MaybeFile.none!enumelt: bb2
   //
   // CHECK:  bb1([[FILE:%.*]] : @owned $File):
   // CHECK:    destroy_value [[FILE]] : $File
@@ -52,7 +53,8 @@ func invokedDeinit() {}
   // CHECK:  load_borrow {{.*}} : $*File
   // CHECK:  [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*File
   // CHECK:  [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*File
-  // CHECK:  end_lifetime [[SELF_VAL]] : $File
+  // CHECK:  [[DD:%.*]] = drop_deinit [[SELF_VAL]] : $File
+  // CHECK:  end_lifetime [[DD]] : $File
 
   deinit {
     invokedDeinit()
@@ -68,6 +70,8 @@ func invokedDeinit() {}
   consuming func tryDestroy(doDiscard: Bool) throws {
     if doDiscard {
       discard self
+    } else {
+     _ = consume self
     }
     throw E.err
   }
@@ -85,7 +89,8 @@ func invokedDeinit() {}
 // CHECK:     [[MMC:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]] : $*PointerTree
 // CHECK:     [[COPIED_SELF:%.*]] = load [copy] [[MMC]] : $*PointerTree
 // CHECK:     end_access [[ACCESS]] : $*PointerTree
-// CHECK:     end_lifetime [[COPIED_SELF]]
+// CHECK:     [[DD:%.*]] = drop_deinit [[COPIED_SELF]]
+// CHECK:     end_lifetime [[DD]]
 // CHECK:     br bb3
 //
 // CHECK:   bb2:
@@ -136,34 +141,31 @@ final class Wallet {
 
   consuming func changeTicket(inWallet wallet: Wallet? = nil) {
     if let existingWallet = wallet {
-      discard self
       self = .within(existingWallet)
+      _ = consume self
+    } else {
+      discard self
     }
   }
-  // As of now, we allow reinitialization after discard. Not sure if this is intended.
+
   // CHECK-LABEL: sil hidden [ossa] @$s4test6TicketO06changeB08inWalletyAA0E0CSg_tF : $@convention(method) (@guaranteed Optional<Wallet>, @owned Ticket) -> () {
   // CHECK:    [[SELF_REF:%.*]] = project_box [[SELF_BOX:%.*]] : ${ var Ticket }, 0
-  // CHECK:    switch_enum {{.*}} : $Optional<Wallet>, case #Optional.some!enumelt: [[HAVE_WALLET_BB:bb.*]], case #Optional.none!enumelt: {{.*}}
+  // CHECK:    switch_enum {{.*}} : $Optional<Wallet>, case #Optional.some!enumelt: {{.*}}, case #Optional.none!enumelt: [[NO_WALLET_BB:bb[0-9]+]]
   //
   // >> now we begin the destruction sequence, which involves pattern matching on self to destroy its innards
-  // CHECK:  [[HAVE_WALLET_BB]]({{%.*}} : @owned $Wallet):
+  // CHECK:  [[NO_WALLET_BB]]
   // CHECK:    [[SELF_ACCESS:%.*]] = begin_access [read] [unknown] {{%.*}} : $*Ticket
   // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_ACCESS]]
   // CHECK:    [[SELF_COPY:%.*]] = load [copy] [[SELF_MMC]] : $*Ticket
   // CHECK:    end_access [[SELF_ACCESS:%.*]] : $*Ticket
-  // CHECK:    switch_enum [[SELF_COPY]] : $Ticket, case #Ticket.empty!enumelt: [[TICKET_EMPTY:bb[0-9]+]], case #Ticket.within!enumelt: [[TICKET_WITHIN:bb[0-9]+]]
+  // CHECK:    [[DD:%.*]] = drop_deinit [[SELF_COPY]] : $Ticket
+  // CHECK:    switch_enum [[DD]] : $Ticket, case #Ticket.empty!enumelt: [[TICKET_EMPTY:bb[0-9]+]], case #Ticket.within!enumelt: [[TICKET_WITHIN:bb[0-9]+]]
   // CHECK:  [[TICKET_EMPTY]]:
   // CHECK:    br [[JOIN_POINT:bb[0-9]+]]
   // CHECK:  [[TICKET_WITHIN]]([[PREV_SELF_WALLET:%.*]] : @owned $Wallet):
   // CHECK:    destroy_value [[PREV_SELF_WALLET]] : $Wallet
   // CHECK:    br [[JOIN_POINT]]
-  // >> from here on we are reinitializing self.
   // CHECK:  [[JOIN_POINT]]:
-  // CHECK:    [[NEW_SELF_VAL:%.*]] = enum $Ticket, #Ticket.within!enumelt, {{.*}} : $Wallet
-  // CHECK:    [[SELF_ACCESS2:%.*]] = begin_access [modify] [unknown] [[SELF_REF]] : $*Ticket
-  // CHECK:    [[SELF_MMC2:%.*]] = mark_must_check [assignable_but_not_consumable] [[SELF_ACCESS2]] : $*Ticket
-  // CHECK:    assign [[NEW_SELF_VAL]] to [[SELF_MMC2]] : $*Ticket
-  // CHECK:    end_access [[SELF_ACCESS2]] : $*Ticket
 
   deinit {
     print("destroying ticket")

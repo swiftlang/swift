@@ -1248,6 +1248,10 @@ public:
     auto e = getLoweredExplosion(i->getOperand());
     setLoweredExplosion(i, e);
   }
+  void visitDropDeinitInst(DropDeinitInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
   }

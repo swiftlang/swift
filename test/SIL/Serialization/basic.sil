@@ -23,6 +23,11 @@ struct Int32 {
 
 struct EmptyStruct {}
 
+@_moveOnly struct MoveOnlyStruct {
+  @_hasStorage var i: Int32
+  deinit
+}
+
 // CHECK-LABEL: sil @async_test : $@convention(thin) @async
 sil @async_test : $@async () -> () {
 bb0:
@@ -42,6 +47,17 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2)
   (%4, %5, %6) = destructure_struct %1 : $TestArray2
   %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
   return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+// CHECK-LABEL: sil [ossa] @test_drop_deinit :
+// CHECK:         %1 = drop_deinit %0 : $MoveOnlyStruct
+// CHECK-LABEL: } // end sil function 'test_drop_deinit'
+sil [ossa] @test_drop_deinit : $@convention(thin) (@owned MoveOnlyStruct) -> () {
+bb0(%0 : @owned $MoveOnlyStruct):
+  %1 = drop_deinit %0 : $MoveOnlyStruct
+  destroy_value %1 : $MoveOnlyStruct
+  %3 = tuple ()
+  return %3 : $()
 }
 
 sil @test_empty_destructure : $@convention(thin) () -> () {
