@@ -136,3 +136,40 @@ func test_duplicate_and_computed_lazy_properties() {
     lazy var c: Int = 42
   }
 }
+
+func test_invalid_self_uses() {
+  func capture<T>(_: T) -> Int? { nil }
+
+  struct Test {
+    var a: Int {
+      init(initialValue) {
+        let x = self
+        // expected-error@-1 {{'self' within init accessors can only be used to reference properties listed in 'initializes' and 'accesses'; init accessors are run before 'self' is fully available}}
+
+        _ = {
+          print(self)
+          // expected-error@-1 {{'self' within init accessors can only be used to reference properties listed in 'initializes' and 'accesses'; init accessors are run before 'self' is fully available}}
+        }
+
+        _ = { [weak self] in
+          // expected-error@-1 {{'self' within init accessors can only be used to reference properties listed in 'initializes' and 'accesses'; init accessors are run before 'self' is fully available}}
+        }
+
+        _ = {
+          guard let _ = capture(self) else {
+            // expected-error@-1 {{'self' within init accessors can only be used to reference properties listed in 'initializes' and 'accesses'; init accessors are run before 'self' is fully available}}
+            return
+          }
+        }
+
+        Test.test(self)
+        // expected-error@-1 {{'self' within init accessors can only be used to reference properties listed in 'initializes' and 'accesses'; init accessors are run before 'self' is fully available}}
+      }
+
+      get { 42 }
+      set { }
+    }
+
+    static func test<T>(_: T) {}
+  }
+}

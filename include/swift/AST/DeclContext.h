@@ -82,6 +82,7 @@ namespace swift {
   class SerializedDefaultArgumentInitializer;
   class SerializedTopLevelCodeDecl;
   class StructDecl;
+  class AccessorDecl;
 
 namespace serialization {
 using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
@@ -455,6 +456,18 @@ public:
   AbstractFunctionDecl *getInnermostMethodContext();
   const AbstractFunctionDecl *getInnermostMethodContext() const {
     return const_cast<DeclContext*>(this)->getInnermostMethodContext();
+  }
+
+  /// Returns the innermost accessor context that belongs to a property.
+  ///
+  /// This routine looks through closure, initializer, and local function
+  /// contexts to find the innermost accessor declaration.
+  ///
+  /// \returns the innermost accessor, or null if there is no such context.
+  LLVM_READONLY
+  AccessorDecl *getInnermostPropertyAccessorContext();
+  const AccessorDecl *getInnermostPropertyAccessorContext() const {
+    return const_cast<DeclContext*>(this)->getInnermostPropertyAccessorContext();
   }
 
   /// Returns the innermost type context.
