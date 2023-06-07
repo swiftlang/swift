@@ -98,6 +98,23 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS glibc_modulemap)
 
+add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      WASI.swift.gyb
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS WASI
+    INSTALL_IN_COMPONENT sdk-overlay
+    DEPENDS glibc_modulemap)
+
+
 if(WASI IN_LIST SWIFT_SDKS)
   set(arch_subdir "${SWIFT_SDK_WASI_LIB_SUBDIR}/wasm32")
   set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
@@ -202,23 +219,31 @@ add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
-  if(NOT "${sdk}" STREQUAL "LINUX" AND
-     NOT "${sdk}" STREQUAL "FREEBSD" AND
-     NOT "${sdk}" STREQUAL "OPENBSD" AND
-     NOT "${sdk}" STREQUAL "ANDROID" AND
-     NOT "${sdk}" STREQUAL "CYGWIN" AND
-     NOT "${sdk}" STREQUAL "HAIKU")
+  if("${sdk}" STREQUAL "LINUX" OR
+     "${sdk}" STREQUAL "FREEBSD" OR
+     "${sdk}" STREQUAL "OPENBSD" OR
+     "${sdk}" STREQUAL "ANDROID" OR
+     "${sdk}" STREQUAL "CYGWIN" OR
+     "${sdk}" STREQUAL "HAIKU")
+    set(glibc_modulemap_source "glibc.modulemap.gyb")
+    set(glibc_header_source "SwiftGlibc.h.gyb")
+  elseif("${sdk}" STREQUAL "WASI")
+    set(glibc_modulemap_source "wasi.modulemap.gyb")
+    set(glibc_header_source "SwiftWASILibc.h.gyb")
+  else()
     continue()
   endif()
+
+  string(REGEX REPLACE "\\.gyb$" "" glibc_modulemap_outname "${glibc_modulemap_source}")
+  string(REGEX REPLACE "\\.gyb$" "" glibc_header_outname "${glibc_header_source}")
 
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
 
-    set(glibc_modulemap_source "glibc.modulemap.gyb")
-    set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
-    set(glibc_modulemap_out_static "${module_dir_static}/glibc.modulemap")
+    set(glibc_modulemap_out "${module_dir}/${glibc_modulemap_outname}")
+    set(glibc_modulemap_out_static "${module_dir_static}/${glibc_modulemap_outname}")
 
     # Configure the module map based on the target. Each platform needs to
     # reference different headers, based on what's available in their glibc.
@@ -232,10 +257,10 @@ foreach(sdk ${SWIFT_SDKS})
 
     list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
 
-    set(glibc_header_out "${module_dir}/SwiftGlibc.h")
-    set(glibc_header_out_static "${module_dir_static}/SwiftGlibc.h")
+    set(glibc_header_out "${module_dir}/${glibc_header_outname}")
+    set(glibc_header_out_static "${module_dir_static}/${glibc_header_outname}")
     handle_gyb_source_single(glibc_header_target
-        SOURCE "SwiftGlibc.h.gyb"
+        SOURCE "${glibc_header_source}"
         OUTPUT "${glibc_header_out}"
         FLAGS "-DCMAKE_SDK=${sdk}")
     list(APPEND glibc_modulemap_target_list ${glibc_header_target})
@@ -266,7 +291,7 @@ foreach(sdk ${SWIFT_SDKS})
     # prefix. This is the one we'll install instead.
     if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/" AND
        NOT (${sdk} STREQUAL ANDROID AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
-      set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
+      set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/${glibc_modulemap_outname}")
 
       handle_gyb_source_single(glibc_modulemap_native_target
         SOURCE "${glibc_modulemap_source}"
