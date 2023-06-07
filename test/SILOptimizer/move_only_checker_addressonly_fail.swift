@@ -16,6 +16,8 @@ func test1<T>(_ x: T) {
     //
     // An earlier change, I believe made it so that SILGen did not emit these
     // unchecked_addr_cast.
-    consumeValue(x2) // expected-error {{usage of no-implicit-copy value that the compiler can't verify.}}
-    consumeValue(x2) // expected-error {{usage of no-implicit-copy value that the compiler can't verify.}}
+    consumeValue(x2) // expected-error {{'x2' is borrowed and cannot be consumed}}
+    // expected-note @-1 {{consumed here}}
+    consumeValue(x2) // expected-error {{'x2' is borrowed and cannot be consumed}}
+    // expected-note @-1 {{consumed here}}
 }

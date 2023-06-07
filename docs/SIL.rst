@@ -8460,6 +8460,33 @@ need for the guaranteed form in the future.
   @moveOnly trivial type, we convert from the non-trivial representation to the
   trivial representation.
 
+copyable_to_moveonlywrapper_addr
+````````````````````````````````
+::
+
+  sil-instruction ::= 'copyable_to_moveonlywrapper_addr'
+
+`copyable_to_moveonlywrapper_addr`_ takes in a '*T' and maps it to a move only
+wrapped '*@moveOnly T'. This is semantically used by a code generator
+initializing a new moveOnly binding from a copyable value. It semantically acts
+as an address cast. If one thinks of '@moveOnly' as a monad, this is how one
+injects a copyable value into the move only space.
+
+moveonlywrapper_to_copyable_addr
+````````````````````````````````
+::
+
+  sil-instruction ::= 'moveonlywrapper_to_copyable_addr'
+
+`moveonlywrapper_to_copyable_addr`_ takes in a '*@moveOnly T' and produces a new
+'*T' value. This instruction acts like an address cast that projects out the
+underlying T from an @moveOnly T.
+
+NOTE: From the perspective of the address checker, a trivial `load`_ with a
+`moveonlywrapper_to_copyable_addr`_ operand is considered to be a use of a
+noncopyable type.
+
+
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
 

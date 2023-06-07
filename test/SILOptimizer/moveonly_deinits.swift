@@ -19,9 +19,6 @@ struct MoveOnlyStruct {
         y = self
         // expected-note @-1 {{consumed here}}
         // expected-note @-2 {{consumed again here}}
-        // We get an infinite recursion since we are going to call our own
-        // deinit here. We are just testing diagnostics here though.
-        // expected-warning @-6 {{function call causes an infinite recursion}}
         _ = y
         // expected-note @-1 {{consumed here}}
         let z = y // expected-note {{consumed again here}}
@@ -45,9 +42,6 @@ enum MoveOnlyEnum {
         var y = MoveOnlyEnum.lhs(Klass())
         y = self // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
-        // We get an infinite recursion since we are going to call our own
-        // deinit here. We are just testing diagnostics here though.
-        // expected-warning @-5 {{function call causes an infinite recursion}}
         _ = y 
         globalMoveOnlyEnum = self // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}

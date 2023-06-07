@@ -832,7 +832,7 @@ static bool isValueTrivial(SILValue value, SILFunction *function) {
       continue;
 
     // MoveOnly types may have a user-defined deinit.
-    if (v->getType().isPureMoveOnly())
+    if (hasValueDeinit(v))
       return false;
 
     if (isa<StructInst>(v) || isa<TupleInst>(v)) {
@@ -857,6 +857,10 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
 
   SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand->getType();
+
+  // Do not remove a release that calls a value deinit.
+  if (hasValueDeinit(OperandTy))
+    return nullptr;
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {

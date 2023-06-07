@@ -879,6 +879,12 @@ namespace {
         return SGF.B.createStructExtract(loc, base, Field);
       }
 
+      // If we have a moveonlywrapped type, unwrap it. The reason why is that
+      // any fields that we access we want to be treated as copyable.
+      if (base.getType().isMoveOnlyWrapped())
+        base = ManagedValue::forLValue(
+            SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, base.getValue()));
+
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
                                                Field, SubstFieldType);
@@ -4174,8 +4180,17 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
-    if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
-      return ManagedValue::forUnmanaged(addr);
+    if (isPlusZeroOk) {
+      SILType rvalueType = rvalueTL.getLoweredType();
+      SILType addrType = addrTL.getLoweredType();
+      if (!rvalueType.isMoveOnlyWrapped() && addrType.isMoveOnlyWrapped()) {
+        SILValue value = B.createMoveOnlyWrapperToCopyableAddr(loc, addr);
+        return ManagedValue::forUnmanaged(value);
+      }
+      if (rvalueTL.getLoweredType() == addrTL.getLoweredType()) {
+        return ManagedValue::forUnmanaged(addr);
+      }
+    }
 
     // Copy the address-only value.
     return B.bufferForExpr(
@@ -4514,19 +4529,29 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
     return;
   }
 
-  // Then see if our source address was a move only type and our dest was
+  // Then see if our source address was a moveonlywrapped type and our dest was
   // not. In such a case, just cast away the move only and perform a
   // copy_addr. We are going to error on this later after SILGen.
   if (srcTL.getLoweredType().removingMoveOnlyWrapper() ==
       destTL.getLoweredType().removingMoveOnlyWrapper()) {
     // In such a case, for now emit B.createCopyAddr. In the future, insert the
     // address version of moveonly_to_copyable.
-    if (src->getType().isMoveOnlyWrapped())
-      src = B.createUncheckedAddrCast(
-          loc, src, srcTL.getLoweredType().removingMoveOnlyWrapper());
-    if (dest->getType().isMoveOnlyWrapped())
-      dest = B.createUncheckedAddrCast(
-          loc, dest, destTL.getLoweredType().removingMoveOnlyWrapper());
+    if (src->getType().isMoveOnlyWrapped()) {
+      // If we have a take, we are performing an owned usage of our src addr. If
+      // we aren't taking, then we can use guaranteed.
+      if (isTake) {
+        src = B.createMoveOnlyWrapperToCopyableAddr(loc, src);
+      } else {
+        src = B.createMoveOnlyWrapperToCopyableAddr(loc, src);
+      }
+    }
+    if (dest->getType().isMoveOnlyWrapped()) {
+      if (isInit) {
+        dest = B.createMoveOnlyWrapperToCopyableAddr(loc, dest);
+      } else {
+        dest = B.createMoveOnlyWrapperToCopyableAddr(loc, dest);
+      }
+    }
     B.createCopyAddr(loc, src, dest, isTake, isInit);
     return;
   }
@@ -4543,24 +4568,27 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
                                        IsInitialization_t isInit) {
   assert(destTL.getLoweredType().getAddressType() == dest->getType());
 
-  // If our rvalue is a move only value, insert a moveonly_to_copyable
-  // instruction. This type must have come from the usage of an @_noImplicitCopy
-  // or @_isNoEscape. We rely on the relevant checkers at the SIL level to
-  // validate that this is safe to do. SILGen is just leaving in crumbs to be
-  // checked.
-  //
-  // TODO: For now we are only supporting objects since we are setup to handle
-  // lets when opaque values are enabled. We may also in the future support
-  // vars. If we do that before opaque values are enabled, we will use it to
-  // also handle address only lets.
-  if (rvalue->getType().isMoveOnlyWrapped() && rvalue->getType().isObject()) {
-    rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
+  if (rvalue->getType().isMoveOnlyWrapped()) {
+
+    // If our rvalue is a moveonlywrapped value, insert a moveonly_to_copyable
+    // instruction. We rely on the relevant checkers at the SIL level to
+    // validate that this is safe to do. SILGen is just leaving in crumbs to be
+    // checked.
+    if (rvalue->getType().isObject())
+      rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
+    else
+      rvalue = B.createMoveOnlyWrapperToCopyableAddr(loc, rvalue);
+  }
+
+  // If our dest is a moveonlywrapped address, unwrap it.
+  if (dest->getType().isMoveOnlyWrapped()) {
+    dest = B.createMoveOnlyWrapperToCopyableAddr(loc, dest);
   }
 
   // Easy case: the types match.
-  if (rvalue->getType() == destTL.getLoweredType()) {
-    assert(!silConv.useLoweredAddresses()
-           || (destTL.isAddressOnly() == rvalue->getType().isAddress()));
+  if (rvalue->getType().getObjectType() == dest->getType().getObjectType()) {
+    assert(!silConv.useLoweredAddresses() ||
+           (dest->getType().isAddressOnly(F) == rvalue->getType().isAddress()));
     if (rvalue->getType().isAddress()) {
       B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
     } else {
@@ -5102,6 +5130,12 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   UnenforcedAccess access;
   SILValue accessAddress =
     access.beginAccess(*this, loc, destAddr, SILAccessKind::Modify);
+
+  if (srcAddr->getType().isMoveOnlyWrapped())
+    srcAddr = B.createMoveOnlyWrapperToCopyableAddr(loc, srcAddr);
+  if (accessAddress->getType().isMoveOnlyWrapped())
+    accessAddress = B.createMoveOnlyWrapperToCopyableAddr(loc, accessAddress);
+
   B.createCopyAddr(loc, srcAddr, accessAddress, IsNotTake, IsInitialization);
   access.endAccess(*this);
 

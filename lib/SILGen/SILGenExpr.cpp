@@ -6158,11 +6158,18 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
     auto optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
     SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
-    if (address.getType().isMoveOnly()) {
-      SGF.B.createCopyAddr(subExpr, address.getLValueAddress(), toAddr, IsNotTake,
+    SILValue fromAddr = address.getLValueAddress();
+    bool isMoveOnly = fromAddr->getType().isMoveOnly() ||
+                      isa<MoveOnlyWrapperToCopyableAddrInst>(fromAddr);
+    if (toAddr->getType().isMoveOnlyWrapped())
+      toAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(subExpr, toAddr);
+    if (isMoveOnly) {
+      if (fromAddr->getType().isMoveOnlyWrapped())
+        fromAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(subExpr, fromAddr);
+      SGF.B.createCopyAddr(subExpr, fromAddr, toAddr, IsNotTake,
                            IsInitialization);
     } else {
-      SGF.B.createMarkUnresolvedMoveAddr(subExpr, address.getLValueAddress(), toAddr);
+      SGF.B.createMarkUnresolvedMoveAddr(subExpr, fromAddr, toAddr);
     }
     optTemp->finishInitialization(SGF);
 
@@ -6203,8 +6210,15 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
       SGF.emitRValue(subExpr, SGFContext(SGFContext::AllowImmediatePlusZero))
           .getAsSingleValue(SGF, subExpr);
   assert(mv.getType().isAddress());
-  if (mv.getType().isMoveOnly()) {
-    SGF.B.createCopyAddr(subExpr, mv.getValue(), toAddr, IsNotTake,
+  bool isMoveOnly = mv.getType().isMoveOnly() ||
+                    isa<MoveOnlyWrapperToCopyableAddrInst>(mv.getValue());
+  SILValue fromAddr = mv.getValue();
+  if (toAddr->getType().isMoveOnlyWrapped())
+    toAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(subExpr, toAddr);
+  if (isMoveOnly) {
+    if (fromAddr->getType().isMoveOnlyWrapped())
+      fromAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(subExpr, fromAddr);
+    SGF.B.createCopyAddr(subExpr, fromAddr, toAddr, IsNotTake,
                          IsInitialization);
   } else {
     SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
@@ -6229,6 +6243,13 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
       // above.
       ManagedValue value = SGF.B.createFormalAccessLoadBorrow(E, address);
 
+      if (value.getType().isMoveOnlyWrapped()) {
+        value = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(E, value);
+        // If we have a trivial value after unwrapping, just return that.
+        if (value.getType().isTrivial(SGF.F))
+          return RValue(SGF, {value}, subType.getASTType());
+      }
+
       // We purposely, use a lexical cleanup here so that the cleanup lasts
       // through the formal evaluation scope.
       ManagedValue copy = SGF.B.createExplicitCopyValue(E, value);
@@ -6238,8 +6259,13 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
 
     auto optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
     SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
-    SGF.B.createExplicitCopyAddr(subExpr, address.getLValueAddress(), toAddr,
-                                 IsNotTake, IsInitialization);
+    if (toAddr->getType().isMoveOnlyWrapped())
+      toAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(E, toAddr);
+    SILValue fromAddr = address.getLValueAddress();
+    if (fromAddr->getType().isMoveOnlyWrapped())
+      fromAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(E, fromAddr);
+    SGF.B.createExplicitCopyAddr(subExpr, fromAddr, toAddr, IsNotTake,
+                                 IsInitialization);
     optTemp->finishInitialization(SGF);
     return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
   }
@@ -6248,7 +6274,24 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
       return RValue(SGF, {mv}, subType.getASTType());
-    mv = SGF.B.createExplicitCopyValue(E, mv);
+    {
+      // We use a formal evaluation scope so we tightly scope the formal access
+      // borrow below.
+      FormalEvaluationScope scope(SGF);
+      if (mv.getType().isMoveOnlyWrapped()) {
+        if (mv.getOwnershipKind() != OwnershipKind::Guaranteed)
+          mv = mv.formalAccessBorrow(SGF, E);
+        mv = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(E, mv);
+      }
+
+      // Only perform the actual explicit_copy_value if we do not have a trivial
+      // type.
+      //
+      // DISCUSSION: We can only get a trivial type if we have a moveonlywrapped
+      // type of a trivial type.
+      if (!mv.getType().isTrivial(SGF.F))
+        mv = SGF.B.createExplicitCopyValue(E, mv);
+    }
     return RValue(SGF, {mv}, subType.getASTType());
   }
 
@@ -6264,7 +6307,12 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
       SGF.emitRValue(subExpr, SGFContext(SGFContext::AllowImmediatePlusZero))
           .getAsSingleValue(SGF, subExpr);
   assert(mv.getType().isAddress());
-  SGF.B.createExplicitCopyAddr(subExpr, mv.getValue(), toAddr, IsNotTake,
+  if (toAddr->getType().isMoveOnlyWrapped())
+    toAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(E, toAddr);
+  SILValue fromAddr = mv.getValue();
+  if (fromAddr->getType().isMoveOnlyWrapped())
+    fromAddr = SGF.B.createMoveOnlyWrapperToCopyableAddr(E, fromAddr);
+  SGF.B.createExplicitCopyAddr(subExpr, fromAddr, toAddr, IsNotTake,
                                IsInitialization);
   optTemp->finishInitialization(SGF);
   return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());

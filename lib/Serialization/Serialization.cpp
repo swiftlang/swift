@@ -1150,7 +1150,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
         options_block::CompilerPluginExecutablePathLayout
           CompilerPluginExecutablePath(Out);
-        for (auto Arg : options.CompilerPluginLibraryPaths) {
+        for (auto Arg : options.CompilerPluginExecutablePaths) {
           CompilerPluginExecutablePath.emit(ScratchRecord, Arg);
         }
       }
@@ -5645,6 +5645,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
+  registerDeclTypeAbbr<SILMoveOnlyWrappedTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();

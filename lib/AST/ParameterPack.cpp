@@ -29,12 +29,13 @@ namespace {
 
 /// Collects all unique pack type parameters referenced from the pattern type,
 /// skipping those captured by nested pack expansion types.
-struct PackTypeParameterCollector: TypeWalker {
-  llvm::SetVector<Type> typeParams;
+struct PackReferenceCollector: TypeWalker {
+  llvm::function_ref<bool (Type)> fn;
   unsigned expansionLevel;
   SmallVector<unsigned, 2> elementLevel;
 
-  PackTypeParameterCollector() : expansionLevel(0) {
+  PackReferenceCollector(llvm::function_ref<bool (Type)> fn)
+    : fn(fn), expansionLevel(0) {
     elementLevel.push_back(0);
   }
 
@@ -72,12 +73,8 @@ struct PackTypeParameterCollector: TypeWalker {
     }
 
     if (elementLevel.back() == expansionLevel) {
-      if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-        if (paramTy->isParameterPack())
-          typeParams.insert(paramTy);
-      } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-        typeParams.insert(archetypeTy->getRoot());
-      }
+      if (fn(t))
+        return Action::Stop;
     }
 
     return Action::Continue;
@@ -96,13 +93,28 @@ struct PackTypeParameterCollector: TypeWalker {
 
 }
 
+void TypeBase::walkPackReferences(
+    llvm::function_ref<bool (Type)> fn) {
+  Type(this).walk(PackReferenceCollector(fn));
+}
+
 void TypeBase::getTypeParameterPacks(
     SmallVectorImpl<Type> &rootParameterPacks) {
-  PackTypeParameterCollector collector;
-  Type(this).walk(collector);
+  llvm::SmallSetVector<Type, 2> rootParameterPackSet;
 
-  rootParameterPacks.append(collector.typeParams.begin(),
-                            collector.typeParams.end());
+  walkPackReferences([&](Type t) {
+    if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+      if (paramTy->isParameterPack())
+        rootParameterPackSet.insert(paramTy);
+    } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
+      rootParameterPackSet.insert(archetypeTy->getRoot());
+    }
+
+    return false;
+  });
+
+  rootParameterPacks.append(rootParameterPackSet.begin(),
+                            rootParameterPackSet.end());
 }
 
 bool GenericTypeParamType::isParameterPack() const {
@@ -131,6 +143,45 @@ PackType *TypeBase::getPackSubstitutionAsPackType() {
   } else {
     return PackType::getSingletonPackExpansion(this);
   }
+}
+
+static Type increasePackElementLevelImpl(
+    Type type, unsigned level, unsigned outerLevel) {
+  assert(level > 0);
+
+  return type.transformRec([&](TypeBase *t) -> Optional<Type> {
+    if (auto *elementType = dyn_cast<PackElementType>(t)) {
+      if (elementType->getLevel() >= outerLevel) {
+        elementType = PackElementType::get(elementType->getPackType(),
+                                           elementType->getLevel() + level);
+      }
+
+      return Type(elementType);
+    }
+
+    if (auto *expansionType = dyn_cast<PackExpansionType>(t)) {
+      return Type(PackExpansionType::get(
+          increasePackElementLevelImpl(expansionType->getPatternType(),
+                                       level, outerLevel + 1),
+          expansionType->getCountType()));
+    }
+
+    if (t->isParameterPack() || isa<PackArchetypeType>(t)) {
+      if (outerLevel == 0)
+        return Type(PackElementType::get(t, level));
+
+      return Type(t);
+    }
+
+    return None;
+  });
+}
+
+Type TypeBase::increasePackElementLevel(unsigned level) {
+  if (level == 0)
+    return Type(this);
+
+  return increasePackElementLevelImpl(Type(this), level, 0);
 }
 
 CanType PackExpansionType::getReducedShape() {

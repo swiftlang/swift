@@ -384,10 +384,52 @@ swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   return dest;
 }
 
+struct TakeHandler {
+  static inline void handleMetatype(const Metadata *type, uintptr_t addrOffset,
+                                    uint8_t *dest, uint8_t *src) {
+    if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
+      type->vw_initializeWithTake(
+          (OpaqueValue*)((uintptr_t)dest + addrOffset),
+          (OpaqueValue*)((uintptr_t)src + addrOffset));
+    }
+  }
+
+  static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
+                                                   size_t &offset,
+                                                   uintptr_t &addrOffset,
+                                                   uint8_t *dest,
+                                                   uint8_t *src) {
+    ::handleSinglePayloadEnumSimple(typeLayout, offset, src, addrOffset);
+  }
+
+  static inline void handleSinglePayloadEnumFN(const uint8_t *typeLayout,
+                                               size_t &offset, bool resolved,
+                                               uintptr_t &addrOffset,
+                                               uint8_t *dest, uint8_t *src) {
+    ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, src, addrOffset);
+  }
+
+  static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset,
+                                     uint8_t *dest, uint8_t *src) {
+    if (tag == RefCountingKind::UnknownWeak) {
+      swift_unknownObjectWeakTakeInit(
+        (WeakReference*)((uintptr_t)dest + addrOffset),
+        (WeakReference*)((uintptr_t)src + addrOffset));
+    } else if (tag == RefCountingKind::Existential) {
+      auto *type = getExistentialTypeMetadata(
+          (OpaqueValue*)((uintptr_t)src + addrOffset));
+      if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
+        type->vw_initializeWithTake(
+            (OpaqueValue*)((uintptr_t)dest + addrOffset),
+            (OpaqueValue*)((uintptr_t)src + addrOffset));
+      }
+    }
+  }
+};
+
 extern "C" swift::OpaqueValue *
 swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                            const Metadata *metadata) {
-  const uint8_t *typeLayout = metadata->getLayoutString();
   size_t size = metadata->vw_size();
 
   memcpy(dest, src, size);
@@ -396,73 +438,7 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
     return dest;
   }
 
-  auto offset = layoutStringHeaderSize;
-  uintptr_t addrOffset = 0;
-
-  while (true) {
-    uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
-    auto tag = static_cast<RefCountingKind>(skip >> 56);
-    skip &= ~(0xffULL << 56);
-    addrOffset += skip;
-
-    switch (tag) {
-    case RefCountingKind::UnknownWeak:
-      swift_unknownObjectWeakTakeInit(
-          (WeakReference*)((uintptr_t)dest + addrOffset),
-          (WeakReference*)((uintptr_t)src + addrOffset));
-      break;
-    case RefCountingKind::Metatype: {
-      auto *type = readBytes<const Metadata*>(typeLayout, offset);
-      if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
-        type->vw_initializeWithTake(
-            (OpaqueValue*)((uintptr_t)dest + addrOffset),
-            (OpaqueValue*)((uintptr_t)src + addrOffset));
-      }
-      break;
-    }
-    case RefCountingKind::Existential: {
-      auto *type = getExistentialTypeMetadata(
-          (OpaqueValue*)((uintptr_t)src + addrOffset));
-      if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
-        type->vw_initializeWithTake(
-            (OpaqueValue*)((uintptr_t)dest + addrOffset),
-            (OpaqueValue*)((uintptr_t)src + addrOffset));
-      }
-      break;
-    }
-    case RefCountingKind::Resilient: {
-      auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
-      if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
-        type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
-                                    (OpaqueValue*)((uintptr_t)src + addrOffset));
-      }
-      break;
-    }
-
-    case RefCountingKind::SinglePayloadEnumSimple: {
-      handleSinglePayloadEnumSimple(typeLayout, offset, (uint8_t *)src,
-                                    addrOffset);
-      break;
-    }
-
-    case RefCountingKind::SinglePayloadEnumFN: {
-      handleSinglePayloadEnumFN(typeLayout, offset, false, (uint8_t *)src,
-                                addrOffset);
-      break;
-    }
-
-    case RefCountingKind::SinglePayloadEnumFNResolved: {
-      handleSinglePayloadEnumFN(typeLayout, offset, true, (uint8_t *)src,
-                                addrOffset);
-      break;
-    }
-
-    case RefCountingKind::End:
-      return dest;
-    default:
-      break;
-    }
-  }
+  handleRefCounts<0, TakeHandler>(metadata, (uint8_t *)dest, (uint8_t *)src);
 
   return dest;
 }
