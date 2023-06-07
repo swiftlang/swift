@@ -95,39 +95,31 @@ public func run_SuffixCountableRange(_ n: Int) {
     check(result == sumCount)
   }
 }
+
 @inline(never)
 public func run_SuffixSequence(_ n: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
   for _ in 1...20*n {
-    var result = 0
-    for element in s.suffix(suffixCount) {
-      result += element
-    }
-    check(result == sumCount)
+    blackHole(s.suffix(suffixCount))
   }
 }
+
 @inline(never)
 public func run_SuffixAnySequence(_ n: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
   for _ in 1...20*n {
-    var result = 0
-    for element in s.suffix(suffixCount) {
-      result += element
-    }
-    check(result == sumCount)
+    blackHole(s.suffix(suffixCount))
   }
 }
+
 @inline(never)
 public func run_SuffixAnySeqCntRange(_ n: Int) {
   let s = AnySequence(0..<sequenceCount)
   for _ in 1...20*n {
-    var result = 0
-    for element in s.suffix(suffixCount) {
-      result += element
-    }
-    check(result == sumCount)
+    blackHole(s.suffix(suffixCount))
   }
 }
+
 @inline(never)
 public func run_SuffixAnySeqCRangeIter(_ n: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
