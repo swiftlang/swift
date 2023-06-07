@@ -874,6 +874,12 @@ ERROR(need_hermetic_seal_to_import_module,none,
       "module %0 was built with -experimental-hermetic-seal-at-link, but "
       "current compilation does not have -experimental-hermetic-seal-at-link",
       (Identifier))
+ERROR(need_cxx_interop_to_import_module,none,
+      "module %0 was built with C++ interoperability enabled, but "
+      "current compilation does not enable C++ interoperability",
+      (Identifier))
+NOTE(enable_cxx_interop_docs,none,
+     "visit https://www.swift.org/documentation/cxx-interop/project-build-setup to learn how to enable C++ interoperability", ())
 
 ERROR(modularization_issue_decl_moved,Fatal,
       "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
