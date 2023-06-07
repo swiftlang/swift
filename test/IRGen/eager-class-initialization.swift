@@ -31,5 +31,5 @@ class GenericAncestryWithCustomName : Generic<Double> {}
 // CHECK-OLD-NEXT: call void asm sideeffect "", "r"(%swift.type* [[METADATA]])
 // CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s4main29GenericAncestryWithCustomNameCMa"([[INT]] 0)
 // CHECK-NEXT:     [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK-NEXT:     call void asm sideeffect "", "r"(%swift.type* [[METADATA]])
+// CHECK-NEXT:     call void asm sideeffect "", "r"(ptr [[METADATA]])
 // CHECK-NEXT:     ret
