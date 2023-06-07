@@ -2139,9 +2139,10 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
 
 bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
                                           bool asNote) const {
-  // Not being able to infer the type of a pattern should already have been
-  // diagnosed on the pattern's initializer or as a structural issue of the AST.
-  return true;
+  // An unresolved AnyPatternDecl means there was some issue in the match
+  // that means we couldn't infer the pattern. We don't have a diagnostic to
+  // emit here, the failure should be diagnosed by the fix for expression.
+  return false;
 }
 
 IgnoreUnresolvedPatternVar *
@@ -2424,6 +2425,20 @@ bool AllowTupleLabelMismatch::diagnose(const Solution &solution,
   TupleLabelMismatchWarning warning(solution, getFromType(), getToType(),
                                     getLocator());
   return warning.diagnose(asNote);
+}
+
+AllowAssociatedValueMismatch *
+AllowAssociatedValueMismatch::create(ConstraintSystem &cs, Type fromType,
+                                     Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowAssociatedValueMismatch(cs, fromType, toType, locator);
+}
+
+bool AllowAssociatedValueMismatch::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  AssociatedValueMismatchFailure failure(solution, getFromType(), getToType(),
+                                         getLocator());
+  return failure.diagnose(asNote);
 }
 
 bool AllowSwiftToCPointerConversion::diagnose(const Solution &solution,

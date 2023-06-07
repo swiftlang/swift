@@ -3926,12 +3926,6 @@ struct TypeSimplifier {
         auto conformance = CS.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance) {
-          // FIXME: This regresses diagnostics if removed, but really the
-          // handling of a missing conformance should be the same for
-          // tuples and non-tuples.
-          if (lookupBaseType->is<TupleType>())
-            return DependentMemberType::get(lookupBaseType, assocType);
-
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
@@ -5826,6 +5820,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::PatternMatch: {
       auto patternElt = path[0].castTo<LocatorPathElt::PatternMatch>();
       anchor = patternElt.getPattern();
+      path = path.slice(1);
+      continue;
+    }
+
+    case ConstraintLocator::EnumPatternImplicitCastMatch: {
       path = path.slice(1);
       continue;
     }
