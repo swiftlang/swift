@@ -32,6 +32,7 @@ using namespace SourceKit;
 using namespace sourcekitd;
 
 static xpc_connection_t MainConnection = nullptr;
+static bool RequestBarriersEnabled = false;
 
 static void postNotification(sourcekitd_response_t Notification) {
   xpc_connection_t peer = MainConnection;
@@ -255,43 +256,66 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
     assert(type == XPC_TYPE_DICTIONARY);
     // Handle the message
     xpc_retain(event);
-    dispatch_async(msgHandlingQueue, ^{
-      if (xpc_object_t contents =
-              xpc_dictionary_get_value(event, xpc::KeyMsg)) {
+    if (xpc_object_t contents = xpc_dictionary_get_value(event, xpc::KeyMsg)) {
+      assert(xpc_get_type(contents) == XPC_TYPE_ARRAY);
+      sourcekitd_object_t req = xpc_array_get_value(contents, 0);
+
+      void (^handler)(void) = ^{
         SourceKitCancellationToken cancelToken =
             reinterpret_cast<SourceKitCancellationToken>(
                 xpc_dictionary_get_uint64(event, xpc::KeyCancelToken));
         auto Responder = std::make_shared<XPCResponder>(event, peer);
         xpc_release(event);
 
-        assert(xpc_get_type(contents) == XPC_TYPE_ARRAY);
-        sourcekitd_object_t req = xpc_array_get_value(contents, 0);
         sourcekitd::handleRequest(req, /*CancellationToken=*/cancelToken,
                                   [Responder](sourcekitd_response_t response) {
                                     Responder->sendReply(response);
                                   });
-      } else if (xpc_object_t contents =
-                     xpc_dictionary_get_value(event, "ping")) {
+      };
+
+      if (sourcekitd::requestIsEnableBarriers(req)) {
+        dispatch_barrier_async(msgHandlingQueue, ^{
+          auto Responder = std::make_shared<XPCResponder>(event, peer);
+          xpc_release(event);
+          RequestBarriersEnabled = true;
+          sourcekitd::sendBarriersEnabledResponse([Responder](sourcekitd_response_t response) {
+            Responder->sendReply(response);
+          });
+        });
+      } else if (RequestBarriersEnabled && sourcekitd::requestIsBarrier(req)) {
+        dispatch_barrier_async(msgHandlingQueue, handler);
+      } else {
+        dispatch_async(msgHandlingQueue, handler);
+      }
+    } else if (xpc_object_t contents =
+                   xpc_dictionary_get_value(event, "ping")) {
+      dispatch_async(msgHandlingQueue, ^{
         // Ping back.
         xpc_object_t reply = xpc_dictionary_create_reply(event);
         xpc_release(event);
         assert(reply);
         xpc_connection_send_message(peer, reply);
         xpc_release(reply);
-      } else if (SourceKitCancellationToken cancelToken =
-                     reinterpret_cast<SourceKitCancellationToken>(
-                         xpc_dictionary_get_uint64(event,
-                                                   xpc::KeyCancelRequest))) {
+      });
+    } else if (SourceKitCancellationToken cancelToken =
+                   reinterpret_cast<SourceKitCancellationToken>(
+                       xpc_dictionary_get_uint64(event,
+                                                 xpc::KeyCancelRequest))) {
+      // Execute cancellation on a queue other than `msgHandling` so that we
+      // don’t block the cancellation of a request with a barrier
+      dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         sourcekitd::cancelRequest(/*CancellationToken=*/cancelToken);
-      } else if (SourceKitCancellationToken cancelToken =
-                     reinterpret_cast<SourceKitCancellationToken>(
-                         xpc_dictionary_get_uint64(
-                             event, xpc::KeyDisposeRequestHandle))) {
+      });
+    } else if (SourceKitCancellationToken cancelToken =
+                   reinterpret_cast<SourceKitCancellationToken>(
+                       xpc_dictionary_get_uint64(
+                           event, xpc::KeyDisposeRequestHandle))) {
+      dispatch_async(msgHandlingQueue, ^{
         sourcekitd::disposeCancellationToken(/*CancellationToken=*/cancelToken);
-      } else {
-        assert(false && "unexpected message");
-      }
-    });
+      });
+    } else {
+      assert(false && "unexpected message");
+    }
   }
 }
 
