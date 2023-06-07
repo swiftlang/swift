@@ -187,6 +187,7 @@ protected:
     SHARED_FIELD(LoadInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignByWrapperInst, uint8_t mode);
+    SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
     SHARED_FIELD(SelectEnumInstBase, bool hasDefault);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);

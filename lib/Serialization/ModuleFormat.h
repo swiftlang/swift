@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 788; // noimplicitcopy addr
+const uint16_t SWIFTMODULE_VERSION_MINOR = 790; // add `out` kind to mark uninitialized instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -330,6 +330,7 @@ enum AccessorKind : uint8_t {
   MutableAddress,
   Read,
   Modify,
+  Init,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -2225,6 +2226,16 @@ namespace decls_block {
       BCVBR<4>, // # of type erased parameters
       BCArray<IdentifierIDField> // target function pieces, spi groups, type erased params
       >;
+
+  using InitializesDeclAttrLayout = BCRecordLayout<
+      Initializes_DECL_ATTR,
+      BCArray<IdentifierIDField> // initialized properties
+  >;
+
+  using AccessesDeclAttrLayout = BCRecordLayout<
+      Accesses_DECL_ATTR,
+      BCArray<IdentifierIDField> // initialized properties
+  >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,

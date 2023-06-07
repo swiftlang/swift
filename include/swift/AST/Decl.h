@@ -47,6 +47,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <map>
 #include <type_traits>
 
 namespace swift {
@@ -184,6 +185,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DistributedMethod,
   Getter,
   Setter,
+  InitAccessor,
   Addressor,
   MutableAddressor,
   ReadAccessor,
@@ -3986,6 +3988,16 @@ public:
   /// Return a collection of the stored member variables of this type.
   ArrayRef<VarDecl *> getStoredProperties() const;
 
+  /// Return a collection of all properties with init accessors in
+  /// this type.
+  ArrayRef<VarDecl *> getInitAccessorProperties() const;
+
+  /// Establish a mapping between properties that could be iniitalized
+  /// via other properties by means of init accessors. This mapping is
+  /// one-to-many because we allow intersecting `initializes(...)`.
+  void collectPropertiesInitializableByInitAccessors(
+      std::multimap<VarDecl *, VarDecl *> &result) const;
+
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
@@ -7567,6 +7579,10 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  bool isInitAccessor() const {
+    return (getAccessorKind() == AccessorKind::Init);
   }
 
   /// \returns true if this is non-mutating due to applying a 'mutating'
