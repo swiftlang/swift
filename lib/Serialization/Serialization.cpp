@@ -2903,6 +2903,34 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_Initializes: {
+      auto abbrCode = S.DeclTypeAbbrCodes[InitializesDeclAttrLayout::Code];
+      auto attr = cast<InitializesAttr>(DA);
+
+      SmallVector<IdentifierID, 4> properties;
+      for (auto identifier : attr->getProperties()) {
+        properties.push_back(S.addDeclBaseNameRef(identifier));
+      }
+
+      InitializesDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, properties);
+      return;
+    }
+
+    case DAK_Accesses: {
+      auto abbrCode = S.DeclTypeAbbrCodes[AccessesDeclAttrLayout::Code];
+      auto attr = cast<InitializesAttr>(DA);
+
+      SmallVector<IdentifierID, 4> properties;
+      for (auto identifier : attr->getProperties()) {
+        properties.push_back(S.addDeclBaseNameRef(identifier));
+      }
+
+      AccessesDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, properties);
+      return;
+    }
+
     case DAK_DynamicReplacement: {
       auto abbrCode =
           S.DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];

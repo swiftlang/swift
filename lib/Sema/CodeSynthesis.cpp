@@ -294,6 +294,12 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
+    std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
+    decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
+
+    // A single property could be used to initialize N other stored
+    // properties via a call to its init accessor.
+    llvm::SmallPtrSet<VarDecl *, 4> usedInitProperties;
     for (auto member : decl->getMembers()) {
       auto var = dyn_cast<VarDecl>(member);
       if (!var)
@@ -301,6 +307,20 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
+
+      // Check whether this property could be initialized via init accessor.
+      //
+      // Note that we check for a single match here because intersecting
+      // properties are going to be diagnosed.
+      if (initializedViaAccessor.count(var) == 1) {
+        auto *initializerProperty = initializedViaAccessor.find(var)->second;
+        // Parameter for this property is already emitted.
+        if (usedInitProperties.count(initializerProperty))
+          continue;
+
+        var = initializerProperty;
+        usedInitProperties.insert(initializerProperty);
+      }
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 

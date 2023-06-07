@@ -1265,6 +1265,10 @@ public:
                                        AccessorKind currentKind,
                                        SourceLoc const& currentLoc);
 
+  ParserStatus parseInitAccessorEffects(ParsedAccessors &accessors,
+                                        AccessorKind currentKind,
+                                        DeclAttributes &Attributes);
+
   /// Parse accessors provided as a separate list, for use in macro
   /// expansions.
   void parseTopLevelAccessors(

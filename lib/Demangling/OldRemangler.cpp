@@ -1244,6 +1244,11 @@ ManglingError Remangler::mangleDidSet(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "W", ctx, depth + 1);
 }
 
+ManglingError Remangler::mangleInitAccessor(Node *node, EntityContext &ctx,
+                                            unsigned depth) {
+  return mangleAccessor(node->getFirstChild(), "i", ctx, depth + 1);
+}
+
 ManglingError Remangler::mangleOwningMutableAddressor(Node *node,
                                                       EntityContext &ctx,
                                                       unsigned depth) {

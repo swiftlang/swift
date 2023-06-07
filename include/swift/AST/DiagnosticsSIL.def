@@ -189,6 +189,9 @@ ERROR(ivar_not_initialized_at_superinit,none,
 ERROR(ivar_not_initialized_at_implicit_superinit,none,
       "property '%0' not initialized at implicitly generated super.init call",
       (StringRef, bool))
+ERROR(ivar_not_initialized_by_init_accessor,none,
+      "property %0 not initialized by init accessor",
+      (DeclName))
 
 ERROR(self_use_before_fully_init,none,
       "'self' used in %select{method call|property access}1 %0 before "
