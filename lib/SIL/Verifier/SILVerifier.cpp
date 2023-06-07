@@ -2722,6 +2722,46 @@ public:
     checkAssignByWrapperArgs(Src->getType(), setterConv);
   }
 
+  void checkAssigOrInitInstAccessorArgs(SILType argTy,
+                                        SILFunctionConventions &conv) {
+    unsigned argIdx = conv.getSILArgIndexOfFirstParam();
+    checkAssignByWrapperArgsRecursively(argTy, conv, argIdx);
+  }
+
+  void checkAssignOrInitInst(AssignOrInitInst *AI) {
+    SILValue Src = AI->getSrc();
+    require(AI->getModule().getStage() == SILStage::Raw,
+            "assign_or_init can only exist in raw SIL");
+
+    SILValue initFn = AI->getInitializer();
+    SILValue setterFn = AI->getSetter();
+
+    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+    // Check init - it's an unapplied reference that takes property addresses
+    // and `initialValue`.
+    {
+      // We need to map un-applied function reference into context before
+      // check `initialValue` argument.
+      auto subs = cast<PartialApplyInst>(setterFn)->getSubstitutionMap();
+      initTy = initTy->substGenericArgs(F.getModule(), subs,
+                                        F.getTypeExpansionContext());
+
+      SILFunctionConventions initConv(initTy, AI->getModule());
+      require(initConv.getNumIndirectSILResults() ==
+                  AI->getInitializedProperties().size(),
+              "init function has invalid number of indirect results");
+      checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
+    }
+
+    // Check setter - it's a partially applied reference which takes
+    // `initialValue`.
+    CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions setterConv(setterTy, AI->getModule());
+    require(setterConv.getNumIndirectSILResults() == 0,
+            "set function has indirect results");
+    checkAssignByWrapperArgs(Src->getType(), setterConv);
+  };
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
   void checkLoad##Name##Inst(Load##Name##Inst *LWI) {                          \
     require(LWI->getType().isObject(), "Result of load must be an object");    \

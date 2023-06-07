@@ -6294,11 +6294,13 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
   }
   else if (auto *MED = E->getSubstituteDecl()) {
     Mangle::ASTMangler mangler;
-    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+    MED->forEachExpandedNode([&](ASTNode node) {
       if (auto *expr = node.dyn_cast<Expr *>())
         visit(expr, C);
       else if (auto *stmt = node.dyn_cast<Stmt *>())
         SGF.emitStmt(stmt);
+      else
+        SGF.visit(node.get<Decl *>());
     });
     return RValue();
   }

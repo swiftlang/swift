@@ -625,6 +625,16 @@ OperandOwnershipClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i) {
   return OperandOwnership::InstantaneousUse; // initializer/setter closure
 }
 
+OperandOwnership
+OperandOwnershipClassifier::visitAssignOrInitInst(AssignOrInitInst *i) {
+  if (getValue() == i->getSrc()) {
+    return OperandOwnership::DestroyingConsume;
+  }
+
+  // initializer/setter closure
+  return OperandOwnership::InstantaneousUse;
+}
+
 OperandOwnership OperandOwnershipClassifier::visitStoreInst(StoreInst *i) {
   if (getValue() != i->getSrc()) {
     return OperandOwnership::TrivialUse;

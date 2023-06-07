@@ -341,6 +341,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Modify:
       OS << "!modify";
       break;
+    case AccessorKind::Init:
+      OS << "!init";
+      break;
     }
     break;
   }
@@ -1768,8 +1771,33 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
+
     *this << getIDAndType(AI->getDest())
           << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
+  }
+
+  void visitAssignOrInitInst(AssignOrInitInst *AI) {
+    switch (AI->getMode()) {
+    case AssignOrInitInst::Unknown:
+      break;
+    case AssignOrInitInst::Init:
+      *this << "[init] ";
+      break;
+    case AssignOrInitInst::Set:
+      *this << "[set] ";
+      break;
+    }
+
+    // Print all of the properties that have been previously initialized.
+    for (unsigned i = 0, n = AI->getNumInitializedProperties(); i != n; ++i) {
+      if (AI->isPropertyAlreadyInitialized(i)) {
+        *this << "[assign=" << i << "] ";
+      }
+    }
+
+    *this << getIDAndType(AI->getSrc());
+    *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
   }
 
@@ -1787,6 +1815,9 @@ public:
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
     case MarkUninitializedInst::DelegatingSelfAllocated:
       *this << "[delegatingselfallocated] ";
+      break;
+    case MarkUninitializedInst::Out:
+      *this << "[out] ";
       break;
     }
     *this << getIDAndType(MU->getOperand());

@@ -254,6 +254,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      case AccessorKind::Modify:
        return DescriptiveDeclKind::ModifyAccessor;
+
+     case AccessorKind::Init:
+       return DescriptiveDeclKind::InitAccessor;
      }
      llvm_unreachable("bad accessor kind");
    }
@@ -354,6 +357,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MutableAddressor, "mutableAddress accessor");
   ENTRY(ReadAccessor, "_read accessor");
   ENTRY(ModifyAccessor, "_modify accessor");
+  ENTRY(InitAccessor, "init acecssor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(Missing, "missing decl");
@@ -381,7 +385,10 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
-void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
+void Decl::visitAuxiliaryDecls(
+    AuxiliaryDeclCallback callback,
+    bool visitFreestandingExpanded
+) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<Decl *>(this);
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -414,13 +421,15 @@ void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
     }
   }
 
-  else if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
-    if (auto bufferID = evaluateOrDefault(
-            ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
-      auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
-      auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
-      for (auto *decl : sourceFile->getTopLevelDecls())
-        callback(decl);
+  if (visitFreestandingExpanded) {
+    if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
+      if (auto bufferID = evaluateOrDefault(
+              ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
+        auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
+        auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+        for (auto *decl : sourceFile->getTopLevelDecls())
+          callback(decl);
+      }
     }
   }
 
@@ -4880,6 +4889,28 @@ ArrayRef<VarDecl *> NominalTypeDecl::getStoredProperties() const {
       {});
 }
 
+ArrayRef<VarDecl *>
+NominalTypeDecl::getInitAccessorProperties() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      InitAccessorPropertiesRequest{mutableThis},
+      {});
+}
+
+void NominalTypeDecl::collectPropertiesInitializableByInitAccessors(
+    std::multimap<VarDecl *, VarDecl *> &result) const {
+  for (auto *property : getInitAccessorProperties()) {
+    auto *initAccessor = property->getAccessor(AccessorKind::Init);
+    if (auto *initAttr =
+            initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
+      for (auto *subsumed : initAttr->getPropertyDecls(initAccessor))
+        result.insert({subsumed, property});
+    }
+  }
+}
+
 ArrayRef<Decl *>
 NominalTypeDecl::getStoredPropertiesAndMissingMemberPlaceholders() const {
   auto &ctx = getASTContext();
@@ -6689,10 +6720,28 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // 'let's are only ever settable from a specific DeclContext.
   if (UseDC == nullptr)
     return false;
-  
+
   // 'let' properties in structs/classes are only ever settable in their
-  // designated initializer(s).
+  // designated initializer(s) or by init accessors.
   if (isInstanceMember()) {
+    // Init accessors allow assignments to `let` properties if a
+    // property is part of `initializes(...)` list.
+    if (auto *accessor =
+            dyn_cast<AccessorDecl>(const_cast<DeclContext *>(UseDC))) {
+      // Check whether this property is part of `initializes(...)` list,
+      // and allow assignment/mutation if so. DI would be responsible
+      // for checking for re-assignment.
+      if (auto *initAttr =
+              accessor->getAttrs().getAttribute<InitializesAttr>()) {
+        return llvm::is_contained(initAttr->getPropertyDecls(accessor),
+                                  const_cast<VarDecl *>(this));
+      }
+
+      // If there is no `initializes` attribute, no referenced properties
+      // can be assignment to or mutated.
+      return false;
+    }
+
     auto *CD = dyn_cast<ConstructorDecl>(UseDC);
     if (!CD) return false;
     
@@ -8324,7 +8373,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
 
     case AccessorKind::Set:
     case AccessorKind::DidSet:
-    case AccessorKind::WillSet: {
+    case AccessorKind::WillSet:
+    case AccessorKind::Init: {
       SmallVector<Identifier, 4> argNames;
       // The implicit value/buffer parameter.
       argNames.push_back(Identifier());
@@ -9305,6 +9355,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
+  case AccessorKind::Init:
     return false;
   }
   llvm_unreachable("bad accessor kind");
@@ -10637,8 +10688,9 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
   return getRawDiscriminator();
 }
 
-void MacroExpansionDecl::forEachExpandedExprOrStmt(
-    ExprOrStmtExpansionCallback callback) const {
+void MacroExpansionDecl::forEachExpandedNode(
+    llvm::function_ref<void(ASTNode)> callback
+) const {
   auto mutableThis = const_cast<MacroExpansionDecl *>(this);
   auto bufferID = evaluateOrDefault(
       getASTContext().evaluator,
@@ -10650,8 +10702,7 @@ void MacroExpansionDecl::forEachExpandedExprOrStmt(
   auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
   auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
   for (auto node : sourceFile->getTopLevelItems())
-    if (node.is<Expr *>() || node.is<Stmt *>())
-      callback(node);
+    callback(node);
 }
 
 NominalTypeDecl *

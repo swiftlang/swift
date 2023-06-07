@@ -590,9 +590,17 @@ DECL_ATTR_KINDS = [
                         swift_name='atReasync',
                         code=110),
 
-    # 111 was an experimental @completionHandlerAsync and is now unused
-
-    # 113 was experimental _unsafeSendable and is now unused
+    DeclAttribute('initializes', 'Initializes',
+                  OnAccessor,
+                  ABIStableToAdd, ABIStableToRemove,
+                  APIBreakingToAdd, APIBreakingToRemove,
+                  code=111),
+    # Note: 112 is used by 'nonisolated'
+    DeclAttribute('accesses', 'Accesses',
+                  OnAccessor,
+                  ABIStableToAdd, ABIStableToRemove,
+                  APIBreakingToAdd, APIBreakingToRemove,
+                  code=113),
 
     SimpleDeclAttribute('_unsafeInheritExecutor', 'UnsafeInheritExecutor',
                         OnFunc, UserInaccessible,

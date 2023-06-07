@@ -820,6 +820,8 @@ NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
                SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(AssignOrInitInst, assign_or_init,
+               SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugValueInst, debug_value,

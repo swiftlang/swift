@@ -1256,6 +1256,67 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
+AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Src,
+                                   SILValue Initializer, SILValue Setter,
+                                   AssignOrInitInst::Mode Mode)
+    : InstructionBase<SILInstructionKind::AssignOrInitInst, NonValueInstruction>(Loc),
+      Operands(this, Src, Initializer, Setter) {
+  assert(Initializer->getType().is<SILFunctionType>());
+  sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
+  Assignments.resize(getNumInitializedProperties());
+}
+
+void AssignOrInitInst::markAsInitialized(VarDecl *property) {
+  auto toInitProperties = getInitializedProperties();
+  for (unsigned index : indices(toInitProperties)) {
+    if (toInitProperties[index] == property) {
+      markAsInitialized(index);
+      break;
+    }
+  }
+}
+
+void AssignOrInitInst::markAsInitialized(unsigned propertyIdx) {
+  assert(propertyIdx < getNumInitializedProperties());
+  Assignments.set(propertyIdx);
+}
+
+bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {
+  assert(propertyIdx < Assignments.size());
+  return Assignments.test(propertyIdx);
+}
+
+AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
+  auto *initRef = cast<FunctionRefInst>(getInitializer());
+  auto *accessorRef = initRef->getReferencedFunctionOrNull();
+  assert(accessorRef);
+  return dyn_cast_or_null<AccessorDecl>(accessorRef->getDeclContext());
+}
+
+unsigned AssignOrInitInst::getNumInitializedProperties() const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>();
+    return initAttr ? initAttr->getNumProperties() : 0;
+  }
+  return 0;
+}
+
+ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>())
+      return initAttr->getPropertyDecls(accessor);
+  }
+  return {};
+}
+
+ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>())
+      return accessAttr->getPropertyDecls(accessor);
+  }
+  return {};
+}
+
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,
                                ArrayRef<SILValue> Elements, SILFunction &F) {

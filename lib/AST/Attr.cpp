@@ -1588,6 +1588,10 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<synthesized protocol>>";
   case DAK_Specialize:
     return "_specialize";
+  case DAK_Initializes:
+    return "initializes";
+  case DAK_Accesses:
+    return "accesses";
   case DAK_Implements:
     return "_implements";
   case DAK_ClangImporterSynthesizedType:
@@ -2362,6 +2366,38 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
                                  std::move(originalName), parameterIndices);
 }
 
+InitializesAttr::InitializesAttr(SourceLoc atLoc, SourceRange range,
+                                 ArrayRef<Identifier> properties)
+    : DeclAttribute(DAK_Initializes, atLoc, range, /*implicit*/false),
+      numProperties(properties.size()) {
+  std::uninitialized_copy(properties.begin(), properties.end(),
+                          getTrailingObjects<Identifier>());
+}
+
+InitializesAttr *
+InitializesAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
+                        ArrayRef<Identifier> properties) {
+  unsigned size = totalSizeToAlloc<Identifier>(properties.size());
+  void *mem = ctx.Allocate(size, alignof(InitializesAttr));
+  return new (mem) InitializesAttr(atLoc, range, properties);
+}
+
+AccessesAttr::AccessesAttr(SourceLoc atLoc, SourceRange range,
+                           ArrayRef<Identifier> properties)
+    : DeclAttribute(DAK_Accesses, atLoc, range, /*implicit*/false),
+      numProperties(properties.size()) {
+  std::uninitialized_copy(properties.begin(), properties.end(),
+                          getTrailingObjects<Identifier>());
+}
+
+AccessesAttr *
+AccessesAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
+                     ArrayRef<Identifier> properties) {
+  unsigned size = totalSizeToAlloc<Identifier>(properties.size());
+  void *mem = ctx.Allocate(size, alignof(AccessesAttr));
+  return new (mem) AccessesAttr(atLoc, range, properties);
+}
+
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
                                TypeRepr *TyR,
                                DeclName MemberName,
@@ -2502,6 +2538,26 @@ DeclAttributes::getEffectiveSendableAttr() const {
     return sendableAttr;
 
   return assumedAttr;
+}
+
+ArrayRef<VarDecl *>
+InitializesAttr::getPropertyDecls(AccessorDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      InitAccessorReferencedVariablesRequest{
+          const_cast<InitializesAttr *>(this), attachedTo, getProperties()},
+      {});
+}
+
+ArrayRef<VarDecl *>
+AccessesAttr::getPropertyDecls(AccessorDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      InitAccessorReferencedVariablesRequest{const_cast<AccessesAttr *>(this),
+                                             attachedTo, getProperties()},
+      {});
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
