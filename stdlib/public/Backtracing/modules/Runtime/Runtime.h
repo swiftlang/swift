@@ -32,7 +32,6 @@ bool _swift_backtrace_isThunkFunction(const char *rawName);
 char *_swift_backtrace_demangle(const char *rawName,
                                 size_t rawNameLength,
                                 char *outputBuffer,
-                                size_t *outputBufferSize,
-                                int *status);
+                                size_t *outputBufferSize);
 
 #endif // SWIFT_BACKTRACING_RUNTIME_H
