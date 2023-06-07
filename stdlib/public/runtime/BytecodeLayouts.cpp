@@ -547,17 +547,20 @@ swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   return swift_generic_initWithTake(dest, src, metadata);
 }
 
-void swift::swift_resolve_resilientAccessors(
-    uint8_t *layoutStr, size_t layoutStrOffset, const uint8_t *fieldLayoutStr,
-    size_t refCountBytes, const Metadata *fieldType) {
+void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
+                                             size_t layoutStrOffset,
+                                             const uint8_t *fieldLayoutStr,
+                                             const Metadata *fieldType) {
   size_t i = layoutStringHeaderSize;
-  while (i < (layoutStringHeaderSize + refCountBytes)) {
+  while (true) {
     size_t currentOffset = i;
     uint64_t size = readBytes<uint64_t>(fieldLayoutStr, i);
     RefCountingKind tag = (RefCountingKind)(size >> 56);
     size &= ~(0xffULL << 56);
 
     switch (tag) {
+    case RefCountingKind::End:
+      return;
     case RefCountingKind::Resilient: {
       auto *type = getResilientTypeMetadata(fieldType, fieldLayoutStr, i);
       size_t writeOffset = layoutStrOffset + currentOffset -
@@ -593,15 +596,43 @@ void swift::swift_resolve_resilientAccessors(
       i += 3 * sizeof(size_t);
       break;
 
-    case RefCountingKind::MultiPayloadEnumFN:
-      // TODO: implement
-      swift_unreachable("not implemented");
-      break;
+    case RefCountingKind::MultiPayloadEnumFN: {
+      auto getEnumTag =
+          readRelativeFunctionPointer<GetEnumTagFn>(fieldLayoutStr, i);
+      size_t writeOffset =
+          layoutStrOffset + currentOffset - layoutStringHeaderSize;
+      uint64_t tagAndOffset =
+          (((uint64_t)RefCountingKind::MultiPayloadEnumFNResolved) << 56) |
+          size;
+      writeBytes(layoutStr, writeOffset, tagAndOffset);
+      writeBytes(layoutStr, writeOffset, getEnumTag);
 
-    case RefCountingKind::MultiPayloadEnumFNResolved:
-      // TODO: implement
-      swift_unreachable("not implemented");
+      size_t numCases = readBytes<size_t>(fieldLayoutStr, i);
+      size_t refCountBytes = readBytes<size_t>(fieldLayoutStr, i);
+
+      size_t casesBeginOffset =
+          layoutStrOffset + i + (numCases * sizeof(size_t));
+
+      for (size_t j = 0; j < numCases; j++) {
+        size_t caseOffset = readBytes<size_t>(fieldLayoutStr, i);
+        uint8_t *caseLayoutString =
+            fieldLayoutStr + i + (numCases * sizeof(size_t)) + caseOffset;
+        swift_resolve_resilientAccessors(layoutStr,
+                                         casesBeginOffset + caseOffset,
+                                         caseLayoutString, fieldType);
+      }
       break;
+    }
+
+    case RefCountingKind::MultiPayloadEnumFNResolved: {
+      // skip function pointer
+      i += sizeof(uintptr_t);
+      size_t numCases = readBytes<size_t>(fieldLayoutStr, i);
+      size_t refCountBytes = readBytes<size_t>(fieldLayoutStr, i);
+      // skip enum size, offsets and ref counts
+      i += sizeof(size_t) + (numCases * sizeof(size_t)) + refCountBytes;
+      break;
+    }
 
     default:
       break;

@@ -69,7 +69,10 @@ swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest, swift::
 SWIFT_RUNTIME_EXPORT
 void swift_generic_instantiateLayoutString(const uint8_t *layoutStr, Metadata *type);
 
-void swift_resolve_resilientAccessors(uint8_t *layoutStr, size_t layoutStrOffset, const uint8_t *fieldLayoutStr, size_t refCountBytes, const Metadata *fieldType);
+void swift_resolve_resilientAccessors(uint8_t *layoutStr,
+                                      size_t layoutStrOffset,
+                                      const uint8_t *fieldLayoutStr,
+                                      const Metadata *fieldType);
 } // namespace swift
 
 #endif // SWIFT_BYTECODE_LAYOUTS_H
