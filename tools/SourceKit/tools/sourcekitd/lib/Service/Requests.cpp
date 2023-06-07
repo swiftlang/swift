@@ -405,6 +405,26 @@ void sourcekitd::disposeCancellationToken(
   getGlobalContext().getRequestTracker()->stopTracking(CancellationToken);
 }
 
+bool sourcekitd::requestIsBarrier(sourcekitd_object_t ReqObj) {
+  RequestDict Req(ReqObj);
+  sourcekitd_uid_t ReqUID = Req.getUID(KeyRequest);
+  return ReqUID == RequestEditorOpen || ReqUID == RequestEditorReplaceText ||
+         ReqUID == RequestEditorClose;
+}
+
+bool sourcekitd::requestIsEnableBarriers(sourcekitd_object_t ReqObj) {
+  RequestDict Req(ReqObj);
+  sourcekitd_uid_t ReqUID = Req.getUID(KeyRequest);
+  return ReqUID == RequestEnableRequestBarriers;
+}
+
+void sourcekitd::sendBarriersEnabledResponse(ResponseReceiver Receiver) {
+  ResponseBuilder RespBuilder;
+  auto Elem = RespBuilder.getDictionary();
+  Elem.setBool(KeyBarriersEnabled, true);
+  Receiver(RespBuilder.createResponse());
+}
+
 static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
     Optional<StringRef> SourceFile, Optional<StringRef> SourceText,
     const Optional<VFSOptions> &vfsOptions, llvm::SmallString<64> &ErrBuf) {
