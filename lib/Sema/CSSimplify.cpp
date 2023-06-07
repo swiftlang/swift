@@ -2165,7 +2165,9 @@ private:
       const auto &elt2 = tuple2->getElement(i);
 
       if (inPatternMatchingContext) {
-        if (elt1.hasName() && elt1.getName() != elt2.getName())
+        // FIXME: The fact that this isn't symmetric is wrong since this logic
+        // is called for bind and equal constraints...
+        if (elt2.hasName() && elt1.getName() != elt2.getName())
           return true;
       } else {
         // If the names don't match, we have a conflict.
@@ -2343,30 +2345,6 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
   return getTypeMatchSuccess();
 }
 
-namespace {
-
-/// Collects all unique pack type variables referenced from the pattern type,
-/// skipping those captured by nested pack expansion types.
-///
-/// FIXME: This could probably be a common utility method somewhere.
-struct PackTypeVariableCollector: TypeWalker {
-  llvm::SetVector<TypeVariableType *> typeVars;
-
-  Action walkToTypePre(Type t) override {
-    if (t->is<PackExpansionType>())
-      return Action::SkipChildren;
-
-    if (auto *typeVar = t->getAs<TypeVariableType>()) {
-      if (typeVar->getImpl().canBindToPack())
-        typeVars.insert(typeVar);
-    }
-
-    return Action::Continue;
-  }
-};
-
-}
-
 /// Utility function used when matching a pack expansion type against a
 /// pack type.
 ///
@@ -2399,21 +2377,26 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
                                                     Type pattern,
                                                     PackType *pack,
                                                     ConstraintLocatorBuilder locator) {
-  SmallVector<Type, 2> elts;
-
+  llvm::SmallSetVector<TypeVariableType *, 2> typeVarSet;
   llvm::MapVector<TypeVariableType *, SmallVector<Type, 2>> typeVars;
 
-  PackTypeVariableCollector collector;
-  pattern.walk(collector);
+  pattern->walkPackReferences([&](Type t) {
+    if (auto *typeVar = t->getAs<TypeVariableType>()) {
+      if (typeVar->getImpl().canBindToPack())
+        typeVarSet.insert(typeVar);
+    }
 
-  if (collector.typeVars.empty())
+    return false;
+  });
+
+  if (typeVarSet.empty())
     return nullptr;
 
   auto *loc = cs.getConstraintLocator(locator);
 
   // For each pack type variable occurring in the pattern type, compute a
   // binding pack type comprised of fresh type variables.
-  for (auto *typeVar : collector.typeVars) {
+  for (auto *typeVar : typeVarSet) {
     auto &freshTypeVars = typeVars[typeVar];
     for (unsigned i = 0, e = pack->getNumElements(); i < e; ++i) {
       auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
@@ -2440,6 +2423,8 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
       }
     }
   }
+
+  SmallVector<Type, 2> elts;
 
   // For each element of the original pack type, instantiate the pattern type by
   // replacing each pack type variable with the corresponding element of the
@@ -3523,21 +3508,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // FIXME: We should check value ownership too, but it's not completely
       // trivial because of inout-to-pointer conversions.
 
-      // For equality contravariance doesn't matter, but let's make sure
-      // that types are matched in original order because that is important
-      // when function types are equated as part of pattern matching.
-      auto paramType1 = kind == ConstraintKind::Equal ? func1Param.getOldType()
-                                                      : func2Param.getOldType();
-
-      auto paramType2 = kind == ConstraintKind::Equal ? func2Param.getOldType()
-                                                      : func1Param.getOldType();
-
-      // Compare the parameter types.
-      auto result = matchTypes(paramType1, paramType2, subKind, subflags,
-                               (func1Params.size() == 1
-                                ? argumentLocator
-                                : argumentLocator.withPathElement(
-                                      LocatorPathElt::TupleElement(i))));
+      // Compare the parameter types, taking contravariance into account.
+      auto result = matchTypes(
+          func2Param.getOldType(), func1Param.getOldType(), subKind, subflags,
+          (func1Params.size() == 1 ? argumentLocator
+                                   : argumentLocator.withPathElement(
+                                         LocatorPathElt::TupleElement(i))));
       if (result.isFailure())
         return result;
     }
@@ -6367,8 +6343,20 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::EnumPatternImplicitCastMatch: {
+    // If either type is a placeholder, consider this fixed.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   case ConstraintLocator::PatternMatch: {
     auto *pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
+
+    // TODO: We ought to introduce a new locator element for this.
     bool isMemberMatch =
         lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern);
 
@@ -6383,13 +6371,12 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
-    // If member reference didn't match expected pattern,
-    // let's consider that a contextual mismatch.
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
       conversionsOrFixes.push_back(AllowAssociatedValueMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+      break;
     }
 
     // `weak` declaration with an explicit non-optional type e.g.
@@ -6402,7 +6389,7 @@ bool ConstraintSystem::repairFailures(
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
           ROK = OA->get();
 
-        if (!rhs->getOptionalObjectType() &&
+        if (!lhs->getOptionalObjectType() &&
             optionalityOf(ROK) == ReferenceOwnershipOptionality::Required) {
           conversionsOrFixes.push_back(
               AllowNonOptionalWeak::create(*this, getConstraintLocator(NP)));
@@ -6410,6 +6397,9 @@ bool ConstraintSystem::repairFailures(
         }
       }
     }
+
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
 
     break;
   }
@@ -14833,8 +14823,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
 
-    (void)matchTypes(type1, OptionalType::get(type2),
-                     ConstraintKind::Conversion,
+    // NOTE: The order here is important! Pattern matching equality is
+    // not symmetric (we need to fix that either by using a different
+    // constraint, or actually making it symmetric).
+    (void)matchTypes(OptionalType::get(type1), type2, ConstraintKind::Equal,
                      TypeMatchFlags::TMF_ApplyingFix, locator);
 
     return SolutionKind::Solved;

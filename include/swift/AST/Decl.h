@@ -225,6 +225,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 /// Diagnostic printing of \c ReferenceOwnership.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
 
+enum class SelfAccessKind : uint8_t {
+  NonMutating,
+  Mutating,
+  LegacyConsuming,
+  Consuming,
+  Borrowing,
+  LastSelfAccessKind = Borrowing,
+};
+enum : unsigned {
+  NumSelfAccessKindBits =
+      countBitsUsed(static_cast<unsigned>(SelfAccessKind::LastSelfAccessKind))
+};
+static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
+                  (NumSelfAccessKindBits << 1),
+              "Self Access Kind is too small to fit in SelfAccess kind bits. "
+              "Please expand ");
+
+/// Diagnostic printing of \c SelfAccessKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
+
 /// Encapsulation of the overload signature of a given declaration,
 /// which is used to determine uniqueness of a declaration within a
 /// given context.
@@ -316,6 +336,10 @@ enum class ArtificialMainKind : uint8_t {
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl : public ASTAllocated<Decl> {
 protected:
+  // clang-format off
+  //
+  // We format these different than clang-format wishes us to... so turn if off
+  // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
@@ -457,7 +481,8 @@ protected:
     DistributedThunk: 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl,
+                        1+1+2+1+1+NumSelfAccessKindBits+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -474,7 +499,7 @@ protected:
     SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
-    SelfAccess : 2,
+    SelfAccess : NumSelfAccessKindBits,
 
     /// Whether this is a top-level function which should be treated
     /// as if it were in local context for the purposes of capture
@@ -736,6 +761,8 @@ protected:
   );
 
   } Bits;
+  // Turn back on clang-format now that we have defined our inline bitfields.
+  // clang-format on
 
   // Storage for the declaration attributes.
   DeclAttributes Attrs;
@@ -7233,17 +7260,6 @@ public:
 
 class OperatorDecl;
 
-enum class SelfAccessKind : uint8_t {
-  NonMutating,
-  Mutating,
-  LegacyConsuming,
-  Consuming,
-  Borrowing,
-};
-
-/// Diagnostic printing of \c SelfAccessKind.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
-  
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;

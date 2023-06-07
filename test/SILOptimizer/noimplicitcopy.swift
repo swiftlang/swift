@@ -2001,8 +2001,9 @@ public func closureCaptureClassUseAfterConsumeError(_ x: Klass) {
     let _ = x3
 }
 
-public func closureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let f = { // expected-note {{consumed here}}
+public func closureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) {
+    // expected-error @-1 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
+    let f = { // expected-note {{closure capturing 'x2' here}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2)
         print(x2)
@@ -2121,8 +2122,9 @@ public func closureAndDeferCaptureClassUseAfterConsume3(_ x: Klass) {
     classConsume(x2) // expected-note {{consumed again here}}
 }
 
-public func closureAndDeferCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let f = { // expected-note {{consumed here}}
+public func closureAndDeferCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) {
+    // expected-error @-1 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
+    let f = { // expected-note {{closure capturing 'x2' here}}
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2)
@@ -2186,8 +2188,9 @@ public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) {
 }
 
 
-public func closureAndClosureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) { // expected-error {{'x2' is borrowed and cannot be consumed}}
-    let f = { // expected-note {{consumed here}}
+public func closureAndClosureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) {
+    // expected-error @-1 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
+    let f = { // expected-note {{closure capturing 'x2' here}}
         let g = {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2)

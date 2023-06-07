@@ -57,7 +57,7 @@ void suspend_other_threads();
 void resume_other_threads();
 bool run_backtracer(void);
 
-swift::CrashInfo crashInfo;
+CrashInfo crashInfo;
 
 os_unfair_lock crashLock = OS_UNFAIR_LOCK_INIT;
 

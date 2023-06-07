@@ -483,7 +483,14 @@ static ManagedValue createInputFunctionArgument(
   assert((F.isBare() || isFormalParameterPack || decl) &&
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
-  arg->setNoImplicitCopy(isNoImplicitCopy);
+  if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
+    if (!arg->getType().isPureMoveOnly()) {
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+    }
+  }
+  if (isNoImplicitCopy)
+    arg->setNoImplicitCopy(isNoImplicitCopy);
   arg->setClosureCapture(isClosureCapture);
   arg->setLifetimeAnnotation(lifetimeAnnotation);
   arg->setFormalParameterPack(isFormalParameterPack);

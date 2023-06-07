@@ -659,7 +659,8 @@ static Type getTypeForDWARFMangling(Type t) {
       return t;
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes);
+    SubstFlags::AllowLoweredTypes |
+    SubstFlags::PreservePackExpansionLevel);
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
@@ -1288,8 +1289,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PackElement: {
       auto elementType = cast<PackElementType>(tybase);
       appendType(elementType->getPackType(), sig, forDecl);
-
-      // FIXME: append expansion depth
+      // If this ever changes, just mangle level 0 as a plain type parameter.
+      assert(elementType->getLevel() > 0);
+      appendOperator("Qe", Index(elementType->getLevel() - 1));
 
       return;
     }

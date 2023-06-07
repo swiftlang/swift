@@ -4298,30 +4298,18 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::InOut:
   case ParamSpecifier::LegacyShared:
   case ParamSpecifier::LegacyOwned:
+  case ParamSpecifier::Borrowing:
     break;
-
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        diagnoseInvalid(ownershipRepr,
-                        ownershipRepr->getLoc(),
+        diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),
                         diag::ownership_specifier_nonescaping_closure,
                         ownershipRepr->getSpecifierSpelling());
         return ErrorType::get(getASTContext());
       }
     }
-  SWIFT_FALLTHROUGH;
-  case ParamSpecifier::Borrowing:
-    // Unless we have the experimental no-implicit-copy feature enabled, Copyable
-    // types can't use 'consuming' or 'borrowing' ownership specifiers.
-    if (!getASTContext().LangOpts.hasFeature(Feature::NoImplicitCopy)) {
-      if (!result->isPureMoveOnly()) {
-        diagnoseInvalid(ownershipRepr,
-                        ownershipRepr->getLoc(),
-                        diag::ownership_specifier_copyable);
-        return ErrorType::get(getASTContext());
-      }
-    }
+    break;
   }
 
   return result;

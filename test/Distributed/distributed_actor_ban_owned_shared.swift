@@ -15,8 +15,7 @@ distributed actor First {
   distributed func owned(_: __owned Param) async throws {} // expected-error{{cannot declare '__owned' argument '_' in distributed instance method 'owned'}}
   distributed func shared(_: __shared Param) async throws {} // expected-error{{cannot declare '__shared' argument '_' in distributed instance method 'shared'}}
   distributed func consuming(_: consuming Param) async throws {}
-  // expected-error@-1{{copyable types cannot be 'consuming' or 'borrowing' yet}}
-  // expected-error@-2{{parameter '' of type '<<error type>>' in distributed instance method does not conform to serialization requirement 'Codable'}}
+  // expected-error @-1 {{cannot declare 'consuming' argument '_' in distributed instance method 'consuming'}}
 }
 
 func test(first: First) async throws {
