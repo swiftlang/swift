@@ -30,6 +30,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   main.swift
   AnsiColor.swift
   TargetMacOS.swift
+  TargetLinux.swift
   Themes.swift
   Utils.swift
 
@@ -44,5 +45,5 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
     ${BACKTRACING_COMPILE_FLAGS}
     -parse-as-library
 
-  TARGET_SDKS OSX)
+  TARGET_SDKS OSX LINUX)
 
