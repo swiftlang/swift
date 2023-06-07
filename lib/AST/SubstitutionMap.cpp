@@ -418,6 +418,16 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.
+    if (conformance.isPack()) {
+      auto pack = conformance.getPack();
+      conformance = ProtocolConformanceRef(
+          pack->getAssociatedConformance(step.first, step.second));
+      if (conformance.isInvalid())
+        return conformance;
+
+      continue;
+    }
+
     auto concrete = conformance.getConcrete();
     auto normal = concrete->getRootNormalConformance();
 
