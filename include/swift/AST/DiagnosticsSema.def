@@ -874,6 +874,12 @@ ERROR(need_hermetic_seal_to_import_module,none,
       "module %0 was built with -experimental-hermetic-seal-at-link, but "
       "current compilation does not have -experimental-hermetic-seal-at-link",
       (Identifier))
+ERROR(need_cxx_interop_to_import_module,none,
+      "module %0 was built with C++ interoperability enabled, but "
+      "current compilation does not enable C++ interoperability",
+      (Identifier))
+NOTE(enable_cxx_interop_docs,none,
+     "visit https://www.swift.org/documentation/cxx-interop/project-build-setup to learn how to enable C++ interoperability", ())
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"

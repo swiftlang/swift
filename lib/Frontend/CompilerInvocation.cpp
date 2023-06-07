@@ -1005,6 +1005,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_experimental_c_foreign_reference_types);
 
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
+  Opts.RequireCxxInteropToImportCxxInteropModule =
+      !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
