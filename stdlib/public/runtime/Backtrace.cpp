@@ -843,8 +843,8 @@ namespace backtrace {
 /// @param mangledName is the symbol name to be tested.
 ///
 /// @returns `true` if `mangledName` represents a thunk function.
-SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift) bool
-_swift_isThunkFunction(const char *mangledName) {
+SWIFT_RUNTIME_STDLIB_SPI bool
+_swift_backtrace_isThunkFunction(const char *mangledName) {
   swift::Demangle::Context ctx;
 
   return ctx.isThunkSymbol(mangledName);
@@ -855,8 +855,7 @@ SWIFT_RUNTIME_STDLIB_SPI char *
 _swift_backtrace_demangle(const char *mangledName,
                           size_t mangledNameLength,
                           char *outputBuffer,
-                          size_t *outputBufferSize,
-                          int *status) {
+                          size_t *outputBufferSize) {
   llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
 
   // You must provide buffer size if you're providing your own output buffer
@@ -884,13 +883,16 @@ _swift_backtrace_demangle(const char *mangledName,
     ::memcpy(outputBuffer, result.data(), toCopy);
     outputBuffer[toCopy] = '\0';
 
-    *status = 0;
     return outputBuffer;
 #ifndef _WIN32
   } else if (name.startswith("_Z")) {
-    // Try C++
+    // Try C++; note that we don't want to force callers to use malloc() to
+    // allocate their buffer, which is a requirement for __cxa_demangle
+    // because it may call realloc() on the incoming pointer.  As a result,
+    // we never pass the caller's buffer to __cxa_demangle.
     size_t resultLen;
-    char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, status);
+    int status = 0;
+    char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
 
     if (result) {
       size_t bufferSize;
@@ -910,15 +912,12 @@ _swift_backtrace_demangle(const char *mangledName,
 
       free(result);
 
-      *status = 0;
       return outputBuffer;
     }
 #else
     // On Windows, the mangling is different.
     // ###TODO: Call __unDName()
 #endif
-  } else {
-    *status = -2;
   }
 
   return nullptr;
