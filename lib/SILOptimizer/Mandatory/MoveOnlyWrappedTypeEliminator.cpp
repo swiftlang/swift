@@ -279,6 +279,18 @@ struct SILMoveOnlyWrappedTypeEliminator {
 
 } // namespace
 
+/// Returns true if this is a moveonlywrapped type whose underlying type is a
+/// trivial type /or/ if this is a boxed type of that sort.
+static bool isMoveOnlyWrappedTrivial(SILValue value) {
+  auto *fn = value->getFunction();
+  SILType type = value->getType();
+  if (type.removingMoveOnlyWrapper().isTrivial(fn))
+    return true;
+  if (type.isBoxedMoveOnlyWrappedType(fn))
+    return type.getSILBoxFieldType(fn).removingMoveOnlyWrapper().isTrivial(fn);
+  return false;
+}
+
 bool SILMoveOnlyWrappedTypeEliminator::process() {
   bool madeChange = true;
 
@@ -314,7 +326,7 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
           continue;
 
         if (trivialOnly &&
-            !v->getType().removingMoveOnlyWrapper().isTrivial(*fn))
+            !isMoveOnlyWrappedTrivial(v))
           continue;
 
         v->unsafelyEliminateMoveOnlyWrapper(fn);
