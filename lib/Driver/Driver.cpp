@@ -2064,7 +2064,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         }
       case file_types::TY_AutolinkFile:
       case file_types::TY_Object:
-      case file_types::TY_LLVM_BC:
       case file_types::TY_TBD:
         // Object inputs are only okay if linking.
         if (OI.shouldLink()) {
@@ -2078,6 +2077,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_Dependencies:
       case file_types::TY_Assembly:
       case file_types::TY_LLVM_IR:
+      case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
       case file_types::TY_ClangHeader:
       case file_types::TY_ClangModuleFile:
