@@ -8,7 +8,7 @@
 // RUN: %target-codesign %t/CrashOpt
 // RUN: %target-codesign %t/CrashOptNoDebug
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Crash 2>&1 || true) | %FileCheck %s
-// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash || true) | %FileCheck %s --check-prefix FRIENDLY
+// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash 2>&1 || true) | %FileCheck %s --check-prefix FRIENDLY
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashNoDebug 2>&1 || true) | %FileCheck %s --check-prefix NODEBUG
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOpt 2>&1 || true) | %FileCheck %s --check-prefix OPTIMIZED
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug 2>&1 || true) | %FileCheck %s --check-prefix OPTNODEBUG
