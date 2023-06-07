@@ -2799,7 +2799,9 @@ IgnoreMissingEachKeyword::create(ConstraintSystem &cs, Type valuePackTy,
 
 bool AllowInvalidMemberReferenceInInitAccessor::diagnose(
     const Solution &solution, bool asNote) const {
-  return false;
+  InvalidMemberReferenceWithinInitAccessor failure(solution, MemberName,
+                                                   getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowInvalidMemberReferenceInInitAccessor *

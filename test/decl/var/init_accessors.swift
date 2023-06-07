@@ -173,3 +173,51 @@ func test_invalid_self_uses() {
     static func test<T>(_: T) {}
   }
 }
+
+func test_invalid_references() {
+  struct Test {
+    var _a: Int
+    var _b: Int
+
+    var c: String
+    static var c: String = ""
+
+    var _d: String
+
+    var data: Int {
+      init(initialValue) initializes(_a) accesses(_d) {
+        _a = initialValue // Ok
+
+        print(_d) // Ok
+        self._d = "" // Ok
+
+        if self._b > 0 { // expected-error {{cannot reference instance member '_b'; init accessors can only refer to instance properties listed in 'initializes' and 'accesses' attributes}}
+        }
+
+        let x = c.lowercased()
+        // expected-error@-1 {{static member 'c' cannot be used on instance of type 'Test'}}
+
+        print(Test.c.lowercased()) // Ok
+
+        guard let v = test() else {
+          // expected-error@-1 {{cannot reference instance member 'test'; init accessors can only refer to instance properties listed in 'initializes' and 'accesses' attributes}}
+          return
+        }
+
+        _ = {
+          if true {
+            print(_b)
+            // expected-error@-1 {{cannot reference instance member '_b'; init accessors can only refer to instance properties listed in 'initializes' and 'accesses' attributes}}
+            print(self._b)
+            // expected-error@-1 {{cannot reference instance member '_b'; init accessors can only refer to instance properties listed in 'initializes' and 'accesses' attributes}}
+          }
+        }
+      }
+
+      get { _a }
+      set { }
+    }
+
+    func test() -> Int? { 42 }
+  }
+}

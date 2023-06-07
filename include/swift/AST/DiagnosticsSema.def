@@ -7346,7 +7346,11 @@ ERROR(invalid_use_of_self_in_init_accessor,none,
       "'self' within init accessors can only be used to reference "
       "properties listed in 'initializes' and 'accesses'; "
       "init accessors are run before 'self' is fully available", ())
-
+ERROR(init_accessor_invalid_member_ref,none,
+      "cannot reference instance member %0; init accessors can only "
+      "refer to instance properties listed in 'initializes' and "
+      "'accesses' attributes",
+      (DeclNameRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
