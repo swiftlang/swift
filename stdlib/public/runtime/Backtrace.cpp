@@ -123,7 +123,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   true,
 
   // outputTo,
-  OutputTo::Stdout,
+  OutputTo::Auto,
 
   // swiftBacktracePath
   NULL,
@@ -320,6 +320,13 @@ BacktraceInitializer::BacktraceInitializer() {
       _swift_backtraceSettings.preset = Preset::Friendly;
     else
       _swift_backtraceSettings.preset = Preset::Full;
+  }
+
+  if (_swift_backtraceSettings.outputTo == OutputTo::Auto) {
+    if (_swift_backtraceSettings.interactive == OnOffTty::On)
+      _swift_backtraceSettings.outputTo = OutputTo::Stdout;
+    else
+      _swift_backtraceSettings.outputTo = OutputTo::Stderr;
   }
 
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
@@ -648,7 +655,9 @@ _swift_processBacktracingSetting(llvm::StringRef key,
   } else if (key.equals_insensitive("cache")) {
     _swift_backtraceSettings.cache = parseBoolean(value);
   } else if (key.equals_insensitive("output-to")) {
-    if (value.equals_insensitive("stdout"))
+    if (value.equals_insensitive("auto"))
+      _swift_backtraceSettings.outputTo = OutputTo::Auto;
+    else if (value.equals_insensitive("stdout"))
       _swift_backtraceSettings.outputTo = OutputTo::Stdout;
     else if (value.equals_insensitive("stderr"))
       _swift_backtraceSettings.outputTo = OutputTo::Stderr;
