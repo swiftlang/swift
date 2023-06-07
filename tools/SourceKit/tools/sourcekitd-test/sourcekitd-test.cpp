@@ -1412,7 +1412,6 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::ConformingMethodList:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
-    case SourceKitRequest::SyntacticMacroExpansion:
       printRawResponse(Resp);
       break;
     case SourceKitRequest::Compile:
@@ -1568,6 +1567,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
 #include "swift/Refactoring/RefactoringKinds.def"
       case SourceKitRequest::SyntacticRename:
+      case SourceKitRequest::SyntacticMacroExpansion:
         printSyntacticRenameEdits(Info, llvm::outs());
         break;
       case SourceKitRequest::FindRenameRanges:

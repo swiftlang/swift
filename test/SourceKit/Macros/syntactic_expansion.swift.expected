@@ -1,124 +1,108 @@
-{
-  key.categorizededits: [
-    {
-      key.edits: [
-        {
-          key.line: 1,
-          key.column: 1,
-          key.endline: 1,
-          key.endcolumn: 22,
-          key.text: ""
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 13,
-          key.column: 1,
-          key.endline: 13,
-          key.endcolumn: 1,
-          key.text: "static func requirement() where Element : P {\n  Element.requirement()\n}"
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 13,
-          key.column: 2,
-          key.endline: 13,
-          key.endcolumn: 2,
-          key.text: "extension Generic : P where Element: P {}"
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 5,
-          key.column: 3,
-          key.endline: 5,
-          key.endcolumn: 21,
-          key.text: ""
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 7,
-          key.column: 17,
-          key.endline: 7,
-          key.endcolumn: 17,
-          key.text: "{\n    get {\n            _value.wrappedValue\n      }\n\n    set {\n            _value.wrappedValue = newValue\n      }\n}"
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 7,
-          key.column: 12,
-          key.endline: 7,
-          key.endcolumn: 12,
-          key.text: "var _value: MyWrapperThingy<Int>"
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 2,
-          key.column: 1,
-          key.endline: 2,
-          key.endcolumn: 19,
-          key.text: ""
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 7,
-          key.column: 3,
-          key.endline: 7,
-          key.endcolumn: 3,
-          key.text: "@Wrapper"
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 10,
-          key.column: 3,
-          key.endline: 10,
-          key.endcolumn: 3,
-          key.text: "@Wrapper"
-        }
-      ],
-      key.category: source.edit.kind.active
-    },
-    {
-      key.edits: [
-        {
-          key.line: 12,
-          key.column: 3,
-          key.endline: 12,
-          key.endcolumn: 35,
-          key.text: "struct blah8 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {\n  }\n}\nstruct blah16 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {\n  }\n}\nstruct blah32 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {\n  }\n}\nstruct blah64 {\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {\n  }\n  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {\n  }\n}"
-        }
-      ],
-      key.category: source.edit.kind.active
-    }
-  ]
+### 1
+source.edit.kind.active:
+  1:1-1:22 ""
+source.edit.kind.active:
+  13:1-13:1 "static func requirement() where Element : P {
+  Element.requirement()
+}"
+source.edit.kind.active:
+  13:2-13:2 "extension Generic : P where Element: P {}"
+source.edit.kind.active:
+  5:3-5:21 ""
+source.edit.kind.active:
+  7:17-7:17 "{
+    get {
+            _value.wrappedValue
+      }
+
+    set {
+            _value.wrappedValue = newValue
+      }
+}"
+source.edit.kind.active:
+  7:12-7:12 "var _value: MyWrapperThingy<Int>"
+source.edit.kind.active:
+  2:1-2:19 ""
+source.edit.kind.active:
+  7:3-7:3 "@Wrapper"
+source.edit.kind.active:
+  10:3-10:3 "@Wrapper"
+source.edit.kind.active:
+  12:3-12:35 "struct blah8 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {
+  }
 }
+struct blah16 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {
+  }
+}
+struct blah32 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {
+  }
+}
+struct blah64 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {
+  }
+}"
+### 2
+source.edit.kind.active:
+  12:3-12:35 "struct blah8 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {
+  }
+}
+struct blah16 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {
+  }
+}
+struct blah32 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {
+  }
+}
+struct blah64 {
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {
+  }
+  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {
+  }
+}"
+source.edit.kind.active:
+  2:1-2:19 ""
+source.edit.kind.active:
+  7:3-7:3 "@Wrapper"
+source.edit.kind.active:
+  10:3-10:3 "@Wrapper"
+source.edit.kind.active:
+  5:3-5:21 ""
+source.edit.kind.active:
+  7:17-7:17 "{
+    get {
+            _value.wrappedValue
+      }
+
+    set {
+            _value.wrappedValue = newValue
+      }
+}"
+source.edit.kind.active:
+  7:12-7:12 "var _value: MyWrapperThingy<Int>"
+source.edit.kind.active:
+  1:1-1:22 ""
+source.edit.kind.active:
+  13:1-13:1 "static func requirement() where Element : P {
+  Element.requirement()
+}"
+source.edit.kind.active:
+  13:2-13:2 "extension Generic : P where Element: P {}"

@@ -156,7 +156,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
-              .Default(SourceKitRequest::None);
+        .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request '" << InputArg->getValue()

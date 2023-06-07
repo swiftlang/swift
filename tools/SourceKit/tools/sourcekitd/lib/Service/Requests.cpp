@@ -1842,11 +1842,9 @@ handleRequestDiagnostics(const RequestDict &Req,
 ///     key.macro_roles: [<macro role UID>...]
 ///   }
 ///
-/// Sends the results as a 'CategorizedEdits'. Each edit object has
-/// 'key.buffer_name' that can be used for recursive expansion. If the
-/// client finds nested macro expansion in the expanded source, it can send
-/// another request using the buffer name and the source text in the subsequent
-/// request.
+/// Sends the results as a 'CategorizedEdits'. 
+/// Note that, unlike refactoring, each edit doesn't have 'key.buffer_name'.
+/// FIXME: Support nested expansion.
 static void handleRequestExpandMacroSyntactically(
     const RequestDict &req, SourceKitCancellationToken cancellationToken,
     ResponseReceiver rec) {

@@ -39,7 +39,6 @@ struct MacroExpansionSpecifier {
 /// list of compiler arguments (i.e. 'argHash'), and reused as long as the
 /// compiler arguments are not changed.
 class SyntacticMacroExpansionInstance {
-  const Fingerprint argHash;
   CompilerInvocation invocation;
 
   SourceManager SourceMgr;
@@ -47,8 +46,6 @@ class SyntacticMacroExpansionInstance {
   std::unique_ptr<ASTContext> Ctx;
   ModuleDecl *TheModule = nullptr;
   llvm::StringMap<MacroDecl *> MacroDecls;
-
-  std::mutex mtx;
 
   /// Create 'SourceFile' using the buffer.
   swift::SourceFile *getSourceFile(llvm::MemoryBuffer *inputBuf);
@@ -64,13 +61,12 @@ class SyntacticMacroExpansionInstance {
                     SourceEditConsumer &consumer);
 
 public:
-  SyntacticMacroExpansionInstance(Fingerprint argHash) : argHash(argHash) {}
+  SyntacticMacroExpansionInstance() {}
 
   /// Setup the instance with \p args .
   bool setup(StringRef SwiftExecutablePath, ArrayRef<const char *> args,
              std::shared_ptr<PluginRegistry> plugins, std::string &error);
 
-  const Fingerprint &getArgHash() const { return argHash; }
   ASTContext &getASTContext() { return *Ctx; }
 
   /// Expand all macros in \p inputBuf and send the edit results to \p consumer.
@@ -85,16 +81,12 @@ class SyntacticMacroExpansion {
   StringRef SwiftExecutablePath;
   std::shared_ptr<PluginRegistry> Plugins;
 
-  /// Cached instance.
-  std::shared_ptr<SyntacticMacroExpansionInstance> currentInstance;
-
 public:
   SyntacticMacroExpansion(StringRef SwiftExecutablePath,
                           std::shared_ptr<PluginRegistry> Plugins)
       : SwiftExecutablePath(SwiftExecutablePath), Plugins(Plugins) {}
 
   /// Get instance configured with the specified compiler arguments.
-  /// If 'currentInstance' matches with the arguments, just return it.
   std::shared_ptr<SyntacticMacroExpansionInstance>
   getInstance(ArrayRef<const char *> args, std::string &error);
 };

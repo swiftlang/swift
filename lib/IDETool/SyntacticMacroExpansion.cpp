@@ -26,27 +26,13 @@ using namespace ide;
 std::shared_ptr<SyntacticMacroExpansionInstance>
 SyntacticMacroExpansion::getInstance(ArrayRef<const char *> args,
                                      std::string &error) {
-  // Compute the signature of the invocation.
-  StableHasher argHasher = StableHasher::defaultHasher();
-  for (auto arg : args)
-    argHasher.combine(StringRef(arg));
-  Fingerprint argHash(std::move(argHasher));
-
-  // Check if the current instance is usable.
-  if (auto currentInstance = this->currentInstance) {
-    if (currentInstance->getArgHash() == argHash) {
-      return currentInstance;
-    }
-  }
-
   // Create and configure a new instance.
-  auto instance = std::make_shared<SyntacticMacroExpansionInstance>(argHash);
+  auto instance = std::make_shared<SyntacticMacroExpansionInstance>();
 
   bool failed = instance->setup(SwiftExecutablePath, args, Plugins, error);
   if (failed)
     return nullptr;
 
-  currentInstance = instance;
   return instance;
 }
 
@@ -475,7 +461,6 @@ bool SyntacticMacroExpansionInstance::getExpansion(
 bool SyntacticMacroExpansionInstance::getExpansions(
     llvm::MemoryBuffer *inputBuf, ArrayRef<MacroExpansionSpecifier> expansions,
     SourceEditConsumer &consumer) {
-  std::scoped_lock<std::mutex> lock(mtx);
 
   // Create a source file.
   SourceFile *SF = getSourceFile(inputBuf);

@@ -51,11 +51,27 @@ struct Generic<Element> {
 //##-- Prepare the macro plugin.
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/plugins/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %sourcekitd-test -req=syntactic-expandmacro \
+// RUN: %sourcekitd-test \
+// RUN:   -shell -- echo '### 1' \
+// RUN:   == \
+// RUN:   -req=syntactic-expandmacro \
 // RUN:   -req-opts=1:1:%t/DelegatedConformance.json \
 // RUN:   -req-opts=5:3:%t/myPropertyWrapper.json \
 // RUN:   -req-opts=2:1:%t/wrapAllProperties.json \
 // RUN:   -req-opts=12:3:%t/bitwidthNumberedStructs.json \
+// RUN:   %t/test.swift \
+// RUN:   -- \
+// RUN:   %t/test.swift \
+// RUN:   -plugin-path %t/plugins -Xfrontend -dump-macro-expansions \
+// RUN:   -module-name TestModule \
+// RUN:   == \
+// RUN:   -shell -- echo '### 2' \
+// RUN:   == \
+// RUN:   -req=syntactic-expandmacro \
+// RUN:   -req-opts=12:3:%t/bitwidthNumberedStructs.json \
+// RUN:   -req-opts=2:1:%t/wrapAllProperties.json \
+// RUN:   -req-opts=5:3:%t/myPropertyWrapper.json \
+// RUN:   -req-opts=1:1:%t/DelegatedConformance.json \
 // RUN:   %t/test.swift \
 // RUN:   -- \
 // RUN:   %t/test.swift \
