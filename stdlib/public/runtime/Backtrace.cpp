@@ -855,8 +855,7 @@ SWIFT_RUNTIME_STDLIB_SPI char *
 _swift_backtrace_demangle(const char *mangledName,
                           size_t mangledNameLength,
                           char *outputBuffer,
-                          size_t *outputBufferSize,
-                          int *status) {
+                          size_t *outputBufferSize) {
   llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
 
   // You must provide buffer size if you're providing your own output buffer
@@ -884,13 +883,13 @@ _swift_backtrace_demangle(const char *mangledName,
     ::memcpy(outputBuffer, result.data(), toCopy);
     outputBuffer[toCopy] = '\0';
 
-    *status = 0;
     return outputBuffer;
 #ifndef _WIN32
   } else if (name.startswith("_Z")) {
     // Try C++
     size_t resultLen;
-    char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, status);
+    int status = 0;
+    char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
 
     if (result) {
       size_t bufferSize;
@@ -910,15 +909,12 @@ _swift_backtrace_demangle(const char *mangledName,
 
       free(result);
 
-      *status = 0;
       return outputBuffer;
     }
 #else
     // On Windows, the mangling is different.
     // ###TODO: Call __unDName()
 #endif
-  } else {
-    *status = -2;
   }
 
   return nullptr;

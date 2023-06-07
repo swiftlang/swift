@@ -200,9 +200,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// Demangle the raw name, if possible.
     private func demangleRawName() -> String {
       var length: size_t = 0
-      var status: CInt = 0
       if let demangled = _swift_backtrace_demangle(rawName, rawName.utf8.count,
-                                                   nil, &length, &status) {
+                                                   nil, &length) {
         defer { free(demangled) }
 
         // length is the size of the buffer that was allocated, *not* the
