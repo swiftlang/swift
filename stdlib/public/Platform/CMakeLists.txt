@@ -104,11 +104,12 @@ add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SD
 
     GYB_SOURCES
       ${swift_platform_gyb_sources}
-      WASI.swift.gyb
+      WASILibc.swift.gyb
 
     SWIFT_COMPILE_FLAGS
       ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WASI
     INSTALL_IN_COMPONENT sdk-overlay
@@ -142,7 +143,7 @@ foreach(sdk ${SWIFT_SDKS})
     set(glibc_modulemap_source "glibc.modulemap.gyb")
     set(glibc_header_source "SwiftGlibc.h.gyb")
   elseif("${sdk}" STREQUAL "WASI")
-    set(glibc_modulemap_source "wasi.modulemap.gyb")
+    set(glibc_modulemap_source "wasi-libc.modulemap.gyb")
     set(glibc_header_source "SwiftWASILibc.h.gyb")
   else()
     continue()
