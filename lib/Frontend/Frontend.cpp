@@ -225,7 +225,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     llvm::interleave(
         pair.ModuleNames, [&](auto &name) { optStr += name; },
         [&]() { optStr += ","; });
-    serializationOpts.CompilerPluginLibraryPaths.push_back(optStr);
+    serializationOpts.CompilerPluginExecutablePaths.push_back(optStr);
   }
 
   serializationOpts.DisableCrossModuleIncrementalInfo =
