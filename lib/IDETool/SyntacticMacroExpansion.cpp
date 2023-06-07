@@ -219,7 +219,7 @@ expandFreestandingMacro(MacroDecl *macro,
   std::vector<unsigned> bufferIDs;
 
   SmallString<32> discriminator;
-  discriminator.append("macro_");
+  discriminator.append("__syntactic_macro_");
   addExpansionDiscriminator(discriminator,
                             expansion->getDeclContext()->getParentSourceFile(),
                             expansion->getPoundLoc());
@@ -293,7 +293,9 @@ static Identifier getCustomAttrName(ASTContext &ctx, const CustomAttr *attr) {
   }
 
   // If the attribute is not an identifier type, create an identifier with its
-  // textual representation.
+  // textual representation. This is *not* expected to be reachable.
+  // The only case is like `@Foo?` where the client should not send the
+  // expansion request on this in the first place.
   SmallString<32> name;
   llvm::raw_svector_ostream OS(name);
   tyR->print(OS);
@@ -406,7 +408,7 @@ public:
 };
 } // namespace
 
-bool SyntacticMacroExpansionInstance::getExpansion(
+void SyntacticMacroExpansionInstance::expand(
     SourceFile *SF, const MacroExpansionSpecifier &expansion,
     SourceEditConsumer &consumer) {
 
@@ -417,7 +419,7 @@ bool SyntacticMacroExpansionInstance::getExpansion(
   SF->walk(expansionFinder);
   auto expansionNode = expansionFinder.getResult();
   if (!expansionNode)
-    return true;
+    return;
 
   // Expand the macro.
   std::vector<unsigned> bufferIDs;
@@ -454,20 +456,16 @@ bool SyntacticMacroExpansionInstance::getExpansion(
                                         /*adjust=*/false,
                                         /*includeBufferName=*/false);
   }
-
-  return false;
 }
 
-bool SyntacticMacroExpansionInstance::getExpansions(
+void SyntacticMacroExpansionInstance::expandAll(
     llvm::MemoryBuffer *inputBuf, ArrayRef<MacroExpansionSpecifier> expansions,
     SourceEditConsumer &consumer) {
 
   // Create a source file.
   SourceFile *SF = getSourceFile(inputBuf);
 
-  bool hasError = false;
   for (const auto &expansion : expansions) {
-    hasError |= getExpansion(SF, expansion, consumer);
+    expand(SF, expansion, consumer);
   }
-  return hasError;
 }

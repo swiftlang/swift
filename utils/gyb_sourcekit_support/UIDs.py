@@ -276,12 +276,9 @@ UID_REQUESTS = [
     REQUEST('Diagnostics', 'source.request.diagnostics'),
     REQUEST('Compile', 'source.request.compile'),
     REQUEST('CompileClose', 'source.request.compile.close'),
-<<<<<<< HEAD
     REQUEST('EnableRequestBarriers', 'source.request.enable_request_barriers'),
-=======
-    REQUEST('ExpandMacroSyntactically',
-            'source.request.expand.macro.syntactically'),
->>>>>>> 309c87b56fa ([SourceKit] Add request to expand macros syntactically)
+    REQUEST('SyntacticMacroExpansion',
+            'source.request.syntactic_macro_expansion'),
 ]
 
 

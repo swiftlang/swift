@@ -422,10 +422,10 @@ static bool readPopularAPIList(StringRef filename,
 /// where {path} is a path to a JSON file that has macro roles and definition.
 /// {line} and {column} is resolved to 'offset' using \p inputBuf .
 static bool setSyntacticMacroExpansions(sourcekitd_object_t req,
-                                        TestOptions &Opts,
+                                        TestOptions &opts,
                                         llvm::MemoryBuffer *inputBuf) {
   SmallVector<sourcekitd_object_t, 4> expansions;
-  for (std::string &opt : Opts.RequestOptions) {
+  for (std::string &opt : opts.RequestOptions) {
     SmallVector<StringRef, 3> args;
     StringRef(opt).split(args, ":");
     unsigned line, column;
@@ -437,7 +437,7 @@ static bool setSyntacticMacroExpansions(sourcekitd_object_t req,
     }
     unsigned offset = resolveFromLineCol(line, column, inputBuf);
 
-    auto Buffer = getBufferForFilename(args[2], Opts.VFSFiles)->getBuffer();
+    auto Buffer = getBufferForFilename(args[2], opts.VFSFiles)->getBuffer();
     char *Err = nullptr;
     auto expansion = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
     if (!expansion) {
@@ -1150,7 +1150,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::SyntacticMacroExpansion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
-                                          RequestExpandMacroSyntactically);
+                                          RequestSyntacticMacroExpansion);
     setSyntacticMacroExpansions(Req, Opts, SourceBuf.get());
     break;
   }

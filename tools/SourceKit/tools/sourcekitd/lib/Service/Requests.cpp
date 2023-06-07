@@ -1845,7 +1845,7 @@ handleRequestDiagnostics(const RequestDict &Req,
 /// Sends the results as a 'CategorizedEdits'. 
 /// Note that, unlike refactoring, each edit doesn't have 'key.buffer_name'.
 /// FIXME: Support nested expansion.
-static void handleRequestExpandMacroSyntactically(
+static void handleRequestSyntacticMacroExpansion(
     const RequestDict &req, SourceKitCancellationToken cancellationToken,
     ResponseReceiver rec) {
 
@@ -2055,8 +2055,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestRelatedIdents, handleRequestRelatedIdents)
   HANDLE_REQUEST(RequestActiveRegions, handleRequestActiveRegions)
   HANDLE_REQUEST(RequestDiagnostics, handleRequestDiagnostics)
-  HANDLE_REQUEST(RequestExpandMacroSyntactically,
-                 handleRequestExpandMacroSyntactically)
+  HANDLE_REQUEST(RequestSyntacticMacroExpansion,
+                 handleRequestSyntacticMacroExpansion)
 
   {
     SmallString<64> ErrBuf;

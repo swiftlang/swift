@@ -56,7 +56,7 @@ class SyntacticMacroExpansionInstance {
                           const MacroExpansionSpecifier &expansion);
 
   /// Expand single 'expansion' in SF.
-  bool getExpansion(swift::SourceFile *SF,
+  void expand(swift::SourceFile *SF,
                     const MacroExpansionSpecifier &expansion,
                     SourceEditConsumer &consumer);
 
@@ -71,7 +71,7 @@ public:
 
   /// Expand all macros in \p inputBuf and send the edit results to \p consumer.
   /// Expansions are specified by \p expansions .
-  bool getExpansions(llvm::MemoryBuffer *inputBuf,
+  void expandAll(llvm::MemoryBuffer *inputBuf,
                      ArrayRef<MacroExpansionSpecifier> expansions,
                      SourceEditConsumer &consumer);
 };

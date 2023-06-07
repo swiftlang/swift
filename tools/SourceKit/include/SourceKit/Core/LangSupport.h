@@ -244,6 +244,9 @@ struct MacroExpansionInfo {
   };
   // See swift::ExpandedMacroDefinition.
   struct ExpandedMacroDefinition {
+    // 'Replacement.range' references some part of code in 'expansionText'.
+    // 'expansionText' will be replaced by the 'parameterIndex'-th argument of
+    // the macro.
     struct Replacement {
       RawCharSourceRange range;
       unsigned parameterIndex;
@@ -257,7 +260,8 @@ struct MacroExpansionInfo {
         : expansionText(expansionText), replacements(){};
   };
 
-  // Offset of the macro expansion syntax (i.e. attribute or #<macro name>)
+  // Offset of the macro expansion syntax (i.e. attribute or #<macro name>) from
+  // the start of the source file.
   unsigned offset;
 
   // Macro roles.

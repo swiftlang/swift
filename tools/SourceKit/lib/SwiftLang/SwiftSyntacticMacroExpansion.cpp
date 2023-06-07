@@ -89,6 +89,6 @@ void SwiftLangSupport::expandMacroSyntactically(
   }
 
   RequestRefactoringEditConsumer consumer(receiver);
-  (void)instance->getExpansions(inputBuf, expansions, consumer);
+  instance->expandAll(inputBuf, expansions, consumer);
   // consumer automatically send the results on destruction.
 }

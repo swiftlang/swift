@@ -29,53 +29,53 @@ source.edit.kind.active:
   10:3-10:3 "@Wrapper"
 source.edit.kind.active:
   12:3-12:35 "struct blah8 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {
   }
 }
 struct blah16 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {
   }
 }
 struct blah32 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {
   }
 }
 struct blah64 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {
   }
 }"
 ### 2
 source.edit.kind.active:
   12:3-12:35 "struct blah8 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu0_() {
   }
 }
 struct blah16 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu1_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu2_() {
   }
 }
 struct blah32 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu3_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu4_() {
   }
 }
 struct blah64 {
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu5_() {
   }
-  func macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {
+  func __syntactic_macro_a01f07de3e9ee8585adf794ccd6dec8c6methodfMu6_() {
   }
 }"
 source.edit.kind.active:
