@@ -203,14 +203,6 @@ extension ObservableMacro: MemberMacro {
     declaration.addIfNeeded(ObservableMacro.accessFunction(observableType), to: &declarations)
     declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType), to: &declarations)
 
-    let storedInstanceVariables = declaration.definedVariables.filter { $0.isValidForObservation }
-    for property in storedInstanceVariables {
-      if property.hasMacroApplication(ObservableMacro.ignoredMacroName) { continue }
-      if property.initializer == nil {
-        context.addDiagnostics(from: DiagnosticsError(syntax: property, message: "@Observable requires property '\(property.identifier?.text ?? "")' to have an initial value", id: .missingInitializer), node: property)
-      }
-    }
-
     return declarations
   }
 }
@@ -290,6 +282,13 @@ public struct ObservationTrackedMacro: AccessorMacro {
       return []
     }
 
+    let initAccessor: AccessorDeclSyntax =
+      """
+      init(initialValue) initializes(_\(identifier)) {
+        _\(identifier) = initialValue
+      }
+      """
+
     let getAccessor: AccessorDeclSyntax =
       """
       get {
@@ -307,7 +306,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
       }
       """
 
-    return [getAccessor, setAccessor]
+    return [initAccessor, getAccessor, setAccessor]
   }
 }
 
