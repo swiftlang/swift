@@ -1397,6 +1397,7 @@ FirstArgOwnershipForwardingSingleValueInst::classof(SILInstructionKind kind) {
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
     return true;
   default:
@@ -8516,10 +8517,21 @@ private:
             DebugLoc, operand, operand->getType().addingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
                                             : OwnershipKind::Owned),
-        initialKind(kind) {}
+        initialKind(kind) {
+    assert(!operand->getType().isMoveOnly() &&
+           "Cannot be moveonly or moveonly wrapped");
+  }
 
 public:
   InitialKind getInitialKind() const { return initialKind; }
+
+  bool hasGuaranteedInitialKind() const {
+    return getInitialKind() == InitialKind::Guaranteed;
+  }
+
+  bool hasOwnedInitialKind() const {
+    return getInitialKind() == InitialKind::Owned;
+  }
 };
 
 /// Convert from an @moveOnly wrapper type to the underlying copyable type. Can
@@ -8568,10 +8580,71 @@ private:
             DebugLoc, operand, operand->getType().removingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
                                             : OwnershipKind::Owned),
-        initialKind(kind) {}
+        initialKind(kind) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "Expected moveonlywrapped argument!");
+  }
 
 public:
   InitialKind getInitialKind() const { return initialKind; }
+
+  bool hasGuaranteedInitialKind() const {
+    return getInitialKind() == InitialKind::Guaranteed;
+  }
+
+  bool hasOwnedInitialKind() const {
+    return getInitialKind() == InitialKind::Owned;
+  }
+};
+
+/// Convert a ${ @moveOnly T } to $T. This is a forwarding instruction that acts
+/// similarly to an object cast like upcast, unlike
+/// MoveOnlyWrapperToCopyableValue which provides artificial semantics injected
+/// by SILGen.
+class MoveOnlyWrapperToCopyableBoxInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst,
+          FirstArgOwnershipForwardingSingleValueInst> {
+  friend class SILBuilder;
+
+  MoveOnlyWrapperToCopyableBoxInst(SILDebugLocation DebugLoc, SILValue operand,
+                                   ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(
+            DebugLoc, operand,
+            operand->getType().removingMoveOnlyWrapperToBoxedType(
+                operand->getFunction()),
+            forwardingOwnershipKind) {
+    assert(
+        operand->getType().isBoxedMoveOnlyWrappedType(operand->getFunction()) &&
+        "Expected moveonlywrapped argument!");
+  }
+};
+
+class CopyableToMoveOnlyWrapperAddrInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst,
+          SingleValueInstruction> {
+  friend class SILBuilder;
+
+  CopyableToMoveOnlyWrapperAddrInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().addingMoveOnlyWrapper()) {
+    assert(!operand->getType().isMoveOnly() && "Expected copyable argument");
+  }
+};
+
+class MoveOnlyWrapperToCopyableAddrInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst,
+          SingleValueInstruction> {
+  friend class SILBuilder;
+
+  MoveOnlyWrapperToCopyableAddrInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().removingMoveOnlyWrapper()) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "Expected moveonlywrapped argument");
+  }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers

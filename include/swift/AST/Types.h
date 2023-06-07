@@ -5305,7 +5305,9 @@ class SILMoveOnlyWrappedType final : public TypeBase,
   SILMoveOnlyWrappedType(CanType innerType)
       : TypeBase(TypeKind::SILMoveOnlyWrapped, &innerType->getASTContext(),
                  innerType->getRecursiveProperties()),
-        innerType(innerType) {}
+        innerType(innerType) {
+    assert(!innerType->isPureMoveOnly() && "Inner type must be copyable");
+  }
 
 public:
   CanType getInnerType() const { return innerType; }

@@ -199,6 +199,7 @@ struct OwnershipModelEliminatorVisitor
   }
   HANDLE_FORWARDING_INST(ConvertFunction)
   HANDLE_FORWARDING_INST(MoveOnlyWrapperToCopyableValue)
+  HANDLE_FORWARDING_INST(MoveOnlyWrapperToCopyableBox)
   HANDLE_FORWARDING_INST(Upcast)
   HANDLE_FORWARDING_INST(UncheckedRefCast)
   HANDLE_FORWARDING_INST(RefToBridgeObject)
