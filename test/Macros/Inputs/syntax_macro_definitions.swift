@@ -299,6 +299,25 @@ public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
   }
 }
 
+public struct VarDeclMacro: CodeItemMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    let name = context.makeUniqueName("fromMacro")
+    return [
+      "let \(name) = 23",
+      "use(\(name))",
+      """
+      if true {
+        let \(name) = "string"
+        use(\(name))
+      }
+      """
+    ]
+  }
+}
+
 public struct WarningMacro: ExpressionMacro {
    public static func expansion(
      of macro: some FreestandingMacroExpansionSyntax,

@@ -1850,7 +1850,7 @@ public:
     if (!isa<ClassDecl>(decl->getDeclContext())) {
       decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
         this->visit(auxiliaryDecl);
-      });
+      }, /*visitFreestandingExpanded=*/false);
     }
 
     if (auto *Stats = getASTContext().Stats)
@@ -2066,8 +2066,7 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-    // Decls in expansion already visited as auxiliary decls.
-    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+    MED->forEachExpandedNode([&](ASTNode node) {
       TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
     });
   }
