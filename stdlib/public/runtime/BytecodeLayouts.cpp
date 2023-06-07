@@ -615,7 +615,7 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
 
       for (size_t j = 0; j < numCases; j++) {
         size_t caseOffset = readBytes<size_t>(fieldLayoutStr, i);
-        uint8_t *caseLayoutString =
+        const uint8_t *caseLayoutString =
             fieldLayoutStr + i + (numCases * sizeof(size_t)) + caseOffset;
         swift_resolve_resilientAccessors(layoutStr,
                                          casesBeginOffset + caseOffset,
