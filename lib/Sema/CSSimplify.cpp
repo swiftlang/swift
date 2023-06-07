@@ -9632,6 +9632,44 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         }
       }
 
+      if (auto *UDE =
+              getAsExpr<UnresolvedDotExpr>(memberLocator->getAnchor())) {
+        auto *base = UDE->getBase();
+        if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
+          if (accessor->isInitAccessor() && isa<DeclRefExpr>(base) &&
+              accessor->getImplicitSelfDecl() ==
+                  cast<DeclRefExpr>(base)->getDecl()) {
+            bool isValidReference = false;
+
+            // If name doesn't appear in either `initializes` or `accesses`
+            // then it's invalid instance member.
+
+            if (auto *initializesAttr =
+                    accessor->getAttrs().getAttribute<InitializesAttr>()) {
+              isValidReference |= llvm::any_of(
+                  initializesAttr->getProperties(), [&](Identifier name) {
+                    return DeclNameRef(name) == memberName;
+                  });
+            }
+
+            if (auto *accessesAttr =
+                    accessor->getAttrs().getAttribute<AccessesAttr>()) {
+              isValidReference |= llvm::any_of(
+                  accessesAttr->getProperties(), [&](Identifier name) {
+                    return DeclNameRef(name) == memberName;
+                  });
+            }
+
+            if (!isValidReference) {
+              result.addUnviable(
+                  candidate,
+                  MemberLookupResult::UR_UnavailableWithinInitAccessor);
+              return;
+            }
+          }
+        }
+      }
+
     // If the underlying type of a typealias is fully concrete, it is legal
     // to access the type with a protocol metatype base.
     } else if (instanceTy->isExistentialType() &&
@@ -10208,6 +10246,9 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
 
     case MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype:
       return AllowInvalidStaticMemberRefOnProtocolMetatype::create(cs, locator);
+
+    case MemberLookupResult::UR_UnavailableWithinInitAccessor:
+      return nullptr;
     }
   }
 
