@@ -10248,7 +10248,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       return AllowInvalidStaticMemberRefOnProtocolMetatype::create(cs, locator);
 
     case MemberLookupResult::UR_UnavailableWithinInitAccessor:
-      return nullptr;
+      return AllowInvalidMemberReferenceInInitAccessor::create(cs, memberName,
+                                                               locator);
     }
   }
 
@@ -14672,6 +14673,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
   case FixKind::IgnoreUnresolvedPatternVar: {
     return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::AllowInvalidMemberReferenceInInitAccessor: {
+    return recordFix(fix, 5) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::ExplicitlyConstructRawRepresentable: {

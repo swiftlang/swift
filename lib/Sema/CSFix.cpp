@@ -2796,3 +2796,16 @@ IgnoreMissingEachKeyword::create(ConstraintSystem &cs, Type valuePackTy,
   return new (cs.getAllocator())
       IgnoreMissingEachKeyword(cs, valuePackTy, locator);
 }
+
+bool AllowInvalidMemberReferenceInInitAccessor::diagnose(
+    const Solution &solution, bool asNote) const {
+  return false;
+}
+
+AllowInvalidMemberReferenceInInitAccessor *
+AllowInvalidMemberReferenceInInitAccessor::create(ConstraintSystem &cs,
+                                                  DeclNameRef memberName,
+                                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidMemberReferenceInInitAccessor(cs, memberName, locator);
+}
