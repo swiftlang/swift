@@ -1154,14 +1154,38 @@ void LifetimeChecker::doIt() {
 
   // All of the indirect results marked as "out" have to be fully initialized
   // before their lifetime ends.
-  if (TheMemory.isOut() && Uses.empty()) {
-    auto loc = TheMemory.getLoc();
+  if (TheMemory.isOut()) {
+    auto diagnoseMissingInit = [&]() {
+      std::string propertyName;
+      auto *property = TheMemory.getPathStringToElement(0, propertyName);
+      diagnose(Module, F.getLocation(),
+               diag::ivar_not_initialized_by_init_accessor,
+               property->getName());
+      EmittedErrorLocs.push_back(TheMemory.getLoc());
+    };
 
-    std::string propertyName;
-    auto *property = TheMemory.getPathStringToElement(0, propertyName);
-    diagnose(Module, F.getLocation(),
-             diag::ivar_not_initialized_by_init_accessor, property->getName());
-    EmittedErrorLocs.push_back(loc);
+    // No uses means that there was no initialization.
+    if (Uses.empty()) {
+      diagnoseMissingInit();
+      return;
+    }
+
+    // Go over every return block and check whether member is fully initialized
+    // because it's possible that there is branch that doesn't have any use of
+    // the memory and nothing else is going to diagnose that. This is different
+    // from `self`, for example, because it would always have either `copy_addr`
+    // or `load` before return.
+
+    auto returnBB = F.findReturnBB();
+
+    while (returnBB != F.end()) {
+      auto *terminator = returnBB->getTerminator();
+
+      if (!isInitializedAtUse(DIMemoryUse(terminator, DIUseKind::Load, 0, 1)))
+        diagnoseMissingInit();
+
+      ++returnBB;
+    }
   }
 
   // If the memory object has nontrivial type, then any destroy/release of the
