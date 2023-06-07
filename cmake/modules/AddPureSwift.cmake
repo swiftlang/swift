@@ -141,6 +141,12 @@ function(add_pure_swift_host_library name)
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)
 
+  if(APSHL_SHARED AND CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    # Allow install_name_tool to update paths (for rdar://109473564)
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+                 LINK_FLAGS " -Xlinker -headerpad_max_install_names")
+  endif()
+
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
   # LLVM_COMMON_DEPENDS if a global variable set in ./lib that provides targets
