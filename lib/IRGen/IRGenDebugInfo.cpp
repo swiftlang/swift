@@ -1545,6 +1545,7 @@ private:
     }
 
     case TypeKind::Pack:
+    case TypeKind::PackElement:
       llvm_unreachable("Unimplemented!");
 
     case TypeKind::SILPack:

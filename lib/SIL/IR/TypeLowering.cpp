@@ -79,6 +79,9 @@ namespace {
     bool visitDependentMemberType(CanDependentMemberType type) {
       return false;
     }
+    bool visitPackElementType(CanPackElementType type) {
+      return false;
+    }
     
     /// Archetype metatypes have non-trivial representation in case
     /// they instantiate to a class metatype.
@@ -550,6 +553,12 @@ namespace {
     RetTy visitDependentMemberType(CanDependentMemberType type,
                                    AbstractionPattern origType,
                                    IsTypeExpansionSensitive_t isSensitive) {
+      return visitAbstractTypeParamType(type, origType, isSensitive);
+    }
+
+    RetTy visitPackElementType(CanPackElementType type,
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
@@ -3075,6 +3084,10 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                                             loweredSubstCountType));
     }
 
+    CanType visitPackElementType(CanPackElementType substPackElementType) {
+      return substPackElementType;
+    }
+
     CanType visitBuiltinTupleType(CanBuiltinTupleType type) {
       llvm_unreachable("BuiltinTupleType should not show up here");
     }
@@ -4163,6 +4176,10 @@ public:
   }
   bool visitDependentMemberType(CanDependentMemberType type1,
                                 CanDependentMemberType type2) {
+    return false;
+  }
+  bool visitPackElementType(CanPackElementType type1,
+                            CanPackElementType type2) {
     return false;
   }
 

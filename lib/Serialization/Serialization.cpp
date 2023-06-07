@@ -5068,6 +5068,14 @@ public:
                                         S.addTypeRef(expansionTy->getCountType()));
   }
 
+  void visitPackElementType(const PackElementType *elementType) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PackElementTypeLayout::Code];
+    PackElementTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(elementType->getPackType()),
+                                      elementType->getLevel());
+  }
+
   void visitPackType(const PackType *packTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[PackTypeLayout::Code];
@@ -5635,6 +5643,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
   registerDeclTypeAbbr<PackExpansionTypeLayout>();
+  registerDeclTypeAbbr<PackElementTypeLayout>();
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
 

@@ -13,7 +13,7 @@ func takeAny(_ arg: Any) {}
 // CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
-// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat ()}
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{/* shape: each T */ repeat ()}
 // CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
 // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $Any
 // CHECK-NEXT:    [[ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
