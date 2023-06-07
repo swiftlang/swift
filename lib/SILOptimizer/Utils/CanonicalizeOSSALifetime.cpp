@@ -522,7 +522,7 @@ void CanonicalizeOSSALifetime::findOriginalBoundary(
 ///   These are the "original" live blocks (originalLiveBlocks).
 ///   [Color these blocks green.]
 /// - From within that collection, collect the blocks which contain a _final_
-///   consuming, non-destroy use, and their successors.
+///   consuming, non-destroy use, and their iterative successors.
 ///   These are the "consumed" blocks (consumedAtExitBlocks).
 ///   [Color these blocks red.]
 /// - Extend liveness down to the boundary between originalLiveBlocks and
@@ -569,8 +569,11 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
     }
   }
 
-  // Second, collect the blocks which occur after a _final_ consuming use.
+  // Second, collect the blocks which contain a _final_ consuming use and their
+  // iterative successors within the originalLiveBlocks.
   BasicBlockSet consumedAtExitBlocks(currentDef->getFunction());
+  // The subset of consumedAtExitBlocks which do not contain a _final_ consuming
+  // use, i.e. the subset that is dead.
   StackList<SILBasicBlock *> consumedAtEntryBlocks(currentDef->getFunction());
   {
     // Start the forward walk from blocks which contain _final_ non-destroy
@@ -596,8 +599,8 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
     }
   }
 
-  // Third, find the blocks on the boundary between the originally-live blocks
-  // and the originally-live-but-consumed blocks.  Extend liveness "to the end"
+  // Third, find the blocks on the boundary between the originalLiveBlocks
+  // blocks and the consumedAtEntryBlocks blocks.  Extend liveness "to the end"
   // of these blocks.
   for (auto *block : consumedAtEntryBlocks) {
     for (auto *predecessor : block->getPredecessorBlocks()) {
