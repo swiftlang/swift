@@ -109,6 +109,7 @@ enum class SanitizePaths {
 };
 
 enum class OutputTo {
+  Auto = -1,
   Stdout = 0,
   Stderr = 2,
 };
