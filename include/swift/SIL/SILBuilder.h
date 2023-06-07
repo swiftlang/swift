@@ -1410,6 +1410,24 @@ public:
         CopyableToMoveOnlyWrapperValueInst::Guaranteed));
   }
 
+  MoveOnlyWrapperToCopyableBoxInst *
+  createMoveOnlyWrapperToCopyableBox(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) MoveOnlyWrapperToCopyableBoxInst(
+        getSILDebugLocation(loc), src, src->getOwnershipKind()));
+  }
+
+  MoveOnlyWrapperToCopyableAddrInst *
+  createMoveOnlyWrapperToCopyableAddr(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) MoveOnlyWrapperToCopyableAddrInst(
+        getSILDebugLocation(loc), src));
+  }
+
+  CopyableToMoveOnlyWrapperAddrInst *
+  createCopyableToMoveOnlyWrapperAddr(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) CopyableToMoveOnlyWrapperAddrInst(
+        getSILDebugLocation(loc), src));
+  }
+
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(

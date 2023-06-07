@@ -496,17 +496,23 @@ public func aggStructDiamondOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) {
 }
 
 public func aggStructDiamondInLoop(_ x: AggStruct) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
-    // expected-error @-1 {{'x2' used after consume}}
+    @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' consumed in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-4 {{'x2' consumed more than once}}
     for _ in 0..<1024 {
         if boolValue {
             let y = x2 // expected-note {{consumed here}}
             let _ = y
-            aggStructConsume(x2) // expected-note {{used here}}
+            aggStructConsume(x2) // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed again here}}
         } else {
             let y = x2 // expected-note {{consumed here}}
+            // expected-note @-1 {{consumed again here}}
             let _ = y
-            aggStructConsume(x2) // expected-note {{used here}}
+            aggStructConsume(x2) // expected-note {{consumed again here}}
+            // expected-note @-1 {{consumed in loop here}}
         }
     }
 }
@@ -517,26 +523,35 @@ public func aggStructDiamondInLoopArg(@_noImplicitCopy _ x2: AggStruct) { // exp
             let y = x2 // expected-note {{consumed here}}
             let _ = y
 
-            aggStructConsume(x2)
+            aggStructConsume(x2) // expected-note {{consumed here}}
         } else {
             let y = x2 // expected-note {{consumed here}}
             let _ = y
-            aggStructConsume(x2)
+            aggStructConsume(x2) // expected-note {{consumed here}}
         }
     }
 }
 
-public func aggStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) { // expected-error {{'x2' used after consume}}
-    // expected-error @-1 {{'x2' used after consume}}
+public func aggStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-4 {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
         if boolValue {
             let y = x2 // expected-note {{consumed here}}
             let _ = y
-            aggStructConsume(x2) // expected-note {{used here}}
+            aggStructConsume(x2)
+            // expected-note @-1 {{consumed here}}
+            // expected-note @-2 {{consumed again here}}
         } else {
-            let y = x2 // expected-note {{consumed here}}
+            let y = x2
+            // expected-note @-1 {{consumed here}}
+            // expected-note @-2 {{consumed again here}}
             let _ = y
-            aggStructConsume(x2) // expected-note {{used here}}
+            aggStructConsume(x2)
+            // expected-note @-1 {{consumed in loop here}}
+            // expected-note @-2 {{consumed again here}}
         }
     }
 }
@@ -629,28 +644,36 @@ public func aggGenericStructMultipleNonConsumingUseTestOwnedArg(@_noImplicitCopy
 }
 
 public func aggGenericStructUseAfterConsume(_ x: AggGenericStruct<Trivial>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
+    @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     let y = x2  // expected-note {{consumed here}}
     let _ = y
-    aggGenericStructConsume(x2) // expected-note {{used here}}
+    aggGenericStructConsume(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed again here}}
     print(x2)
+    // expected-note @-1 {{consumed again here}}
 }
 
 public func aggGenericStructUseAfterConsumeArg(@_noImplicitCopy _ x2: AggGenericStruct<Trivial>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     let y = x2  // expected-note {{consumed here}}
     let _ = y
-    aggGenericStructConsume(x2)
+    aggGenericStructConsume(x2) // expected-note {{consumed here}}
     print(x2) // expected-note {{consumed here}}
 }
 
-public func aggGenericStructUseAfterConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Trivial>) { // expected-error {{'x2' used after consume}}
+public func aggGenericStructUseAfterConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Trivial>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     let y = x2  // expected-note {{consumed here}}
     let _ = y
-    aggGenericStructConsume(x2) // expected-note {{used here}}
+    aggGenericStructConsume(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed again here}}
     print(x2)
+    // expected-note @-1 {{consumed again here}}
 }
 
 public func aggGenericStructDoubleConsume(_ x: AggGenericStruct<Trivial>) {
@@ -698,11 +721,11 @@ public func aggGenericStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned A
 }
 
 public func aggGenericStructDiamond(_ x: AggGenericStruct<Trivial>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
     if boolValue {
         let y = x2 // expected-note {{consumed here}}
         let _ = y
-        aggGenericStructConsume(x2) // expected-note {{used here}}
+        aggGenericStructConsume(x2) // expected-note {{consumed again here}}
     } else {
         let z = x2
         let _ = z
@@ -713,18 +736,19 @@ public func aggGenericStructDiamondArg(@_noImplicitCopy _ x2: AggGenericStruct<T
     if boolValue {
         let y = x2 // expected-note {{consumed here}}
         let _ = y
-        aggGenericStructConsume(x2)
+        aggGenericStructConsume(x2) // expected-note {{consumed here}}
     } else {
         let z = x2 // expected-note {{consumed here}}
         let _ = z
     }
 }
 
-public func aggGenericStructDiamondOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Trivial>) { // expected-error {{'x2' used after consume}}
+public func aggGenericStructDiamondOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Trivial>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
     if boolValue {
         let y = x2 // expected-note {{consumed here}}
         let _ = y
-        aggGenericStructConsume(x2) // expected-note {{used here}}
+        aggGenericStructConsume(x2) // expected-note {{consumed again here}}
     } else {
         let z = x2
         let _ = z
@@ -856,28 +880,38 @@ public func aggGenericStructMultipleNonConsumingUseTestOwnedArg<T>(@_noImplicitC
 }
 
 public func aggGenericStructUseAfterConsume<T>(_ x: AggGenericStruct<T>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
+    @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' used after consume}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     let y = x2 // expected-note {{consumed here}}
     let _ = y
-    aggGenericStructConsume(x2) // expected-note {{used here}}
-    print(x2)
+    aggGenericStructConsume(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed again here}}
+    print(x2) // expected-note {{consumed here}}
+    // expected-note @-1 {{consumed again here}}
+    aggGenericStructUseMoveOnlyWithoutEscaping(x2)
+    // expected-note @-1 {{used here}}
 }
 
 public func aggGenericStructUseAfterConsumeArg<T>(@_noImplicitCopy _ x2: AggGenericStruct<T>) { // expected-error {{'x2' is borrowed and cannot be consumed}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     let y = x2 // expected-note {{consumed here}}
     let _ = y
-    aggGenericStructConsume(x2)
+    aggGenericStructConsume(x2) // expected-note {{consumed here}}
     print(x2) // expected-note {{consumed here}}
 }
 
-public func aggGenericStructUseAfterConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' used after consume}} 
+public func aggGenericStructUseAfterConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     let y = x2 // expected-note {{consumed here}}
     let _ = y
-    aggGenericStructConsume(x2) // expected-note {{used here}}
-    print(x2)
+    aggGenericStructConsume(x2) // expected-note {{consumed again here}}
+    // expected-note @-1 {{consumed here}}
+    print(x2) // expected-note {{consumed again here}}
 }
 
 public func aggGenericStructDoubleConsume<T>(_ x: AggGenericStruct<T>) {

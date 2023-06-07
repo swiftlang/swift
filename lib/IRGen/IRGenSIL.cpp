@@ -1268,6 +1268,20 @@ public:
     auto e = getLoweredExplosion(i->getOperand());
     setLoweredExplosion(i, e);
   }
+  void
+  visitMoveOnlyWrapperToCopyableBoxInst(MoveOnlyWrapperToCopyableBoxInst *i) {
+    llvm_unreachable("OSSA instruction");
+  }
+  void
+  visitMoveOnlyWrapperToCopyableAddrInst(MoveOnlyWrapperToCopyableAddrInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
+  void
+  visitCopyableToMoveOnlyWrapperAddrInst(CopyableToMoveOnlyWrapperAddrInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);

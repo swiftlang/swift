@@ -4486,3 +4486,14 @@ func testMyEnum() {
     _ = consume x // expected-note {{consumed again here}}
   }
 }
+
+////////////////////////
+// MARK: Setter Tests //
+////////////////////////
+
+public class NonFinalCopyableKlassWithMoveOnlyField {
+    var moveOnlyVarStruct = NonTrivialStruct()
+    let moveOnlyLetStruct = NonTrivialStruct()
+    var moveOnlyVarProt = AddressOnlyProtocol()
+    let moveOnlyLetProt = AddressOnlyProtocol()
+}

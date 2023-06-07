@@ -721,8 +721,8 @@ public:
     return getRawASTType()->is<SILMoveOnlyWrappedType>();
   }
 
-  /// If this is already a move only wrapped type, return *this. Otherwise, wrap
-  /// the copyable type in the mov eonly wrapper.
+  /// If this is already a moveonlywrapped type, return *this. Otherwise, wrap
+  /// the copyable type in the moveonlywrapper.
   SILType addingMoveOnlyWrapper() const {
     if (isMoveOnlyWrapped())
       return *this;
@@ -748,6 +748,20 @@ public:
     }
     return *this;
   }
+
+  /// If this is a box type containing a moveonlywrapped type, return a new box
+  /// with the moveonlywrapped type unwrapped.
+  ///
+  /// DISCUSSION: This is separate from addingMoveOnlyWrapper since this API
+  /// requires a SILFunction * and is specialized.
+  SILType addingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+
+  /// If this is a box type containing a copyable type, return a new box type
+  /// with the copyable type wrapped in a moveonly wrapped type.
+  ///
+  /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
+  /// requires a SILFunction * and is specialized.
+  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
@@ -797,6 +811,12 @@ public:
 
   bool isBoxedNonCopyableType(const SILFunction &fn) const {
     return isBoxedNonCopyableType(&fn);
+  }
+
+  bool isBoxedMoveOnlyWrappedType(const SILFunction *fn) const {
+    if (!this->is<SILBoxType>())
+      return false;
+    return getSILBoxFieldType(fn).isMoveOnlyWrapped();
   }
 
   SILType getInstanceTypeOfMetatype(SILFunction *function) const;

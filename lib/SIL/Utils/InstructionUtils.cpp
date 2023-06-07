@@ -459,6 +459,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::ThickToObjCMetatypeInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:

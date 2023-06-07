@@ -2330,6 +2330,27 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                            noNestedConflict, fromBuiltin);
     break;
   }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createMoveOnlyWrapperToCopyableAddr(Loc, op);
+    break;
+  }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createMoveOnlyWrapperToCopyableBox(Loc, op);
+    break;
+  }
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createCopyableToMoveOnlyWrapperAddr(Loc, op);
+    break;
+  }
   case SILInstructionKind::EndAccessInst: {
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));

@@ -669,12 +669,15 @@ struct ImmutableAddressUseVerifier {
             OpenedExistentialAccess::Immutable)
           return true;
         LLVM_FALLTHROUGH;
+      case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+      case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
       case SILInstructionKind::StructElementAddrInst:
       case SILInstructionKind::TupleElementAddrInst:
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
       case SILInstructionKind::MarkMustCheckInst:
+      case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
       case SILInstructionKind::PackElementGetInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
@@ -4497,6 +4500,9 @@ public:
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand()->getType(),
             "can't upcast to same type");
+    require(UI->getOperand()->getType().isMoveOnlyWrapped() ==
+                UI->getType().isMoveOnlyWrapped(),
+            "cast cannot be used to remove move only wrapped?!");
     checkNoTrivialToReferenceCast(UI);
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
@@ -4590,6 +4596,9 @@ public:
             "unchecked_addr_cast operand must be an address");
     require(AI->getType().isAddress(),
             "unchecked_addr_cast result must be an address");
+    require(AI->getOperand()->getType().isMoveOnlyWrapped() ==
+                AI->getType().isMoveOnlyWrapped(),
+            "Unchecked addr cast cannot be used to remove move only wrapped?!");
   }
   
   void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
@@ -4600,6 +4609,9 @@ public:
             "unchecked_trivial_bit_cast must produce a value");
     require(BI->getType().isTrivial(F),
             "unchecked_trivial_bit_cast must produce a value of trivial type");
+    require(BI->getOperand()->getType().isMoveOnlyWrapped() ==
+                BI->getType().isMoveOnlyWrapped(),
+            "cast cannot be used to remove move only wrapped?!");
   }
 
   void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
@@ -4608,6 +4620,9 @@ public:
             "unchecked_bitwise_cast must operate on a value");
     require(BI->getType().isObject(),
             "unchecked_bitwise_cast must produce a value");
+    require(BI->getOperand()->getType().isMoveOnlyWrapped() ==
+                BI->getType().isMoveOnlyWrapped(),
+            "cast cannot be used to remove move only wrapped?!");
   }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
@@ -6037,9 +6052,21 @@ public:
       MoveOnlyWrapperToCopyableValueInst *cvt) {
     require(cvt->getOperand()->getType().isObject(),
             "Operand value should be an object");
-    require(!cvt->getType().isMoveOnlyWrapped(), "Output should not move only");
+    require(cvt->getOperand()->getType().isMoveOnlyWrapped(),
+            "Operand should be move only wrapped");
     require(cvt->getType() ==
                 cvt->getOperand()->getType().removingMoveOnlyWrapper(),
+            "Result and operand must have the same type, today.");
+  }
+
+  void checkMoveOnlyWrapperToCopyableBoxInst(
+      MoveOnlyWrapperToCopyableBoxInst *cvt) {
+    require(cvt->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(cvt->getOperand()->getType().isBoxedMoveOnlyWrappedType(cvt->getFunction()),
+            "Operand should be move only wrapped");
+    require(cvt->getType() ==
+            cvt->getOperand()->getType().removingMoveOnlyWrapperToBoxedType(cvt->getFunction()),
             "Result and operand must have the same type, today.");
   }
 
@@ -6069,6 +6096,27 @@ public:
     require(apmi, "Must have instruction operand.");
     require(isa<AllocPackMetadataInst>(apmi),
             "Must have alloc_pack_metadata operand");
+  }
+
+  void checkMoveOnlyWrapperToCopyableAddrInst(
+      MoveOnlyWrapperToCopyableAddrInst *cvt) {
+    require(cvt->getType().isAddress(), "Output should be an address");
+    require(cvt->getOperand()->getType().isMoveOnlyWrapped(),
+            "Input should be move only");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().removingMoveOnlyWrapper(),
+            "Result and operand must have the same type.");
+  }
+
+  void checkCopyableToMoveOnlyWrapperAddrInst(
+      CopyableToMoveOnlyWrapperAddrInst *cvt) {
+    require(cvt->getType().isAddress(), "Output should be an address");
+    require(!cvt->getOperand()->getType().isMoveOnlyWrapped(),
+            "Input should not be move only wrapped");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().addingMoveOnlyWrapper(),
+            "Result and operand must have the same underlying type ignoring "
+            "move only wrappedness.");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {

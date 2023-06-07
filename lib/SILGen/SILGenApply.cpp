@@ -227,8 +227,26 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
 }
 
 static ManagedValue convertOwnershipConventionGivenParamInfo(
-    SILGenFunction &SGF, SILParameterInfo param, ManagedValue value,
+    SILGenFunction &SGF, SILParameterInfo param,
+    Optional<AnyFunctionType::Param> origParam, ManagedValue value,
     SILLocation loc, bool isForCoroutine) {
+  bool isOwned = false;
+  if (origParam) {
+    isOwned |= origParam->isOwned();
+  }
+
+  // If we have a moveonlywrapped type that is trivial when unwrapped, then we
+  // at an ABI level our parameter will be passed as direct_unowned. We want to
+  // consume this value though if we have an owned parameter.
+  auto valueType = value.getType();
+  if (isOwned && valueType.isMoveOnlyWrapped() &&
+      valueType.removingMoveOnlyWrapper().isTrivial(SGF.F)) {
+    if (value.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      value = value.copyUnmanaged(SGF, loc);
+      return SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, value);
+    }
+  }
+
   if (param.isConsumed() &&
       value.getOwnershipKind() == OwnershipKind::Guaranteed) {
     return value.copyUnmanaged(SGF, loc);
@@ -257,7 +275,8 @@ static void convertOwnershipConventionsGivenParamInfos(
   llvm::transform(indices(params), std::back_inserter(outVar),
                   [&](unsigned i) -> ManagedValue {
                     return convertOwnershipConventionGivenParamInfo(
-                        SGF, params[i], values[i], loc, isForCoroutine);
+                        SGF, params[i], None /*orig param*/, values[i], loc,
+                        isForCoroutine);
                   });
 }
 
@@ -1895,8 +1914,11 @@ static void emitRawApply(SILGenFunction &SGF,
       argValue = args[i].forward(SGF);
       if (argValue->getType().isMoveOnlyWrapped() &&
           !inputTy.isMoveOnlyWrapped()) {
-        argValue =
-            SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, argValue);
+        if (argValue->getType().isObject())
+          argValue =
+              SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, argValue);
+        else
+          argValue = SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, argValue);
       }
     } else {
       ManagedValue arg = args[i];
@@ -1911,10 +1933,17 @@ static void emitRawApply(SILGenFunction &SGF,
           // We need to borrow so that we can convert from $@moveOnly T -> $T.
           // Use a formal access borrow to ensure that we have tight scopes like
           // we do when we borrow fn.
-          if (!arg.isPlusZero())
-            arg = arg.formalAccessBorrow(SGF, loc);
+          if (arg.getType().isObject()) {
+            if (!arg.isPlusZero() ||
+                arg.getOwnershipKind() != OwnershipKind::Guaranteed)
+              arg = arg.formalAccessBorrow(SGF, loc);
 
-          arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+            arg =
+                SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+          } else {
+            arg = ManagedValue::forBorrowedAddressRValue(
+                SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, arg.getValue()));
+          }
         }
       }
 
@@ -3096,7 +3125,12 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
 
   SILType ty =
       SGF.getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
-  if (!ty.isPureMoveOnly())
+  bool isMoveOnly = ty.isPureMoveOnly();
+  if (auto *pd = dyn_cast<ParamDecl>(storage)) {
+      isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+      isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Consuming;
+  }
+  if (!isMoveOnly)
       return nullptr;
 
   // It makes sense to borrow any kind of storage we refer to at this stage,
@@ -3205,7 +3239,8 @@ public:
         DelayedArguments(delayedArgs) {}
 
   // origParamType is a parameter type.
-  void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
+  void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
+                     Optional<AnyFunctionType::Param> param = None) {
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
     if (arg.isDelayedDefaultArg()) {
@@ -3225,7 +3260,7 @@ public:
       maybeEmitForeignArgument();
       return;
     }
-    emit(std::move(arg), origParamType);
+    emit(std::move(arg), origParamType, param);
     maybeEmitForeignArgument();
   }
 
@@ -3233,6 +3268,7 @@ public:
   void emitPreparedArgs(PreparedArguments &&args,
                         AbstractionPattern origFormalType) {
     assert(args.isValid());
+    auto params = args.getParams();
     auto argSources = std::move(args).getSources();
 
     maybeEmitForeignArgument();
@@ -3249,10 +3285,10 @@ public:
       // If the next pattern is not a pack expansion, just emit it as a
       // single argument.
       if (!origFormalParamType.isPackExpansion()) {
-        emitSingleArg(std::move(argSources[nextArgSourceIndex++]),
-                      origFormalParamType);
-
-      // Otherwise we need to emit a pack argument.
+        emitSingleArg(std::move(argSources[nextArgSourceIndex]),
+                      origFormalParamType, params[nextArgSourceIndex]);
+        ++nextArgSourceIndex;
+        // Otherwise we need to emit a pack argument.
       } else {
         auto numComponents =
           origFormalParamType.getNumPackExpandedComponents();
@@ -3268,7 +3304,8 @@ public:
   }
 
 private:
-  void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
+  void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
+            Optional<AnyFunctionType::Param> origParam = None) {
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
@@ -3309,6 +3346,12 @@ private:
     SILType loweredSubstParamType = SILType::getPrimitiveType(
                 param.getInterfaceType(),
                 loweredSubstArgType.getCategory());
+    bool isShared = false;
+    bool isOwned = false;
+    if (origParam) {
+      isOwned |= origParam->isOwned();
+      isShared |= origParam->isShared();
+    }
 
     // If the caller takes the argument indirectly, the argument has an
     // inout type.
@@ -3319,7 +3362,7 @@ private:
     }
 
     // If we have a guaranteed +0 parameter...
-    if (param.isGuaranteed()) {
+    if (param.isGuaranteed() || isShared) {
       // And this is a yield, emit a borrowed r-value.
       if (IsYield) {
         if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
@@ -3341,7 +3384,7 @@ private:
         return;
     }
 
-    if (param.isConsumed()) {
+    if (param.isConsumed() || isOwned) {
       if (tryEmitConsumedMoveOnly(std::move(arg), loweredSubstArgType,
                                   loweredSubstParamType, origParamType,
                                   paramSlice))
@@ -3355,7 +3398,8 @@ private:
 
     // Okay, if the original parameter is passed directly, then we
     // just need to handle abstraction differences and bridging.
-    emitDirect(std::move(arg), loweredSubstArgType, origParamType, param);
+    emitDirect(std::move(arg), loweredSubstArgType, origParamType, param,
+               origParam);
   }
 
   ClaimedParamsRef claimNextParameters(unsigned count) {
@@ -3669,14 +3713,14 @@ private:
   }
 
   void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
-                  AbstractionPattern origParamType,
-                  SILParameterInfo param) {
+                  AbstractionPattern origParamType, SILParameterInfo param,
+                  Optional<AnyFunctionType::Param> origParam = None) {
     ManagedValue value;
     auto loc = arg.getLocation();
 
     auto convertOwnershipConvention = [&](ManagedValue value) {
-      return convertOwnershipConventionGivenParamInfo(SGF, param, value, loc,
-                                                      IsForCoroutine);
+      return convertOwnershipConventionGivenParamInfo(
+          SGF, param, origParam, value, loc, IsForCoroutine);
     };
 
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
@@ -4261,7 +4305,6 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
   params = params.slice(1);
 
   // Load if necessary.
-  assert(!param.isConsumed() && "emitting borrow into consumed parameter?");
   if (value.getType().isAddress()) {
     if (!param.isIndirectInGuaranteed() || !SGF.silConv.useLoweredAddresses()) {
       if (value.getType().isMoveOnly()) {
@@ -4350,10 +4393,15 @@ static void emitConsumedLValueRecursive(SILGenFunction &SGF, SILLocation loc,
   params = params.slice(1);
 
   // Load if necessary.
-  assert(param.isConsumed() && "Should have a consumed parameter?");
   if (value.getType().isAddress()) {
     if (!param.isIndirectIn() || !SGF.silConv.useLoweredAddresses()) {
       value = SGF.B.createFormalAccessLoadTake(loc, value);
+
+      // If our value is a moveonlywrapped type, unwrap it using owned so that
+      // we consume it.
+      if (value.getType().isMoveOnlyWrapped()) {
+        value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, value);
+      }
     }
   }
 
@@ -4366,7 +4414,7 @@ void DelayedArgument::emitConsumedLValue(SILGenFunction &SGF,
                                          SmallVectorImpl<ManagedValue> &args,
                                          size_t &argIndex) {
   // Begin the access.
-  auto value = SGF.emitConsumedLValue(info.Loc, std::move(info.LV));
+  ManagedValue value = SGF.emitConsumedLValue(info.Loc, std::move(info.LV));
   ClaimedParamsRef params = info.ParamsToEmit;
 
   // We inserted exactly one space in the argument array, so fix that up
@@ -5233,12 +5281,25 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
 
   // Apply 'self' if provided.
   if (apply.selfParam) {
-    AnyFunctionType::Param selfParam(
-        apply.selfParam.getSubstRValueType(),
-        Identifier(),
-        apply.selfParam.isLValue()
-          ? ParameterTypeFlags().withInOut(true)
-          : ParameterTypeFlags());
+    auto substFormalType = apply.getCallee().getSubstFormalType();
+    auto origSelfParam = substFormalType->getParams().back();
+    auto origSelfParamFlags = origSelfParam.getParameterFlags();
+
+    auto newFlags = ParameterTypeFlags();
+    if (apply.selfParam.isLValue()) {
+      newFlags = newFlags.withInOut(true);
+    } else {
+      // Transfer to new flags shared or owned if we do not have an lvalue.
+      //
+      // TODO: I wonder if we can reuse more of the orig self param flags here.
+      if (origSelfParamFlags.isOwned())
+        newFlags = newFlags.withOwned(true);
+      else if (origSelfParamFlags.isShared())
+        newFlags = newFlags.withShared(true);
+    }
+
+    AnyFunctionType::Param selfParam(apply.selfParam.getSubstRValueType(),
+                                     Identifier(), newFlags);
     emission.addSelfParam(e, std::move(apply.selfParam), selfParam);
   }
 
