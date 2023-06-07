@@ -146,7 +146,6 @@ bool _swift_backtrace_isThunkFunction(const char *mangledName);
 /// @param outputBuffer is a pointer to a buffer in which to place the result.
 /// @param outputBufferSize points to a variable that contains the size of the
 /// output buffer.
-/// @param status returns the status codes defined in the C++ ABI.
 ///
 /// If outputBuffer is nullptr, the function will allocate memory for the
 /// result using malloc().  In this case, outputBufferSize may be nullptr;
@@ -168,8 +167,7 @@ SWIFT_RUNTIME_STDLIB_SPI
 char *_swift_backtrace_demangle(const char *mangledName,
                                 size_t mangledNameLength,
                                 char *outputBuffer,
-                                size_t *outputBufferSize,
-                                int *status);
+                                size_t *outputBufferSize);
 #ifdef __cplusplus
 } // namespace backtrace
 } // namespace runtime
