@@ -296,6 +296,12 @@ getdents(int fd, void *buf, size_t bufsiz)
   return syscall(SYS_getdents64, fd, buf, bufsiz);
 }
 
+pid_t
+gettid()
+{
+  return (pid_t)syscall(SYS_gettid);
+}
+
 /* Stop all other threads in this process; we do this by establishing a
    signal handler for SIGPROF, then iterating through the threads sending
    SIGPROF.
