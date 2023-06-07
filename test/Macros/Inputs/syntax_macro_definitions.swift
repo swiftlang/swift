@@ -1449,23 +1449,22 @@ public struct SimpleCodeItemMacro: CodeItemMacro {
   ) throws -> [CodeBlockItemSyntax] {
     [
       .init(item: .decl("""
-
       struct \(context.makeUniqueName("foo")) {
         var x: Int
       }
       """)),
       .init(item: .stmt("""
-
       if true {
         print("from stmt")
         usedInExpandedStmt()
       }
+      """)),
+      .init(item: .stmt("""
       if false {
         print("impossible")
       }
       """)),
       .init(item: .expr("""
-
       print("from expr")
       """)),
     ]
