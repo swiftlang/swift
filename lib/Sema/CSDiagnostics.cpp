@@ -2715,6 +2715,19 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
+  case ConstraintLocator::EnumPatternImplicitCastMatch: {
+    // In this case, the types are reversed, as we are checking whether we
+    // can convert the pattern type to the context type.
+    std::swap(fromType, toType);
+    diagnostic = diag::cannot_match_value_with_pattern;
+    break;
+  }
+
+  case ConstraintLocator::PatternMatch: {
+    diagnostic = diag::cannot_match_value_with_pattern;
+    break;
+  }
+
   default:
     return false;
   }
@@ -2927,9 +2940,11 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
   auto *locator = getLocator();
   // Can't apply any of the fix-its below if this failure
-  // is related to `inout` argument.
-  if (locator->isLastElement<LocatorPathElt::LValueConversion>())
+  // is related to `inout` argument, or a pattern mismatch.
+  if (locator->isLastElement<LocatorPathElt::LValueConversion>() ||
+      locator->isForPatternMatch()) {
     return;
+  }
 
   if (trySequenceSubsequenceFixIts(diagnostic))
     return;
@@ -3549,6 +3564,8 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     return diag::cannot_convert_discard_value;
 
   case CTP_CaseStmt:
+    return diag::cannot_match_value_with_pattern;
+
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_ForEachSequence:
@@ -8756,7 +8773,7 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
     return false;
 
   auto *var = pattern->getDecl();
-  auto varType = OptionalType::get(getType(var));
+  auto varType = getType(var);
 
   auto diagnostic =
       emitDiagnosticAt(var, diag::invalid_ownership_not_optional,
