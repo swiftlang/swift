@@ -886,7 +886,10 @@ _swift_backtrace_demangle(const char *mangledName,
     return outputBuffer;
 #ifndef _WIN32
   } else if (name.startswith("_Z")) {
-    // Try C++
+    // Try C++; note that we don't want to force callers to use malloc() to
+    // allocate their buffer, which is a requirement for __cxa_demangle
+    // because it may call realloc() on the incoming pointer.  As a result,
+    // we never pass the caller's buffer to __cxa_demangle.
     size_t resultLen;
     int status = 0;
     char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
