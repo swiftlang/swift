@@ -215,7 +215,7 @@ Optional<std::string> ModuleDependencyInfo::getClangIncludeTree() const {
   switch (getKind()) {
   case swift::ModuleDependencyKind::Clang: {
     auto clangModuleStorage = cast<ClangModuleDependencyStorage>(storage.get());
-    Root = clangModuleStorage->clangIncludeTreeRoot;
+    Root = clangModuleStorage->CASClangIncludeTreeRootID;
     break;
   }
   default:
@@ -235,14 +235,14 @@ ModuleDependencyInfo::getBridgingHeaderIncludeTree() const {
     auto swiftInterfaceStorage =
         cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
     Root = swiftInterfaceStorage->textualModuleDetails
-               .bridgingHeaderIncludeTreeRoot;
+               .CASBridgingHeaderIncludeTreeRootID;
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {
     auto swiftSourceStorage =
         cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-    Root =
-        swiftSourceStorage->textualModuleDetails.bridgingHeaderIncludeTreeRoot;
+    Root = swiftSourceStorage->textualModuleDetails
+               .CASBridgingHeaderIncludeTreeRootID;
     break;
   }
   default:
@@ -330,15 +330,15 @@ void ModuleDependencyInfo::addBridgingHeaderIncludeTree(StringRef ID) {
   case swift::ModuleDependencyKind::SwiftInterface: {
     auto swiftInterfaceStorage =
         cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-    swiftInterfaceStorage->textualModuleDetails.bridgingHeaderIncludeTreeRoot =
-        ID.str();
+    swiftInterfaceStorage->textualModuleDetails
+        .CASBridgingHeaderIncludeTreeRootID = ID.str();
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {
     auto swiftSourceStorage =
         cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-    swiftSourceStorage->textualModuleDetails.bridgingHeaderIncludeTreeRoot =
-        ID.str();
+    swiftSourceStorage->textualModuleDetails
+        .CASBridgingHeaderIncludeTreeRootID = ID.str();
     break;
   }
   default:
@@ -435,14 +435,15 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
                                      SDKSettingPath.size());
 
   // Add Legacy layout file (maybe just hard code instead of searching).
-  StringRef RuntimeLibPath =
-      Instance.getInvocation().getSearchPathOptions().RuntimeLibraryPaths[0];
-  auto &FS = Instance.getFileSystem();
-  std::error_code EC;
-  for (auto F = FS.dir_begin(RuntimeLibPath, EC);
-       !EC && F != llvm::vfs::directory_iterator(); F.increment(EC)) {
-    if (F->path().endswith(".yaml"))
-      CommonDependencyFiles.emplace_back(F->path().str());
+  for (auto RuntimeLibPath :
+       Instance.getInvocation().getSearchPathOptions().RuntimeLibraryPaths) {
+    auto &FS = Instance.getFileSystem();
+    std::error_code EC;
+    for (auto F = FS.dir_begin(RuntimeLibPath, EC);
+         !EC && F != llvm::vfs::directory_iterator(); F.increment(EC)) {
+      if (F->path().endswith(".yaml"))
+        CommonDependencyFiles.emplace_back(F->path().str());
+    }
   }
 
   auto CachingFS =

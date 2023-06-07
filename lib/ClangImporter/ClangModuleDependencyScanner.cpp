@@ -187,18 +187,6 @@ void ClangImporter::recordModuleDependencies(
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(overlay);
       }
-    } else {
-      // HACK: find the -ivfsoverlay option from clang scanner and pass to
-      // swift.
-      bool addOption = false;
-      for (auto &arg : clangModuleDep.BuildArguments) {
-        if (addOption) {
-          swiftArgs.push_back("-vfsoverlay");
-          swiftArgs.push_back(arg);
-          addOption = false;
-        } else if (arg == "-ivfsoverlay")
-          addOption = true;
-      }
     }
 
     // Add args reported by the scanner.
@@ -223,6 +211,15 @@ void ClangImporter::recordModuleDependencies(
     // Clear the cache key for module. The module key is computed from clang
     // invocation, not swift invocation.
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
+
+    // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
+    // from clang scanner and pass to swift.
+    for (auto overlay : depsInvocation.getHeaderSearchOpts().VFSOverlayFiles) {
+      if (llvm::is_contained(ctx.SearchPathOpts.VFSOverlayFiles, overlay))
+        continue;
+      swiftArgs.push_back("-vfsoverlay");
+      swiftArgs.push_back(overlay);
+    }
 
     llvm::BumpPtrAllocator allocator;
     llvm::StringSaver saver(allocator);

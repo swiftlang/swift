@@ -378,8 +378,8 @@ static llvm::Error resolveExplicitModuleInputs(
     case swift::ModuleDependencyKind::SwiftSource: {
       auto sourceDepDetails = depInfo->getAsSwiftSourceModule();
       assert(sourceDepDetails && "Expected source dependency");
-      if (sourceDepDetails->textualModuleDetails.bridgingHeaderIncludeTreeRoot
-              .empty()) {
+      if (sourceDepDetails->textualModuleDetails
+              .CASBridgingHeaderIncludeTreeRootID.empty()) {
         if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles
                  .empty()) {
           if (auto tracker =
@@ -396,7 +396,7 @@ static llvm::Error resolveExplicitModuleInputs(
         }
       } else
         includeTrees.push_back(sourceDepDetails->textualModuleDetails
-                                   .bridgingHeaderIncludeTreeRoot);
+                                   .CASBridgingHeaderIncludeTreeRootID);
       break;
     }
     default:
@@ -1338,16 +1338,20 @@ generateFullDependencyGraph(CompilerInstance &instance,
             moduleInterfacePath,
             create_set(swiftTextualDeps->compiledModuleCandidates),
             bridgingHeaderPath,
-            create_set(swiftTextualDeps->textualModuleDetails.bridgingSourceFiles),
-            create_set(swiftTextualDeps->textualModuleDetails.bridgingModuleDependencies),
+            create_set(
+                swiftTextualDeps->textualModuleDetails.bridgingSourceFiles),
+            create_set(swiftTextualDeps->textualModuleDetails
+                           .bridgingModuleDependencies),
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
-            create_set(swiftTextualDeps->textualModuleDetails.bridgingHeaderBuildCommandLine),
+            /*bridgingHeaderBuildCommand*/ create_set({}),
             create_set(swiftTextualDeps->textualModuleDetails.extraPCMArgs),
             create_clone(swiftTextualDeps->contextHash.c_str()),
             swiftTextualDeps->isFramework,
-            create_clone(swiftTextualDeps->textualModuleDetails.CASFileSystemRootID.c_str()),
-            create_clone(swiftTextualDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot.c_str()),
+            create_clone(swiftTextualDeps->textualModuleDetails
+                             .CASFileSystemRootID.c_str()),
+            create_clone(swiftTextualDeps->textualModuleDetails
+                             .CASBridgingHeaderIncludeTreeRootID.c_str()),
             create_clone(swiftTextualDeps->moduleCacheKey.c_str())};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
@@ -1366,17 +1370,23 @@ generateFullDependencyGraph(CompilerInstance &instance,
             moduleInterfacePath,
             create_empty_set(),
             bridgingHeaderPath,
-            create_set(swiftSourceDeps->textualModuleDetails.bridgingSourceFiles),
-            create_set(swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies),
+            create_set(
+                swiftSourceDeps->textualModuleDetails.bridgingSourceFiles),
+            create_set(swiftSourceDeps->textualModuleDetails
+                           .bridgingModuleDependencies),
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
-            create_set(swiftSourceDeps->textualModuleDetails.bridgingHeaderBuildCommandLine),
+            create_set(swiftSourceDeps->bridgingHeaderBuildCommandLine),
             create_set(swiftSourceDeps->textualModuleDetails.extraPCMArgs),
-            /*contextHash*/create_null(),
-            /*isFramework*/false,
-            /*CASFS*/create_clone(swiftSourceDeps->textualModuleDetails.CASFileSystemRootID.c_str()),
-            /*IncludeTree*/create_clone(swiftSourceDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot.c_str()),
-            /*CacheKey*/create_clone("")};
+            /*contextHash*/ create_null(),
+            /*isFramework*/ false,
+            /*CASFS*/
+            create_clone(swiftSourceDeps->textualModuleDetails
+                             .CASFileSystemRootID.c_str()),
+            /*IncludeTree*/
+            create_clone(swiftSourceDeps->textualModuleDetails
+                             .CASBridgingHeaderIncludeTreeRootID.c_str()),
+            /*CacheKey*/ create_clone("")};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
@@ -1397,12 +1407,11 @@ generateFullDependencyGraph(CompilerInstance &instance,
         details->clang_details = {
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
-            create_set(clangDeps->nonPathCommandLine),
+            create_set(clangDeps->buildCommandLine),
             create_set(clangDeps->capturedPCMArgs),
             create_clone(clangDeps->CASFileSystemRootID.c_str()),
-            create_clone(clangDeps->clangIncludeTreeRoot.c_str()),
-            create_clone(clangDeps->moduleCacheKey.c_str())
-        };
+            create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
+            create_clone(clangDeps->moduleCacheKey.c_str())};
       }
       return details;
     };
