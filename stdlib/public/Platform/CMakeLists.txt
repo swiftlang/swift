@@ -114,6 +114,23 @@ add_swift_target_library(swiftMusl ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OV
     TARGET_SDKS MUSL
     INSTALL_IN_COMPONENT sdk-overlay)
 
+add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      WASILibc.swift.gyb
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS WASI
+    INSTALL_IN_COMPONENT sdk-overlay
+    DEPENDS wasilibc_modulemap)
+
 add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ucrt.swift
     ${swift_platform_sources}
@@ -233,6 +250,43 @@ endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
 set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay glibc_modulemap)
+
+set(wasilibc_modulemap_target_list)
+if("WASI" IN_LIST SWIFT_SDKS)
+  set(wasilibc_modulemap_source "wasi-libc.modulemap")
+  foreach(arch ${SWIFT_SDK_WASI_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_WASI_LIB_SUBDIR}/${arch}")
+    set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
+    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+
+    add_custom_command_target(
+      copy_wasilibc_modulemap_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir_static}
+      OUTPUT ${module_dir}/${wasilibc_modulemap_source} ${module_dir_static}/${wasilibc_modulemap_source}
+      COMMENT "Copying WASILibc modulemap to resource directories")
+    add_dependencies(sdk-overlay ${copy_wasilibc_modulemap_resource})
+    list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_resource})
+
+    swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+    endif()
+  endforeach()
+endif()
+add_custom_target(wasilibc_modulemap DEPENDS ${wasilibc_modulemap_target_list})
+set_property(TARGET wasilibc_modulemap PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay wasilibc_modulemap)
 
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
