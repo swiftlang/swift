@@ -139,6 +139,7 @@ class alignas(8) Expr : public ASTAllocated<Expr> {
   void operator=(const Expr&) = delete;
 
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Expr, bitmax(NumExprKindBits,8)+1,
@@ -371,6 +372,7 @@ protected:
   );
 
   } Bits;
+  // clang-format on
 
 private:
   /// Ty - This is the type of the expression.

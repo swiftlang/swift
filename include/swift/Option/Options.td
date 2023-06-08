@@ -633,7 +633,7 @@ def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmo
   HelpText<"Augment emitted Objective-C header with textual imports for every included modular import">;
 
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
-  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
