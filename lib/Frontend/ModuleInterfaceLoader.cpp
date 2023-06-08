@@ -20,6 +20,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -233,6 +234,7 @@ struct ModuleRebuildInfo {
     NotIgnored,
     PublicFramework,
     InterfacePreferred,
+    CompilerHostModule,
   };
   struct CandidateModule {
     std::string path;
@@ -704,7 +706,28 @@ class ModuleInterfaceLoaderImpl {
   bool isInResourceDir(StringRef path) {
     StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
     if (resourceDir.empty()) return false;
-    return path.startswith(resourceDir);
+    return pathStartsWith(resourceDir, path);
+  }
+
+  bool isInResourceHostDir(StringRef path) {
+    StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
+    if (resourceDir.empty()) return false;
+
+    SmallString<128> hostPath;
+    llvm::sys::path::append(hostPath,
+                            resourceDir, "host");
+    return pathStartsWith(hostPath, path);
+  }
+
+  bool isInSystemFrameworks(StringRef path) {
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
+    if (sdkPath.empty()) return false;
+
+    SmallString<128> publicFrameworksPath;
+    llvm::sys::path::append(publicFrameworksPath,
+                            sdkPath, "System", "Library", "Frameworks");
+
+    return pathStartsWith(publicFrameworksPath, path);
   }
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
@@ -719,10 +742,12 @@ class ModuleInterfaceLoaderImpl {
     llvm::sys::path::append(publicFrameworksPath,
                             ctx.SearchPathOpts.getSDKPath(),
                             "System", "Library", "Frameworks");
-    if (!ctx.SearchPathOpts.getSDKPath().empty() &&
-        modulePath.startswith(publicFrameworksPath)) {
+    if (isInSystemFrameworks(modulePath)) {
       shouldLoadAdjacentModule = false;
       rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::PublicFramework);
+    } else if (isInResourceHostDir(modulePath)) {
+      shouldLoadAdjacentModule = false;
+      rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::CompilerHostModule);
     }
 
     switch (loadMode) {
