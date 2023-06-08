@@ -385,7 +385,10 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
-void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
+void Decl::visitAuxiliaryDecls(
+    AuxiliaryDeclCallback callback,
+    bool visitFreestandingExpanded
+) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<Decl *>(this);
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -418,13 +421,15 @@ void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
     }
   }
 
-  else if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
-    if (auto bufferID = evaluateOrDefault(
-            ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
-      auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
-      auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
-      for (auto *decl : sourceFile->getTopLevelDecls())
-        callback(decl);
+  if (visitFreestandingExpanded) {
+    if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
+      if (auto bufferID = evaluateOrDefault(
+              ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
+        auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
+        auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+        for (auto *decl : sourceFile->getTopLevelDecls())
+          callback(decl);
+      }
     }
   }
 
@@ -10624,6 +10629,11 @@ MacroDefinition MacroDecl::getDefinition() const {
       MacroDefinition::forUndefined());
 }
 
+void MacroDecl::setDefinition(MacroDefinition definition) {
+  getASTContext().evaluator.cacheOutput(MacroDefinitionRequest{this},
+                                        std::move(definition));
+}
+
 Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
   auto def = getDefinition();
   if (def.kind != MacroDefinition::Kind::Builtin)
@@ -10640,37 +10650,27 @@ MacroDefinition MacroDefinition::forExpanded(
                                  ctx.AllocateCopy(replacements)};
 }
 
-MacroExpansionDecl::MacroExpansionDecl(
-    DeclContext *dc, MacroExpansionInfo *info
-) : Decl(DeclKind::MacroExpansion, dc), info(info) {
+MacroExpansionDecl::MacroExpansionDecl(DeclContext *dc,
+                                       MacroExpansionInfo *info)
+    : Decl(DeclKind::MacroExpansion, dc),
+      FreestandingMacroExpansion(FreestandingMacroKind::Decl, info) {
   Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
 }
 
-MacroExpansionDecl::MacroExpansionDecl(
+MacroExpansionDecl *
+MacroExpansionDecl::create(
     DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
     DeclNameLoc macroLoc, SourceLoc leftAngleLoc,
     ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
     ArgumentList *args
-) : Decl(DeclKind::MacroExpansion, dc) {
+) {
   ASTContext &ctx = dc->getASTContext();
-  info = new (ctx) MacroExpansionInfo{
+  MacroExpansionInfo *info = new (ctx) MacroExpansionInfo{
       poundLoc, macro, macroLoc,
       leftAngleLoc, rightAngleLoc, genericArgs,
       args ? args : ArgumentList::createImplicit(ctx, {})
   };
-  Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
-}
-
-SourceRange MacroExpansionDecl::getSourceRange() const {
-  SourceLoc endLoc;
-  if (auto argsEndList = info->ArgList->getEndLoc())
-    endLoc = argsEndList;
-  else if (info->RightAngleLoc.isValid())
-    endLoc = info->RightAngleLoc;
-  else
-    endLoc = info->MacroNameLoc.getEndLoc();
-
-  return SourceRange(info->SigilLoc, endLoc);
+  return new (ctx) MacroExpansionDecl(dc, info);
 }
 
 unsigned MacroExpansionDecl::getDiscriminator() const {
@@ -10690,8 +10690,9 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
   return getRawDiscriminator();
 }
 
-void MacroExpansionDecl::forEachExpandedExprOrStmt(
-    ExprOrStmtExpansionCallback callback) const {
+void MacroExpansionDecl::forEachExpandedNode(
+    llvm::function_ref<void(ASTNode)> callback
+) const {
   auto mutableThis = const_cast<MacroExpansionDecl *>(this);
   auto bufferID = evaluateOrDefault(
       getASTContext().evaluator,
@@ -10703,8 +10704,7 @@ void MacroExpansionDecl::forEachExpandedExprOrStmt(
   auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
   auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
   for (auto node : sourceFile->getTopLevelItems())
-    if (node.is<Expr *>() || node.is<Stmt *>())
-      callback(node);
+    callback(node);
 }
 
 NominalTypeDecl *
@@ -10814,13 +10814,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
 }
 
 MacroDiscriminatorContext
-MacroDiscriminatorContext::getParentOf(MacroExpansionExpr *expansion) {
+MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
   return getParentOf(
-      expansion->getLoc(), expansion->getDeclContext());
-}
-
-MacroDiscriminatorContext
-MacroDiscriminatorContext::getParentOf(MacroExpansionDecl *expansion) {
-  return getParentOf(
-      expansion->getLoc(), expansion->getDeclContext());
+      expansion->getPoundLoc(), expansion->getDeclContext());
 }

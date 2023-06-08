@@ -26,6 +26,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -912,7 +913,13 @@ public:
   ///
   /// Auxiliary declarations can be property wrapper backing variables,
   /// backing variables for 'lazy' vars, or peer macro expansions.
-  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const;
+  ///
+  /// When \p visitFreestandingExpanded is true (the default), this will also
+  /// visit the declarations produced by a freestanding macro expansion.
+  void visitAuxiliaryDecls(
+      AuxiliaryDeclCallback callback,
+      bool visitFreestandingExpanded = true
+  ) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
@@ -8596,6 +8603,9 @@ public:
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 
+  /// Set the definition of this macro
+  void setDefinition(MacroDefinition definition);
+
   /// Retrieve the parameter list of this macro.
   ParameterList *getParameterList() const { return parameterList; }
 
@@ -8618,69 +8628,29 @@ public:
   using Decl::getASTContext;
 };
 
-/// Information about a macro expansion that is common between macro
-/// expansion declarations and expressions.
-///
-/// Instances of these types will be shared among paired macro expansion
-/// declaration/expression nodes.
-struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
-  SourceLoc SigilLoc;
-  DeclNameRef MacroName;
-  DeclNameLoc MacroNameLoc;
-  SourceLoc LeftAngleLoc, RightAngleLoc;
-  ArrayRef<TypeRepr *> GenericArgs;
-  ArgumentList *ArgList;
-
-  /// The referenced macro.
-  ConcreteDeclRef macroRef;
-
-  MacroExpansionInfo(SourceLoc sigilLoc,
-                     DeclNameRef macroName,
-                     DeclNameLoc macroNameLoc,
-                     SourceLoc leftAngleLoc, SourceLoc rightAngleLoc,
-                     ArrayRef<TypeRepr *> genericArgs,
-                     ArgumentList *argList)
-    : SigilLoc(sigilLoc), MacroName(macroName), MacroNameLoc(macroNameLoc),
-      LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-      GenericArgs(genericArgs), ArgList(argList) { }
-};
-
-class MacroExpansionDecl : public Decl {
-  MacroExpansionInfo *info;
+class MacroExpansionDecl : public Decl, public FreestandingMacroExpansion {
 
 public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
   MacroExpansionDecl(DeclContext *dc, MacroExpansionInfo *info);
 
-  MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
-                     DeclNameLoc macroLoc,
-                     SourceLoc leftAngleLoc,
-                     ArrayRef<TypeRepr *> genericArgs,
-                     SourceLoc rightAngleLoc,
-                     ArgumentList *args);
+  static MacroExpansionDecl *create(DeclContext *dc, SourceLoc poundLoc,
+                                    DeclNameRef macro, DeclNameLoc macroLoc,
+                                    SourceLoc leftAngleLoc,
+                                    ArrayRef<TypeRepr *> genericArgs,
+                                    SourceLoc rightAngleLoc,
+                                    ArgumentList *args);
 
-  ArrayRef<TypeRepr *> getGenericArgs() const {
-    return info->GenericArgs;
+  DeclContext *getDeclContext() const { return Decl::getDeclContext(); }
+
+  SourceRange getSourceRange() const {
+    return getExpansionInfo()->getSourceRange();
   }
+  SourceLoc getLocFromSource() const { return getExpansionInfo()->SigilLoc; }
 
-  SourceRange getGenericArgsRange() const {
-    return SourceRange(info->LeftAngleLoc, info->RightAngleLoc);
-  }
-
-  SourceRange getSourceRange() const;
-  SourceLoc getLocFromSource() const { return info->SigilLoc; }
-  SourceLoc getPoundLoc() const { return info->SigilLoc; }
-  DeclNameLoc getMacroNameLoc() const { return info->MacroNameLoc; }
-  DeclNameRef getMacroName() const { return info->MacroName; }
-  ArgumentList *getArgs() const { return info->ArgList; }
-  void setArgs(ArgumentList *args) { info->ArgList = args; }
-  using ExprOrStmtExpansionCallback = llvm::function_ref<void(ASTNode)>;
-  void forEachExpandedExprOrStmt(ExprOrStmtExpansionCallback) const;
-  ConcreteDeclRef getMacroRef() const { return info->macroRef; }
-  void setMacroRef(ConcreteDeclRef ref) { info->macroRef = ref; }
-
-  MacroExpansionInfo *getExpansionInfo() const { return info; }
+  /// Enumerate the nodes produced by expanding this macro expansion.
+  void forEachExpandedNode(llvm::function_ref<void(ASTNode)> callback) const;
 
   /// Returns a discriminator which determines this macro expansion's index
   /// in the sequence of macro expansions within the current function.
@@ -8702,6 +8672,9 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;
+  }
+  static bool classof(const FreestandingMacroExpansion *expansion) {
+    return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
   }
 };
 
