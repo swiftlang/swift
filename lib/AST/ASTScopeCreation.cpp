@@ -602,7 +602,7 @@ void ScopeCreator::addChildrenForKnownAttributes(ValueDecl *decl,
       }
     } else if (auto *customAttr = dyn_cast<CustomAttr>(attr)) {
       if (auto *vd = dyn_cast<VarDecl>(decl)) {
-        constructExpandAndInsert<AttachedPropertyWrapperScope>(
+        constructExpandAndInsert<CustomAttributeScope>(
             parent, customAttr, vd);
       }
     }
@@ -716,7 +716,7 @@ CREATES_NEW_INSERTION_POINT(ConditionalClausePatternUseScope)
 
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
-NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
+NO_NEW_INSERTION_POINT(CustomAttributeScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
 NO_NEW_INSERTION_POINT(GuardStmtBodyScope)
 NO_NEW_INSERTION_POINT(ParameterListScope)
@@ -1177,7 +1177,7 @@ void DefaultArgumentInitializerScope::
   scopeCreator.addToScopeTree(initExpr, this);
 }
 
-void AttachedPropertyWrapperScope::
+void CustomAttributeScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
   if (auto *args = attr->getArgs()) {
