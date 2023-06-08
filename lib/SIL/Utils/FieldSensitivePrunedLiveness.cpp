@@ -564,6 +564,38 @@ void FieldSensitivePrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
 void FieldSensitivePrunedLiveBlocks::dump() const { print(llvm::dbgs()); }
 
 //===----------------------------------------------------------------------===//
+//                   FieldSensitivePrunedLivenessBoundary
+//===----------------------------------------------------------------------===//
+
+void FieldSensitivePrunedLivenessBoundary::print(llvm::raw_ostream &OS) const {
+  for (auto pair : lastUsers) {
+    auto *user = pair.first;
+    auto bits = pair.second;
+    OS << "last user: " << *user 
+       << "\tat " << bits << "\n";
+  }
+  for (auto pair : boundaryEdges) {
+    auto *block = pair.first;
+    auto bits = pair.second;
+    OS << "boundary edge: ";
+    block->printAsOperand(OS);
+    OS << "\n" << "\tat " << bits << "\n";
+  }
+  if (!deadDefs.empty()) {
+    for (auto pair : deadDefs) {
+      auto *deadDef = pair.first;
+      auto bits = pair.second;
+      OS << "dead def: " << *deadDef 
+         << "\tat " << bits << "\n";
+    }
+  }
+}
+
+void FieldSensitivePrunedLivenessBoundary::dump() const {
+  print(llvm::dbgs());
+}
+
+//===----------------------------------------------------------------------===//
 //                        MARK: FieldSensitiveLiveness
 //===----------------------------------------------------------------------===//
 
