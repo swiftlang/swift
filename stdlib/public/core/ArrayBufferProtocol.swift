@@ -164,9 +164,9 @@ extension _ArrayBufferProtocol {
     let holeStart = elements + subrange.lowerBound
     let holeEnd = holeStart + newCount
 
-    if eraseCount > 0 {
-      holeStart.deinitialize(count: eraseCount)
-    }
+    // directly forwards to Builtin.destroyArray
+    // TODO: should we branch here or does the compiler branch implicitly?
+    holeStart.deinitialize(count: eraseCount)
 
     // resize the hole to make it the correct size
     // safe to always call, moveInitialize to the same location is a no-op
