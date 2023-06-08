@@ -455,20 +455,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
     }
+
     bool alreadyFailed = false;
     if (shouldWalkExpansion) {
       MED->forEachExpandedNode([&](ASTNode expandedNode) {
         if (alreadyFailed) return;
+
         if (auto *expr = expandedNode.dyn_cast<Expr *>()) {
-          if (!doIt(expr))
-            alreadyFailed = true;
+          alreadyFailed = doIt(expr) == nullptr;
         } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
-          if (!doIt(stmt))
-            alreadyFailed = true;
+          alreadyFailed = doIt(stmt) == nullptr;
         } else {
           auto decl = expandedNode.get<Decl *>();
           if (!isa<VarDecl>(decl))
-            alreadyFailed = inherited::visit(decl);
+            alreadyFailed = doIt(decl);
         }
       });
     }
