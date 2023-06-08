@@ -16,8 +16,6 @@
 
 import Swift
 
-@_implementationOnly import _StringProcessing
-
 @_implementationOnly import OS.Libc
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -476,107 +474,93 @@ public struct Backtrace: CustomStringConvertible, Sendable {
       return []
     }
 
-    let mapRegex = #/
-    ^(?<start>[A-Fa-f0-9]+)-(?<end>[A-Fa-f0-9]+)\s+
-    (?<perms>[-rwxsp]{4})\s+
-    (?<offset>[A-Fa-f0-9]+)\s+
-    (?<major>[A-Fa-f0-9]+):(?<minor>[A-Fa-f0-9]+)\s+
-    (?<inode>\d+)\s+
-    (?<pathname>.*)\s*$
-    /#
-    let lines = procMaps.split(separator: "\n")
-
     // Find all the mapped files and get high/low ranges
     var mappedFiles: [Substring:AddressRange] = [:]
-    for line in lines {
-      if let match = try? mapRegex.wholeMatch(in: line) {
-        let path = stripWhitespace(match.pathname)
-        if match.inode == "0" || path == "" {
-          continue
-        }
-        guard let start = Address(match.start, radix: 16),
-              let end = Address(match.end, radix: 16) else {
-          continue
-        }
+    for match in ProcMapsScanner(procMaps) {
+      let path = stripWhitespace(match.pathname)
+      if match.inode == "0" || path == "" {
+        continue
+      }
+      guard let start = Address(match.start, radix: 16),
+            let end = Address(match.end, radix: 16) else {
+        continue
+      }
 
-        if let range = mappedFiles[path] {
-          mappedFiles[path] = AddressRange(low: min(start, range.low),
-                                           high: max(end, range.high))
-        } else {
-          mappedFiles[path] = AddressRange(low: start,
-                                           high: end)
-        }
+      if let range = mappedFiles[path] {
+        mappedFiles[path] = AddressRange(low: min(start, range.low),
+                                         high: max(end, range.high))
+      } else {
+        mappedFiles[path] = AddressRange(low: start,
+                                         high: end)
       }
     }
 
     // Look for ELF headers in the process' memory
     typealias Source = MemoryImageSource<M>
     let source = Source(with: reader)
-    for line in lines {
-      if let match = try? mapRegex.wholeMatch(in: line) {
-        let path = stripWhitespace(match.pathname)
-        if match.inode == "0" || path == "" {
-          continue
-        }
-
-        guard let start = Address(match.start, radix: 16),
-              let end = Address(match.end, radix: 16),
-              let offset = Address(match.offset, radix: 16) else {
-          continue
-        }
-
-        if offset != 0 || end - start < EI_NIDENT {
-          continue
-        }
-
-        // Extract the filename from path
-        let name: Substring
-        if let slashIndex = path.lastIndex(of: "/") {
-          name = path.suffix(from: path.index(after: slashIndex))
-        } else {
-          name = path
-        }
-
-        // Inspect the image and extract the UUID and end of text
-        let range = mappedFiles[path]!
-        let subSource = SubImageSource(parent: source,
-                                       baseAddress: Source.Address(range.low),
-                                       length: Source.Size(range.high
-                                                             - range.low))
-        var theUUID: [UInt8]? = nil
-        var endOfText: Address = range.low
-
-        if let image = try? Elf32Image(source: subSource) {
-          theUUID = image.uuid
-
-          for hdr in image.programHeaders {
-            if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
-              endOfText = max(endOfText, range.low + Address(hdr.p_vaddr
-                                                               + hdr.p_memsz))
-            }
-          }
-        } else if let image = try? Elf64Image(source: subSource) {
-          theUUID = image.uuid
-
-          for hdr in image.programHeaders {
-            if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
-              endOfText = max(endOfText, range.low + Address(hdr.p_vaddr
-                                                               + hdr.p_memsz))
-            }
-          }
-        } else {
-          // Not a valid ELF image
-          continue
-        }
-
-        let image = Image(name: String(name),
-                          path: String(path),
-                          buildID: theUUID,
-                          baseAddress: range.low,
-                          endOfText: endOfText)
-
-        images.append(image)
+    for match in ProcMapsScanner(procMaps) {
+      let path = stripWhitespace(match.pathname)
+      if match.inode == "0" || path == "" {
+        continue
       }
+
+      guard let start = Address(match.start, radix: 16),
+            let end = Address(match.end, radix: 16),
+            let offset = Address(match.offset, radix: 16) else {
+        continue
+      }
+
+      if offset != 0 || end - start < EI_NIDENT {
+        continue
+      }
+
+      // Extract the filename from path
+      let name: Substring
+      if let slashIndex = path.lastIndex(of: "/") {
+        name = path.suffix(from: path.index(after: slashIndex))
+      } else {
+        name = path
+      }
+
+      // Inspect the image and extract the UUID and end of text
+      let range = mappedFiles[path]!
+      let subSource = SubImageSource(parent: source,
+                                     baseAddress: Source.Address(range.low),
+                                     length: Source.Size(range.high
+                                                           - range.low))
+      var theUUID: [UInt8]? = nil
+      var endOfText: Address = range.low
+
+      if let image = try? Elf32Image(source: subSource) {
+        theUUID = image.uuid
+
+        for hdr in image.programHeaders {
+          if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
+            endOfText = max(endOfText, range.low + Address(hdr.p_vaddr
+                                                             + hdr.p_memsz))
+          }
+        }
+      } else if let image = try? Elf64Image(source: subSource) {
+        theUUID = image.uuid
+
+        for hdr in image.programHeaders {
+          if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
+            endOfText = max(endOfText, range.low + Address(hdr.p_vaddr
+                                                             + hdr.p_memsz))
+          }
+        }
+      } else {
+        // Not a valid ELF image
+        continue
+      }
+
+      let image = Image(name: String(name),
+                        path: String(path),
+                        buildID: theUUID,
+                        baseAddress: range.low,
+                        endOfText: endOfText)
+
+      images.append(image)
     }
     #endif
 
