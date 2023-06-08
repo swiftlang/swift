@@ -416,6 +416,11 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
+      case SILInstructionKind::AllocStackInst: {
+        locations.genValueSelfBit(state.genSet, state.killSet,
+                                  cast<AllocStackInst>(&I));
+        break;
+      }
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
         killBits(state, I.getOperand(0));
@@ -823,6 +828,10 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           checkFuncArgument(bits, op, YI->getArgumentConventionForOperand(op),
                              &I);
         }
+        break;
+      }
+      case SILInstructionKind::AllocStackInst: {
+        locations.setValueSelfBit(bits, cast<AllocStackInst>(&I));
         break;
       }
       case SILInstructionKind::DeallocStackInst: {
