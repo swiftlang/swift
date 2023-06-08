@@ -2613,7 +2613,12 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     takeInst.second.setBits(bits);
     bool claimedConsume = consumes.claimConsume(takeInst.first, bits);
     (void)claimedConsume;
-    assert(claimedConsume && "Should claim all copies?!");
+    if (!claimedConsume) {
+      llvm::errs()
+          << "Found consume that was not recorded as a 'claimed consume'!\n";
+      llvm::errs() << "Unrecorded consume: " << *takeInst.first;
+      llvm_unreachable("Standard compiler abort?!");
+    }
   }
 
   // Then rewrite all copy insts to be takes and claim them.
