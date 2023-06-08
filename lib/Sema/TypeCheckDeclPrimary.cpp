@@ -472,7 +472,6 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   auto *decl = ownerCtx->getAsDecl();
-  bool isGenericType = isa<NominalTypeDecl>(decl);
   bool hasPack = false;
 
   for (auto gp : *genericParams) {
