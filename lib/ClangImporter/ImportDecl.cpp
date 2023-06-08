@@ -126,6 +126,7 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
                                                  AccessorDecl *getter,
                                                  AccessorDecl *setter) {
   assert(getter);
+  storage->getASTContext().evaluator.cacheOutput(HasStorageRequest{storage}, false);
   if (setter) {
     storage->setImplInfo(StorageImplInfo::getMutableComputed());
     storage->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());

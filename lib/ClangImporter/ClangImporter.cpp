@@ -34,6 +34,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
@@ -5042,6 +5043,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     out->setIsObjC(var->isObjC());
     out->setIsDynamic(var->isDynamic());
     out->copyFormalAccessFrom(var);
+    out->getASTContext().evaluator.cacheOutput(HasStorageRequest{out}, false);
     out->setAccessors(SourceLoc(),
                       makeBaseClassMemberAccessors(newContext, out, var),
                       SourceLoc());

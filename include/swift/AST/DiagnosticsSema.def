@@ -7095,6 +7095,10 @@ ERROR(invalid_macro_role_for_macro_syntax,none,
       (unsigned))
 ERROR(macro_cannot_introduce_names,none,
       "'%0' macros are not allowed to introduce names", (StringRef))
+ERROR(macro_accessor_missing_from_expansion,none,
+      "expansion of macro %0 did not produce a %select{non-|}1observing "
+      "accessor",
+      (DeclName, bool))
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",

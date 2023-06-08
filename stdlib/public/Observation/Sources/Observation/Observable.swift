@@ -35,7 +35,7 @@ public macro ObservationTracked() =
   #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")
 
 @available(SwiftStdlib 5.9, *)
-@attached(accessor)
+@attached(accessor, names: named(willSet))
 public macro ObservationIgnored() =
   #externalMacro(module: "ObservationMacros", type: "ObservationIgnoredMacro")
 

@@ -1686,6 +1686,26 @@ private:
   ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class HasStorageRequest :
+    public SimpleRequest<HasStorageRequest,
+                         bool(AbstractStorageDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
 public:
   bool isCached() const { return true; }
 };
