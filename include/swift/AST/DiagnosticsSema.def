@@ -907,11 +907,11 @@ NOTE(modularization_issue_swift_version,none,
      (const ModuleDecl *, llvm::VersionTuple, llvm::VersionTuple))
 NOTE(modularization_issue_audit_headers,none,
      "declarations in the %select{underlying|}0 clang module %1 "
-     "may be hidden by clang project settings",
+     "may be hidden by clang preprocessor macros",
      (bool, const ModuleDecl*))
 NOTE(modularization_issue_layering_expected_local,none,
      "the distributed module %0 refers to the local module %1; "
-     "this may be caused by clang project settings",
+     "this may be caused by header maps or search paths",
      (const ModuleDecl*, const ModuleDecl*))
 NOTE(modularization_issue_layering_found_local,none,
      "the reference may break layering; the candidate was found in "
@@ -919,7 +919,7 @@ NOTE(modularization_issue_layering_found_local,none,
      (const ModuleDecl*, const ModuleDecl*))
 NOTE(modularization_issue_related_modules,none,
      "the %select{declaration|type}0 %1 moved between related modules; "
-     "clang project settings may affect headers shared between these modules",
+     "clang preprocessor macros may affect headers shared between these modules",
      (bool, DeclName))
 
 NOTE(modularization_issue_side_effect_extension_error,none,

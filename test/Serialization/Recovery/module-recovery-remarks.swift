@@ -30,9 +30,9 @@
 
 // CHECK-MOVED: <unknown>:0: note: the module 'LibWithXRef' has enabled library-evolution; the following file may need to be deleted if the SDK was modified: '
 // CHECK-MOVED-SAME: LibWithXRef.swiftmodule'
-// CHECK-MOVED: <unknown>:0: note: declarations in the underlying clang module 'A' may be hidden by clang project settings
-// CHECK-MOVED: <unknown>:0: note: the distributed module 'LibWithXRef' refers to the local module 'A'; this may be caused by clang project settings
-// CHECK-MOVED: <unknown>:0: note: the type 'MyType' moved between related modules; clang project settings may affect headers shared between these modules
+// CHECK-MOVED: <unknown>:0: note: declarations in the underlying clang module 'A' may be hidden by clang preprocessor macros
+// CHECK-MOVED: <unknown>:0: note: the distributed module 'LibWithXRef' refers to the local module 'A'; this may be caused by header maps or search paths
+// CHECK-MOVED: <unknown>:0: note: the type 'MyType' moved between related modules; clang preprocessor macros may affect headers shared between these modules
 // CHECK-MOVED: LibWithXRef.swiftmodule:1:1: note: could not deserialize type for 'foo()'
 // CHECK-MOVED: error: cannot find 'foo' in scope
 
@@ -48,7 +48,7 @@
 // RUN: %target-swift-frontend %t/Empty.swift -emit-module-path %t/A_related.swiftmodule -module-name A_related
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t -I %t/sdk -Rmodule-recovery -sdk %t/sdk 2>&1 \
 // RUN:   | %FileCheck --check-prefixes CHECK-CLANG %s
-// CHECK-CLANG: <unknown>:0: note: declarations in the clang module 'A' may be hidden by clang project settings
+// CHECK-CLANG: <unknown>:0: note: declarations in the clang module 'A' may be hidden by clang preprocessor macros
 // CHECK-CLANG: error: cannot find 'foo' in scope
 
 
