@@ -203,6 +203,15 @@ extension ObservableMacro: MemberMacro {
     declaration.addIfNeeded(ObservableMacro.accessFunction(observableType), to: &declarations)
     declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType), to: &declarations)
 
+#if !OBSERVATION_SUPPORTS_PEER_MACROS
+    let storedInstanceVariables = declaration.definedVariables.filter { $0.isValidForObservation }
+    for property in storedInstanceVariables {
+       if property.hasMacroApplication(ObservableMacro.ignoredMacroName) { continue }
+       let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
+       declaration.addIfNeeded(storage, to: &declarations)
+    }
+#endif
+
     return declarations
   }
 }
