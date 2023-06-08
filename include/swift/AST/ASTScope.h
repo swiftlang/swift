@@ -840,24 +840,20 @@ public:
   bool ignoreInDebugInfo() const override { return true; }
 };
 
-/// Consider:
-///  @_propertyWrapper
-///  struct WrapperWithInitialValue {
-///  }
-///  struct HasWrapper {
-///    @WrapperWithInitialValue var y = 17
-///  }
-/// Lookup has to be able to find the use of WrapperWithInitialValue, that's
-/// what this scope is for. Because the source positions are screwy.
-
-class AttachedPropertyWrapperScope final : public ASTScopeImpl {
+/// The scope for custom attributes and their arguments, such as for
+/// attached property wrappers and for attached macros.
+///
+/// Source locations for the attribute name and its arguments are in the
+/// custom attribute, so lookup is invoked from within the attribute
+/// itself.
+class CustomAttributeScope final : public ASTScopeImpl {
 public:
   CustomAttr *attr;
-  VarDecl *decl;
+  ValueDecl *decl;
 
-  AttachedPropertyWrapperScope(CustomAttr *attr, VarDecl *decl)
+  CustomAttributeScope(CustomAttr *attr, ValueDecl *decl)
       : attr(attr), decl(decl) {}
-  virtual ~AttachedPropertyWrapperScope() {}
+  virtual ~CustomAttributeScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
