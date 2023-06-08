@@ -101,6 +101,7 @@ class DeclAttribute : public AttributeBase {
   friend class TypeAttributes;
 
 protected:
+  // clang-format off
   union {
     uint64_t OpaqueBits;
 
@@ -178,6 +179,7 @@ protected:
       isCategoryNameInvalid : 1
     );
   } Bits;
+  // clang-format on
 
   DeclAttribute *Next = nullptr;
 
