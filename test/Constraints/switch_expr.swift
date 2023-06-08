@@ -518,6 +518,81 @@ func testVoidConversion() {
   }
 }
 
+struct TestOptionalVoidConversion {
+  func takesVoidFn(_ fn: () -> Void) {}
+  func foo() {}
+  func bar(_ x: TestOptionalVoidConversion?) {
+    // In this case we prefer to infer as () -> Void to preserve compatibility.
+    let fn1 = {
+      switch Bool.random() {
+      case true:
+        x?.foo()
+      case false:
+        x?.foo()
+      }
+    }
+    takesVoidFn(fn1)
+
+    let fn2 = {
+      switch Bool.random() {
+      case true:
+        ()
+      case false:
+        x?.foo()
+      }
+    }
+    takesVoidFn(fn2)
+
+    let fn3 = {
+      switch Bool.random() {
+      case true:
+        ()
+      case _ where .random():
+        x?.foo()
+      case false:
+        ()
+      }
+    }
+    takesVoidFn(fn3)
+
+    // But not in expression position, e.g if 'return' is used, or in a binding.
+    let fn4 = {
+      return switch Bool.random() {
+      case true:
+        x?.foo()
+      case false:
+        x?.foo()
+      }
+    }
+    takesVoidFn(fn4) // expected-error {{cannot convert value of type '() -> ()?' to expected argument type '() -> Void'}}
+
+    let fn5 = {
+      // expected-warning@+2 {{constant 'f' inferred to have type '()?', which may be unexpected}}
+      // expected-note@+1 {{add an explicit type annotation to silence this warning}}
+      let f = switch Bool.random() {
+      case true:
+        ()
+      case false:
+        x?.foo()
+      }
+      return f
+    }
+    takesVoidFn(fn5) // expected-error {{cannot convert value of type '() -> ()?' to expected argument type '() -> Void'}}
+
+    let fn6 = {
+      return switch Bool.random() {
+      case true:
+        ()
+      case _ where .random():
+        x?.foo()
+      case false:
+        ()
+      }
+    }
+    takesVoidFn(fn6) // expected-error {{cannot convert value of type '() -> ()?' to expected argument type '() -> Void'}}
+  }
+}
+
 struct SomeError: Error {}
 
 func testThrowInference() {

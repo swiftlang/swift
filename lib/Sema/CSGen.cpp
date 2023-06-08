@@ -3875,14 +3875,56 @@ namespace {
 
       assert(resultTy);
 
-      // If we have a single branch of a SingleValueStmtExpr, we want a
-      // conversion of the result, not a join, which would skip the conversion.
-      // This is needed to ensure we apply the Void/Never conversions.
-      if (elements.size() == 1 && expr->getSingleValueStmtExpr()) {
-        auto &elt = elements[0];
-        CS.addConstraint(ConstraintKind::Conversion, elt.first,
-                         resultTy, elt.second);
-        return resultTy;
+      if (auto *SVE = expr->getSingleValueStmtExpr()) {
+        // If we have a single branch of a SingleValueStmtExpr, we want a
+        // conversion of the result, not a join, which would skip the
+        // conversion. This is needed to ensure we apply the Void/Never
+        // conversions.
+        if (elements.size() == 1) {
+          auto &elt = elements[0];
+          CS.addConstraint(ConstraintKind::Conversion, elt.first,
+                           resultTy, elt.second);
+          return resultTy;
+        }
+        // Otherwise, if this is for an implicit single expr return for a
+        // closure, check to see if we exclusively have (optional) Void
+        // branches, and an unresolved result type. In this case we can bind the
+        // result type to Void, and force the optional branches to be discarded.
+        // This preserves compatibility for cases such as:
+        //
+        // let fn = {
+        //   if .random() {
+        //     someVoidFn()
+        //   } else {
+        //     x?.someVoidFn()
+        //   }
+        // }
+        //
+        // Previously we would default the closure result to Void. But with
+        // if/switch expressions, we are able to infer it to be Void?. However
+        // this is usually not desired, and typically causes conversion failures
+        // downstream.
+        if (auto *CE = dyn_cast<ClosureExpr>(SVE->getDeclContext())) {
+          if (CE->hasSingleExpressionBody() && !hasExplicitResult(CE)) {
+            auto *bodyExpr =
+                CE->getSingleExpressionBody()->getSemanticsProvidingExpr();
+            if (bodyExpr == SVE) {
+              auto fixedResultTy = CS.getFixedTypeRecursive(resultTy,
+                                                            /*rvalue*/ false);
+              if (fixedResultTy->is<TypeVariableType>()) {
+                auto allVoid = llvm::all_of(elements, [&](auto elt) {
+                  auto branchTy = CS.simplifyType(elt.first);
+                  return branchTy->lookThroughAllOptionalTypes()->isVoid();
+                });
+                if (allVoid) {
+                  auto &ctx = CS.getASTContext();
+                  CS.addConstraint(ConstraintKind::Bind, resultTy,
+                                   ctx.getVoidType(), locator);
+                }
+              }
+            }
+          }
+        }
       }
 
       // The type of a join expression is obtained by performing
