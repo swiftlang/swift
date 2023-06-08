@@ -169,11 +169,10 @@ extension _ArrayBufferProtocol {
     }
 
     // resize the hole to make it the correct size
-    if growth != 0 {
-      let tailStart = elements + subrange.upperBound
-      let tailCount = oldCount - subrange.upperBound
-      holeEnd.moveInitialize(from: tailStart, count: tailCount)
-    }
+    // safe to always call, moveInitialize to the same location is a no-op
+    let tailStart = elements + subrange.upperBound
+    let tailCount = oldCount - subrange.upperBound
+    holeEnd.moveInitialize(from: tailStart, count: tailCount)
 
     // place the values into the hole we created
     if newCount > 0 {
