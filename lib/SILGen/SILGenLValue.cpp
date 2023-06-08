@@ -1171,6 +1171,11 @@ namespace {
       assert(base
              && base.getType().isAddress()
              && "should have an address base to borrow from");
+      // If the base value is address-only then we can borrow from the
+      // address in-place.
+      if (!base.getType().isLoadable(SGF.F)) {
+        return base;
+      }
       auto result = SGF.B.createLoadBorrow(loc, base.getValue());
       return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
          base.getValue(), result);
