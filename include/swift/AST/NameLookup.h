@@ -556,6 +556,13 @@ void forEachPotentialResolvedMacro(
     llvm::function_ref<void(MacroDecl *, const MacroRoleAttr *)> body
 );
 
+/// For each macro with the given role that might be attached to the given
+/// declaration, call the body.
+void forEachPotentialAttachedMacro(
+    Decl *decl, MacroRole role,
+    llvm::function_ref<void(MacroDecl *macro, const MacroRoleAttr *)> body
+);
+
 } // end namespace namelookup
 
 /// Describes an inherited nominal entry.

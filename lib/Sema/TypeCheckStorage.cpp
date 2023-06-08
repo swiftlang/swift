@@ -1392,7 +1392,7 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 /// underlying storage.
 static std::pair<BraceStmt *, bool>
 synthesizeTrivialGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->hasStorage());
+  assert(getter->getStorage()->getImplInfo().hasStorage());
   return synthesizeTrivialGetterBody(getter, TargetImpl::Storage, ctx);
 }
 
@@ -3431,6 +3431,73 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
   return StorageImplInfo(ReadImplKind::Stored, writeImpl, readWriteImpl);
 }
 
+bool HasStorageRequest::evaluate(Evaluator &evaluator,
+                                 AbstractStorageDecl *storage) const {
+  // Parameters are always stored.
+  if (isa<ParamDecl>(storage))
+    return true;
+
+  // Only variables can be stored.
+  auto *var = dyn_cast<VarDecl>(storage);
+  if (!var)
+    return false;
+
+  // @_hasStorage implies that it... has storage.
+  if (var->getAttrs().hasAttribute<HasStorageAttr>())
+    return true;
+
+  // Protocol requirements never have storage.
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
+    return false;
+
+  // lazy declarations do not have storage.
+  if (storage->getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
+  // @NSManaged attributes don't have storage
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+    return false;
+
+  // Any accessors that read or write imply that there is no storage.
+  if (storage->getParsedAccessor(AccessorKind::Get) ||
+      storage->getParsedAccessor(AccessorKind::Read) ||
+      storage->getParsedAccessor(AccessorKind::Address) ||
+      storage->getParsedAccessor(AccessorKind::Set) ||
+      storage->getParsedAccessor(AccessorKind::Modify) ||
+      storage->getParsedAccessor(AccessorKind::MutableAddress))
+    return false;
+
+  // willSet or didSet in an overriding property imply that there is no storage.
+  if ((storage->getParsedAccessor(AccessorKind::WillSet) ||
+       storage->getParsedAccessor(AccessorKind::DidSet)) &&
+      storage->getAttrs().hasAttribute<OverrideAttr>())
+    return false;
+
+  // The presence of a property wrapper implies that there is no storage.
+  if (var->hasAttachedPropertyWrapper())
+    return false;
+
+  // Look for any accessor macros that might make this property computed.
+  bool hasStorage = true;
+  namelookup::forEachPotentialAttachedMacro(
+      var, MacroRole::Accessor,
+      [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+        // Will this macro introduce observers?
+        bool foundObserver = accessorMacroOnlyIntroducesObservers(macro, attr);
+
+        // If it's not (just) introducing observers, it's making the property
+        // computed.
+        if (!foundObserver)
+          hasStorage = false;
+
+        // If it will introduce observers, and there is an "override",
+        // the property doesn't have storage.
+        if (foundObserver && storage->getAttrs().hasAttribute<OverrideAttr>())
+          hasStorage = false;
+      });
+  return hasStorage;
+}
+
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
@@ -3590,6 +3657,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
   finishStorageImplInfo(storage, info);
 
+  assert(info.hasStorage() == storage->hasStorage() ||
+         storage->getASTContext().Diags.hadAnyError());
   return info;
 }
 
