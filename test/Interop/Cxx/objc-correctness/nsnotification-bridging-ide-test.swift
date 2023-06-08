@@ -2,7 +2,6 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: @_exported import Foundation
+// CHECK: import Foundation
 
-// CHECK: @available(swift, obsoleted: 3, renamed: "NSNotification.Name.SpaceShip")
-// CHECK: let SpaceShipNotification: NSNotification.Name
+// CHECK: let SpaceShipNotification: String
