@@ -39,6 +39,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
 
@@ -861,7 +862,8 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
 
 /// Evaluate the given freestanding macro expansion.
 static SourceFile *
-evaluateFreestandingMacro(FreestandingMacroExpansion *expansion) {
+evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
+                          StringRef discriminatorStr = "") {
   auto *dc = expansion->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceLoc loc = expansion->getPoundLoc();
@@ -889,6 +891,8 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion) {
 
   /// The discriminator used for the macro.
   LazyValue<std::string> discriminator([&]() -> std::string {
+    if (!discriminatorStr.empty())
+      return discriminatorStr.str();
 #if SWIFT_SWIFT_PARSER
     Mangle::ASTMangler mangler;
     return mangler.mangleMacroExpansion(expansion);
@@ -983,7 +987,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion) {
 }
 
 Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
-  SourceFile *macroSourceFile = evaluateFreestandingMacro(mee);
+  SourceFile *macroSourceFile = ::evaluateFreestandingMacro(mee);
   if (!macroSourceFile)
     return None;
 
@@ -1043,7 +1047,7 @@ Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
 /// Expands the given macro expansion declaration.
 Optional<unsigned>
 swift::expandFreestandingMacro(MacroExpansionDecl *med) {
-  SourceFile *macroSourceFile = evaluateFreestandingMacro(med);
+  SourceFile *macroSourceFile = ::evaluateFreestandingMacro(med);
   if (!macroSourceFile)
     return None;
 
@@ -1065,9 +1069,10 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   return *macroSourceFile->getBufferID();
 }
 
-static SourceFile *
-evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
-                      bool passParentContext, MacroRole role) {
+static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
+                                         CustomAttr *attr,
+                                         bool passParentContext, MacroRole role,
+                                         StringRef discriminatorStr = "") {
   DeclContext *dc;
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
@@ -1117,6 +1122,8 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
 
   /// The discriminator used for the macro.
   LazyValue<std::string> discriminator([&]() -> std::string {
+    if (!discriminatorStr.empty())
+      return discriminatorStr.str();
 #if SWIFT_SWIFT_PARSER
     Mangle::ASTMangler mangler;
     return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
@@ -1228,9 +1235,9 @@ Optional<unsigned> swift::expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 ) {
   // Evaluate the macro.
-  auto macroSourceFile = evaluateAttachedMacro(macro, storage, attr,
-                                               /*passParentContext*/false,
-                                               MacroRole::Accessor);
+  auto macroSourceFile =
+      ::evaluateAttachedMacro(macro, storage, attr,
+                              /*passParentContext=*/false, MacroRole::Accessor);
   if (!macroSourceFile)
     return None;
 
@@ -1279,9 +1286,9 @@ ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
 Optional<unsigned>
 swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
-  auto macroSourceFile = evaluateAttachedMacro(macro, member, attr,
-                                               /*passParentContext*/true,
-                                               MacroRole::MemberAttribute);
+  auto macroSourceFile = ::evaluateAttachedMacro(macro, member, attr,
+                                                 /*passParentContext=*/true,
+                                                 MacroRole::MemberAttribute);
   if (!macroSourceFile)
     return None;
 
@@ -1304,9 +1311,9 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
 Optional<unsigned>
 swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   // Evaluate the macro.
-  auto macroSourceFile = evaluateAttachedMacro(macro, decl, attr,
-                                               /*passParentContext*/false,
-                                               MacroRole::Member);
+  auto macroSourceFile =
+      ::evaluateAttachedMacro(macro, decl, attr,
+                              /*passParentContext=*/false, MacroRole::Member);
   if (!macroSourceFile)
     return None;
 
@@ -1331,9 +1338,9 @@ swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
 
 Optional<unsigned>
 swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
-  auto macroSourceFile = evaluateAttachedMacro(macro, decl, attr,
-                                               /*passParentContext*/false,
-                                               MacroRole::Peer);
+  auto macroSourceFile =
+      ::evaluateAttachedMacro(macro, decl, attr,
+                              /*passParentContext=*/false, MacroRole::Peer);
   if (!macroSourceFile)
     return None;
 
@@ -1357,10 +1364,9 @@ ExpandConformanceMacros::evaluate(Evaluator &evaluator,
 Optional<unsigned>
 swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
                           NominalTypeDecl *nominal) {
-  auto macroSourceFile =
-      evaluateAttachedMacro(macro, nominal, attr,
-                            /*passParentContext*/false,
-                            MacroRole::Conformance);
+  auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
+                                                 /*passParentContext=*/false,
+                                                 MacroRole::Conformance);
 
   if (!macroSourceFile)
     return None;
@@ -1446,4 +1452,20 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   }
 
   return macroExpansion->getMacroRef();
+}
+
+// MARK: for IDE.
+
+SourceFile *swift::evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
+                                         CustomAttr *attr,
+                                         bool passParentContext, MacroRole role,
+                                         StringRef discriminator) {
+  return ::evaluateAttachedMacro(macro, attachedTo, attr, passParentContext,
+                                 role, discriminator);
+}
+
+SourceFile *
+swift::evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
+                                 StringRef discriminator) {
+  return ::evaluateFreestandingMacro(expansion, discriminator);
 }
