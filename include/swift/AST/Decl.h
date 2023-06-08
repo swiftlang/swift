@@ -8601,6 +8601,9 @@ public:
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 
+  /// Set the definition of this macro
+  void setDefinition(MacroDefinition definition);
+
   /// Retrieve the parameter list of this macro.
   ParameterList *getParameterList() const { return parameterList; }
 

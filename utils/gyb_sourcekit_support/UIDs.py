@@ -209,6 +209,9 @@ UID_KEYS = [
     KEY('IsSynthesized', 'key.is_synthesized'),
     KEY('BufferName', 'key.buffer_name'),
     KEY('BarriersEnabled', 'key.barriers_enabled'),
+    KEY('Expansions', 'key.expansions'),
+    KEY('MacroRoles', 'key.macro_roles'),
+    KEY('ExpandedMacroReplacements', 'key.expanded_macro_replacements'),
 ]
 
 
@@ -274,6 +277,8 @@ UID_REQUESTS = [
     REQUEST('Compile', 'source.request.compile'),
     REQUEST('CompileClose', 'source.request.compile.close'),
     REQUEST('EnableRequestBarriers', 'source.request.enable_request_barriers'),
+    REQUEST('SyntacticMacroExpansion',
+            'source.request.syntactic_macro_expansion'),
 ]
 
 
@@ -491,4 +496,12 @@ UID_KINDS = [
     KIND('StatInstructionCount', 'source.statistic.instruction-count'),
     KIND('Swift', 'source.lang.swift'),
     KIND('ObjC', 'source.lang.objc'),
+    KIND('MacroRoleExpression', 'source.lang.swift.macro_role.expression'),
+    KIND('MacroRoleDeclaration', 'source.lang.swift.macro_role.declaration'),
+    KIND('MacroRoleCodeItem', 'source.lang.swift.macro_role.codeitem'),
+    KIND('MacroRoleAccessor', 'source.lang.swift.macro_role.accessor'),
+    KIND('MacroRoleMemberAttribute', 'source.lang.swift.macro_role.member_attribute'),
+    KIND('MacroRoleMember', 'source.lang.swift.macro_role.member'),
+    KIND('MacroRolePeer', 'source.lang.swift.macro_role.peer'),
+    KIND('MacroRoleConformance', 'source.lang.swift.macro_role.conformance'),
 ]
