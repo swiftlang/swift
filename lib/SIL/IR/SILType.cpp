@@ -1048,6 +1048,15 @@ bool SILType::isPureMoveOnly() const {
   return false;
 }
 
+bool SILType::isValueTypeWithDeinit() const {
+  // Do not look inside an aggregate type that has a user-deinit, for which
+  // memberwise-destruction is not equivalent to aggregate destruction.
+  if (auto *nominal = getNominalOrBoundGenericNominal()) {
+    return nominal->getValueTypeDestructor() != nullptr;
+  }
+  return false;
+}
+
 SILType SILType::getInstanceTypeOfMetatype(SILFunction *function) const {
   auto metaType = castTo<MetatypeType>();
   CanType instanceTy = metaType.getInstanceType();
