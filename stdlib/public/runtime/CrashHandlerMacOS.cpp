@@ -428,6 +428,7 @@ run_backtracer()
   case OutputTo::Stdout:
     backtracer_argv[30] = "stdout";
     break;
+  case OutputTo::Auto: // Shouldn't happen, but if it does pick stderr
   case OutputTo::Stderr:
     backtracer_argv[30] = "stderr";
     break;
