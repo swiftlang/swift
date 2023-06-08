@@ -197,7 +197,7 @@ public class MultipleValueInstruction : Instruction {
 }
 
 /// Instructions, which have a single operand.
-public protocol UnaryInstruction : AnyObject {
+public protocol UnaryInstruction : Instruction {
   var operands: OperandArray { get }
   var operand: Operand { get }
 }
@@ -306,14 +306,24 @@ final public class StrongRetainInst : RefCountingInst {
   public var instance: Value { operand.value }
 }
 
+final public class UnownedRetainInst : RefCountingInst {
+  public var instance: Value { operand.value }
+}
+
 final public class RetainValueInst : RefCountingInst {
+  public var value: Value { return operand.value }
 }
 
 final public class StrongReleaseInst : RefCountingInst {
   public var instance: Value { operand.value }
 }
 
+final public class UnownedReleaseInst : RefCountingInst {
+  public var instance: Value { operand.value }
+}
+
 final public class ReleaseValueInst : RefCountingInst {
+  public var value: Value { return operand.value }
 }
 
 final public class DestroyValueInst : Instruction, UnaryInstruction {
