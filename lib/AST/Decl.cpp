@@ -3357,12 +3357,18 @@ TypeRepr *ValueDecl::getResultTypeRepr() const {
     returnRepr = FD->getResultTypeRepr();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     returnRepr = SD->getElementTypeRepr();
+  } else if (auto *MD = dyn_cast<MacroDecl>(this)) {
+    returnRepr = MD->resultType.getTypeRepr();
   }
 
   return returnRepr;
 }
 
 TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+  // FIXME: Macros don't allow opaque result types yet.
+  if (isa<MacroDecl>(this))
+    return nullptr;
+
   auto *returnRepr = this->getResultTypeRepr();
 
   auto *dc = getDeclContext();
