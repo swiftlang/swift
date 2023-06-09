@@ -4573,6 +4573,7 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
     }
 
     if (Tok.isContextualKeyword("_const")) {
+      Tok.setKind(tok::contextual_keyword);
       ConstLoc = consumeToken();
       continue;
     }
@@ -4595,6 +4596,7 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
         }
       }
     }
+    Tok.setKind(tok::contextual_keyword);
     SpecifierLoc = consumeToken();
   }
 
