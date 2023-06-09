@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 protocol A { func a() }
 protocol B { func b() }
