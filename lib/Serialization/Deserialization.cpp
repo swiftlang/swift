@@ -4910,14 +4910,10 @@ public:
 
     // Resolve the name ids.
     DeclName name;
-    if (numArgNames > 0) {
-      SmallVector<Identifier, 2> argNames;
-      for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
-        argNames.push_back(MF.getIdentifier(argNameID));
-      name = DeclName(ctx, baseName, argNames);
-    } else {
-      name = baseName;
-    }
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
+      argNames.push_back(MF.getIdentifier(argNameID));
+    name = DeclName(ctx, baseName, argNames);
     PrettySupplementalDeclNameTrace trace(name);
 
     argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numArgNames);
