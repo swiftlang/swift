@@ -24,6 +24,24 @@ struct Structure {
 }
 
 @Observable
+struct MemberwiseInitializers {
+  var field: Int
+}
+
+func validateMemberwiseInitializers() {
+  _ = MemberwiseInitializers(field: 3)
+}
+
+@Observable
+struct DefiniteInitialization {
+  var field: Int
+  
+  init(field: Int) {
+    self.field = field
+  }
+}
+
+@Observable
 class ContainsWeak {
   weak var obj: AnyObject? = nil
 }
