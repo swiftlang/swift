@@ -144,6 +144,12 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!var->getParentPattern()->getSingleVar())
     return;
 
+  // FIXME: Don't attempt to synthesize default arguments for init
+  //        accessor properties because there could be multiple properties
+  //        with default values they are going to initialize.
+  if (var->getAccessor(AccessorKind::Init))
+    return;
+
   // Whether we have explicit initialization.
   bool isExplicitlyInitialized = false;
   if (auto pbd = var->getParentPatternBinding()) {
