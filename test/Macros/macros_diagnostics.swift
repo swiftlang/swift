@@ -97,7 +97,7 @@ macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
 
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
-  let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
+  let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without a type annotation}}
 
   _ = #stringify()
   // expected-error@-1{{missing argument for parameter #1 in macro expansion}}
