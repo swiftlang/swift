@@ -50,6 +50,7 @@ func test_use_of_initializes_accesses_on_non_inits() {
       }
 
       get { x }
+      set { }
     }
 
     var _y: String {
@@ -62,6 +63,11 @@ func test_use_of_initializes_accesses_on_non_inits() {
       get { y }
       set(initialValue) accesses(x) {}
       // expected-error@-1 {{accesses(...) attribute could only be used with init accessors}}
+    }
+
+    init(x: Int, y: String) {
+      self.y = y
+      self._x = x
     }
   }
 }
@@ -103,6 +109,13 @@ func test_assignment_to_let_properties() {
         self.x = initialValue.0 // Ok
         self.y = initialValue.1 // Ok
       }
+
+      get { (x, y) }
+      set { }
+    }
+
+    init(x: Int, y: Int) {
+      self.point = (x, y)
     }
   }
 }
@@ -116,6 +129,12 @@ func test_duplicate_and_computed_lazy_properties() {
       init(initialValue) initializes(_b, _a) accesses(_a) {
         // expected-error@-1 {{property '_a' cannot be both initialized and accessed}}
       }
+
+      get { _a }
+      set { }
+    }
+
+    init() {
     }
   }
 
@@ -219,6 +238,8 @@ func test_invalid_references() {
     }
 
     func test() -> Int? { 42 }
+
+    init() {}
   }
 }
 
@@ -334,4 +355,20 @@ func test_memberwise_with_overlaps() {
   }
 
   _ = Test3(a: "a", triple: ("b", 2, [1.0, 2.0]), b: 0, c: [1.0]) // Ok
+}
+
+func test_invalid_memberwise() {
+  struct Test1 { // expected-error {{cannot synthesize memberwise initializer}}
+    var _a: Int
+    var _b: Int
+
+    var a: Int {
+      init(initialValue) initializes(_a) accesses(_b) {
+        // expected-note@-1 {{init accessor for 'a' cannot access stored property '_b' because it is called before '_b' is initialized}}
+        _a = initialValue
+      }
+
+      get { _a }
+    }
+  }
 }

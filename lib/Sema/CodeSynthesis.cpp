@@ -1317,6 +1317,12 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   if (hasUserDefinedDesignatedInit(evaluator, decl))
     return false;
 
+  std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
+  decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
+
+  llvm::SmallPtrSet<VarDecl *, 4> initializedProperties;
+  llvm::SmallVector<std::pair<VarDecl *, Identifier>> invalidOrderings;
+
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // If this is a backing storage property for a property wrapper,
@@ -1324,10 +1330,65 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
       if (var->getOriginalWrappedProperty())
         continue;
 
-      if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+        continue;
+
+      // If init accessors are not involved, we are done.
+      if (initializedViaAccessor.empty())
         return true;
+
+      if (!initializedViaAccessor.count(var)) {
+        initializedProperties.insert(var);
+        continue;
+      }
+
+      // Check whether use of init accessors results in access to uninitialized
+      // properties.
+
+      for (auto iter = initializedViaAccessor.find(var);
+           iter != initializedViaAccessor.end(); ++iter) {
+        auto *initializerProperty = iter->second;
+        auto *initAccessor =
+            initializerProperty->getAccessor(AccessorKind::Init);
+
+        // Make sure that all properties accessed by init accessor
+        // are previously initialized.
+        if (auto accessAttr =
+                initAccessor->getAttrs().getAttribute<AccessesAttr>()) {
+          for (auto *property : accessAttr->getPropertyDecls(initAccessor)) {
+            if (!initializedProperties.count(property))
+              invalidOrderings.push_back(
+                  {initializerProperty, property->getName()});
+          }
+        }
+
+        // Record all of the properties initialized by calling init accessor.
+        if (auto initAttr =
+                initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
+          auto properties = initAttr->getPropertyDecls(initAccessor);
+          initializedProperties.insert(properties.begin(), properties.end());
+        }
+      }
     }
   }
+
+  if (invalidOrderings.empty())
+    return !initializedProperties.empty();
+
+  {
+    auto &diags = decl->getASTContext().Diags;
+
+    diags.diagnose(
+        decl, diag::cannot_synthesize_memberwise_due_to_property_init_order);
+
+    for (const auto &invalid : invalidOrderings) {
+      auto *accessor = invalid.first->getAccessor(AccessorKind::Init);
+      diags.diagnose(accessor->getLoc(),
+                     diag::out_of_order_access_in_init_accessor,
+                     invalid.first->getName(), invalid.second);
+    }
+  }
+
   return false;
 }
 
