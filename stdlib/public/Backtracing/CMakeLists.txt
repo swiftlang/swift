@@ -36,6 +36,7 @@ set(BACKTRACING_SOURCES
   ImageSource.swift
   MemoryImageSource.swift
   MemoryReader.swift
+  ProcMapsScanner.swift
   Registers.swift
   SymbolicatedBacktrace.swift
   Utils.swift
@@ -75,7 +76,7 @@ set(LLVM_OPTIONAL_SOURCES
 add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${BACKTRACING_SOURCES}
 
-  SWIFT_MODULE_DEPENDS ${concurrency} _StringProcessing
+  SWIFT_MODULE_DEPENDS ${concurrency}
 
   LINK_LIBRARIES ${swift_backtracing_link_libraries}
 
