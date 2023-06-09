@@ -7138,6 +7138,14 @@ ERROR(macro_in_nested,none,
 ERROR(macro_without_role,none,
       "macro %0 must declare its applicable roles via '@freestanding' or @attached'",
        (DeclName))
+ERROR(macro_result_type_cannot_be_used,none,
+      "only a freestanding expression macro can produce a result of type %0",
+      (Type))
+NOTE(macro_remove_result_type,none,
+      "remove the result type if the macro does not produce a value",
+      ())
+NOTE(macro_make_freestanding_expression,none,
+      "make this macro a freestanding expression macro", ())
 ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))
 ERROR(macro_expansion_missing_arguments,none,

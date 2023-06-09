@@ -46,7 +46,7 @@ internal struct X { } // expected-note{{type declared here}}
 // expected-warning@-1{{external macro implementation type}}
 
 struct ZZZ {
-  macro m5() -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+  macro m5() = #externalMacro(module: "BuiltinMacros", type: "Blah")
   // expected-error@-1{{macro 'm5()' can only be declared at file scope}}
   // expected-error@-2{{macro 'm5()' must declare its applicable roles}}
   // expected-warning@-3{{external macro implementation type}}
@@ -200,3 +200,14 @@ struct SomeType {
   // expected-error@-2{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
   // expected-error@-3{{external macro implementation type}}
 }
+
+
+
+@freestanding(declaration) macro nonExpressionReturnsInt<T>(_: T) -> Int = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}
+// expected-error@-2{{only a freestanding expression macro can produce a result of type 'Int'}}
+// expected-note@-3{{make this macro a freestanding expression macro}}{{1-1=@freestanding(expression)\n}}
+// expected-note@-4{{remove the result type if the macro does not produce a value}}{{67-74=}}
+
+@freestanding(declaration) macro nonExpressionReturnsVoid<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}
