@@ -1,11 +1,9 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
 // RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
 
-// UNSUPPORTED: OS=windows-msvc
-//
-// On Windows, the struct_extract instructions are not fully cleaned up:
-// CHECK-SIL-NOT: struct_extract
-// It likely has to do with the lazy property.
+// Swift sources are require to remove struct_extract so this check-not line passes:
+// "CHECK-SIL-NOT: struct_extract"
+// REQUIRES: swift_in_compiler
 
 func invokedDeinit() {}
 
