@@ -3868,6 +3868,12 @@ getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
+  // Opaque type decls inherit accessibility from their naming decl.
+  if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(this)) {
+    if (auto *namingDecl = opaqueType->getNamingDecl())
+      return namingDecl->getEffectiveAccess();
+  }
+
   auto effectiveAccess =
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true);
