@@ -303,6 +303,11 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
     decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
 
+    auto createParameter = [&](VarDecl *property) {
+      accessLevel = std::min(accessLevel, property->getFormalAccess());
+      params.push_back(createMemberwiseInitParameter(decl, Loc, property));
+    };
+
     // A single property could be used to initialize N other stored
     // properties via a call to its init accessor.
     llvm::SmallPtrSet<VarDecl *, 4> usedInitProperties;
@@ -315,22 +320,17 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         continue;
 
       // Check whether this property could be initialized via init accessor.
-      //
-      // Note that we check for a single match here because intersecting
-      // properties are going to be diagnosed.
-      if (initializedViaAccessor.count(var) == 1) {
-        auto *initializerProperty = initializedViaAccessor.find(var)->second;
-        // Parameter for this property is already emitted.
-        if (usedInitProperties.count(initializerProperty))
-          continue;
+      if (initializedViaAccessor.count(var)) {
+        for (auto iter = initializedViaAccessor.find(var);
+             iter != initializedViaAccessor.end(); ++iter) {
+          auto *initializerProperty = iter->second;
 
-        var = initializerProperty;
-        usedInitProperties.insert(initializerProperty);
+          if (usedInitProperties.insert(initializerProperty).second)
+            createParameter(initializerProperty);
+        }
+      } else {
+        createParameter(var);
       }
-
-      accessLevel = std::min(accessLevel, var->getFormalAccess());
-
-      params.push_back(createMemberwiseInitParameter(decl, Loc, var));
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
     auto classDecl = dyn_cast<ClassDecl>(decl);

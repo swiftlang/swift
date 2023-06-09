@@ -272,22 +272,31 @@ static RValue maybeEmitPropertyWrapperInitFromValue(
                                                           subs, std::move(arg));
 }
 
-static void emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
-                                    AccessorDecl *accessor, SILValue selfValue,
-                                    SILType selfTy, RValue &&initialValue) {
+static void
+emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
+                        AccessorDecl *accessor, SILValue selfValue,
+                        SILType selfTy, RValue &&initialValue,
+                        llvm::SmallPtrSetImpl<VarDecl *> &initializedFields) {
   SmallVector<SILValue> arguments;
 
-  auto emitFieldReference = [&](VarDecl *field) {
+  auto emitFieldReference = [&](VarDecl *field, bool forInit = false) {
     auto fieldTy =
         selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
-    return SGF.B.createStructElementAddr(loc, selfValue, field,
-                                         fieldTy.getAddressType());
+    auto fieldAddr = SGF.B.createStructElementAddr(loc, selfValue, field,
+                                                   fieldTy.getAddressType());
+
+    // If another init accessor already initialized this field then we need
+    // to emit destroy before calling this accessor.
+    if (forInit && !initializedFields.insert(field).second)
+      SGF.B.emitDestroyAddr(loc, fieldAddr);
+
+    return fieldAddr;
   };
 
   // First, let's emit all of the indirect results.
   if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>()) {
     for (auto *property : initAttr->getPropertyDecls(accessor)) {
-      arguments.push_back(emitFieldReference(property));
+      arguments.push_back(emitFieldReference(property, /*forInit=*/true));
     }
   }
 
@@ -402,6 +411,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     // Tracks all the init accessors we have emitted
     // because they can initialize more than one property.
     llvm::SmallPtrSet<AccessorDecl *, 2> emittedInitAccessors;
+    // Tracks all the fields that have been already initialized
+    // via an init accessor.
+    llvm::SmallPtrSet<VarDecl *, 4> fieldsInitializedViaAccessor;
 
     auto elti = elements.begin(), eltEnd = elements.end();
     for (VarDecl *field : decl->getStoredProperties()) {
@@ -409,17 +421,25 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       // Handle situations where this stored propery is initialized
       // via a call to an init accessor on some other property.
       if (initializedViaAccessor.count(field)) {
-        auto *initProperty = initializedViaAccessor.find(field)->second;
-        auto *initAccessor = initProperty->getAccessor(AccessorKind::Init);
+        for (auto iter = initializedViaAccessor.find(field);
+             iter != initializedViaAccessor.end(); ++iter) {
+          auto *initProperty = iter->second;
+          auto *initAccessor = initProperty->getAccessor(AccessorKind::Init);
 
-        if (emittedInitAccessors.count(initAccessor))
-          continue;
+          if (!emittedInitAccessors.insert(initAccessor).second)
+            continue;
 
-        emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot, selfTy,
-                                std::move(*elti));
+          assert(elti != eltEnd &&
+                 "number of args does not match number of fields");
 
-        emittedInitAccessors.insert(initAccessor);
-        ++elti;
+          emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot, selfTy,
+                                  std::move(*elti),
+                                  fieldsInitializedViaAccessor);
+          ++elti;
+        }
+
+        // After all init accessors are emitted let's move on to the next
+        // property.
         continue;
       }
 

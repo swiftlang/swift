@@ -221,3 +221,117 @@ func test_invalid_references() {
     func test() -> Int? { 42 }
   }
 }
+
+func test_memberwise_with_overlaps() {
+  struct Test1<T, U> {
+    var _a: T
+    var _b: Int
+
+    var a: T {
+      init(initialValue) initializes(_a) {
+        _a = initialValue
+      }
+
+      get { _a }
+      set { }
+    }
+
+    var pair: (T, Int) {
+      init(initialValue) initializes(_a, _b) {
+        _a = initialValue.0
+        _b = initialValue.1
+      }
+
+      get { (_a, _b) }
+      set { }
+    }
+
+    var c: U
+  }
+
+  _ = Test1(a: "a", pair: ("b", 1), c: [3.0]) // Ok
+
+  struct Test2<T, U> {
+    var _a: T
+    var _b: Int
+
+    var a: T {
+      init(initialValue) initializes(_a) {
+        _a = initialValue
+      }
+
+      get { _a }
+      set { }
+    }
+
+    var b: Int {
+      init(initialValue) initializes(_b) {
+        _b = initialValue
+      }
+
+      get { _b }
+      set { }
+    }
+
+    var _c: U
+
+    var pair: (T, U) {
+      init(initialValue) initializes(_a, _c) {
+        _a = initialValue.0
+        _c = initialValue.1
+      }
+
+      get { (_a, _c) }
+      set { }
+    }
+  }
+
+  _ = Test2(a: "a", pair: ("c", 2), b: 0) // Ok
+
+  struct Test3<T, U> {
+    var _a: T
+    var _b: Int
+
+    var a: T {
+      init(initialValue) initializes(_a) {
+        _a = initialValue
+      }
+
+      get { _a }
+      set { }
+    }
+
+    var b: Int {
+      init(initialValue) initializes(_b) {
+        _b = initialValue
+      }
+
+      get { _b }
+      set { }
+    }
+
+    var _c: U
+
+    var c: U {
+      init(initialValue) initializes(_c) {
+        _c = initialValue
+      }
+
+      get { _c }
+      set { }
+    }
+
+    var triple: (T, Int, U) {
+      init(initialValue) initializes(_a, _b, _c) {
+        _a = initialValue.0
+        _b = initialValue.1
+        _c = initialValue.2
+      }
+
+      get { (_a, _b, _c) }
+      set { }
+    }
+  }
+
+  _ = Test3(a: "a", triple: ("b", 2, [1.0, 2.0]), b: 0, c: [1.0]) // Ok
+}
