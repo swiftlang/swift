@@ -2018,6 +2018,17 @@ public:
     llvm_unreachable("should always be type-checked already");
   }
 
+  /// Determine the number of bits set.
+  static unsigned numBitsSet(uint64_t value) {
+    unsigned count = 0;
+    for (uint64_t i : range(0, 63)) {
+      if (value & (uint64_t(1) << i))
+        ++count;
+    }
+
+    return count;
+  }
+
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
     checkAccessControl(MD);
@@ -2077,6 +2088,13 @@ public:
         Ctx.Diags.diagnose(MD->arrowLoc, diag::macro_remove_result_type)
           .fixItRemove(SourceRange(MD->arrowLoc, resultTypeRepr->getEndLoc()));
       }
+    }
+
+    // A macro can only have a single freestanding macro role.
+    MacroRoles freestandingRolesInhabited =
+        MD->getMacroRoles() & getFreestandingMacroRoles();
+    if (numBitsSet(freestandingRolesInhabited.toRaw()) > 1) {
+      MD->diagnose(diag::macro_multiple_freestanding_roles);
     }
   }
 
