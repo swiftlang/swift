@@ -1111,7 +1111,7 @@ static void writeJSON(llvm::raw_ostream &out,
       if (hasOverlayDependencies) {
         writeDependencies(out, swiftTextualDeps->swift_overlay_module_dependencies,
                           "swiftOverlayDependencies", 5,
-                          /*trailingComma=*/true);
+                          /*trailingComma=*/false);
       }
     } else if (swiftPlaceholderDeps) {
       out << "\"swiftPlaceholder\": {\n";
