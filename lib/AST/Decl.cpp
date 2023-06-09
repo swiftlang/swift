@@ -2796,13 +2796,26 @@ bool AbstractStorageDecl::isResilient() const {
   return getModuleContext()->isResilient();
 }
 
+static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
+  if (!MD)
+    return false;
+  if (D->getAlternateModuleName().empty())
+    return false;
+  return D->getAlternateModuleName() == MD->getName().str();
+}
+
 bool AbstractStorageDecl::isResilient(ModuleDecl *M,
                                       ResilienceExpansion expansion) const {
   switch (expansion) {
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return M != getModuleContext() && isResilient();
+    // We consider this decl belongs to the module either it's currently
+    // defined in this module or it's originally defined in this module, which
+    // is specified by @_originallyDefinedIn
+    return (M != getModuleContext() &&
+            !isOriginallyDefinedIn(this, M) &&
+            isResilient());
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -4742,14 +4755,6 @@ DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
   return cast<DestructorDecl>(found[0]);
 }
 
-static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
-  if (!MD)
-    return false;
-  if (D->getAlternateModuleName().empty())
-    return false;
-  return D->getAlternateModuleName() == MD->getName().str();
-}
-
 bool NominalTypeDecl::isResilient(ModuleDecl *M,
                                   ResilienceExpansion expansion) const {
   switch (expansion) {
@@ -4759,8 +4764,9 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
     // We consider this decl belongs to the module either it's currently
     // defined in this module or it's originally defined in this module, which
     // is specified by @_originallyDefinedIn
-    return M != getModuleContext() && !isOriginallyDefinedIn(this, M) &&
-      isResilient();
+    return (M != getModuleContext() &&
+            !isOriginallyDefinedIn(this, M) &&
+            isResilient());
   }
   llvm_unreachable("bad resilience expansion");
 }
