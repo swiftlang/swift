@@ -548,7 +548,8 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
 
   // Special case: "extern NSString * fooNotification" adopts
   // NSNotificationName type, and is a member of NSNotificationName
-  if (isNSNotificationGlobal(decl)) {
+  if (isNSNotificationGlobal(decl) &&
+      SwiftContext.LangOpts.EnableObjCInterop) {
     clang::IdentifierInfo *notificationName =
         &clangSema.getASTContext().Idents.get("NSNotificationName");
     clang::LookupResult lookupResult(clangSema, notificationName,
