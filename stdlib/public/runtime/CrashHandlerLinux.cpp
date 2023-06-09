@@ -183,6 +183,18 @@ _swift_installCrashHandler()
 
 namespace {
 
+// Older glibc and musl don't have these two syscalls
+pid_t
+gettid()
+{
+  return (pid_t)syscall(SYS_gettid);
+}
+
+int
+tgkill(int tgid, int tid, int sig) {
+  return syscall(SYS_tgkill, tgid, tid, sig);
+}
+
 void
 reset_signal(int signum)
 {
@@ -294,12 +306,6 @@ int
 getdents(int fd, void *buf, size_t bufsiz)
 {
   return syscall(SYS_getdents64, fd, buf, bufsiz);
-}
-
-pid_t
-gettid()
-{
-  return (pid_t)syscall(SYS_gettid);
 }
 
 /* Stop all other threads in this process; we do this by establishing a
