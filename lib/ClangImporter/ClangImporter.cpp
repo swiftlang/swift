@@ -2752,6 +2752,12 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
 #pragma mark Name lookup
 const clang::TypedefNameDecl *
 ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
+  // This method is used to look up superclasses, which will never be needed
+  // outside of importing ObjC/Foundation.
+  if (!SwiftContext.LangOpts.EnableObjCInterop) {
+    return nullptr;
+  }
+  
   clang::Sema &sema = Instance->getSema();
   clang::LookupResult lookupResult(sema, name,
                                    clang::SourceLocation(),
