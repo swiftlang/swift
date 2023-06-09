@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
 
 // REQUIRES: observation
 // REQUIRES: concurrency
@@ -21,6 +21,24 @@ class ContainsNothing { }
 @Observable
 struct Structure {
   var field: Int = 0
+}
+
+@Observable
+struct MemberwiseInitializers {
+  var field: Int
+}
+
+func validateMemberwiseInitializers() {
+  _ = MemberwiseInitializers(field: 3)
+}
+
+@Observable
+struct DefiniteInitialization {
+  var field: Int
+  
+  init(field: Int) {
+    self.field = field
+  }
 }
 
 @Observable
