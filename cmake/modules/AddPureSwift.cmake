@@ -163,7 +163,7 @@ function(add_pure_swift_host_library name)
   add_custom_command(
       TARGET ${name}
       POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
+      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}> "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${name}.swiftmodule" "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule"
       COMMAND_EXPAND_LISTS
       COMMENT "Update mtime of library outputs workaround")
 
@@ -304,6 +304,24 @@ function(add_pure_swift_host_tool name)
   target_include_directories(${name} PUBLIC
     ${SWIFT_HOST_LIBRARIES_DEST_DIR})
 
+  # Workaround to touch the library and its objects so that we don't
+  # continually rebuild (again, see corresponding change in swift-syntax).
+  add_custom_command(
+      TARGET ${name}
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
+      COMMAND_EXPAND_LISTS
+      COMMENT "Update mtime of executable outputs workaround")
+
+  # Even worse hack - ${name}.swiftmodule is added as an output, even though
+  # this is an executable target. Just touch it all the time to avoid having
+  # to rebuild it every time.
+  add_custom_command(
+      TARGET ${name}
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule"
+      COMMAND_EXPAND_LISTS
+      COMMENT "Update mtime of executable outputs workaround")
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
