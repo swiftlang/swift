@@ -213,7 +213,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto opaqueDecl = OpaqueTypeDecl::get(
       originatingDecl, genericParams, parentDC, interfaceSignature,
       opaqueReprs);
-  opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);
   } else {

@@ -3749,6 +3749,15 @@ bool ValueDecl::isUsableFromInline() const {
       return true;
   }
 
+  if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(this)) {
+    if (auto *namingDecl = opaqueType->getNamingDecl()) {
+      if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+          namingDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+          namingDecl->getAttrs().hasAttribute<InlinableAttr>())
+        return true;
+    }
+  }
+
   if (auto *EED = dyn_cast<EnumElementDecl>(this))
     if (EED->getParentEnum()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
