@@ -1808,8 +1808,10 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
 InitializationPtr SILGenFunction::emitPatternBindingInitialization(
     Pattern *P, JumpDest failureDest, bool generateDebugInfo) {
-  return InitializationForPattern(*this, failureDest, generateDebugInfo)
-      .visit(P);
+  auto init =
+      InitializationForPattern(*this, failureDest, generateDebugInfo).visit(P);
+  init->setEmitDebugValueOnInit(generateDebugInfo);
+  return init;
 }
 
 /// Enter a cleanup to deallocate the given location.
