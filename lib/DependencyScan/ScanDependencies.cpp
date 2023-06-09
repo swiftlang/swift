@@ -254,6 +254,10 @@ computeTransitiveClosureOfExplicitDependencies(
       llvm::set_union(modReachableSet, succReachableSet);
     }
   }
+  // For ease of use down-the-line, remove the node's self from its set of reachable nodes
+  for (const auto &modID : topologicallySortedModuleList)
+    result[modID].erase(modID);
+
   return result;
 }
 
