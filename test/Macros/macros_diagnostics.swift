@@ -211,6 +211,9 @@ struct SomeType {
 
 @freestanding(declaration) macro nonExpressionReturnsVoid<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type}}
+// expected-error@-2{{only a freestanding expression macro can produce a result of type 'Void'}}
+// expected-note@-3{{make this macro a freestanding expression macro}}{{1-1=@freestanding(expression)\n}}
+// expected-note@-4{{remove the result type if the macro does not produce a value}}{{68-76=}}
 
 
 @freestanding(expression)

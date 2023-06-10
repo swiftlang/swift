@@ -2072,15 +2072,25 @@ public:
     }
     }
 
-    // If the macro has a (non-Void) result type, it must have the freestanding
+    // If the macro has a result type, it must have the freestanding
     // expression role. Other roles cannot have result types.
     if (auto resultTypeRepr = MD->getResultTypeRepr()) {
-      if (!MD->getMacroRoles().contains(MacroRole::Expression) &&
-          !MD->getResultInterfaceType()->isEqual(Ctx.getVoidType())) {
-        auto resultType = MD->getResultInterfaceType();
-        Ctx.Diags.diagnose(
-            MD->arrowLoc, diag::macro_result_type_cannot_be_used, resultType)
-          .highlight(resultTypeRepr->getSourceRange());
+      if (!MD->getMacroRoles().contains(MacroRole::Expression)) {
+        auto resultType = MD->getResultInterfaceType(); {
+          auto diag = Ctx.Diags.diagnose(
+              MD->arrowLoc, diag::macro_result_type_cannot_be_used, resultType);
+          diag.highlight(resultTypeRepr->getSourceRange());
+
+          // In a .swiftinterface file, downgrade this diagnostic to a warning.
+          // This allows the compiler to process existing .swiftinterface
+          // files that contain this issue.
+          if (resultType->isVoid()) {
+            if (auto sourceFile = MD->getParentSourceFile())
+              if (sourceFile->Kind == SourceFileKind::Interface)
+                diag.limitBehavior(DiagnosticBehavior::Warning);
+          }
+        }
+
         Ctx.Diags.diagnose(MD->arrowLoc, diag::macro_make_freestanding_expression)
           .fixItInsert(MD->getAttributeInsertionLoc(false),
                        "@freestanding(expression)\n");
