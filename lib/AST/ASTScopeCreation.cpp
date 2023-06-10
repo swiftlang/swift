@@ -180,7 +180,7 @@ public:
   addChildrenForParsedAccessors(AbstractStorageDecl *asd,
                                 ASTScopeImpl *parent);
 
-  void addChildrenForKnownAttributes(ValueDecl *decl,
+  void addChildrenForKnownAttributes(Decl *decl,
                                      ASTScopeImpl *parent);
 
   /// Add PatternEntryDeclScopes for each pattern binding entry.
@@ -569,7 +569,7 @@ void ScopeCreator::addChildrenForParsedAccessors(
   });
 }
 
-void ScopeCreator::addChildrenForKnownAttributes(ValueDecl *decl,
+void ScopeCreator::addChildrenForKnownAttributes(Decl *decl,
                                                  ASTScopeImpl *parent) {
   SmallVector<DeclAttribute *, 2> relevantAttrs;
 
@@ -601,10 +601,8 @@ void ScopeCreator::addChildrenForKnownAttributes(ValueDecl *decl,
             parent, specAttr, afd);
       }
     } else if (auto *customAttr = dyn_cast<CustomAttr>(attr)) {
-      if (auto *vd = dyn_cast<VarDecl>(decl)) {
-        constructExpandAndInsert<CustomAttributeScope>(
-            parent, customAttr, vd);
-      }
+      constructExpandAndInsert<CustomAttributeScope>(
+          parent, customAttr, decl);
     }
   }
 }
@@ -1192,7 +1190,9 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
     GenericTypeOrExtensionScope *scope, ScopeCreator &scopeCreator) const {
   // Get now in case recursion emancipates scope
   auto *const ip = scope->getParent().get();
-  
+
+  scopeCreator.addChildrenForKnownAttributes(scope->getDecl(), scope);
+
   auto *context = scope->getGenericContext();
   auto *genericParams = (isa<TypeAliasDecl>(context)
                          ? context->getParsedGenericParams()
