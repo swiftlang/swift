@@ -72,13 +72,17 @@ struct HasInnerClosure {
   #freestandingWithClosure(1) { x in x }
 }
 
+#if TEST_DIAGNOSTICS
 // Arbitrary names at global scope
 
 #bitwidthNumberedStructs("MyIntGlobal")
+// expected-error@-1 {{'declaration' macros are not allowed to introduce arbitrary names at global scope}}
 
 func testArbitraryAtGlobal() {
   _ = MyIntGlobal16()
+  // expected-error@-1 {{cannot find 'MyIntGlobal16' in scope}}
 }
+#endif
 
 // DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf1_{{.*}}warning: 'deprecated()' is deprecated
 // DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf2_{{.*}}warning: 'deprecated()' is deprecated
