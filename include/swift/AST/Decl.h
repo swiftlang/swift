@@ -5297,6 +5297,9 @@ public:
   /// used carefully.
   void setImplInfo(StorageImplInfo implInfo);
 
+  /// Cache the implementation-info, for use by the request-evaluator.
+  void cacheImplInfo(StorageImplInfo implInfo);
+
   ReadImplKind getReadImpl() const {
     return getImplInfo().getReadImpl();
   }

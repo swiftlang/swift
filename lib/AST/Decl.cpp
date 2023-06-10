@@ -2525,7 +2525,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
                                        ResilienceExpansion expansion) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
-    assert(hasStorage());
+    assert(hasStorage() || getASTContext().Diags.hadAnyError());
     return AccessStrategy::getStorage();
 
   case AccessSemantics::DistributedThunk:
@@ -6398,15 +6398,23 @@ StorageImplInfo AbstractStorageDecl::getImplInfo() const {
     StorageImplInfo::getSimpleStored(StorageIsMutable));
 }
 
-void AbstractStorageDecl::setImplInfo(StorageImplInfo implInfo) {
+void AbstractStorageDecl::cacheImplInfo(StorageImplInfo implInfo) {
   LazySemanticInfo.ImplInfoComputed = 1;
   ImplInfo = implInfo;
+}
+
+void AbstractStorageDecl::setImplInfo(StorageImplInfo implInfo) {
+  cacheImplInfo(implInfo);
 
   if (isImplicit()) {
     auto &evaluator = getASTContext().evaluator;
     HasStorageRequest request{this};
     if (!evaluator.hasCachedResult(request))
       evaluator.cacheOutput(request, implInfo.hasStorage());
+    else {
+      assert(
+        evaluateOrDefault(evaluator, request, false) == implInfo.hasStorage());
+    }
   }
 }
 

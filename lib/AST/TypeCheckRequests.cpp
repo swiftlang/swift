@@ -687,7 +687,7 @@ StorageImplInfoRequest::getCachedResult() const {
 
 void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
   auto *storage = std::get<0>(getStorage());
-  storage->setImplInfo(value);
+  storage->cacheImplInfo(value);
 }
 
 //----------------------------------------------------------------------------//
