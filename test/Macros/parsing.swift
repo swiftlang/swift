@@ -51,7 +51,7 @@ macro am1()
   named, // expected-error{{introduced name kind 'named' requires a single argument '(name)'}}
   arbitrary(a) // expected-error{{introduced name kind 'arbitrary' must not have an argument}}
 )
-macro am2() -> Void
+macro am2()
 // expected-error@-1{{macro 'am2()' requires a definition}}
 
 #m1 + 1
