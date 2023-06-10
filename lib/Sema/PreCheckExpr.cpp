@@ -602,8 +602,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       }
 
       TypoCorrectionResults corrections(Name, nameLoc);
-      TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                                         lookupOptions, corrections);
+
+      // FIXME: Don't perform typo correction inside macro arguments, because it
+      // will invoke synthesizing declarations in this scope, which will attempt to
+      // expand this macro which leads to circular reference errors.
+      if (!ASTScope::isInMacroArgument(DC->getParentSourceFile(), UDRE->getLoc())) {
+        TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
+                                           lookupOptions, corrections);
+      }
 
       if (auto typo = corrections.claimUniqueCorrection()) {
         auto diag = Context.Diags.diagnose(
