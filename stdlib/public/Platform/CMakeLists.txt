@@ -96,7 +96,7 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS "${swiftGlibc_target_sdks}"
     INSTALL_IN_COMPONENT sdk-overlay
-    DEPENDS glibc_modulemap)
+    DEPENDS libc_modulemap)
 
 add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ${swift_platform_sources}
@@ -104,15 +104,16 @@ add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SD
 
     GYB_SOURCES
       ${swift_platform_gyb_sources}
-      WASI.swift.gyb
+      WASILibc.swift.gyb
 
     SWIFT_COMPILE_FLAGS
       ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WASI
     INSTALL_IN_COMPONENT sdk-overlay
-    DEPENDS glibc_modulemap)
+    DEPENDS libc_modulemap)
 
 add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ucrt.swift
@@ -131,7 +132,7 @@ add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
     TARGET_SDKS WINDOWS
     INSTALL_IN_COMPONENT sdk-overlay)
 
-set(glibc_modulemap_target_list)
+set(libc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
   if("${sdk}" STREQUAL "LINUX" OR
      "${sdk}" STREQUAL "FREEBSD" OR
@@ -139,65 +140,65 @@ foreach(sdk ${SWIFT_SDKS})
      "${sdk}" STREQUAL "ANDROID" OR
      "${sdk}" STREQUAL "CYGWIN" OR
      "${sdk}" STREQUAL "HAIKU")
-    set(glibc_modulemap_source "glibc.modulemap.gyb")
-    set(glibc_header_source "SwiftGlibc.h.gyb")
+    set(libc_modulemap_source "glibc.modulemap.gyb")
+    set(libc_header_source "SwiftGlibc.h.gyb")
   elseif("${sdk}" STREQUAL "WASI")
-    set(glibc_modulemap_source "wasi.modulemap.gyb")
-    set(glibc_header_source "SwiftWASILibc.h.gyb")
+    set(libc_modulemap_source "wasi-libc.modulemap.gyb")
+    set(libc_header_source "SwiftWASILibc.h.gyb")
   else()
     continue()
   endif()
 
-  string(REGEX REPLACE "\\.gyb$" "" glibc_modulemap_outname "${glibc_modulemap_source}")
-  string(REGEX REPLACE "\\.gyb$" "" glibc_header_outname "${glibc_header_source}")
+  string(REGEX REPLACE "\\.gyb$" "" libc_modulemap_outname "${libc_modulemap_source}")
+  string(REGEX REPLACE "\\.gyb$" "" libc_header_outname "${libc_header_source}")
 
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
 
-    set(glibc_modulemap_out "${module_dir}/${glibc_modulemap_outname}")
-    set(glibc_modulemap_out_static "${module_dir_static}/${glibc_modulemap_outname}")
+    set(libc_modulemap_out "${module_dir}/${libc_modulemap_outname}")
+    set(libc_modulemap_out_static "${module_dir_static}/${libc_modulemap_outname}")
 
     # Configure the module map based on the target. Each platform needs to
-    # reference different headers, based on what's available in their glibc.
-    # This is the 'glibc.modulemap' in the 'resource-dir', so
+    # reference different headers, based on what's available in their libc.
+    # This is the .modulemap in the 'resource-dir', so
     # it's the one we'll look at during the build process.
-    handle_gyb_source_single(glibc_modulemap_target
-        SOURCE "${glibc_modulemap_source}"
-        OUTPUT "${glibc_modulemap_out}"
+    handle_gyb_source_single(libc_modulemap_target
+        SOURCE "${libc_modulemap_source}"
+        OUTPUT "${libc_modulemap_out}"
         FLAGS
             "-DCMAKE_SDK=${sdk}")
 
-    list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
+    list(APPEND libc_modulemap_target_list ${libc_modulemap_target})
 
-    set(glibc_header_out "${module_dir}/${glibc_header_outname}")
-    set(glibc_header_out_static "${module_dir_static}/${glibc_header_outname}")
-    handle_gyb_source_single(glibc_header_target
-        SOURCE "${glibc_header_source}"
-        OUTPUT "${glibc_header_out}"
+    set(libc_header_out "${module_dir}/${libc_header_outname}")
+    set(libc_header_out_static "${module_dir_static}/${libc_header_outname}")
+    handle_gyb_source_single(libc_header_target
+        SOURCE "${libc_header_source}"
+        OUTPUT "${libc_header_out}"
         FLAGS "-DCMAKE_SDK=${sdk}")
-    list(APPEND glibc_modulemap_target_list ${glibc_header_target})
+    list(APPEND libc_modulemap_target_list ${libc_header_target})
 
     if(SWIFT_BUILD_STATIC_STDLIB)
       add_custom_command_target(
-        copy_glibc_modulemap_header_static
+        copy_libc_modulemap_header_static
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "copy"
-            ${glibc_modulemap_out} ${glibc_modulemap_out_static}
+            ${libc_modulemap_out} ${libc_modulemap_out_static}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "copy"
-            ${glibc_header_out} ${glibc_header_out_static}
-        OUTPUT ${glibc_modulemap_out_static} ${glibc_header_out_static}
+            ${libc_header_out} ${libc_header_out_static}
+        OUTPUT ${libc_modulemap_out_static} ${libc_header_out_static}
         DEPENDS
-          "${glibc_modulemap_target}"
-          "${glibc_header_target}"
-        COMMENT "Copying Glibc modulemap and header to static resources")
+          "${libc_modulemap_target}"
+          "${libc_header_target}"
+        COMMENT "Copying libc modulemap and header to static resources")
 
-      list(APPEND glibc_modulemap_target_list
-        ${copy_glibc_modulemap_header_static})
+      list(APPEND libc_modulemap_target_list
+        ${copy_libc_modulemap_header_static})
     endif()
 
     # If this SDK is a target for a non-native host, except if it's for Android
@@ -205,15 +206,15 @@ foreach(sdk ${SWIFT_SDKS})
     # prefix. This is the one we'll install instead.
     if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/" AND
        NOT (${sdk} STREQUAL ANDROID AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
-      set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/${glibc_modulemap_outname}")
+      set(libc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/${libc_modulemap_outname}")
 
-      handle_gyb_source_single(glibc_modulemap_native_target
-        SOURCE "${glibc_modulemap_source}"
-        OUTPUT "${glibc_sysroot_relative_modulemap_out}"
+      handle_gyb_source_single(libc_modulemap_native_target
+        SOURCE "${libc_modulemap_source}"
+        OUTPUT "${libc_sysroot_relative_modulemap_out}"
         FLAGS "-DCMAKE_SDK=${sdk}")
 
-      list(APPEND glibc_modulemap_target_list ${glibc_modulemap_native_target})
-      set(glibc_modulemap_out ${glibc_sysroot_relative_modulemap_out})
+      list(APPEND libc_modulemap_target_list ${libc_modulemap_native_target})
+      set(libc_modulemap_out ${libc_sysroot_relative_modulemap_out})
     endif()
 
     # FIXME: When SDK is a cross-compile target (SDK != Host), the generated
@@ -221,26 +222,26 @@ foreach(sdk ${SWIFT_SDKS})
     #        It is not relocatable to the target platform itself.
     #        This affects any cross-compiled targets that use glibc.modulemap.
 
-    swift_install_in_component(FILES "${glibc_modulemap_out}"
+    swift_install_in_component(FILES "${libc_modulemap_out}"
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
-    swift_install_in_component(FILES "${glibc_header_out}"
+    swift_install_in_component(FILES "${libc_header_out}"
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
 
     if(SWIFT_BUILD_STATIC_STDLIB)
-      swift_install_in_component(FILES "${glibc_modulemap_out}"
+      swift_install_in_component(FILES "${libc_modulemap_out}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
-      swift_install_in_component(FILES "${glibc_header_out}"
+      swift_install_in_component(FILES "${libc_header_out}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
     endif()
   endforeach()
 endforeach()
-add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
-set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")
-add_dependencies(sdk-overlay glibc_modulemap)
+add_custom_target(libc_modulemap DEPENDS ${libc_modulemap_target_list})
+set_property(TARGET libc_modulemap PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay libc_modulemap)
 
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
