@@ -545,8 +545,10 @@ static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
           UnqualifiedLookupFlags::ExcludeMacroExpansions))
     return descriptor;
 
-  auto &evaluator = descriptor.DC->getASTContext().evaluator;
-  if (!evaluator.hasActiveResolveMacroRequest())
+  auto isInMacroArgument = ASTScope::isInMacroArgument(
+      descriptor.DC->getParentSourceFile(), descriptor.Loc);
+
+  if (!isInMacroArgument)
     return descriptor;
 
   descriptor.Options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
@@ -560,8 +562,10 @@ static DirectLookupDescriptor excludeMacrosIfNeeded(
           NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
     return descriptor;
 
-  auto &evaluator = descriptor.DC->getASTContext().evaluator;
-  if (!evaluator.hasActiveResolveMacroRequest())
+  auto isInMacroArgument = ASTScope::isInMacroArgument(
+      descriptor.DC->getParentSourceFile(), loc);
+
+  if (!isInMacroArgument)
     return descriptor;
 
   descriptor.Options |=
@@ -577,8 +581,10 @@ excludeMacrosIfNeeded(const DeclContext *dc, SourceLoc loc,
   if (options & NL_ExcludeMacroExpansions)
     return options;
 
-  auto &evaluator = dc->getASTContext().evaluator;
-  if (!evaluator.hasActiveResolveMacroRequest())
+  auto isInMacroArgument = ASTScope::isInMacroArgument(
+      dc->getParentSourceFile(), loc);
+
+  if (!isInMacroArgument)
     return options;
 
   return options | NL_ExcludeMacroExpansions;
