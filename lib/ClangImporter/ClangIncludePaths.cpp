@@ -91,6 +91,12 @@ static Optional<Path> getGlibcModuleMapPath(
   return getActualModuleMapPath("glibc.modulemap", Opts, triple, vfs);
 }
 
+static Optional<Path> getWASILibcModuleMapPath(
+    SearchPathOptions &Opts, const llvm::Triple &triple,
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+  return getActualModuleMapPath("wasi-libc.modulemap", Opts, triple, vfs);
+}
+
 static Optional<Path> getLibStdCxxModuleMapPath(
     SearchPathOptions &opts, const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
@@ -183,11 +189,32 @@ static bool shouldInjectGlibcModulemap(const llvm::Triple &triple) {
          triple.isAndroid();
 }
 
+static bool shouldInjectWASILibcModulemap(const llvm::Triple &triple) {
+  return triple.isOSWASI();
+}
+
 static SmallVector<std::pair<std::string, std::string>, 2> getGlibcFileMapping(
     ASTContext &ctx,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  if (!shouldInjectGlibcModulemap(triple))
+
+  std::string auxiliaryHeaderName;
+  llvm::Optional<Path> maybeActualModuleMapPath;
+  if (shouldInjectGlibcModulemap(triple)) {
+    auxiliaryHeaderName = "SwiftGlibc.h";
+    maybeActualModuleMapPath = getGlibcModuleMapPath(ctx.SearchPathOpts, triple, vfs);
+  } else if (shouldInjectWASILibcModulemap(triple)) {
+    auxiliaryHeaderName = "SwiftWASILibc.h";
+    maybeActualModuleMapPath = getWASILibcModuleMapPath(ctx.SearchPathOpts, triple, vfs);
+  } else {
+    return {};
+  }
+
+  Path actualModuleMapPath;
+  if (auto path = maybeActualModuleMapPath)
+    actualModuleMapPath = path.value();
+  else
+    // FIXME: Emit a warning of some kind.
     return {};
 
   // Extract the Glibc path from Clang driver.
@@ -213,24 +240,17 @@ static SmallVector<std::pair<std::string, std::string>, 2> getGlibcFileMapping(
     return {};
   }
 
-  Path actualModuleMapPath;
-  if (auto path = getGlibcModuleMapPath(ctx.SearchPathOpts, triple, vfs))
-    actualModuleMapPath = path.value();
-  else
-    // FIXME: Emit a warning of some kind.
-    return {};
-
   // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
   // directly from the modulemap.
   Path actualHeaderPath = actualModuleMapPath;
   llvm::sys::path::remove_filename(actualHeaderPath);
-  llvm::sys::path::append(actualHeaderPath, "SwiftGlibc.h");
+  llvm::sys::path::append(actualHeaderPath, auxiliaryHeaderName);
 
   Path injectedModuleMapPath(glibcDir);
   llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
 
   Path injectedHeaderPath(glibcDir);
-  llvm::sys::path::append(injectedHeaderPath, "SwiftGlibc.h");
+  llvm::sys::path::append(injectedHeaderPath, auxiliaryHeaderName);
 
   return {
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
