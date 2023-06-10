@@ -60,6 +60,11 @@ std::pair<CaseStmt *, CaseStmt *> ASTScope::lookupFallthroughSourceAndDest(
   return ASTScopeImpl::lookupFallthroughSourceAndDest(sourceFile, loc);
 }
 
+bool ASTScope::isInMacroArgument(SourceFile *sourceFile,
+                                 SourceLoc loc) {
+  return ASTScopeImpl::isInMacroArgument(sourceFile, loc);
+}
+
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4996)

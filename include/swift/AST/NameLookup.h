@@ -815,6 +815,10 @@ public:
   static std::pair<CaseStmt *, CaseStmt *>
   lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
+  /// Returns \c true if the given source location is inside an attached
+  /// or freestanding macro argument.
+  static bool isInMacroArgument(SourceFile *sourceFile, SourceLoc loc);
+
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);

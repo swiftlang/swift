@@ -675,3 +675,21 @@ std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
 
   return { nullptr, nullptr };
 }
+
+bool ASTScopeImpl::isInMacroArgument(SourceFile *sourceFile,
+                                     SourceLoc loc) {
+  if (!sourceFile || sourceFile->Kind == SourceFileKind::Interface)
+    return false;
+
+  if (loc.isInvalid())
+    return false;
+
+  auto *fileScope = sourceFile->getScope().impl;
+  auto *scope = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  do {
+    if (scope->isMacroArgumentScope())
+      return true;
+  } while ((scope = scope->getParent().getPtrOrNull()));
+
+  return false;
+}

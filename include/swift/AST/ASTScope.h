@@ -278,6 +278,17 @@ public:
   static std::pair<CaseStmt *, CaseStmt *>
   lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
+  /// Returns \c true if the given source location is inside an attached
+  /// or freestanding macro argument.
+  static bool isInMacroArgument(SourceFile *sourceFile, SourceLoc loc);
+
+  /// Returns \c true if this scope contains macro arguments.
+  ///
+  /// This is always true within macro expansion decl scopes, and it's
+  /// true within custom attribute scopes if the attribute name is a
+  /// potential macro reference.
+  virtual bool isMacroArgumentScope() const { return false; }
+
   /// Scopes that cannot bind variables may set this to true to create more
   /// compact scope tree in the debug info.
   virtual bool ignoreInDebugInfo() const { return false; }
@@ -867,7 +878,15 @@ public:
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return attr;
   }
- bool ignoreInDebugInfo() const override { return true; }
+  bool ignoreInDebugInfo() const override { return true; }
+
+  bool isMacroArgumentScope() const override {
+    // FIXME: This should check whether the attribute name is
+    // a macro. Otherwise, macro expansion will be suppressed
+    // for property wrapper arguments.
+    return true;
+  }
+  
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 };
@@ -1265,6 +1284,10 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+
+  bool isMacroArgumentScope() const override {
+    return true;
+  }
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
