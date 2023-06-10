@@ -2803,8 +2803,7 @@ void swift::swift_initStructMetadataWithLayoutString(
 
         if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
           swift_resolve_resilientAccessors(layoutStr, layoutStrOffset,
-                                           fieldLayoutStr, fieldRefCountBytes,
-                                           fieldType);
+                                           fieldLayoutStr, fieldType);
         }
 
         if (offset) {

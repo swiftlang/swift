@@ -1352,6 +1352,17 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
                 getOpValue(Inst->getSetter()), Inst->getMode()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitAssignOrInitInst(AssignOrInitInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createAssignOrInit(
+                getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getSrc()),
+                getOpValue(Inst->getInitializer()),
+                getOpValue(Inst->getSetter()), Inst->getMode()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {

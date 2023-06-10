@@ -2332,6 +2332,71 @@ static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
   return false;
 }
 
+static bool parseAssignOrInitMode(AssignOrInitInst::Mode &Result,
+                                  SILParser &P) {
+  StringRef Str;
+  if (!parseSILOptional(Str, P)) {
+    Result = AssignOrInitInst::Unknown;
+    return false;
+  }
+
+  auto Tmp = llvm::StringSwitch<AssignOrInitInst::Mode>(Str)
+      .Case("init", AssignOrInitInst::Init)
+      .Case("set", AssignOrInitInst::Set)
+      .Default(AssignOrInitInst::Unknown);
+
+  // Return true (following the conventions in this file) if we fail.
+  if (Tmp == AssignOrInitInst::Unknown)
+    return true;
+
+  Result = Tmp;
+  return false;
+}
+
+static bool
+parseAssignOrInitAssignments(llvm::SmallVectorImpl<unsigned> &assignments,
+                             SILParser &SP) {
+  // Could be more than one [assign=<index>] attributes.
+  for (;;) {
+    SourceLoc loc;
+
+    // Consume '['
+    if (!SP.P.consumeIf(tok::l_square))
+      return false;
+
+    // Consume the identifier which should be "assign"
+    {
+      Identifier Id;
+      if (SP.parseSILIdentifier(Id, loc, diag::expected_in_attribute_list))
+        return true;
+
+      if (!Id.is("assign")) {
+        SP.P.diagnose(loc, diag::sil_invalid_attribute_for_expected, Id.str(),
+                      "assign");
+        return true;
+      }
+    }
+
+    uint64_t index;
+
+    // Consume '='
+    if (!SP.P.consumeIf(tok::equal)) {
+      SP.P.diagnose(loc, diag::expected_equal_in_sil_instr);
+      return true;
+    }
+
+    // Consume the property index.
+    if (SP.parseInteger(index, diag::expected_in_attribute_list))
+      return true;
+
+    // Consume ']'
+    if (SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list))
+      return true;
+
+    assignments.push_back(index);
+  }
+}
+
 // Parse a list of integer indices, prefaced with the given string label.
 // Returns true on error.
 static bool parseIndexList(Parser &P, StringRef label,
@@ -4468,6 +4533,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       Kind = MarkUninitializedInst::DelegatingSelf;
     else if (KindId.str() == "delegatingselfallocated")
       Kind = MarkUninitializedInst::DelegatingSelfAllocated;
+    else if (KindId.str() == "out")
+      Kind = MarkUninitializedInst::Out;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
                  "var, rootself, crossmodulerootself, derivedself, "
@@ -4673,6 +4740,31 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createCopyableToMoveOnlyWrapperAddr(InstLoc, addrVal);
     break;
   }
+
+  case SILInstructionKind::AssignOrInitInst: {
+    SILValue Src, InitFn, SetFn;
+    AssignOrInitInst::Mode Mode;
+    llvm::SmallVector<unsigned, 2> assignments;
+
+    if (parseAssignOrInitMode(Mode, *this) ||
+        parseAssignOrInitAssignments(assignments, *this) ||
+        parseTypedValueRef(Src, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("set") || parseTypedValueRef(SetFn, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto *AI = B.createAssignOrInit(InstLoc, Src, InitFn, SetFn, Mode);
+
+    for (unsigned index : assignments)
+      AI->markAsInitialized(index);
+
+    ResultVal = AI;
+    break;
+  }
+
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::EndAccessInst:

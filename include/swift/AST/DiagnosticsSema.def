@@ -197,6 +197,9 @@ ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
 ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
       "pattern cannot match values of type %0",
       (Type))
+ERROR(cannot_match_value_with_pattern,none,
+      "pattern of type %1 cannot match %0",
+      (Type, Type))
 
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
@@ -873,18 +876,54 @@ ERROR(need_hermetic_seal_to_import_module,none,
       (Identifier))
 
 ERROR(modularization_issue_decl_moved,Fatal,
-      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "%1 was expected to be in %2, but now a candidate is found only in %3",
-      (bool, DeclName, Identifier, Identifier))
+      (bool, DeclName, const ModuleDecl*, const ModuleDecl*))
 ERROR(modularization_issue_decl_type_changed,Fatal,
-      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
-      "%select{|, it was in %2 and is now found in %4}5",
-      (bool, DeclName, Identifier, StringRef, Identifier, bool))
+      "%select{|, it was in %2 and is now a candidate is found only in %4}5",
+      (bool, DeclName, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
-      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "%1 is not found, it was expected to be in %2",
-      (bool, DeclName, Identifier))
+      (bool, DeclName, const ModuleDecl*))
+
+NOTE(modularization_issue_note_expected,none,
+     "the %select{declaration|type}0 was expected to be found in module %1 at '%2'",
+     (bool, const ModuleDecl*, StringRef))
+NOTE(modularization_issue_note_expected_underlying,none,
+     "or expected to be found in the underlying module '%0' defined at '%1'",
+     (StringRef, StringRef))
+NOTE(modularization_issue_note_found,none,
+     "the %select{declaration|type}0 was actually found in module %1 at '%2'",
+     (bool, const ModuleDecl*, StringRef))
+
+NOTE(modularization_issue_stale_module,none,
+     "the module %0 has enabled library-evolution; "
+     "the following file may need to be deleted if the SDK was modified: '%1'",
+     (const ModuleDecl *, StringRef))
+NOTE(modularization_issue_swift_version,none,
+     "the module %0 was built with a Swift language version set to %1 "
+     "while the current invocation uses %2; "
+     "APINotes may change how clang declarations are imported",
+     (const ModuleDecl *, llvm::VersionTuple, llvm::VersionTuple))
+NOTE(modularization_issue_audit_headers,none,
+     "declarations in the %select{underlying|}0 clang module %1 "
+     "may be hidden by clang preprocessor macros",
+     (bool, const ModuleDecl*))
+NOTE(modularization_issue_layering_expected_local,none,
+     "the distributed module %0 refers to the local module %1; "
+     "this may be caused by header maps or search paths",
+     (const ModuleDecl*, const ModuleDecl*))
+NOTE(modularization_issue_layering_found_local,none,
+     "the reference may break layering; the candidate was found in "
+     "the local module %1 for a reference from the distributed module %0",
+     (const ModuleDecl*, const ModuleDecl*))
+NOTE(modularization_issue_related_modules,none,
+     "the %select{declaration|type}0 %1 moved between related modules; "
+     "clang preprocessor macros may affect headers shared between these modules",
+     (bool, DeclName))
 
 NOTE(modularization_issue_side_effect_extension_error,none,
      "could not deserialize extension",
@@ -893,9 +932,10 @@ NOTE(modularization_issue_side_effect_type_error,none,
      "could not deserialize type for %0",
      (DeclName))
 
-WARNING(modularization_issue_worked_around,none,
-        "attempting forced recovery enabled by -experimental-force-workaround-broken-modules",
-        ())
+NOTE(modularization_issue_worked_around,none,
+     "attempting forced recovery enabled by "
+     "-experimental-force-workaround-broken-modules",
+     ())
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -5853,6 +5893,8 @@ ERROR(no_opaque_return_type_of,none,
 
 ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
+ERROR(objc_init_accessor, none,
+      "init accessors cannot be marked @objc", ())
 ERROR(objc_addressor, none,
       "addressors are not allowed to be marked @objc", ())
 ERROR(objc_coroutine_accessor, none,
@@ -7096,6 +7138,14 @@ ERROR(macro_in_nested,none,
 ERROR(macro_without_role,none,
       "macro %0 must declare its applicable roles via '@freestanding' or @attached'",
        (DeclName))
+ERROR(macro_result_type_cannot_be_used,none,
+      "only a freestanding expression macro can produce a result of type %0",
+      (Type))
+NOTE(macro_remove_result_type,none,
+      "remove the result type if the macro does not produce a value",
+      ())
+NOTE(macro_make_freestanding_expression,none,
+      "make this macro a freestanding expression macro", ())
 ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))
 ERROR(macro_expansion_missing_arguments,none,
@@ -7271,6 +7321,25 @@ NOTE(opt_out_from_missing_reflection_metadata_attr,none,
      "opt-out of reflection metadata attribute @%0 using"
      " unavailable extension",
      (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Init accessors
+//------------------------------------------------------------------------------
+
+ERROR(init_accessor_can_refer_only_to_properties,none,
+      "init accessor cannot refer to %0 %1; init accessors can refer only"
+      " to stored properties",
+      (DescriptiveDeclKind, DeclNameRef))
+
+ERROR(init_accessor_initializes_attribute_on_other_declaration,none,
+      "initalizes(...) attribute could only be used with init accessors",
+      ())
+ERROR(init_accessor_accesses_attribute_on_other_declaration,none,
+      "accesses(...) attribute could only be used with init accessors",
+      ())
+ERROR(init_accessor_property_both_init_and_accessed,none,
+      "property %0 cannot be both initialized and accessed",
+      (DeclName))
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

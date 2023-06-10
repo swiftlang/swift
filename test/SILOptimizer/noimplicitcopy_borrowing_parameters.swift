@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -verify
+// RUN: %target-swift-frontend -emit-sil %s -verify -sil-verify-all
 
 ////////////////////////
 // MARK: Declarations //

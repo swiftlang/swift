@@ -294,6 +294,8 @@ public:
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
+  void visitInitializesAttr(InitializesAttr *attr);
+  void visitAccessesAttr(AccessesAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
 
@@ -3548,6 +3550,44 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
   (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
 }
 
+void AttributeChecker::visitInitializesAttr(InitializesAttr *attr) {
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::init_accessor_initializes_attribute_on_other_declaration);
+    return;
+  }
+
+  (void)attr->getPropertyDecls(accessor);
+}
+
+void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::init_accessor_accesses_attribute_on_other_declaration);
+    return;
+  }
+
+  // Check whether there are any intersections between initializes(...) and
+  // accesses(...) attributes.
+
+  Optional<ArrayRef<VarDecl *>> initializedProperties;
+  if (auto *initAttr = D->getAttrs().getAttribute<InitializesAttr>()) {
+    initializedProperties.emplace(initAttr->getPropertyDecls(accessor));
+  }
+
+  if (initializedProperties) {
+    for (auto *property : attr->getPropertyDecls(accessor)) {
+      if (llvm::is_contained(*initializedProperties, property)) {
+        diagnose(attr->getLocation(),
+                 diag::init_accessor_property_both_init_and_accessed,
+                 property->getName());
+      }
+    }
+  }
+}
+
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   DeclContext *DC = D->getDeclContext();
 
@@ -4901,6 +4941,8 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
     return DescriptiveDeclKind::Addressor;
   case AccessorKind::MutableAddress:
     return DescriptiveDeclKind::MutableAddressor;
+  case AccessorKind::Init:
+    return DescriptiveDeclKind::InitAccessor;
   }
 }
 
@@ -7510,4 +7552,66 @@ void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
           }
         });
   }
+}
+
+ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
+    Evaluator &evaluator, DeclAttribute *attr, AccessorDecl *attachedTo,
+    ArrayRef<Identifier> referencedVars) const {
+  auto &ctx = attachedTo->getASTContext();
+
+  auto *storage = attachedTo->getStorage();
+
+  auto typeDC = storage->getDeclContext()->getSelfNominalTypeDecl();
+  if (!typeDC)
+    return ctx.AllocateCopy(ArrayRef<VarDecl *>());
+
+  SmallVector<VarDecl *> results;
+
+  bool failed = false;
+  for (auto name : referencedVars) {
+    auto propertyResults = typeDC->lookupDirect(DeclName(name));
+    switch (propertyResults.size()) {
+    case 0: {
+      ctx.Diags.diagnose(attr->getLocation(), diag::cannot_find_type_in_scope,
+                         DeclNameRef(name));
+      failed = true;
+      break;
+    }
+
+    case 1: {
+      auto *member = propertyResults.front();
+
+      // Only stored properties are supported.
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        if (var->getImplInfo().hasStorage()) {
+          results.push_back(var);
+          break;
+        }
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::init_accessor_can_refer_only_to_properties,
+                         member->getDescriptiveKind(), member->createNameRef());
+      failed = true;
+      break;
+    }
+
+    default:
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::ambiguous_member_overload_set,
+                         DeclNameRef(name));
+
+      for (auto *choice : propertyResults) {
+        ctx.Diags.diagnose(choice, diag::decl_declared_here, choice->getName());
+      }
+
+      failed = true;
+      break;
+    }
+  }
+
+  if (failed)
+    return ctx.AllocateCopy(ArrayRef<VarDecl *>());
+
+  return ctx.AllocateCopy(results);
 }

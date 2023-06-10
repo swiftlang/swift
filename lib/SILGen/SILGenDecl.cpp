@@ -1625,11 +1625,13 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
 }
 
 void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
-  D->forEachExpandedExprOrStmt([&](ASTNode node) {
+  D->forEachExpandedNode([&](ASTNode node) {
     if (auto *expr = node.dyn_cast<Expr *>())
       emitIgnoredExpr(expr);
     else if (auto *stmt = node.dyn_cast<Stmt *>())
       emitStmt(stmt);
+    else
+      visit(node.get<Decl *>());
   });
 }
 
@@ -1806,8 +1808,10 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
 InitializationPtr SILGenFunction::emitPatternBindingInitialization(
     Pattern *P, JumpDest failureDest, bool generateDebugInfo) {
-  return InitializationForPattern(*this, failureDest, generateDebugInfo)
-      .visit(P);
+  auto init =
+      InitializationForPattern(*this, failureDest, generateDebugInfo).visit(P);
+  init->setEmitDebugValueOnInit(generateDebugInfo);
+  return init;
 }
 
 /// Enter a cleanup to deallocate the given location.

@@ -1581,6 +1581,8 @@ namespace  {
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
     UNINTERESTING_ATTR(RestatedObjCConformance)
+    UNINTERESTING_ATTR(Initializes)
+    UNINTERESTING_ATTR(Accesses)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
@@ -2277,6 +2279,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::DidSet:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
+    case AccessorKind::Init:
       // These accessors are never part of the opaque set. Bail out early
       // to avoid computing the overridden declarations of the storage.
       return noResults;

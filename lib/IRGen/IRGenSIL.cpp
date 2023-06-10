@@ -1228,6 +1228,9 @@ public:
   void visitAssignByWrapperInst(AssignByWrapperInst *i) {
     llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
   }
+  void visitAssignOrInitInst(AssignOrInitInst *i) {
+    llvm_unreachable("assign_or_init is not valid in canonical SIL");
+  }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
   }
@@ -2887,12 +2890,10 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   FunctionPointer fp =
       FunctionPointer::forDirect(fpKind, value, secondaryValue, sig, useSignature);
   // Update the foreign no-throw information if needed.
-  if (const auto *cd = fn->getClangDecl()) {
+  if (auto *cd = fn->getClangDecl()) {
     if (auto *cfd = dyn_cast<clang::FunctionDecl>(cd)) {
-      if (auto *cft = cfd->getType()->getAs<clang::FunctionProtoType>()) {
-        if (cft->isNothrow())
-          fp.setForeignNoThrow();
-      }
+      if (IGM.isCxxNoThrow(const_cast<clang::FunctionDecl *>(cfd)))
+        fp.setForeignNoThrow();
     }
     if (IGM.emittedForeignFunctionThunksWithExceptionTraps.count(fnPtr))
       fp.setForeignCallCatchesExceptionInThunk();

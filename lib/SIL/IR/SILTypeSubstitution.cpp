@@ -77,7 +77,9 @@ public:
                ProtocolConformanceRef(conformedProtocol),
                conformingReplacementType->getCanonicalType(),
                typeExpansionContext);
-      }, SubstFlags::SubstituteOpaqueArchetypes);
+      },
+      SubstFlags::SubstituteOpaqueArchetypes |
+      SubstFlags::PreservePackExpansionLevel);
   }
 
   // Substitute a function type.

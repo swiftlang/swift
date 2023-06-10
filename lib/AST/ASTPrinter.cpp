@@ -3218,6 +3218,10 @@ static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
   });
 }
 
+static bool usesFeatureInitAccessors(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   auto &attrs = decl->getAttrs();
   return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
@@ -4328,6 +4332,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
+  case AccessorKind::Init:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4342,6 +4347,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
+    break;
   }
 
   // handle effects specifiers before the body

@@ -472,7 +472,6 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   auto *decl = ownerCtx->getAsDecl();
-  bool isGenericType = isa<NominalTypeDecl>(decl);
   bool hasPack = false;
 
   for (auto gp : *genericParams) {
@@ -1850,7 +1849,7 @@ public:
     if (!isa<ClassDecl>(decl->getDeclContext())) {
       decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
         this->visit(auxiliaryDecl);
-      });
+      }, /*visitFreestandingExpanded=*/false);
     }
 
     if (auto *Stats = getASTContext().Stats)
@@ -2061,13 +2060,29 @@ public:
       break;
     }
     }
+
+    // If the macro has a (non-Void) result type, it must have the freestanding
+    // expression role. Other roles cannot have result types.
+    if (auto resultTypeRepr = MD->getResultTypeRepr()) {
+      if (!MD->getMacroRoles().contains(MacroRole::Expression) &&
+          !MD->getResultInterfaceType()->isEqual(Ctx.getVoidType())) {
+        auto resultType = MD->getResultInterfaceType();
+        Ctx.Diags.diagnose(
+            MD->arrowLoc, diag::macro_result_type_cannot_be_used, resultType)
+          .highlight(resultTypeRepr->getSourceRange());
+        Ctx.Diags.diagnose(MD->arrowLoc, diag::macro_make_freestanding_expression)
+          .fixItInsert(MD->getAttributeInsertionLoc(false),
+                       "@freestanding(expression)\n");
+        Ctx.Diags.diagnose(MD->arrowLoc, diag::macro_remove_result_type)
+          .fixItRemove(SourceRange(MD->arrowLoc, resultTypeRepr->getEndLoc()));
+      }
+    }
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-    // Decls in expansion already visited as auxiliary decls.
-    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+    MED->forEachExpandedNode([&](ASTNode node) {
       TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
     });
   }

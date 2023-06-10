@@ -984,7 +984,8 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     SmallVector<Solution, 4> solutions;
     cs.solveForCodeCompletion(solutions);
 
-    CompletionContextFinder analyzer(func, func->getDeclContext());
+    SyntacticElementTarget funcTarget(func);
+    CompletionContextFinder analyzer(funcTarget, func->getDeclContext());
     if (analyzer.hasCompletion()) {
       filterSolutionsForCodeCompletion(solutions, analyzer);
       for (const auto &solution : solutions) {

@@ -403,6 +403,25 @@ bool swift::onlyUsedByAssignByWrapper(PartialApplyInst *PAI) {
   return usedByAssignByWrapper;
 }
 
+bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
+  bool usedByAssignOrInit = false;
+  for (Operand *Op : PAI->getUses()) {
+    SILInstruction *user = Op->getUser();
+    if (isa<AssignOrInitInst>(user)) {
+      usedByAssignOrInit = true;
+      continue;
+    }
+
+    if (isa<DestroyValueInst>(user)) {
+      continue;
+    }
+
+    return false;
+  }
+
+  return usedByAssignOrInit;
+}
+
 static RuntimeEffect metadataEffect(SILType ty) {
   ClassDecl *cl = ty.getClassOrBoundGenericClass();
   if (cl && !cl->hasKnownSwiftImplementation())
@@ -521,6 +540,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
+  case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::EndApplyInst:

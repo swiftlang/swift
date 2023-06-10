@@ -3595,11 +3595,30 @@ namespace {
           return nullptr;
       }
 
-      auto importedType =
-          Impl.importType(decl->getType(), ImportTypeKind::RecordField,
-                          ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None,
-                          getImportTypeAttrs(decl));
+      ImportedType importedType;
+      auto fieldType = decl->getType();
+      if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
+        fieldType = elaborated->desugar();
+      if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
+        if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
+          if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
+            // If this fails, it means that we need a stronger predicate for
+            // determining the relationship between an enum and typedef.
+            assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+                   typedefType->getCanonicalTypeInternal());
+            if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
+              importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
+            }
+          }
+        }
+      }
+
+      if (!importedType)
+        importedType =
+            Impl.importType(decl->getType(), ImportTypeKind::RecordField,
+                            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                            isInSystemModule(dc), Bridgeability::None,
+                            getImportTypeAttrs(decl));
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
@@ -5828,6 +5847,13 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
                                           const clang::EnumDecl *decl) {
   ASTContext &ctx = Impl.SwiftContext;
 
+  auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+  // Create a struct with the underlying type as a field.
+  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+      decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
+  Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
+
   // Compute the underlying type.
   auto underlyingType = Impl.importTypeIgnoreIUO(
       decl->getIntegerType(), ImportTypeKind::Enum,
@@ -5835,12 +5861,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
       isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
   if (!underlyingType)
     return nullptr;
-
-  auto Loc = Impl.importSourceLoc(decl->getLocation());
-
-  // Create a struct with the underlying type as a field.
-  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
 
   synthesizer.makeStructRawValued(structDecl, underlyingType,
                                   {KnownProtocolKind::OptionSet});

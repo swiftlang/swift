@@ -283,6 +283,22 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
+ArrayRef<VarDecl *>
+InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
+                                        NominalTypeDecl *decl) const {
+  SmallVector<VarDecl *, 4> results;
+  for (auto *member : decl->getMembers()) {
+    auto *var = dyn_cast<VarDecl>(member);
+    if (!var || !var->getAccessor(AccessorKind::Init)) {
+      continue;
+    }
+
+    results.push_back(var);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
 /// Check whether the pattern may have storage.
 ///
 /// This query is careful not to trigger accessor macro expansion, which
@@ -2058,6 +2074,9 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     break;
+
+  case AccessorKind::Init:
+    llvm_unreachable("init accessor not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }
@@ -2568,6 +2587,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Init:
     break;
 
   case AccessorKind::WillSet:
@@ -3477,6 +3497,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
+  bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
 
   auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
@@ -3490,7 +3511,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // If there's a writing accessor of any sort, there must also be a
   // reading accessor.
-  } else if (hasSetter || hasModify || hasMutableAddress) {
+  } else if (hasInit || hasSetter || hasModify || hasMutableAddress) {
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be

@@ -77,7 +77,12 @@ public:
     Resilient = 0x0f,
     SinglePayloadEnumSimple = 0x10,
     SinglePayloadEnumFN = 0x11,
-    SinglePayloadEnumFNResolved = 0x12,
+    // reserved
+    // SinglePayloadEnumFNResolved = 0x12,
+
+    MultiPayloadEnumFN = 0x13,
+    // reserved
+    // MultiPayloadEnumFNResolved = 0x14,
 
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
@@ -101,13 +106,19 @@ private:
     const TypeLayoutEntry *payload;
   };
 
+  struct MultiPayloadEnumFN {
+    llvm::Function *tagFn;
+    const EnumTypeLayoutEntry *entry;
+  };
+
   struct RefCounting {
     RefCountingKind kind;
     union {
       size_t size;
-      llvm::Function* metaTypeRef;
+      llvm::Function *metaTypeRef;
       SinglePayloadEnumSimple singlePayloadEnumSimple;
       SinglePayloadEnumFN singlePayloadEnumFN;
+      MultiPayloadEnumFN multiPayloadEnumFN;
     };
 
     RefCounting() = default;
@@ -148,6 +159,15 @@ public:
     op.singlePayloadEnumFN.tagFn = tagFn;
     op.singlePayloadEnumSimple.extraTagByteCount = extraTagByteCount;
     op.singlePayloadEnumFN.payload = payload;
+    refCountings.push_back(op);
+  }
+
+  void addMultiPayloadEnumFN(llvm::Function *tagFn,
+                             const EnumTypeLayoutEntry *entry) {
+    RefCounting op;
+    op.kind = RefCountingKind::MultiPayloadEnumFN;
+    op.multiPayloadEnumFN.tagFn = tagFn;
+    op.multiPayloadEnumFN.entry = entry;
     refCountings.push_back(op);
   }
 
@@ -275,6 +295,63 @@ public:
                          (3 * IGM.getPointerSize().getValue()) +
                          nestedRefCountBytes;
         skip += enumData.extraTagByteCount;
+
+        flags |= LayoutStringFlags::HasRelativePointers;
+        break;
+      }
+
+      case RefCountingKind::MultiPayloadEnumFN: {
+        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+        B.addInt64(op);
+
+        skip = 0;
+
+        auto enumData = refCounting.multiPayloadEnumFN;
+        auto payloads = enumData.entry->cases;
+
+        B.addRelativeOffset(IGM.IntPtrTy, enumData.tagFn);
+
+        B.addSize(Size(payloads.size()));
+
+        auto nestedRefCountBytesPlaceholder =
+            B.addPlaceholderWithSize(IGM.SizeTy);
+        B.addSize(*enumData.entry->fixedSize(IGM));
+
+        SmallVector<
+            clang::CodeGen::ConstantAggregateBuilderBase::PlaceholderPosition,
+            4>
+            offsetPlaceholders;
+        for (auto *p : payloads) {
+          (void)p;
+          auto placeholder = B.addPlaceholderWithSize(IGM.SizeTy);
+          offsetPlaceholders.push_back(placeholder);
+          refCountBytes += IGM.getPointerSize().getValue();
+        }
+
+        size_t nestedRefCountBytes = 0;
+        for (auto p : llvm::zip(payloads, offsetPlaceholders)) {
+          auto *payload = std::get<0>(p);
+
+          B.fillPlaceholderWithInt(std::get<1>(p), IGM.SizeTy,
+                                   nestedRefCountBytes);
+
+          size_t nestedSkip = 0;
+          LayoutStringBuilder nestedBuilder{};
+          payload->refCountString(IGM, nestedBuilder, genericSig);
+          addRefCountings(IGM, B, genericSig, nestedBuilder.refCountings,
+                          nestedSkip, nestedRefCountBytes, flags);
+
+          // NUL terminator
+          B.addInt64(0);
+          nestedRefCountBytes += sizeof(uint64_t);
+        }
+
+        B.fillPlaceholderWithInt(nestedRefCountBytesPlaceholder, IGM.SizeTy,
+                                 nestedRefCountBytes);
+
+        refCountBytes += sizeof(uint64_t) +
+                         (4 * IGM.getPointerSize().getValue()) +
+                         nestedRefCountBytes;
 
         flags |= LayoutStringFlags::HasRelativePointers;
         break;
@@ -2208,6 +2285,22 @@ bool EnumTypeLayoutEntry::buildSinglePayloadRefCountString(
   return true;
 }
 
+bool EnumTypeLayoutEntry::buildMultiPayloadRefCountString(
+    IRGenModule &IGM, LayoutStringBuilder &B,
+    GenericSignature genericSig) const {
+  auto valid = std::all_of(cases.begin(), cases.end(), [&](auto *c) {
+    LayoutStringBuilder nestedBuilder{};
+    return c->refCountString(IGM, nestedBuilder, genericSig);
+  });
+
+  if (valid) {
+    auto *tagFn = createFixedEnumLoadTag(IGM, *this);
+    B.addMultiPayloadEnumFN(tagFn, this);
+  }
+
+  return valid;
+}
+
 llvm::Constant *
 EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                   GenericSignature genericSig) const {
@@ -2245,12 +2338,20 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
     return nullptr;
 
   case CopyDestroyStrategy::Normal: {
-    if (!isFixedSize(IGM) || isMultiPayloadEnum() ||
-        !buildSinglePayloadRefCountString(IGM, B, genericSig)) {
-      return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
+    bool valid = false;
+    if (isFixedSize(IGM)) {
+      if (isMultiPayloadEnum()) {
+        valid = buildMultiPayloadRefCountString(IGM, B, genericSig);
+      } else {
+        valid = buildSinglePayloadRefCountString(IGM, B, genericSig);
+      }
     }
 
-    return createConstant(B);
+    if (valid) {
+      return createConstant(B);
+    } else {
+      return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
+    }
   }
 
   case CopyDestroyStrategy::ForwardToPayload:
@@ -2281,8 +2382,11 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case CopyDestroyStrategy::ForwardToPayload:
     return cases[0]->refCountString(IGM, B, genericSig);
   case CopyDestroyStrategy::Normal: {
-    if (!isMultiPayloadEnum() &&
-        buildSinglePayloadRefCountString(IGM, B, genericSig)) {
+
+    if (isMultiPayloadEnum() &&
+        buildMultiPayloadRefCountString(IGM, B, genericSig)) {
+      return true;
+    } else if (buildSinglePayloadRefCountString(IGM, B, genericSig)) {
       return true;
     }
 

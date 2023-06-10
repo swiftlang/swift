@@ -373,6 +373,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
         storage->getWriteImpl() == WriteImplKind::StoredWithObservers)
       return storage->isDynamic();
     return false;
+  case AccessorKind::Init:
+    return false;
   }
   llvm_unreachable("covered switch");
 }
@@ -1693,6 +1695,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Read:
       break;
 
+    case AccessorKind::Init:
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
@@ -1784,6 +1787,7 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
   case AccessorKind::Set:
+  case AccessorKind::Init:
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' or 'oldValue' parameter.
       return nullptr;
@@ -2118,6 +2122,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::DidSet:
     case AccessorKind::WillSet:
     case AccessorKind::Set:
+    case AccessorKind::Init:
       return TupleType::getEmpty(ctx);
 
     // Addressor result types can get complicated because of the owner.

@@ -1720,3 +1720,14 @@ SILValue SILGenFunction::emitWrapIntegerLiteral(SILLocation loc,
   auto propertyValue = emitWrapIntegerLiteral(loc, propertyTy, value);
   return B.createStruct(loc, ty, propertyValue);
 }
+
+ParamDecl *SILGenFunction::isMappedToInitAccessorArgument(VarDecl *property) {
+  assert(isa<AccessorDecl>(FunctionDC) &&
+         cast<AccessorDecl>(FunctionDC)->isInitAccessor());
+
+  auto arg = InitAccessorArgumentMappings.find(property);
+  if (arg == InitAccessorArgumentMappings.end())
+    return nullptr;
+
+  return arg->second;
+}

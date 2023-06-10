@@ -1171,6 +1171,11 @@ namespace {
       assert(base
              && base.getType().isAddress()
              && "should have an address base to borrow from");
+      // If the base value is address-only then we can borrow from the
+      // address in-place.
+      if (!base.getType().isLoadable(SGF.F)) {
+        return base;
+      }
       auto result = SGF.B.createLoadBorrow(loc, base.getValue());
       return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
          base.getValue(), result);
@@ -1509,6 +1514,33 @@ namespace {
       return false;
     }
 
+    /// Whether an assignment 'x = y' can be re-written as a call to an
+    /// init accessor declared by 'x'.
+    bool canRewriteSetAsInitAccessor(SILGenFunction &SGF) const {
+      auto *varDecl = dyn_cast<VarDecl>(Storage);
+      if (!varDecl || varDecl->isStatic() ||
+          varDecl->getDeclContext()->isLocalContext())
+        return false;
+
+      auto *fnDecl = SGF.FunctionDC->getAsDecl();
+      bool isAssignmentToSelfParamInInit =
+          IsOnSelfParameter && isa<ConstructorDecl>(fnDecl) &&
+          // Convenience initializers only contain assignments and not
+          // initializations.
+          !(cast<ConstructorDecl>(fnDecl)->isConvenienceInit());
+
+      // Assignment to a wrapped property can only be re-written to initialization for
+      // members of `self` in an initializer, and for local variables.
+      if (!isAssignmentToSelfParamInInit)
+        return false;
+
+      auto *initAccessor = varDecl->getAccessor(AccessorKind::Init);
+      if (!initAccessor)
+        return false;
+
+      return true;
+    }
+
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
       assert(getAccessorDecl()->isSetter());
@@ -1674,6 +1706,36 @@ namespace {
 
         return Mval;
       };
+
+      if (canRewriteSetAsInitAccessor(SGF)) {
+        // Emit an assign_or_init with the allocating initializer function and the
+        // setter function as arguments. DefiniteInitialization will then decide
+        // between the two functions, depending if it's an init call or a
+        // set call.
+        VarDecl *field = cast<VarDecl>(Storage);
+        auto FieldType = field->getValueInterfaceType();
+        if (!Substitutions.empty()) {
+          FieldType = FieldType.subst(Substitutions);
+        }
+
+        // Emit the init accessor function partially applied to the base.
+        auto *initAccessor = field->getOpaqueAccessor(AccessorKind::Init);
+        auto initConstant = SGF.getAccessorDeclRef(initAccessor);
+        SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
+
+        // Emit the set accessor function partially applied to the base.
+        auto setterFRef = getSetterFRef();
+        auto setterTy = getSetterType(setterFRef);
+        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+        auto setterFn = emitPartialSetterApply(setterFRef, setterConv);
+
+        // Create the assign_or_init with the initializer and setter.
+        auto value = emitValue(field, FieldType, setterTy, setterConv);
+        SGF.B.createAssignOrInit(loc, value.forward(SGF), initFRef,
+                                 setterFn.getValue(),
+                                 AssignOrInitInst::Unknown);
+        return;
+      }
 
       if (canRewriteSetAsPropertyWrapperInit(SGF) &&
           !Storage->isStatic() &&
@@ -2943,7 +3005,11 @@ namespace {
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
         llvm_unreachable("cannot use accessor directly to perform an access");
+
+      case AccessorKind::Init:
+        llvm_unreachable("init accessor not yet implemented");
       }
+
       llvm_unreachable("bad kind");
     }
   };
@@ -3498,11 +3564,12 @@ static bool isCallToSelfOfCurrentFunction(SILGenFunction &SGF, LookupExpr *e) {
              cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false);
 }
 
-static bool isCurrentFunctionReadAccess(SILGenFunction &SGF) {
+static bool isCurrentFunctionAccessor(SILGenFunction &SGF,
+                                      AccessorKind accessorKind) {
   auto *contextAccessorDecl =
       dyn_cast_or_null<AccessorDecl>(SGF.FunctionDC->getAsDecl());
   return contextAccessorDecl &&
-         contextAccessorDecl->getAccessorKind() == AccessorKind::Read;
+         contextAccessorDecl->getAccessorKind() == accessorKind;
 }
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
@@ -3511,6 +3578,19 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // MemberRefExpr can refer to type and function members, but the only case
   // that can be an lvalue is a VarDecl.
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
+
+  // A reference to an instance property in init accessor body
+  // has to be remapped into an argument reference because all
+  // of the properties from initialized/accesses lists are passed
+  // to init accessors individually via arguments.
+  if (isCurrentFunctionAccessor(SGF, AccessorKind::Init)) {
+    if (auto *arg = SGF.isMappedToInitAccessorArgument(var)) {
+      auto subs = e->getMember().getSubstitutions();
+      return emitLValueForNonMemberVarDecl(
+          SGF, e, ConcreteDeclRef(arg, subs), getSubstFormalRValueType(e),
+          accessKind, options, AccessSemantics::Ordinary, None);
+    }
+  }
 
   auto accessSemantics = e->getAccessSemantics();
   AccessStrategy strategy =
@@ -3521,7 +3601,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
-  bool isContextRead = isCurrentFunctionReadAccess(SGF);
+  bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
 
   // If we are inside _read, calling self.get, and the _read we are inside of is
   // the same as the as self's variable and the current function is a
@@ -3722,7 +3802,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
                             SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
-  bool isContextRead = isCurrentFunctionReadAccess(SGF);
+  bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
 
   // If we are inside _read, calling self.get, and the _read we are inside of is
   // the same as the as self's variable and the current function is a
@@ -5027,7 +5107,8 @@ static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
   }
 
   auto &setterComponent = static_cast<GetterSetterComponent&>(component);
-  if (setterComponent.canRewriteSetAsPropertyWrapperInit(SGF))
+  if (setterComponent.canRewriteSetAsPropertyWrapperInit(SGF) ||
+      setterComponent.canRewriteSetAsInitAccessor(SGF))
     return false;
 
   setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),

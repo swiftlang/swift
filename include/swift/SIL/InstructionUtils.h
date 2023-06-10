@@ -145,6 +145,10 @@ SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 /// init or set function.
 bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 
+/// Returns true if \p PAI is only used by an \c assign_or_init
+/// instruction as init or set function.
+bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);
+
 /// Returns the runtime effects of \p inst.
 ///
 /// Predicts which runtime calls are called in the generated code for `inst`.
