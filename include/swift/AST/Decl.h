@@ -3899,7 +3899,7 @@ public:
   /// protocols to which the nominal type conforms. Furthermore, the resulting
   /// set of declarations has not been filtered for visibility, nor have
   /// overridden declarations been removed.
-  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name,
+  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name, SourceLoc loc = SourceLoc(),
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
@@ -4454,7 +4454,8 @@ class ClassDecl final : public NominalTypeDecl {
       // Force loading all the members, which will add this attribute if any of
       // members are determined to be missing while loading.
       auto mutableThis = const_cast<ClassDecl *>(this);
-      (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
+      (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
+                                      getStartLoc());
     }
 
     if (Bits.ClassDecl.ComputedHasMissingDesignatedInitializers)

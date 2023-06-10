@@ -774,7 +774,7 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 2> result;
 
     decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
-                          DeclNameRef(pair.first),
+                          DeclNameRef(pair.first), decl->getLoc(),
                           NL_QualifiedDefault | NL_OnlyTypes,
                           result);
 

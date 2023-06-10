@@ -1395,7 +1395,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // See if the type has a member type with this name.
       auto Result = TypeChecker::lookupMemberType(
           DC, TD->getDeclaredInterfaceType(), Name,
-          defaultMemberLookupOptions);
+          UDE->getLoc(), defaultMemberLookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1488,6 +1488,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (BaseTy->mayHaveMembers()) {
     // See if there is a member type with this name.
     auto Result = TypeChecker::lookupMemberType(DC, BaseTy, Name,
+                                                UDE->getLoc(),
                                                 defaultMemberLookupOptions);
 
     // If there is no nested type with this name, we have a lookup of

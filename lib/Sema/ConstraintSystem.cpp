@@ -279,13 +279,15 @@ getDynamicResultSignature(ValueDecl *decl) {
   llvm_unreachable("Not a valid @objc member");
 }
 
-LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
+LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name,
+                                             SourceLoc loc) {
   // Check whether we've already performed this lookup.
   auto &result = MemberLookups[{base, name}];
   if (result) return *result;
 
   // Lookup the member.
-  result = TypeChecker::lookupMember(DC, base, name, defaultMemberLookupOptions);
+  result = TypeChecker::lookupMember(DC, base, name, loc,
+                                     defaultMemberLookupOptions);
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
