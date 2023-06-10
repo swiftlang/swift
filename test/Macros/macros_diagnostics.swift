@@ -211,3 +211,10 @@ struct SomeType {
 
 @freestanding(declaration) macro nonExpressionReturnsVoid<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type}}
+
+
+@freestanding(expression)
+@freestanding(declaration)
+macro multipleFreestandingRoles<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}
+// expected-error@-2{{macro can only have a single freestanding role}}

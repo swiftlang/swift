@@ -35,6 +35,7 @@ protocol Q { associatedtype Assoc }
 @freestanding(expression) @freestanding(declaration, names: named(Foo)) @attached(accessor)
 macro m10(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm10'}}
+// expected-error@-2{{macro can only have a single freestanding role}}
 
 @attached(
   accessor,
