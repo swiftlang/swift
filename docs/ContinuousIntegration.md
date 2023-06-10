@@ -286,9 +286,6 @@ Currently, supported pull request testing triggers:
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
 Windows      | @swift-ci Please test Windows platform | Swift Test Windows Platform
-Linux        | @swift-ci Please test Tensorflow Linux platform | Swift Test Linux Platform (TensorFlow)
-Linux (GPU)  | @swift-ci Please test Tensorflow Linux GPU platform |Swift Test Linux Platform with GPU (TensorFlow)
-macOS        | @swift-ci Please test Tensorflow macOS platform | Swift Test macOS Platform (TensorFlow)
 
 ## ci.swift.org bots
 
