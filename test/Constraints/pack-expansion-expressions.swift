@@ -475,7 +475,7 @@ do {
   }
 }
 
-// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without more context`
+// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without a type annotation`
 do {
   func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
     return (repeat (each value).makeA()) // Ok
