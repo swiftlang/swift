@@ -510,3 +510,27 @@ func testHasEqualsSelf(
   _ = (zP == true)
   _ = (wP == true)
 }
+
+// Macro whose implementation is both an expression and declaration macro.
+@freestanding(declaration)
+macro AsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "ExprAndDeclMacro")
+
+@freestanding(expression)
+macro AsExprMacro<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "ExprAndDeclMacro")
+
+func testExpressionAndDeclarationMacro() {
+  #AsExprMacro(1 + 1) // expected-warning{{expression of type '(Int, String)' is unused}}
+  struct Inner {
+    #AsDeclMacro(1 + 1)
+  }
+  #AsDeclMacro(1 + 1)
+}
+
+// Expression macro implementation with declaration macro role
+@freestanding(declaration) macro stringifyAsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+func testExpressionAsDeclarationMacro() {
+#if TEST_DIAGNOSTICS
+  #stringifyAsDeclMacro(1+1)
+  // expected-error@-1{{macro implementation type 'StringifyMacro' doesn't conform to required protocol 'DeclarationMacro' (from macro 'stringifyAsDeclMacro')}}
+#endif
+}

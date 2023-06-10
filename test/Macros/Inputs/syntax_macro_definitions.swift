@@ -73,6 +73,26 @@ public struct StringifyMacro: ExpressionMacro {
   }
 }
 
+public struct ExprAndDeclMacro: ExpressionMacro, DeclarationMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      fatalError("boom")
+    }
+
+    return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
+  }
+
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> [DeclSyntax] {
+    return []
+  }
+}
+
 public struct StringifyAndTryMacro: ExpressionMacro {
   public static func expansion(
     of macro: some FreestandingMacroExpansionSyntax,
