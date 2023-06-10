@@ -555,7 +555,7 @@ static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
 
 /// Exclude macros in the direct lookup descriptor if we need to.
 static DirectLookupDescriptor excludeMacrosIfNeeded(
-    DirectLookupDescriptor descriptor) {
+    DirectLookupDescriptor descriptor, SourceLoc loc) {
   if (descriptor.Options.contains(
           NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
     return descriptor;
@@ -572,7 +572,8 @@ static DirectLookupDescriptor excludeMacrosIfNeeded(
 
 /// Exclude macros in the name lookup options if we need to.
 static NLOptions
-excludeMacrosIfNeeded(const DeclContext *dc, NLOptions options) {
+excludeMacrosIfNeeded(const DeclContext *dc, SourceLoc loc,
+                      NLOptions options) {
   if (options & NL_ExcludeMacroExpansions)
     return options;
 
@@ -591,25 +592,27 @@ LookupInModuleRequest::LookupInModuleRequest(
       const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
       namelookup::ResolutionKind resolutionKind,
       const DeclContext *moduleScopeContext,
-      NLOptions options
+      SourceLoc loc, NLOptions options
  ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
                    moduleScopeContext,
-                   excludeMacrosIfNeeded(moduleOrFile, options)) { }
+                   excludeMacrosIfNeeded(moduleOrFile, loc, options)) { }
 
 ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(
     const DeclContext *dc, ModuleDecl *module, DeclNameRef name,
-    NLOptions options
- ) : SimpleRequest(dc, module, name, excludeMacrosIfNeeded(dc, options)) { }
+    SourceLoc loc, NLOptions options
+ ) : SimpleRequest(dc, module, name,
+                   excludeMacrosIfNeeded(dc, loc, options)) { }
 
 QualifiedLookupRequest::QualifiedLookupRequest(
                        const DeclContext *dc,
                        SmallVector<NominalTypeDecl *, 4> decls,
-                       DeclNameRef name, NLOptions options
+                       DeclNameRef name,
+                       SourceLoc loc, NLOptions options
 ) : SimpleRequest(dc, std::move(decls), name,
-                  excludeMacrosIfNeeded(dc, options)) { }
+                  excludeMacrosIfNeeded(dc, loc, options)) { }
 
-DirectLookupRequest::DirectLookupRequest(DirectLookupDescriptor descriptor)
-    : SimpleRequest(excludeMacrosIfNeeded(descriptor)) { }
+DirectLookupRequest::DirectLookupRequest(DirectLookupDescriptor descriptor, SourceLoc loc)
+    : SimpleRequest(excludeMacrosIfNeeded(descriptor, loc)) { }
 
 // Implement the clang importer type zone.
 #define SWIFT_TYPEID_ZONE ClangImporter

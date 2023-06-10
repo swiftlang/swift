@@ -2734,10 +2734,10 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
-                          NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NL_QualifiedDefault, declsFound);
     } else if (dc->isModuleScopeContext()) {
       dc->lookupQualified(dc->getParentModule(), projectionName,
-                          NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NL_QualifiedDefault, declsFound);
     } else {
       llvm_unreachable("Property wrappers don't work in local contexts");
     }

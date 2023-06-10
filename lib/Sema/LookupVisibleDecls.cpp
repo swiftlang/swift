@@ -1188,6 +1188,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
 
   SmallVector<ValueDecl *, 2> subscripts;
   dc->lookupQualified(baseType, subscriptName,
+                      baseType->getAnyNominal()->getLoc(),
                       NL_QualifiedDefault | NL_ProtocolMembers, subscripts);
 
   for (ValueDecl *VD : subscripts) {

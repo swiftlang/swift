@@ -142,7 +142,7 @@ lookupEnumMemberElement(DeclContext *DC, Type ty,
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   LookupResult foundElements =
-      TypeChecker::lookupMember(DC, ty, name, lookupOptions);
+      TypeChecker::lookupMember(DC, ty, name, UseLoc, lookupOptions);
   return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/false, foundElements);
 }
