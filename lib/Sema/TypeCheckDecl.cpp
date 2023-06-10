@@ -1612,11 +1612,19 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
 
 SmallVector<MacroDecl *, 1>
 TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                          SourceLoc loc, MacroRoles roles) {
+                          MacroRoles roles) {
   SmallVector<MacroDecl *, 1> choices;
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
-  UnqualifiedLookupDescriptor descriptor(macroName, moduleScopeDC);
+
+  // Macro lookup should always exclude macro expansions; macro
+  // expansions cannot introduce new macro declarations. Note that
+  // the source location here doesn't matter.
+  UnqualifiedLookupDescriptor descriptor{
+    macroName, moduleScopeDC, SourceLoc(),
+    UnqualifiedLookupFlags::ExcludeMacroExpansions
+  };
+
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
   for (const auto &found : lookup.allResults()) {
