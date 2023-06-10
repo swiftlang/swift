@@ -133,5 +133,44 @@ git rebase --continue
 
 ### How do I clean up my git history?
 
-TODO: Link to a beginner-friendly external resource, or (less preferably)
-describe basic usage of rebase here.
+Git's history can sometimes become cluttered with many small commits. 
+Fortunately, Git has a feature called `rebase` that allows you to clean up your commit history. 
+Here's a simple way to use it, If you want to learn more, 
+[GitHub - About Git rebase](https://docs.github.com/en/get-started/using-git/about-git-rebase) 
+provides a comprehensive overview of `rebase`:
+
+1. Begin an interactive rebase: Use `git rebase -i HEAD~N`, where `N` is the number of commits 
+   from the latest one you want to edit. This will open a text editor, 
+   listing the last `N` commits with the word "pick" next to each one.
+
+   ```sh
+   git rebase -i HEAD~N
+   ```
+   
+2. Edit the commits: Replace "pick" with the operation you want to perform on the commit:
+
+   - `reword`: Change the commit message.
+   - `edit`: Amend the commit.
+   - `squash`: Combine the commit with the previous one.
+   - `fixup`: Similar to `squash`, but discard this commit's log message.
+   - `drop`: Remove the commit.
+
+3. Save and exit: After saving and closing the file, git will execute each operation. 
+   If you selected `reword`, `edit`, or `squash`, git will pause and give you a chance
+   to alter the commit message or the commit itself.
+
+   ```sh
+   git commit --amend
+   ```
+
+4. Continue the rebase: Once you're done with each commit, you can continue the rebase 
+   using `git rebase --continue`. If you want to abort the rebase at any point, 
+   you can use `git rebase --abort`.
+
+   ```sh
+   git rebase --continue
+   ```
+
+It's important to note that you should only rebase commits that have not been pushed to a public branch. 
+If you need to tidy up commits that have already been pushed, 
+it's generally better to use git revert to avoid causing confusion for other developers.
