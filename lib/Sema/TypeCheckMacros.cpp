@@ -1487,7 +1487,7 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // So bail out to prevent diagnostics from the contraint system.
   if (macroRef.getAttr()) {
     auto foundMacros = TypeChecker::lookupMacros(
-        dc, macroRef.getMacroName(), SourceLoc(), roles);
+        dc, macroRef.getMacroName(), roles);
     if (foundMacros.empty())
       return ConcreteDeclRef();
   }

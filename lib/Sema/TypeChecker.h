@@ -940,8 +940,7 @@ PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
 SmallVector<MacroDecl *, 1>
-lookupMacros(DeclContext *dc, DeclNameRef macroName, SourceLoc loc,
-             MacroRoles contexts);
+lookupMacros(DeclContext *dc, DeclNameRef macroName, MacroRoles contexts);
 
 enum class UnsupportedMemberTypeAccessKind : uint8_t {
   None,
