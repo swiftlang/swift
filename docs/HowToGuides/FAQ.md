@@ -173,4 +173,4 @@ provides a comprehensive overview of `rebase`:
 
 It's important to note that you should only rebase commits that have not been pushed to a public branch. 
 If you need to tidy up commits that have already been pushed, 
-it's generally better to use git revert to avoid causing confusion for other developers.
+it's generally better to use `git revert` to avoid causing confusion for other developers.
