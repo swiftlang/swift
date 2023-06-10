@@ -849,9 +849,9 @@ public:
 class CustomAttributeScope final : public ASTScopeImpl {
 public:
   CustomAttr *attr;
-  ValueDecl *decl;
+  Decl *decl;
 
-  CustomAttributeScope(CustomAttr *attr, ValueDecl *decl)
+  CustomAttributeScope(CustomAttr *attr,Decl *decl)
       : attr(attr), decl(decl) {}
   virtual ~CustomAttributeScope() {}
 
@@ -1130,9 +1130,9 @@ protected:
 class DifferentiableAttributeScope final : public ASTScopeImpl {
 public:
   DifferentiableAttr *const differentiableAttr;
-  ValueDecl *const attributedDeclaration;
+  Decl *const attributedDeclaration;
 
-  DifferentiableAttributeScope(DifferentiableAttr *diffAttr, ValueDecl *decl)
+  DifferentiableAttributeScope(DifferentiableAttr *diffAttr, Decl *decl)
       : differentiableAttr(diffAttr), attributedDeclaration(decl) {}
   virtual ~DifferentiableAttributeScope() {}
 
