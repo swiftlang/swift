@@ -689,6 +689,16 @@ bool ASTScopeImpl::isInMacroArgument(SourceFile *sourceFile,
   do {
     if (scope->isMacroArgumentScope())
       return true;
+
+    // If we've reached a source file scope, we can't be inside of
+    // a macro argument. Either this is a top-level source file, or
+    // it's macro expansion buffer. We have to check for this because
+    // macro expansion buffers for freestanding macros are children of
+    // MacroExpansionDeclScope, and child scopes of freestanding macros
+    // are otherwise inside the macro argument.
+    if (scope->getClassName() == "ASTSourceFileScope")
+      return false;
+
   } while ((scope = scope->getParent().getPtrOrNull()));
 
   return false;
