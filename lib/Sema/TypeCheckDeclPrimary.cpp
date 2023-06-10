@@ -2073,11 +2073,10 @@ public:
     }
     }
 
-    // If the macro has a (non-Void) result type, it must have the freestanding
+    // If the macro has a result type, it must have the freestanding
     // expression role. Other roles cannot have result types.
     if (auto resultTypeRepr = MD->getResultTypeRepr()) {
-      if (!MD->getMacroRoles().contains(MacroRole::Expression) &&
-          !MD->getResultInterfaceType()->isEqual(Ctx.getVoidType())) {
+      if (!MD->getMacroRoles().contains(MacroRole::Expression)) {
         auto resultType = MD->getResultInterfaceType();
         Ctx.Diags.diagnose(
             MD->arrowLoc, diag::macro_result_type_cannot_be_used, resultType)
