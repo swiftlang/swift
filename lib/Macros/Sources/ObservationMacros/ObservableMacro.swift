@@ -17,6 +17,22 @@ import SwiftSyntaxMacros
 @_implementationOnly import SwiftSyntaxBuilder
 
 public struct ObservableMacro {
+  static let moduleName = "_Observation"
+
+  static let conformanceName = "Observable"
+  static var qualifiedConformanceName: String {
+    return "\(moduleName).\(conformanceName)"
+  }
+
+  static var observableConformanceType: TypeSyntax {
+    "\(raw: qualifiedConformanceName)"
+  }
+
+  static let registrarTypeName = "ObservationRegistrar"
+  static var qualifiedRegistrarTypeName: String {
+    return "\(moduleName).\(registrarTypeName)"
+  }
+  
   static let trackedMacroName = "ObservationTracked"
   static let ignoredMacroName = "ObservationIgnored"
 
@@ -25,7 +41,7 @@ public struct ObservableMacro {
   static func registrarVariable(_ observableType: TokenSyntax) -> DeclSyntax {
     return
       """
-      @\(raw: ignoredMacroName) private let \(raw: registrarVariableName) = ObservationRegistrar()
+      @\(raw: ignoredMacroName) private let \(raw: registrarVariableName) = \(raw: qualifiedRegistrarTypeName)()
       """
   }
   
@@ -262,13 +278,13 @@ extension ObservableMacro: ConformanceMacro {
     
     if let inheritanceList {
       for inheritance in inheritanceList {
-        if inheritance.typeName.identifier == "Observable" {
+        if inheritance.typeName.identifier == ObservableMacro.conformanceName {
           return []
         }
       }
     }
     
-    return [("Observable", nil)]
+    return [(ObservableMacro.observableConformanceType, nil)]
   }
 }
 
