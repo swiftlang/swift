@@ -97,7 +97,7 @@ enum E: Error { case err }
     discard (self) // expected-error {{cannot convert value of type 'File' to expected argument type 'Int'}}
 
     // FIXME: we should get an error about it being illegal to discard in a closure.
-    let _ = { // expected-error {{type of expression is ambiguous without more context}}
+    let _ = { // expected-error {{type of expression is ambiguous without a type annotation}}
       discard self
       return 0
     }()

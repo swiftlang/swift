@@ -315,15 +315,15 @@ function(_add_target_variant_c_compile_flags)
      list(APPEND result -funwind-tables)
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "WASI")
-    list(APPEND result "-D_WASI_EMULATED_MMAN" "-D_WASI_EMULATED_SIGNAL" "-D_WASI_EMULATED_PROCESS_CLOCKS")
-  endif()
-
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
       # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
       list(APPEND result "-march=core2")
     endif()
+  endif()
+
+  if("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN" "-D_WASI_EMULATED_SIGNAL" "-D_WASI_EMULATED_PROCESS_CLOCKS")
   endif()
 
   if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)

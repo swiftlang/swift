@@ -275,10 +275,10 @@ ERROR(no_candidates_match_argument_type,none,
       (StringRef, Type, unsigned))
 
 ERROR(cannot_infer_closure_parameter_type,none,
-      "unable to infer type of a closure parameter %0 in the current context",
+      "cannot infer type of closure parameter %0 without a type annotation",
        (StringRef))
 ERROR(cannot_infer_closure_type,none,
-      "unable to infer closure type in the current context", ())
+      "unable to infer closure type without a type annotation", ())
 ERROR(cannot_infer_empty_closure_result_type,none,
       "cannot infer return type of empty closure", ())
 ERROR(cannot_infer_closure_result_type,none,
@@ -4163,7 +4163,7 @@ ERROR(could_not_infer_placeholder,none,
       "could not infer type for placeholder", ())
 
 ERROR(type_of_expression_is_ambiguous,none,
-      "type of expression is ambiguous without more context", ())
+      "type of expression is ambiguous without a type annotation", ())
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
@@ -7146,6 +7146,8 @@ NOTE(macro_remove_result_type,none,
       ())
 NOTE(macro_make_freestanding_expression,none,
       "make this macro a freestanding expression macro", ())
+ERROR(macro_multiple_freestanding_roles,none,
+      "macro can only have a single freestanding role", ())
 ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))
 ERROR(macro_expansion_missing_arguments,none,

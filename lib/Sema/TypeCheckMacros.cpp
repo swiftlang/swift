@@ -66,7 +66,8 @@ extern "C" ptrdiff_t swift_ASTGen_checkMacroDefinition(
 
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
-    const char *discriminator, ptrdiff_t discriminatorLength, void *sourceFile,
+    const char *discriminator, ptrdiff_t discriminatorLength,
+    uint8_t rawMacroRole, void *sourceFile,
     const void *sourceLocation, const char **evaluatedSource,
     ptrdiff_t *evaluatedSourceLength);
 
@@ -901,6 +902,13 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
 #endif
   });
 
+  // Only one freestanding macro role is permitted, so look at the roles to
+  // figure out which one to use.
+  MacroRole macroRole =
+    macroRoles.contains(MacroRole::Expression) ? MacroRole::Expression
+    : macroRoles.contains(MacroRole::Declaration) ? MacroRole::Declaration
+    : MacroRole::CodeItem;
+
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -961,7 +969,8 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags, externalDef->opaqueHandle,
         static_cast<uint32_t>(externalDef->kind), discriminator->data(),
-        discriminator->size(), astGenSourceFile,
+        discriminator->size(),
+        static_cast<uint32_t>(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)

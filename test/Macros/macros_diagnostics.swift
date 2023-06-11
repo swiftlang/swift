@@ -97,7 +97,7 @@ macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
 
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
-  let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
+  let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without a type annotation}}
 
   _ = #stringify()
   // expected-error@-1{{missing argument for parameter #1 in macro expansion}}
@@ -211,3 +211,13 @@ struct SomeType {
 
 @freestanding(declaration) macro nonExpressionReturnsVoid<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type}}
+// expected-error@-2{{only a freestanding expression macro can produce a result of type 'Void'}}
+// expected-note@-3{{make this macro a freestanding expression macro}}{{1-1=@freestanding(expression)\n}}
+// expected-note@-4{{remove the result type if the macro does not produce a value}}{{68-76=}}
+
+
+@freestanding(expression)
+@freestanding(declaration)
+macro multipleFreestandingRoles<T>(_: T) -> Void = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}
+// expected-error@-2{{macro can only have a single freestanding role}}
