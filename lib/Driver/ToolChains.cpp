@@ -1513,7 +1513,8 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
   if (!scratchPath.empty())
     runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
-  if (!SDKPath.empty()) {
+  // Only Darwin places libraries directly in /sdk/usr/lib/swift/.
+  if (Triple.isOSDarwin() && !SDKPath.empty()) {
     if (!scratchPath.empty()) {
       // If we added the secondary resource dir, we also need the iOSSupport
       // directory.
