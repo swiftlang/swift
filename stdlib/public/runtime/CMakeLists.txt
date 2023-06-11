@@ -102,7 +102,8 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
-macro(add_image_inspection_shared sdk primary_arch inspection_file linkfile_src)
+set(sdk "${SWIFT_HOST_VARIANT_SDK}")
+if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
 
@@ -111,57 +112,19 @@ macro(add_image_inspection_shared sdk primary_arch inspection_file linkfile_src)
   add_custom_command_target(swift_static_binary_${sdk}_args
     COMMAND
       "${CMAKE_COMMAND}" -E copy
-      "${linkfile_src}"
+      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     OUTPUT
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     DEPENDS
-      "${linkfile_src}")
+      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                              DESTINATION "lib/swift_static/${lowercase_sdk}"
                              COMPONENT stdlib)
-endmacro()
-
-set(is_image_inspection_required)
-foreach(sdk IN LISTS SWIFT_SDKS)
-  set(image_inspection_shared_sdk)
-  set(primary_arch)
-  set(image_inspection_shared_file)
-  set(linkfile_src)
-
-  if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND ELFISH_SDKS ${sdk})
-    set(linkfile_src "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
-  elseif("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "WASM")
-    set(linkfile_src "${SWIFT_SOURCE_DIR}/utils/webassembly/static-executable-args.lnk")
-  endif()
-
-  if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
-    set(image_inspection_shared_sdk "${sdk}")
-    set(image_inspection_shared_file ImageInspectionELF.cpp)
-  elseif(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "WASI")
-    set(image_inspection_shared_sdk "${sdk}")
-    set(image_inspection_shared_file ImageInspectionWasm.cpp)
-    # Set default arch
-    set(primary_arch "wasm32")
-  endif()
-
-  if("${sdk}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}")
-    set(primary_arch ${SWIFT_PRIMARY_VARIANT_ARCH})
-  endif()
-
-  if(NOT "${image_inspection_shared_sdk}" STREQUAL "" AND NOT "${primary_arch}" STREQUAL "")
-    set(is_image_inspection_required TRUE)
-    add_image_inspection_shared(${image_inspection_shared_sdk} ${primary_arch} ${image_inspection_shared_file} ${linkfile_src})
-  endif()
-endforeach()
-
-if(is_image_inspection_required)
-  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
-  add_dependencies(stdlib static_binary_magic)
   add_dependencies(stdlib ${static_binary_lnk_file_list})
+  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 endif()
 
 add_swift_target_library(swiftRuntime OBJECT_LIBRARY
