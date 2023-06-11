@@ -1272,6 +1272,19 @@ bool swift::accessorMacroOnlyIntroducesObservers(
   return false;
 }
 
+bool swift::accessorMacroIntroducesInitAccessor(
+    MacroDecl *macro, const MacroRoleAttr *attr
+) {
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().getKind() ==
+           DeclBaseName::Kind::Constructor))
+      return true;
+  }
+
+  return false;
+}
+
 Optional<unsigned> swift::expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 ) {
@@ -1289,15 +1302,17 @@ Optional<unsigned> swift::expandAccessors(
   // side effect of registering those accessor declarations with the storage
   // declaration, so there is nothing further to do.
   bool foundNonObservingAccessor = false;
+  bool foundInitAccessor = false;
   for (auto decl : macroSourceFile->getTopLevelItems()) {
     auto accessor = dyn_cast_or_null<AccessorDecl>(decl.dyn_cast<Decl *>());
     if (!accessor)
       continue;
 
-    if (accessor->isObservingAccessor())
-      continue;
+    if (accessor->isInitAccessor())
+      foundInitAccessor = true;
 
-    foundNonObservingAccessor = true;
+    if (!accessor->isObservingAccessor())
+      foundNonObservingAccessor = true;
   }
 
   auto roleAttr = macro->getMacroRoleAttr(MacroRole::Accessor);
@@ -1319,6 +1334,14 @@ Optional<unsigned> swift::expandAccessors(
     storage->diagnose(
         diag::macro_accessor_missing_from_expansion, macro->getName(),
         !expectedNonObservingAccessor);
+  }
+
+  // 'init' accessors must be documented in the macro role attribute.
+  if (foundInitAccessor &&
+      !accessorMacroIntroducesInitAccessor(macro, roleAttr)) {
+    storage->diagnose(
+        diag::macro_init_accessor_not_documented, macro->getName());
+    // FIXME: Add the appropriate "names: named(init)".
   }
 
   return macroSourceFile->getBufferID();

@@ -82,6 +82,11 @@ Optional<unsigned> expandConformances(CustomAttr *attr, MacroDecl *macro,
 bool accessorMacroOnlyIntroducesObservers(
     MacroDecl *macro, const MacroRoleAttr *attr);
 
+/// Determine whether an accessor macro (defined with the given role attribute)
+/// introduces an init accessor.
+bool accessorMacroIntroducesInitAccessor(
+    MacroDecl *macro, const MacroRoleAttr *attr);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */
