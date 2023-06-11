@@ -513,7 +513,7 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 ///
 /// \param CurrDC the DeclContext from which the lookup is done.
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
-                              Type BaseTy,
+                              Type BaseTy, SourceLoc loc,
                               const DeclContext *CurrDC,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,

@@ -617,7 +617,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   });
 
   if (baseTypeOrNull) {
-    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, SourceLoc(), DC,
                              /*includeInstanceMembers*/true,
                              /*includeDerivedRequirements*/false,
                              /*includeProtocolExtensionMembers*/true,
