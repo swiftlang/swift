@@ -350,41 +350,6 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
-/// Check whether the pattern may have storage.
-///
-/// This query is careful not to trigger accessor macro expansion, which
-/// creates a cycle. It conservatively assumes that all accessor macros
-/// produce computed properties, which is... incorrect.
-///
-/// The query also avoids triggering a `StorageImplInfoRequest` for patterns
-/// involved in a ProtocolDecl, because we know they can never contain storage.
-/// For background, vars of noncopyable type have their OpaqueReadOwnership
-/// determined by the type of the var decl, but that type hasn't always been
-/// determined when this query is made.
-static bool mayHaveStorage(Pattern *pattern) {
-  // Check whether there are any accessor macros, or it's a protocol member.
-  bool hasAccessorMacros = false;
-  bool inProtocolDecl = false;
-  pattern->forEachVariable([&](VarDecl *VD) {
-    if (isa<ProtocolDecl>(VD->getDeclContext()))
-      inProtocolDecl = true;
-
-    VD->forEachAttachedMacro(MacroRole::Accessor,
-      [&](CustomAttr *customAttr, MacroDecl *macro) {
-        hasAccessorMacros = true;
-      });
-  });
-
-  if (hasAccessorMacros)
-    return false;
-
-  // protocol members can never contain storage; avoid triggering request.
-  if (inProtocolDecl)
-    return false;
-
-  return pattern->hasStorage();
-}
-
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,
@@ -485,7 +450,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      mayHaveStorage(pattern)) {
+      pattern->hasStorage()) {
     if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
