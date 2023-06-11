@@ -6861,6 +6861,9 @@ bool VarDecl::isLazilyInitializedGlobal() const {
   if (isDebuggerVar())
     return false;
 
+  if (getAttrs().hasAttribute<SILGenNameAttr>())
+    return false;
+
   // Top-level global variables in the main source file and in the REPL are not
   // lazily initialized.
   return !isTopLevelGlobal();

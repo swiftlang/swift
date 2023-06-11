@@ -5361,7 +5361,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         bool isImplicit;
         serialization::decls_block::SILGenNameDeclAttrLayout::readRecord(
             scratch, isImplicit);
-        Attr = new (ctx) SILGenNameAttr(blobData, isImplicit);
+        Attr = new (ctx) SILGenNameAttr(blobData, /*raw*/ false, isImplicit);
         break;
       }
 

@@ -2893,6 +2893,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       ParseSymbolName = consumeIf(tok::comma);
     }
 
+    bool Raw = false;
+    if (DK == DAK_SILGenName) {
+      if (Tok.is(tok::identifier) && Tok.getText() == "raw") {
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+        Raw = true;
+      }
+    }
+
     llvm::Optional<StringRef> AsmName;
     if (ParseSymbolName) {
       if (Tok.isNot(tok::string_literal)) {
@@ -2928,7 +2937,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     if (!DiscardAttribute) {
       if (DK == DAK_SILGenName)
-        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), AtLoc,
+        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), Raw, AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,

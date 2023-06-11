@@ -2315,6 +2315,9 @@ public:
         if (!var->hasStorage())
           return;
 
+        if (var->getAttrs().hasAttribute<SILGenNameAttr>())
+          return;
+
         if (var->isInvalid() || PBD->isInvalid())
           return;
 
