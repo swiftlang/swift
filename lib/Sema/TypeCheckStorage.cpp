@@ -106,8 +106,16 @@ static bool hasStoredProperties(NominalTypeDecl *decl,
                 || (decl != implDecl))));
 }
 
-static void computeLoweredStoredProperties(NominalTypeDecl *decl,
-                                           IterableDeclContext *implDecl) {
+namespace {
+  enum class LoweredPropertiesReason {
+    Stored,
+    Memberwise
+  };
+}
+
+static void computeLoweredProperties(NominalTypeDecl *decl,
+                                     IterableDeclContext *implDecl,
+                                     LoweredPropertiesReason reason) {
   // Expand synthesized member macros.
   auto &ctx = decl->getASTContext();
   (void)evaluateOrDefault(ctx.evaluator,
@@ -127,14 +135,19 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
     if (!var || var->isStatic())
       continue;
 
-    if (var->getAttrs().hasAttribute<LazyAttr>())
-      (void) var->getLazyStorageProperty();
+    if (reason == LoweredPropertiesReason::Stored) {
+      if (var->getAttrs().hasAttribute<LazyAttr>())
+        (void) var->getLazyStorageProperty();
 
-    if (var->hasAttachedPropertyWrapper()) {
-      (void) var->getPropertyWrapperAuxiliaryVariables();
-      (void) var->getPropertyWrapperInitializerInfo();
+      if (var->hasAttachedPropertyWrapper()) {
+        (void) var->getPropertyWrapperAuxiliaryVariables();
+        (void) var->getPropertyWrapperInitializerInfo();
+      }
     }
   }
+
+  if (reason != LoweredPropertiesReason::Stored)
+    return;
 
   // If this is an actor, check conformance to the Actor protocol to
   // ensure that the actor storage will get created (if needed).
@@ -162,6 +175,11 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
       }
     }
   }
+}
+
+static void computeLoweredStoredProperties(NominalTypeDecl *decl,
+                                           IterableDeclContext *implDecl) {
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Stored);
 }
 
 /// Enumerate both the stored properties and missing members,
@@ -283,13 +301,46 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
+/// Determine whether the given variable has an init accessor.
+static bool hasInitAccessor(VarDecl *var) {
+  if (var->getAccessor(AccessorKind::Init))
+    return true;
+
+  // Look to see whether it is possible that there is an init accessor.
+  bool hasInitAccessor = false;
+  namelookup::forEachPotentialAttachedMacro(
+      var, MacroRole::Accessor,
+      [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+        if (accessorMacroIntroducesInitAccessor(macro, attr))
+          hasInitAccessor = true;
+      });
+
+  // There is no chance for an init accessor, so we're done.
+  if (!hasInitAccessor)
+    return false;
+
+  // We might get an init accessor by expanding accessor macros; do so now.
+  (void)evaluateOrDefault(
+       var->getASTContext().evaluator, ExpandAccessorMacros{var}, { });
+
+  return var->getAccessor(AccessorKind::Init);
+}
+
 ArrayRef<VarDecl *>
 InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
                                         NominalTypeDecl *decl) const {
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
+    return ArrayRef<VarDecl *>();
+
+  // Make sure we expand what we need to to get all of the properties.
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+
   SmallVector<VarDecl *, 4> results;
   for (auto *member : decl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
-    if (!var || !var->getAccessor(AccessorKind::Init)) {
+    if (!var || var->isStatic() || !hasInitAccessor(var)) {
       continue;
     }
 

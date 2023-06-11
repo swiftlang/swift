@@ -23,11 +23,11 @@
 #endif
 @attached(memberAttribute)
 @attached(conformance)
-public macro Observable() = 
+public macro Observable() =
   #externalMacro(module: "ObservationMacros", type: "ObservableMacro")
 
 @available(SwiftStdlib 5.9, *)
-@attached(accessor)
+@attached(accessor, names: named(init), named(get), named(set))
 #if OBSERVATION_SUPPORTS_PEER_MACROS
 @attached(peer, names: prefixed(_))
 #endif
