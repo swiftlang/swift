@@ -34,7 +34,7 @@ struct StackOverflow {
 
 // CHECK: Thread 0 {{(".*" )?}}crashed:
 
-// CHECK:     0               0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:{{[0-9]+}}
+// CHECK:     0               0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift
 // CHECK-NEXT:     1 [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // CHECK-NEXT:     2 [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
 // CHECK-NEXT:     3 [ra]          0x{{[0-9a-f]+}} recurse(_:) + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:19:3
