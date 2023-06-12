@@ -214,6 +214,66 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   vwtable->publishLayout(layout);
 }
 
+// void
+// swift::swift_initEnumMetadataMultiPayloadWithLayoutString(EnumMetadata *enumType,
+//                                      EnumLayoutFlags layoutFlags,
+//                                      unsigned numPayloads,
+//                                      const TypeLayout * const *payloadLayouts) {
+  // // Accumulate the layout requirements of the payloads.
+  // size_t payloadSize = 0, alignMask = 0;
+  // bool isPOD = true, isBT = true;
+  // for (unsigned i = 0; i < numPayloads; ++i) {
+  //   const TypeLayout *payloadLayout = payloadLayouts[i];
+  //   payloadSize
+  //     = std::max(payloadSize, (size_t)payloadLayout->size);
+  //   alignMask |= payloadLayout->flags.getAlignmentMask();
+  //   isPOD &= payloadLayout->flags.isPOD();
+  //   isBT &= payloadLayout->flags.isBitwiseTakable();
+  // }
+
+  // // Store the max payload size in the metadata.
+  // assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
+
+  // // The total size includes space for the tag.
+  // auto tagCounts = getEnumTagCounts(payloadSize,
+  //                               enumType->getDescription()->getNumEmptyCases(),
+  //                               numPayloads);
+  // unsigned totalSize = payloadSize + tagCounts.numTagBytes;
+
+  // // See whether there are extra inhabitants in the tag.
+  // unsigned numExtraInhabitants = tagCounts.numTagBytes == 4
+  //   ? INT_MAX
+  //   : (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+  // numExtraInhabitants = std::min(numExtraInhabitants,
+  //                         unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
+
+  // auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
+
+  // // Set up the layout info in the vwtable.
+  // auto rawStride = (totalSize + alignMask) & ~alignMask;
+  // TypeLayout layout{totalSize,
+  //                   rawStride == 0 ? 1 : rawStride,
+  //                   ValueWitnessFlags()
+  //                    .withAlignmentMask(alignMask)
+  //                    .withPOD(isPOD)
+  //                    .withBitwiseTakable(isBT)
+  //                    .withEnumWitnesses(true)
+  //                    .withInlineStorage(ValueWitnessTable::isValueInline(
+  //                        isBT, totalSize, alignMask + 1)),
+  //                   numExtraInhabitants};
+
+  // installCommonValueWitnesses(layout, vwtable);
+
+  // // Unconditionally overwrite the enum-tag witnesses.
+  // // The compiler does not generate meaningful enum-tag witnesses for
+  // // enums in this state.
+  // vwtable->getEnumTagSinglePayload = swift_getMultiPayloadEnumTagSinglePayload;
+  // vwtable->storeEnumTagSinglePayload =
+  //     swift_storeMultiPayloadEnumTagSinglePayload;
+
+  // vwtable->publishLayout(layout);
+//}
+
 namespace {
 struct MultiPayloadLayout {
   size_t payloadSize;
