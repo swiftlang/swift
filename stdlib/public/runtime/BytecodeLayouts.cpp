@@ -182,12 +182,21 @@ static uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
   switch (byteCount) {
   case 1:
     return addr[0];
-  case 2:
-    return ((uint16_t *)addr)[0];
-  case 4:
-    return ((uint32_t *)addr)[0];
-  case 8:
-    return ((uint64_t *)addr)[0];
+  case 2: {
+    uint16_t res = 0;
+    memcpy(&res, addr, sizeof(uint16_t));
+    return res;
+  }
+  case 4: {
+    uint32_t res = 0;
+    memcpy(&res, addr, sizeof(uint32_t));
+    return res;
+  }
+  case 8: {
+    uint64_t res = 0;
+    memcpy(&res, addr, sizeof(uint64_t));
+    return res;
+  }
   default:
     swift_unreachable("Unsupported tag byte length.");
   }
@@ -608,7 +617,8 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
       writeBytes(layoutStr, writeOffset, getEnumTag);
 
       size_t numCases = readBytes<size_t>(fieldLayoutStr, i);
-      size_t refCountBytes = readBytes<size_t>(fieldLayoutStr, i);
+      // skip ref count bytes
+      i += sizeof(size_t);
 
       size_t casesBeginOffset =
           layoutStrOffset + i + (numCases * sizeof(size_t));

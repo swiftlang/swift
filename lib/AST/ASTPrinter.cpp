@@ -4811,16 +4811,14 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
       }
   );
 
-  {
+  if (decl->resultType.getTypeRepr() ||
+      !decl->getResultInterfaceType()->isVoid()) {
     Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
     SWIFT_DEFER {
       Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
     };
 
-    if (decl->parameterList)
-      Printer << " -> ";
-    else
-      Printer << ": ";
+    Printer << " -> ";
 
     TypeLoc resultTypeLoc(
         decl->resultType.getTypeRepr(), decl->getResultInterfaceType());

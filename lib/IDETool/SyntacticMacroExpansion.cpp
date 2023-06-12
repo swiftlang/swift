@@ -412,7 +412,7 @@ void SyntacticMacroExpansionInstance::expand(
     SourceFile *SF, const MacroExpansionSpecifier &expansion,
     SourceEditConsumer &consumer) {
 
-  // Find the expansion at 'expantion.offset'.
+  // Find the expansion at 'expansion.offset'.
   MacroExpansionFinder expansionFinder(
       SourceMgr,
       SourceMgr.getLocForOffset(*SF->getBufferID(), expansion.offset));
