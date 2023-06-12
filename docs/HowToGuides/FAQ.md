@@ -135,9 +135,10 @@ git rebase --continue
 
 Git's history can sometimes become cluttered with many small commits. 
 Fortunately, Git has a feature called `rebase` that allows you to clean up your commit history. 
-Here's a simple way to use it, If you want to learn more, 
+If you want to learn more, 
 [GitHub - About Git rebase](https://docs.github.com/en/get-started/using-git/about-git-rebase) 
-provides a comprehensive overview of `rebase`:
+provides a comprehensive overview of `rebase`.
+Here's a small gist that goes through the basics on how to use it:
 
 1. Begin an interactive rebase: Use `git rebase -i HEAD~N`, where `N` is the number of commits 
    from the latest one you want to edit. This will open a text editor, 
