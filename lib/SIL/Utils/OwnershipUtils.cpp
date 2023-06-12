@@ -1366,10 +1366,7 @@ ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
   // NOTE: This if chain is meant to be a covered switch, so make sure to return
   // in each if itself since we have an unreachable at the bottom to ensure if a
   // new subclass of OwnershipForwardingInst is added
-  if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
-    return ofsvi->getForwardingOwnershipKind();
-
-  if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     return ofsvi->getForwardingOwnershipKind();
 
   if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
@@ -1405,9 +1402,7 @@ void ForwardingOperand::setForwardingOwnershipKind(
   // NOTE: This if chain is meant to be a covered switch, so make sure to return
   // in each if itself since we have an unreachable at the bottom to ensure if a
   // new subclass of OwnershipForwardingInst is added
-  if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
-    return ofsvi->setForwardingOwnershipKind(newKind);
-  if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     return ofsvi->setForwardingOwnershipKind(newKind);
   if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
     return ofci->setForwardingOwnershipKind(newKind);
@@ -1471,11 +1466,7 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
                                              ValueOwnershipKind newKind) const {
   auto *user = use->getUser();
 
-  if (auto *fInst = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
-    if (fInst->getForwardingOwnershipKind() == oldKind)
-      return fInst->setForwardingOwnershipKind(newKind);
-
-  if (auto *fInst = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
+  if (auto *fInst = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     if (fInst->getForwardingOwnershipKind() == oldKind)
       return fInst->setForwardingOwnershipKind(newKind);
 
