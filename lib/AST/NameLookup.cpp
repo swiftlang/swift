@@ -1594,6 +1594,60 @@ static DeclName adjustLazyMacroExpansionNameKey(
   return name;
 }
 
+SmallVector<MacroDecl *, 1>
+namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
+                         MacroRoles roles) {
+  SmallVector<MacroDecl *, 1> choices;
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+
+  // Macro lookup should always exclude macro expansions; macro
+  // expansions cannot introduce new macro declarations. Note that
+  // the source location here doesn't matter.
+  UnqualifiedLookupDescriptor descriptor{
+    macroName, moduleScopeDC, SourceLoc(),
+    UnqualifiedLookupFlags::ExcludeMacroExpansions
+  };
+
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &found : lookup.allResults()) {
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+      auto candidateRoles = macro->getMacroRoles();
+      if ((candidateRoles && roles.contains(candidateRoles)) ||
+          // FIXME: `externalMacro` should have all roles.
+          macro->getBaseIdentifier().str() == "externalMacro") {
+        choices.push_back(macro);
+      }
+    }
+  }
+  return choices;
+}
+
+bool
+namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
+  bool inMacroArgument = false;
+
+  ASTScope::lookupEnclosingMacroScope(
+      sourceFile, loc,
+      [&](auto potentialMacro) -> bool {
+        UnresolvedMacroReference macro(potentialMacro);
+
+        if (macro.getFreestanding()) {
+          inMacroArgument = true;
+        } else if (auto *attr = macro.getAttr()) {
+          auto *moduleScope = sourceFile->getModuleScopeContext();
+          auto results = lookupMacros(moduleScope, macro.getMacroName(),
+                                      getAttachedMacroRoles());
+          inMacroArgument = !results.empty();
+        }
+
+        return inMacroArgument;
+      });
+
+  return inMacroArgument;
+}
+
 /// Call the given function body with each macro declaration and its associated
 /// role attribute for the given role.
 ///
@@ -2631,7 +2685,7 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
 
   // Manually exclude macro expansions here since the source location
   // is overridden below.
-  if (ASTScope::isInMacroArgument(dc->getParentSourceFile(), loc))
+  if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
     options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
 
   // In a protocol or protocol extension, the 'where' clause can refer to

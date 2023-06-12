@@ -545,7 +545,7 @@ static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
           UnqualifiedLookupFlags::ExcludeMacroExpansions))
     return descriptor;
 
-  auto isInMacroArgument = ASTScope::isInMacroArgument(
+  auto isInMacroArgument = namelookup::isInMacroArgument(
       descriptor.DC->getParentSourceFile(), descriptor.Loc);
 
   if (!isInMacroArgument)
@@ -562,7 +562,7 @@ static DirectLookupDescriptor excludeMacrosIfNeeded(
           NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
     return descriptor;
 
-  auto isInMacroArgument = ASTScope::isInMacroArgument(
+  auto isInMacroArgument = namelookup::isInMacroArgument(
       descriptor.DC->getParentSourceFile(), loc);
 
   if (!isInMacroArgument)
@@ -581,7 +581,7 @@ excludeMacrosIfNeeded(const DeclContext *dc, SourceLoc loc,
   if (options & NL_ExcludeMacroExpansions)
     return options;
 
-  auto isInMacroArgument = ASTScope::isInMacroArgument(
+  auto isInMacroArgument = namelookup::isInMacroArgument(
       dc->getParentSourceFile(), loc);
 
   if (!isInMacroArgument)

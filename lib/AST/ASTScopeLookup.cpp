@@ -676,19 +676,26 @@ std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
   return { nullptr, nullptr };
 }
 
-bool ASTScopeImpl::isInMacroArgument(SourceFile *sourceFile,
-                                     SourceLoc loc) {
+void ASTScopeImpl::lookupEnclosingMacroScope(
+    SourceFile *sourceFile, SourceLoc loc,
+    llvm::function_ref<bool(ASTScope::PotentialMacro)> consume) {
   if (!sourceFile || sourceFile->Kind == SourceFileKind::Interface)
-    return false;
+    return;
 
   if (loc.isInvalid())
-    return false;
+    return;
 
   auto *fileScope = sourceFile->getScope().impl;
   auto *scope = fileScope->findInnermostEnclosingScope(loc, nullptr);
   do {
-    if (scope->isMacroArgumentScope())
-      return true;
+    auto *freestanding = scope->getFreestandingMacro().getPtrOrNull();
+    if (freestanding && consume(freestanding))
+      return;
+
+    auto *attr = scope->getDeclAttributeIfAny().getPtrOrNull();
+    auto *potentialAttached = dyn_cast_or_null<CustomAttr>(attr);
+    if (potentialAttached && consume(potentialAttached))
+      return;
 
     // If we've reached a source file scope, we can't be inside of
     // a macro argument. Either this is a top-level source file, or
@@ -697,9 +704,7 @@ bool ASTScopeImpl::isInMacroArgument(SourceFile *sourceFile,
     // MacroExpansionDeclScope, and child scopes of freestanding macros
     // are otherwise inside the macro argument.
     if (scope->getClassName() == "ASTSourceFileScope")
-      return false;
+      return;
 
   } while ((scope = scope->getParent().getPtrOrNull()));
-
-  return false;
 }
