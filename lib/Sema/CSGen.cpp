@@ -3900,7 +3900,7 @@ namespace {
                  FunctionRefKind functionRefKind,
                  MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
-      auto results = TypeChecker::lookupMacros(
+      auto results = namelookup::lookupMacros(
           CurDC, DeclNameRef(macroName), roles);
       for (const auto &result : results) {
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);

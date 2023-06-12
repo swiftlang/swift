@@ -545,6 +545,15 @@ template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
 
+/// \returns The set of macro declarations with the given name that
+/// fulfill any of the given macro roles.
+SmallVector<MacroDecl *, 1>
+lookupMacros(DeclContext *dc, DeclNameRef macroName, MacroRoles roles);
+
+/// \returns Whether the given source location is inside an attached
+/// or freestanding macro argument.
+bool isInMacroArgument(SourceFile *sourceFile, SourceLoc loc);
+
 /// Call the given function body with each macro declaration and its associated
 /// role attribute for the given role.
 ///
@@ -816,9 +825,21 @@ public:
   static std::pair<CaseStmt *, CaseStmt *>
   lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
-  /// Returns \c true if the given source location is inside an attached
-  /// or freestanding macro argument.
-  static bool isInMacroArgument(SourceFile *sourceFile, SourceLoc loc);
+  using PotentialMacro =
+      llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *>;
+
+  /// Look up the scope tree for the nearest enclosing macro scope at
+  /// the given source location.
+  ///
+  /// \param sourceFile The source file containing the given location.
+  /// \param loc        The source location to start lookup from.
+  /// \param consume    A function that is called when a potential macro
+  ///                   scope is found. If \c consume returns \c true, lookup
+  ///                   will stop. If \c consume returns \c false, lookup will
+  ///                   continue up the scope tree.
+  static void lookupEnclosingMacroScope(
+      SourceFile *sourceFile, SourceLoc loc,
+      llvm::function_ref<bool(PotentialMacro macro)> consume);
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
