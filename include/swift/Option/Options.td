@@ -1829,6 +1829,15 @@ def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-
   Flags<[FrontendOption, HelpHidden, NoDriverOption]>,
   HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
 
+def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Cache Key for bridging header pch">;
+
+def clang_include_tree: Flag<["-"], "clang-include-tree">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Use clang include tree">;
+
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 def enable_cas: Flag<["-"], "enable-cas">,
@@ -1838,6 +1847,10 @@ def enable_cas: Flag<["-"], "enable-cas">,
 def cas_fs: Separate<["-"], "cas-fs">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
+
+def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 
 def load_plugin_library:
   Separate<["-"], "load-plugin-library">,
