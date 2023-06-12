@@ -3282,11 +3282,9 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
     IRGenFunction &IGF, const clang::CXXConstructorDecl *ctor,
     llvm::FunctionType *ctorFnType, llvm::Constant *ctorAddress,
     llvm::ArrayRef<llvm::Value *> args) {
-  bool canThrow = IGF.IGM.isForeignExceptionHandlingEnabled();
-  if (auto *fpt = ctor->getType()->getAs<clang::FunctionProtoType>()) {
-    if (fpt->isNothrow())
-      canThrow = false;
-  }
+  bool canThrow =
+      IGF.IGM.isForeignExceptionHandlingEnabled() &&
+      !IGF.IGM.isCxxNoThrow(const_cast<clang::CXXConstructorDecl *>(ctor));
   if (!canThrow)
     return IGF.Builder.CreateCall(ctorFnType, ctorAddress, args);
   llvm::CallBase *result;
