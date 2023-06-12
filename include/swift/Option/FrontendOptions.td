@@ -865,6 +865,11 @@ def cxx_interop_getters_setters_as_properties :
   HelpText<"Import getters and setters as computed properties in Swift">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_disable_requirement_at_import :
+  Flag<["-"], "disable-cxx-interop-requirement-at-import">,
+  HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

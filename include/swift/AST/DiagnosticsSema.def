@@ -874,6 +874,12 @@ ERROR(need_hermetic_seal_to_import_module,none,
       "module %0 was built with -experimental-hermetic-seal-at-link, but "
       "current compilation does not have -experimental-hermetic-seal-at-link",
       (Identifier))
+ERROR(need_cxx_interop_to_import_module,none,
+      "module %0 was built with C++ interoperability enabled, but "
+      "current compilation does not enable C++ interoperability",
+      (Identifier))
+NOTE(enable_cxx_interop_docs,none,
+     "visit https://www.swift.org/documentation/cxx-interop/project-build-setup to learn how to enable C++ interoperability", ())
 
 ERROR(modularization_issue_decl_moved,Fatal,
       "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
@@ -7181,6 +7187,13 @@ ERROR(invalid_macro_role_for_macro_syntax,none,
       (unsigned))
 ERROR(macro_cannot_introduce_names,none,
       "'%0' macros are not allowed to introduce names", (StringRef))
+ERROR(macro_accessor_missing_from_expansion,none,
+      "expansion of macro %0 did not produce a %select{non-|}1observing "
+      "accessor",
+      (DeclName, bool))
+ERROR(macro_init_accessor_not_documented,none,
+      "expansion of macro %0 produced an unexpected 'init' accessor",
+      (DeclName))
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",

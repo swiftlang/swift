@@ -3026,15 +3026,17 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
   auto readWriteImpl = getActualReadWriteImplKind(rawReadWriteImplKind);
   if (!readWriteImpl) return;
 
+  auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
+  decl->setImplInfo(implInfo);
+
+  decl->getASTContext().evaluator.cacheOutput(HasStorageRequest{decl}, implInfo.hasStorage());
+
   SmallVector<AccessorDecl*, 8> accessors;
   for (DeclID id : rawIDs.IDs) {
     auto accessor = dyn_cast_or_null<AccessorDecl>(getDecl(id));
     if (!accessor) return;
     accessors.push_back(accessor);
   }
-
-  auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
-  decl->setImplInfo(implInfo);
 
   if (implInfo.isSimpleStored() && accessors.empty())
     return;
@@ -3652,6 +3654,9 @@ public:
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
 
+    MF.configureStorage(var, opaqueReadOwnership,
+                        readImpl, writeImpl, readWriteImpl, accessors);
+
     auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTypeOrError)
       return interfaceTypeOrError.takeError();
@@ -3663,8 +3668,6 @@ public:
       AddAttribute(
           new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
-    MF.configureStorage(var, opaqueReadOwnership,
-                        readImpl, writeImpl, readWriteImpl, accessors);
     auto accessLevel = getActualAccessLevel(rawAccessLevel);
     if (!accessLevel)
       return MF.diagnoseFatal();
@@ -5024,14 +5027,10 @@ public:
 
     // Resolve the name ids.
     DeclName name;
-    if (numArgNames > 0) {
-      SmallVector<Identifier, 2> argNames;
-      for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
-        argNames.push_back(MF.getIdentifier(argNameID));
-      name = DeclName(ctx, baseName, argNames);
-    } else {
-      name = baseName;
-    }
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
+      argNames.push_back(MF.getIdentifier(argNameID));
+    name = DeclName(ctx, baseName, argNames);
     PrettySupplementalDeclNameTrace trace(name);
 
     argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numArgNames);

@@ -2525,7 +2525,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
                                        ResilienceExpansion expansion) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
-    assert(hasStorage());
+    assert(hasStorage() || getASTContext().Diags.hadAnyError());
     return AccessStrategy::getStorage();
 
   case AccessSemantics::DistributedThunk:
@@ -6393,11 +6393,38 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
       ctx.evaluator, HasCircularInheritedProtocolsRequest{mutableThis}, true);
 }
 
+bool AbstractStorageDecl::hasStorage() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    HasStorageRequest{const_cast<AbstractStorageDecl *>(this)},
+    false);
+}
+
 StorageImplInfo AbstractStorageDecl::getImplInfo() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
     StorageImplInfoRequest{const_cast<AbstractStorageDecl *>(this)},
     StorageImplInfo::getSimpleStored(StorageIsMutable));
+}
+
+void AbstractStorageDecl::cacheImplInfo(StorageImplInfo implInfo) {
+  LazySemanticInfo.ImplInfoComputed = 1;
+  ImplInfo = implInfo;
+}
+
+void AbstractStorageDecl::setImplInfo(StorageImplInfo implInfo) {
+  cacheImplInfo(implInfo);
+
+  if (isImplicit()) {
+    auto &evaluator = getASTContext().evaluator;
+    HasStorageRequest request{this};
+    if (!evaluator.hasCachedResult(request))
+      evaluator.cacheOutput(request, implInfo.hasStorage());
+    else {
+      assert(
+        evaluateOrDefault(evaluator, request, false) == implInfo.hasStorage());
+    }
+  }
 }
 
 bool AbstractStorageDecl::hasPrivateAccessor() const {
