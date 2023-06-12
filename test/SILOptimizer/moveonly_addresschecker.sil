@@ -100,12 +100,12 @@ bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEP_3:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.k
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP_3]]
 // CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
 // CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
 // CHECK-NEXT:   destroy_addr [[GEP_1]]
 // CHECK-NEXT:   destroy_addr [[GEP_2]]
-// CHECK-NEXT:   [[GEP_3:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.k
-// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP_3]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyField'
@@ -125,10 +125,6 @@ bb0(%0 : @owned $NonTrivialStruct):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
-// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK-NEXT:   destroy_addr [[GEP_1]]
-// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
@@ -142,6 +138,10 @@ bb0(%0 : @owned $NonTrivialStruct):
 // CHECK-NEXT:   br bb3([[RESULT]] :
 
 // CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock'
@@ -172,18 +172,14 @@ bb3(%5 : @owned $Klass):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
-// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK-NEXT:   destroy_addr [[GEP_1]]
-// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
-// CHECK-NEXT:   destroy_addr [[GEP]]
 // CHECK-NEXT:   function_ref get_klass
 // CHECK-NEXT:   [[FUNC:%.*]] = function_ref @get_klass :
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUNC]]()
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   destroy_addr [[GEP]]
 // CHECK-NEXT:   br bb3([[RESULT]] :
 //
 // CHECK: bb2:
@@ -192,6 +188,10 @@ bb3(%5 : @owned $Klass):
 // CHECK-NEXT:   br bb3([[RESULT]] :
 
 // CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock2'
@@ -222,19 +222,15 @@ bb3(%5 : @owned $Klass):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
-// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK-NEXT:   destroy_addr [[GEP_1]]
-// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
-// CHECK-NEXT:   destroy_addr [[GEP]]
 // CHECK-NEXT:   function_ref get_klass
 // CHECK-NEXT:   [[FUNC:%.*]] = function_ref @get_klass :
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUNC]]()
 // CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEPP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   destroy_addr [[GEPP]]
 // CHECK-NEXT:   store [[RESULT]] to [init] [[GEP]]
 // CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
 // CHECK-NEXT:   br bb3([[RESULT]] :
@@ -245,6 +241,10 @@ bb3(%5 : @owned $Klass):
 // CHECK-NEXT:   br bb3([[RESULT]] :
 //
 // CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock3'
@@ -310,8 +310,8 @@ bb0(%arg : @owned $Klass):
 // CHECK-LABEL: sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 // CHECK: [[STACK:%.*]] = alloc_stack [lexical] $Klass, var, name "x2"
 // CHECK: store {{%.*}} to [init] [[STACK]]
-// CHECK: destroy_addr [[STACK]]
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] [[STACK]]
+// CHECK: destroy_addr [[STACK]]
 // CHECK: store {{%.*}} to [init] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[STACK]]
@@ -659,16 +659,16 @@ sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
 // CHECK:          [[M4_S4_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
 // CHECK:          [[SEE_ADDR_2:%[^,]+]] = function_ref @see_addr_2
 // CHECK:          apply [[SEE_ADDR_2]]([[M4_S2_ADDR]], [[M4_S4_ADDR]])
-//  HECK:          [[M4_S4_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
-//  HECK:          destroy_addr [[M4_S4_ADDR_2]]
-// CHECK:          [[M4_S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
-// CHECK:          destroy_addr [[M4_S2_ADDR_2]]
 // CHECK:          [[M4_S1_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s1
 // CHECK:          [[M4_S1:%[^,]+]] = load [take] [[M4_S1_ADDR]] : $*M
 // CHECK:          [[M4_S3_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s3
 // CHECK:          [[M4_S3:%[^,]+]] = load [take] [[M4_S3_ADDR]] : $*M
 // CHECK:          [[END_2:%[^,]+]] = function_ref @end_2
 // CHECK:          apply [[END_2]]([[M4_S1]], [[M4_S3]])
+// CHECK:          [[M4_S4_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:          destroy_addr [[M4_S4_ADDR_2]]
+// CHECK:          [[M4_S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:          destroy_addr [[M4_S2_ADDR_2]]
 // CHECK-LABEL: } // end sil function 'rdar110676577'
 sil [ossa] @rdar110676577 : $@convention(thin) () -> () {
 bb0:

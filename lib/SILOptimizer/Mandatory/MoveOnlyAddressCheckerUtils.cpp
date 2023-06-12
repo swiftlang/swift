@@ -642,6 +642,15 @@ namespace {
 struct UseState {
   MarkMustCheckInst *address;
 
+  /// The number of fields in the exploded type.  Set in initializeLiveness.
+  unsigned fieldCount = UINT_MAX;
+
+  /// The blocks that consume fields of the value.
+  ///
+  /// A map from blocks to a bit vector recording which fields were destroyed
+  /// in each.
+  llvm::SmallMapVector<SILBasicBlock *, SmallBitVector, 8> consumingBlocks;
+
   /// A map from destroy_addr to the part of the type that it destroys.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> destroys;
 
@@ -750,6 +759,7 @@ struct UseState {
 
   void clear() {
     address = nullptr;
+    consumingBlocks.clear();
     destroys.clear();
     livenessUses.clear();
     borrows.clear();
@@ -804,6 +814,14 @@ struct UseState {
     if (debugValue) {
       llvm::dbgs() << *debugValue;
     }
+  }
+
+  void recordConsumingBlock(SILBasicBlock *block, TypeTreeLeafTypeRange range) {
+    auto iter = consumingBlocks.find(block);
+    if (iter == consumingBlocks.end()) {
+      iter = consumingBlocks.insert({block, SmallBitVector(fieldCount)}).first;
+    }
+    range.setBits(iter->second);
   }
 
   void
@@ -907,6 +925,8 @@ struct UseState {
 
 void UseState::initializeLiveness(
     FieldSensitiveMultiDefPrunedLiveRange &liveness) {
+  fieldCount = liveness.getNumSubElements();
+
   // We begin by initializing all of our init uses.
   for (auto initInstAndValue : initInsts) {
     LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
@@ -1019,6 +1039,8 @@ void UseState::initializeLiveness(
     if (!isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
       liveness.updateForUse(reinitInstAndValue.first, reinitInstAndValue.second,
                             false /*lifetime ending*/);
+      recordConsumingBlock(reinitInstAndValue.first->getParent(),
+                           reinitInstAndValue.second);
       LLVM_DEBUG(llvm::dbgs() << "Added liveness for reinit: "
                               << *reinitInstAndValue.first;
                  liveness.print(llvm::dbgs()));
@@ -1030,6 +1052,8 @@ void UseState::initializeLiveness(
   for (auto takeInstAndValue : takeInsts) {
     liveness.updateForUse(takeInstAndValue.first, takeInstAndValue.second,
                           true /*lifetime ending*/);
+    recordConsumingBlock(takeInstAndValue.first->getParent(),
+                         takeInstAndValue.second);
     LLVM_DEBUG(llvm::dbgs()
                    << "Added liveness for take: " << *takeInstAndValue.first;
                liveness.print(llvm::dbgs()));
@@ -1037,9 +1061,16 @@ void UseState::initializeLiveness(
   for (auto copyInstAndValue : copyInsts) {
     liveness.updateForUse(copyInstAndValue.first, copyInstAndValue.second,
                           true /*lifetime ending*/);
+    recordConsumingBlock(copyInstAndValue.first->getParent(),
+                         copyInstAndValue.second);
     LLVM_DEBUG(llvm::dbgs()
                    << "Added liveness for copy: " << *copyInstAndValue.first;
                liveness.print(llvm::dbgs()));
+  }
+
+  for (auto destroyInstAndValue : destroys) {
+    recordConsumingBlock(destroyInstAndValue.first->getParent(),
+                         destroyInstAndValue.second);
   }
 
   // Do the same for our borrow and liveness insts.
@@ -1319,6 +1350,44 @@ struct MoveOnlyAddressCheckerPImpl {
   void checkForReinitAfterDiscard();
 
   void handleSingleBlockDestroy(SILInstruction *destroy, bool isReinit);
+};
+
+class ExtendUnconsumedLiveness {
+  UseState addressUseState;
+  FieldSensitiveMultiDefPrunedLiveRange &liveness;
+  FieldSensitivePrunedLivenessBoundary &boundary;
+
+  enum class DestroyKind {
+    Destroy,
+    Take,
+    Reinit,
+  };
+  using DestroysCollection =
+      llvm::SmallMapVector<SILInstruction *, DestroyKind, 8>;
+  using ConsumingBlocksCollection = SmallPtrSetVector<SILBasicBlock *, 8>;
+
+public:
+  ExtendUnconsumedLiveness(UseState addressUseState,
+                           FieldSensitiveMultiDefPrunedLiveRange &liveness,
+                           FieldSensitivePrunedLivenessBoundary &boundary)
+      : addressUseState(addressUseState), liveness(liveness),
+        boundary(boundary) {}
+
+  void run();
+
+  void runOnField(unsigned element, DestroysCollection &destroys,
+                  ConsumingBlocksCollection &consumingBlocks);
+
+private:
+  bool hasDefAfter(SILInstruction *inst, unsigned element);
+
+  bool
+  shouldAddDestroyToLiveness(SILInstruction *destroy, unsigned element,
+                             BasicBlockSet const &consumedAtExitBlocks,
+                             BasicBlockSetVector const &consumedAtEntryBlocks);
+
+  void addPreviousInstructionToLiveness(SILInstruction *inst, unsigned element,
+                                        bool lifetimeEnding);
 };
 
 } // namespace
@@ -2433,6 +2502,9 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     });
   };
 
+  // Control flow merge blocks used as insertion points.
+  llvm::DenseMap<SILBasicBlock *, SmallBitVector> mergeBlocks;
+
   for (auto &pair : boundary.getLastUsers()) {
     auto *inst = pair.first;
     auto &bv = pair.second;
@@ -2479,6 +2551,16 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
         if (isa<TermInst>(inst)) {
           auto *block = inst->getParent();
           for (auto *succBlock : block->getSuccessorBlocks()) {
+            auto iter = mergeBlocks.find(succBlock);
+            if (iter == mergeBlocks.end())
+              iter = mergeBlocks.insert({succBlock, bits}).first;
+            else {
+              SmallBitVector &alreadySetBits = iter->second;
+              bool hadCommon = alreadySetBits.anyCommon(bits);
+              alreadySetBits &= bits;
+              if (hadCommon)
+                continue;
+            }
 
             auto *insertPt = &*succBlock->begin();
             insertDestroyBeforeInstruction(addressUseState, insertPt,
@@ -2771,6 +2853,240 @@ void MoveOnlyAddressCheckerPImpl::checkForReinitAfterDiscard() {
   }
 }
 
+void ExtendUnconsumedLiveness::run() {
+  ConsumingBlocksCollection consumingBlocks;
+  DestroysCollection destroys;
+  for (unsigned element = 0, count = liveness.getNumSubElements();
+       element < count; ++element) {
+
+    for (auto pair : addressUseState.consumingBlocks) {
+      if (pair.second.test(element)) {
+        consumingBlocks.insert(pair.first);
+      }
+    }
+
+    for (auto pair : addressUseState.destroys) {
+      if (pair.second.contains(element)) {
+        destroys[pair.first] = DestroyKind::Destroy;
+      }
+    }
+    for (auto pair : addressUseState.takeInsts) {
+      if (pair.second.contains(element)) {
+        destroys[pair.first] = DestroyKind::Take;
+      }
+    }
+    for (auto pair : addressUseState.reinitInsts) {
+      if (pair.second.contains(element)) {
+        destroys[pair.first] = DestroyKind::Reinit;
+      }
+    }
+
+    runOnField(element, destroys, consumingBlocks);
+
+    consumingBlocks.clear();
+    destroys.clear();
+  }
+}
+
+/// Extend liveness of each field as far as possible within the original live
+/// range as far as possible without incurring any copies.
+///
+/// The strategy has two parts.
+///
+/// (1) The global analysis:
+/// - Collect the blocks in which the field was live before canonicalization.
+///   These are the "original" live blocks (originalLiveBlocks).
+///   [Color these blocks green.]
+/// - From within that collection, collect the blocks which contain a _final_
+///   consuming, non-destroy use, and their iterative successors.
+///   These are the "consumed" blocks (consumedAtExitBlocks).
+///   [Color these blocks red.]
+/// - Extend liveness down to the boundary between originalLiveBlocks and
+///   consumedAtExitBlocks blocks.
+///   [Extend liveness down to the boundary between green blocks and red.]
+/// - In particular, in regions of originalLiveBlocks which have no boundary
+///   with consumedAtExitBlocks, liveness should be extended to its original
+///   extent.
+///   [Extend liveness down to the boundary between green blocks and uncolored.]
+///
+/// (2) The local analysis:
+/// - For in-block lifetimes, extend liveness forward from non-consuming uses
+///   and dead defs to the original destroy.
+void ExtendUnconsumedLiveness::runOnField(
+    unsigned element, DestroysCollection &destroys,
+    ConsumingBlocksCollection &consumingBlocks) {
+  SILValue currentDef = addressUseState.address;
+
+  // First, collect the blocks that were _originally_ live.  We can't use
+  // liveness here because it doesn't include blocks that occur before a
+  // destroy_addr.
+  BasicBlockSet originalLiveBlocks(currentDef->getFunction());
+  {
+    // Some of the work here was already done by initializeLiveness.
+    // Specifically, it already discovered all blocks containing (transitive)
+    // uses and blocks that appear between them and the def.
+    //
+    // Seed the set with what it already discovered.
+    for (auto *discoveredBlock : liveness.getDiscoveredBlocks())
+      originalLiveBlocks.insert(discoveredBlock);
+
+    // Start the walk from the consuming blocks (which includes destroys as well
+    // as the other consuming uses).
+    BasicBlockWorklist worklist(currentDef->getFunction());
+    for (auto *consumingBlock : consumingBlocks) {
+      worklist.push(consumingBlock);
+    }
+
+    // Walk backwards from consuming blocks.
+    while (auto *block = worklist.pop()) {
+      if (!originalLiveBlocks.insert(block)) {
+        continue;
+      }
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        // If the block was discovered by liveness, we already added it to the
+        // set.
+        if (originalLiveBlocks.contains(predecessor))
+          continue;
+        worklist.pushIfNotVisited(predecessor);
+      }
+    }
+  }
+
+  // Second, collect the blocks which occur after a consuming use.
+  BasicBlockSet consumedAtExitBlocks(currentDef->getFunction());
+  BasicBlockSetVector consumedAtEntryBlocks(currentDef->getFunction());
+  {
+    // Start the forward walk from blocks which contain non-destroy consumes not
+    // followed by defs.
+    //
+    // Because they contain a consume not followed by a def, these are
+    // consumed-at-exit.
+    BasicBlockWorklist worklist(currentDef->getFunction());
+    for (auto iterator : boundary.getLastUsers()) {
+      if (!iterator.second.test(element))
+        continue;
+      auto *instruction = iterator.first;
+      // Skip over destroys on the boundary.
+      auto iter = destroys.find(instruction);
+      if (iter != destroys.end() && iter->second != DestroyKind::Take) {
+        continue;
+      }
+      // Skip over non-consuming users.
+      auto interestingUser = liveness.isInterestingUser(instruction, element);
+      assert(interestingUser !=
+             FieldSensitivePrunedLiveness::IsInterestingUser::NonUser);
+      if (interestingUser !=
+          FieldSensitivePrunedLiveness::IsInterestingUser::LifetimeEndingUse) {
+        continue;
+      }
+      // A consume with a subsequent def doesn't cause the block to be
+      // consumed-at-exit.
+      if (hasDefAfter(instruction, element))
+        continue;
+      worklist.push(instruction->getParent());
+    }
+    while (auto *block = worklist.pop()) {
+      consumedAtExitBlocks.insert(block);
+      for (auto *successor : block->getSuccessorBlocks()) {
+        if (!originalLiveBlocks.contains(successor))
+          continue;
+        worklist.pushIfNotVisited(successor);
+        consumedAtEntryBlocks.insert(successor);
+      }
+    }
+  }
+
+  // Third, find the blocks on the boundary between the originally-live blocks
+  // and the originally-live-but-consumed blocks.  Extend liveness "to the end"
+  // of these blocks.
+  for (auto *block : consumedAtEntryBlocks) {
+    for (auto *predecessor : block->getPredecessorBlocks()) {
+      if (consumedAtExitBlocks.contains(predecessor))
+        continue;
+      // Add "the instruction(s) before the terminator" of the predecessor to
+      // liveness.
+      addPreviousInstructionToLiveness(predecessor->getTerminator(), element,
+                                       /*lifetimeEnding*/ false);
+    }
+  }
+
+  // Finally, preserve the destroys which weren't in the consumed region in
+  // place: hoisting such destroys would not avoid copies.
+  for (auto pair : destroys) {
+    auto *destroy = pair.first;
+    if (!shouldAddDestroyToLiveness(destroy, element, consumedAtExitBlocks,
+                                    consumedAtEntryBlocks))
+      continue;
+    addPreviousInstructionToLiveness(destroy, element,
+                                     /*lifetimeEnding*/ false);
+  }
+}
+
+bool ExtendUnconsumedLiveness::shouldAddDestroyToLiveness(
+    SILInstruction *destroy, unsigned element,
+    BasicBlockSet const &consumedAtExitBlocks,
+    BasicBlockSetVector const &consumedAtEntryBlocks) {
+  auto *block = destroy->getParent();
+  bool followedByDef = hasDefAfter(destroy, element);
+  if (!followedByDef) {
+    // This destroy is the last write to the field in the block.
+    //
+    // If the block is consumed-at-exit, then there is some other consuming use
+    // before this destroy.  Liveness can't be extended.
+    return !consumedAtExitBlocks.contains(block);
+  }
+  for (auto *inst = destroy->getPreviousInstruction(); inst;
+       inst = inst->getPreviousInstruction()) {
+    if (liveness.isDef(inst, element)) {
+      // Found the corresponding def with no intervening users.  Liveness
+      // can be extended to the destroy.
+      return true;
+    }
+    auto interestingUser = liveness.isInterestingUser(inst, element);
+    switch (interestingUser) {
+    case FieldSensitivePrunedLiveness::IsInterestingUser::NonUser:
+      break;
+    case FieldSensitivePrunedLiveness::IsInterestingUser::NonLifetimeEndingUse:
+      // The first use seen is non-consuming.  Liveness can be extended to the
+      // destroy.
+      return true;
+      break;
+    case FieldSensitivePrunedLiveness::IsInterestingUser::LifetimeEndingUse:
+      // Found a consuming use.  Liveness can't be extended to the destroy
+      // (without creating a copy and triggering a diagnostic).
+      return false;
+      break;
+    }
+  }
+  // Found no uses or defs between the destroy and the top of the block.  If the
+  // block was not consumed at entry, liveness can be extended to the destroy.
+  return !consumedAtEntryBlocks.contains(block);
+}
+
+bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,
+                                           unsigned element) {
+  // NOTE: Start iteration at \p start, not its sequel, because
+  //       it might be both a consuming use and a def.
+  for (auto *inst = start; inst; inst = inst->getNextInstruction()) {
+    if (liveness.isDef(inst, element))
+      return true;
+  }
+  return false;
+}
+
+void ExtendUnconsumedLiveness::addPreviousInstructionToLiveness(
+    SILInstruction *inst, unsigned element, bool lifetimeEnding) {
+  auto range = TypeTreeLeafTypeRange(element, element + 1);
+  if (auto *previous = inst->getPreviousInstruction()) {
+    liveness.updateForUse(previous, range, lifetimeEnding);
+  } else {
+    for (auto *predecessor : inst->getParent()->getPredecessorBlocks()) {
+      liveness.updateForUse(predecessor->getTerminator(), range,
+                            lifetimeEnding);
+    }
+  }
+}
+
 bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     MarkMustCheckInst *markedAddress) {
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
@@ -2864,6 +3180,10 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   }
 
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
+  liveness.computeBoundary(boundary);
+  ExtendUnconsumedLiveness extension(addressUseState, liveness, boundary);
+  extension.run();
+  boundary.clear();
   liveness.computeBoundary(boundary);
   insertDestroysOnBoundary(markedAddress, liveness, boundary);
   checkForReinitAfterDiscard();
