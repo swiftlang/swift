@@ -1816,6 +1816,14 @@ def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;
 
+def cas_plugin_path: Separate<["-"], "cas-plugin-path">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Path to CAS Plugin">, MetaVarName<"<path>">;
+
+def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
+
 def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-for-testing">,
   Flags<[FrontendOption, HelpHidden, NoDriverOption]>,
   HelpText<"Allow compilation caching with unstable inputs for testing purpose">;

@@ -406,14 +406,13 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   if (!Opts.EnableCAS)
     return false;
 
-  auto MaybeCache = llvm::cas::createOnDiskUnifiedCASDatabases(Opts.CASPath);
-  if (!MaybeCache) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_create_cas, Opts.CASPath,
-                         toString(MaybeCache.takeError()));
+  auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
+  if (!MaybeDB) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         toString(MaybeDB.takeError()));
     return true;
   }
-  CAS = std::move(MaybeCache->first);
-  ResultCache = std::move(MaybeCache->second);
+  std::tie(CAS, ResultCache) = *MaybeDB;
 
   // create baseline key.
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);

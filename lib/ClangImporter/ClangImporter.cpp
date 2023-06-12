@@ -709,13 +709,28 @@ importer::getNormalInvocationArguments(
                                llvm::sys::path::get_separator() +
                                "apinotes").str());
 
-  if (!importerOpts.CASPath.empty()) {
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("-fcas-path");
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back(importerOpts.CASPath);
+  if (importerOpts.CASOpts) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-fno-pch-timestamp");
+    if (!importerOpts.CASOpts->CASPath.empty()) {
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("-fcas-path");
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back(importerOpts.CASOpts->CASPath);
+    }
+    if (!importerOpts.CASOpts->PluginPath.empty()) {
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("-fcas-plugin-path");
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back(importerOpts.CASOpts->PluginPath);
+      for (auto Opt : importerOpts.CASOpts->PluginOptions) {
+        invocationArgStrs.push_back("-Xclang");
+        invocationArgStrs.push_back("-fcas-plugin-option");
+        invocationArgStrs.push_back("-Xclang");
+        invocationArgStrs.push_back(
+            (llvm::Twine(Opt.first) + "=" + Opt.second).str());
+      }
+    }
   }
 }
 

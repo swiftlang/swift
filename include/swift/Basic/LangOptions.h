@@ -23,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
+#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
@@ -820,7 +821,7 @@ namespace swift {
     std::string Optimization;
 
     /// clang CASOptions.
-    std::string CASPath;
+    llvm::Optional<clang::CASOptions> CASOpts;
 
     /// Cache key for imported bridging header.
     std::string BridgingHeaderPCHCacheKey;

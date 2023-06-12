@@ -1506,7 +1506,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
   if (FrontendOpts.EnableCAS)
-    Opts.CASPath = FrontendOpts.CASPath;
+    Opts.CASOpts = FrontendOpts.CASOpts;
 
   return false;
 }

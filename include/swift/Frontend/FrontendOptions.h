@@ -21,6 +21,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
+#include "clang/CAS/CASOptions.h"
 
 #include <string>
 #include <vector>
@@ -125,8 +126,8 @@ public:
   /// Use CAS.
   bool EnableCAS = false;
 
-  /// The CAS Path.
-  std::string CASPath;
+  /// CASOptions
+  clang::CASOptions CASOpts;
 
   /// CASFS Root.
   std::vector<std::string> CASFSRootIDs;

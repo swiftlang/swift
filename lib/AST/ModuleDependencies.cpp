@@ -454,16 +454,11 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
   if (!CachingFS) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_create_cas,
-                                 "CachingOnDiskFS",
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                  toString(CachingFS.takeError()));
     return;
   }
   CacheFS = std::move(*CachingFS);
-
-  clang::CASOptions CASOpts;
-  CASOpts.CASPath = Instance.getInvocation().getFrontendOptions().CASPath;
-  CASOpts.ensurePersistentCAS();
 
   UseClangIncludeTree =
       Instance.getInvocation().getClangImporterOptions().UseClangIncludeTree;
@@ -474,8 +469,9 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      ClangScanningFormat, CASOpts, Instance.getSharedCASInstance(),
-      Instance.getSharedCacheInstance(),
+      ClangScanningFormat,
+      Instance.getInvocation().getFrontendOptions().CASOpts,
+      Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       UseClangIncludeTree ? nullptr : CacheFS,
       /* ReuseFileManager */ false, /* OptimizeArgs */ false);
 }

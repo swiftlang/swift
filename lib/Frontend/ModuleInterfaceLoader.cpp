@@ -39,6 +39,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
@@ -1600,12 +1601,23 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
   }
 
-  if (!clangImporterOpts.CASPath.empty()) {
-    genericSubInvocation.getClangImporterOptions().CASPath =
-        clangImporterOpts.CASPath;
+  if (clangImporterOpts.CASOpts) {
+    genericSubInvocation.getClangImporterOptions().CASOpts =
+        clangImporterOpts.CASOpts;
     GenericArgs.push_back("-enable-cas");
-    GenericArgs.push_back("-cas-path");
-    GenericArgs.push_back(clangImporterOpts.CASPath);
+    if (!clangImporterOpts.CASOpts->CASPath.empty()) {
+      GenericArgs.push_back("-cas-path");
+      GenericArgs.push_back(clangImporterOpts.CASOpts->CASPath);
+    }
+    if (!clangImporterOpts.CASOpts->PluginPath.empty()) {
+      GenericArgs.push_back("-cas-plugin-path");
+      GenericArgs.push_back(clangImporterOpts.CASOpts->PluginPath);
+      for (auto Opt : clangImporterOpts.CASOpts->PluginOptions) {
+        GenericArgs.push_back("-cas-plugin-option");
+        std::string pair = (llvm::Twine(Opt.first) + "=" + Opt.second).str();
+        GenericArgs.push_back(ArgSaver.save(pair));
+      }
+    }
   }
 
   if (clangImporterOpts.UseClangIncludeTree) {
@@ -1702,7 +1714,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // required by sourcekitd.
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
-  subClangImporterOpts.CASPath = clangImporterOpts.CASPath;
+  subClangImporterOpts.CASOpts = clangImporterOpts.CASOpts;
 
   // If the compiler has been asked to be strict with ensuring downstream dependencies
   // get the parent invocation's context, or this is an Explicit build, inherit the

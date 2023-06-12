@@ -352,8 +352,16 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   Opts.EnableCAS = Args.hasArg(OPT_enable_cas);
-  Opts.CASPath =
+  Opts.CASOpts.CASPath =
       Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
+  Opts.CASOpts.PluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
+  for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
+    StringRef Name, Value;
+    std::tie(Name, Value) = Opt.split('=');
+    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
+                                            std::string(Value));
+  }
+
   Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
   Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
 
