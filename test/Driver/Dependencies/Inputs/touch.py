@@ -26,6 +26,12 @@ timeVal = int(sys.argv[1])
 # From http://stackoverflow.com/a/1160227.
 for filePathPattern in sys.argv[2:]:
     # Support glob patterns if the shell did not expand them (like cmd.exe)
-    for filePath in glob.glob(filePathPattern):
+    if glob.escape(filePathPattern) == filePathPattern:
+        # Not a glob pattern. We should touch that specific file.
+        filePaths = [ filePathPattern ]
+    else:
+        filePaths = glob.glob(filePathPattern)
+
+    for filePath in filePaths:
         with open(filePath, 'a'):
             os.utime(filePath, (timeVal, timeVal))
