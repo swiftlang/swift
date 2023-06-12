@@ -1627,7 +1627,7 @@ void namelookup::forEachPotentialResolvedMacro(
 
 /// For each macro with the given role that might be attached to the given
 /// declaration, call the body.
-static void forEachPotentialAttachedMacro(
+void namelookup::forEachPotentialAttachedMacro(
     Decl *decl, MacroRole role,
     llvm::function_ref<void(MacroDecl *macro, const MacroRoleAttr *)> body
 ) {

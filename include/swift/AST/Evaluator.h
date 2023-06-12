@@ -316,6 +316,12 @@ public:
     cache.insert<Request>(request, std::move(output));
   }
 
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  bool hasCachedResult(const Request &request) {
+    return cache.find_as(request) != cache.end<Request>();
+  }
+
   /// Do not introduce new callers of this function.
   template<typename Request,
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>

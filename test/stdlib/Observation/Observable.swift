@@ -35,7 +35,7 @@ func validateMemberwiseInitializers() {
 @Observable
 struct DefiniteInitialization {
   var field: Int
-  
+
   init(field: Int) {
     self.field = field
   }
@@ -62,21 +62,21 @@ class ContainsIUO {
 }
 
 class NonObservable {
-  
+
 }
 
 @Observable
 class InheritsFromNonObservable: NonObservable {
-  
+
 }
 
 protocol NonObservableProtocol {
-  
+
 }
 
 @Observable
 class ConformsToNonObservableProtocol: NonObservableProtocol {
-  
+
 }
 
 struct NonObservableContainer {
@@ -91,19 +91,19 @@ class ImplementsAccessAndMutation {
   var field = 3
   let accessCalled: (PartialKeyPath<ImplementsAccessAndMutation>) -> Void
   let withMutationCalled: (PartialKeyPath<ImplementsAccessAndMutation>) -> Void
-  
+
   init(accessCalled: @escaping (PartialKeyPath<ImplementsAccessAndMutation>) -> Void, withMutationCalled: @escaping (PartialKeyPath<ImplementsAccessAndMutation>) -> Void) {
     self.accessCalled = accessCalled
     self.withMutationCalled = withMutationCalled
   }
-  
+
   internal func access<Member>(
       keyPath: KeyPath<ImplementsAccessAndMutation , Member>
   ) {
     accessCalled(keyPath)
     _$observationRegistrar.access(self, keyPath: keyPath)
   }
-  
+
   internal func withMutation<Member, T>(
     keyPath: KeyPath<ImplementsAccessAndMutation , Member>,
     _ mutation: () throws -> T
@@ -128,7 +128,7 @@ class Entity {
 class Person : Entity {
   var firstName = ""
   var lastName = ""
-  
+
   var friends = [Person]()
 
   var fullName: String { firstName + " " + lastName }
@@ -165,7 +165,7 @@ class HasIntermediaryConformance: Intermediary { }
 
 class CapturedState<State>: @unchecked Sendable {
   var state: State
-  
+
   init(state: State) {
     self.state = state
   }
