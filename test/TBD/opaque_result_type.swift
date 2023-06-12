@@ -77,11 +77,6 @@ public func dynReplacement(x: String) -> some P {
   return "replaced"
 }
 
-@usableFromInline
-func ufi() -> some O {
-  return 1
-}
-
 extension String: P {
   public func poo() -> some O {
     return 0
