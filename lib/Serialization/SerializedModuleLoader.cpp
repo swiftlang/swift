@@ -478,8 +478,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
        modulePath.str(), moduleDocPath, sourceInfoPath,
-       importedModuleNames, importedHeaders, isFramework,
-       /*module-cache-key*/ "");
+       importedModuleNames, importedHeaders, isFramework);
 
   return std::move(dependencies);
 }
