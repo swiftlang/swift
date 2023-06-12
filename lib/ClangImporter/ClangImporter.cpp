@@ -5731,7 +5731,8 @@ Type ClangImporter::importVarDeclType(
   // Special case: NS Notifications
   if (isNSNotificationGlobal(decl))
     if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
-                                            Impl.CurrentVersion))
+                                            Impl.CurrentVersion,
+                                            Impl.SwiftContext))
       declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
 
   bool isInSystemModule =

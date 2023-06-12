@@ -956,7 +956,7 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
       break;
     }
     // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(decl, clangSema, version)) {
+  } else if (auto newtypeDecl = findSwiftNewtype(decl, clangSema, version, swiftCtx)) {
     res = newtypeDecl;
     // Everything else goes into its redeclaration context.
   } else {
@@ -1551,7 +1551,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // FIXME: ugly to check here, instead perform unified check up front in
   // containing struct...
-  if (findSwiftNewtype(D, clangSema, version))
+  if (findSwiftNewtype(D, clangSema, version, swiftCtx))
     result.info.importAsMember = true;
 
   // Find the original method/property declaration and retrieve the
@@ -2315,7 +2315,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
-  if (auto newtypeDecl = findSwiftNewtype(D, clangSema, version)) {
+  if (auto newtypeDecl = findSwiftNewtype(D, clangSema, version, swiftCtx)) {
     result.info.importAsMember = true;
     baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName(),
                                              strippedPrefix);

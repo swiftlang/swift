@@ -123,7 +123,8 @@ bool isNSNotificationGlobal(const clang::NamedDecl *);
 // swift_newtype), return it, otherwise null
 clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
                                          clang::Sema &clangSema,
-                                         ImportNameVersion version);
+                                         ImportNameVersion version,
+                                         ASTContext &ctx);
 
 /// Whether the passed type is NSString *
 bool isNSString(const clang::Type *);

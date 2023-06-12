@@ -533,7 +533,8 @@ importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
 // null
 clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
                                                    clang::Sema &clangSema,
-                                                   ImportNameVersion version) {
+                                                   ImportNameVersion version,
+                                                   ASTContext &ctx) {
   // Newtype was introduced in Swift 3
   if (version <= ImportNameVersion::swift2())
     return nullptr;
@@ -549,7 +550,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
   // Special case: "extern NSString * fooNotification" adopts
   // NSNotificationName type, and is a member of NSNotificationName
   if (isNSNotificationGlobal(decl) &&
-      SwiftContext.LangOpts.EnableObjCInterop) {
+      ctx.LangOpts.EnableObjCInterop) {
     clang::IdentifierInfo *notificationName =
         &clangSema.getASTContext().Idents.get("NSNotificationName");
     clang::LookupResult lookupResult(clangSema, notificationName,
