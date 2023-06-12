@@ -621,6 +621,11 @@ public:
     return Core->Bits.HasHermeticSealAtLink;
   }
 
+  /// Whether this module was built with C++ interoperability enabled.
+  bool hasCxxInteroperability() const {
+    return Core->Bits.HasCxxInteroperability;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
