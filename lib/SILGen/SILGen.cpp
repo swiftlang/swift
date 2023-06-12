@@ -371,7 +371,7 @@ static FuncDecl *lookupIntrinsic(ModuleDecl &module,
     return *cache;
 
   SmallVector<ValueDecl *, 1> decls;
-  module.lookupQualified(&module, DeclNameRef(name),
+  module.lookupQualified(&module, DeclNameRef(name), SourceLoc(),
                          NL_QualifiedDefault | NL_IncludeUsableFromInline,
                          decls);
   if (decls.size() != 1) {

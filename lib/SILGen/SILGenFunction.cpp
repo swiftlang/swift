@@ -1092,7 +1092,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SmallVector<ValueDecl *, 2> results;
     UIKit->lookupQualified(UIKit,
                            DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
-                           NL_QualifiedDefault,
+                           SourceLoc(), NL_QualifiedDefault,
                            results);
 
     // As the comment above alludes, using a qualified lookup into UIKit is

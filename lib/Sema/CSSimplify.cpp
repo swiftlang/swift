@@ -9307,6 +9307,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   Type baseObjTy = baseTy->getRValueType();
   Type instanceTy = baseObjTy;
 
+  auto memberNode = simplifyLocatorToAnchor(memberLocator);
+  auto memberLoc = memberNode ? memberNode.getStartLoc() : SourceLoc();
+
   if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     instanceTy = baseObjMeta->getInstanceType();
   }
@@ -9419,7 +9422,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   }
 
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(instanceTy, lookupName);
+  LookupResult &lookup = lookupMember(instanceTy, lookupName, memberLoc);
 
   // If this is true, we're using type construction syntax (Foo()) rather
   // than an explicit call to `init` (Foo.init()).
@@ -9819,7 +9822,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       memberName.getBaseName() == DeclBaseName::createConstructor() &&
       !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
-                                      DeclNameRef(ctx.getIdentifier("init")));
+                                      DeclNameRef(ctx.getIdentifier("init")),
+                                      memberLoc);
     for (auto result : compatLookup)
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/false,
@@ -9829,7 +9833,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
   if (bridgedType) {
-    LookupResult &bridgedLookup = lookupMember(bridgedType, memberName);
+    LookupResult &bridgedLookup = lookupMember(bridgedType, memberName,
+                                               memberLoc);
     ModuleDecl *foundationModule = nullptr;
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
@@ -9892,7 +9897,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // prioritize them and mark any results found on wrapped type
         // as a fallback results.
         bool isFallback = !result.ViableCandidates.empty();
-        LookupResult &optionalLookup = lookupMember(objectType, memberName);
+        LookupResult &optionalLookup = lookupMember(objectType, memberName,
+                                                    memberLoc);
         for (auto result : optionalLookup)
           addChoice(getOverloadChoice(result.getValueDecl(),
                                       /*bridged*/ false,
@@ -9960,7 +9966,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     lookupOptions |= NameLookupFlags::IgnoreAccessControl;
 
     auto lookup =
-        TypeChecker::lookupMember(DC, instanceTy, memberName, lookupOptions);
+        TypeChecker::lookupMember(DC, instanceTy, memberName,
+                                  memberLoc, lookupOptions);
     for (auto entry : lookup) {
       auto *cand = entry.getValueDecl();
 

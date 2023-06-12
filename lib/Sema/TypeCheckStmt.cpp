@@ -2180,6 +2180,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
                               DeclNameRef::createConstructor(),
+                              apply->getLoc(),
                               subOptions, lookupResults);
 
     for (auto decl : lookupResults) {

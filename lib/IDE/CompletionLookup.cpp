@@ -2262,7 +2262,7 @@ bool CompletionLookup::tryUnwrappedCompletions(Type ExprType, bool isIUO) {
   // unforced IUO.
   if (isIUO) {
     if (Type Unwrapped = ExprType->getOptionalObjectType()) {
-      lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
+      lookupVisibleMemberDecls(*this, Unwrapped, DotLoc, CurrDeclContext,
                                IncludeInstanceMembers,
                                /*includeDerivedRequirements*/ false,
                                /*includeProtocolExtensionMembers*/ true);
@@ -2289,7 +2289,8 @@ bool CompletionLookup::tryUnwrappedCompletions(Type ExprType, bool isIUO) {
     if (NumBytesToEraseForOptionalUnwrap <=
         CodeCompletionResult::MaxNumBytesToErase) {
       if (!tryTupleExprCompletions(Unwrapped)) {
-        lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
+        lookupVisibleMemberDecls(*this, Unwrapped, DotLoc,
+                                 CurrDeclContext,
                                  IncludeInstanceMembers,
                                  /*includeDerivedRequirements*/ false,
                                  /*includeProtocolExtensionMembers*/ true);
@@ -2370,7 +2371,7 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD) {
   // Don't check/return so we still add the members of Optional itself below
   tryUnwrappedCompletions(ExprType, isIUO);
 
-  lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
+  lookupVisibleMemberDecls(*this, ExprType, DotLoc, CurrDeclContext,
                            IncludeInstanceMembers,
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
@@ -2833,7 +2834,7 @@ void CompletionLookup::getUnresolvedMemberCompletions(Type T) {
   llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
   llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
   llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
-  lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
+  lookupVisibleMemberDecls(consumer, baseType, DotLoc, CurrDeclContext,
                            /*includeInstanceMembers=*/false,
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
@@ -2847,7 +2848,7 @@ void CompletionLookup::getEnumElementPatternCompletions(Type T) {
   llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::EnumElement);
   llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
   llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
-  lookupVisibleMemberDecls(*this, baseType, CurrDeclContext,
+  lookupVisibleMemberDecls(*this, baseType, DotLoc, CurrDeclContext,
                            /*includeInstanceMembers=*/false,
                            /*includeDerivedRequirements=*/false,
                            /*includeProtocolExtensionMembers=*/true);
@@ -2915,8 +2916,8 @@ void CompletionLookup::getTypeCompletions(Type BaseType) {
   Kind = LookupKind::Type;
   this->BaseType = BaseType;
   NeedLeadingDot = !HaveDot;
-  lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType), CurrDeclContext,
-                           IncludeInstanceMembers,
+  lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType), DotLoc,
+                           CurrDeclContext, IncludeInstanceMembers,
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ false);
   if (BaseType->isAnyExistentialType()) {
@@ -2951,8 +2952,8 @@ void CompletionLookup::getGenericRequirementCompletions(
   Kind = LookupKind::GenericRequirement;
   this->BaseType = selfTy;
   NeedLeadingDot = false;
-  lookupVisibleMemberDecls(*this, MetatypeType::get(selfTy), CurrDeclContext,
-                           IncludeInstanceMembers,
+  lookupVisibleMemberDecls(*this, MetatypeType::get(selfTy), DotLoc,
+                           CurrDeclContext, IncludeInstanceMembers,
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
   // We not only allow referencing nested types/typealiases directly, but also
