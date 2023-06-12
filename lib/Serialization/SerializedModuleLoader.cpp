@@ -442,7 +442,8 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   const std::string sourceInfoPath;
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-      modulePath.str(), moduleDocPath, sourceInfoPath, isFramework);
+      modulePath.str(), moduleDocPath, sourceInfoPath, isFramework,
+      /*module-cache-key*/ "");
   // Some transitive dependencies of binary modules are not required to be
   // imported during normal builds.
   // TODO: This is worth revisiting for debugger purposes where

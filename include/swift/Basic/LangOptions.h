@@ -822,6 +822,9 @@ namespace swift {
     /// clang CASOptions.
     std::string CASPath;
 
+    /// Cache key for imported bridging header.
+    std::string BridgingHeaderPCHCacheKey;
+
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
 
@@ -890,6 +893,9 @@ namespace swift {
     /// Disable implicitly-built Clang modules because they are explicitly
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
+
+    /// Enable ClangIncludeTree for explicit module builds.
+    bool UseClangIncludeTree = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
