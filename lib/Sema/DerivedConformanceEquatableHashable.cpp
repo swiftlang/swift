@@ -890,6 +890,10 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setSynthesized();
+  hashValueDecl->setImplicit();
+  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+  hashValueDecl->copyFormalAccessFrom(derived.Nominal,
+                                      /*sourceIsParentContext*/ true);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -908,12 +912,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
-  hashValueDecl->setImplicit();
-  hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
-  hashValueDecl->copyFormalAccessFrom(derived.Nominal,
-                                      /*sourceIsParentContext*/ true);
 
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&

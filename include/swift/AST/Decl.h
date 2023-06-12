@@ -5295,10 +5295,10 @@ public:
 
   /// Overwrite the registered implementation-info.  This should be
   /// used carefully.
-  void setImplInfo(StorageImplInfo implInfo) {
-    LazySemanticInfo.ImplInfoComputed = 1;
-    ImplInfo = implInfo;
-  }
+  void setImplInfo(StorageImplInfo implInfo);
+
+  /// Cache the implementation-info, for use by the request-evaluator.
+  void cacheImplInfo(StorageImplInfo implInfo);
 
   ReadImplKind getReadImpl() const {
     return getImplInfo().getReadImpl();
@@ -5313,9 +5313,7 @@ public:
 
   /// Return true if this is a VarDecl that has storage associated with
   /// it.
-  bool hasStorage() const {
-    return getImplInfo().hasStorage();
-  }
+  bool hasStorage() const;
 
   /// Return true if this storage has the basic accessors/capability
   /// to be mutated.  This is generally constant after the accessors are
