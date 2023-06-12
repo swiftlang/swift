@@ -1319,6 +1319,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
+    if (Invocation.getLangOptions().EnableCXXInterop &&
+        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
+      MainModule->setHasCxxInteroperability();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

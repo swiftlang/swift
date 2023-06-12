@@ -824,6 +824,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
+    if (loadedModuleFile->hasCxxInteroperability())
+      M.setHasCxxInteroperability();
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
@@ -894,6 +896,19 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
     Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
                        diag::need_hermetic_seal_to_import_module, M.getName());
+  }
+
+  // Non-resilient modules built with C++ interoperability enabled
+  // are typically incompatible with clients that do not enable
+  // C++ interoperability.
+  if (M.hasCxxInteroperability() &&
+      M.getResilienceStrategy() != ResilienceStrategy::Resilient &&
+      !Ctx.LangOpts.EnableCXXInterop &&
+      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule) {
+    auto loc = diagLoc.value_or(SourceLoc());
+    Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
+                       M.getName());
+    Ctx.Diags.diagnose(loc, diag::enable_cxx_interop_docs);
   }
 
   return fileUnit;

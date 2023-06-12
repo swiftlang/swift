@@ -843,6 +843,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
   BLOCK_RECORD(options_block, MODULE_ABI_NAME);
   BLOCK_RECORD(options_block, IS_CONCURRENCY_CHECKED);
+  BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
   BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_PATH);
@@ -1088,6 +1089,12 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->isConcurrencyChecked()) {
         options_block::IsConcurrencyCheckedLayout IsConcurrencyChecked(Out);
         IsConcurrencyChecked.emit(ScratchRecord);
+      }
+
+      if (M->hasCxxInteroperability()) {
+        options_block::HasCxxInteroperabilityEnabledLayout
+            CxxInteroperabilityEnabled(Out);
+        CxxInteroperabilityEnabled.emit(ScratchRecord);
       }
 
       if (options.SerializeOptionsForDebugging) {

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 790; // add `out` kind to mark uninitialized instruction
+const uint16_t SWIFTMODULE_VERSION_MINOR = 791; // HasCxxInteroperability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -888,6 +888,7 @@ namespace options_block {
     EXTERNAL_SEARCH_PLUGIN_PATH,
     COMPILER_PLUGIN_LIBRARY_PATH,
     COMPILER_PLUGIN_EXECUTABLE_PATH,
+    HAS_CXX_INTEROPERABILITY_ENABLED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -975,6 +976,10 @@ namespace options_block {
   using ModuleExportAsNameLayout = BCRecordLayout<
     MODULE_EXPORT_AS_NAME,
     BCBlob
+  >;
+
+  using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
+    HAS_CXX_INTEROPERABILITY_ENABLED
   >;
 }
 
