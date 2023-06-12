@@ -2174,11 +2174,26 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
 
 RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
                                                SGFContext C) {
+  auto emitStmt = [&]() {
+    SGF.emitStmt(E->getStmt());
+
+    // A switch of an uninhabited value gets emitted as an unreachable. In that
+    // case we need to emit a block to emit the rest of the expression code
+    // into. This block will be unreachable, so will be eliminated by the
+    // SILOptimizer. This is easier than handling unreachability throughout
+    // expression emission, as eventually SingleValueStmtExprs ought to be able
+    // to appear in arbitrary expression position. The rest of the emission
+    // will reference the uninitialized temporary variable, but that's fine
+    // because it'll be eliminated.
+    if (!SGF.B.hasValidInsertionPoint())
+      SGF.B.emitBlock(SGF.createBasicBlock());
+  };
+
   // A void SingleValueStmtExpr either only has Void expression branches, or
   // we've decided that it should have purely statement semantics. In either
   // case, we can just emit the statement as-is, and produce the void rvalue.
   if (E->getType()->isVoid()) {
-    SGF.emitStmt(E->getStmt());
+    emitStmt();
     return SGF.emitEmptyTupleRValue(E, C);
   }
   auto &lowering = SGF.getTypeLowering(E->getType());
@@ -2201,7 +2216,7 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
   // Push the initialization for branches of the statement to initialize into.
   SGF.SingleValueStmtInitStack.push_back(std::move(initInfo));
   SWIFT_DEFER { SGF.SingleValueStmtInitStack.pop_back(); };
-  SGF.emitStmt(E->getStmt());
+  emitStmt();
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
 }
 
