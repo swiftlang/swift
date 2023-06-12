@@ -7194,6 +7194,10 @@ ERROR(macro_accessor_missing_from_expansion,none,
 ERROR(macro_init_accessor_not_documented,none,
       "expansion of macro %0 produced an unexpected 'init' accessor",
       (DeclName))
+ERROR(global_arbitrary_name,none,
+      "'%0' macros are not allowed to introduce arbitrary names "
+      "at global scope",
+      (StringRef))
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",

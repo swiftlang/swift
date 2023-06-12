@@ -767,6 +767,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
 
 LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
-  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
+  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name),
+                                   SourceLoc(), None);
 }
 

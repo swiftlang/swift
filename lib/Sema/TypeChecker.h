@@ -914,6 +914,7 @@ LookupResult lookupUnqualifiedType(
 /// \returns The result of name lookup.
 LookupResult
 lookupMember(DeclContext *dc, Type type, DeclNameRef name,
+             SourceLoc loc = SourceLoc(),
              NameLookupOptions options = defaultMemberLookupOptions);
 
 /// Look up a member type within the given type.
@@ -929,6 +930,7 @@ lookupMember(DeclContext *dc, Type type, DeclNameRef name,
 /// \returns The result of name lookup.
 LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
+                 SourceLoc loc = SourceLoc(),
                  NameLookupOptions options = defaultMemberTypeLookupOptions);
 
 /// Given an expression that's known to be an infix operator,
@@ -938,10 +940,6 @@ lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
-
-SmallVector<MacroDecl *, 1>
-lookupMacros(DeclContext *dc, DeclNameRef macroName, SourceLoc loc,
-             MacroRoles contexts);
 
 enum class UnsupportedMemberTypeAccessKind : uint8_t {
   None,

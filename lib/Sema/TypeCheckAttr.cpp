@@ -2328,7 +2328,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
-                               SF, NL_QualifiedDefault);
+                               SF, attr->getLocation(),
+                               NL_QualifiedDefault);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -3047,7 +3048,8 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
     options |= NL_IncludeUsableFromInline;
 
   if (typeCtx)
-    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName, options,
+    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
+                                     attr->getLocation(), options,
                                      results);
 }
 
@@ -4057,11 +4059,12 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
       auto builderType = nominal->getDeclaredType();
       nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
-                               NL_QualifiedDefault,
+                               attr->getLocation(), NL_QualifiedDefault,
                                buildPartialBlockFirstMatches);
       nominal->lookupQualified(
           builderType, DeclNameRef(buildPartialBlockAccumulated),
-          NL_QualifiedDefault, buildPartialBlockAccumulatedMatches);
+          attr->getLocation(), NL_QualifiedDefault,
+          buildPartialBlockAccumulatedMatches);
 
       hasAccessibleBuildPartialBlockFirst = llvm::any_of(
           buildPartialBlockFirstMatches, isBuildMethodAsAccessibleAsType);
@@ -7267,7 +7270,8 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
                                      nameRef.withoutArgumentLabels(),
-                                     NL_OnlyTypes, lookupResults);
+                                     attr->getLocation(), NL_OnlyTypes,
+                                     lookupResults);
     if (lookupResults.size() == 1)
       return lookupResults[0];
     return nullptr;
