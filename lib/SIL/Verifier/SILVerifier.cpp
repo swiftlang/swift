@@ -1306,7 +1306,7 @@ public:
       }
     }
 
-    if (I->getFunction()->hasOwnership() && OwnershipForwardingMixin::isa(I)) {
+    if (I->getFunction()->hasOwnership() && ForwardingInstruction::isa(I)) {
       checkOwnershipForwardingInst(I);
     }
   }
@@ -1353,7 +1353,7 @@ public:
   /// of its results, check forwarding invariants.
   void checkOwnershipForwardingInst(SILInstruction *i) {
     ValueOwnershipKind ownership =
-        OwnershipForwardingMixin::get(i)->getForwardingOwnershipKind();
+        ForwardingInstruction::get(i)->getForwardingOwnershipKind();
 
     if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Owned;
@@ -1378,9 +1378,9 @@ public:
     // representation. Non-destructive projection is allowed. Aggregation and
     // destructive disaggregation is not allowed. See SIL.rst, Forwarding
     // Addres-Only Values.
-    if (ownership == OwnershipKind::Guaranteed
-        && OwnershipForwardingMixin::isAddressOnly(i)) {
-      require(OwnershipForwardingMixin::hasSameRepresentation(i),
+    if (ownership == OwnershipKind::Guaranteed &&
+        ForwardingInstruction::isAddressOnly(i)) {
+      require(ForwardingInstruction::hasSameRepresentation(i),
               "Forwarding a guaranteed address-only value requires the same "
               "representation since no move or copy is allowed.");
     }

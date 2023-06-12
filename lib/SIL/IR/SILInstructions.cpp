@@ -3200,7 +3200,7 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
          "result info?!");
 }
 
-bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
+bool ForwardingInstruction::hasSameRepresentation(SILInstruction *inst) {
   switch (inst->getKind()) {
   // Explicitly list instructions which definitely involve a representation
   // change.
@@ -3208,7 +3208,7 @@ bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
   default:
     // Conservatively assume that a conversion changes representation.
     // Operations can be added as needed to participate in SIL opaque values.
-    assert(OwnershipForwardingMixin::isa(inst));
+    assert(ForwardingInstruction::isa(inst));
     return false;
 
   case SILInstructionKind::ConvertFunctionInst:
@@ -3228,14 +3228,14 @@ bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
   }
 }
 
-bool OwnershipForwardingMixin::isAddressOnly(SILInstruction *inst) {
+bool ForwardingInstruction::isAddressOnly(SILInstruction *inst) {
   if (auto *aggregate =
-      dyn_cast<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+          dyn_cast<AllArgOwnershipForwardingSingleValueInst>(inst)) {
     // If any of the operands are address-only, then the aggregate must be.
     return aggregate->getType().isAddressOnly(*inst->getFunction());
   }
   // All other forwarding instructions must forward their first operand.
-  assert(OwnershipForwardingMixin::isa(inst));
+  assert(ForwardingInstruction::isa(inst));
   return inst->getOperand(0)->getType().isAddressOnly(*inst->getFunction());
 }
 

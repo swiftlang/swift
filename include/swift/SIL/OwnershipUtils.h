@@ -219,7 +219,7 @@ public:
   }
 
   bool preservesOwnership() const {
-    auto &mixin = *OwnershipForwardingMixin::get(use->getUser());
+    auto &mixin = *ForwardingInstruction::get(use->getUser());
     return mixin.preservesOwnership();
   }
 

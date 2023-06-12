@@ -112,10 +112,10 @@ bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
       if (ti->mayHaveTerminatorResult())
-        return OwnershipForwardingMixin::get(ti)->preservesOwnership();
+        return ForwardingInstruction::get(ti)->preservesOwnership();
 
   if (auto *inst = value->getDefiningInstruction())
-    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+    if (auto *mixin = ForwardingInstruction::get(inst))
       return mixin->preservesOwnership() &&
              !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
 
@@ -123,7 +123,7 @@ bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
 }
 
 bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
-  if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
+  if (auto *mixin = ForwardingInstruction::get(use->getUser()))
     return mixin->preservesOwnership() &&
            !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
   return false;
@@ -131,7 +131,7 @@ bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   if (auto *inst = value->getDefiningInstructionOrTerminator()) {
-    if (auto *mixin = OwnershipForwardingMixin::get(inst)) {
+    if (auto *mixin = ForwardingInstruction::get(inst)) {
       return mixin->preservesOwnership() &&
              !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
     }
@@ -141,7 +141,7 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
-  if (auto *mixin = OwnershipForwardingMixin::get(user))
+  if (auto *mixin = ForwardingInstruction::get(user))
     return mixin->preservesOwnership() &&
            !isa<GuaranteedFirstArgForwardingSingleValueInst>(user);
   return false;
@@ -1733,12 +1733,12 @@ bool swift::visitForwardedGuaranteedOperands(
   if (inst->getNumRealOperands() == 0) {
     return false;
   }
-  if (isa<FirstArgOwnershipForwardingSingleValueInst>(inst)
-      || isa<OwnershipForwardingConversionInst>(inst)
-      || isa<OwnershipForwardingSelectEnumInstBase>(inst)
-      || isa<OwnershipForwardingMultipleValueInstruction>(inst)
-      || isa<MoveOnlyWrapperToCopyableValueInst>(inst)
-      || isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
+  if (isa<FirstArgOwnershipForwardingSingleValueInst>(inst) ||
+      isa<OwnershipForwardingConversionInst>(inst) ||
+      isa<OwnershipForwardingSelectEnumInstBase>(inst) ||
+      isa<OwnershipForwardingMultipleValueInstruction>(inst) ||
+      isa<MoveOnlyWrapperToCopyableValueInst>(inst) ||
+      isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
     assert(!isa<SingleValueInstruction>(inst)
            || !BorrowedValue(cast<SingleValueInstruction>(inst))
                   && "forwarded operand cannot begin a borrow scope");

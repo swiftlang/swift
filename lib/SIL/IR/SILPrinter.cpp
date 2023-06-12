@@ -1725,8 +1725,7 @@ public:
     }
   }
 
-  void printForwardingOwnershipKind(OwnershipForwardingMixin *inst,
-                                    SILValue op) {
+  void printForwardingOwnershipKind(ForwardingInstruction *inst, SILValue op) {
     if (!op)
       return;
 

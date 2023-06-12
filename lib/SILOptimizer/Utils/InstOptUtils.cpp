@@ -1803,7 +1803,7 @@ SILValue swift::makeValueAvailable(SILValue value, SILBasicBlock *inBlock) {
 
 bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks) {
-  if (!OwnershipForwardingMixin::isa(forwardingInst) ||
+  if (!ForwardingInstruction::isa(forwardingInst) ||
       isa<AllArgOwnershipForwardingSingleValueInst>(forwardingInst))
     return false;
 
