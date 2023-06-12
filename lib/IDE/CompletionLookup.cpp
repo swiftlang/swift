@@ -3215,6 +3215,36 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
   RequestedCachedResults.insert(RequestedResultsTy::topLevelResults(filter));
 }
 
+namespace {
+
+/// A \c VisibleDeclConsumer that stores all decls that are found and is able
+/// to forward the to another \c VisibleDeclConsumer later.
+class StoringDeclConsumer : public VisibleDeclConsumer {
+  struct FoundDecl {
+    ValueDecl *VD;
+    DeclVisibilityKind Reason;
+    DynamicLookupInfo DynamicLookupInfo;
+  };
+
+  std::vector<FoundDecl> FoundDecls;
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo DynamicLookupInfo = {}) override {
+    FoundDecls.push_back({VD, Reason, DynamicLookupInfo});
+  }
+
+public:
+  /// Call \c foundDecl for every declaration that this consumer has found.
+  void forward(VisibleDeclConsumer &Consumer) {
+    for (auto &FoundDecl : FoundDecls) {
+      Consumer.foundDecl(FoundDecl.VD, FoundDecl.Reason,
+                         FoundDecl.DynamicLookupInfo);
+    }
+  }
+};
+
+} // namespace
+
 void CompletionLookup::getToplevelCompletions(CodeCompletionFilter Filter) {
   Kind = (Filter - CodeCompletionFilterFlag::Module)
                  .containsOnly(CodeCompletionFilterFlag::Type)
@@ -3222,9 +3252,24 @@ void CompletionLookup::getToplevelCompletions(CodeCompletionFilter Filter) {
              : LookupKind::ValueInDeclContext;
   NeedLeadingDot = false;
 
+  // If we have 'addinitstotoplevel' enabled, calling `foundDecl` on `this`
+  // can cause macros to get expanded, which can then cause new members ot get
+  // added to 'TopLevelValues', invalidating iterator over `TopLevelDecls` in
+  // `SourceLookupCache::lookupVisibleDecls`.
+  //
+  // Technically `foundDecl` should not expand macros or discover new top level
+  // members in any way because those newly discovered decls will not be added
+  // to the code completion results. However, it's preferrable to miss results
+  // than to silently invalidate a collection, resulting in hard-to-diagnose
+  // crashes.
+  // Thus, store all the decls found by `CurrModule->lookupVisibleDecls` in a
+  // vector first and only call `this->foundDecl` once we have left the
+  // iteration loop over `TopLevelDecls`.
+  StoringDeclConsumer StoringConsumer;
+
   UsableFilteringDeclConsumer UsableFilteringConsumer(
       Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getIDEInspectionTargetLoc(),
-      *this);
+      StoringConsumer);
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext,
                                                       UsableFilteringConsumer);
 
@@ -3243,6 +3288,8 @@ void CompletionLookup::getToplevelCompletions(CodeCompletionFilter Filter) {
 
   CurrModule->lookupVisibleDecls({}, FilteringConsumer,
                                  NLKind::UnqualifiedLookup);
+
+  StoringConsumer.forward(*this);
 }
 
 void CompletionLookup::lookupExternalModuleDecls(
