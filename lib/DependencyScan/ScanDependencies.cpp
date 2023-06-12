@@ -334,6 +334,12 @@ static llvm::Error resolveExplicitModuleInputs(
                        : binaryDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.first + "=" +
                             path);
+      for (const auto &headerDep : binaryDepDetails->preCompiledBridgingHeaderPaths) {
+        commandLine.push_back("-Xcc");
+        commandLine.push_back("-include-pch");
+        commandLine.push_back("-Xcc");
+        commandLine.push_back(headerDep);
+      }
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
       auto placeholderDetails = depInfo->getAsPlaceholderDependencyModule();
@@ -1167,6 +1173,13 @@ static void writeJSON(llvm::raw_ostream &out,
                              swiftBinaryDeps->module_cache_key, 5,
                              /*trailingComma=*/true);
       }
+
+      // Module Header Dependencies
+      if (swiftBinaryDeps->header_dependencies->count != 0)
+        writeJSONSingleField(out, "headerDependencies",
+                             swiftBinaryDeps->header_dependencies, 5,
+                             /*trailingComma=*/true);
+
       writeJSONSingleField(out, "isFramework", swiftBinaryDeps->is_framework,
                            5, /*trailingComma=*/false);
     } else {
@@ -1403,6 +1416,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
             create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
+            create_set(swiftBinaryDeps->preCompiledBridgingHeaderPaths),
             swiftBinaryDeps->isFramework,
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str())};
       } else {
