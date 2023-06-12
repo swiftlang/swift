@@ -2942,10 +2942,9 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   SILGlobalVariable *var = i->getReferencedGlobal();
-  SILType loweredTy = var->getLoweredTypeInContext(getExpansionContext());
-  assert(loweredTy == i->getType().getObjectType());
+  SILType loweredTy = var->getLoweredType();
   auto &ti = getTypeInfo(loweredTy);
-  
+
   auto expansion = IGM.getResilienceExpansionForLayout(var);
 
   // If the variable is empty in all resilience domains that can see it,
@@ -2968,7 +2967,15 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   // Otherwise, the static storage for the global consists of a fixed-size
   // buffer; project it.
   addr = emitProjectValueInBuffer(*this, loweredTy, addr);
-  
+
+
+  // Get the address of the type in context.
+  SILType loweredTyInContext = var->getLoweredTypeInContext(getExpansionContext());
+  auto &tiInContext = getTypeInfo(loweredTyInContext);
+  auto ptr = Builder.CreateBitOrPointerCast(addr.getAddress(),
+                                            tiInContext.getStorageType()->getPointerTo());
+  addr = Address(ptr, tiInContext.getStorageType(),
+                 tiInContext.getBestKnownAlignment());
   setLoweredAddress(i, addr);
 }
 
