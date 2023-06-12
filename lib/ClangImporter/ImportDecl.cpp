@@ -2635,30 +2635,38 @@ namespace {
         }
         clang::CXXConstructorDecl *copyCtor = nullptr;
         clang::CXXConstructorDecl *moveCtor = nullptr;
+        clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor()) {
           copyCtor = clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        } else if (decl->needsImplicitMoveConstructor()) {
+        }
+        if (decl->needsImplicitMoveConstructor()) {
           moveCtor = clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        } else {
-          // We may have a defaulted copy constructor that needs to be defined.
-          // Try to find it.
-          for (auto methods : decl->methods()) {
-            if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
-              if (declCtor->isDefaulted() &&
-                  declCtor->getAccess() == clang::AS_public &&
-                  !declCtor->isDeleted() &&
-                  // Note: we use "doesThisDeclarationHaveABody" here because
-                  // that's what "DefineImplicitCopyConstructor" checks.
-                  !declCtor->doesThisDeclarationHaveABody()) {
-                if (declCtor->isCopyConstructor()) {
+        }
+        if (decl->needsImplicitDefaultConstructor()) {
+          defaultCtor = clangSema.DeclareImplicitDefaultConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+        }
+        // We may have a defaulted copy/move/default constructor that needs to
+        // be defined. Try to find it.
+        for (auto methods : decl->methods()) {
+          if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
+            if (declCtor->isDefaulted() &&
+                declCtor->getAccess() == clang::AS_public &&
+                !declCtor->isDeleted() &&
+                // Note: we use "doesThisDeclarationHaveABody" here because
+                // that's what "DefineImplicitCopyConstructor" checks.
+                !declCtor->doesThisDeclarationHaveABody()) {
+              if (declCtor->isCopyConstructor()) {
+                if (!copyCtor)
                   copyCtor = declCtor;
-                  break;
-                } else if (declCtor->isMoveConstructor()) {
+              } else if (declCtor->isMoveConstructor()) {
+                if (!moveCtor)
                   moveCtor = declCtor;
-                  break;
-                }
+              } else if (declCtor->isDefaultConstructor()) {
+                if (!defaultCtor)
+                  defaultCtor = declCtor;
               }
             }
           }
@@ -2670,6 +2678,10 @@ namespace {
         if (moveCtor) {
           clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
                                                   moveCtor);
+        }
+        if (defaultCtor) {
+          clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
+                                                     defaultCtor);
         }
 
         if (decl->needsImplicitDestructor()) {
