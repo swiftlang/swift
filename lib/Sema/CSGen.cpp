@@ -2949,10 +2949,6 @@ namespace {
         PreWalkAction walkToDeclPre(Decl *D) override {
           return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
         }
-
-        PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-          return Action::SkipChildren(P);
-        }
       } collectVarRefs(CS);
 
       // Walk the capture list if this closure has one,  because it could
