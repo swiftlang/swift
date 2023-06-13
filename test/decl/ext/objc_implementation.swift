@@ -1,13 +1,17 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h
 // REQUIRES: objc_interop
 
-@_objcImplementation extension ObjCClass {
+protocol EmptySwiftProto {}
+
+@_objcImplementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
   // expected-note@-1 {{previously implemented by extension here}}
   // expected-warning@-2 {{extension for main class interface should provide implementation for instance method 'method(fromHeader4:)'; this will become an error before '@_objcImplementation' is stabilized}}
   // expected-warning@-3 {{extension for main class interface should provide implementation for property 'propertyFromHeader9'; this will become an error before '@_objcImplementation' is stabilized}}
   // FIXME: give better diagnostic expected-warning@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'; this will become an error before '@_objcImplementation' is stabilized}}
   // FIXME: give better diagnostic expected-warning@-5 {{extension for main class interface should provide implementation for property 'propertyFromHeader7'; this will become an error before '@_objcImplementation' is stabilized}}
   // FIXME: give better diagnostic expected-warning@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'; this will become an error before '@_objcImplementation' is stabilized}}
+  // expected-warning@-7 {{'@_objcImplementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
+  // expected-warning@-8 {{'@_objcImplementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
