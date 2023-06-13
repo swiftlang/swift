@@ -1709,6 +1709,11 @@ ERROR(objc_implementation_type_mismatch,none,
       "header",
       (DescriptiveDeclKind, ValueDecl *, Type, Type))
 
+ERROR(objc_implementation_required_attr_mismatch,none,
+      "%0 %1 %select{should not|should}2 be 'required' to match %0 declared by "
+      "the header",
+      (DescriptiveDeclKind, ValueDecl *, bool))
+
 ERROR(objc_implementation_wrong_objc_name,none,
       "selector %0 for %1 %2 not found in header; did you mean %3?",
       (ObjCSelector, DescriptiveDeclKind, ValueDecl *, ObjCSelector))
