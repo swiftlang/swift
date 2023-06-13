@@ -73,6 +73,23 @@ void swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                       size_t layoutStrOffset,
                                       const uint8_t *fieldLayoutStr,
                                       const Metadata *fieldType);
+
+template <typename T>
+inline T readBytes(const uint8_t *layoutStr, size_t &i) {
+  T returnVal;
+  memcpy(&returnVal, layoutStr + i, sizeof(T));
+  i += sizeof(T);
+  return returnVal;
+}
+
+template <typename T>
+inline void writeBytes(uint8_t *layoutStr, size_t &i, T value) {
+  memcpy(layoutStr + i, &value, sizeof(T));
+  i += sizeof(T);
+}
+
+constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
+
 } // namespace swift
 
 #endif // SWIFT_BYTECODE_LAYOUTS_H
