@@ -246,6 +246,17 @@ public:
   operator Kind() const { return kind; }
 };
 
+/// Specifies whether checks applied to function types should
+/// apply to their params, results, or both
+enum class FunctionCheckType {
+  /// Check params and results
+  ParamsResults,
+  /// Check params only
+  Params,
+  /// Check results only
+  Results,
+};
+
 /// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
 ///
@@ -270,7 +281,8 @@ public:
 bool diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
     SendableCheckReason refKind,
-    Optional<ActorIsolation> knownIsolation = None);
+    Optional<ActorIsolation> knownIsolation = None,
+    FunctionCheckType funcCheckType = FunctionCheckType::ParamsResults);
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(

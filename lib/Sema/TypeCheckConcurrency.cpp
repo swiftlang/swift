@@ -1002,9 +1002,14 @@ bool swift::diagnoseNonSendableTypes(
   return anyMissing;
 }
 
+namespace {
+
+}
+
 bool swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    SendableCheckReason reason, Optional<ActorIsolation> knownIsolation) {
+    SendableCheckReason reason, Optional<ActorIsolation> knownIsolation,
+    FunctionCheckType funcCheckType) {
 
   // Retrieve the actor isolation to use in diagnostics.
   auto getActorIsolation = [&] {
@@ -1017,23 +1022,35 @@ bool swift::diagnoseNonSendableTypesInReference(
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
-    for (auto param : *function->getParameters()) {
-      Type paramType = param->getInterfaceType().subst(subs);
-      if (diagnoseNonSendableTypes(
-              paramType, fromDC, loc, diag::non_sendable_param_type,
-              (unsigned)reason, function->getDescriptiveKind(),
-              function->getName(), getActorIsolation()))
-        return true;
+    switch (funcCheckType) {
+    case FunctionCheckType::Results: break;
+    case FunctionCheckType::Params:
+    case FunctionCheckType::ParamsResults:
+      for (auto param : *function->getParameters()) {
+        Type paramType = param->getInterfaceType().subst(subs);
+        if (diagnoseNonSendableTypes(
+            paramType, fromDC, loc, diag::non_sendable_param_type,
+            (unsigned)reason, function->getDescriptiveKind(),
+            function->getName(), getActorIsolation()))
+          return true;
+      }
+      break;
     }
 
     // Check the result type of a function.
     if (auto func = dyn_cast<FuncDecl>(function)) {
-      Type resultType = func->getResultInterfaceType().subst(subs);
-      if (diagnoseNonSendableTypes(
-              resultType, fromDC, loc, diag::non_sendable_result_type,
-              (unsigned)reason, func->getDescriptiveKind(), func->getName(),
-              getActorIsolation()))
-        return true;
+      switch (funcCheckType) {
+      case FunctionCheckType::Params: break;
+      case FunctionCheckType::Results:
+      case FunctionCheckType::ParamsResults:
+        Type resultType = func->getResultInterfaceType().subst(subs);
+        if (diagnoseNonSendableTypes(
+            resultType, fromDC, loc, diag::non_sendable_result_type,
+            (unsigned)reason, func->getDescriptiveKind(), func->getName(),
+            getActorIsolation()))
+          return true;
+        break;
+      }
     }
 
     return false;
@@ -4370,7 +4387,11 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   case OverrideIsolationResult::Sendable:
     diagnoseNonSendableTypesInReference(
         getDeclRefInContext(value), value->getInnermostDeclContext(),
-        value->getLoc(), SendableCheckReason::Override);
+        value->getLoc(), SendableCheckReason::Override, None, FunctionCheckType::Results);
+
+    diagnoseNonSendableTypesInReference(
+        getDeclRefInContext(overridden), overridden->getInnermostDeclContext(),
+        overridden->getLoc(), SendableCheckReason::Override, None, FunctionCheckType::Params);
     return;
 
   case OverrideIsolationResult::Disallowed:
