@@ -2080,6 +2080,19 @@ IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
 }
 
+bool IgnoreInvalidPatternInExpr::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  InvalidPatternInExprFailure failure(solution, P, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreInvalidPatternInExpr *
+IgnoreInvalidPatternInExpr::create(ConstraintSystem &cs, Pattern *pattern,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidPatternInExpr(cs, pattern, locator);
+}
+
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
   MissingContextualTypeForNil failure(solution, getLocator());
