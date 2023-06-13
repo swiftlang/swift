@@ -303,14 +303,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
     decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
 
-    auto createParameter = [&](VarDecl *property) {
-      accessLevel = std::min(accessLevel, property->getFormalAccess());
-      params.push_back(createMemberwiseInitParameter(decl, Loc, property));
-    };
-
-    // A single property could be used to initialize N other stored
-    // properties via a call to its init accessor.
-    llvm::SmallPtrSet<VarDecl *, 4> usedInitProperties;
     for (auto member : decl->getMembers()) {
       auto var = dyn_cast<VarDecl>(member);
       if (!var)
@@ -319,14 +311,11 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 
-      // Check whether this property could be initialized via init accessor.
-      if (initializedViaAccessor.count(var) == 1) {
-        auto *initializerProperty = initializedViaAccessor.find(var)->second;
-        if (usedInitProperties.insert(initializerProperty).second)
-          createParameter(initializerProperty);
-      } else {
-        createParameter(var);
-      }
+      if (initializedViaAccessor.count(var))
+        continue;
+
+      accessLevel = std::min(accessLevel, var->getFormalAccess());
+      params.push_back(createMemberwiseInitParameter(decl, Loc, var));
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
     auto classDecl = dyn_cast<ClassDecl>(decl);
@@ -1333,48 +1322,47 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
       if (initializedViaAccessor.empty())
         return true;
 
+      // Check whether use of init accessors results in access to uninitialized
+      // properties.
+
+      if (auto *initAccessor = var->getAccessor(AccessorKind::Init)) {
+        // Make sure that all properties accessed by init accessor
+        // are previously initialized.
+        if (auto accessAttr =
+            initAccessor->getAttrs().getAttribute<AccessesAttr>()) {
+          for (auto *property : accessAttr->getPropertyDecls(initAccessor)) {
+            if (!initializedProperties.count(property))
+              invalidOrderings.push_back(
+                {var, property->getName()});
+          }
+        }
+
+        // Record all of the properties initialized by calling init accessor.
+        if (auto initAttr =
+            initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
+          auto properties = initAttr->getPropertyDecls(initAccessor);
+          initializedProperties.insert(properties.begin(), properties.end());
+        }
+
+        continue;
+      }
+
       switch (initializedViaAccessor.count(var)) {
       // Not covered by an init accessor.
       case 0:
         initializedProperties.insert(var);
         continue;
 
-      // Covered by a single init accessor.
+      // Covered by a single init accessor, we'll handle that
+      // once we get to the property with init accessor.
       case 1:
-        break;
+        continue;
 
-      // Covered by one than one init accessor which means that we
-      // cannot synthesize memberwise initializer.
+      // Covered by more than one init accessor which means that we
+      // cannot synthesize memberwise initializer due to intersecting
+      // initializations.
       default:
         return false;
-      }
-
-      // Check whether use of init accessors results in access to uninitialized
-      // properties.
-
-      for (auto iter = initializedViaAccessor.find(var);
-           iter != initializedViaAccessor.end(); ++iter) {
-        auto *initializerProperty = iter->second;
-        auto *initAccessor =
-            initializerProperty->getAccessor(AccessorKind::Init);
-
-        // Make sure that all properties accessed by init accessor
-        // are previously initialized.
-        if (auto accessAttr =
-                initAccessor->getAttrs().getAttribute<AccessesAttr>()) {
-          for (auto *property : accessAttr->getPropertyDecls(initAccessor)) {
-            if (!initializedProperties.count(property))
-              invalidOrderings.push_back(
-                  {initializerProperty, property->getName()});
-          }
-        }
-
-        // Record all of the properties initialized by calling init accessor.
-        if (auto initAttr =
-                initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
-          auto properties = initAttr->getPropertyDecls(initAccessor);
-          initializedProperties.insert(properties.begin(), properties.end());
-        }
       }
     }
   }

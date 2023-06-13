@@ -400,29 +400,39 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
-    // Tracks all the init accessors we have emitted
-    // because they can initialize more than one property.
-    llvm::SmallPtrSet<AccessorDecl *, 2> emittedInitAccessors;
     auto elti = elements.begin(), eltEnd = elements.end();
-    for (VarDecl *field : decl->getStoredProperties()) {
+
+    llvm::SmallPtrSet<VarDecl *, 4> storedProperties;
+    {
+      auto properties = decl->getStoredProperties();
+      storedProperties.insert(properties.begin(), properties.end());
+    }
+
+    for (auto *member : decl->getMembers()) {
+      auto *field = dyn_cast<VarDecl>(member);
+      if (!field)
+        continue;
+
+      if (initializedViaAccessor.count(field))
+        continue;
 
       // Handle situations where this stored propery is initialized
       // via a call to an init accessor on some other property.
-      if (initializedViaAccessor.count(field) == 1) {
-        auto *initProperty = initializedViaAccessor.find(field)->second;
-        auto *initAccessor = initProperty->getAccessor(AccessorKind::Init);
+      if (auto *initAccessor = field->getAccessor(AccessorKind::Init)) {
+        if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
+          assert(elti != eltEnd &&
+                 "number of args does not match number of fields");
 
-        if (!emittedInitAccessors.insert(initAccessor).second)
+          emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot, selfTy,
+                                  std::move(*elti));
+          ++elti;
           continue;
-
-        assert(elti != eltEnd &&
-               "number of args does not match number of fields");
-
-        emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot, selfTy,
-                                std::move(*elti));
-        ++elti;
-        continue;
+        }
       }
+
+      // If this is not one of the stored properties, let's move on.
+      if (!storedProperties.count(field))
+        continue;
 
       auto fieldTy =
           selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());

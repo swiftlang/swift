@@ -360,10 +360,25 @@ func test_memberwise_with_overlaps_dont_synthesize_inits() {
   // expected-error@-1 {{'Test3<String, [Double]>' cannot be constructed because it has no accessible initializers}}
 }
 
-func test_invalid_memberwise() {
-  struct Test1 { // expected-error {{cannot synthesize memberwise initializer}}
+func test_memberwise_ordering() {
+  struct Test1 {
     var _a: Int
     var _b: Int
+
+    var a: Int {
+      init(initialValue) initializes(_a) accesses(_b) {
+        _a = initialValue
+      }
+
+      get { _a }
+      set { }
+    }
+  }
+
+  _ = Test1(_b: 42, a: 0) // Ok
+
+  struct Test2 { // expected-error {{cannot synthesize memberwise initializer}}
+    var _a: Int
 
     var a: Int {
       init(initialValue) initializes(_a) accesses(_b) {
@@ -373,5 +388,59 @@ func test_invalid_memberwise() {
 
       get { _a }
     }
+
+    var _b: Int
   }
+
+  struct Test3 {
+    var _a: Int
+
+    var pair: (Int, Int) {
+      init(initialValue) initializes(_a, _b) {
+        _a = initialValue.0
+        _b = initialValue.1
+      }
+
+      get { (_a, _b) }
+      set { }
+    }
+
+    var _b: Int
+  }
+
+  _ = Test3(pair: (0, 1)) // Ok
+
+  struct Test4 {
+    var _a: Int
+    var _b: Int
+
+    var pair: (Int, Int) {
+      init(initalValue) accesses(_a, _b) {
+      }
+
+      get { (_a, _b) }
+      set { }
+    }
+
+    var _c: Int
+  }
+
+  _ = Test4(_a: 0, _b: 1, _c: 2) // Ok
+
+  struct Test5 {
+    var _a: Int
+    var _b: Int
+
+    var c: Int {
+      init(initalValue) initializes(_c) accesses(_a, _b) {
+      }
+
+      get { _c }
+      set { }
+    }
+
+    var _c: Int
+  }
+
+  _ = Test5(_a: 0, _b: 1, c: 2) // Ok
 }
