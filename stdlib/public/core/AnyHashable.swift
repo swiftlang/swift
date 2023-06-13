@@ -57,6 +57,7 @@ internal protocol _AnyHashableBox {
 }
 
 extension _AnyHashableBox {
+  @inlinable
   var _canonicalBox: _AnyHashableBox {
     return self
   }
@@ -64,6 +65,7 @@ extension _AnyHashableBox {
 
 @usableFromInline @frozen
 internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
+  @usableFromInline
   internal var _baseHashable: Base
 
   @inlinable
@@ -71,10 +73,12 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
     self._baseHashable = base
   }
 
+  @inlinable
   internal func _unbox<T: Hashable>() -> T? {
     return (self as _AnyHashableBox as? _ConcreteHashableBox<T>)?._baseHashable
   }
 
+  @inlinable
   internal func _isEqual(to rhs: _AnyHashableBox) -> Bool? {
     if let rhs: Base = rhs._unbox() {
       return _baseHashable == rhs
@@ -82,22 +86,27 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
     return nil
   }
 
+  @inlinable
   internal var _hashValue: Int {
     return _baseHashable.hashValue
   }
 
+  @inlinable
   func _hash(into hasher: inout Hasher) {
     _baseHashable.hash(into: &hasher)
   }
 
+  @inlinable
   func _rawHashValue(_seed: Int) -> Int {
     return _baseHashable._rawHashValue(seed: _seed)
   }
 
+  @inlinable
   internal var _base: Any {
     return _baseHashable
   }
 
+  @inlinable
   internal
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     guard let value = _baseHashable as? T else { return false }
@@ -138,6 +147,7 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 /// two releases of the standard library.
 @frozen
 public struct AnyHashable {
+  @usableFromInline
   internal var _box: _AnyHashableBox
 
   @inlinable
@@ -159,7 +169,7 @@ public struct AnyHashable {
   ///
   /// - Parameter base: A hashable value to wrap.
   @inlinable
-  public init(_ base: some Hashable) {
+  public init<H: Hashable>(_ base: H) {
     if H.self == String.self || H.self == Substring.self {
       self.init(_box: _ConcreteHashableBox(base))
       return
