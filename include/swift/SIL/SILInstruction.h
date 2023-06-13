@@ -8504,7 +8504,7 @@ public:
 class MoveOnlyWrapperToCopyableBoxInst
     : public UnaryInstructionBase<
           SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst,
-          FirstArgOwnershipForwardingSingleValueInst> {
+          OwnershipForwardingSingleValueInstruction> {
   friend class SILBuilder;
 
   MoveOnlyWrapperToCopyableBoxInst(SILDebugLocation DebugLoc, SILValue operand,
@@ -10832,8 +10832,6 @@ inline ForwardingInstruction *ForwardingInstruction::get(SILInstruction *inst) {
     return result;
   if (auto *result =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
-    return result;
-  if (auto *result = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst))
     return result;
   if (auto *result = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(inst))
     return result;
