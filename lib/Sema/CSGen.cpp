@@ -3432,16 +3432,18 @@ namespace {
     }
     
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
-      // If there are UnresolvedPatterns floating around after pattern type
-      // checking, they are definitely invalid. However, we will
-      // diagnose that condition elsewhere; to avoid unnecessary noise errors,
-      // just plop an open type variable here.
-      
-      auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator,
-                                           TVO_CanBindToLValue |
-                                           TVO_CanBindToNoEscape);
-      return typeVar;
+      // Encountering an UnresolvedPatternExpr here means we have an invalid
+      // ExprPattern with a Pattern node like 'let x' nested in it. Record a
+      // fix, and assign ErrorTypes to any VarDecls bound.
+      auto *locator = CS.getConstraintLocator(expr);
+      auto *P = expr->getSubPattern();
+      CS.recordFix(IgnoreInvalidPatternInExpr::create(CS, P, locator));
+
+      P->forEachVariable([&](VarDecl *VD) {
+        CS.setType(VD, ErrorType::get(CS.getASTContext()));
+      });
+
+      return CS.createTypeVariable(locator, TVO_CanBindToHole);
     }
 
     /// Get the type T?
