@@ -586,10 +586,33 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
   if (!valueType || !sizeType)
     return;
 
+  auto insertId = ctx.getIdentifier("__insertUnsafe");
+  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
+  FuncDecl *insert = nullptr;
+  for (auto candidate : inserts) {
+    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
+      if (!candidateMethod->hasParameterList())
+        continue;
+      auto params = candidateMethod->getParameters();
+      if (params->size() != 1)
+        continue;
+      auto param = params->front();
+      if (param->getType()->getCanonicalType() !=
+          valueType->getUnderlyingType()->getCanonicalType())
+        continue;
+      insert = candidateMethod;
+      break;
+    }
+  }
+  if (!insert)
+    return;
+
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
                                sizeType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+                               insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
 }
 
