@@ -6601,7 +6601,7 @@ void IRGenSILFunction::visitObjCProtocolInst(ObjCProtocolInst *i) {
 
 void IRGenSILFunction::visitRefToBridgeObjectInst(
                                               swift::RefToBridgeObjectInst *i) {
-  Explosion refEx = getLoweredExplosion(i->getConverted());
+  Explosion refEx = getLoweredExplosion(i->getOperand(0));
   llvm::Value *ref = refEx.claimNext();
   
   Explosion bitsEx = getLoweredExplosion(i->getBitsOperand());
@@ -6659,7 +6659,7 @@ void IRGenSILFunction::visitValueToBridgeObjectInst(
 
 void IRGenSILFunction::visitBridgeObjectToRefInst(
                                               swift::BridgeObjectToRefInst *i) {
-  Explosion boEx = getLoweredExplosion(i->getConverted());
+  Explosion boEx = getLoweredExplosion(i->getOperand());
   llvm::Value *bo = boEx.claimNext();
   Explosion resultEx;
   
@@ -6730,7 +6730,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
 
 void IRGenSILFunction::visitBridgeObjectToWordInst(
                                              swift::BridgeObjectToWordInst *i) {
-  Explosion boEx = getLoweredExplosion(i->getConverted());
+  Explosion boEx = getLoweredExplosion(i->getOperand());
   llvm::Value *val = boEx.claimNext();
   val = Builder.CreatePtrToInt(val, IGM.SizeTy);
   Explosion wordEx;

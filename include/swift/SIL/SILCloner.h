@@ -1693,7 +1693,7 @@ visitRefToBridgeObjectInst(RefToBridgeObjectInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createRefToBridgeObject(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getConverted()),
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand(0)),
                 getOpValue(Inst->getBitsOperand()),
                 getBuilder().hasOwnership()
                     ? Inst->getForwardingOwnershipKind()
@@ -1707,7 +1707,7 @@ visitBridgeObjectToRefInst(BridgeObjectToRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createBridgeObjectToRef(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getConverted()),
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 getOpType(Inst->getType()),
                 getBuilder().hasOwnership()
                     ? Inst->getForwardingOwnershipKind()
@@ -1721,7 +1721,7 @@ visitBridgeObjectToWordInst(BridgeObjectToWordInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createBridgeObjectToWord(
                                     getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getConverted()),
+                                    getOpValue(Inst->getOperand()),
                                     getOpType(Inst->getType())));
 }
 

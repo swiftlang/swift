@@ -268,8 +268,8 @@ SILValue swift::stripBorrow(SILValue V) {
 // This is guaranteed to handle all function-type conversions: ThinToThick,
 // ConvertFunction, and ConvertEscapeToNoEscapeInst.
 SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
-  if (auto *convert = dyn_cast<ConversionInst>(I))
-    return convert;
+  if (auto convert = ConversionOperation(I))
+    return *convert;
 
   switch (I->getKind()) {
   default:

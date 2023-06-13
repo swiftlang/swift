@@ -95,7 +95,6 @@ bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
     return false;
 
   if (isa<OwnershipForwardingSingleValueInstruction>(inst) ||
-      isa<OwnershipForwardingConversionInst>(inst) ||
       isa<OwnershipForwardingMultipleValueInstruction>(inst)) {
     Operand *forwardedOper = &inst->getOperandRef(0);
     // Trivial conversions do not need to be hoisted out of a borrow scope.

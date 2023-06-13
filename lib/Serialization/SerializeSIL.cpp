@@ -1931,15 +1931,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::RefToBridgeObjectInst: {
     auto RI = cast<RefToBridgeObjectInst>(&SI);
-    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
-           SILAbbrCodes[SILTwoOperandsLayout::Code], (unsigned)SI.getKind(),
-           /*attr*/ 0,
-           S.addTypeRef(RI->getConverted()->getType().getRawASTType()),
-           (unsigned)RI->getConverted()->getType().getCategory(),
-           addValueRef(RI->getConverted()),
-           S.addTypeRef(RI->getBitsOperand()->getType().getRawASTType()),
-           (unsigned)RI->getBitsOperand()->getType().getCategory(),
-           addValueRef(RI->getBitsOperand()));
+    auto op = RI->getOperand(0);
+    SILTwoOperandsLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILTwoOperandsLayout::Code],
+        (unsigned)SI.getKind(),
+        /*attr*/ 0, S.addTypeRef(op->getType().getRawASTType()),
+        (unsigned)op->getType().getCategory(), addValueRef(op),
+        S.addTypeRef(RI->getBitsOperand()->getType().getRawASTType()),
+        (unsigned)RI->getBitsOperand()->getType().getCategory(),
+        addValueRef(RI->getBitsOperand()));
     break;
   }
   // Checked Conversion instructions.
