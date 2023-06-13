@@ -185,9 +185,7 @@ using namespace swift::hashable_support;
 
 @end
 
-Class swift::getNSErrorClass() {
-  return SWIFT_LAZY_CONSTANT(objc_lookUpClass("NSError"));
-}
+extern Class swift::getNSErrorClass();
 
 const Metadata *swift::getNSErrorMetadata() {
   return SWIFT_LAZY_CONSTANT(

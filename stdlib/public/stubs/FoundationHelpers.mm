@@ -31,34 +31,103 @@ typedef enum {
 
 using namespace swift;
 
-static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
-static CFHashCode(*_CFStringHashNSString)(id str);
-static CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
-static CFTypeID _CFStringTypeID = 0;
-static swift_once_t initializeBridgingFuncsOnce;
+typedef struct _CFBridgingState {
+  int version;
+  CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
+  CFHashCode(*_CFStringHashNSString)(id str);
+  CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
+  CFTypeID _CFStringTypeID = 0;
+  Class NSErrorClass;
+  Class NSStringClass;
+  Class NSArrayClass;
+  Class NSMutableArrayClass;
+  Class NSSetClass;
+  Class NSDictionaryClass;
+  Class NSEnumeratorClass;
+  //version 0 ends here
+} CFBridgingState;
+
+static CFBridgingState *bridgingState;
+static swift_once_t initializeBridgingStateOnce;
 
 extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
                                        const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
 
+static void _initializeBridgingFunctionsFromCFImpl(void *ctxt) {
+  assert(!bridgingState);
+  bridgingState = (CFBridgingState *)ctxt;
+}
+
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
+  assert(!bridgingState);
+  bridgingState = calloc(1, sizeof(bridgingState));
   auto getStringTypeID =
     (CFTypeID(*)(void))
     dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
   assert(getStringTypeID);
-  _CFStringTypeID = getStringTypeID();
-  
-  _CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
-  _CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT,
-                                                   "CFStringHashNSString");
-  _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(
-                                                   RTLD_DEFAULT,
-                                                   "CFStringHashCString");
+  bridgingState->version = 0;
+  bridgingState->_CFStringTypeID = getStringTypeID();
+  bridgingState->_CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
+  bridgingState->_CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT, "CFStringHashNSString");
+  bridgingState->_CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(RTLD_DEFAULT, "CFStringHashCString");
+  bridgingState->NSErrorClass = objc_lookUpClass("NSError");
+  bridgingState->NSStringClass = objc_lookUpClass("NSString");
+  bridgingState->NSArrayClass = objc_lookUpClass("NSArray");
+  bridgingState->NSMutableArrayClass = objc_lookUpClass("NSMutableArray");
+  bridgingState->NSSetClass = objc_lookUpClass("NSSet");
+  bridgingState->NSDictionaryClass = objc_lookUpClass("NSDictionary");
+  bridgingState->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
 }
 
 static inline void initializeBridgingFunctions() {
-  swift_once(&initializeBridgingFuncsOnce,
+  swift_once(&initializeBridgingStateOnce,
              _initializeBridgingFunctionsImpl,
              nullptr);
+}
+
+SWIFT_RUNTIME_EXPORT swift_initializeCoreFoundationState(CFBridgingState *state) {
+  swift_once(&initializeBridgingStateOnce,
+             _initializeBridgingFunctionsFromCFImpl,
+             (void *)state);
+}
+
+Class swift::getNSErrorClass() {
+  initializeBridgingFunctions();
+  return bridgingState->NSErrorClass;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+bool
+swift_stdlib_connectNSBaseClasses() {
+  initializeBridgingFunctions();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  Class ourArray = objc_lookUpClass("__SwiftNativeNSArrayBase");
+  if (!ourArray) return false;
+  class_setSuperclass(ourArray, bridgingState->NSArrayClass);
+  
+  Class ourMutableArray = objc_lookUpClass("__SwiftNativeNSMutableArrayBase");
+  if (!ourMutableArray) return false;
+  class_setSuperclass(ourMutableArray, bridgingState->NSMutableArrayClass);
+  
+  Class ourDictionary = objc_lookUpClass("__SwiftNativeNSDictionaryBase");
+  if (!ourDictionary) return false;
+  class_setSuperclass(ourDictionary, bridgingState->NSDictionaryClass);
+  
+  Class ourSet = objc_lookUpClass("__SwiftNativeNSSetBase");
+  if (!ourSet) return false;
+  class_setSuperclass(ourSet, bridgingState->NSSetClass);
+  
+  Class ourString = objc_lookUpClass("__SwiftNativeNSStringBase");
+  if (!ourString) return false;
+  class_setSuperclass(ourString, bridgingState->NSStringClass);
+  
+  Class ourEnumerator = objc_lookUpClass("__SwiftNativeNSEnumeratorBase");
+  if (!ourEnumerator) return false;
+  class_setSuperclass(ourEnumerator, bridgingState->NSEnumeratorClass);
+
+  return true;
+#pragma clang diagnostic pop
 }
 
 __swift_uint8_t
