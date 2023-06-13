@@ -1868,10 +1868,13 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   auto *paramLocator = getConstraintLocator(
       locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
 
-  unsigned options = (TVO_PrefersSubtypeBinding |
-                      TVO_CanBindToHole);
+  unsigned options = TVO_PrefersSubtypeBinding;
+
   if (parameter->isParameterPack())
     options |= TVO_CanBindToPack;
+
+  if (shouldAttemptFixes())
+    options |= TVO_CanBindToHole;
 
   auto typeVar = createTypeVariable(paramLocator, options);
   auto result = replacements.insert(std::make_pair(
