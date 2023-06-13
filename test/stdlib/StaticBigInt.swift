@@ -29,6 +29,8 @@ final class StaticBigIntTests {
     let testCase = StaticBigIntTests()
     let testSuite = TestSuite("StaticBigIntTests")
     testSuite.test("BinaryRepresentation",     testCase.testBinaryRepresentation)
+    testSuite.test("SequenceOfNegativeValue",  testCase.testSequenceOfNegativeValue)
+    testSuite.test("SequenceOfPositiveValue",  testCase.testSequenceOfPositiveValue)
     testSuite.test("TextualRepresentation",    testCase.testTextualRepresentation)
     testSuite.test("PrefixPlusTypeInference",  testCase.testPrefixPlusTypeInference)
     testSuite.test("PrefixMinusTypeInference", testCase.testPrefixMinusTypeInference)
@@ -85,6 +87,64 @@ extension StaticBigIntTests {
 #error("Unimplemented")
 #endif
     }
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testSequenceOfNegativeValue() {
+    let value: StaticBigInt = -0x0011223344556677_8899AABBCCDDEEFF
+    expectEqualSequence(
+      [0x01, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+       0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+       0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+      value.sequence(of: UInt8.self).prefix(24)
+    )
+    expectEqualSequence(
+      [0x1101, 0x3322, 0x5544, 0x7766,
+       0x9988, 0xBBAA, 0xDDCC, 0xFFEE,
+       0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF],
+      value.sequence(of: UInt16.self).prefix(12)
+    )
+    expectEqualSequence(
+      [0x33221101, 0x77665544,
+       0xBBAA9988, 0xFFEEDDCC,
+       0xFFFFFFFF, 0xFFFFFFFF],
+      value.sequence(of: UInt32.self).prefix(6)
+    )
+    expectEqualSequence(
+      [0x7766554433221101,
+       0xFFEEDDCCBBAA9988,
+       0xFFFFFFFFFFFFFFFF],
+      value.sequence(of: UInt64.self).prefix(3)
+    )
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testSequenceOfPositiveValue() {
+    let value: StaticBigInt = 0x0011223344556677_8899AABBCCDDEEFF
+    expectEqualSequence(
+      [0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88,
+       0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+      value.sequence(of: UInt8.self).prefix(24)
+    )
+    expectEqualSequence(
+      [0xEEFF, 0xCCDD, 0xAABB, 0x8899,
+       0x6677, 0x4455, 0x2233, 0x0011,
+       0x0000, 0x0000, 0x0000, 0x0000],
+      value.sequence(of: UInt16.self).prefix(12)
+    )
+    expectEqualSequence(
+      [0xCCDDEEFF, 0x8899AABB,
+       0x44556677, 0x00112233,
+       0x00000000, 0x00000000],
+      value.sequence(of: UInt32.self).prefix(6)
+    )
+    expectEqualSequence(
+      [0x8899AABBCCDDEEFF,
+       0x0011223344556677,
+       0x0000000000000000],
+      value.sequence(of: UInt64.self).prefix(3)
+    )
   }
 }
 

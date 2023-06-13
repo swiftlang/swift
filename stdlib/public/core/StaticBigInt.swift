@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -133,6 +133,87 @@ extension StaticBigInt {
     fatalError("Swift compiler is incompatible with this SDK version")
 #endif
   }
+
+  /// Returns this value's binary representation, as an infinite sequence of
+  /// fixed-width elements.
+  ///
+  /// The elements are ordered from least significant to most significant, with
+  /// an infinite sign extension. Negative values are in two's complement.
+  ///
+  ///     let value: StaticBigInt = 0x0011223344556677_8899AABBCCDDEEFF
+  ///     value.signum()  //-> +1
+  ///     value.bitWidth  //-> 118
+  ///
+  ///     value.sequence(of: UInt8.self).prefix(24).elementsEqual(
+  ///         [0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88,
+  ///          0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
+  ///          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+  ///     ) //-> true
+  ///
+  ///     value.sequence(of: UInt16.self).prefix(12).elementsEqual(
+  ///         [0xEEFF, 0xCCDD, 0xAABB, 0x8899,
+  ///          0x6677, 0x4455, 0x2233, 0x0011,
+  ///          0x0000, 0x0000, 0x0000, 0x0000]
+  ///     ) //-> true
+  ///
+  ///     value.sequence(of: UInt32.self).prefix(6).elementsEqual(
+  ///         [0xCCDDEEFF, 0x8899AABB,
+  ///          0x44556677, 0x00112233,
+  ///          0x00000000, 0x00000000]
+  ///     ) //-> true
+  ///
+  ///     value.sequence(of: UInt64.self).prefix(3).elementsEqual(
+  ///         [0x8899AABBCCDDEEFF,
+  ///          0x0011223344556677,
+  ///          0x0000000000000000]
+  ///     ) //-> true
+  ///
+  /// - Parameter elementType: A fixed-width unsigned integer type.
+  /// - Returns: An infinite multi-pass sequence.
+  @available(SwiftStdlib 5.8, *)
+  @backDeployed(before: SwiftStdlib 9999)
+  @warn_unqualified_access
+  public func sequence<Element>(
+    of elementType: Element.Type
+  ) -> some Sequence<Element> where
+    Element: _ExpressibleByBuiltinIntegerLiteral,
+    Element: FixedWidthInteger,
+    Element: UnsignedInteger
+  {
+    typealias State = (bitIndex: Int, word: UInt)
+    let state: State = (0, 0)
+    let next: (inout State) -> Element?
+    let signExtension: Element = _isNegative ? ~0 : 0
+    if Element.bitWidth.isMultiple(of: UInt.bitWidth) {
+      // Specialize for a multi-word element type.
+      next = { [bitWidth, signExtension] state in
+        guard state.bitIndex < bitWidth else { return signExtension }
+        var result: Element = 0
+        for _ in stride(from: 0, to: Element.bitWidth, by: UInt.bitWidth) {
+          let wordIndex = state.bitIndex >> UInt.bitWidth.trailingZeroBitCount
+          state.word = self[wordIndex]
+          result |= Element(_truncatingBits: state.word) &<< state.bitIndex
+          state.bitIndex += UInt.bitWidth
+        }
+        return result
+      }
+    } else if UInt.bitWidth.isMultiple(of: Element.bitWidth) {
+      // Specialize for a multi-element word type.
+      next = { [bitWidth, signExtension] state in
+        guard state.bitIndex < bitWidth else { return signExtension }
+        if state.bitIndex.isMultiple(of: UInt.bitWidth) {
+          let wordIndex = state.bitIndex >> UInt.bitWidth.trailingZeroBitCount
+          state.word = self[wordIndex]
+        }
+        let result = Element(_truncatingBits: state.word &>> state.bitIndex)
+        state.bitIndex += Element.bitWidth
+        return result
+      }
+    } else {
+      fatalError("Unsupported element type")
+    }
+    return Swift.sequence(state: state, next: next)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -160,13 +241,10 @@ extension StaticBigInt: CustomDebugStringConvertible {
       typealias Element = UInt32
       let hexDigitsPerElement = Element.bitWidth / 4
       _internalInvariant(hexDigitsPerElement <= _SmallString.capacity)
-      _internalInvariant(UInt.bitWidth.isMultiple(of: Element.bitWidth))
 
       // Lazily compute the magnitude, starting with the least significant bits.
       var overflow = isNegative
-      for bitIndex in stride(from: 0, to: bitWidth, by: Element.bitWidth) {
-        let wordIndex = bitIndex >> UInt.bitWidth.trailingZeroBitCount
-        var element = Element(_truncatingBits: self[wordIndex] &>> bitIndex)
+      for var element in self.sequence(of: Element.self) {
         if isNegative {
           element = ~element
           if overflow {
@@ -178,6 +256,7 @@ extension StaticBigInt: CustomDebugStringConvertible {
         let hexDigits = String(element, radix: 16, uppercase: true).utf8
         _ = utf8.suffix(hexDigits.count).update(fromContentsOf: hexDigits)
         utf8 = utf8.dropLast(hexDigitsPerElement)
+        guard !utf8.isEmpty else { break }
       }
       return capacity
     }
