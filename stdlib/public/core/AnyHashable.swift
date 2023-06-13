@@ -62,9 +62,11 @@ extension _AnyHashableBox {
   }
 }
 
+@usableFromInline @frozen
 internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
   internal var _baseHashable: Base
 
+  @inlinable
   internal init(_ base: Base) {
     self._baseHashable = base
   }
@@ -138,16 +140,27 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
 
+  @inlinable
   internal init(_box box: _AnyHashableBox) {
     self._box = box
+  }
+  
+  @usableFromInline
+  internal init(slowPathBase base: some Hashable) {
+    self.init(_box: _ConcreteHashableBox(false)) // Dummy value
+    _withUnprotectedUnsafeMutablePointer(to: &self) {
+      _makeAnyHashableUpcastingToHashableBaseType(
+        base,
+        storingResultInto: $0)
+    }
   }
 
   /// Creates a type-erased hashable value that wraps the given instance.
   ///
   /// - Parameter base: A hashable value to wrap.
-  @_specialize(where H == String)
-  public init<H: Hashable>(_ base: H) {
-    if H.self == String.self {
+  @inlinable
+  public init(_ base: some Hashable) {
+    if H.self == String.self || H.self == Substring.self {
       self.init(_box: _ConcreteHashableBox(base))
       return
     }
@@ -157,13 +170,8 @@ public struct AnyHashable {
       self = custom
       return
     }
-
-    self.init(_box: _ConcreteHashableBox(false)) // Dummy value
-    _withUnprotectedUnsafeMutablePointer(to: &self) {
-      _makeAnyHashableUpcastingToHashableBaseType(
-        base,
-        storingResultInto: $0)
-    }
+    
+    self.init(slowPathBase: base)
   }
 
   internal init<H: Hashable>(_usingDefaultRepresentationOf base: H) {
