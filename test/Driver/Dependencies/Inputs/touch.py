@@ -28,7 +28,7 @@ for filePathPattern in sys.argv[2:]:
     # Support glob patterns if the shell did not expand them (like cmd.exe)
     if glob.escape(filePathPattern) == filePathPattern:
         # Not a glob pattern. We should touch that specific file.
-        filePaths = [ filePathPattern ]
+        filePaths = [filePathPattern]
     else:
         filePaths = glob.glob(filePathPattern)
 
