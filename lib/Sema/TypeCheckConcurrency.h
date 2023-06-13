@@ -277,6 +277,9 @@ enum class FunctionCheckType {
 /// \param refKind Describes what kind of reference is being made, which is
 /// used to tailor the diagnostic.
 ///
+/// \param funcCheckType Describes whether function types in this reference
+/// should be checked for sendability of their results, params, or both
+///
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,

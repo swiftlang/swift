@@ -1002,10 +1002,6 @@ bool swift::diagnoseNonSendableTypes(
   return anyMissing;
 }
 
-namespace {
-
-}
-
 bool swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
     SendableCheckReason reason, Optional<ActorIsolation> knownIsolation,
@@ -1026,6 +1022,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     case FunctionCheckType::Results: break;
     case FunctionCheckType::Params:
     case FunctionCheckType::ParamsResults:
+      // only check params if funcCheckType specifies so
       for (auto param : *function->getParameters()) {
         Type paramType = param->getInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
@@ -1043,6 +1040,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       case FunctionCheckType::Params: break;
       case FunctionCheckType::Results:
       case FunctionCheckType::ParamsResults:
+        // only check results if funcCheckType specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
             resultType, fromDC, loc, diag::non_sendable_result_type,
@@ -4385,10 +4383,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
     return;
 
   case OverrideIsolationResult::Sendable:
+    //check that the results of the overriding method are sendable
     diagnoseNonSendableTypesInReference(
         getDeclRefInContext(value), value->getInnermostDeclContext(),
         value->getLoc(), SendableCheckReason::Override, None, FunctionCheckType::Results);
 
+    //check that the parameters of the overridden method are sendable
     diagnoseNonSendableTypesInReference(
         getDeclRefInContext(overridden), overridden->getInnermostDeclContext(),
         overridden->getLoc(), SendableCheckReason::Override, None, FunctionCheckType::Params);
