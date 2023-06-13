@@ -3083,7 +3083,7 @@ public func closureLetClassUseAfterConsumeArg(_ argX: inout Klass) {
 
 // We do not support captures of vars by closures today.
 public func closureLetCaptureClassUseAfterConsume() {
-    var x2 = Klass() // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+    var x2 = Klass() // expected-error {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
@@ -3096,7 +3096,7 @@ public func closureLetCaptureClassUseAfterConsume() {
 }
 
 public func closureLetCaptureClassUseAfterConsume2() {
-    var x2 = Klass() // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+    var x2 = Klass() // expected-error {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = Klass()
     let f = {
         borrowVal(x2)
@@ -3106,7 +3106,7 @@ public func closureLetCaptureClassUseAfterConsume2() {
 }
 
 public func closureLetCaptureClassUseAfterConsumeError() {
-    var x2 = Klass() // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+    var x2 = Klass() // expected-error {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
@@ -3254,7 +3254,7 @@ public func closureVarCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 public func deferCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' used after consume}}
-    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
     defer { // expected-note {{used here}}
@@ -3269,7 +3269,7 @@ public func deferCaptureClassUseAfterConsume() {
 
 public func deferCaptureClassUseAfterConsume2() {
     var x2 = Klass()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = Klass()
@@ -3284,7 +3284,7 @@ public func deferCaptureClassUseAfterConsume2() {
 }
 
 public func deferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
     defer {
@@ -3298,7 +3298,7 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 
 public func closureLetAndDeferCaptureClassUseAfterConsume() {
     var x2 = Klass()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
@@ -3316,7 +3316,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume() {
 
 public func closureLetAndDeferCaptureClassUseAfterConsume2() {
     var x2 = Klass() // expected-error {{'x2' used after consume}}
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
@@ -3335,7 +3335,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume2() {
 
 public func closureLetAndDeferCaptureClassUseAfterConsume3() {
     var x2 = Klass() // expected-error {{'x2' used after consume}}
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = { 
@@ -3354,7 +3354,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume3() {
 }
 
 public func closureLetAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-note @-3 {{'x2' is declared 'inout'}}
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
@@ -3377,7 +3377,7 @@ public func closureLetAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) 
 
 public func closureLetAndClosureCaptureClassUseAfterConsume() {
     var x2 = Klass() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = Klass()
     let f = {
         let g = {
@@ -3393,7 +3393,7 @@ public func closureLetAndClosureCaptureClassUseAfterConsume() {
 
 public func closureLetAndClosureCaptureClassUseAfterConsume2() {
     var x2 = Klass() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = Klass()
     let f = {
         let g = {
@@ -3436,7 +3436,7 @@ public func closureLetAndClosureCaptureClassArgUseAfterConsume(_ x2: inout Klass
 
 public func closureVarAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = Klass() // expected-error {{'x2' consumed more than once}}
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = x // expected-note {{consumed here}}
     var f = {}
     f = {
@@ -3453,7 +3453,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) 
 
 public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = Klass()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = x // expected-note {{consumed here}}
     var f = {}
@@ -3474,7 +3474,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass)
 public func closureVarAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' is borrowed and cannot be consumed}}
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = x
     // expected-note @-1 {{consumed here}}
     var f = {}
@@ -3522,7 +3522,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned 
 }
 
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: consuming Klass) {
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     var f = {}
     f = {
@@ -3555,7 +3555,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned
 
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of closure capture 'x2' after consume}}
     var f = {}
     f = {
         defer {
