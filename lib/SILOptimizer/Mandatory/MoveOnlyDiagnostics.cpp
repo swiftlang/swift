@@ -542,6 +542,19 @@ void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses(
 //                         MARK: Address Diagnostics
 //===----------------------------------------------------------------------===//
 
+static bool isClosureCapture(MarkMustCheckInst *markedValue) {
+  SILValue val = markedValue->getOperand();
+
+  // look past any project-box
+  if (auto *pbi = dyn_cast<ProjectBoxInst>(val))
+    val = pbi->getOperand();
+
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(val))
+    return fArg->isClosureCapture();
+
+  return false;
+}
+
 void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
     MarkMustCheckInst *markedValue, SILInstruction *consumingUser) {
   if (!useWithDiagnostic.insert(consumingUser).second)
@@ -596,8 +609,8 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
     diagnose(
         astContext, markedValue,
         diag::
-            sil_movechecking_inout_not_reinitialized_before_end_of_function,
-        varName);
+            sil_movechecking_not_reinitialized_before_end_of_function,
+        varName, isClosureCapture(markedValue));
     diagnose(astContext, violatingUser,
              diag::sil_movechecking_consuming_use_here);
     return;
@@ -647,8 +660,8 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
   // consuming message:
   diagnose(
       astContext, markedValue,
-      diag::sil_movechecking_inout_not_reinitialized_before_end_of_function,
-      varName);
+      diag::sil_movechecking_not_reinitialized_before_end_of_function,
+      varName, isClosureCapture(markedValue));
   diagnose(astContext, violatingUser,
            diag::sil_movechecking_consuming_use_here);
 }
