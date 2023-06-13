@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Import.h"
+#include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -767,6 +768,9 @@ class SwiftDependencyScanningService {
     ModuleDependenciesKindMap ModuleDependenciesMap;
   };
 
+  /// The CASOption created the Scanning Service if used.
+  llvm::Optional<clang::CASOptions> CASOpts;
+
   /// The persistent Clang dependency scanner service
   Optional<clang::tooling::dependencies::DependencyScanningService>
       ClangScanningService;
@@ -863,7 +867,7 @@ public:
   void overlaySharedFilesystemCacheForCompilation(CompilerInstance &Instance);
 
   /// Setup caching service.
-  void setupCachingDependencyScanningService(CompilerInstance &Instance);
+  bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.

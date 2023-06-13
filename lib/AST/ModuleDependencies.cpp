@@ -417,12 +417,25 @@ void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(
   Instance.getSourceMgr().setFileSystem(depFS);
 }
 
-void SwiftDependencyScanningService::setupCachingDependencyScanningService(
+bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
   if (!Instance.getInvocation().getFrontendOptions().EnableCAS)
-    return;
+    return false;
+
+  if (CASOpts) {
+    // If CASOption matches, the service is initialized already.
+    if (*CASOpts == Instance.getInvocation().getFrontendOptions().CASOpts)
+      return false;
+
+    // CASOption mismatch, return error.
+    Instance.getDiags().diagnose(
+        SourceLoc(), diag::error_cas,
+        "conflicting CAS options used in scanning service");
+    return true;
+  }
 
   // Setup CAS.
+  CASOpts = Instance.getInvocation().getFrontendOptions().CASOpts;
   CAS = Instance.getSharedCASInstance();
 
   // Add SDKSetting file.
@@ -456,7 +469,7 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!CachingFS) {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                  toString(CachingFS.takeError()));
-    return;
+    return true;
   }
   CacheFS = std::move(*CachingFS);
 
@@ -474,6 +487,8 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       UseClangIncludeTree ? nullptr : CacheFS,
       /* ReuseFileManager */ false, /* OptimizeArgs */ false);
+
+  return false;
 }
 
 SwiftDependencyScanningService::ContextSpecificGlobalCacheState *
