@@ -666,9 +666,6 @@ void swift_initStructMetadataWithLayoutString(StructMetadata *self,
                                               const uint8_t *fieldTags,
                                               uint32_t *fieldOffsets);
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-size_t _swift_refCountBytesForMetatype(const Metadata *type);
-
 enum LayoutStringFlags : uint64_t {
   Empty = 0,
   // TODO: Track other useful information tha can be used to optimize layout
@@ -687,6 +684,9 @@ inline LayoutStringFlags operator|(LayoutStringFlags a, LayoutStringFlags b) {
 inline LayoutStringFlags &operator|=(LayoutStringFlags &a, LayoutStringFlags b) {
   return a = (a | b);
 }
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+size_t _swift_refCountBytesForMetatype(const Metadata *type);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_addRefCountStringForMetatype(uint8_t *layoutStr,

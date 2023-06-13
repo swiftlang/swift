@@ -37,26 +37,6 @@
 
 using namespace swift;
 
-static const size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
-
-/// Given a pointer and an offset, read the requested data and increment the
-/// offset
-template <typename T>
-static T readBytes(const uint8_t *typeLayout, size_t &i) {
-  T returnVal;
-  memcpy(&returnVal, typeLayout + i, sizeof(T));
-  i += sizeof(T);
-  return returnVal;
-}
-
-/// Given a pointer, a value, and an offset, write the value at the given
-/// offset and increment offset by the size of T
-template <typename T>
-static void writeBytes(uint8_t *typeLayout, size_t &i, T value) {
-  memcpy(typeLayout + i, &value, sizeof(T));
-  i += sizeof(T);
-}
-
 static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
