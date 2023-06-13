@@ -1379,6 +1379,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
   SmallVector<ValueDecl *, 4> foundDecls;
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
+      builderType->getAnyNominal()->getLoc(),
       NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
   for (auto decl : foundDecls) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {

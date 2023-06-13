@@ -1594,6 +1594,60 @@ static DeclName adjustLazyMacroExpansionNameKey(
   return name;
 }
 
+SmallVector<MacroDecl *, 1>
+namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
+                         MacroRoles roles) {
+  SmallVector<MacroDecl *, 1> choices;
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+
+  // Macro lookup should always exclude macro expansions; macro
+  // expansions cannot introduce new macro declarations. Note that
+  // the source location here doesn't matter.
+  UnqualifiedLookupDescriptor descriptor{
+    macroName, moduleScopeDC, SourceLoc(),
+    UnqualifiedLookupFlags::ExcludeMacroExpansions
+  };
+
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &found : lookup.allResults()) {
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+      auto candidateRoles = macro->getMacroRoles();
+      if ((candidateRoles && roles.contains(candidateRoles)) ||
+          // FIXME: `externalMacro` should have all roles.
+          macro->getBaseIdentifier().str() == "externalMacro") {
+        choices.push_back(macro);
+      }
+    }
+  }
+  return choices;
+}
+
+bool
+namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
+  bool inMacroArgument = false;
+
+  ASTScope::lookupEnclosingMacroScope(
+      sourceFile, loc,
+      [&](auto potentialMacro) -> bool {
+        UnresolvedMacroReference macro(potentialMacro);
+
+        if (macro.getFreestanding()) {
+          inMacroArgument = true;
+        } else if (auto *attr = macro.getAttr()) {
+          auto *moduleScope = sourceFile->getModuleScopeContext();
+          auto results = lookupMacros(moduleScope, macro.getMacroName(),
+                                      getAttachedMacroRoles());
+          inMacroArgument = !results.empty();
+        }
+
+        return inMacroArgument;
+      });
+
+  return inMacroArgument;
+}
+
 /// Call the given function body with each macro declaration and its associated
 /// role attribute for the given role.
 ///
@@ -1851,10 +1905,10 @@ maybeFilterOutUnwantedDecls(TinyPtrVector<ValueDecl *> decls,
 }
 
 TinyPtrVector<ValueDecl *>
-NominalTypeDecl::lookupDirect(DeclName name,
+NominalTypeDecl::lookupDirect(DeclName name, SourceLoc loc,
                               OptionSet<LookupDirectFlags> flags) {
   return evaluateOrDefault(getASTContext().evaluator,
-                           DirectLookupRequest({this, name, flags}), {});
+                           DirectLookupRequest({this, name, flags}, loc), {});
 }
 
 TinyPtrVector<ValueDecl *>
@@ -2195,6 +2249,7 @@ void namelookup::tryExtractDirectlyReferencedNominalTypes(
 
 bool DeclContext::lookupQualified(Type type,
                                   DeclNameRef member,
+                                  SourceLoc loc,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
@@ -2209,14 +2264,16 @@ bool DeclContext::lookupQualified(Type type,
 
   // Handle lookup in a module.
   if (auto moduleTy = type->getAs<ModuleType>())
-    return lookupQualified(moduleTy->getModule(), member, options, decls);
+    return lookupQualified(moduleTy->getModule(), member,
+                           loc, options, decls);
 
   // Figure out which nominal types we will look into.
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   namelookup::extractDirectlyReferencedNominalTypes(type,
                                                     nominalTypesToLookInto);
 
-  return lookupQualified(nominalTypesToLookInto, member, options, decls);
+  return lookupQualified(nominalTypesToLookInto, member,
+                         loc, options, decls);
 }
 
 static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
@@ -2251,11 +2308,11 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
 
 bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclNameRef member,
-                                  NLOptions options,
+                                  SourceLoc loc, NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   assert(decls.empty() && "additive lookup not supported");
   QualifiedLookupRequest req{this, {typeDecls.begin(), typeDecls.end()},
-                             member, options};
+                             member, loc, options};
   decls = evaluateOrDefault(getASTContext().evaluator, req, {});
   return !decls.empty();
 }
@@ -2309,7 +2366,11 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
     if (options & NL_ExcludeMacroExpansions)
       flags |= NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
-    for (auto decl : current->lookupDirect(member.getFullName(), flags)) {
+
+    // Note that the source loc argument doesn't matter, because excluding
+    // macro expansions is already propagated through the lookup flags above.
+    for (auto decl : current->lookupDirect(member.getFullName(),
+                                           SourceLoc(), flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
@@ -2383,10 +2444,10 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 }
 
 bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
-                                  NLOptions options,
+                                  SourceLoc loc, NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   assert(decls.empty() && "additive lookup not supported");
-  ModuleQualifiedLookupRequest req{this, module, member, options};
+  ModuleQualifiedLookupRequest req{this, module, member, loc, options};
   decls = evaluateOrDefault(getASTContext().evaluator, req, {});
   return !decls.empty();
 }
@@ -2404,7 +2465,7 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     lookupInModule(module, member.getFullName(), decls, NLKind::QualifiedLookup,
-                   kind, topLevelScope, options);
+                   kind, topLevelScope, SourceLoc(), options);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -2421,7 +2482,7 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                      })) {
       lookupInModule(module, member.getFullName(), decls,
                      NLKind::QualifiedLookup, kind, topLevelScope,
-                     options);
+                     SourceLoc(), options);
     }
   }
 
@@ -2613,6 +2674,20 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter,
                                          bool allowUsableFromInline=false) {
+  UnqualifiedLookupOptions options =
+      UnqualifiedLookupFlags::TypeLookup |
+      UnqualifiedLookupFlags::AllowProtocolMembers;
+  if (lookupOuter == LookupOuterResults::Included)
+    options |= UnqualifiedLookupFlags::IncludeOuterResults;
+
+  if (allowUsableFromInline)
+    options |= UnqualifiedLookupFlags::IncludeUsableFromInline;
+
+  // Manually exclude macro expansions here since the source location
+  // is overridden below.
+  if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
+    options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
   // In a protocol or protocol extension, the 'where' clause can refer to
   // associated types without 'Self' qualification:
   //
@@ -2639,15 +2714,6 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
     loc = SourceLoc();
 
   DirectlyReferencedTypeDecls results;
-
-  UnqualifiedLookupOptions options =
-      UnqualifiedLookupFlags::TypeLookup |
-      UnqualifiedLookupFlags::AllowProtocolMembers;
-  if (lookupOuter == LookupOuterResults::Included)
-    options |= UnqualifiedLookupFlags::IncludeOuterResults;
-
-  if (allowUsableFromInline)
-    options |= UnqualifiedLookupFlags::IncludeUsableFromInline;
 
   auto &ctx = dc->getASTContext();
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
@@ -2679,6 +2745,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ArrayRef<TypeDecl *> baseTypes,
                                        DeclNameRef name,
                                        DeclContext *dc,
+                                       SourceLoc loc,
                                        bool allowUsableFromInline=false) {
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
@@ -2705,7 +2772,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
       resolveTypeDeclsToNominal(ctx.evaluator, ctx, baseTypes, moduleDecls,
                                 anyObject);
 
-    dc->lookupQualified(nominalTypeDecls, name, options, members);
+    dc->lookupQualified(nominalTypeDecls, name, loc, options, members);
 
     // Search all of the modules.
     for (auto module : moduleDecls) {
@@ -2713,7 +2780,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
       innerOptions &= ~NL_RemoveOverridden;
       innerOptions &= ~NL_RemoveNonVisible;
       SmallVector<ValueDecl *, 4> moduleMembers;
-      dc->lookupQualified(module, name, innerOptions, moduleMembers);
+      dc->lookupQualified(module, name, loc, innerOptions, moduleMembers);
       members.append(moduleMembers.begin(), moduleMembers.end());
     }
 
@@ -2765,6 +2832,7 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     current =
         directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
                                                component->getNameRef(), dc,
+                                               component->getLoc(),
                                                allowUsableFromInline);
     if (current.empty())
       return current;
@@ -3549,7 +3617,8 @@ bool IsCallAsFunctionNominalRequest::evaluate(Evaluator &evaluator,
   // member access.
   SmallVector<ValueDecl *, 4> results;
   auto opts = NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreAccessControl;
-  dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction), opts, results);
+  dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction),
+                      decl->getLoc(), opts, results);
 
   return llvm::any_of(results, [](ValueDecl *decl) -> bool {
     if (auto *fd = dyn_cast<FuncDecl>(decl))

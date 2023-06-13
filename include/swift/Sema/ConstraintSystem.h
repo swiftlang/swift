@@ -2910,7 +2910,8 @@ public:
   /// and no new names are introduced after that point.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, DeclNameRef name);
+  LookupResult &lookupMember(Type base, DeclNameRef name,
+                             SourceLoc loc);
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.

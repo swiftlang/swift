@@ -1413,6 +1413,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
           { C, DeclBaseName::createConstructor(), { C.Id_from } });
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
+                                    classDecl->getLoc(),
                                     NameLookupFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())

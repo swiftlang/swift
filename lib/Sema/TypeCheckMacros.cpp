@@ -1471,6 +1471,40 @@ swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
   return macroSourceFile->getBufferID();
 }
 
+/// Emits an error and returns \c true if the maro reference may
+/// introduce arbitrary names at global scope.
+static bool diagnoseArbitraryGlobalNames(DeclContext *dc,
+                                         UnresolvedMacroReference macroRef,
+                                         MacroRole macroRole) {
+  auto &ctx = dc->getASTContext();
+  assert(macroRole == MacroRole::Declaration ||
+         macroRole == MacroRole::Peer);
+
+  if (!dc->isModuleScopeContext())
+    return false;
+
+  bool isInvalid = false;
+  namelookup::forEachPotentialResolvedMacro(
+      dc, macroRef.getMacroName(), macroRole,
+      [&](MacroDecl *decl, const MacroRoleAttr *attr) {
+        if (!isInvalid &&
+            attr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+          ctx.Diags.diagnose(macroRef.getSigilLoc(),
+                             diag::global_arbitrary_name,
+                             getMacroRoleString(macroRole));
+          isInvalid = true;
+
+          // If this is an attached macro, mark the attribute as invalid
+          // to avoid diagnosing an unknown attribute later.
+          if (auto *attr = macroRef.getAttr()) {
+            attr->setInvalid();
+          }
+        }
+      });
+
+  return isInvalid;
+}
+
 ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
                                               UnresolvedMacroReference macroRef,
                                               DeclContext *dc) const {
@@ -1487,11 +1521,24 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // When a macro is not found for a custom attribute, it may be a non-macro.
   // So bail out to prevent diagnostics from the contraint system.
   if (macroRef.getAttr()) {
-    auto foundMacros = TypeChecker::lookupMacros(
-        dc, macroRef.getMacroName(), SourceLoc(), roles);
+    auto foundMacros = namelookup::lookupMacros(
+        dc, macroRef.getMacroName(), roles);
     if (foundMacros.empty())
       return ConcreteDeclRef();
   }
+
+  // Freestanding and peer macros applied at top-level scope cannot introduce
+  // arbitrary names. Introducing arbitrary names means that any lookup
+  // into this scope must expand the macro. This is a problem, because
+  // resolving the macro can invoke type checking other declarations, e.g.
+  // anything that the macro arguments depend on. If _anything_ the macro
+  // depends on performs name unqualified name lookup, e.g. type resolution,
+  // we'll get circularity errors. It's better to prevent this by banning
+  // these macros at global scope if any of the macro candidates introduce
+  // arbitrary names.
+  if (diagnoseArbitraryGlobalNames(dc, macroRef, MacroRole::Declaration) ||
+      diagnoseArbitraryGlobalNames(dc, macroRef, MacroRole::Peer))
+    return ConcreteDeclRef();
 
   // If we already have a MacroExpansionExpr, use that. Otherwise,
   // create one.

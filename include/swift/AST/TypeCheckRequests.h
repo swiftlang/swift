@@ -3249,6 +3249,9 @@ private:
 public:
   UnresolvedMacroReference(FreestandingMacroExpansion *exp) : pointer(exp) {}
   UnresolvedMacroReference(CustomAttr *attr) : pointer(attr) {}
+  UnresolvedMacroReference(
+      llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *> pointer)
+      : pointer(pointer) {}
 
   FreestandingMacroExpansion *getFreestanding() const {
     return pointer.dyn_cast<FreestandingMacroExpansion *>();

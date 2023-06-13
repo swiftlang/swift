@@ -461,7 +461,7 @@ public:
   LookupInModuleRequest(
       const DeclContext *, DeclName, NLKind,
       namelookup::ResolutionKind, const DeclContext *,
-      NLOptions);
+      SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -511,7 +511,7 @@ class ModuleQualifiedLookupRequest
 public:
   ModuleQualifiedLookupRequest(const DeclContext *,
                                ModuleDecl *, DeclNameRef,
-                               NLOptions);
+                               SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -537,7 +537,7 @@ class QualifiedLookupRequest
 public:
   QualifiedLookupRequest(const DeclContext *,
                          SmallVector<NominalTypeDecl *, 4>,
-                         DeclNameRef, NLOptions);
+                         DeclNameRef, SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -588,7 +588,7 @@ class DirectLookupRequest
                            TinyPtrVector<ValueDecl *>(DirectLookupDescriptor),
                            RequestFlags::Uncached|RequestFlags::DependencySink> {
 public:
-  DirectLookupRequest(DirectLookupDescriptor);
+  DirectLookupRequest(DirectLookupDescriptor, SourceLoc);
 
 private:
   friend SimpleRequest;
