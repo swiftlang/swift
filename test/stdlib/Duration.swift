@@ -14,8 +14,8 @@ if #available(SwiftStdlib 5.7, *) {
       expectEqual(sec, Int64(integerValue))
       expectEqual(attosec, 0)
     }
-    let halfSecond = Duration.seconds(0.25)
-    expectEqual(halfSecond.components, (0, 250_000_000_000_000_000))
+    let quarterSecond = Duration.seconds(0.25)
+    expectEqual(quarterSecond.components, (0, 250_000_000_000_000_000))
     // Value that overflows conversion from Double -> Int64, but should be
     // representable as a number of seconds:
     let huge: Double = 1.7e20
