@@ -12,7 +12,16 @@
 
 @end
 
-@interface ObjCClass : ObjCBaseClass
+@protocol ObjCProto
+
+- (instancetype)initFromProtocol1:(int)param;
+- (instancetype)initFromProtocol2:(int)param;
+
+@end
+
+@interface ObjCClass : ObjCBaseClass <ObjCProto>
+
+- (instancetype)initNotFromProtocol:(int)param;
 
 - (void)methodFromHeader1:(int)param;
 - (void)methodFromHeader2:(int)param;
