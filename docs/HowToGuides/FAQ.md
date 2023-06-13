@@ -172,6 +172,6 @@ Here's a small gist that goes through the basics on how to use it:
    git rebase --continue
    ```
 
-It's important to note that you should only rebase commits that have not been pushed to a public branch. 
+We suggest considering to rebase only those commits that haven't been pushed to a public branch.
 If you need to tidy up commits that have already been pushed, 
 it's generally better to use `git revert` to avoid causing confusion for other developers.
