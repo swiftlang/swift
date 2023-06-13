@@ -3143,11 +3143,11 @@ func closureLetStoreClosureInVariableIsEscape() {
 
     let f = {
         borrowVal(s)
-        consumeVal(s) // expected-error {{noncopyable 's' cannot be consumed when captured by a closure}}
+        consumeVal(s) // expected-error {{noncopyable 's' cannot be consumed when captured by an escaping closure}}
     }
     let c = StoreClosure(f: f)
     _ = c
-    consumeVal(s) // expected-error {{noncopyable 's' cannot be consumed when captured by a closure}}
+    consumeVal(s) // expected-error {{noncopyable 's' cannot be consumed when captured by an escaping closure}}
 }
 
 /////////////////////////////
@@ -3202,8 +3202,8 @@ public func closureVarCaptureClassUseAfterConsume() {
     var f = {}
     f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     }
     f()
 }
@@ -3214,7 +3214,7 @@ public func closureVarCaptureClassUseAfterConsume2() {
     var f = {}
     f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     }
     f()
 }
@@ -3225,12 +3225,12 @@ public func closureVarCaptureClassUseAfterConsumeError() {
     var f = {}
     f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    let x3 = x2 // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+    let x3 = x2 // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     x2 = Klass()
     let _ = x3
 }
@@ -3458,7 +3458,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass)
     x2 = x // expected-note {{consumed here}}
     var f = {}
     f = {
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         defer {
             borrowVal(x2)
             consumeVal(x2) // expected-note {{consumed here}}
@@ -3479,7 +3479,7 @@ public func closureVarAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass)
     // expected-note @-1 {{consumed here}}
     var f = {}
     f = {
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         defer {
             borrowVal(x2)
             consumeVal(x2) // expected-note {{consumed here}}
@@ -3489,11 +3489,11 @@ public func closureVarAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass)
         print("foo")
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
 }
 
 public func closureVarAndDeferCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
-    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     // expected-error @-2 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     var f = {}
     f = {// expected-note {{closure capturing 'x2' here}}
@@ -3508,7 +3508,7 @@ public func closureVarAndDeferCaptureClassArgUseAfterConsume(_ x2: borrowing Kla
 }
 
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     var f = {}
     f = {
         defer {
@@ -3539,7 +3539,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: consumi
 
 // TODO: MG
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned Klass) {
-    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     var f = {}
     f = {
         defer {
@@ -3550,7 +3550,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume3(_ x2: __owned
         print("foo")
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
 }
 
 public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
@@ -3567,7 +3567,7 @@ public func closureVarAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consumi
         print("foo")
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
 }
 
 ///////////////////////////////////////////
@@ -3582,11 +3582,11 @@ public func closureVarAndClosureCaptureClassUseAfterConsume(_ x: borrowing Klass
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
-        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+        consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     }
     f()
 }
@@ -3601,14 +3601,14 @@ public func closureVarAndClosureCaptureClassUseAfterConsume2(_ x: borrowing Klas
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    let x3 = x2 // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+    let x3 = x2 // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     _ = x3
 }
 
@@ -3623,19 +3623,19 @@ public func closureVarAndClosureCaptureClassUseAfterConsume3(_ x: borrowing Klas
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-    let x3 = x2 // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+    let x3 = x2 // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     _ = x3
 }
 
 public func closureVarAndClosureCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
-    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     // expected-error @-2 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     // expected-error @-3 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     var f = {}
@@ -3657,8 +3657,8 @@ public func closureVarAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owne
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
     }
@@ -3671,8 +3671,8 @@ public func closureVarAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: consu
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
     }
@@ -3685,13 +3685,13 @@ public func closureVarAndClosureCaptureClassOwnedArgUseAfterConsume3(_ x2: __own
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
 }
 
 public func closureVarAndClosureCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
@@ -3700,13 +3700,13 @@ public func closureVarAndClosureCaptureClassOwnedArgUseAfterConsume4(_ x2: consu
         var g = {}
         g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
-            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
+            consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by a closure}}
+    consumeVal(x2) // expected-error {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
 }
 
 /////////////////////////////
@@ -4106,14 +4106,14 @@ func inoutCaptureTest() -> (() -> ()) {
 
     borrowVal(x)
     consumeVal(x)
-    // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by a closure}}
+    // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     x = NonTrivialStruct()
 
     let g = {
         x = NonTrivialStruct()
         useInOut(&x)
         consumeVal(x)
-        // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by a closure}}
+        // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     }
     g()
 
@@ -4130,13 +4130,13 @@ func inoutCaptureTestAddressOnlyGeneric<T : P>(_ t: T.Type) -> (() -> ()) {
     }
 
     borrowVal(x)
-    consumeVal(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by a closure}}
+    consumeVal(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     x = AddressOnlyGeneric<T>()
 
     let g = {
         x = AddressOnlyGeneric<T>()
         useInOut(&x)
-        consumeVal(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by a closure}}
+        consumeVal(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     }
     g()
 

@@ -766,7 +766,7 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by a closure", (StringRef))
+      "noncopyable '%0' cannot be consumed when captured by an escaping closure", (StringRef))
 ERROR(sil_movechecking_inout_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of inout parameter '%0' after consume", (StringRef))
 ERROR(sil_movechecking_value_consumed_in_a_loop, none,
