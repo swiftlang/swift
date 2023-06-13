@@ -117,23 +117,25 @@ bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
   if (auto *inst = value->getDefiningInstruction())
     if (auto *mixin = ForwardingInstruction::get(inst))
       return mixin->preservesOwnership() &&
-             !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
+             !ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(inst);
 
   return false;
 }
 
 bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
-  if (auto *mixin = ForwardingInstruction::get(use->getUser()))
-    return mixin->preservesOwnership() &&
-           !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
+  if (auto *fwi = ForwardingInstruction::get(use->getUser()))
+    return fwi->preservesOwnership() &&
+           !ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(
+               use->getUser());
   return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   if (auto *inst = value->getDefiningInstructionOrTerminator()) {
-    if (auto *mixin = ForwardingInstruction::get(inst)) {
-      return mixin->preservesOwnership() &&
-             !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
+    if (auto *fwi = ForwardingInstruction::get(inst)) {
+      return fwi->preservesOwnership() &&
+             !ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(
+                 inst);
     }
   }
   return false;
@@ -141,9 +143,10 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
-  if (auto *mixin = ForwardingInstruction::get(user))
-    return mixin->preservesOwnership() &&
-           !isa<GuaranteedFirstArgForwardingSingleValueInst>(user);
+  if (auto *fwi = ForwardingInstruction::get(user))
+    return fwi->preservesOwnership() &&
+           !ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(
+               user);
   return false;
 }
 
@@ -1717,17 +1720,11 @@ bool swift::visitForwardedGuaranteedOperands(
   if (inst->getNumRealOperands() == 0) {
     return false;
   }
-  if (isa<FirstArgOwnershipForwardingSingleValueInst>(inst) ||
-      isa<OwnershipForwardingConversionInst>(inst) ||
-      isa<OwnershipForwardingSelectEnumInstBase>(inst) ||
-      isa<OwnershipForwardingMultipleValueInstruction>(inst)) {
-    assert(!isa<SingleValueInstruction>(inst)
-           || !BorrowedValue(cast<SingleValueInstruction>(inst))
-                  && "forwarded operand cannot begin a borrow scope");
+  if (ForwardingInstruction::canForwardFirstOperandOnly(inst)) {
     visitOperand(&inst->getOperandRef(0));
     return true;
   }
-  if (isa<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+  if (ForwardingInstruction::canForwardAllOperands(inst)) {
     assert(inst->getNumOperands() > 0 && "checked above");
     assert(inst->getNumOperands() == inst->getNumRealOperands() &&
            "mixin expects all readl operands");

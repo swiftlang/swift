@@ -3229,13 +3229,15 @@ bool ForwardingInstruction::hasSameRepresentation(SILInstruction *inst) {
 }
 
 bool ForwardingInstruction::isAddressOnly(SILInstruction *inst) {
-  if (auto *aggregate =
-          dyn_cast<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+  if (canForwardAllOperands(inst)) {
+    // All ForwardingInstructions that forward all operands are currently a
+    // single value instruction.
+    auto *aggregate = cast<OwnershipForwardingSingleValueInstruction>(inst);
     // If any of the operands are address-only, then the aggregate must be.
     return aggregate->getType().isAddressOnly(*inst->getFunction());
   }
   // All other forwarding instructions must forward their first operand.
-  assert(ForwardingInstruction::isa(inst));
+  assert(canForwardFirstOperandOnly(inst));
   return inst->getOperand(0)->getType().isAddressOnly(*inst->getFunction());
 }
 

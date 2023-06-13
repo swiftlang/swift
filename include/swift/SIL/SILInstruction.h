@@ -1239,9 +1239,48 @@ public:
     ownershipKind = newKind;
   }
 
+  static bool canForwardAllOperands(SILInstruction *inst) {
+    switch (inst->getKind()) {
+    case SILInstructionKind::StructInst:
+    case SILInstructionKind::TupleInst:
+    case SILInstructionKind::LinearFunctionInst:
+    case SILInstructionKind::DifferentiableFunctionInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static bool canForwardFirstOperandOnly(SILInstruction *inst) {
+    if (!ForwardingInstruction::isa(inst)) {
+      return false;
+    }
+    return !canForwardAllOperands(inst);
+  }
+
+  static bool canForwardOwnedCompatibleValuesOnly(SILInstruction *inst) {
+    switch (inst->getKind()) {
+    case SILInstructionKind::MarkUninitializedInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static bool canForwardGuaranteedCompatibleValuesOnly(SILInstruction *inst) {
+    switch (inst->getKind()) {
+    case SILInstructionKind::TupleExtractInst:
+    case SILInstructionKind::StructExtractInst:
+    case SILInstructionKind::DifferentiableFunctionExtractInst:
+    case SILInstructionKind::LinearFunctionExtractInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   /// Defined inline below due to forward declaration issues.
   static ForwardingInstruction *get(SILInstruction *inst);
-  /// Defined inline below due to forward declaration issues.
   static bool isa(SILInstructionKind kind);
   static bool isa(const SILInstruction *inst) { return isa(inst->getKind()); }
   static bool isa(SILNodePointer node) {
@@ -1295,24 +1334,6 @@ public:
     return classof(inst->getKind());
   }
 };
-
-inline bool
-OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::ObjectInst:
-  case SILInstructionKind::EnumInst:
-  case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::InitExistentialRefInst:
-  case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
-  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
-  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
-    return true;
-  default:
-    return false;
-  }
-}
 
 /// A value base result of a multiple value instruction.
 ///
@@ -10548,6 +10569,37 @@ public:
   }
 };
 
+inline bool
+OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
+  switch (kind) {
+  case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::EnumInst:
+  case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::InitExistentialRefInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::DifferentiableFunctionExtractInst:
+  case SILInstructionKind::LinearFunctionExtractInst:
+  case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILInstructionKind::StructInst:
+  case SILInstructionKind::TupleInst:
+  case SILInstructionKind::LinearFunctionInst:
+  case SILInstructionKind::DifferentiableFunctionInst:
+  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 /// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness
 /// function for a given original function.
 class DifferentiabilityWitnessFunctionInst
@@ -10832,8 +10884,6 @@ inline ForwardingInstruction *ForwardingInstruction::get(SILInstruction *inst) {
     return result;
   if (auto *result =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
-    return result;
-  if (auto *result = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(inst))
     return result;
   return nullptr;
 }

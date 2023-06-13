@@ -1355,14 +1355,14 @@ public:
     ValueOwnershipKind ownership =
         ForwardingInstruction::get(i)->getForwardingOwnershipKind();
 
-    if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
+    if (ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(i)) {
       ValueOwnershipKind kind = OwnershipKind::Owned;
       require(kind.isCompatibleWith(ownership),
               "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
               "compatible with owned");
     }
 
-    if (auto *o = dyn_cast<GuaranteedFirstArgForwardingSingleValueInst>(i)) {
+    if (ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(i)) {
       ValueOwnershipKind kind = OwnershipKind::Guaranteed;
       require(kind.isCompatibleWith(ownership),
               "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
