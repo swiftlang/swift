@@ -243,7 +243,7 @@ func test_invalid_references() {
   }
 }
 
-func test_memberwise_with_overlaps() {
+func test_memberwise_with_overlaps_dont_synthesize_inits() {
   struct Test1<T, U> {
     var _a: T
     var _b: Int
@@ -270,7 +270,8 @@ func test_memberwise_with_overlaps() {
     var c: U
   }
 
-  _ = Test1(a: "a", pair: ("b", 1), c: [3.0]) // Ok
+  _ = Test1<String, [Double]>(a: "a", pair: ("b", 1), c: [3.0])
+  // expected-error@-1 {{'Test1<String, [Double]>' cannot be constructed because it has no accessible initializers}}
 
   struct Test2<T, U> {
     var _a: T
@@ -307,7 +308,8 @@ func test_memberwise_with_overlaps() {
     }
   }
 
-  _ = Test2(a: "a", pair: ("c", 2), b: 0) // Ok
+  _ = Test2<String, Int>(a: "a", pair: ("c", 2), b: 0)
+  // expected-error@-1 {{'Test2<String, Int>' cannot be constructed because it has no accessible initializers}}
 
   struct Test3<T, U> {
     var _a: T
@@ -354,7 +356,8 @@ func test_memberwise_with_overlaps() {
     }
   }
 
-  _ = Test3(a: "a", triple: ("b", 2, [1.0, 2.0]), b: 0, c: [1.0]) // Ok
+  _ = Test3<String, [Double]>(a: "a", triple: ("b", 2, [1.0, 2.0]), b: 0, c: [1.0])
+  // expected-error@-1 {{'Test3<String, [Double]>' cannot be constructed because it has no accessible initializers}}
 }
 
 func test_invalid_memberwise() {

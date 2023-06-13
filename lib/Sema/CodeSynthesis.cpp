@@ -320,14 +320,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         continue;
 
       // Check whether this property could be initialized via init accessor.
-      if (initializedViaAccessor.count(var)) {
-        for (auto iter = initializedViaAccessor.find(var);
-             iter != initializedViaAccessor.end(); ++iter) {
-          auto *initializerProperty = iter->second;
-
-          if (usedInitProperties.insert(initializerProperty).second)
-            createParameter(initializerProperty);
-        }
+      if (initializedViaAccessor.count(var) == 1) {
+        auto *initializerProperty = initializedViaAccessor.find(var)->second;
+        if (usedInitProperties.insert(initializerProperty).second)
+          createParameter(initializerProperty);
       } else {
         createParameter(var);
       }
@@ -1337,9 +1333,20 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
       if (initializedViaAccessor.empty())
         return true;
 
-      if (!initializedViaAccessor.count(var)) {
+      switch (initializedViaAccessor.count(var)) {
+      // Not covered by an init accessor.
+      case 0:
         initializedProperties.insert(var);
         continue;
+
+      // Covered by a single init accessor.
+      case 1:
+        break;
+
+      // Covered by one than one init accessor which means that we
+      // cannot synthesize memberwise initializer.
+      default:
+        return false;
       }
 
       // Check whether use of init accessors results in access to uninitialized
