@@ -2004,7 +2004,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
       const std::vector<std::pair<std::string, std::string>>
           &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {});
+      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {}, {});
       ExplicitModuleMap.try_emplace(moduleInput.first, std::move(entry));
     }
   }
@@ -2270,7 +2270,7 @@ struct ExplicitCASModuleLoader::Implementation {
       const std::vector<std::pair<std::string, std::string>>
           &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {});
+      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {}, {});
       ExplicitModuleMap.try_emplace(moduleInput.first, std::move(entry));
     }
   }
