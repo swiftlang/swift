@@ -42,7 +42,7 @@ StringForPrintObjectTests.test("Basic") {
   let a_printed = printObj(a)
   let a_debug = debugVal(&a)
   expectEqual("Hello World", String(reflecting: a))
-  expectEqual("Hello World\n", a_printed)
+  expectEqual("Hello World\n  - super : NSMutableString\n    - super : NSString\n      - super : NSObject\n", a_printed)
   expectEqual(a_printed, a_debug)
 }
 
@@ -51,7 +51,7 @@ StringForPrintObjectTests.test("NSStringFromStringLiteral") {
   let a_printed = printObj(a)
   let a_debug = debugVal(&a)
   expectEqual("Hello World", String(reflecting: a))
-  expectEqual("Hello World\n", a_printed)
+  expectEqual("Hello World\n  - super : NSMutableString\n    - super : NSString\n      - super : NSObject\n", a_printed)
   expectEqual(a_printed, a_debug)
 }
 
@@ -63,7 +63,7 @@ StringForPrintObjectTests.test("NSStringFromUnsafeBuffer") {
   let a_printed = printObj(a)
   let a_debug = debugVal(&a)
   expectEqual("A", String(reflecting: a))
-  expectEqual("A\n", a_printed)
+  expectEqual("A\n  - super : NSString\n    - super : NSObject\n", a_printed)
   expectEqual(a_printed, a_debug)
   buf.deallocate()
 }
@@ -86,7 +86,7 @@ StringForPrintObjectTests.test("ArrayOfStrings") {
   let a_printed = printObj(a)
   let a_debug = debugVal(&a)
   expectEqual("[Hello World]", String(reflecting: a))
-  expectEqual("▿ 1 element\n  - 0 : Hello World\n", a_printed)
+  expectEqual("▿ 1 element\n  - 0 : Hello World\n    - super : NSMutableString\n      - super : NSString\n        - super : NSObject\n", a_printed)
   expectEqual(a_printed, a_debug)
 }
 
@@ -99,7 +99,7 @@ StringForPrintObjectTests.test("StructWithOneMember") {
   let a_printed = printObj(StructWithOneMember())
   let a_debug = debugVal(&a)
   expectEqual("main.StructWithOneMember(a: Hello World)", String(reflecting: a))
-  expectEqual("▿ StructWithOneMember\n  - a : Hello World\n", a_printed)
+  expectEqual("▿ StructWithOneMember\n  - a : Hello World\n    - super : NSMutableString\n      - super : NSString\n        - super : NSObject\n", a_printed)
   expectEqual(a_printed, a_debug)
 }
 
@@ -113,7 +113,7 @@ StringForPrintObjectTests.test("StructWithTwoMembers") {
   let a_printed = printObj(StructWithTwoMembers())
   let a_debug = debugVal(&a)
   expectEqual("main.StructWithTwoMembers(a: 1, b: Hello World)", String(reflecting: a))
-  expectEqual("▿ StructWithTwoMembers\n  - a : 1\n  - b : Hello World\n", a_printed)
+  expectEqual("▿ StructWithTwoMembers\n  - a : 1\n  - b : Hello World\n    - super : NSMutableString\n      - super : NSString\n        - super : NSObject\n", a_printed)
   expectEqual(a_printed, a_debug)
 }
 

@@ -21,6 +21,15 @@ class ClassWithMirror: CustomReflectable {
   }
 }
 
+class RecursiveClass {
+  var a = 1
+  var b = "Hello World"
+  var c: RecursiveClass?
+  init() {
+    self.c = self
+  }
+}
+
 #if _runtime(_ObjC)
 struct DontBridgeThisStruct {
   var message = "Hello World"
@@ -61,12 +70,21 @@ StringForPrintObjectTests.test("StructWithMembers") {
   expectEqual(printed, "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
 }
 
+
 #if _runtime(_ObjC)
 StringForPrintObjectTests.test("ClassWithMembers") {
   let printed = _stringForPrintObject(ClassWithMembers())
-  expectTrue(printed.hasPrefix("<ClassWithMembers: 0x"))
+  expectTrue(printed.hasPrefix("▿ <ClassWithMembers: 0x"))
+  expectTrue(printed.hasSuffix(">\n  - a : 1\n  - b : \"Hello World\"\n"))
 }
 #endif
+
+StringForPrintObjectTests.test("RecursiveClass") {
+  let printed = _stringForPrintObject(RecursiveClass())
+  expectTrue(printed.hasPrefix("▿ <RecursiveClass: 0x"))
+  expectTrue(printed.contains(">\n  - a : 1\n  - b : \"Hello World\"\n  ▿ c : Optional<RecursiveClass>\n    ▿ some : <RecursiveClass: 0x"))
+  expectTrue(printed.hasSuffix("> { ... }\n"))
+}
 
 StringForPrintObjectTests.test("ClassWithMirror") {
   let printed = _stringForPrintObject(ClassWithMirror())

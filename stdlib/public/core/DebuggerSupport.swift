@@ -150,21 +150,8 @@ public enum _DebuggerSupport {
   
     print(String(repeating: " ", count: indent), terminator: "", to: &target)
 
-    // do not expand classes with no custom Mirror
-    // yes, a type can lie and say it's a class when it's not since we only
-    // check the displayStyle - but then the type would have a custom Mirror
-    // anyway, so there's that...
-    let isNonClass = mirror.displayStyle != .`class`
-    let isCustomReflectable: Bool
-    if let value = value {
-      isCustomReflectable = value is CustomReflectable
-    } else {
-      isCustomReflectable = true
-    }
-    let willExpand = isNonClass || isCustomReflectable
-
     let count = mirror.children.count
-    let bullet = isRoot && (count == 0 || !willExpand) ? ""
+    let bullet = isRoot && count == 0 ? ""
       : count == 0    ? "- "
       : maxDepth <= 0 ? "▹ " : "▿ "
     print(bullet, terminator: "", to: &target)
@@ -179,7 +166,7 @@ public enum _DebuggerSupport {
       print(str, terminator: "", to: &target)
     }
   
-    if (maxDepth <= 0) || !willExpand {
+    if (maxDepth <= 0) {
       print("", to: &target)
       return
     }
