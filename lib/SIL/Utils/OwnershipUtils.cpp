@@ -1386,13 +1386,6 @@ ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
     return ofti->getForwardingOwnershipKind();
   }
 
-  if (auto *move = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-    return move->getForwardingOwnershipKind();
-  }
-
-  if (auto *move = dyn_cast<MoveOnlyWrapperToCopyableBoxInst>(user))
-    return move->getForwardingOwnershipKind();
-
   llvm_unreachable("Unhandled forwarding inst?!");
 }
 
@@ -1727,9 +1720,7 @@ bool swift::visitForwardedGuaranteedOperands(
   if (isa<FirstArgOwnershipForwardingSingleValueInst>(inst) ||
       isa<OwnershipForwardingConversionInst>(inst) ||
       isa<OwnershipForwardingSelectEnumInstBase>(inst) ||
-      isa<OwnershipForwardingMultipleValueInstruction>(inst) ||
-      isa<MoveOnlyWrapperToCopyableValueInst>(inst) ||
-      isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
+      isa<OwnershipForwardingMultipleValueInstruction>(inst)) {
     assert(!isa<SingleValueInstruction>(inst)
            || !BorrowedValue(cast<SingleValueInstruction>(inst))
                   && "forwarded operand cannot begin a borrow scope");
