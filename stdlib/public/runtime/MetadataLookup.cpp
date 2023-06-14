@@ -17,6 +17,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
+#include "Tracing.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
@@ -742,11 +743,13 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
           return nullptr;
 #endif
 
+  auto traceState = runtime::trace::metadata_scan_begin(node);
+
   for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto context = record.getContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(context, node)) {
-          return context;
+          return traceState.end(context);
         }
       }
     }
@@ -970,11 +973,13 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        NodePointer node) {
+  auto traceState = runtime::trace::protocol_scan_begin(node);
+
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
         if (_contextDescriptorMatchesMangling(protocol, node))
-          return protocol;
+          return traceState.end(protocol);
       }
     }
   }
