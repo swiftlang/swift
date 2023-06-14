@@ -3840,6 +3840,9 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
+
+      if (!node->hasChildren())
+        return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
       NodePointer parentOrModule = node->getChild(0);
       if (isSpecialized(parentOrModule)) {
         auto unspec = getUnspecialized(parentOrModule, Factory);
@@ -3860,8 +3863,14 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias: {
+      if (!node->hasChildren())
+        return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
+
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
+
+      if (!unboundType->hasChildren())
+        return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
       NodePointer nominalType = unboundType->getChild(0);
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
@@ -3869,12 +3878,16 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     }
 
     case Node::Kind::ConstrainedExistential: {
+      if (!node->hasChildren())
+        return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
       return unboundType;
     }
 
     case Node::Kind::BoundGenericFunction: {
+      if (!node->hasChildren())
+        return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
       NodePointer unboundFunction = node->getChild(0);
       DEMANGLER_ASSERT(unboundFunction->getKind() == Node::Kind::Function ||
                            unboundFunction->getKind() ==
@@ -3886,6 +3899,8 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     }
 
     case Node::Kind::Extension: {
+      if (node->getNumChildren() < 2)
+        return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
       NodePointer parent = node->getChild(1);
       if (!isSpecialized(parent))
         return node;
