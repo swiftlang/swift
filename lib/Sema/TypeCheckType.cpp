@@ -1412,7 +1412,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   NameLookupOptions relookupOptions = lookupOptions;
   relookupOptions |= NameLookupFlags::IgnoreAccessControl;
   auto inaccessibleMembers = TypeChecker::lookupMemberType(
-      dc, parentType, repr->getNameRef(), relookupOptions);
+      dc, parentType, repr->getNameRef(),
+      repr->getLoc(), relookupOptions);
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
@@ -1443,8 +1444,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     NLOptions memberLookupOptions = (NL_QualifiedDefault |
                                      NL_IgnoreAccessControl);
     SmallVector<ValueDecl *, 2> results;
-    dc->lookupQualified(parentType, repr->getNameRef(), memberLookupOptions,
-                        results);
+    dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
+                        memberLookupOptions, results);
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!results.empty()) {
@@ -1834,7 +1835,7 @@ static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(
-        DC, parentTy, repr->getNameRef(), lookupOptions);
+        DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether

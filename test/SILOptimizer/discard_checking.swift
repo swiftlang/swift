@@ -388,7 +388,7 @@ struct Basics: ~Copyable {
 
   // FIXME move checker is treating the defer like a closure capture (rdar://100468597)
   // not expecting any errors here
-  consuming func brokenPositiveTest(_ i: Int) { // expected-error {{missing reinitialization of inout parameter 'self' after consume}}
+  consuming func brokenPositiveTest(_ i: Int) { // expected-error {{missing reinitialization of closure capture 'self' after consume}}
     defer { discard self } // expected-note {{consumed here}}
     switch i {
     case 0, 1, 2, 3: return

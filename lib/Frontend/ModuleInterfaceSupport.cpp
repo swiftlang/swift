@@ -181,7 +181,7 @@ diagnoseIfModuleImportsShadowingDecl(ModuleInterfaceOptions const &Opts,
   SmallVector<ValueDecl *, 4> decls;
   lookupInModule(importedModule, importingModule->getName(), decls,
                  NLKind::UnqualifiedLookup, ResolutionKind::TypesOnly,
-                 importedModule,
+                 importedModule, SourceLoc(),
                  NL_UnqualifiedDefault | NL_IncludeUsableFromInline);
   for (auto decl : decls)
     diagnoseDeclShadowsModule(Opts, cast<TypeDecl>(decl), importingModule,

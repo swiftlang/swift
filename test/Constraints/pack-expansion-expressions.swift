@@ -553,3 +553,11 @@ do {
     _ = (repeat overloaded(1, each a))
   }
 }
+
+func configure<T, each Element>(
+  _ item: T,
+  with configuration: repeat (ReferenceWritableKeyPath<T, each Element>, each Element)
+) -> T {
+  repeat item[keyPath: (each configuration).0] = (each configuration).1
+  return item
+}

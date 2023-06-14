@@ -1014,6 +1014,7 @@ static void collectNonOveriddenSuperclassInits(
   SmallVector<ValueDecl *, 4> lookupResults;
   subclass->lookupQualified(
       superclassDecl, DeclNameRef::createConstructor(),
+      subclass->getStartLoc(),
       subOptions, lookupResults);
 
   for (auto decl : lookupResults) {

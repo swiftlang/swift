@@ -1306,7 +1306,8 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
 
   SmallVector<ValueDecl *, 4> lookupResults;
-  DC->lookupQualified(nominal, name, subOptions, lookupResults);
+  DC->lookupQualified(nominal, name, nominal->getLoc(),
+                      subOptions, lookupResults);
 
   for (auto decl : lookupResults) {
     if (!isa<ProtocolDecl>(decl->getDeclContext()))
@@ -1387,7 +1388,8 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
 
     SmallVector<ValueDecl *, 4> lookupResults;
     bool addedAny = false;
-    DC->lookupQualified(nominal, reqName, options, lookupResults);
+    DC->lookupQualified(nominal, reqName, nominal->getLoc(),
+                        options, lookupResults);
     for (auto *decl : lookupResults) {
       if (!isa<ProtocolDecl>(decl->getDeclContext())) {
         witnesses.push_back(decl);
@@ -1399,7 +1401,8 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     // again using only the base name.
     if (!addedAny && ignoringNames) {
       lookupResults.clear();
-      DC->lookupQualified(nominal, reqBaseName, options, lookupResults);
+      DC->lookupQualified(nominal, reqBaseName, nominal->getLoc(),
+                          options, lookupResults);
       for (auto *decl : lookupResults) {
         if (!isa<ProtocolDecl>(decl->getDeclContext()))
           witnesses.push_back(decl);
@@ -4754,6 +4757,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   DC->lookupQualified(DC->getSelfNominalTypeDecl(),
                       assocType->createNameRef(),
+                      DC->getSelfNominalTypeDecl()->getLoc(),
                       subOptions, candidates);
 
   // If there aren't any candidates, we're done.
@@ -6331,7 +6335,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
       DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
 
       SmallVector<ValueDecl *, 4> lookupResults;
-      typeDecl->lookupQualified(typeDecl, baseName, subOptions, lookupResults);
+      typeDecl->lookupQualified(typeDecl, baseName, typeDecl->getLoc(),
+                                subOptions, lookupResults);
       for (auto decl : lookupResults) {
         auto method = dyn_cast<FuncDecl>(decl);
         if (!method) continue;
@@ -7202,6 +7207,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       SmallVector<ValueDecl *, 2> found;
       module->lookupQualified(
                            proto, DeclNameRef(assocType->getName()),
+                           proto->getLoc(),
                            NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
                            found);
       if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))

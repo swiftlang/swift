@@ -2635,30 +2635,38 @@ namespace {
         }
         clang::CXXConstructorDecl *copyCtor = nullptr;
         clang::CXXConstructorDecl *moveCtor = nullptr;
+        clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor()) {
           copyCtor = clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        } else if (decl->needsImplicitMoveConstructor()) {
+        }
+        if (decl->needsImplicitMoveConstructor()) {
           moveCtor = clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        } else {
-          // We may have a defaulted copy constructor that needs to be defined.
-          // Try to find it.
-          for (auto methods : decl->methods()) {
-            if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
-              if (declCtor->isDefaulted() &&
-                  declCtor->getAccess() == clang::AS_public &&
-                  !declCtor->isDeleted() &&
-                  // Note: we use "doesThisDeclarationHaveABody" here because
-                  // that's what "DefineImplicitCopyConstructor" checks.
-                  !declCtor->doesThisDeclarationHaveABody()) {
-                if (declCtor->isCopyConstructor()) {
+        }
+        if (decl->needsImplicitDefaultConstructor()) {
+          defaultCtor = clangSema.DeclareImplicitDefaultConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+        }
+        // We may have a defaulted copy/move/default constructor that needs to
+        // be defined. Try to find it.
+        for (auto methods : decl->methods()) {
+          if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
+            if (declCtor->isDefaulted() &&
+                declCtor->getAccess() == clang::AS_public &&
+                !declCtor->isDeleted() &&
+                // Note: we use "doesThisDeclarationHaveABody" here because
+                // that's what "DefineImplicitCopyConstructor" checks.
+                !declCtor->doesThisDeclarationHaveABody()) {
+              if (declCtor->isCopyConstructor()) {
+                if (!copyCtor)
                   copyCtor = declCtor;
-                  break;
-                } else if (declCtor->isMoveConstructor()) {
+              } else if (declCtor->isMoveConstructor()) {
+                if (!moveCtor)
                   moveCtor = declCtor;
-                  break;
-                }
+              } else if (declCtor->isDefaultConstructor()) {
+                if (!defaultCtor)
+                  defaultCtor = declCtor;
               }
             }
           }
@@ -2670,6 +2678,10 @@ namespace {
         if (moveCtor) {
           clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
                                                   moveCtor);
+        }
+        if (defaultCtor) {
+          clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
+                                                     defaultCtor);
         }
 
         if (decl->needsImplicitDestructor()) {
@@ -6532,7 +6544,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
   superDecl->lookupQualified(superDecl, DeclNameRef(decl->getName()),
-                             NL_QualifiedDefault,
+                             decl->getLoc(), NL_QualifiedDefault,
                              results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
@@ -6605,7 +6617,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
       superDecl, DeclNameRef(subscript->getName()),
-      NL_QualifiedDefault, lookup);
+      subscript->getLoc(), NL_QualifiedDefault, lookup);
 
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -8292,7 +8304,8 @@ static void finishTypeWitnesses(
                           NL_OnlyTypes |
                           NL_ProtocolMembers);
 
-    dc->lookupQualified(nominal, DeclNameRef(assocType->getName()), options,
+    dc->lookupQualified(nominal, DeclNameRef(assocType->getName()),
+                        nominal->getLoc(), options,
                         lookupResults);
     for (auto member : lookupResults) {
       auto typeDecl = cast<TypeDecl>(member);

@@ -774,7 +774,7 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 2> result;
 
     decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
-                          DeclNameRef(pair.first),
+                          DeclNameRef(pair.first), decl->getLoc(),
                           NL_QualifiedDefault | NL_OnlyTypes,
                           result);
 
@@ -1607,28 +1607,6 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
       dc->getASTContext().evaluator,
       ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), {});
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
-}
-
-SmallVector<MacroDecl *, 1>
-TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                          SourceLoc loc, MacroRoles roles) {
-  SmallVector<MacroDecl *, 1> choices;
-  auto moduleScopeDC = dc->getModuleScopeContext();
-  ASTContext &ctx = moduleScopeDC->getASTContext();
-  UnqualifiedLookupDescriptor descriptor(macroName, moduleScopeDC);
-  auto lookup = evaluateOrDefault(
-      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-  for (const auto &found : lookup.allResults()) {
-    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
-      auto candidateRoles = macro->getMacroRoles();
-      if ((candidateRoles && roles.contains(candidateRoles)) ||
-          // FIXME: `externalMacro` should have all roles.
-          macro->getBaseIdentifier().str() == "externalMacro") {
-        choices.push_back(macro);
-      }
-    }
-  }
-  return choices;
 }
 
 /// Validate the given operator declaration.
