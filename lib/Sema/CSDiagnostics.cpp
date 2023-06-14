@@ -120,14 +120,6 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
       return env->mapElementTypeIntoPackContext(type);
     }
 
-    if (auto *packType = type->getAs<PackType>()) {
-      if (packType->getNumElements() == 1) {
-        auto eltType = resolveType(packType->getElementType(0));
-        if (auto expansion = eltType->getAs<PackExpansionType>())
-          return expansion->getPatternType();
-      }
-    }
-
     return type->isPlaceholder() ? Type(type->getASTContext().TheUnresolvedType)
                                  : type;
   });

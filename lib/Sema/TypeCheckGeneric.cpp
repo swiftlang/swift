@@ -839,6 +839,7 @@ static std::string gatherGenericParamBindingsText(
 
   SmallString<128> result;
   llvm::raw_svector_ostream OS(result);
+  auto options = PrintOptions::forDiagnosticArguments();
 
   for (auto gp : genericParams) {
     auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
@@ -860,19 +861,7 @@ static std::string gatherGenericParamBindingsText(
     if (!type)
       return "";
 
-    if (auto *packType = type->getAs<PackType>()) {
-      bool first = true;
-      for (auto eltType : packType->getElementTypes()) {
-        if (first)
-          first = false;
-        else
-          OS << ", ";
-
-        OS << eltType;
-      }
-    } else {
-      OS << type.getString();
-    }
+    type->print(OS, options);
   }
 
   OS << "]";
