@@ -30,7 +30,8 @@
 /// observable:
 ///
 /// ```swift
-/// @Observable class Car {
+/// @Observable 
+/// class Car {
 ///    var name: String = ""
 ///    var needsRepairs: Bool = false
 ///    
