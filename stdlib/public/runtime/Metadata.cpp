@@ -28,6 +28,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -426,6 +427,16 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+namespace swift {
+  struct StaticAssertGenericMetadataCacheEntryValueOffset {
+    static_assert(
+      offsetof(GenericCacheEntry, Value) ==
+      offsetof(swift::GenericMetadataCacheEntry<InProcess::StoredPointer>,
+               Value),
+      "The generic metadata cache entry layout mismatch");
+  };
+}
 
 namespace {
   class GenericMetadataCache :
