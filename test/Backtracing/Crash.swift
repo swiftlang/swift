@@ -20,6 +20,9 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 
+// rdar://110743884
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+
 func level1() {
   level2()
 }
