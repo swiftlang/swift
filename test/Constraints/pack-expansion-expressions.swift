@@ -37,7 +37,7 @@ func coerceExpansion<each T>(_ value: repeat each T) {
 func localValuePack<each T>(_ t: repeat each T) -> (repeat each T, repeat each T) {
   let local = repeat each t
   let localAnnotated: repeat each T = repeat each t
-  // expected-error@-1{{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
   return (repeat each local, repeat each localAnnotated)
 }
