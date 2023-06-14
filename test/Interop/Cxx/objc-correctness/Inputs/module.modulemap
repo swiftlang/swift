@@ -9,3 +9,6 @@ module CxxClassWithNSStringInit [extern_c] {
   requires cplusplus
 }
 
+module NSOptionsMangling {
+  header "NSOptionsMangling.h"
+}
