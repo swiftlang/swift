@@ -18,7 +18,9 @@
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/Debug.h"
 #include "Private.h"
+#include "BytecodeLayouts.h"
 #include "EnumImpl.h"
+#include "MetadataCache.h"
 #include <cstring>
 #include <algorithm>
 
@@ -214,65 +216,143 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   vwtable->publishLayout(layout);
 }
 
-// void
-// swift::swift_initEnumMetadataMultiPayloadWithLayoutString(EnumMetadata *enumType,
-//                                      EnumLayoutFlags layoutFlags,
-//                                      unsigned numPayloads,
-//                                      const TypeLayout * const *payloadLayouts) {
-  // // Accumulate the layout requirements of the payloads.
-  // size_t payloadSize = 0, alignMask = 0;
-  // bool isPOD = true, isBT = true;
-  // for (unsigned i = 0; i < numPayloads; ++i) {
-  //   const TypeLayout *payloadLayout = payloadLayouts[i];
-  //   payloadSize
-  //     = std::max(payloadSize, (size_t)payloadLayout->size);
-  //   alignMask |= payloadLayout->flags.getAlignmentMask();
-  //   isPOD &= payloadLayout->flags.isPOD();
-  //   isBT &= payloadLayout->flags.isBitwiseTakable();
-  // }
+void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
+    EnumMetadata *enumType,
+    EnumLayoutFlags layoutFlags,
+    unsigned numPayloads,
+    const Metadata * const *payloadLayouts) {
+  // Accumulate the layout requirements of the payloads.
+  size_t payloadSize = 0, alignMask = 0;
+  bool isPOD = true, isBT = true;
 
-  // // Store the max payload size in the metadata.
-  // assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
+  size_t payloadRefCountBytes = 0;
+  for (unsigned i = 0; i < numPayloads; ++i) {
+    const TypeLayout *payloadLayout = payloadLayouts[i]->getTypeLayout();
+    payloadSize
+      = std::max(payloadSize, (size_t)payloadLayout->size);
+    alignMask |= payloadLayout->flags.getAlignmentMask();
+    isPOD &= payloadLayout->flags.isPOD();
+    isBT &= payloadLayout->flags.isBitwiseTakable();
 
-  // // The total size includes space for the tag.
-  // auto tagCounts = getEnumTagCounts(payloadSize,
-  //                               enumType->getDescription()->getNumEmptyCases(),
-  //                               numPayloads);
-  // unsigned totalSize = payloadSize + tagCounts.numTagBytes;
+    payloadRefCountBytes += _swift_refCountBytesForMetatype(payloadLayouts[i]);
+    // NUL terminator
+    payloadRefCountBytes += sizeof(uint64_t);
+  }
 
-  // // See whether there are extra inhabitants in the tag.
-  // unsigned numExtraInhabitants = tagCounts.numTagBytes == 4
-  //   ? INT_MAX
-  //   : (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
-  // numExtraInhabitants = std::min(numExtraInhabitants,
-  //                         unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
+  // Store the max payload size in the metadata.
+  assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
 
-  // auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
+  // The total size includes space for the tag.
+  auto tagCounts = getEnumTagCounts(payloadSize,
+                                enumType->getDescription()->getNumEmptyCases(),
+                                numPayloads);
+  unsigned totalSize = payloadSize + tagCounts.numTagBytes;
 
-  // // Set up the layout info in the vwtable.
-  // auto rawStride = (totalSize + alignMask) & ~alignMask;
-  // TypeLayout layout{totalSize,
-  //                   rawStride == 0 ? 1 : rawStride,
-  //                   ValueWitnessFlags()
-  //                    .withAlignmentMask(alignMask)
-  //                    .withPOD(isPOD)
-  //                    .withBitwiseTakable(isBT)
-  //                    .withEnumWitnesses(true)
-  //                    .withInlineStorage(ValueWitnessTable::isValueInline(
-  //                        isBT, totalSize, alignMask + 1)),
-  //                   numExtraInhabitants};
+  // See whether there are extra inhabitants in the tag.
+  unsigned numExtraInhabitants = tagCounts.numTagBytes == 4
+    ? INT_MAX
+    : (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+  numExtraInhabitants = std::min(numExtraInhabitants,
+                          unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 
-  // installCommonValueWitnesses(layout, vwtable);
+  auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
 
-  // // Unconditionally overwrite the enum-tag witnesses.
-  // // The compiler does not generate meaningful enum-tag witnesses for
-  // // enums in this state.
-  // vwtable->getEnumTagSinglePayload = swift_getMultiPayloadEnumTagSinglePayload;
-  // vwtable->storeEnumTagSinglePayload =
-  //     swift_storeMultiPayloadEnumTagSinglePayload;
+  // Instantiate layout string
+  {
+    const size_t fixedLayoutHeaderSize = layoutStringHeaderSize +
+                                         sizeof(uint64_t) +         // Tag + offset
+                                         sizeof(size_t) +           // Extra tag byte count
+                                         sizeof(size_t) * 3;        // Payload count, ref count bytes, enum size
 
-  // vwtable->publishLayout(layout);
-//}
+    const size_t allocationSize = fixedLayoutHeaderSize +
+                                  (numPayloads * sizeof(size_t)) +  // Payload ref count offsets
+                                  payloadRefCountBytes +
+                                  sizeof(uint64_t) * 2;             // Last skip bytes + NUL terminator
+
+    uint8_t *layoutStr = (uint8_t *)MetadataAllocator(LayoutStringTag)
+        .Allocate(allocationSize, alignof(uint8_t));
+
+    size_t layoutStrOffset = sizeof(uint64_t);
+    uint64_t tagAndOffset = ((uint64_t)RefCountingKind::MultiPayloadEnumGeneric) << 56;
+
+    size_t refCountBytes = allocationSize - layoutStringHeaderSize -
+                           (sizeof(uint64_t) * 2);
+    writeBytes(layoutStr, layoutStrOffset, refCountBytes);
+    writeBytes(layoutStr, layoutStrOffset, tagAndOffset);
+    writeBytes(layoutStr, layoutStrOffset, size_t(tagCounts.numTagBytes));
+    writeBytes(layoutStr, layoutStrOffset, size_t(numPayloads));
+    writeBytes(layoutStr, layoutStrOffset, payloadRefCountBytes);
+    writeBytes(layoutStr, layoutStrOffset, size_t(totalSize));
+
+    size_t fullOffset = 0;
+    LayoutStringFlags flags = LayoutStringFlags::Empty;
+
+    size_t payloadRefCountOffsetOffset = layoutStrOffset;
+    size_t payloadRefCountOffset = 0;
+
+    layoutStrOffset += sizeof(size_t) * numPayloads;
+
+    for (unsigned i = 0; i < numPayloads; ++i) {
+      const Metadata *payloadType = payloadLayouts[i];
+
+      writeBytes(layoutStr, payloadRefCountOffsetOffset, payloadRefCountOffset);
+
+      size_t layoutStrOffsetBefore = layoutStrOffset;
+      size_t previousFieldOffset = 0;
+      _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
+                                          payloadType, fullOffset,
+                                          previousFieldOffset);
+
+      // NUL terminator
+      writeBytes<uint64_t>(layoutStr, layoutStrOffset, 0);
+
+      payloadRefCountOffset += (layoutStrOffset - layoutStrOffsetBefore);
+    }
+
+    // Last skip bytes (always 0 for enums)
+    writeBytes<uint64_t>(layoutStr, layoutStrOffset, 0);
+    // NUL terminator
+    writeBytes<uint64_t>(layoutStr, layoutStrOffset, 0);
+
+    // we mask out HasRelativePointers, because at this point they have all been
+    // resolved to metadata pointers
+    layoutStrOffset = 0;
+    writeBytes(layoutStr, layoutStrOffset,
+        ((uint64_t)flags) & ~((uint64_t)LayoutStringFlags::HasRelativePointers));
+
+    enumType->setLayoutString(layoutStr);
+
+    vwtable->destroy = swift_generic_destroy;
+    vwtable->initializeWithCopy = swift_generic_initWithCopy;
+    vwtable->initializeWithTake = swift_generic_initWithTake;
+    vwtable->assignWithCopy = swift_generic_assignWithCopy;
+    vwtable->assignWithTake = swift_generic_assignWithTake;
+  }
+
+  // Set up the layout info in the vwtable.
+  auto rawStride = (totalSize + alignMask) & ~alignMask;
+  TypeLayout layout{totalSize,
+                    rawStride == 0 ? 1 : rawStride,
+                    ValueWitnessFlags()
+                     .withAlignmentMask(alignMask)
+                     .withPOD(isPOD)
+                     .withBitwiseTakable(isBT)
+                     .withEnumWitnesses(true)
+                     .withInlineStorage(ValueWitnessTable::isValueInline(
+                         isBT, totalSize, alignMask + 1)),
+                    numExtraInhabitants};
+
+  installCommonValueWitnesses(layout, vwtable);
+
+  // Unconditionally overwrite the enum-tag witnesses.
+  // The compiler does not generate meaningful enum-tag witnesses for
+  // enums in this state.
+  vwtable->getEnumTagSinglePayload = swift_getMultiPayloadEnumTagSinglePayload;
+  vwtable->storeEnumTagSinglePayload =
+      swift_storeMultiPayloadEnumTagSinglePayload;
+
+  vwtable->publishLayout(layout);
+}
 
 namespace {
 struct MultiPayloadLayout {

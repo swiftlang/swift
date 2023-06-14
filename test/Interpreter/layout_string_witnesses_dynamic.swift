@@ -306,7 +306,7 @@ enum TestEnum {
 
 func testGenericWithEnumNonEmpty() {
     let ptr = allocateInternalGenericPtr(of: TestEnum.self)
-    
+
     do {
         let x = TestClass()
         testGenericInit(ptr, to: TestEnum.nonEmpty(x))
@@ -336,7 +336,7 @@ public struct ResilientWrapper {
 
 func testResilient() {
     let ptr = UnsafeMutablePointer<ResilientWrapper>.allocate(capacity: 1)
-    
+
     do {
         let x = TestClass()
         testInit(ptr, to: ResilientWrapper(x: SimpleResilient(x: 23, y: x), y: 5))
@@ -369,7 +369,7 @@ public struct GenericResilientWrapper<T> {
 
 func testGenericResilient() {
     let ptr = UnsafeMutablePointer<GenericResilientWrapper<TestClass>>.allocate(capacity: 1)
-    
+
     do {
         let x = TestClass()
         testInit(ptr, to: GenericResilientWrapper(x: GenericResilient(x: x, y: 32), y: 32))
