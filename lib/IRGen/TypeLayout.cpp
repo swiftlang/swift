@@ -83,6 +83,7 @@ public:
     MultiPayloadEnumFN = 0x13,
     // reserved
     // MultiPayloadEnumFNResolved = 0x14,
+    // MultiPayloadEnumGeneric = 0x15,
 
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,

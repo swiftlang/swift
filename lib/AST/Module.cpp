@@ -43,6 +43,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
@@ -4235,18 +4236,6 @@ FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
   return &TF;
 }
 
-static bool prefixMatches(StringRef prefix, StringRef path) {
-  auto prefixIt = llvm::sys::path::begin(prefix),
-       prefixEnd = llvm::sys::path::end(prefix);
-  for (auto pathIt = llvm::sys::path::begin(path),
-            pathEnd = llvm::sys::path::end(path);
-       prefixIt != prefixEnd && pathIt != pathEnd; ++prefixIt, ++pathIt) {
-    if (*prefixIt != *pathIt)
-      return false;
-  }
-  return prefixIt == prefixEnd;
-}
-
 bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
   // stdlib is non-user by definition
   if (mod->isStdlibModule())
@@ -4274,5 +4263,6 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
     return false;
 
   StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
-  return (!runtimePath.empty() && prefixMatches(runtimePath, modulePath)) || (!sdkPath.empty() && prefixMatches(sdkPath, modulePath));
+  return (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) ||
+      (!sdkPath.empty() && pathStartsWith(sdkPath, modulePath));
 }
