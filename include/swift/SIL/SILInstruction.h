@@ -8285,8 +8285,7 @@ public:
 /// checking by the checkers that rely upon this instruction.
 class MarkMustCheckInst
     : public UnaryInstructionBase<SILInstructionKind::MarkMustCheckInst,
-                                  SingleValueInstruction>,
-      public ForwardingInstruction {
+                                  OwnershipForwardingSingleValueInstruction> {
   friend class SILBuilder;
 
 public:
@@ -8325,9 +8324,8 @@ private:
 
   MarkMustCheckInst(SILDebugLocation DebugLoc, SILValue operand,
                     CheckKind checkKind)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
-        ForwardingInstruction(SILInstructionKind::MarkMustCheckInst,
-                              operand->getOwnershipKind()),
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
+                             operand->getOwnershipKind()),
         kind(checkKind) {
     assert(operand->getType().isMoveOnly() &&
            "mark_must_check can only take a move only typed value");
@@ -8356,8 +8354,7 @@ public:
 class MarkUnresolvedReferenceBindingInst
     : public UnaryInstructionBase<
           SILInstructionKind::MarkUnresolvedReferenceBindingInst,
-          SingleValueInstruction>,
-      public ForwardingInstruction {
+          OwnershipForwardingSingleValueInstruction> {
   friend class SILBuilder;
 
 public:
@@ -8372,10 +8369,8 @@ private:
 
   MarkUnresolvedReferenceBindingInst(SILDebugLocation debugLoc,
                                      SILValue operand, Kind kind)
-      : UnaryInstructionBase(debugLoc, operand, operand->getType()),
-        ForwardingInstruction(
-            SILInstructionKind::MarkUnresolvedReferenceBindingInst,
-            operand->getOwnershipKind()),
+      : UnaryInstructionBase(debugLoc, operand, operand->getType(),
+                             operand->getOwnershipKind()),
         kind(kind) {}
 
 public:
@@ -10819,9 +10814,7 @@ inline bool ForwardingInstruction::isa(SILInstructionKind kind) {
          OwnershipForwardingTermInst::classof(kind) ||
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
-         OwnershipForwardingMultipleValueInstruction::classof(kind) ||
-         kind == SILInstructionKind::MarkMustCheckInst ||
-         kind == SILInstructionKind::MarkUnresolvedReferenceBindingInst;
+         OwnershipForwardingMultipleValueInstruction::classof(kind);
 }
 
 inline ForwardingInstruction *ForwardingInstruction::get(SILInstruction *inst) {
@@ -10839,10 +10832,6 @@ inline ForwardingInstruction *ForwardingInstruction::get(SILInstruction *inst) {
     return result;
   if (auto *result =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
-    return result;
-  if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
-    return result;
-  if (auto *result = dyn_cast<MarkUnresolvedReferenceBindingInst>(inst))
     return result;
   if (auto *result = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst))
     return result;
