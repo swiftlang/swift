@@ -9,6 +9,10 @@
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
+
+// rdar://110743884
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+
 var x: UInt = 0
 
 func level1() {

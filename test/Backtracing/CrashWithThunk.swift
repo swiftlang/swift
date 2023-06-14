@@ -11,6 +11,9 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 
+// rdar://110743884
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+
 struct Foo<T> {
   var value: T
 }
