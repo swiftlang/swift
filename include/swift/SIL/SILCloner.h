@@ -3251,24 +3251,6 @@ SILCloner<ImplClass>::visitSelectEnumAddrInst(SelectEnumAddrInst *Inst) {
                                     CaseResults));
 }
 
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitSelectValueInst(SelectValueInst *Inst) {
-  SILValue DefaultResult;
-  if (Inst->hasDefault())
-    DefaultResult = getOpValue(Inst->getDefaultResult());
-  SmallVector<std::pair<SILValue, SILValue>, 8> CaseResults;
-  for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
-    CaseResults.push_back(std::make_pair(getOpValue(Inst->getCase(i).first),
-                                         getOpValue(Inst->getCase(i).second)));
-
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createSelectValue(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getType()), DefaultResult, CaseResults));
-}
-
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitDynamicMethodBranchInst(
     DynamicMethodBranchInst *Inst) {

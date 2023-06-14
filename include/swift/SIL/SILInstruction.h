@@ -1392,7 +1392,6 @@ FirstArgOwnershipForwardingSingleValueInst::classof(SILInstructionKind kind) {
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
@@ -6659,8 +6658,8 @@ public:
   }
 };
 
-// Abstract base class of all select instructions like select_enum,
-// select_value, etc. The template parameter represents a type of case values
+// Abstract base class of all select instructions like select_enum.
+// The template parameter represents a type of case values
 // to be compared with the operand of a select instruction.
 //
 // Subclasses must provide tail allocated storage.
@@ -6876,50 +6875,6 @@ class SelectEnumAddrInst final
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
          SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount);
-};
-
-/// Select on a value of a builtin integer type.
-///
-/// There is 'the' operand, followed by pairs of operands for each case,
-/// followed by an optional default operand.
-class SelectValueInst final
-    : public InstructionBaseWithTrailingOperands<
-          SILInstructionKind::SelectValueInst, SelectValueInst,
-          SelectInstBase<SelectValueInst, SILValue, SingleValueInstruction>> {
-  friend SILBuilder;
-
-  SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-                  SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults);
-
-  static SelectValueInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-         SILValue DefaultValue,
-         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M);
-
-public:
-  std::pair<SILValue, SILValue>
-  getCase(unsigned i) const {
-    auto cases = getAllOperands().slice(1);
-    return {cases[i*2].get(), cases[i*2+1].get()};
-  }
-
-  unsigned getNumCases() const {
-    // Ignore the first non-case operand.
-    auto count = getAllOperands().size() - 1;
-    // This implicitly ignore the optional default operand.
-    return count / 2;
-  }
-
-  bool hasDefault() const {
-    // If the operand count is even, then we have a default value.
-    return (getAllOperands().size() & 1) == 0;
-  }
-
-  SILValue getDefaultResult() const {
-    assert(hasDefault() && "doesn't have a default");
-    return getAllOperands().back().get();
-  }
 };
 
 /// MetatypeInst - Represents the production of an instance of a given metatype

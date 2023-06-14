@@ -4933,55 +4933,6 @@ public:
               "switch_value default destination cannot take arguments");
   }
 
-  void checkSelectValueCases(SelectValueInst *I) {
-    struct APIntCmp {
-      bool operator()(const APInt &a, const APInt &b) const {
-        return a.ult(b);
-      };
-    };
-
-    llvm::SmallSet<APInt, 16, APIntCmp> seenCaseValues;
-
-    // Verify the set of cases we dispatch on.
-    for (unsigned i = 0, e = I->getNumCases(); i < e; ++i) {
-      SILValue casevalue;
-      SILValue result;
-      std::tie(casevalue, result) = I->getCase(i);
-      
-      if (!isa<SILUndef>(casevalue)) {
-        auto  *il = dyn_cast<IntegerLiteralInst>(casevalue);
-        require(il,
-                "select_value case operands should refer to integer literals");
-        APInt elt = il->getValue();
-
-        require(!seenCaseValues.count(elt),
-                "select_value dispatches on same case value more than once");
-
-        seenCaseValues.insert(elt);
-      }
-
-      requireSameType(I->getOperand()->getType(), casevalue->getType(),
-                      "select_value case value must match type of operand");
-
-      // The result value must match the type of the instruction.
-      requireSameType(result->getType(), I->getType(),
-                    "select_value case result must match type of instruction");
-    }
-
-    require(I->hasDefault(),
-            "select_value should always have a default");
-    requireSameType(I->getDefaultResult()->getType(),
-                  I->getType(),
-                  "select_value default operand must match type of instruction");
-  }
-
-  void checkSelectValueInst(SelectValueInst *SVI) {
-    require(SVI->getOperand()->getType().isObject(),
-            "select_value operand must be an object");
-
-    checkSelectValueCases(SVI);
-  }
-
   void checkSwitchEnumInst(SwitchEnumInst *switchEnum) {
     require(switchEnum->getOperand()->getType().isObject(),
             "switch_enum operand must be an object");

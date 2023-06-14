@@ -1975,35 +1975,6 @@ SwitchValueInst *SwitchValueInst::create(
   return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 
-SelectValueInst::SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                                 SILType Type, SILValue DefaultResult,
-                                 ArrayRef<SILValue> CaseValuesAndResults)
-    : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
-                                          DebugLoc, Type) {}
-
-SelectValueInst *
-SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
-                        SILValue DefaultResult,
-                        ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
-                        SILModule &M) {
-  // Allocate enough room for the instruction with tail-allocated data for all
-  // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
-  // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
-  SmallVector<SILValue, 8> CaseValuesAndResults;
-  for (auto pair : CaseValues) {
-    CaseValuesAndResults.push_back(pair.first);
-    CaseValuesAndResults.push_back(pair.second);
-  }
-
-  if ((bool)DefaultResult)
-    CaseValuesAndResults.push_back(DefaultResult);
-
-  auto Size = totalSizeToAlloc<swift::Operand>(CaseValuesAndResults.size() + 1);
-  auto Buf = M.allocateInst(Size, alignof(SelectValueInst));
-  return ::new (Buf)
-      SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
-}
-
 template <typename SELECT_ENUM_INST>
 SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
     SILDebugLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
