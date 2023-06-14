@@ -2899,6 +2899,18 @@ public:
   {
     assert(!ext->hasClangNode() && "passed interface, not impl, to checker");
 
+    // Conformances are declared exclusively in the interface, so diagnose any
+    // in the implementation right away.
+    for (auto &inherited : ext->getInherited()) {
+      bool isImportedProtocol = false;
+      if (auto protoNominal = inherited.getType()->getAnyNominal())
+        isImportedProtocol = protoNominal->hasClangNode();
+
+      diagnose(inherited.getLoc(),
+               diag::attr_objc_implementation_no_conformance,
+               inherited.getType(), isImportedProtocol);
+    }
+
     // Did we actually match this extension to an interface? (In invalid code,
     // we might not have.)
     auto interfaceDecl = ext->getImplementedObjCDecl();
