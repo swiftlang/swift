@@ -111,6 +111,12 @@ void swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                                         unsigned numPayloads,
                                         const TypeLayout * const *payloadTypes);
 
+SWIFT_RUNTIME_EXPORT
+void swift_initEnumMetadataMultiPayloadWithLayoutString(EnumMetadata *enumType,
+                                                        EnumLayoutFlags flags,
+                                                        unsigned numPayloads,
+                                          const Metadata * const *payloadTypes);
+
 /// Return an integer value representing which case of a multi-payload
 ///        enum is inhabited.
 ///

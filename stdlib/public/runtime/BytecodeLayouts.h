@@ -49,6 +49,7 @@ enum class RefCountingKind : uint8_t {
 
   MultiPayloadEnumFN = 0x13,
   MultiPayloadEnumFNResolved = 0x14,
+  MultiPayloadEnumGeneric = 0x15,
 
   Skip = 0x80,
   // We may use the MSB as flag that a count follows,
