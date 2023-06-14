@@ -4,14 +4,8 @@
   return (repeat each t)
 }
 
-// FIXME: Useless alloc_pack/dealloc_pack
-
 // CHECK-LABEL: sil @$s17tuples_from_packs14makeEmptyTupleyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: %0 = alloc_pack $Pack{}
-// CHECK-NEXT: %1 = alloc_pack $Pack{}
-// CHECK-NEXT: dealloc_pack %1 : $*Pack{}
-// CHECK-NEXT: dealloc_pack %0 : $*Pack{}
 // CHECK-NEXT: [[RET:%.*]] = tuple ()
 // CHECK-NEXT: return [[RET]] : $()
 public func makeEmptyTuple() {

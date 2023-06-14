@@ -60,6 +60,9 @@ STATISTIC(DeadKeyPathEliminated,
 STATISTIC(DeadAllocApplyEliminated,
           "number of allocating Apply instructions removed");
 
+STATISTIC(DeadAllocPackEliminated,
+          "number of AllocPack instructions removed");
+
 using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 
 namespace {
@@ -282,6 +285,14 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
 
   if (isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst))
     return true;
+
+  // Setting a value within a pack does not prevent eliminating an alloc_pack.
+  if (auto set = dyn_cast<PackElementSetInst>(Inst)) {
+    // TODO: when we have OSSA, we can also accept stores of non trivial values:
+    //       just replace the store with a destroy_value.
+    return !onlyAcceptTrivialStores ||
+           set->getElementType().isTrivial(*set->getFunction());
+  }
 
   // If Inst does not read or write to memory, have side effects, and is not a
   // terminator, we can zap it.
@@ -738,6 +749,7 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
+  bool processAllocPack(AllocPackInst *API);
 
   bool insertCompensatingReleases(SILInstruction *before,
                                   const UserList &users);
@@ -766,6 +778,8 @@ class DeadObjectElimination : public SILFunctionTransform {
           Changed |= processAllocBox(A);
         else if (auto *A = dyn_cast<ApplyInst>(&inst))
           Changed |= processAllocApply(A, DEBlocks);
+        else if (auto *A = dyn_cast<AllocPackInst>(&inst))
+          Changed |= processAllocPack(A);
       }
       deleter.cleanupDeadInstructions();
     }
@@ -896,6 +910,36 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
 
   ++DeadKeyPathEliminated;
+  return true;
+}
+
+bool DeadObjectElimination::processAllocPack(AllocPackInst *API) {
+  bool isTrivialType = true;
+
+  // If all the elements within this pack are trivial, then this pack is trivial.
+  // Otherwise, a single non-trivial element makes this entire pack non-trivial.
+  for (auto i : indices(API->getPackType()->getElementTypes())) {
+    auto eltTy = API->getPackType()->getSILElementType(i);
+
+    if (!eltTy.isTrivial(*API->getFunction())) {
+      isTrivialType = false;
+      break;
+    }
+  }
+
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(API, &UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/ !isTrivialType)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // Remove the AllocPack and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_pack.\n");
+
+  ++DeadAllocPackEliminated;
   return true;
 }
 
