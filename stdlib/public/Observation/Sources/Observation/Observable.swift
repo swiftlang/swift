@@ -26,7 +26,7 @@
 ///
 /// This macro adds observation support to a custom type and conforms the type
 /// to the ``Observation/Observable-swift.protocol`` protocol. For example, the
-/// following code apply the `Observable` macro to the type `Car` making it
+/// following code applies the `Observable` macro to the type `Car` making it
 /// observable:
 ///
 /// ```swift
