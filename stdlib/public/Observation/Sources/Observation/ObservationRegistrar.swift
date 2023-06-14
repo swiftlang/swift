@@ -148,6 +148,8 @@ public struct ObservationRegistrar: Sendable {
   
   /// Identifies mutations to the transactions registered for observers.
   ///
+  /// This method calls ``willset(_:keypath:)`` before the mutation. Then it
+  /// calls ``didset(_:keypath:)`` after the mutation.
   /// - Parameters:
   ///   - of: An instance of an observable type.
   ///   - keyPath: The key path of an observed property.

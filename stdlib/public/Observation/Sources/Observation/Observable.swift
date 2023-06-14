@@ -53,7 +53,7 @@ public macro Observable() =
 
 /// Synthesizes a property for accessors.
 ///
-/// The ``Observation`` framework uses this macro. Its use outside of the
+/// The ``Observation`` module uses this macro. Its use outside of the
 /// framework isn't necessary.
 @available(SwiftStdlib 5.9, *)
 @attached(accessor, names: named(init), named(get), named(set))
@@ -63,7 +63,7 @@ public macro Observable() =
 public macro ObservationTracked() =
   #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")
 
-/// Turns off observation tracking of a property.
+/// Disables observation tracking of a property.
 ///
 /// By default, an object can observe any property of an observable type that
 /// is accessible to the observing object. To prevent observation of an
