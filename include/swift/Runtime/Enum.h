@@ -45,6 +45,11 @@ void swift_initEnumMetadataSingleCase(EnumMetadata *enumType,
                                       EnumLayoutFlags flags,
                                       const TypeLayout *payload);
 
+SWIFT_RUNTIME_EXPORT
+void swift_initEnumMetadataSingleCaseWithLayoutString(
+    EnumMetadata *self, EnumLayoutFlags layoutFlags,
+    const Metadata *payloadType);
+
 /// Initialize the type metadata for a single-payload enum type.
 ///
 /// \param enumType - pointer to the instantiated but uninitialized metadata

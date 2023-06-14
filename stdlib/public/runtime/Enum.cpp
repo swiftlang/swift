@@ -65,6 +65,61 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
   vwtable->publishLayout(layout);
 }
 
+void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
+    EnumMetadata *self, EnumLayoutFlags layoutFlags,
+    const Metadata *payloadType) {
+  assert(self->hasLayoutString());
+
+  auto payloadLayout = payloadType->getTypeLayout();
+  auto vwtable = getMutableVWTableForInit(self, layoutFlags);
+
+  TypeLayout layout;
+  layout.size = payloadLayout->size;
+  layout.stride = payloadLayout->stride;
+  layout.flags = payloadLayout->flags.withEnumWitnesses(true);
+  layout.extraInhabitantCount = payloadLayout->getNumExtraInhabitants();
+
+  auto refCountBytes = _swift_refCountBytesForMetatype(payloadType);
+  const size_t fixedLayoutStringSize =
+      layoutStringHeaderSize + sizeof(uint64_t) * 2;
+
+  uint8_t *layoutStr =
+      (uint8_t *)MetadataAllocator(LayoutStringTag)
+          .Allocate(fixedLayoutStringSize + refCountBytes, alignof(uint8_t));
+
+  size_t layoutStrOffset = sizeof(uint64_t);
+  writeBytes(layoutStr, layoutStrOffset, refCountBytes);
+  size_t fullOffset = 0;
+  size_t previousFieldOffset = 0;
+  LayoutStringFlags flags = LayoutStringFlags::Empty;
+
+  _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
+                                      payloadType, fullOffset,
+                                      previousFieldOffset);
+
+  writeBytes(layoutStr, layoutStrOffset, (uint64_t)previousFieldOffset);
+  writeBytes(layoutStr, layoutStrOffset, (uint64_t)0);
+
+  // we mask out HasRelativePointers, because at this point they have all been
+  // resolved to metadata pointers
+  layoutStrOffset = 0;
+  writeBytes(layoutStr, layoutStrOffset,
+             ((uint64_t)flags) &
+                 ~((uint64_t)LayoutStringFlags::HasRelativePointers));
+
+  vwtable->destroy = swift_generic_destroy;
+  vwtable->initializeWithCopy = swift_generic_initWithCopy;
+  vwtable->initializeWithTake = swift_generic_initWithTake;
+  vwtable->assignWithCopy = swift_generic_assignWithCopy;
+  vwtable->assignWithTake = swift_generic_assignWithTake;
+
+  installCommonValueWitnesses(layout, vwtable);
+
+  self->setLayoutString(layoutStr);
+
+  vwtable->publishLayout(layout);
+}
+
 void
 swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
                                            EnumLayoutFlags layoutFlags,
@@ -221,6 +276,8 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
     EnumLayoutFlags layoutFlags,
     unsigned numPayloads,
     const Metadata * const *payloadLayouts) {
+  assert(enumType->hasLayoutString());
+
   // Accumulate the layout requirements of the payloads.
   size_t payloadSize = 0, alignMask = 0;
   bool isPOD = true, isBT = true;

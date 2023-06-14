@@ -2739,8 +2739,8 @@ void swift::swift_initStructMetadataWithLayoutString(
                                         previousFieldOffset);
   }
 
-  writeBytes(layoutStr, layoutStrOffset, previousFieldOffset);
-  writeBytes(layoutStr, layoutStrOffset, 0);
+  writeBytes(layoutStr, layoutStrOffset, (uint64_t)previousFieldOffset);
+  writeBytes(layoutStr, layoutStrOffset, (uint64_t)0);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
