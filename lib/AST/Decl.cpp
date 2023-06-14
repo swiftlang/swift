@@ -7168,6 +7168,12 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
       isBackingStorageForDeclaredProperty(this))
     return false;
 
+  // If this is a computed property with `init` accessor, it's
+  // memberwise initializable when it could be used to initialize
+  // other stored properties.
+  if (auto *init = getAccessor(AccessorKind::Init))
+    return init->getAttrs().hasAttribute<InitializesAttr>();
+
   // If this is a computed property, it's not memberwise initialized unless
   // the caller has asked for the declared properties and it is either a
   // `lazy` property or a property with an attached wrapper.

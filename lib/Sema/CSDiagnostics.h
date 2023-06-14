@@ -3015,6 +3015,19 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidMemberReferenceWithinInitAccessor final
+    : public FailureDiagnostic {
+  DeclNameRef MemberName;
+
+public:
+  InvalidMemberReferenceWithinInitAccessor(const Solution &solution,
+                                           DeclNameRef memberName,
+                                           ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), MemberName(memberName) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
