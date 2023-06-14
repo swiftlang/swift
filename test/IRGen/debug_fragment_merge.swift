@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-llvm-optzns -O -g | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
+// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-ir -disable-llvm-optzns -O -g | %FileCheck %s
 
 protocol External {
   func use(str: String);
