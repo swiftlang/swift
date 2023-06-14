@@ -12,6 +12,9 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 
+// rdar://110743884
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+
 func recurse(_ level: Int) {
   if level % 100000 == 0 {
     print(level)
