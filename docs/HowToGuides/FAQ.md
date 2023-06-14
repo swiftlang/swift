@@ -138,6 +138,14 @@ Fortunately, Git has a feature called `rebase` that allows you to clean up your 
 If you want to learn more, 
 [GitHub - About Git rebase](https://docs.github.com/en/get-started/using-git/about-git-rebase) 
 provides a comprehensive overview of `rebase`.
+
+> **Warning**
+We suggest considering to `rebase` only those commits that haven't been pushed to a public branch. 
+Rebasing existing commits would block merging because we don't allow force pushes to the repository.
+If you need to tidy up commits that have already been pushed, 
+it's generally better to use `git revert` for the sake of avoid causing confusion for other developers.
+
+
 Here's a small gist that goes through the basics on how to use it:
 
 1. Begin an interactive rebase: Use `git rebase -i HEAD~N`, where `N` is the number of commits 
@@ -171,7 +179,3 @@ Here's a small gist that goes through the basics on how to use it:
    ```sh
    git rebase --continue
    ```
-
-We suggest considering to `rebase` only those commits that haven't been pushed to a public branch.
-If you need to tidy up commits that have already been pushed, 
-it's generally better to use `git revert` to avoid causing confusion for other developers.
