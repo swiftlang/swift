@@ -688,25 +688,6 @@ namespace {
       return visitSelectEnumInstBase(RHS);
     }
 
-    bool visitSelectValueInst(const SelectValueInst *RHS) {
-      // Check that the instructions match cases in the same order.
-      auto *X = cast<SelectValueInst>(LHS);
-
-      if (X->getNumCases() != RHS->getNumCases())
-        return false;
-      if (X->hasDefault() != RHS->hasDefault())
-        return false;
-
-      for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
-        if (X->getCase(i).first != RHS->getCase(i).first)
-          return false;
-        if (X->getCase(i).second != RHS->getCase(i).second)
-          return false;
-      }
-
-      return true;
-    }
-
     // Conversion instructions.
     // All of these just return true as they have already had their
     // operands and types checked

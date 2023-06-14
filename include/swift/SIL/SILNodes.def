@@ -609,8 +609,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(SelectEnumAddrInst, select_enum_addr,
                     SingleValueInstruction, MayRead, DoesNotRelease)
-  SINGLE_VALUE_INST(SelectValueInst, select_value,
-                    SingleValueInstruction, None, DoesNotRelease)
 
   // Protocol and Protocol Composition Types
   SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,

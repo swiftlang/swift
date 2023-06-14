@@ -183,7 +183,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(UncheckedEnumData)
   FORWARDING_INST(MarkUninitialized)
   FORWARDING_INST(SelectEnum)
-  FORWARDING_INST(SelectValue)
   FORWARDING_INST(DestructureStruct)
   FORWARDING_INST(DestructureTuple)
   FORWARDING_INST(TupleExtract)
