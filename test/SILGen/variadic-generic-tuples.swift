@@ -331,3 +331,24 @@ func testFancyTuple_pack<each T>(values: repeat each T) {
 
 // rdar://107664237
 func f<each T>() -> (repeat Array<each T>) {}
+
+// rdar://109911655
+struct GenericButLoadable<X, Y> { }
+struct StructOfLoadableTuple<each S> {
+  let elements: (repeat GenericButLoadable<each S, each S>)
+}
+// Force the emission of the memberwise initializer.
+func testStructOfLoadableTuple() -> StructOfLoadableTuple<Int> {
+  StructOfLoadableTuple(elements: (GenericButLoadable<Int, Int>()))
+}
+
+//   The memberwise initializer.
+// CHECK-LABEL: sil {{.*}}@$s4main21StructOfLoadableTupleV8elementsACyxxQp_QPGAA010GenericButD0VyxxGxQp_t_tcfC :
+// CHECK:       bb0(%0 : $*StructOfLoadableTuple<repeat each S>, %1 : $*Pack{repeat GenericButLoadable<each S, each S>}, %2 : $@thin StructOfLoadableTuple<repeat each S>.Type):
+// CHECK-NEXT:    [[TUPLE:%.*]] = alloc_stack $(repeat GenericButLoadable<each S, each S>)
+// CHECK:         [[INDEX:%.*]] = dynamic_pack_index {{.*}} of $Pack{repeat GenericButLoadable<each S, each S>}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each S> at <Pack{repeat each S}>, shape $each S, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[TUPLE_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat GenericButLoadable<each S, each S>) as $*GenericButLoadable<@pack_element([[UUID]]) each S, @pack_element([[UUID]]) each S>
+// CHECK-NEXT:    [[PACK_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat GenericButLoadable<each S, each S>} as $*GenericButLoadable<@pack_element([[UUID]]) each S, @pack_element([[UUID]]) each S>
+// CHECK-NEXT:    [[PACK_ELT:%.*]] = load [trivial] [[PACK_ELT_ADDR]] :
+// CHECK-NEXT:    store [[PACK_ELT]] to [trivial] [[TUPLE_ELT_ADDR]] :
