@@ -20,12 +20,14 @@
 using namespace swift;
 
 void PluginLoader::createModuleToExecutablePluginMap() {
-  for (auto &arg : Ctx.SearchPathOpts.getCompilerPluginExecutablePaths()) {
-    // Create a moduleName -> pluginPath mapping.
-    assert(!arg.ExecutablePath.empty() && "empty plugin path");
-    StringRef pathStr = Ctx.AllocateCopy(arg.ExecutablePath);
-    for (auto moduleName : arg.ModuleNames) {
-      ExecutablePluginPaths[Ctx.getIdentifier(moduleName)] = pathStr;
+  for (auto &elem : Ctx.SearchPathOpts.PluginSearchOpts) {
+    if (auto *arg = elem.dyn_cast<PluginSearchOption::LoadPluginExecutable>()) {
+      // Create a moduleName -> pluginPath mapping.
+      assert(!arg->ExecutablePath.empty() && "empty plugin path");
+      StringRef pathStr = Ctx.AllocateCopy(arg->ExecutablePath);
+      for (auto moduleName : arg->ModuleNames) {
+        ExecutablePluginPaths[Ctx.getIdentifier(moduleName)] = pathStr;
+      }
     }
   }
 }
@@ -46,69 +48,59 @@ PluginRegistry *PluginLoader::getRegistry() {
   return Registry;
 }
 
-llvm::Optional<std::string>
-PluginLoader::lookupExplicitLibraryPluginByModuleName(Identifier moduleName) {
-  // Look for 'lib${module name}(.dylib|.so)'.
-  SmallString<64> expectedBasename;
-  expectedBasename.append("lib");
-  expectedBasename.append(moduleName.str());
-  expectedBasename.append(LTDL_SHLIB_EXT);
-
-  // Try '-load-plugin-library'.
-  for (const auto &libPath :
-       Ctx.SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    if (llvm::sys::path::filename(libPath) == expectedBasename) {
-      return libPath;
-    }
-  }
-  return None;
-}
-
-llvm::Optional<std::string>
-PluginLoader::lookupLibraryPluginInSearchPathByModuleName(
-    Identifier moduleName) {
-  // Look for 'lib${module name}(.dylib|.so)'.
-  SmallString<64> expectedBasename;
-  expectedBasename.append("lib");
-  expectedBasename.append(moduleName.str());
-  expectedBasename.append(LTDL_SHLIB_EXT);
-
-  // Try '-plugin-path'.
-  auto fs = Ctx.SourceMgr.getFileSystem();
-  for (const auto &searchPath : Ctx.SearchPathOpts.PluginSearchPaths) {
-    SmallString<128> fullPath(searchPath);
-    llvm::sys::path::append(fullPath, expectedBasename);
-    if (fs->exists(fullPath)) {
-      return std::string(fullPath);
-    }
-  }
-
-  return None;
-}
-
-Optional<std::pair<std::string, std::string>>
-PluginLoader::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
+std::pair<std::string, std::string>
+PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   auto fs = Ctx.SourceMgr.getFileSystem();
 
-  for (auto &pair : Ctx.SearchPathOpts.ExternalPluginSearchPaths) {
-    SmallString<128> fullPath(pair.SearchPath);
-    llvm::sys::path::append(fullPath,
-                            "lib" + moduleName.str() + LTDL_SHLIB_EXT);
+  // Look for 'lib${module name}(.dylib|.so)'.
+  // FIXME: Shared library prefix might be different between platforms.
+  SmallString<64> pluginLibBasename;
+  pluginLibBasename.append("lib");
+  pluginLibBasename.append(moduleName.str());
+  pluginLibBasename.append(LTDL_SHLIB_EXT);
 
-    if (fs->exists(fullPath)) {
-      return {{std::string(fullPath), pair.ServerPath}};
+  // FIXME: Should we create a lookup table keyed by module name?
+  for (auto &entry : Ctx.SearchPathOpts.PluginSearchOpts) {
+    using namespace PluginSearchOption;
+    // Try '-load-plugin-library'.
+    if (auto *val = entry.dyn_cast<LoadPluginLibrary>()) {
+      if (llvm::sys::path::filename(val->LibraryPath) == pluginLibBasename) {
+        return {val->LibraryPath, ""};
+      }
+      continue;
+    }
+
+    // Try '-load-plugin-executable'.
+    if (auto *v = entry.dyn_cast<LoadPluginExecutable>()) {
+      auto found = ExecutablePluginPaths.find(moduleName);
+      if (found != ExecutablePluginPaths.end()) {
+        return {"", std::string(found->second)};
+      }
+      continue;
+    }
+
+    // Try '-plugin-path'.
+    if (auto *v = entry.dyn_cast<PluginPath>()) {
+      SmallString<128> fullPath(v->SearchPath);
+      llvm::sys::path::append(fullPath, pluginLibBasename);
+      if (fs->exists(fullPath)) {
+        return {std::string(fullPath), ""};
+      }
+      continue;
+    }
+
+    // Try '-external-plugin-path'.
+    if (auto *v = entry.dyn_cast<ExternalPluginPath>()) {
+      SmallString<128> fullPath(v->SearchPath);
+      llvm::sys::path::append(fullPath, pluginLibBasename);
+      if (fs->exists(fullPath)) {
+        return {std::string(fullPath), v->ServerPath};
+      }
+      continue;
     }
   }
-  return None;
-}
 
-Optional<StringRef>
-PluginLoader::lookupExecutablePluginByModuleName(Identifier moduleName) {
-  auto &execPluginPaths = ExecutablePluginPaths;
-  auto found = execPluginPaths.find(moduleName);
-  if (found == execPluginPaths.end())
-    return None;
-  return found->second;
+  return {};
 }
 
 LoadedLibraryPlugin *PluginLoader::loadLibraryPlugin(StringRef path) {
