@@ -15,9 +15,6 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-// rdar://110743884
-// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
-
 @available(SwiftStdlib 5.1, *)
 func crash() {
   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
