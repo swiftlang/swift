@@ -1300,7 +1300,6 @@ public:
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
   void visitSelectEnumInst(SelectEnumInst *i);
   void visitSelectEnumAddrInst(SelectEnumAddrInst *i);
-  void visitSelectValueInst(SelectValueInst *i);
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *i);
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
@@ -4658,27 +4657,6 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
     // emitBBMapForSelectEnum set up a phi node to receive the result.
     Builder.SetInsertPoint(contBB);
   }
-  
-  setLoweredValue(inst,
-                  getLoweredValueForSelect(*this, result, inst));
-}
-
-void IRGenSILFunction::visitSelectValueInst(SelectValueInst *inst) {
-  Explosion value = getLoweredExplosion(inst->getOperand());
-
-  // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<SILValue, llvm::BasicBlock*>, 4> dests;
-  llvm::BasicBlock *defaultDest;
-  Explosion result;
-  auto *contBB = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
-
-  // Emit the dispatch.
-  emitSwitchValueDispatch(*this, inst->getOperand()->getType(), value, dests,
-                          defaultDest);
-
-  // emitBBMapForSelectEnum set up a continuation block and phi nodes to
-  // receive the result.
-  Builder.SetInsertPoint(contBB);
 
   setLoweredValue(inst,
                   getLoweredValueForSelect(*this, result, inst));

@@ -81,11 +81,11 @@ static void deleteCopyAndMoveChain(SILValue v, InstructionDeleter &deleter) {
 ///   AllArgOwnershipForwardingSingleValueInst
 ///     (Struct, Tuple)
 ///   FirstArgOwnershipForwardingSingleValueInst
-///     (Object, Enum, UncheckedEnumData, SelectValue, Open/InitExistentialRef,
+///     (Object, Enum, UncheckedEnumData, Open/InitExistentialRef,
 ///      MarkDependence)
 ///
 /// TODO:
-///   Enum, SelectValue, InitExistential, MarkDependence
+///   Enum, InitExistential, MarkDependence
 ///   Struct, Tuple
 ///   SelectEnum, SwitchEnum, CheckCastBranch
 bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
