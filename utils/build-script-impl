@@ -2044,6 +2044,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${SWIFT_STDLIB_TRACING}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_TRACING}")
+                    )
+                fi
+
                 if [[ "${SWIFT_STDLIB_CONCURRENCY_TRACING}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
