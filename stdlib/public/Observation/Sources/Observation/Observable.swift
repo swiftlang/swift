@@ -29,18 +29,16 @@
 /// following code applies the `Observable` macro to the type `Car` making it
 /// observable:
 ///
-/// ```swift
-/// @Observable 
-/// class Car {
-///    var name: String = ""
-///    var needsRepairs: Bool = false
-///    
-///    init(name: String, needsRepairs: Bool = false) {
-///        self.name = name
-///        self.needsRepairs = needsRepairs
-///    }
-///}
-///```
+///     @Observable 
+///     class Car {
+///        var name: String = ""
+///        var needsRepairs: Bool = false
+///        
+///        init(name: String, needsRepairs: Bool = false) {
+///            self.name = name
+///            self.needsRepairs = needsRepairs
+///        }
+///     }
 @available(SwiftStdlib 5.9, *)
 #if OBSERVATION_SUPPORTS_PEER_MACROS
 @attached(member, names: named(_$observationRegistrar), named(access), named(withMutation))

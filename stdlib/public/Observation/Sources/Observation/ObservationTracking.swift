@@ -88,17 +88,15 @@ public struct ObservationTracking {
 /// to the name of cars, but it doesn't track changes to any other property of
 /// `Car`:
 /// 
-/// ```swift
-/// func render() {
-///     withObservationTracking {
-///         for car in cars {
-///             print(car.name)
+///     func render() {
+///         withObservationTracking {
+///             for car in cars {
+///                 print(car.name)
+///             }
+///         } onChange: {
+///             print("Schedule renderer.")
 ///         }
-///     } onChange: {
-///         print("Schedule renderer.")
 ///     }
-/// }
-/// ```
 ///
 /// - Parameters:
 ///     - apply: A closure that contains properties to track.
