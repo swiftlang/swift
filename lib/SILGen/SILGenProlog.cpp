@@ -263,10 +263,7 @@ public:
     bool argIsLoadable = argType.isLoadable(SGF.F);
     if (argIsLoadable) {
       if (argType.isAddress()) {
-        if (mv.isPlusOne(SGF))
-          mv = SGF.B.createLoadTake(loc, mv);
-        else
-          mv = SGF.B.createLoadBorrow(loc, mv);
+        mv = SGF.B.createLoadWithSameOwnership(loc, mv);
         argType = argType.getObjectType();
       }
     }
