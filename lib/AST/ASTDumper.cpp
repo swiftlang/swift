@@ -2128,6 +2128,17 @@ public:
     PrintWithColorRAII(OS, ExprModifierColor)
       << " number_of_decls=" << E->getDecls().size()
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
+    if (!E->isForOperator()) {
+      PrintWithColorRAII(OS, ExprModifierColor) << " decls=[\n";
+      interleave(
+          E->getDecls(),
+          [&](ValueDecl *D) {
+            OS.indent(Indent + 2);
+            D->dumpRef(PrintWithColorRAII(OS, DeclModifierColor).getOS());
+          },
+          [&] { PrintWithColorRAII(OS, DeclModifierColor) << ",\n"; });
+      PrintWithColorRAII(OS, ExprModifierColor) << "]";
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
