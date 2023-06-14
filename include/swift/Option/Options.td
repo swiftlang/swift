@@ -304,15 +304,6 @@ def I : JoinedOrSeparate<["-"], "I">,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
-def plugin_path : Separate<["-"], "plugin-path">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
-  HelpText<"Add directory to the plugin search path">;
-
-def external_plugin_path : Separate<["-"], "external-plugin-path">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
-  HelpText<"Add directory to the plugin search path with a plugin server executable">,
-  MetaVarName<"<path>#<plugin-server-path>">;
-
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
@@ -1807,15 +1798,26 @@ def nostartfiles:
 
 // END ONLY SUPPORTED IN NEW DRIVER
 
+def plugin_search_Group : OptionGroup<"<plugin search options>">;
+
+def plugin_path : Separate<["-"], "plugin-path">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Add directory to the plugin search path">;
+
+def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Add directory to the plugin search path with a plugin server executable">,
+  MetaVarName<"<path>#<plugin-server-path>">;
+
 def load_plugin_library:
-  Separate<["-"], "load-plugin-library">,
+  Separate<["-"], "load-plugin-library">, Group<plugin_search_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to a dynamic library containing compiler plugins such as "
            "macros">,
   MetaVarName<"<path>">;
 
 def load_plugin_executable:
-  Separate<["-"], "load-plugin-executable">,
+  Separate<["-"], "load-plugin-executable">, Group<plugin_search_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to an executable compiler plugins and providing module names "
            "such as macros">,
