@@ -31,7 +31,7 @@ extension CxxSet {
   /// - Complexity: O(*n*), where *n* is the number of elements in the Swift
   ///   sequence
   @inlinable
-  public init<S: Sequence>(_ sequence: S) where S.Element == Element {
+  public init<S: Sequence>(_ sequence: __shared S) where S.Element == Element {
     self.init()
     for item in sequence {
       self.__insertUnsafe(item)
