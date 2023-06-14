@@ -2312,6 +2312,19 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
   }
 }
 
+// In case of `var` initializations, SILGen creates a dynamic begin/end_access
+// pair around the initialization store. If it's an initialization (and not
+// a re-assign) it's guaranteed that it's an exclusive access and we can
+// convert the access to an `[init] [static]` access.
+static void setStaticInitAccess(SILValue memoryAddress) {
+  if (auto *ba = dyn_cast<BeginAccessInst>(memoryAddress)) {
+    if (ba->getEnforcement() == SILAccessEnforcement::Dynamic) {
+      ba->setEnforcement(SILAccessEnforcement::Static);
+      if (ba->getAccessKind() == SILAccessKind::Modify)
+        ba->setAccessKind(SILAccessKind::Init);
+    }
+  }
+}
 
 /// updateInstructionForInitState - When an instruction being analyzed moves
 /// from being InitOrAssign to some concrete state, update it for that state.
@@ -2336,6 +2349,8 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     assert(!CA->isInitializationOfDest() &&
            "should not modify copy_addr that already knows it is initialized");
     CA->setIsInitializationOfDest(InitKind);
+    if (InitKind == IsInitialization)
+      setStaticInitAccess(CA->getDest());
     return;
   }
 
@@ -2382,6 +2397,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
               MarkMustCheckInst::CheckKind::InitableButNotConsumable);
         }
       }
+      setStaticInitAccess(AI->getDest());
     }
 
     return;
