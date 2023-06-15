@@ -211,6 +211,7 @@ KNOWN_SETTINGS=(
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-threading-package                       ""                "override the threading package for the host build; this is either a single package or a semicolon-separated list of sdk:package pairs.  Valid packages are empty string (no override), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
     swift-stdlib-single-threaded-concurrency      "0"               "build Swift concurrency in single-threaded mode"
+    swift-stdlib-tracing                          ""                "whether to enable tracing signposts for the stdlib; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-use-relative-protocol-witness-tables "0"            "whether to use relative protocol witness table"
     swift-enable-runtime-function-counters        ""                "whether to enable runtime function counters"
