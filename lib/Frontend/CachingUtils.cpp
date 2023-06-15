@@ -15,13 +15,19 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
+#include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
+#include "llvm/CAS/CASFileSystem.h"
+#include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/CAS/TreeEntry.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/VirtualOutputFile.h"
 #include <memory>
@@ -342,4 +348,121 @@ Error storeCachedCompilerOutput(llvm::cas::ObjectStore &CAS,
   return Error::success();
 }
 
+static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
+  return createStringError(llvm::inconvertibleErrorCode(),
+                           "CASID missing from Object Store " + ID.toString());
+}
+
+static Expected<ObjectRef> mergeCASFileSystem(ObjectStore &CAS,
+                                              ArrayRef<std::string> FSRoots) {
+  llvm::cas::HierarchicalTreeBuilder Builder;
+  for (auto &Root : FSRoots) {
+    auto ID = CAS.parseID(Root);
+    if (!ID)
+      return ID.takeError();
+
+    auto Ref = CAS.getReference(*ID);
+    if (!Ref)
+      return createCASObjectNotFoundError(*ID);
+    Builder.pushTreeContent(*Ref, "");
+  }
+
+  auto NewRoot = Builder.create(CAS);
+  if (!NewRoot)
+    return NewRoot.takeError();
+
+  return NewRoot->getRef();
+}
+
+Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
+createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
+                    ArrayRef<std::string> IncludeTrees) {
+  assert(!FSRoots.empty() || !IncludeTrees.empty() && "no root ID provided");
+  if (FSRoots.size() == 1 && IncludeTrees.empty()) {
+    auto ID = CAS.parseID(FSRoots.front());
+    if (!ID)
+      return ID.takeError();
+    auto Ref = CAS.getReference(*ID);
+    if (!Ref)
+      return createCASObjectNotFoundError(*ID);
+  }
+
+  auto NewRoot = mergeCASFileSystem(CAS, FSRoots);
+  if (!NewRoot)
+    return NewRoot.takeError();
+
+  auto FS = createCASFileSystem(CAS, CAS.getID(*NewRoot));
+  if (!FS)
+    return FS.takeError();
+
+  auto CASFS = makeIntrusiveRefCnt<vfs::OverlayFileSystem>(std::move(*FS));
+  // Push all Include File System onto overlay.
+  for (auto &Tree : IncludeTrees) {
+    auto ID = CAS.parseID(Tree);
+    if (!ID)
+      return ID.takeError();
+
+    auto Ref = CAS.getReference(*ID);
+    if (!Ref)
+      return createCASObjectNotFoundError(*ID);
+    auto IT = clang::cas::IncludeTreeRoot::get(CAS, *Ref);
+    if (!IT)
+      return IT.takeError();
+
+    auto ITFS = clang::cas::createIncludeTreeFileSystem(*IT);
+    if (!ITFS)
+      return ITFS.takeError();
+    CASFS->pushOverlay(std::move(*ITFS));
+  }
+
+  return CASFS;
+}
+
+namespace cas {
+
+CachingTool::CachingTool(StringRef Path) {
+  auto DB = llvm::cas::createOnDiskUnifiedCASDatabases(Path);
+  if (!DB) {
+    llvm::errs() << "Failed to create CAS at " << Path << ": "
+                 << toString(DB.takeError()) << "\n";
+    return;
+  }
+
+  CAS = std::move(DB->first);
+  Cache = std::move(DB->second);
+}
+
+std::string CachingTool::computeCacheKey(ArrayRef<const char *> Args,
+                                         StringRef InputPath,
+                                         file_types::ID OutputKind) {
+  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
+  if (!BaseKey) {
+    llvm::errs() << "Failed to create cache key: "
+                 << toString(BaseKey.takeError()) << "\n";
+    return "";
+  }
+
+  auto Key =
+      createCompileJobCacheKeyForOutput(*CAS, *BaseKey, InputPath, OutputKind);
+  if (!Key) {
+    llvm::errs() << "Failed to create cache key: " << toString(Key.takeError())
+                 << "\n";
+    return "";
+  }
+
+  return CAS->getID(*Key).toString();
+}
+
+std::string CachingTool::storeContent(StringRef Content) {
+  auto Result = CAS->storeFromString({}, Content);
+  if (!Result) {
+    llvm::errs() << "Failed to store to CAS: " << toString(Result.takeError())
+                 << "\n";
+    return "";
+  }
+
+  return CAS->getID(*Result).toString();
+}
+
+} // namespace cas
 } // namespace swift

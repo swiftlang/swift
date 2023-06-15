@@ -247,7 +247,8 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     CanType depTy = req.getFirstType()->getCanonicalType();
     auto replacement = depTy.subst(IFS);
     auto *proto = req.getProtocolDecl();
-    auto conformance = IFS.lookupConformance(depTy, replacement, proto);
+    auto conformance = IFS.lookupConformance(depTy, replacement, proto,
+                                             /*level=*/0);
     conformances.push_back(conformance);
   }
 
@@ -417,6 +418,16 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.
+    if (conformance.isPack()) {
+      auto pack = conformance.getPack();
+      conformance = ProtocolConformanceRef(
+          pack->getAssociatedConformance(step.first, step.second));
+      if (conformance.isInvalid())
+        return conformance;
+
+      continue;
+    }
+
     auto concrete = conformance.getConcrete();
     auto normal = concrete->getRootNormalConformance();
 
@@ -440,7 +451,9 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 }
 
 SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
-  return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
+  return subst(MapTypeOutOfContext(),
+               MakeAbstractConformanceForGenericType(),
+               SubstFlags::PreservePackExpansionLevel);
 }
 
 SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap,
@@ -829,5 +842,7 @@ SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return this->subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+  return this->subst(replacer, replacer,
+                     SubstFlags::SubstituteOpaqueArchetypes |
+                     SubstFlags::PreservePackExpansionLevel);
 }

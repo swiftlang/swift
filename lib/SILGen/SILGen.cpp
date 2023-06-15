@@ -371,7 +371,7 @@ static FuncDecl *lookupIntrinsic(ModuleDecl &module,
     return *cache;
 
   SmallVector<ValueDecl *, 1> decls;
-  module.lookupQualified(&module, DeclNameRef(name),
+  module.lookupQualified(&module, DeclNameRef(name), SourceLoc(),
                          NL_QualifiedDefault | NL_IncludeUsableFromInline,
                          decls);
   if (decls.size() != 1) {
@@ -871,6 +871,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       PrettyStackTraceSILFunction X("silgen closureexpr", f);
       f->createProfiler(constant);
       SILGenFunction(*this, *f, ce).emitClosure(ce);
+      postEmitFunction(constant, f);
+      break;
+    }
+
+    if (constant.isInitAccessor()) {
+      auto *accessor = cast<AccessorDecl>(constant.getDecl());
+      preEmitFunction(constant, f, accessor);
+      PrettyStackTraceSILFunction X("silgen init accessor", f);
+      f->createProfiler(constant);
+      SILGenFunction(*this, *f, accessor).emitInitAccessor(accessor);
       postEmitFunction(constant, f);
       break;
     }

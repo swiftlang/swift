@@ -341,6 +341,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Modify:
       OS << "!modify";
       break;
+    case AccessorKind::Init:
+      OS << "!init";
+      break;
     }
     break;
   }
@@ -1424,6 +1427,9 @@ public:
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }
+  void visitAllocPackMetadataInst(AllocPackMetadataInst *APMI) {
+    *this << APMI->getType().getObjectType();
+  }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
@@ -1765,8 +1771,33 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
+
     *this << getIDAndType(AI->getDest())
           << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
+  }
+
+  void visitAssignOrInitInst(AssignOrInitInst *AI) {
+    switch (AI->getMode()) {
+    case AssignOrInitInst::Unknown:
+      break;
+    case AssignOrInitInst::Init:
+      *this << "[init] ";
+      break;
+    case AssignOrInitInst::Set:
+      *this << "[set] ";
+      break;
+    }
+
+    // Print all of the properties that have been previously initialized.
+    for (unsigned i = 0, n = AI->getNumInitializedProperties(); i != n; ++i) {
+      if (AI->isPropertyAlreadyInitialized(i)) {
+        *this << "[assign=" << i << "] ";
+      }
+    }
+
+    *this << getIDAndType(AI->getSrc());
+    *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
   }
 
@@ -1784,6 +1815,9 @@ public:
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
     case MarkUninitializedInst::DelegatingSelfAllocated:
       *this << "[delegatingselfallocated] ";
+      break;
+    case MarkUninitializedInst::Out:
+      *this << "[out] ";
       break;
     }
     *this << getIDAndType(MU->getOperand());
@@ -2453,6 +2487,9 @@ public:
   void visitDeallocPackInst(DeallocPackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
+  void visitDeallocPackMetadataInst(DeallocPackMetadataInst *DPMI) {
+    *this << getIDAndType(DPMI->getOperand());
+  }
   void visitDeallocStackRefInst(DeallocStackRefInst *ESRL) {
     *this << getIDAndType(ESRL->getOperand());
   }
@@ -2483,6 +2520,18 @@ public:
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getOperand());
+  }
+  void visitMoveOnlyWrapperToCopyableAddrInst(
+      MoveOnlyWrapperToCopyableAddrInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
+  }
+  void
+  visitMoveOnlyWrapperToCopyableBoxInst(MoveOnlyWrapperToCopyableBoxInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
+  }
+  void visitCopyableToMoveOnlyWrapperAddrInst(
+      CopyableToMoveOnlyWrapperAddrInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
@@ -2663,21 +2712,6 @@ public:
     printSelectEnumInst(SEI);
   }
 
-  void visitSelectValueInst(SelectValueInst *SVI) {
-    *this << getIDAndType(SVI->getOperand());
-
-    for (unsigned i = 0, e = SVI->getNumCases(); i < e; ++i) {
-      SILValue casevalue;
-      SILValue result;
-      std::tie(casevalue, result) = SVI->getCase(i);
-      *this << ", case " << Ctx.getID(casevalue) << ": " << Ctx.getID(result);
-    }
-    if (SVI->hasDefault())
-      *this << ", default " << Ctx.getID(SVI->getDefaultResult());
-
-    *this << " : " << SVI->getType();
-  }
-  
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     *this << getIDAndType(DMBI->getOperand()) << ", " << DMBI->getMember()
           << ", " << Ctx.getID(DMBI->getHasMethodBB()) << ", "
@@ -3162,6 +3196,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   if (forceEnableLexicalLifetimes()) {
     OS << "[lexical_lifetimes] ";
+  }
+  if (!useStackForPackMetadata()) {
+    OS << "[no_onstack_pack_metadata] ";
   }
 
   if (isExactSelfClass()) {

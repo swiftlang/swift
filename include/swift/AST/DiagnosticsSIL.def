@@ -189,6 +189,9 @@ ERROR(ivar_not_initialized_at_superinit,none,
 ERROR(ivar_not_initialized_at_implicit_superinit,none,
       "property '%0' not initialized at implicitly generated super.init call",
       (StringRef, bool))
+ERROR(ivar_not_initialized_by_init_accessor,none,
+      "property %0 not initialized by init accessor",
+      (DeclName))
 
 ERROR(self_use_before_fully_init,none,
       "'self' used in %select{method call|property access}1 %0 before "
@@ -763,9 +766,10 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by a closure", (StringRef))
-ERROR(sil_movechecking_inout_not_reinitialized_before_end_of_function, none,
-      "missing reinitialization of inout parameter '%0' after consume", (StringRef))
+      "noncopyable '%0' cannot be consumed when captured by an escaping closure", (StringRef))
+ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
+      "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
+      "after consume", (StringRef, bool))
 ERROR(sil_movechecking_value_consumed_in_a_loop, none,
       "'%0' consumed in a loop", (StringRef))
 ERROR(sil_movechecking_use_after_partial_consume, none,
@@ -776,7 +780,13 @@ ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
 ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       "cannot partially consume '%0' when it has a deinitializer",
       (StringRef))
+ERROR(sil_movechecking_discard_missing_consume_self, none,
+      "must consume 'self' before exiting method that discards self", ())
+ERROR(sil_movechecking_reinit_after_discard, none,
+      "cannot reinitialize 'self' after 'discard self'", ())
 
+NOTE(sil_movechecking_discard_self_here, none,
+     "discarded self here", ())
 NOTE(sil_movechecking_partial_consume_here, none,
      "partially consumed here", ())
 NOTE(sil_movechecking_consuming_use_here, none,

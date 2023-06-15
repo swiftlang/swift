@@ -1106,6 +1106,18 @@ struct BridgedBuilder{
   }
 
   SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createUnownedRetain(BridgedValue op) const {
+    auto b = builder();
+    return {b.createUnownedRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createUnownedRelease(BridgedValue op) const {
+    auto b = builder();
+    return {b.createUnownedRelease(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
   BridgedInstruction createFunctionRef(BridgedFunction function) const {
     return {builder().createFunctionRef(regularLoc(), function.getFunction())};
   }

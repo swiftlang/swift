@@ -43,6 +43,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
@@ -249,7 +250,7 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
 
-        if (VD->getAttrs().hasAttribute<CustomAttr>()) {
+        if (!onlyOperators && VD->getAttrs().hasAttribute<CustomAttr>()) {
           MayHaveAuxiliaryDecls.push_back(VD);
         }
       }
@@ -279,8 +280,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
     else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
 
-    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
-      MayHaveAuxiliaryDecls.push_back(MED);
+    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D)) {
+      if (!onlyOperators)
+        MayHaveAuxiliaryDecls.push_back(MED);
+    }
   }
 }
 
@@ -644,6 +647,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
+  Bits.ModuleDecl.HasCxxInteroperability = 0;
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
@@ -4232,18 +4236,6 @@ FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
   return &TF;
 }
 
-static bool prefixMatches(StringRef prefix, StringRef path) {
-  auto prefixIt = llvm::sys::path::begin(prefix),
-       prefixEnd = llvm::sys::path::end(prefix);
-  for (auto pathIt = llvm::sys::path::begin(path),
-            pathEnd = llvm::sys::path::end(path);
-       prefixIt != prefixEnd && pathIt != pathEnd; ++prefixIt, ++pathIt) {
-    if (*prefixIt != *pathIt)
-      return false;
-  }
-  return prefixIt == prefixEnd;
-}
-
 bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
   // stdlib is non-user by definition
   if (mod->isStdlibModule())
@@ -4271,5 +4263,6 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
     return false;
 
   StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
-  return (!runtimePath.empty() && prefixMatches(runtimePath, modulePath)) || (!sdkPath.empty() && prefixMatches(sdkPath, modulePath));
+  return (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) ||
+      (!sdkPath.empty() && pathStartsWith(sdkPath, modulePath));
 }

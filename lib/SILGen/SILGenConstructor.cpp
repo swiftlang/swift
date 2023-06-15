@@ -30,6 +30,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include <map>
 
 using namespace swift;
 using namespace Lowering;
@@ -221,6 +222,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
         auto eltAddr =
           SGF.B.createPackElementGet(loc, packIndex, arg, eltTy);
         ManagedValue eltMV = emitManagedParameter(SGF, eltAddr, argIsConsumed);
+        eltMV = SGF.B.createLoadIfLoadable(loc, eltMV);
         eltInit->copyOrInitValueInto(SGF, loc, eltMV, argIsConsumed);
         eltInit->finishInitialization(SGF);
       });
@@ -231,19 +233,16 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 
   ManagedValue mvArg = emitManagedParameter(SGF, arg, argIsConsumed);
 
+  // This can happen if the value is resilient in the calling convention
+  // but not resilient locally.
+  if (argType.isAddress()) {
+    mvArg = SGF.B.createLoadIfLoadable(loc, mvArg);
+  }
+
   if (argInit) {
     argInit->copyOrInitValueInto(SGF, loc, mvArg, argIsConsumed);
     argInit->finishInitialization(SGF);
     return RValue::forInContext();
-  }
-
-  // This can happen if the value is resilient in the calling convention
-  // but not resilient locally.
-  if (argType.isLoadable(SGF.F) && argType.isAddress()) {
-    if (mvArg.isPlusOne(SGF))
-      mvArg = SGF.B.createLoadTake(loc, mvArg);
-    else
-      mvArg = SGF.B.createLoadBorrow(loc, mvArg);
   }
 
   return RValue(SGF, loc, type, mvArg);
@@ -269,6 +268,48 @@ static RValue maybeEmitPropertyWrapperInitFromValue(
 
   return SGF.emitApplyOfPropertyWrapperBackingInitializer(loc, originalProperty,
                                                           subs, std::move(arg));
+}
+
+static void
+emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
+                        AccessorDecl *accessor, SILValue selfValue,
+                        SILType selfTy, RValue &&initialValue) {
+  SmallVector<SILValue> arguments;
+
+  auto emitFieldReference = [&](VarDecl *field, bool forInit = false) {
+    auto fieldTy =
+        selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
+    return SGF.B.createStructElementAddr(loc, selfValue, field,
+                                         fieldTy.getAddressType());
+  };
+
+  // First, let's emit all of the indirect results.
+  if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>()) {
+    for (auto *property : initAttr->getPropertyDecls(accessor)) {
+      arguments.push_back(emitFieldReference(property, /*forInit=*/true));
+    }
+  }
+
+  // `initialValue`
+  std::move(initialValue).forwardAll(SGF, arguments);
+
+  // And finally, all of the properties in `accesses(...)` list which are
+  // `inout` arguments.
+  if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>()) {
+    for (auto *property : accessAttr->getPropertyDecls(accessor)) {
+      arguments.push_back(emitFieldReference(property));
+    }
+  }
+
+  SubstitutionMap subs;
+  if (auto *env =
+          accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
+    subs = env->getForwardingSubstitutionMap();
+  }
+
+  SILValue accessorRef =
+      SGF.emitGlobalFunctionRef(loc, SGF.getAccessorDeclRef(accessor));
+  (void)SGF.B.createApply(loc, accessorRef, subs, arguments, ApplyOptions());
 }
 
 static SubstitutionMap getSubstitutionsForPropertyInitializer(
@@ -312,6 +353,12 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   auto selfIfaceTy = selfDecl->getInterfaceType();
   SILType selfTy = SGF.getSILTypeInContext(selfResultInfo, loweredFunctionTy);
 
+  auto *decl = selfTy.getStructOrBoundGenericStruct();
+  assert(decl && "not a struct?!");
+
+  std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
+  decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
+
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
   if (selfTy.isAddress()) {
@@ -324,6 +371,10 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(selfIfaceTy);
     resultSlot = SGF.F.begin()->createFunctionArgument(selfTy, VD);
+  } else if (!initializedViaAccessor.empty()) {
+    // Allocate "self" on stack which we are going to use to
+    // reference/init fields and then load to return.
+    resultSlot = SGF.emitTemporaryAllocation(Loc, selfTy);
   }
 
   LoweredParamsInContextGenerator loweredParams(SGF);
@@ -343,15 +394,44 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   (void) loweredParams.claimNext();
   loweredParams.finish();
 
-  auto *decl = selfTy.getStructOrBoundGenericStruct();
-  assert(decl && "not a struct?!");
-
   auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
 
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
     auto elti = elements.begin(), eltEnd = elements.end();
-    for (VarDecl *field : decl->getStoredProperties()) {
+
+    llvm::SmallPtrSet<VarDecl *, 4> storedProperties;
+    {
+      auto properties = decl->getStoredProperties();
+      storedProperties.insert(properties.begin(), properties.end());
+    }
+
+    for (auto *member : decl->getMembers()) {
+      auto *field = dyn_cast<VarDecl>(member);
+      if (!field)
+        continue;
+
+      if (initializedViaAccessor.count(field))
+        continue;
+
+      // Handle situations where this stored propery is initialized
+      // via a call to an init accessor on some other property.
+      if (auto *initAccessor = field->getAccessor(AccessorKind::Init)) {
+        if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
+          assert(elti != eltEnd &&
+                 "number of args does not match number of fields");
+
+          emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot, selfTy,
+                                  std::move(*elti));
+          ++elti;
+          continue;
+        }
+      }
+
+      // If this is not one of the stored properties, let's move on.
+      if (!storedProperties.count(field))
+        continue;
+
       auto fieldTy =
           selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
       SILValue slot =
@@ -421,6 +501,16 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           field->getPointerAuthQualifier().isPresent()) {
         SGF.B.createEndAccess(Loc, slot, /* aborted */ false);
       }
+    }
+
+    // Load as "take" from our stack allocation and return.
+    if (!selfTy.isAddress() && !initializedViaAccessor.empty()) {
+      auto resultValue = SGF.B.emitLoadValueOperation(
+          Loc, resultSlot, LoadOwnershipQualifier::Take);
+
+      SGF.B.createReturn(ImplicitReturnLocation(Loc), resultValue,
+                         std::move(functionLevelScope));
+      return;
     }
 
     SGF.B.createReturn(ImplicitReturnLocation(Loc),
@@ -1480,4 +1570,82 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   B.createReturn(loc, selfArg);
 
   emitEpilog(loc);
+}
+
+void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
+  RegularLocation loc(accessor);
+  loc.markAutoGenerated();
+
+  auto accessorTy = F.getLoweredFunctionType();
+
+  auto createArgument = [&](VarDecl *property, SILType type,
+                            bool markUninitialized = false) {
+    auto *arg = ParamDecl::createImplicit(
+        getASTContext(), property->getBaseIdentifier(),
+        property->getBaseIdentifier(), type.getASTType()->mapTypeOutOfContext(),
+        accessor, ParamSpecifier::InOut);
+
+    RegularLocation loc(property);
+    loc.markAutoGenerated();
+
+    SILValue argValue = F.begin()->createFunctionArgument(type, arg);
+    VarLocs[arg] =
+        markUninitialized
+            ? VarLoc::get(B.createMarkUninitializedOut(loc, argValue))
+            : VarLoc::get(argValue);
+
+    InitAccessorArgumentMappings[property] = arg;
+  };
+
+  // First, emit results, this is our "initializes(...)" properties and
+  // require DI to check that each property is fully initialized.
+  if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>()) {
+    auto initializedProperties = initAttr->getPropertyDecls(accessor);
+    for (unsigned i = 0, n = initializedProperties.size(); i != n; ++i) {
+      auto *property = initializedProperties[i];
+      auto propertyTy =
+          getSILTypeInContext(accessorTy->getResults()[i], accessorTy);
+      createArgument(property, propertyTy, /*markUninitialized=*/true);
+    }
+  }
+
+  // Collect all of the parameters that represent properties listed by
+  // "accesses" attribute. They have to be emitted in order of arguments which
+  // means after the "newValue" which is emitted by \c emitBasicProlog.
+  Optional<ArrayRef<VarDecl *>> accessedProperties;
+  {
+    if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>())
+      accessedProperties = accessAttr->getPropertyDecls(accessor);
+  }
+
+  // Emit `newValue` argument.
+  emitBasicProlog(accessor->getParameters(), /*selfParam=*/nullptr,
+                  TupleType::getEmpty(F.getASTContext()), accessor,
+                  /*throws=*/false, /*throwsLoc=*/SourceLoc(),
+                  /*ignored parameters*/
+                  accessedProperties ? accessedProperties->size() : 0);
+
+  // Emit arguments for all `accesses(...)` properties.
+  if (accessedProperties) {
+    auto propertyIter = accessedProperties->begin();
+    auto propertyArgs = accessorTy->getParameters().slice(
+        accessorTy->getNumParameters() - accessedProperties->size());
+
+    for (const auto &argument : propertyArgs) {
+      createArgument(*propertyIter, getSILTypeInContext(argument, accessorTy));
+      ++propertyIter;
+    }
+  }
+
+  prepareEpilog(accessor->getResultInterfaceType(), accessor->hasThrows(),
+                CleanupLocation(accessor));
+
+  emitProfilerIncrement(accessor->getTypecheckedBody());
+
+  // Emit the actual function body as usual
+  emitStmt(accessor->getTypecheckedBody());
+
+  emitEpilog(accessor);
+
+  mergeCleanupBlocks();
 }

@@ -373,6 +373,16 @@ public:
   /// An efficient implementation of `!isTrivial() && isOrContainsRawPointer()`.
   bool isNonTrivialOrContainsRawPointer(const SILFunction *f) const;
 
+  /// Whether the type contains a generic parameter declared as a parameter
+  /// pack.
+  bool hasParameterPack() const { return getASTType()->hasParameterPack(); }
+
+  /// Whether the type contains a concrete pack.
+  bool hasConcretePack() const { return getASTType()->hasConcretePack(); }
+
+  /// Whether the type contains some flavor of pack.
+  bool hasPack() const { return getASTType()->hasPack(); }
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
@@ -383,6 +393,8 @@ public:
   bool isReferenceCounted(SILModule &M) const;
 
   bool isReferenceCounted(SILFunction *f) const;
+
+  bool isUnownedStorageType() const { return is<UnownedStorageType>(); }
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
@@ -735,6 +747,10 @@ public:
   /// for a move only wrapped type.
   bool isPureMoveOnly() const;
 
+  /// Return true if this is a value type (struct/enum) that requires
+  /// deinitialization beyond destruction of its members.
+  bool isValueTypeWithDeinit() const;
+
   /// Returns true if and only if this type is a first class move only
   /// type. NOTE: Returns false if the type is a move only wrapped type.
   bool isMoveOnlyNominalType() const;
@@ -747,8 +763,8 @@ public:
     return getRawASTType()->is<SILMoveOnlyWrappedType>();
   }
 
-  /// If this is already a move only wrapped type, return *this. Otherwise, wrap
-  /// the copyable type in the mov eonly wrapper.
+  /// If this is already a moveonlywrapped type, return *this. Otherwise, wrap
+  /// the copyable type in the moveonlywrapper.
   SILType addingMoveOnlyWrapper() const {
     if (isMoveOnlyWrapped())
       return *this;
@@ -774,6 +790,20 @@ public:
     }
     return *this;
   }
+
+  /// If this is a box type containing a moveonlywrapped type, return a new box
+  /// with the moveonlywrapped type unwrapped.
+  ///
+  /// DISCUSSION: This is separate from addingMoveOnlyWrapper since this API
+  /// requires a SILFunction * and is specialized.
+  SILType addingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+
+  /// If this is a box type containing a copyable type, return a new box type
+  /// with the copyable type wrapped in a moveonly wrapped type.
+  ///
+  /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
+  /// requires a SILFunction * and is specialized.
+  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
@@ -823,6 +853,12 @@ public:
 
   bool isBoxedNonCopyableType(const SILFunction &fn) const {
     return isBoxedNonCopyableType(&fn);
+  }
+
+  bool isBoxedMoveOnlyWrappedType(const SILFunction *fn) const {
+    if (!this->is<SILBoxType>())
+      return false;
+    return getSILBoxFieldType(fn).isMoveOnlyWrapped();
   }
 
   SILType getInstanceTypeOfMetatype(SILFunction *function) const;

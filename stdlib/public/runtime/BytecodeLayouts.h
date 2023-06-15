@@ -47,6 +47,10 @@ enum class RefCountingKind : uint8_t {
   SinglePayloadEnumFN = 0x11,
   SinglePayloadEnumFNResolved = 0x12,
 
+  MultiPayloadEnumFN = 0x13,
+  MultiPayloadEnumFNResolved = 0x14,
+  MultiPayloadEnumGeneric = 0x15,
+
   Skip = 0x80,
   // We may use the MSB as flag that a count follows,
   // so all following values are reserved
@@ -66,7 +70,27 @@ swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest, swift::
 SWIFT_RUNTIME_EXPORT
 void swift_generic_instantiateLayoutString(const uint8_t *layoutStr, Metadata *type);
 
-void swift_resolve_resilientAccessors(uint8_t *layoutStr, size_t layoutStrOffset, const uint8_t *fieldLayoutStr, size_t refCountBytes, const Metadata *fieldType);
+void swift_resolve_resilientAccessors(uint8_t *layoutStr,
+                                      size_t layoutStrOffset,
+                                      const uint8_t *fieldLayoutStr,
+                                      const Metadata *fieldType);
+
+template <typename T>
+inline T readBytes(const uint8_t *layoutStr, size_t &i) {
+  T returnVal;
+  memcpy(&returnVal, layoutStr + i, sizeof(T));
+  i += sizeof(T);
+  return returnVal;
+}
+
+template <typename T>
+inline void writeBytes(uint8_t *layoutStr, size_t &i, T value) {
+  memcpy(layoutStr + i, &value, sizeof(T));
+  i += sizeof(T);
+}
+
+constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
+
 } // namespace swift
 
 #endif // SWIFT_BYTECODE_LAYOUTS_H

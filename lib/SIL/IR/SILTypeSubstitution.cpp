@@ -77,7 +77,9 @@ public:
                ProtocolConformanceRef(conformedProtocol),
                conformingReplacementType->getCanonicalType(),
                typeExpansionContext);
-      }, SubstFlags::SubstituteOpaqueArchetypes);
+      },
+      SubstFlags::SubstituteOpaqueArchetypes |
+      SubstFlags::PreservePackExpansionLevel);
   }
 
   // Substitute a function type.
@@ -292,7 +294,7 @@ public:
   }
 
   SILType subst(SILType type) {
-    return SILType::getPrimitiveType(visit(type.getASTType()),
+    return SILType::getPrimitiveType(visit(type.getRawASTType()),
                                      type.getCategory());
   }
 
@@ -334,10 +336,13 @@ public:
     llvm_unreachable("CanPackType shouldn't show in lowered types");
   }
 
+  /* FIXME: Uncomment this once SubstFlags::PreservePackExpansionLevel is gone */
+#if 0
   CanType visitPackExpansionType(CanPackExpansionType origType) {
     llvm_unreachable("shouldn't substitute an independent lowered pack "
                      "expansion type");
   }
+#endif
 
   void substPackExpansion(CanPackExpansionType origType,
                           llvm::function_ref<void(CanType)> addExpandedType) {
@@ -362,6 +367,7 @@ public:
     substElts.reserve(origType->getNumElements());
     for (auto &origElt : origType->getElements()) {
       CanType origEltType = CanType(origElt.getType());
+
       if (auto origExpansion = dyn_cast<PackExpansionType>(origEltType)) {
         bool first = true;
         substPackExpansion(origExpansion, [&](CanType substEltType) {
@@ -577,7 +583,8 @@ SILFunctionType::substituteOpaqueArchetypes(TypeConverter &TC,
       context.isWholeModuleContext());
 
   InFlightSubstitution IFS(replacer, replacer,
-                           SubstFlags::SubstituteOpaqueArchetypes);
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
 
   SILTypeSubstituter substituter(TC, context, IFS, getSubstGenericSignature());
   auto resTy =

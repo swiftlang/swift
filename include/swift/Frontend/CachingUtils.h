@@ -19,6 +19,7 @@
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/CASReference.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include <memory>
 
@@ -54,6 +55,32 @@ llvm::Error storeCachedCompilerOutput(llvm::cas::ObjectStore &CAS,
                                       StringRef CorrespondingInput,
                                       file_types::ID OutputKind);
 
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+createCASFileSystem(llvm::cas::ObjectStore &CAS, ArrayRef<std::string> FSRoots,
+                    ArrayRef<std::string> IncludeTreeRoots);
+
+namespace cas {
+/// Helper class to manage CAS/Caching from libSwiftScan C APIs.
+class CachingTool {
+public:
+  // Create the tool with a list of arguments from compiler invocation.
+  CachingTool(llvm::StringRef Path);
+
+  // Compute the CASID for PCH output from invocation.
+  std::string computeCacheKey(llvm::ArrayRef<const char *> Args,
+                              StringRef InputPath, file_types::ID OutputKind);
+
+  // Store content into CAS.
+  std::string storeContent(llvm::StringRef Content);
+
+  // Check if the tool is correctly initialized.
+  bool isValid() const { return CAS && Cache; }
+
+private:
+  std::unique_ptr<llvm::cas::ObjectStore> CAS;
+  std::unique_ptr<llvm::cas::ActionCache> Cache;
+};
+} // namespace cas
 }
 
 #endif

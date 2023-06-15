@@ -116,6 +116,7 @@ class MinimalStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_BUILD_PRIVATE:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_STDLIB_TRACING:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_CONCURRENCY_TRACING:BOOL', 'FALSE')
         self.cmake_options.define(

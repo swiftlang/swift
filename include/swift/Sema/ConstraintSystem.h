@@ -1500,6 +1500,10 @@ public:
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
 
+  /// A map of expressions to the ExprPatterns that they are being solved as
+  /// a part of.
+  llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
+
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallVector<ParamDecl *, 2> isolatedParams;
 
@@ -1685,6 +1689,16 @@ public:
         : nullptr;
   }
 
+  /// Retrieve the solved ExprPattern that corresponds to provided
+  /// sub-expression.
+  NullablePtr<ExprPattern> getExprPatternFor(Expr *E) const {
+    auto result = exprPatterns.find(E);
+    if (result == exprPatterns.end())
+      return nullptr;
+
+    return result->second;
+  }
+
   /// This method implements functionality of `Expr::isTypeReference`
   /// with data provided by a given solution.
   bool isTypeReference(Expr *E) const;
@@ -1865,6 +1879,11 @@ struct MemberLookupResult {
     /// This is a static member being access through a protocol metatype
     /// but its result type doesn't conform to this protocol.
     UR_InvalidStaticMemberOnProtocolMetatype,
+
+    /// This is a member that doesn't appear in 'initializes' and/or
+    /// 'accesses' attributes of the init accessor and therefore canno
+    /// t be referenced in its body.
+    UR_UnavailableWithinInitAccessor,
   };
 
   /// This is a list of considered (but rejected) candidates, along with a
@@ -2147,6 +2166,10 @@ private:
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
+
+  /// A map of expressions to the ExprPatterns that they are being solved as
+  /// a part of.
+  llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
@@ -2745,6 +2768,9 @@ public:
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
 
+    /// The length of \c exprPatterns.
+    unsigned numExprPatterns;
+
     /// The length of \c isolatedParams.
     unsigned numIsolatedParams;
 
@@ -2889,7 +2915,8 @@ public:
   /// and no new names are introduced after that point.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, DeclNameRef name);
+  LookupResult &lookupMember(Type base, DeclNameRef name,
+                             SourceLoc loc);
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.
@@ -3164,6 +3191,15 @@ public:
     assert(item != nullptr);
     assert(caseLabelItems.count(item) == 0);
     caseLabelItems[item] = info;
+  }
+
+  /// Record a given ExprPattern as the parent of its sub-expression.
+  void setExprPatternFor(Expr *E, ExprPattern *EP) {
+    assert(E);
+    assert(EP);
+    auto inserted = exprPatterns.insert({E, EP}).second;
+    assert(inserted && "Mapping already defined?");
+    (void)inserted;
   }
 
   Optional<CaseLabelItemInfo> getCaseLabelItemInfo(
@@ -4314,6 +4350,11 @@ public:
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
   bool generateConstraints(SingleValueStmtExpr *E);
+
+  /// Generate constraints for an array of ExprPatterns, forming a conjunction
+  /// that solves each expression in turn.
+  void generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
+                           ConstraintLocatorBuilder locator);
 
   /// Generate constraints for the given (unchecked) expression.
   ///

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -enable-experimental-feature NoImplicitCopy -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify %s
 
 //////////////////
 // Declarations //
@@ -1020,10 +1020,10 @@ public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' u
 public func enumPatternMatchIfLet1() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed again here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed again here}}
         borrowVal(x)
     }
 }
@@ -1031,10 +1031,10 @@ public func enumPatternMatchIfLet1() {
 public func enumPatternMatchIfLet1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed here}}
         borrowVal(x)
     }
-    if case let EnumTy.klass(x) = x2 { // expected-note {{consumed here}}
+    if case let EnumTy.klass(x) = consume x2 { // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
         borrowVal(x)
     }
@@ -1044,7 +1044,7 @@ public func enumPatternMatchIfLet2() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed in a loop}}
     x2 = EnumTy.klass(NonTrivialStruct())
     for _ in 0..<1024 {
-        if case let EnumTy.klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let EnumTy.klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1052,7 +1052,7 @@ public func enumPatternMatchIfLet2() {
 
 public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
-        if case let EnumTy.klass(x) = x2 {  // expected-note {{consumed here}}
+        if case let EnumTy.klass(x) = consume x2 {  // expected-note {{consumed here}}
             borrowVal(x)
         }
     }
@@ -1062,7 +1062,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{
 public func enumPatternMatchSwitch1() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
@@ -1074,7 +1074,7 @@ public func enumPatternMatchSwitch1() {
 }
 
 public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
@@ -1088,7 +1088,7 @@ public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {
 public func enumPatternMatchSwitch2() {
     var x2 = EnumTy.klass(NonTrivialStruct())
     x2 = EnumTy.klass(NonTrivialStruct())
-    switch x2 {
+    switch consume x2 {
     case let EnumTy.klass(k):
         borrowVal(k)
     case .int:
@@ -1097,7 +1097,7 @@ public func enumPatternMatchSwitch2() {
 }
 
 public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k):
         borrowVal(k)
     case .int:
@@ -1109,7 +1109,7 @@ public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {
 public func enumPatternMatchSwitch2WhereClause() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where x2.doSomething(): // expected-note {{used here}}
         borrowVal(k)
@@ -1121,7 +1121,7 @@ public func enumPatternMatchSwitch2WhereClause() {
 }
 
 public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where x2.doSomething():
         borrowVal(k)
@@ -1135,7 +1135,7 @@ public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expec
 public func enumPatternMatchSwitch2WhereClause2() {
     var x2 = EnumTy.klass(NonTrivialStruct())
     x2 = EnumTy.klass(NonTrivialStruct())
-    switch x2 {
+    switch consume x2 {
     case let EnumTy.klass(k)
            where boolValue:
         borrowVal(k)
@@ -1147,7 +1147,7 @@ public func enumPatternMatchSwitch2WhereClause2() {
 }
 
 public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-    switch x2 { // expected-note {{consumed here}}
+    switch consume x2 { // expected-note {{consumed here}}
     case let EnumTy.klass(k)
            where boolValue:
         borrowVal(k)
@@ -1200,7 +1200,7 @@ public func closureClassUseAfterConsumeArg(_ argX: inout NonTrivialStruct) {
 // We do not support captures of vars by closures today.
 public func closureCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = NonTrivialStruct()
     let f = {
@@ -1216,7 +1216,7 @@ public func closureCaptureClassUseAfterConsumeError() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    // expected-error @-3 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-3 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-4 {{'x2' consumed more than once}}
     // expected-error @-5 {{'x2' consumed more than once}}
     x2 = NonTrivialStruct()
@@ -1251,7 +1251,7 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) 
 // TODO: Improve error msg here to make it clear the use is due to the defer.
 public func deferCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
@@ -1266,7 +1266,7 @@ public func deferCaptureClassUseAfterConsume() {
 
 public func deferCaptureClassUseAfterConsume2() {
     var x2 = NonTrivialStruct()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
@@ -1281,7 +1281,7 @@ public func deferCaptureClassUseAfterConsume2() {
 }
 
 public func deferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
     defer {
@@ -1295,7 +1295,7 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {
 
 public func closureAndDeferCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = NonTrivialStruct()
     let f = {
@@ -1313,7 +1313,7 @@ public func closureAndDeferCaptureClassUseAfterConsume() {
 
 public func closureAndDeferCaptureClassUseAfterConsume2() {
     var x2 = NonTrivialStruct()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
@@ -1333,7 +1333,7 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
 
 public func closureAndDeferCaptureClassUseAfterConsume3() {
     var x2 = NonTrivialStruct()
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
@@ -1353,7 +1353,7 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
 }
 
 public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {
-    // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-note @-3 {{'x2' is declared 'inout'}}
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
@@ -1373,7 +1373,7 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivial
 public func closureAndClosureCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = NonTrivialStruct()
     let f = {
         let g = {
@@ -1390,7 +1390,7 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
 public func closureAndClosureCaptureClassUseAfterConsume2() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of closure capture 'x2' after consume}}
     x2 = NonTrivialStruct()
     let f = {
         let g = {
@@ -1408,7 +1408,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
 public func closureAndClosureCaptureClassUseAfterConsume3() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
+    // expected-error @-2 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     let f = {

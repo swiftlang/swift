@@ -82,6 +82,7 @@ namespace swift {
   class SerializedDefaultArgumentInitializer;
   class SerializedTopLevelCodeDecl;
   class StructDecl;
+  class AccessorDecl;
 
 namespace serialization {
 using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
@@ -457,6 +458,18 @@ public:
     return const_cast<DeclContext*>(this)->getInnermostMethodContext();
   }
 
+  /// Returns the innermost accessor context that belongs to a property.
+  ///
+  /// This routine looks through closure, initializer, and local function
+  /// contexts to find the innermost accessor declaration.
+  ///
+  /// \returns the innermost accessor, or null if there is no such context.
+  LLVM_READONLY
+  AccessorDecl *getInnermostPropertyAccessorContext();
+  const AccessorDecl *getInnermostPropertyAccessorContext() const {
+    return const_cast<DeclContext*>(this)->getInnermostPropertyAccessorContext();
+  }
+
   /// Returns the innermost type context.
   ///
   /// This routine looks through closure, initializer, and local function
@@ -598,7 +611,8 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, DeclNameRef member, NLOptions options,
+  bool lookupQualified(Type type, DeclNameRef member,
+                       SourceLoc loc, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look for the set of declarations with the given name within the
@@ -616,12 +630,12 @@ public:
   ///
   /// \returns true if anything was found.
   bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclNameRef member,
-                       NLOptions options,
+                       SourceLoc loc, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Perform qualified lookup for the given member in the given module.
   bool lookupQualified(ModuleDecl *module, DeclNameRef member,
-                       NLOptions options,
+                       SourceLoc loc, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look up all Objective-C methods with the given selector visible

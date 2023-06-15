@@ -323,7 +323,7 @@ function(_add_target_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WASI")
-    list(APPEND result "-D_WASI_EMULATED_MMAN")
+    list(APPEND result "-D_WASI_EMULATED_MMAN" "-D_WASI_EMULATED_PROCESS_CLOCKS")
   endif()
 
   if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
@@ -415,6 +415,10 @@ function(_add_target_variant_c_compile_flags)
 
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-DSWIFT_STDLIB_ENABLE_UNICODE_DATA")
+  endif()
+
+  if(SWIFT_STDLIB_TRACING)
+    list(APPEND result "-DSWIFT_STDLIB_TRACING")
   endif()
 
   if(SWIFT_STDLIB_CONCURRENCY_TRACING)
@@ -897,7 +901,7 @@ function(add_swift_target_library_single target name)
 
   # Define availability macros.
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
   endforeach()
 
   # Enable -target-min-inlining-version

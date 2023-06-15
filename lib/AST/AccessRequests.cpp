@@ -61,7 +61,17 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     case AccessorKind::DidSet:
       // These are only needed to synthesize the setter.
       return AccessLevel::Private;
+    case AccessorKind::Init:
+      // These are only called from designated initializers.
+      return AccessLevel::Private;
     }
+  }
+
+  // Special case for opaque type decls, which inherit the access of their
+  // naming decls.
+  if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(D)) {
+    if (auto *namingDecl = opaqueType->getNamingDecl())
+      return namingDecl->getFormalAccess();
   }
 
   DeclContext *DC = D->getDeclContext();

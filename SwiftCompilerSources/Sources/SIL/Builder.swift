@@ -136,6 +136,18 @@ public struct Builder {
     return notifyNew(release.getAs(StrongReleaseInst.self))
   }
 
+  @discardableResult
+  public func createUnownedRetain(operand: Value) -> UnownedRetainInst {
+    let retain = bridged.createUnownedRetain(operand.bridged)
+    return notifyNew(retain.getAs(UnownedRetainInst.self))
+  }
+
+  @discardableResult
+  public func createUnownedRelease(operand: Value) -> UnownedReleaseInst {
+    let release = bridged.createUnownedRelease(operand.bridged)
+    return notifyNew(release.getAs(UnownedReleaseInst.self))
+  }
+
   public func createFunctionRef(_ function: Function) -> FunctionRefInst {
     let functionRef = bridged.createFunctionRef(function.bridged)
     return notifyNew(functionRef.getAs(FunctionRefInst.self))

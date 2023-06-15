@@ -149,6 +149,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocPackInst:
+  case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocBoxInst:
@@ -224,6 +225,9 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)       \
   case SILInstructionKind::Load##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
@@ -251,7 +255,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectEnumAddrInst:
-  case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::OpenExistentialAddrInst:
@@ -281,6 +284,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocPackInst:
+  case SILInstructionKind::DeallocPackMetadataInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocBoxInst:
@@ -313,6 +317,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
+  case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugStepInst:

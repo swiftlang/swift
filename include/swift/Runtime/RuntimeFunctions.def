@@ -1276,7 +1276,8 @@ FUNCTION(InitStructMetadata,
 // void swift_initStructMetadataWithLayoutString(Metadata *structType,
 //                                               StructLayoutFlags flags,
 //                                               size_t numFields,
-//                                               Metadata * const *fieldTypes,
+//                                               uint8_t * const *fieldTypes,
+//                                               const uint8_t *fieldTags
 //                                               uint32_t *fieldOffsets);
 FUNCTION(InitStructMetadataWithLayoutString,
          swift_initStructMetadataWithLayoutString, C_CC, AlwaysAvailable,
@@ -1299,6 +1300,17 @@ FUNCTION(InitEnumMetadataSingleCase,
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData))
 
+// void swift_initEnumMetadataSingleCaseWithLayoutString(Metadata *enumType,
+//                                                       EnumLayoutFlags flags,
+//                                                       Metadata *payload);
+FUNCTION(InitEnumMetadataSingleCaseWithLayoutString,
+         swift_initEnumMetadataSingleCaseWithLayoutString,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(MetaData))
+
 // void swift_initEnumMetadataSinglePayload(Metadata *enumType,
 //                                          EnumLayoutFlags flags,
 //                                          TypeLayout *payload,
@@ -1312,6 +1324,7 @@ FUNCTION(InitEnumMetadataSinglePayload,
          EFFECT(MetaData))
 
 // void swift_initEnumMetadataMultiPayload(Metadata *enumType,
+//                                         EnumLayoutFlags layoutFlags,
 //                                         size_t numPayloads,
 //                                         TypeLayout * const *payloadTypes);
 FUNCTION(InitEnumMetadataMultiPayload,
@@ -1319,6 +1332,19 @@ FUNCTION(InitEnumMetadataMultiPayload,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(MetaData))
+
+// void
+// swift_initEnumMetadataMultiPayloadWithLayoutString(Metadata *enumType,
+//                                                  EnumLayoutFlags layoutFlags,
+//                                                    size_t numPayloads,
+//                                              Metadata * const *payloadTypes);
+FUNCTION(InitEnumMetadataMultiPayloadWithLayoutString,
+         swift_initEnumMetadataMultiPayloadWithLayoutString,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, TypeMetadataPtrPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData))
 

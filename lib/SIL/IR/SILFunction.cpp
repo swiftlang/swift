@@ -211,6 +211,7 @@ void SILFunction::init(
   this->IsDistributed = isDistributed;
   this->IsRuntimeAccessible = isRuntimeAccessible;
   this->ForceEnableLexicalLifetimes = DoNotForceEnableLexicalLifetimes;
+  this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -451,7 +452,8 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(genericSig.getPointer()),
-                    genericSig);
+                    genericSig,
+                    SubstFlags::PreservePackExpansionLevel);
 }
 
 bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {

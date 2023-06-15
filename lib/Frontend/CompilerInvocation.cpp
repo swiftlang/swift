@@ -682,8 +682,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                               /*default*/ false);
   Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
 
-  Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
-
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
@@ -1045,6 +1043,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_experimental_c_foreign_reference_types);
 
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
+  Opts.RequireCxxInteropToImportCxxInteropModule =
+      !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
@@ -1438,12 +1438,15 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
       Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
   }
 
-  if (!workingDirectory.empty()) {
-    // Provide a working directory to Clang as well if there are any -Xcc
-    // options, in case some of them are search-related. But do it at the
-    // beginning, so that an explicit -Xcc -working-directory will win.
-    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
-                          {"-working-directory", workingDirectory.str()});
+  if (FrontendOpts.CASFSRootIDs.empty() &&
+      FrontendOpts.ClangIncludeTrees.empty()) {
+    if (!workingDirectory.empty()) {
+      // Provide a working directory to Clang as well if there are any -Xcc
+      // options, in case some of them are search-related. But do it at the
+      // beginning, so that an explicit -Xcc -working-directory will win.
+      Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                            {"-working-directory", workingDirectory.str()});
+    }
   }
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
@@ -1463,6 +1466,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (auto *A = Args.getLastArg(OPT_import_objc_header))
     Opts.BridgingHeader = A->getValue();
+  Opts.BridgingHeaderPCHCacheKey =
+      Args.getLastArgValue(OPT_bridging_header_pch_key);
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
@@ -1473,6 +1478,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
+  Opts.UseClangIncludeTree |= Args.hasArg(OPT_clang_include_tree);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
@@ -2065,6 +2071,30 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
   if (specifiedDestroyHoistingOption)
     Opts.DestroyHoisting = *specifiedDestroyHoistingOption;
+
+  Optional<bool> enablePackMetadataStackPromotionFlag;
+  if (Arg *A = Args.getLastArg(OPT_enable_pack_metadata_stack_promotion)) {
+    enablePackMetadataStackPromotionFlag =
+        llvm::StringSwitch<Optional<bool>>(A->getValue())
+            .Case("true", true)
+            .Case("false", false)
+            .Default(None);
+  }
+  if (Args.getLastArg(OPT_enable_pack_metadata_stack_promotion_noArg)) {
+    if (!enablePackMetadataStackPromotionFlag.value_or(true)) {
+      // Error if pack metadata stack promotion has been disabled via the
+      // meta-var form and enabled via the flag.
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                     "enable-pack-metadata-stack-promotion",
+                     "enable-pack-metadata-stack-promotion=false");
+      return true;
+    } else {
+      enablePackMetadataStackPromotionFlag = true;
+    }
+  }
+  if (enablePackMetadataStackPromotionFlag)
+    Opts.EnablePackMetadataStackPromotion =
+        enablePackMetadataStackPromotionFlag.value();
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);

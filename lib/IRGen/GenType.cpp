@@ -2010,7 +2010,8 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
         return type;
       },
       MakeAbstractConformanceForGenericType(),
-      SubstFlags::AllowLoweredTypes);
+      SubstFlags::AllowLoweredTypes |
+      SubstFlags::PreservePackExpansionLevel);
     return CanType(exemplified);
   }
 }
@@ -2896,11 +2897,14 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
     return false;
   }
 
-  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinit(nominal);
+  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinit(
+      nominal, false /*deserialize lazily*/);
 
-  // If we do not have a deinit table, call the value witness instead.
+  // If we do not have a deinit table already deserialized, call the value
+  // witness instead.
   if (!deinitTable) {
     irgen::emitDestroyCall(IGF, T, indirect());
+    indirectCleanup();
     return true;
   }
 

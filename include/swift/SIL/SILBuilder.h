@@ -413,11 +413,9 @@ public:
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false,
-                                   bool isLexical = false, bool wasMoved = false
-#ifndef NDEBUG
-                                   ,
+                                   bool isLexical = false,
+                                   bool wasMoved = false,
                                    bool skipVarDeclAssert = false
-#endif
   ) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
@@ -425,6 +423,8 @@ public:
     if (dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()))
       assert((skipVarDeclAssert || Loc.isSynthesizedAST() || Var) &&
              "location is a VarDecl, but SILDebugVariable is empty");
+#else
+    (void)skipVarDeclAssert;
 #endif
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
@@ -435,6 +435,15 @@ public:
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
+  }
+  AllocPackMetadataInst *
+  createAllocPackMetadata(SILLocation loc,
+                          Optional<SILType> elementType = llvm::None) {
+    return insert(new (getModule()) AllocPackMetadataInst(
+        getSILDebugLocation(loc),
+        elementType.value_or(
+            SILType::getEmptyTupleType(getModule().getASTContext())
+                .getAddressType())));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -473,21 +482,25 @@ public:
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
                           usesMoveableValueDebugInfo,
-                          /*skipVarDeclAssert*/ false, hasPointerEscape);
+                          /*skipVarDeclAssert*/ false,
+                          hasPointerEscape);
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false,
                                bool reflection = false,
-                               bool usesMoveableValueDebugInfo = false
-#ifndef NDEBUG
-                               ,
+                               bool usesMoveableValueDebugInfo = false,
                                bool skipVarDeclAssert = false,
-#endif
                                bool hasPointerEscape = false) {
+#if NDEBUG
+    (void)skipVarDeclAssert;
+#endif
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
+#if defined(NDEBUG)
+    (void) skipVarDeclAssert;
+#endif
     assert((skipVarDeclAssert ||
             !dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
@@ -943,6 +956,14 @@ public:
         getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
   }
 
+  AssignOrInitInst *createAssignOrInit(SILLocation Loc, SILValue Src,
+                                       SILValue Initializer,
+                                       SILValue Setter,
+                                       AssignOrInitInst::Mode Mode) {
+    return insert(new (getModule()) AssignOrInitInst(
+        getSILDebugLocation(Loc), Src, Initializer, Setter, Mode));
+  }
+
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
                                      SILValue DestAddr) {
     return insert(new (getModule())
@@ -997,7 +1018,11 @@ public:
                                                          SILValue src) {
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
-  
+  MarkUninitializedInst *createMarkUninitializedOut(SILLocation Loc,
+                                                    SILValue src) {
+    return createMarkUninitialized(Loc, src, MarkUninitializedInst::Out);
+  }
+
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation Loc,
                                                    ArrayRef<SILValue> vars) {
     return insert(
@@ -1400,6 +1425,24 @@ public:
         CopyableToMoveOnlyWrapperValueInst::Guaranteed));
   }
 
+  MoveOnlyWrapperToCopyableBoxInst *
+  createMoveOnlyWrapperToCopyableBox(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) MoveOnlyWrapperToCopyableBoxInst(
+        getSILDebugLocation(loc), src, src->getOwnershipKind()));
+  }
+
+  MoveOnlyWrapperToCopyableAddrInst *
+  createMoveOnlyWrapperToCopyableAddr(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) MoveOnlyWrapperToCopyableAddrInst(
+        getSILDebugLocation(loc), src));
+  }
+
+  CopyableToMoveOnlyWrapperAddrInst *
+  createCopyableToMoveOnlyWrapperAddr(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) CopyableToMoveOnlyWrapperAddrInst(
+        getSILDebugLocation(loc), src));
+  }
+
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
@@ -1685,14 +1728,6 @@ public:
     return insert(SelectEnumAddrInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
         getModule(), CaseCounts, DefaultCount));
-  }
-
-  SelectValueInst *createSelectValue(
-      SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultResult,
-      ArrayRef<std::pair<SILValue, SILValue>> CaseValuesAndResult) {
-    return insert(SelectValueInst::create(getSILDebugLocation(Loc), Operand, Ty,
-                                          DefaultResult, CaseValuesAndResult,
-                                          getModule()));
   }
 
   TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
@@ -2221,6 +2256,11 @@ public:
   DeallocPackInst *createDeallocPack(SILLocation loc, SILValue operand) {
     return insert(new (getModule())
                       DeallocPackInst(getSILDebugLocation(loc), operand));
+  }
+  DeallocPackMetadataInst *createDeallocPackMetadata(SILLocation loc,
+                                                     SILValue alloc) {
+    return insert(new (getModule())
+                      DeallocPackMetadataInst(getSILDebugLocation(loc), alloc));
   }
   DeallocStackRefInst *createDeallocStackRef(SILLocation Loc,
                                                      SILValue operand) {

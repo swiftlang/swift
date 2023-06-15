@@ -243,6 +243,34 @@ func testGenericEnum() {
 
 testGenericEnum()
 
+func testGenericEnumSingleton() {
+    let ptr = allocateInternalGenericPtr(of: SingletonEnum<TestClass>.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: SingletonEnum<TestClass>.only(x, 23))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: SingletonEnum<TestClass>.only(y, 32))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: SingletonEnum<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericEnumSingleton()
+
 func testRecursive() {
     let ptr = allocateInternalGenericPtr(of: Recursive<TestClass>.self)
 
@@ -306,7 +334,7 @@ enum TestEnum {
 
 func testGenericWithEnumNonEmpty() {
     let ptr = allocateInternalGenericPtr(of: TestEnum.self)
-    
+
     do {
         let x = TestClass()
         testGenericInit(ptr, to: TestEnum.nonEmpty(x))
@@ -336,7 +364,7 @@ public struct ResilientWrapper {
 
 func testResilient() {
     let ptr = UnsafeMutablePointer<ResilientWrapper>.allocate(capacity: 1)
-    
+
     do {
         let x = TestClass()
         testInit(ptr, to: ResilientWrapper(x: SimpleResilient(x: 23, y: x), y: 5))
@@ -369,7 +397,7 @@ public struct GenericResilientWrapper<T> {
 
 func testGenericResilient() {
     let ptr = UnsafeMutablePointer<GenericResilientWrapper<TestClass>>.allocate(capacity: 1)
-    
+
     do {
         let x = TestClass()
         testInit(ptr, to: GenericResilientWrapper(x: GenericResilient(x: x, y: 32), y: 32))

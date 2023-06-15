@@ -442,6 +442,10 @@ public struct InternalEnumWrapper {
   }
 }
 
+public enum SingletonEnum<T> {
+    case only(T, Int)
+}
+
 public enum SinglePayloadEnumManyXI {
     case empty0
     case empty1

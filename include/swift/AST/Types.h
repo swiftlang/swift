@@ -179,7 +179,10 @@ public:
     /// they have a type variable originator.
     SolverAllocated = 0x8000,
 
-    Last_Property = SolverAllocated
+    /// This type contains a concrete pack.
+    HasConcretePack = 0x10000,
+
+    Last_Property = HasConcretePack
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -254,6 +257,8 @@ public:
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   bool hasParameterPack() const { return Bits & HasParameterPack; }
+
+  bool hasConcretePack() const { return Bits & HasConcretePack; }
 
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
@@ -370,6 +375,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
 protected:
   enum { NumAFTExtInfoBits = 11 };
   enum { NumSILExtInfoBits = 11 };
+
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -412,12 +419,12 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+31,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+30,
     /// Type variable options.
     Options : 7,
     : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 31
+    ID : 30
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
@@ -496,6 +503,7 @@ protected:
   );
 
   } Bits;
+  // clang-format on
 
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
@@ -684,6 +692,13 @@ public:
     return getRecursiveProperties().hasParameterPack();
   }
 
+  bool hasConcretePack() const {
+    return getRecursiveProperties().hasConcretePack();
+  }
+
+  /// Whether the type has some flavor of pack.
+  bool hasPack() const { return hasParameterPack() || hasConcretePack(); }
+
   /// Determine whether the type involves a parameterized existential type.
   bool hasParameterizedExistential() const {
     return getRecursiveProperties().hasParameterizedExistential();
@@ -712,8 +727,10 @@ public:
       SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
   /// Retrieve the set of type parameter packs that occur within this type.
-  void getTypeParameterPacks(
-      SmallVectorImpl<Type> &rootParameterPacks);
+  void getTypeParameterPacks(SmallVectorImpl<Type> &rootParameterPacks);
+
+  /// Retrieve the set of type parameter packs that occur within this type.
+  void walkPackReferences(llvm::function_ref<bool (Type)> fn);
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
@@ -779,6 +796,9 @@ public:
   /// substitutions to be unadorned pack parameters or archetypes, which
   /// this function will wrap into a pack containing a singleton expansion.
   PackType *getPackSubstitutionAsPackType();
+
+  /// Increase the expansion level of each parameter pack appearing in this type.
+  Type increasePackElementLevel(unsigned level);
 
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
@@ -5288,7 +5308,9 @@ class SILMoveOnlyWrappedType final : public TypeBase,
   SILMoveOnlyWrappedType(CanType innerType)
       : TypeBase(TypeKind::SILMoveOnlyWrapped, &innerType->getASTContext(),
                  innerType->getRecursiveProperties()),
-        innerType(innerType) {}
+        innerType(innerType) {
+    assert(!innerType->isPureMoveOnly() && "Inner type must be copyable");
+  }
 
 public:
   CanType getInnerType() const { return innerType; }

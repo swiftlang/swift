@@ -61,7 +61,10 @@ public:
 
   NominalTypeDecl *getNominalDecl() const { return nominalDecl; }
 
-  SILFunction *getImplementation() const { return funcImpl; }
+  SILFunction *getImplementation() const {
+    assert(funcImpl);
+    return funcImpl;
+  }
 
   IsSerialized_t isSerialized() const {
     return serialized ? IsSerialized : IsNotSerialized;

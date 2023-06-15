@@ -876,6 +876,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
   elt.setPattern(pattern);
   elt.setInitializer(init);
+  
   isFalsable |= pattern->isRefutablePattern();
   return hadError;
 }
@@ -2179,6 +2180,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
                               DeclNameRef::createConstructor(),
+                              apply->getLoc(),
                               subOptions, lookupResults);
 
     for (auto decl : lookupResults) {

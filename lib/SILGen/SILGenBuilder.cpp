@@ -437,6 +437,23 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
   return cloner.clone(result);
 }
 
+ManagedValue
+SILGenBuilder::createLoadIfLoadable(SILLocation loc, ManagedValue addr) {
+  assert(addr.getType().isAddress());
+  if (!addr.getType().isLoadable(SGF.F))
+    return addr;
+  return createLoadWithSameOwnership(loc, addr);
+}
+
+ManagedValue
+SILGenBuilder::createLoadWithSameOwnership(SILLocation loc,
+                                           ManagedValue addr) {
+  if (addr.isPlusOne(SGF))
+    return createLoadTake(loc, addr);
+  else
+    return createLoadBorrow(loc, addr);
+}
+
 ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
   auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadTake(loc, v, lowering);
@@ -483,7 +500,14 @@ static ManagedValue createInputFunctionArgument(
   assert((F.isBare() || isFormalParameterPack || decl) &&
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
-  arg->setNoImplicitCopy(isNoImplicitCopy);
+  if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
+    if (!arg->getType().isPureMoveOnly()) {
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+    }
+  }
+  if (isNoImplicitCopy)
+    arg->setNoImplicitCopy(isNoImplicitCopy);
   arg->setClosureCapture(isClosureCapture);
   arg->setLifetimeAnnotation(lifetimeAnnotation);
   arg->setFormalParameterPack(isFormalParameterPack);

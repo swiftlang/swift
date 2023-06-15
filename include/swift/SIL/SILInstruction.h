@@ -821,6 +821,10 @@ public:
   /// The first operand must be the allocating instruction.
   bool isDeallocatingStack() const;
 
+  /// Whether IRGen lowering of this instruction may result in emitting packs of
+  /// metadata or witness tables.
+  bool mayRequirePackMetadata() const;
+
   /// Create a new copy of this instruction, which retains all of the operands
   /// and other information of this one.  If an insertion point is specified,
   /// then the new instruction is inserted before the specified point, otherwise
@@ -1388,11 +1392,11 @@ FirstArgOwnershipForwardingSingleValueInst::classof(SILInstructionKind kind) {
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
     return true;
   default:
@@ -2273,6 +2277,27 @@ public:
   CanSILPackType getPackType() const {
     return getType().castTo<SILPackType>();
   }
+};
+
+/// AllocPackMetadataInst - Marker instruction indicating that the next
+///                         instruction might allocate on-stack pack metadata
+///                         during IRGen.
+///
+/// Only valid in lowered SIL.
+class AllocPackMetadataInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::AllocPackMetadataInst, AllocPackMetadataInst,
+          AllocationInst> {
+  friend SILBuilder;
+
+  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType)
+      : NullaryInstructionWithTypeDependentOperandsBase(
+            loc, {}, elementType.getAddressType()) {}
+
+public:
+  /// The instruction which may trigger on-stack pack metadata when IRGen
+  /// lowering.
+  SILInstruction *getIntroducer() { return getNextInstruction(); }
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
@@ -4909,6 +4934,78 @@ public:
   }
 };
 
+/// AssignOrInitInst - Represents an abstract assignment via a init accessor
+/// or a setter, which may either be an initialization or a store sequence.
+/// This is only valid in Raw SIL.
+///
+/// Note that this instruction does not inherit from AssignInstBase because
+/// there is no physical destination of the assignment. Both the init
+/// and the setter are factored into functions.
+class AssignOrInitInst
+    : public InstructionBase<SILInstructionKind::AssignOrInitInst,
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
+  friend SILBuilder;
+  USE_SHARED_UINT8;
+
+  FixedOperandList<3> Operands;
+
+  /// Marks all of the properties in `initializes(...)` list that
+  /// have been initialized before this intruction to help Raw SIL
+  /// lowering to emit destroys.
+  llvm::BitVector Assignments;
+
+public:
+  enum Mode {
+    /// The mode is not decided yet (by DefiniteInitialization).
+    Unknown,
+
+    /// The initializer is called with Src as argument.
+    Init,
+
+    /// The setter is called with Src as argument.
+    Set
+  };
+
+private:
+  AssignOrInitInst(SILDebugLocation DebugLoc,
+                   SILValue Src, SILValue Initializer,
+                   SILValue Setter, Mode mode);
+
+public:
+  SILValue getSrc() const { return Operands[0].get(); }
+  SILValue getInitializer() const { return Operands[1].get(); }
+  SILValue getSetter() { return  Operands[2].get(); }
+
+  Mode getMode() const {
+    return Mode(sharedUInt8().AssignOrInitInst.mode);
+  }
+
+  void setMode(Mode mode) {
+    sharedUInt8().AssignOrInitInst.mode = uint8_t(mode);
+  }
+
+  /// Mark a property from `initializes(...)` list as initialized
+  /// before this instruction.
+  void markAsInitialized(VarDecl *property);
+  void markAsInitialized(unsigned propertyIdx);
+
+  /// Check whether a property from `initializes(...)` list with
+  /// the given index has already been initialized and requires
+  /// destroy before it could be re-initialized.
+  bool isPropertyAlreadyInitialized(unsigned propertyIdx);
+
+  unsigned getNumInitializedProperties() const;
+
+  ArrayRef<VarDecl *> getInitializedProperties() const;
+  ArrayRef<VarDecl *> getAccessedProperties() const;
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  AccessorDecl *getReferencedInitAccessor() const;
+};
+
 /// Indicates that a memory location is uninitialized at this point and needs to
 /// be initialized by the end of the function and before any escape point for
 /// this instruction. This is only valid in Raw SIL.
@@ -4948,6 +5045,10 @@ public:
     /// DelegatingSelfAllocated designates "self" in a delegating class
     /// initializer where memory has already been allocated.
     DelegatingSelfAllocated,
+
+    /// Out designates an indirectly returned result.
+    /// This is the result that has to be checked for initialization.
+    Out,
   };
 private:
   Kind ThisKind;
@@ -4962,6 +5063,7 @@ public:
   Kind getMarkUninitializedKind() const { return ThisKind; }
 
   bool isVar() const { return ThisKind == Var; }
+  bool isOut() const { return ThisKind == Out; }
   bool isRootSelf() const {
     return ThisKind == RootSelf;
   }
@@ -6556,8 +6658,8 @@ public:
   }
 };
 
-// Abstract base class of all select instructions like select_enum,
-// select_value, etc. The template parameter represents a type of case values
+// Abstract base class of all select instructions like select_enum.
+// The template parameter represents a type of case values
 // to be compared with the operand of a select instruction.
 //
 // Subclasses must provide tail allocated storage.
@@ -6773,50 +6875,6 @@ class SelectEnumAddrInst final
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
          SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount);
-};
-
-/// Select on a value of a builtin integer type.
-///
-/// There is 'the' operand, followed by pairs of operands for each case,
-/// followed by an optional default operand.
-class SelectValueInst final
-    : public InstructionBaseWithTrailingOperands<
-          SILInstructionKind::SelectValueInst, SelectValueInst,
-          SelectInstBase<SelectValueInst, SILValue, SingleValueInstruction>> {
-  friend SILBuilder;
-
-  SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-                  SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults);
-
-  static SelectValueInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-         SILValue DefaultValue,
-         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M);
-
-public:
-  std::pair<SILValue, SILValue>
-  getCase(unsigned i) const {
-    auto cases = getAllOperands().slice(1);
-    return {cases[i*2].get(), cases[i*2+1].get()};
-  }
-
-  unsigned getNumCases() const {
-    // Ignore the first non-case operand.
-    auto count = getAllOperands().size() - 1;
-    // This implicitly ignore the optional default operand.
-    return count / 2;
-  }
-
-  bool hasDefault() const {
-    // If the operand count is even, then we have a default value.
-    return (getAllOperands().size() & 1) == 0;
-  }
-
-  SILValue getDefaultResult() const {
-    assert(hasDefault() && "doesn't have a default");
-    return getAllOperands().back().get();
-  }
 };
 
 /// MetatypeInst - Represents the production of an instance of a given metatype
@@ -8491,10 +8549,21 @@ private:
             DebugLoc, operand, operand->getType().addingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
                                             : OwnershipKind::Owned),
-        initialKind(kind) {}
+        initialKind(kind) {
+    assert(!operand->getType().isMoveOnly() &&
+           "Cannot be moveonly or moveonly wrapped");
+  }
 
 public:
   InitialKind getInitialKind() const { return initialKind; }
+
+  bool hasGuaranteedInitialKind() const {
+    return getInitialKind() == InitialKind::Guaranteed;
+  }
+
+  bool hasOwnedInitialKind() const {
+    return getInitialKind() == InitialKind::Owned;
+  }
 };
 
 /// Convert from an @moveOnly wrapper type to the underlying copyable type. Can
@@ -8543,10 +8612,71 @@ private:
             DebugLoc, operand, operand->getType().removingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
                                             : OwnershipKind::Owned),
-        initialKind(kind) {}
+        initialKind(kind) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "Expected moveonlywrapped argument!");
+  }
 
 public:
   InitialKind getInitialKind() const { return initialKind; }
+
+  bool hasGuaranteedInitialKind() const {
+    return getInitialKind() == InitialKind::Guaranteed;
+  }
+
+  bool hasOwnedInitialKind() const {
+    return getInitialKind() == InitialKind::Owned;
+  }
+};
+
+/// Convert a ${ @moveOnly T } to $T. This is a forwarding instruction that acts
+/// similarly to an object cast like upcast, unlike
+/// MoveOnlyWrapperToCopyableValue which provides artificial semantics injected
+/// by SILGen.
+class MoveOnlyWrapperToCopyableBoxInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst,
+          FirstArgOwnershipForwardingSingleValueInst> {
+  friend class SILBuilder;
+
+  MoveOnlyWrapperToCopyableBoxInst(SILDebugLocation DebugLoc, SILValue operand,
+                                   ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(
+            DebugLoc, operand,
+            operand->getType().removingMoveOnlyWrapperToBoxedType(
+                operand->getFunction()),
+            forwardingOwnershipKind) {
+    assert(
+        operand->getType().isBoxedMoveOnlyWrappedType(operand->getFunction()) &&
+        "Expected moveonlywrapped argument!");
+  }
+};
+
+class CopyableToMoveOnlyWrapperAddrInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst,
+          SingleValueInstruction> {
+  friend class SILBuilder;
+
+  CopyableToMoveOnlyWrapperAddrInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().addingMoveOnlyWrapper()) {
+    assert(!operand->getType().isMoveOnly() && "Expected copyable argument");
+  }
+};
+
+class MoveOnlyWrapperToCopyableAddrInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst,
+          SingleValueInstruction> {
+  friend class SILBuilder;
+
+  MoveOnlyWrapperToCopyableAddrInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().removingMoveOnlyWrapper()) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "Expected moveonlywrapped argument");
+  }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
@@ -8683,6 +8813,27 @@ class DeallocPackInst :
 
   DeallocPackInst(SILDebugLocation debugLoc, SILValue operand)
       : UnaryInstructionBase(debugLoc, operand) {}
+};
+
+/// DeallocPackMetadataInst - Deallocate stack memory allocated on behalf of the
+///                           operand by IRGen.
+///
+/// Only valid in lowered SIL.
+class DeallocPackMetadataInst final
+    : public UnaryInstructionBase<SILInstructionKind::DeallocPackMetadataInst,
+                                  DeallocationInst> {
+  friend SILBuilder;
+
+  DeallocPackMetadataInst(SILDebugLocation debugLoc, SILValue alloc)
+      : UnaryInstructionBase(debugLoc, alloc) {}
+
+public:
+  AllocPackMetadataInst *getAllocation() {
+    return cast<AllocPackMetadataInst>(getOperand().getDefiningInstruction());
+  }
+  /// The instruction which may trigger on-stack pack metadata when IRGen
+  /// lowering.
+  SILInstruction *getIntroducer() { return getAllocation()->getIntroducer(); }
 };
 
 /// Like DeallocStackInst, but for `alloc_ref [stack]`.

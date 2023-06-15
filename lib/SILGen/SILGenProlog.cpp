@@ -263,10 +263,7 @@ public:
     bool argIsLoadable = argType.isLoadable(SGF.F);
     if (argIsLoadable) {
       if (argType.isAddress()) {
-        if (mv.isPlusOne(SGF))
-          mv = SGF.B.createLoadTake(loc, mv);
-        else
-          mv = SGF.B.createLoadBorrow(loc, mv);
+        mv = SGF.B.createLoadWithSameOwnership(loc, mv);
         argType = argType.getObjectType();
       }
     }
@@ -653,7 +650,19 @@ private:
     // - @noImplicitCopy
     // - @_eagerMove
     // - @_noEagerMove
-    auto isNoImplicitCopy = pd->isNoImplicitCopy();
+    bool isNoImplicitCopy = pd->isNoImplicitCopy();
+    if (!argrv.getType().isPureMoveOnly()) {
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+      if (pd->isSelfParameter()) {
+        auto *dc = pd->getDeclContext();
+        if (auto *fn = dyn_cast<FuncDecl>(dc)) {
+          auto accessKind = fn->getSelfAccessKind();
+          isNoImplicitCopy |= accessKind == SelfAccessKind::Borrowing;
+          isNoImplicitCopy |= accessKind == SelfAccessKind::Consuming;
+        }
+      }
+    }
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only
@@ -782,6 +791,25 @@ private:
         allocStack->setIsLexical();
       SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(allocStack);
       return;
+    }
+
+    if (auto *arg = dyn_cast<SILFunctionArgument>(argrv.getValue())) {
+      if (arg->isNoImplicitCopy()) {
+        switch (pd->getSpecifier()) {
+        case swift::ParamSpecifier::Borrowing:
+          // Shouldn't have any cleanups on this.
+          assert(!argrv.hasCleanup());
+          argrv = ManagedValue::forBorrowedAddressRValue(
+              SGF.B.createCopyableToMoveOnlyWrapperAddr(pd, argrv.getValue()));
+          break;
+        case swift::ParamSpecifier::Consuming:
+        case swift::ParamSpecifier::Default:
+        case swift::ParamSpecifier::InOut:
+        case swift::ParamSpecifier::LegacyOwned:
+        case swift::ParamSpecifier::LegacyShared:
+          break;
+        }
+      }
     }
 
     SILValue debugOperand = argrv.getValue();
@@ -1538,54 +1566,91 @@ SILValue SILGenFunction::emitGetCurrentExecutor(SILLocation loc) {
   return ExpectedExecutor;
 }
 
+static void emitIndirectPackParameter(SILGenFunction &SGF,
+                                      PackType *resultType,
+                                      CanTupleEltTypeArrayRef
+                                        resultTypesInContext,
+                                      AbstractionPattern origExpansionType,
+                                      DeclContext *DC) {
+  auto &ctx = SGF.getASTContext();
+
+  bool indirect =
+    origExpansionType.arePackElementsPassedIndirectly(SGF.SGM.Types);
+  SmallVector<CanType, 4> packElts;
+  for (auto substEltType : resultTypesInContext) {
+    auto origComponentType
+      = origExpansionType.getPackExpansionComponentType(substEltType);
+    CanType loweredEltTy =
+      SGF.getLoweredRValueType(origComponentType, substEltType);
+    packElts.push_back(loweredEltTy);
+  }
+
+  SILPackType::ExtInfo extInfo(indirect);
+  auto packType = SILPackType::get(ctx, extInfo, packElts);
+  auto resultSILType = SILType::getPrimitiveAddressType(packType);
+
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                                 ctx.getIdentifier("$return_value"), SourceLoc(),
+                                 ctx.getIdentifier("$return_value"),
+                                 DC);
+  var->setSpecifier(ParamSpecifier::InOut);
+  var->setInterfaceType(resultType);
+  auto *arg = SGF.F.begin()->createFunctionArgument(resultSILType, var);
+  (void)arg;
+}
+
 static void emitIndirectResultParameters(SILGenFunction &SGF,
                                          Type resultType,
                                          AbstractionPattern origResultType,
                                          DeclContext *DC) {
-  // Expand tuples.
+  CanType resultTypeInContext =
+    DC->mapTypeIntoContext(resultType)->getCanonicalType();
+
+  // Tuples in the original result type are expanded.
   if (origResultType.isTuple()) {
-    auto tupleType = resultType->castTo<TupleType>();
-    for (unsigned i = 0, e = origResultType.getNumTupleElements(); i < e; ++i) {
-      emitIndirectResultParameters(SGF, tupleType->getElementType(i),
-                                   origResultType.getTupleElementType(i),
-                                   DC);
-    }
+    origResultType.forEachTupleElement(resultTypeInContext,
+                                       [&](TupleElementGenerator &elt) {
+      auto origEltType = elt.getOrigType();
+      auto substEltTypes = elt.getSubstTypes(resultType);
+
+      // If the original element isn't a pack expansion, pull out the
+      // corresponding substituted tuple element and recurse.
+      if (!elt.isOrigPackExpansion()) {
+        emitIndirectResultParameters(SGF, substEltTypes[0], origEltType, DC);
+        return;
+      }
+
+      // Otherwise, bind a pack parameter.
+      PackType *resultPackType = [&] {
+        SmallVector<Type, 4> packElts(substEltTypes.begin(),
+                                      substEltTypes.end());
+        return PackType::get(SGF.getASTContext(), packElts);
+      }();
+      emitIndirectPackParameter(SGF, resultPackType, elt.getSubstTypes(),
+                                origEltType, DC);
+    });
     return;
   }
 
+  assert(!resultType->is<PackExpansionType>());
+
   // If the return type is address-only, emit the indirect return argument.
   auto &resultTI =
-    SGF.SGM.Types.getTypeLowering(origResultType,
-                                  DC->mapTypeIntoContext(resultType),
+    SGF.SGM.Types.getTypeLowering(origResultType, resultTypeInContext,
                                   SGF.getTypeExpansionContext());
   
   // The calling convention always uses minimal resilience expansion.
   auto &resultTIConv = SGF.SGM.Types.getTypeLowering(
-      DC->mapTypeIntoContext(resultType), TypeExpansionContext::minimal());
+      resultTypeInContext, TypeExpansionContext::minimal());
   auto resultConvType = resultTIConv.getLoweredType();
 
   auto &ctx = SGF.getASTContext();
 
   SILType resultSILType = resultTI.getLoweredType().getAddressType();
 
-  // FIXME: respect susbtitution properly and collect the appropriate
-  // tuple components from resultType that correspond to the
-  // pack expansion in origType.
-  bool isPackExpansion = resultType->is<PackExpansionType>();
-  if (isPackExpansion) {
-    resultType = PackType::get(ctx, {resultType});
-
-    bool indirect =
-      origResultType.arePackElementsPassedIndirectly(SGF.SGM.Types);
-    SILPackType::ExtInfo extInfo(indirect);
-    resultSILType = SILType::getPrimitiveAddressType(
-      SILPackType::get(ctx, extInfo, {resultSILType.getASTType()}));
-  }
-
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
-  if (!isPackExpansion &&
-      !SILModuleConventions::isReturnedIndirectlyInSIL(resultConvType,
+  if (!SILModuleConventions::isReturnedIndirectlyInSIL(resultConvType,
                                                        SGF.SGM.M)) {
     if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
         || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)

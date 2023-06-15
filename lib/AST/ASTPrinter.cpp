@@ -3218,6 +3218,10 @@ static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
   });
 }
 
+static bool usesFeatureInitAccessors(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   auto &attrs = decl->getAttrs();
   return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
@@ -4328,6 +4332,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
+  case AccessorKind::Init:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4342,6 +4347,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
+    break;
   }
 
   // handle effects specifiers before the body
@@ -4805,16 +4811,14 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
       }
   );
 
-  {
+  if (decl->resultType.getTypeRepr() ||
+      !decl->getResultInterfaceType()->isVoid()) {
     Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
     SWIFT_DEFER {
       Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
     };
 
-    if (decl->parameterList)
-      Printer << " -> ";
-    else
-      Printer << ": ";
+    Printer << " -> ";
 
     TypeLoc resultTypeLoc(
         decl->resultType.getTypeRepr(), decl->getResultInterfaceType());
@@ -6047,7 +6051,8 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    Printer << "Pack{";
+    if (Options.PrintExplicitPackTypes)
+      Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
@@ -6056,7 +6061,9 @@ public:
       Type EltType = Fields[i];
       visit(EltType);
     }
-    Printer << "}";
+
+    if (Options.PrintExplicitPackTypes)
+      Printer << "}";
   }
 
   void visitSILPackType(SILPackType *T) {
@@ -6075,12 +6082,24 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
+    SmallVector<Type, 2> rootParameterPacks;
+    T->getPatternType()->getTypeParameterPacks(rootParameterPacks);
+
+    if (rootParameterPacks.empty() &&
+        (T->getCountType()->isParameterPack() ||
+         T->getCountType()->is<PackArchetypeType>())) {
+      Printer << "/* shape: ";
+      visit(T->getCountType());
+      Printer << " */ ";
+    }
+
     Printer << "repeat ";
+
     visit(T->getPatternType());
   }
 
   void visitPackElementType(PackElementType *T) {
-    Printer << "@level(" << T->getLevel() << ") ";
+    Printer << "/* level: " << T->getLevel() << " */ ";
     visit(T->getPackType());
   }
 

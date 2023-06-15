@@ -73,6 +73,26 @@ public struct StringifyMacro: ExpressionMacro {
   }
 }
 
+public struct ExprAndDeclMacro: ExpressionMacro, DeclarationMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      fatalError("boom")
+    }
+
+    return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
+  }
+
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> [DeclSyntax] {
+    return []
+  }
+}
+
 public struct StringifyAndTryMacro: ExpressionMacro {
   public static func expansion(
     of macro: some FreestandingMacroExpansionSyntax,
@@ -164,7 +184,7 @@ public enum AddBlocker: ExpressionMacro {
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
     let visitor = AddVisitor()
-    let result = visitor.visit(Syntax(node))
+    let result = visitor.rewrite(Syntax(node))
 
     for diag in visitor.diagnostics {
       context.diagnose(diag)
@@ -295,6 +315,25 @@ public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
       // 2. Curry thunk at call sites
       //    func foo()
       //    Foo2.foo // AutoClosureExpr with invalid discriminator
+    ]
+  }
+}
+
+public struct VarDeclMacro: CodeItemMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    let name = context.makeUniqueName("fromMacro")
+    return [
+      "let \(name) = 23",
+      "use(\(name))",
+      """
+      if true {
+        let \(name) = "string"
+        use(\(name))
+      }
+      """
     ]
   }
 }
@@ -1430,23 +1469,22 @@ public struct SimpleCodeItemMacro: CodeItemMacro {
   ) throws -> [CodeBlockItemSyntax] {
     [
       .init(item: .decl("""
-
       struct \(context.makeUniqueName("foo")) {
         var x: Int
       }
       """)),
       .init(item: .stmt("""
-
       if true {
         print("from stmt")
         usedInExpandedStmt()
       }
+      """)),
+      .init(item: .stmt("""
       if false {
         print("impossible")
       }
       """)),
       .init(item: .expr("""
-
       print("from expr")
       """)),
     ]
@@ -1503,5 +1541,88 @@ public struct SingleMemberMacro: MemberMacro {
     return [
       member,
     ]
+  }
+}
+
+public struct UseIdentifierMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let argument = node.argumentList.first?.expression.as(StringLiteralExprSyntax.self) else {
+      fatalError("boom")
+    }
+    return [
+      """
+      func \(context.makeUniqueName("name"))() {
+        _ = \(raw: argument.segments.first!)
+      }
+      """,
+      """
+      struct Foo {
+        var \(context.makeUniqueName("name")): Int {
+          _ = \(raw: argument.segments.first!)
+          return 0
+        }
+      }
+      """
+    ]
+  }
+}
+
+public struct StaticFooFuncMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func foo() {}",
+    ]
+  }
+}
+
+public struct SelfAlwaysEqualOperator: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func ==(lhs: Self, rhs: Bool) -> Bool { true }",
+    ]
+  }
+}
+
+extension SelfAlwaysEqualOperator: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "static func ==(lhs: Self, rhs: Bool) -> Bool { true }",
+    ]
+  }
+}
+
+public struct InitializableMacro: ConformanceMacro, MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingConformancesOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+    return [("Initializable", nil)]
+  }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let requirement: DeclSyntax =
+      """
+      init(value: Int) {}
+      """
+
+    return [requirement]
   }
 }

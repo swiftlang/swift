@@ -126,6 +126,7 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
                                                  AccessorDecl *getter,
                                                  AccessorDecl *setter) {
   assert(getter);
+  storage->getASTContext().evaluator.cacheOutput(HasStorageRequest{storage}, false);
   if (setter) {
     storage->setImplInfo(StorageImplInfo::getMutableComputed());
     storage->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
@@ -2634,30 +2635,38 @@ namespace {
         }
         clang::CXXConstructorDecl *copyCtor = nullptr;
         clang::CXXConstructorDecl *moveCtor = nullptr;
+        clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor()) {
           copyCtor = clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        } else if (decl->needsImplicitMoveConstructor()) {
+        }
+        if (decl->needsImplicitMoveConstructor()) {
           moveCtor = clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        } else {
-          // We may have a defaulted copy constructor that needs to be defined.
-          // Try to find it.
-          for (auto methods : decl->methods()) {
-            if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
-              if (declCtor->isDefaulted() &&
-                  declCtor->getAccess() == clang::AS_public &&
-                  !declCtor->isDeleted() &&
-                  // Note: we use "doesThisDeclarationHaveABody" here because
-                  // that's what "DefineImplicitCopyConstructor" checks.
-                  !declCtor->doesThisDeclarationHaveABody()) {
-                if (declCtor->isCopyConstructor()) {
+        }
+        if (decl->needsImplicitDefaultConstructor()) {
+          defaultCtor = clangSema.DeclareImplicitDefaultConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+        }
+        // We may have a defaulted copy/move/default constructor that needs to
+        // be defined. Try to find it.
+        for (auto methods : decl->methods()) {
+          if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
+            if (declCtor->isDefaulted() &&
+                declCtor->getAccess() == clang::AS_public &&
+                !declCtor->isDeleted() &&
+                // Note: we use "doesThisDeclarationHaveABody" here because
+                // that's what "DefineImplicitCopyConstructor" checks.
+                !declCtor->doesThisDeclarationHaveABody()) {
+              if (declCtor->isCopyConstructor()) {
+                if (!copyCtor)
                   copyCtor = declCtor;
-                  break;
-                } else if (declCtor->isMoveConstructor()) {
+              } else if (declCtor->isMoveConstructor()) {
+                if (!moveCtor)
                   moveCtor = declCtor;
-                  break;
-                }
+              } else if (declCtor->isDefaultConstructor()) {
+                if (!defaultCtor)
+                  defaultCtor = declCtor;
               }
             }
           }
@@ -2669,6 +2678,10 @@ namespace {
         if (moveCtor) {
           clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
                                                   moveCtor);
+        }
+        if (defaultCtor) {
+          clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
+                                                     defaultCtor);
         }
 
         if (decl->needsImplicitDestructor()) {
@@ -3581,6 +3594,12 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // While importing the DeclContext, we might have imported the decl
+      // itself.
+      auto known = Impl.importDeclCached(decl, getVersion());
+      if (known.has_value())
+        return known.value();
+
       // TODO: do we want to emit a diagnostic here?
       // Types that are marked as foreign references cannot be stored by value.
       if (auto recordType =
@@ -3589,11 +3608,30 @@ namespace {
           return nullptr;
       }
 
-      auto importedType =
-          Impl.importType(decl->getType(), ImportTypeKind::RecordField,
-                          ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None,
-                          getImportTypeAttrs(decl));
+      ImportedType importedType;
+      auto fieldType = decl->getType();
+      if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
+        fieldType = elaborated->desugar();
+      if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
+        if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
+          if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
+            // If this fails, it means that we need a stronger predicate for
+            // determining the relationship between an enum and typedef.
+            assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+                   typedefType->getCanonicalTypeInternal());
+            if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
+              importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
+            }
+          }
+        }
+      }
+
+      if (!importedType)
+        importedType =
+            Impl.importType(decl->getType(), ImportTypeKind::RecordField,
+                            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                            isInSystemModule(dc), Bridgeability::None,
+                            getImportTypeAttrs(decl));
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
@@ -5822,6 +5860,13 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
                                           const clang::EnumDecl *decl) {
   ASTContext &ctx = Impl.SwiftContext;
 
+  auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+  // Create a struct with the underlying type as a field.
+  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+      decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
+  Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
+
   // Compute the underlying type.
   auto underlyingType = Impl.importTypeIgnoreIUO(
       decl->getIntegerType(), ImportTypeKind::Enum,
@@ -5829,12 +5874,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
       isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
   if (!underlyingType)
     return nullptr;
-
-  auto Loc = Impl.importSourceLoc(decl->getLocation());
-
-  // Create a struct with the underlying type as a field.
-  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
 
   synthesizer.makeStructRawValued(structDecl, underlyingType,
                                   {KnownProtocolKind::OptionSet});
@@ -6505,7 +6544,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
   superDecl->lookupQualified(superDecl, DeclNameRef(decl->getName()),
-                             NL_QualifiedDefault,
+                             decl->getLoc(), NL_QualifiedDefault,
                              results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
@@ -6578,7 +6617,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
       superDecl, DeclNameRef(subscript->getName()),
-      NL_QualifiedDefault, lookup);
+      subscript->getLoc(), NL_QualifiedDefault, lookup);
 
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -8265,7 +8304,8 @@ static void finishTypeWitnesses(
                           NL_OnlyTypes |
                           NL_ProtocolMembers);
 
-    dc->lookupQualified(nominal, DeclNameRef(assocType->getName()), options,
+    dc->lookupQualified(nominal, DeclNameRef(assocType->getName()),
+                        nominal->getLoc(), options,
                         lookupResults);
     for (auto member : lookupResults) {
       auto typeDecl = cast<TypeDecl>(member);
@@ -8761,8 +8801,6 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
     E->loadAllMembers();
 }
 
-ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext);
-
 void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord) {
   // Import all of the members.
@@ -8793,7 +8831,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     // This means we found a member in a C++ record's base class.
     if (swiftDecl->getClangDecl() != clangRecord) {
       // So we need to clone the member into the derived class.
-      if (auto newDecl = cloneBaseMemberDecl(cast<ValueDecl>(member), swiftDecl)) {
+      if (auto newDecl = importBaseMemberDecl(cast<ValueDecl>(member), swiftDecl)) {
         swiftDecl->addMember(newDecl);
       }
       continue;

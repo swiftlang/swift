@@ -1324,6 +1324,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::AllocPackMetadataInst:
+  case SILInstructionKind::DeallocPackMetadataInst:
     llvm_unreachable("not supported");
 
   case SILInstructionKind::AllocBoxInst: {
@@ -2344,6 +2346,27 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                            noNestedConflict, fromBuiltin);
     break;
   }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createMoveOnlyWrapperToCopyableAddr(Loc, op);
+    break;
+  }
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createMoveOnlyWrapperToCopyableBox(Loc, op);
+    break;
+  }
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createCopyableToMoveOnlyWrapperAddr(Loc, op);
+    break;
+  }
   case SILInstructionKind::EndAccessInst: {
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
@@ -2416,6 +2439,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::AssignByWrapperInst:
+  case SILInstructionKind::AssignOrInitInst:
     llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
@@ -2675,35 +2699,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createSwitchValue(Loc, Cond, DefaultBB, CaseBBs);
     break;
   }
-  case SILInstructionKind::SelectValueInst: {
-    // Format: condition, a list of cases (ValueID + Value ID),
-    // default value ID. Use SILOneTypeValuesLayout: the type is
-    // for condition, the list has value for condition, result type,
-    // hasDefault, default,
-    // basic block ID, a list of (Value ID, Value ID).
-    SILValue Cond = getLocalValue(
-        ListOfValues[0],
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
-
-    Type ResultLoweredTy = MF->getType(ListOfValues[1]);
-    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[2];
-    SILType ResultTy = getSILType(ResultLoweredTy, ResultCategory, Fn);
-
-    SILValue DefaultVal = nullptr;
-    if (ListOfValues[3])
-      DefaultVal = getLocalValue(ListOfValues[4], ResultTy);
-
-    SmallVector<std::pair<SILValue, SILValue>, 4> CaseValuesAndResults;
-    for (unsigned I = 5, E = ListOfValues.size(); I < E; I += 2) {
-      auto CaseValue = getLocalValue(ListOfValues[I], Cond->getType());
-      auto Result = getLocalValue(ListOfValues[I+1], ResultTy);
-      CaseValuesAndResults.push_back({CaseValue, Result});
-    }
-
-    ResultInst = Builder.createSelectValue(Loc, Cond, ResultTy, DefaultVal,
-                                           CaseValuesAndResults);
-    break;
-  }  
   case SILInstructionKind::EnumInst: {
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.

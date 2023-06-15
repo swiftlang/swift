@@ -138,7 +138,7 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1, with: repeat each tuple1.element) // legacy syntax
 
   _ = zip(repeat each tuple1, with: repeat each tuple2)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each T' and 'each U' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'repeat each T' and 'repeat each U' have the same shape}}
 
   _ = forward(repeat each tuple3)
 }
@@ -475,7 +475,7 @@ do {
   }
 }
 
-// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without more context`
+// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without a type annotation`
 do {
   func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
     return (repeat (each value).makeA()) // Ok
@@ -527,8 +527,8 @@ do {
 func test_pack_expansion_to_void_conv_for_closure_result<each T>(x: repeat each T) {
   let _: () -> Void = { repeat print(each x) } // Ok
   let _: () -> Void = { (repeat print(each x)) } // Ok
-  let _: (Int) -> Void = { repeat ($0, print(each x)) } // expected-warning {{'repeat (Int, ())' is unused}}
-  let _: (Int, String) -> Void = { ($0, repeat ($1, print(each x))) } // expected-warning {{'(Int, repeat (String, ()))' is unused}}
+  let _: (Int) -> Void = { repeat ($0, print(each x)) } // expected-warning {{expression of type '/* shape: each T */ repeat (Int, ())' is unused}}
+  let _: (Int, String) -> Void = { ($0, repeat ($1, print(each x))) } // expected-warning {{expression of type '(Int, /* shape: each T */ repeat (String, ()))' is unused}}
 }
 
 // rdar://109539394 - crash on passing multiple variadic lists to singly variadic callee
@@ -552,4 +552,12 @@ do {
   func test<each T>(_ a: repeat each T) {
     _ = (repeat overloaded(1, each a))
   }
+}
+
+func configure<T, each Element>(
+  _ item: T,
+  with configuration: repeat (ReferenceWritableKeyPath<T, each Element>, each Element)
+) -> T {
+  repeat item[keyPath: (each configuration).0] = (each configuration).1
+  return item
 }
