@@ -1300,6 +1300,17 @@ FUNCTION(InitEnumMetadataSingleCase,
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData))
 
+// void swift_initEnumMetadataSingleCaseWithLayoutString(Metadata *enumType,
+//                                                       EnumLayoutFlags flags,
+//                                                       Metadata *payload);
+FUNCTION(InitEnumMetadataSingleCaseWithLayoutString,
+         swift_initEnumMetadataSingleCaseWithLayoutString,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(MetaData))
+
 // void swift_initEnumMetadataSinglePayload(Metadata *enumType,
 //                                          EnumLayoutFlags flags,
 //                                          TypeLayout *payload,

@@ -892,7 +892,7 @@ bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
           Feature::LayoutStringValueWitnessesInstantiation) &&
       IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
     if (auto *enumEntry = typeLayoutEntry->getAsEnum()) {
-      return enumEntry->isMultiPayloadEnum();
+      return enumEntry->isMultiPayloadEnum() || enumEntry->isSingleton();
     }
     return (typeLayoutEntry->isAlignedGroup() &&
             !typeLayoutEntry->isFixedSize(IGM));
