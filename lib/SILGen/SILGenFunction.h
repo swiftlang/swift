@@ -296,7 +296,7 @@ public:
   std::string MagicFunctionString;
   
   /// The abstraction pattern against which the function is being lowered.
-  Optional<AbstractionPattern> OrigFnType;
+  llvm::Optional<AbstractionPattern> OrigFnType;
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
 
@@ -475,7 +475,7 @@ public:
   /// Indicates whether this function is a distributed actor's designated
   /// initializer, providing the needed clean-up to emit an identity
   /// assignment after initializing the actorSystem property.
-  Optional<InitializeDistActorIdentity> DistActorCtorContext;
+  llvm::Optional<InitializeDistActorIdentity> DistActorCtorContext;
 
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
@@ -530,7 +530,7 @@ public:
   SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
   ManagedValue InitDelegationSelf;
   SILValue InitDelegationSelfBox;
-  Optional<SILLocation> InitDelegationLoc;
+  llvm::Optional<SILLocation> InitDelegationLoc;
   ManagedValue SuperInitDelegationSelf;
 
   RValue emitRValueForSelfInDelegationInit(SILLocation loc, CanType refType,
@@ -588,7 +588,7 @@ public:
   ProfileCounter loadProfilerCount(ASTNode Node) const;
 
   /// Get the PGO node's parent.
-  Optional<ASTNode> getPGOParent(ASTNode Node) const;
+  llvm::Optional<ASTNode> getPGOParent(ASTNode Node) const;
 
   /// Tracer object for counting SIL (and other events) caused by this instance.
   FrontendStatsTracer StatsTracer;
@@ -692,9 +692,9 @@ public:
     return SGM.Types.getConstantInfo(context, constant);
   }
 
-  Optional<SILAccessEnforcement> getStaticEnforcement(VarDecl *var = nullptr);
-  Optional<SILAccessEnforcement> getDynamicEnforcement(VarDecl *var = nullptr);
-  Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
+  llvm::Optional<SILAccessEnforcement> getStaticEnforcement(VarDecl *var = nullptr);
+  llvm::Optional<SILAccessEnforcement> getDynamicEnforcement(VarDecl *var = nullptr);
+  llvm::Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
   std::string getMagicFileIDString(SourceLoc loc);
@@ -703,7 +703,7 @@ public:
 
   SILDebugLocation
   getSILDebugLocation(SILBuilder &B, SILLocation Loc,
-                      Optional<SILLocation> CurDebugLocOverride,
+                      llvm::Optional<SILLocation> CurDebugLocOverride,
                       bool ForMetaInstruction);
 
   const SILDebugScope *getScopeOrNull(SILLocation Loc,
@@ -872,14 +872,14 @@ public:
   /// body.
   void emitGeneratorFunction(SILDeclRef function, Type resultInterfaceType,
                              BraceStmt *body,
-                             Optional<AbstractionPattern> pattern = None);
+                             llvm::Optional<AbstractionPattern> pattern = llvm::None);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 
   /// Generate code to obtain the address of the given global variable.
   ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var,
-                                     Optional<ActorIsolation> actorIso);
+                                     llvm::Optional<ActorIsolation> actorIso);
 
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
@@ -904,7 +904,7 @@ public:
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
                            bool isSelfConformance,
-                           Optional<ActorIsolation> enterIsolation);
+                           llvm::Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
   /// of all index expressions including default arguments.
@@ -1028,8 +1028,8 @@ public:
   /// region ends. Invoke \c emit on the breadcrumb to
   /// restore the previously-active executor.
   ExecutorBreadcrumb emitHopToTargetActor(SILLocation loc,
-                            Optional<ActorIsolation> actorIso,
-                            Optional<ManagedValue> actorSelf);
+                            llvm::Optional<ActorIsolation> actorIso,
+                            llvm::Optional<ManagedValue> actorSelf);
 
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
@@ -1053,16 +1053,16 @@ public:
   ///
   /// NOTE: this does not support actor initializers!
   void emitConstructorPrologActorHop(SILLocation loc,
-                                     Optional<ActorIsolation> actorIso);
+                                     llvm::Optional<ActorIsolation> actorIso);
 
   /// Set the given global actor as the isolation for this function
   /// (generally a thunk) and hop to it.
   void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
 
   /// Emit the executor for the given actor isolation.
-  Optional<SILValue> emitExecutor(SILLocation loc,
+  llvm::Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,
-                                  Optional<ManagedValue> maybeSelf);
+                                  llvm::Optional<ManagedValue> maybeSelf);
 
   /// Emit the executor value that corresponds to the generic (concurrent)
   /// executor.
@@ -1103,14 +1103,14 @@ public:
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
                   bool throws, SourceLoc throwsLoc,
-                  Optional<AbstractionPattern> origClosureType = None);
+                  llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
   /// A simpler version of emitProlog
   /// \returns the number of variables in paramPatterns.
   uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
                            Type resultType, DeclContext *DC,
                            bool throws, SourceLoc throwsLoc,
                            unsigned numIgnoredTrailingParameters,
-                           Optional<AbstractionPattern> origClosureType = None);
+                           llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1131,7 +1131,7 @@ public:
   /// \param isThrowing  If true, create an error epilog block.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(Optional<Type> directResultType,
+  void prepareEpilog(llvm::Optional<Type> directResultType,
                      bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
@@ -1149,7 +1149,7 @@ public:
   ///          of the return instruction if the epilog block is supposed to host
   ///          the ReturnLocation (This happens in case the predecessor block is
   ///          merged with the epilog block.)
-  std::pair<Optional<SILValue>, SILLocation>
+  std::pair<llvm::Optional<SILValue>, SILLocation>
     emitEpilogBB(SILLocation TopLevelLoc);
   
   /// Emits a standard epilog which runs top-level cleanups then returns
@@ -1437,7 +1437,7 @@ public:
   /// specified Initialization buffer(s). This avoids an allocation and copy if
   /// the result would be allocated into temporary memory normally.
   /// The location defaults to \c E.
-  void emitExprInto(Expr *E, Initialization *I, Optional<SILLocation> L = None);
+  void emitExprInto(Expr *E, Initialization *I, llvm::Optional<SILLocation> L = llvm::None);
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
@@ -1606,7 +1606,7 @@ public:
       bool isDirectAccessorUse,
       PreparedArguments &&optionalSubscripts, SGFContext C,
       bool isOnSelfParameter,
-      Optional<ActorIsolation> implicitActorHopTarget = None);
+      llvm::Optional<ActorIsolation> implicitActorHopTarget = llvm::None);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
@@ -1852,7 +1852,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ActorIsolation> implicitActorHopTarget);
+                   llvm::Optional<ActorIsolation> implicitActorHopTarget);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -1884,8 +1884,8 @@ public:
                               CanType foreignResultType,
                               CanType nativeResultType,
                               ApplyOptions options,
-                    Optional<SILFunctionTypeRepresentation> overrideRep,
-                    const Optional<ForeignErrorConvention> &foreignError,
+                    llvm::Optional<SILFunctionTypeRepresentation> overrideRep,
+                    const llvm::Optional<ForeignErrorConvention> &foreignError,
                               SGFContext ctx = SGFContext());
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
@@ -1964,7 +1964,7 @@ public:
   /// (which will be passed in).
   template<typename R, typename F>
   R emitOpenExistentialExpr(OpenExistentialExpr *e, F emitSubExpr) {
-    Optional<R> result;
+    llvm::Optional<R> result;
     emitOpenExistentialExprImpl(e,
                             [&](Expr *subExpr) {
                               result.emplace(emitSubExpr(subExpr));
@@ -2035,7 +2035,7 @@ public:
       SILLocation loc, ConsumableManagedValue src, Type sourceType,
       CanType targetType, SGFContext C,
       llvm::function_ref<void(ManagedValue)> handleTrue,
-      llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
+      llvm::function_ref<void(llvm::Optional<ManagedValue>)> handleFalse,
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
 
@@ -2054,7 +2054,7 @@ public:
   void emitCheckedCastBranch(
       SILLocation loc, Expr *src, Type targetType, SGFContext C,
       llvm::function_ref<void(ManagedValue)> handleTrue,
-      llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
+      llvm::function_ref<void(llvm::Optional<ManagedValue>)> handleFalse,
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
 
@@ -2130,15 +2130,15 @@ public:
                                  const ForeignErrorConvention &foreignError);
 
   SILValue emitForeignErrorBlock(SILLocation loc, SILBasicBlock *errorBB,
-                                 Optional<ManagedValue> errorSlot,
-                                 Optional<ForeignAsyncConvention> foreignAsync);
+                                 llvm::Optional<ManagedValue> errorSlot,
+                                 llvm::Optional<ForeignAsyncConvention> foreignAsync);
 
   SILValue emitForeignErrorCheck(SILLocation loc,
                                  SmallVectorImpl<ManagedValue> &directResults,
                                  ManagedValue errorSlot,
                                  bool suppressErrorCheck,
                                  const ForeignErrorConvention &foreignError,
-                                 Optional<ForeignAsyncConvention> foreignAsync);
+                                 llvm::Optional<ForeignAsyncConvention> foreignAsync);
 
   //===--------------------------------------------------------------------===//
   // Re-abstraction thunks
@@ -2379,7 +2379,7 @@ public:
   /// \param ArgNo optionally describes this function argument's
   /// position for debug info.
   std::unique_ptr<Initialization> emitLocalVariableWithCleanup(
-      VarDecl *D, Optional<MarkUninitializedInst::Kind> kind,
+      VarDecl *D, llvm::Optional<MarkUninitializedInst::Kind> kind,
       unsigned ArgNo = 0, bool generateDebugInfo = true);
 
   /// Emit the allocation for a local temporary, provides an
@@ -2780,7 +2780,7 @@ class SILGenSavedInsertionPoint {
   FunctionSection SavedSection;
 public:
   SILGenSavedInsertionPoint(SILGenFunction &SGF, SILBasicBlock *newIP,
-                            Optional<FunctionSection> optSection = None)
+                            llvm::Optional<FunctionSection> optSection = llvm::None)
       : SGF(SGF), SavedIP(SGF.B.getInsertionBB()),
         SavedSection(SGF.CurFunctionSection) {
     FunctionSection section = (optSection ? *optSection : SavedSection);

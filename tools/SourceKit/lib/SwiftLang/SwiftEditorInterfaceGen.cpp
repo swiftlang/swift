@@ -117,7 +117,7 @@ public:
 
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     TypeOrExtensionDecl Target,
-                                    Optional<BracketOptions> Bracket) override {
+                                    llvm::Optional<BracketOptions> Bracket) override {
     // When we start print a synthesized extension, record the target's USR.
     llvm::SmallString<64> Buf;
     llvm::raw_svector_ostream OS(Buf);
@@ -130,7 +130,7 @@ public:
   void
   printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                 TypeOrExtensionDecl Target,
-                                Optional<BracketOptions> Bracket) override {
+                                llvm::Optional<BracketOptions> Bracket) override {
     // When we leave a synthesized extension, clear target's USR.
     TargetUSR = "";
   }
@@ -307,11 +307,11 @@ public:
 
 static bool getModuleInterfaceInfo(ASTContext &Ctx,
                                    StringRef ModuleName,
-                                   Optional<StringRef> Group,
+                                   llvm::Optional<StringRef> Group,
                                  SwiftInterfaceGenContext::Implementation &Impl,
                                    std::string &ErrMsg,
                                    bool SynthesizedExtensions,
-                                   Optional<StringRef> InterestedUSR) {
+                                   llvm::Optional<StringRef> InterestedUSR) {
   ModuleDecl *&Mod = Impl.Mod;
   SourceTextInfo &Info = Impl.Info;
 
@@ -362,7 +362,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
       Options.SkipInlineCXXNamespace = true;
     }
   }
-  ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
+  ModuleTraversalOptions TraversalOptions = llvm::None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
@@ -431,11 +431,11 @@ SwiftInterfaceGenContextRef
 SwiftInterfaceGenContext::create(StringRef DocumentName,
                                  bool IsModule,
                                  StringRef ModuleOrHeaderName,
-                                 Optional<StringRef> Group,
+                                 llvm::Optional<StringRef> Group,
                                  CompilerInvocation Invocation,
                                  std::string &ErrMsg,
                                  bool SynthesizedExtensions,
-                                 Optional<StringRef> InterestedUSR) {
+                                 llvm::Optional<StringRef> InterestedUSR) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
   IFaceGenCtx->Impl.DocumentName = DocumentName.str();
   IFaceGenCtx->Impl.IsModule = IsModule;
@@ -653,7 +653,7 @@ llvm::Optional<std::pair<unsigned, unsigned>>
 SwiftInterfaceGenContext::findUSRRange(StringRef USR) const {
   auto Pos = Impl.Info.USRMap.find(USR);
   if (Pos == Impl.Info.USRMap.end())
-    return None;
+    return llvm::None;
 
   return std::make_pair(Pos->getValue().Range.Offset,
                         Pos->getValue().Range.Length);
@@ -736,10 +736,10 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                            StringRef Name,
                                            StringRef ModuleName,
-                                           Optional<StringRef> Group,
+                                           llvm::Optional<StringRef> Group,
                                            ArrayRef<const char *> Args,
                                            bool SynthesizedExtensions,
-                                           Optional<StringRef> InterestedUSR) {
+                                           llvm::Optional<StringRef> InterestedUSR) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -884,11 +884,11 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,
                                                       HeaderName,
-                                                      None,
+                                                      llvm::None,
                                                       Invocation,
                                                       Error,
                                                       SynthesizedExtensions,
-                                                      None);
+                                                      llvm::None);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(Error.c_str());
     return;

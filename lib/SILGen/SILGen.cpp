@@ -95,7 +95,7 @@ SILGenModule::~SILGenModule() {
 }
 
 static SILDeclRef
-getBridgingFn(Optional<SILDeclRef> &cacheSlot,
+getBridgingFn(llvm::Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,
               Identifier moduleName,
               StringRef functionName,
@@ -366,7 +366,7 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
 }
 
 static FuncDecl *lookupIntrinsic(ModuleDecl &module,
-                                 Optional<FuncDecl *> &cache, Identifier name) {
+                                 llvm::Optional<FuncDecl *> &cache, Identifier name) {
   if (cache)
     return *cache;
 
@@ -384,7 +384,7 @@ static FuncDecl *lookupIntrinsic(ModuleDecl &module,
 }
 
 static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            Optional<FuncDecl *> &cache,
+                                            llvm::Optional<FuncDecl *> &cache,
                                             StringRef name) {
   auto *module = C.getLoadedModule(C.Id_Concurrency);
   if (!module) {
@@ -606,7 +606,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                               functionName,
                               functionTy,
                               env,
-                              /*location*/ None,
+                              /*location*/ llvm::None,
                               IsNotBare,
                               IsNotTransparent,
                               IsNotSerialized,
@@ -1939,7 +1939,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   bool needsGenericContext = true;
   
   if (canStorageUseTrivialDescriptor(*this, decl)) {
-    (void)SILProperty::create(M, /*serialized*/ false, decl, None);
+    (void)SILProperty::create(M, /*serialized*/ false, decl, llvm::None);
     return;
   }
   
@@ -2009,7 +2009,7 @@ namespace {
 class SourceFileScope {
   SILGenModule &sgm;
   SILDeclRef EntryRef;
-  Optional<Scope> scope;
+  llvm::Optional<Scope> scope;
   bool isAsyncTopLevel = false;
 public:
   SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm) {
@@ -2043,7 +2043,7 @@ public:
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
       auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
 
-      sgm.TopLevelSGF->prepareEpilog(None, true, moduleCleanupLoc);
+      sgm.TopLevelSGF->prepareEpilog(llvm::None, true, moduleCleanupLoc);
 
       auto prologueLoc = RegularLocation::getModuleLocation();
       prologueLoc.markAsPrologue();
@@ -2358,7 +2358,7 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options,
-                                                    None, irgenOptions);
+                                                    llvm::None, irgenOptions);
   return llvm::cantFail(
       mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
 }
@@ -2367,6 +2367,6 @@ std::unique_ptr<SILModule>
 swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
-  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options, None, irgenOptions);
+  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options, llvm::None, irgenOptions);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }

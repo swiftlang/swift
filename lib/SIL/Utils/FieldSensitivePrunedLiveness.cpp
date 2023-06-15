@@ -107,7 +107,7 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
 //                           MARK: SubElementNumber
 //===----------------------------------------------------------------------===//
 
-Optional<SubElementOffset>
+llvm::Optional<SubElementOffset>
 SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
                                     SILValue rootAddress) {
   unsigned finalSubElementOffset = 0;
@@ -196,11 +196,11 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
     // really do not want to abort. Instead, our caller can choose to abort if
     // they get back a None. This ensures that we do not abort in cases where we
     // just want to emit to the user a "I do not understand" error.
-    return None;
+    return llvm::None;
   }
 }
 
-Optional<SubElementOffset>
+llvm::Optional<SubElementOffset>
 SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
                                   SILValue rootAddress) {
   unsigned finalSubElementOffset = 0;
@@ -310,7 +310,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
     // really do not want to abort. Instead, our caller can choose to abort if
     // they get back a None. This ensures that we do not abort in cases where we
     // just want to emit to the user a "I do not understand" error.
-    return None;
+    return llvm::None;
   }
 }
 

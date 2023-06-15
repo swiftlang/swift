@@ -40,7 +40,7 @@ using namespace swift;
 using namespace Lowering;
 
 
-Optional<SILVTable::Entry>
+llvm::Optional<SILVTable::Entry>
 SILGenModule::emitVTableMethod(ClassDecl *theClass,
                                SILDeclRef derived, SILDeclRef base) {
   assert(base.kind == derived.kind);
@@ -73,7 +73,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     // domain, don't emit the vtable entry.
     if (derivedClass->isResilient(M.getSwiftModule(),
                                   ResilienceExpansion::Maximal)) {
-      return None;
+      return llvm::None;
     }
   }
 
@@ -764,7 +764,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // But this is expensive, so we only do it for coroutine lowering.
   // When they're part of the AST function type, we can remove this
   // parameter completely.
-  Optional<SubstitutionMap> witnessSubsForTypeLowering;
+  llvm::Optional<SubstitutionMap> witnessSubsForTypeLowering;
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
@@ -909,7 +909,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
                           witnessSubs, isFree, /*isSelfConformance*/ true,
-                          None);
+                          llvm::None);
 
   SGM.emitLazyConformancesForFunction(f);
 

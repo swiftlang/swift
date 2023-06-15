@@ -196,9 +196,9 @@ public:
     return true;
   }
   void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *value,
-                              Optional<Atomicity> atomicity = None) const {}
+                              llvm::Optional<Atomicity> atomicity = llvm::None) const {}
   void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *value,
-                               Optional<Atomicity> atomicity = None) const {}
+                               llvm::Optional<Atomicity> atomicity = llvm::None) const {}
   void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *value,
                               Address valueAddr) const {
     IGF.Builder.CreateStore(value, valueAddr);
@@ -208,9 +208,9 @@ public:
     return true;
   }
   void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *value,
-                               Optional<Atomicity> atomicity = None) const {}
+                               llvm::Optional<Atomicity> atomicity = llvm::None) const {}
   void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *value,
-                                Optional<Atomicity> atomicity = None) const {}
+                                llvm::Optional<Atomicity> atomicity = llvm::None) const {}
   void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *value,
                               Address valueAddr) const {
     IGF.Builder.CreateStore(value, valueAddr);

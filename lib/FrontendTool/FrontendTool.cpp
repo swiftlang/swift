@@ -1683,7 +1683,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   const ASTContext &Context = Instance.getASTContext();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  llvm::Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
@@ -2180,12 +2180,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      std::make_unique<Optional<PrettyStackTraceFileContents>[]>(
+      std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
         configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              Optional<PrettyStackTraceFileContents> &trace) {
+              llvm::Optional<PrettyStackTraceFileContents> &trace) {
     trace.emplace(*buffer);
   });
 

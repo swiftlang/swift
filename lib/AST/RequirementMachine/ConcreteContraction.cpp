@@ -200,7 +200,7 @@ class ConcreteContraction {
     Other
   };
 
-  Optional<Type> substTypeParameterRec(Type type, Position position) const;
+  llvm::Optional<Type> substTypeParameterRec(Type type, Position position) const;
   Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;
@@ -233,7 +233,7 @@ public:
 /// to be some subclass of SomeClass which does conform to Sequence;
 /// this is perfectly valid, and we cannot substitute the 'T.Element'
 /// requirement. In this case, this method returns None.
-Optional<Type> ConcreteContraction::substTypeParameterRec(
+llvm::Optional<Type> ConcreteContraction::substTypeParameterRec(
     Type type, Position position) const {
 
   // If we have a superclass (T : C) or same-type requirement (T == C),
@@ -271,7 +271,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
     auto baseType = memberType->getBase();
     auto substBaseType = substTypeParameterRec(baseType, Position::BaseType);
     if (!substBaseType)
-      return None;
+      return llvm::None;
 
     // A resolved DependentMemberType stores an associated type declaration.
     //
@@ -301,7 +301,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
           llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
                        << proto->getName() << "\n";
         }
-        return None;
+        return llvm::None;
       }
 
       return assocType->getDeclaredInterfaceType()
@@ -322,7 +322,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
         llvm::dbgs() << "@@@ Lookup of " << memberType->getName() << " failed on "
                      << *substBaseType << "\n";
       }
-      return None;
+      return llvm::None;
     }
 
     // Substitute the base type into the member type.
@@ -332,7 +332,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
     return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Replace the generic parameter at the root of \p type, which must be a
@@ -357,9 +357,9 @@ Type ConcreteContraction::substTypeParameter(
 /// Substitute all type parameters occurring in structural positions of \p type.
 Type ConcreteContraction::substType(Type type) const {
   return type.transformRec(
-      [&](Type type) -> Optional<Type> {
+      [&](Type type) -> llvm::Optional<Type> {
         if (!type->isTypeParameter())
-          return None;
+          return llvm::None;
 
         return substTypeParameter(type, Position::Other);
       });

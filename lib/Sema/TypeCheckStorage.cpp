@@ -860,23 +860,23 @@ namespace  {
 }
 
 /// Determine whether the given property should be accessed via the enclosing-self access pattern.
-static Optional<EnclosingSelfPropertyWrapperAccess>
+static llvm::Optional<EnclosingSelfPropertyWrapperAccess>
 getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   // The enclosing-self pattern only applies to instance properties of
   // classes.
   if (!property->isInstanceMember())
-    return None;
+    return llvm::None;
   auto classDecl = property->getDeclContext()->getSelfClassDecl();
   if (!classDecl)
-    return None;
+    return llvm::None;
 
   // The pattern currently only works with the outermost property wrapper.
   Type outermostWrapperType = property->getPropertyWrapperBackingPropertyType();
   if (!outermostWrapperType)
-    return None;
+    return llvm::None;
   NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
   if (!wrapperTypeDecl)
-    return None;
+    return llvm::None;
 
   // Look for a generic subscript that fits the general form we need.
   auto wrapperInfo = wrapperTypeDecl->getPropertyWrapperTypeInfo();
@@ -884,7 +884,7 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
       forProjected ? wrapperInfo.enclosingInstanceProjectedSubscript
                    : wrapperInfo.enclosingInstanceWrappedSubscript;
   if (!subscript)
-    return None;
+    return llvm::None;
 
   EnclosingSelfPropertyWrapperAccess result;
   result.subscript = subscript;
@@ -898,13 +898,13 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-static Optional<PropertyWrapperLValueness>
+static llvm::Optional<PropertyWrapperLValueness>
 getPropertyWrapperLValueness(VarDecl *var) {
   auto &ctx = var->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator,
       PropertyWrapperLValuenessRequest{var},
-      None);
+      llvm::None);
 }
 
 /// Build a reference to the storage of a declaration. Returns nullptr if there
@@ -930,7 +930,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isLValue = isUsedForSetAccess;
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
-  Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
+  llvm::Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
   // Contains the underlying wrappedValue declaration in a property wrapper
   // along with whether or not the reference to this field needs to be an lvalue
   llvm::SmallVector<std::pair<VarDecl *, bool>, 1> underlyingVars;
@@ -2896,7 +2896,7 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
     : PropertyWrapperMutability::Nonmutating;
 }
 
-Optional<PropertyWrapperMutability>
+llvm::Optional<PropertyWrapperMutability>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
   VarDecl *originalVar = var;
@@ -2906,7 +2906,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
     originalVar = var->getOriginalWrappedProperty(
         PropertyWrapperSynthesizedPropertyKind::Projection);
     if (!originalVar)
-      return None;
+      return llvm::None;
 
     numWrappers = originalVar->getAttachedPropertyWrappers().size();
     isProjectedValue = true;
@@ -2919,9 +2919,9 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
       varSourceFile && varSourceFile->Kind != SourceFileKind::Interface;
 
   if (var->getParsedAccessor(AccessorKind::Get) && isVarNotInInterfaceFile)
-    return None;
+    return llvm::None;
   if (var->getParsedAccessor(AccessorKind::Set) && isVarNotInInterfaceFile)
-    return None;
+    return llvm::None;
 
   // Figure out which member we're looking through.
   auto varMember = isProjectedValue
@@ -2931,7 +2931,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   // Start with the traits from the outermost wrapper.
   auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
   if (firstWrapper.*varMember == nullptr)
-    return None;
+    return llvm::None;
   
   PropertyWrapperMutability result;
   
@@ -2948,7 +2948,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
     assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
-      return None;
+      return llvm::None;
     
     PropertyWrapperMutability nextResult;
     nextResult.Getter =
@@ -2962,7 +2962,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i]),
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i-1]));
 
-      return None;
+      return llvm::None;
     }
     nextResult.Setter =
               result.composeWith(getSetterMutatingness(wrapper.valueVar,
@@ -2974,7 +2974,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   return result;
 }
 
-Optional<PropertyWrapperLValueness>
+llvm::Optional<PropertyWrapperLValueness>
 PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
   VarDecl *VD = var;
@@ -2988,7 +2988,7 @@ PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
   }
 
   if (!VD)
-    return None;
+    return llvm::None;
 
   auto varMember = isProjectedValue
       ? &PropertyWrapperTypeInfo::projectedValueVar

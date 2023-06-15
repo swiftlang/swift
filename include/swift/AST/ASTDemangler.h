@@ -24,6 +24,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Optional.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
@@ -126,7 +127,7 @@ public:
     Demangle::ImplParameterConvention calleeConvention,
     ArrayRef<Demangle::ImplFunctionParam<Type>> params,
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
-    Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+    llvm::Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags);
 
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
@@ -143,10 +144,10 @@ public:
                                              ArrayRef<Type> genArgs);
 
   Type createExistentialMetatypeType(Type instance,
-                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
+                     llvm::Optional<Demangle::ImplMetatypeRepresentation> repr=llvm::None);
 
   Type createMetatypeType(Type instance,
-                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
+                     llvm::Optional<Demangle::ImplMetatypeRepresentation> repr=llvm::None);
 
   Type createGenericTypeParameterType(unsigned depth, unsigned index);
 
@@ -222,7 +223,7 @@ private:
     SynthesizedByImporter
   };
 
-  Optional<ForeignModuleKind>
+  llvm::Optional<ForeignModuleKind>
   getForeignModuleKind(NodePointer node);
 
   GenericTypeDecl *findTypeDecl(DeclContext *dc,

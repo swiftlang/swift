@@ -101,7 +101,7 @@ namespace irgen {
                                   SILType srcType,
                                   SILType destType,
                                   CheckedCastMode mode,
-                                  Optional<MetatypeRepresentation> metatypeKind,
+                                  llvm::Optional<MetatypeRepresentation> metatypeKind,
                                   GenericSignature fnSig,
                                   Explosion &ex);
 

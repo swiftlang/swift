@@ -38,7 +38,7 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
   return vt;
 }
 
-Optional<SILVTable::Entry>
+llvm::Optional<SILVTable::Entry>
 SILVTable::getEntry(SILModule &M, SILDeclRef method) const {
   SILDeclRef m = method;
   do {
@@ -47,7 +47,7 @@ SILVTable::getEntry(SILModule &M, SILDeclRef method) const {
       return (*entryIter).second;
     }
   } while ((m = m.getOverridden()));
-  return None;
+  return llvm::None;
 }
 
 void SILVTable::removeFromVTableCache(Entry &entry) {

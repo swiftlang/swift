@@ -320,7 +320,7 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
-      Results, None,
+      Results, llvm::None,
       SubstitutionMap(), SubstitutionMap(),
       M.getASTContext());
   return FunctionType;
@@ -1292,7 +1292,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, {},
-      Results, None,
+      Results, llvm::None,
       SubstitutionMap(), SubstitutionMap(),
       M.getASTContext());
   return FunctionType;

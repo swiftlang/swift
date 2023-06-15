@@ -24,24 +24,24 @@ namespace Lowering {
 
 class CalleeTypeInfo {
 public:
-  Optional<AbstractionPattern> origFormalType;
+  llvm::Optional<AbstractionPattern> origFormalType;
   CanSILFunctionType substFnType;
-  Optional<AbstractionPattern> origResultType;
+  llvm::Optional<AbstractionPattern> origResultType;
   CanType substResultType;
   ForeignInfo foreign;
 
 private:
-  Optional<SILFunctionTypeRepresentation> overrideRep;
+  llvm::Optional<SILFunctionTypeRepresentation> overrideRep;
 
 public:
   CalleeTypeInfo() = default;
 
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
-                 const Optional<ForeignErrorConvention> &foreignError,
-                 const Optional<ForeignAsyncConvention> &foreignAsync,
+                 const llvm::Optional<ForeignErrorConvention> &foreignError,
+                 const llvm::Optional<ForeignAsyncConvention> &foreignAsync,
                  ImportAsMemberStatus foreignSelf,
-                 Optional<SILFunctionTypeRepresentation> overrideRep = None)
+                 llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
       : origFormalType(llvm::None), substFnType(substFnType),
         origResultType(origResultType),
         substResultType(substResultType), foreign{foreignSelf, foreignError,
@@ -50,7 +50,7 @@ public:
 
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
-                 Optional<SILFunctionTypeRepresentation> overrideRep = None)
+                 llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
       : origFormalType(llvm::None), substFnType(substFnType),
         origResultType(origResultType), substResultType(substResultType),
         foreign(), overrideRep(overrideRep) {}

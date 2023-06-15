@@ -257,7 +257,7 @@ static bool hasExclusivityAttr(VarDecl *var, ExclusivityAttr::Mode mode) {
   return exclAttr && exclAttr->getMode() == mode;
 }
 
-Optional<SILAccessEnforcement>
+llvm::Optional<SILAccessEnforcement>
 SILGenFunction::getStaticEnforcement(VarDecl *var) {
   if (var && shouldUseUnsafeEnforcement(var))
     return SILAccessEnforcement::Unsafe;
@@ -265,7 +265,7 @@ SILGenFunction::getStaticEnforcement(VarDecl *var) {
   return SILAccessEnforcement::Static;
 }
 
-Optional<SILAccessEnforcement>
+llvm::Optional<SILAccessEnforcement>
 SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   if (getOptions().EnforceExclusivityDynamic) {
     if (var && shouldUseUnsafeEnforcement(var))
@@ -276,10 +276,10 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   } else if (hasExclusivityAttr(var, ExclusivityAttr::Checked)) {
     return SILAccessEnforcement::Dynamic;
   }
-  return None;
+  return llvm::None;
 }
 
-Optional<SILAccessEnforcement>
+llvm::Optional<SILAccessEnforcement>
 SILGenFunction::getUnknownEnforcement(VarDecl *var) {
   if (var && shouldUseUnsafeEnforcement(var))
     return SILAccessEnforcement::Unsafe;
@@ -571,8 +571,8 @@ namespace {
       llvm_unreachable("called project on a pseudo-component");
     }
 
-    Optional<AccessStorage> getAccessStorage() const override {
-      return None;
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
+      return llvm::None;
     }
   };
 
@@ -609,7 +609,7 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
                                  LValueTypeData typeData,
                                  SGFAccessKind accessKind,
                                  SILAccessEnforcement enforcement,
-                                 Optional<ActorIsolation> actorIso) {
+                                 llvm::Optional<ActorIsolation> actorIso) {
     auto silAccessKind = SILAccessKind::Modify;
     if (isReadAccess(accessKind))
       silAccessKind = SILAccessKind::Read;
@@ -642,7 +642,7 @@ static ManagedValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
                                      LValueTypeData typeData,
                                      SGFAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
-                                     Optional<ActorIsolation> actorIso) {
+                                     llvm::Optional<ActorIsolation> actorIso) {
   return ManagedValue::forLValue(
       enterAccessScope(SGF, loc, base, addr.getLValueAddress(), typeData,
                        accessKind, enforcement, actorIso));
@@ -774,7 +774,7 @@ namespace {
   public:
     RefElementComponent(VarDecl *field, LValueOptions options,
                         SILType substFieldType, LValueTypeData typeData,
-                        Optional<ActorIsolation> actorIso)
+                        llvm::Optional<ActorIsolation> actorIso)
       : PhysicalPathComponent(typeData, RefElementKind, actorIso),
         Field(field), SubstFieldType(substFieldType),
         IsNonAccessing(options.IsNonAccessing) {}
@@ -836,7 +836,7 @@ namespace {
   public:
     TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
       : PhysicalPathComponent(typeData, TupleElementKind,
-        /*actorIsolation=*/None),
+        /*actorIsolation=*/llvm::None),
         ElementIndex(elementIndex) {}
 
     virtual bool isLoadingPure() const override { return true; }
@@ -866,7 +866,7 @@ namespace {
   public:
     StructElementComponent(VarDecl *field, SILType substFieldType,
                            LValueTypeData typeData,
-                           Optional<ActorIsolation> actorIso)
+                           llvm::Optional<ActorIsolation> actorIso)
       : PhysicalPathComponent(typeData, StructElementKind, actorIso),
         Field(field), SubstFieldType(substFieldType) {}
 
@@ -912,7 +912,7 @@ namespace {
   public:
     ForceOptionalObjectComponent(LValueTypeData typeData, bool isImplicitUnwrap)
       : PhysicalPathComponent(typeData, OptionalObjectKind,
-        /*actorIsolation=*/None),
+        /*actorIsolation=*/llvm::None),
         isImplicitUnwrap(isImplicitUnwrap) {}
     
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
@@ -934,7 +934,7 @@ namespace {
     OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype,
                                    LValueTypeData typeData)
       : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind,
-        /*actorIsolation=*/None) {
+        /*actorIsolation=*/llvm::None) {
       assert(getSubstFormalType() == openedArchetype);
     }
 
@@ -1003,8 +1003,8 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
-    Optional<AccessStorage> getAccessStorage() const override {
-      return None;
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
+      return llvm::None;
     }
 
     RValue get(SILGenFunction &SGF, SILLocation loc,
@@ -1083,14 +1083,14 @@ namespace {
   /// A physical path component which returns a literal address.
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
-    Optional<SILAccessEnforcement> Enforcement;
+    llvm::Optional<SILAccessEnforcement> Enforcement;
     bool IsRValue;
   public:
     ValueComponent(ManagedValue value,
-                   Optional<SILAccessEnforcement> enforcement,
+                   llvm::Optional<SILAccessEnforcement> enforcement,
                    LValueTypeData typeData,
                    bool isRValue = false,
-                   Optional<ActorIsolation> actorIso = None) :
+                   llvm::Optional<ActorIsolation> actorIso = llvm::None) :
       PhysicalPathComponent(typeData, ValueKind, actorIso),
       Value(value),
       Enforcement(enforcement),
@@ -1162,7 +1162,7 @@ namespace {
   class BorrowValueComponent : public PhysicalPathComponent {
   public:
     BorrowValueComponent(LValueTypeData typeData)
-      : PhysicalPathComponent(typeData, BorrowValueKind, None) {}
+      : PhysicalPathComponent(typeData, BorrowValueKind, llvm::None) {}
 
     virtual bool isLoadingPure() const override { return true; }
 
@@ -1407,7 +1407,7 @@ namespace {
     bool IsDirectAccessorUse;
     bool IsOnSelfParameter;
     SubstitutionMap Substitutions;
-    Optional<ActorIsolation> ActorIso;
+    llvm::Optional<ActorIsolation> ActorIso;
 
   public:
     AccessorBasedComponent(PathComponent::KindTy kind,
@@ -1419,7 +1419,7 @@ namespace {
                            ArgumentList *argListForDiagnostics,
                            PreparedArguments &&indices,
                            bool isOnSelfParameter = false,
-                           Optional<ActorIsolation> actorIso = None)
+                           llvm::Optional<ActorIsolation> actorIso = llvm::None)
         : super(kind, decl, baseFormalType, typeData, argListForDiagnostics,
                 std::move(indices)),
           Accessor(accessor), IsSuper(isSuper),
@@ -1458,7 +1458,7 @@ namespace {
                            ArgumentList *subscriptArgList,
                            PreparedArguments &&indices,
                            bool isOnSelfParameter,
-                           Optional<ActorIsolation> actorIso)
+                           llvm::Optional<ActorIsolation> actorIso)
       : AccessorBasedComponent(GetterSetterKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
                                baseFormalType, typeData, subscriptArgList,
@@ -1774,12 +1774,12 @@ namespace {
               SGF.maybeEmitValueOfLocalVarDecl(backingVar, AccessKind::Write);
         } else if (BaseFormalType->mayHaveSuperclass()) {
           RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
-                                  typeData, /*actorIsolation=*/None);
+                                  typeData, /*actorIsolation=*/llvm::None);
           proj = std::move(REC).project(SGF, loc, base);
         } else {
           assert(BaseFormalType->getStructOrBoundGenericStruct());
           StructElementComponent SEC(backingVar, varStorageType, typeData,
-                                     /*actorIsolation=*/None);
+                                     /*actorIsolation=*/llvm::None);
           proj = std::move(SEC).project(SGF, loc, base);
         }
 
@@ -1863,7 +1863,7 @@ namespace {
     /// the same dynamic PathComponent type as the receiver) to see if they are
     /// identical.  If so, there is a conflicting writeback happening, so emit a
     /// diagnostic.
-    Optional<AccessStorage> getAccessStorage() const override {
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
       return AccessStorage{Storage, IsSuper,
                              Indices.isNull() ? nullptr : &Indices,
                              ArgListForDiagnostics };
@@ -1929,7 +1929,7 @@ namespace {
       return SGF.emitAssignToLValue(loc, std::move(value), std::move(lv));
     }
 
-    Optional<AccessStorage> getAccessStorage() const override {
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
       return AccessStorage{Storage, IsSuper,
                              Indices.isNull() ? nullptr : &Indices,
                              ArgListForDiagnostics};
@@ -1967,7 +1967,7 @@ namespace {
           lv.addNonMemberVarComponent(SGF, loc, var, Substitutions, Options,
                                       accessKind, strategy,
                                       getSubstFormalType(),
-                                      /*actorIsolation=*/None);
+                                      /*actorIsolation=*/llvm::None);
         }
       }
       
@@ -2069,7 +2069,7 @@ namespace {
       OS.indent(indent) << "EndApplyPseudoComponent";
     }
 
-    Optional<AccessStorage> getAccessStorage() const override {
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
       return AccessStorage{Storage, IsSuper,
                              PeekedIndices.isNull() ? nullptr : &PeekedIndices,
                              ArgListForDiagnostics};
@@ -2310,8 +2310,8 @@ namespace {
                                       SGFContext());
     }
 
-    Optional<AccessStorage> getAccessStorage() const override {
-      return None;
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
+      return llvm::None;
     }
 
     std::unique_ptr<LogicalPathComponent>
@@ -2334,7 +2334,7 @@ namespace {
                                         KeyPathTypeKind typeKind,
                                         ManagedValue keyPath)
       : PhysicalPathComponent(typeData, PhysicalKeyPathApplicationKind,
-                              /*actorIsolation=*/None),
+                              /*actorIsolation=*/llvm::None),
         TypeKind(typeKind), KeyPath(keyPath) {
       assert(typeKind == KPTK_KeyPath ||
              typeKind == KPTK_WritableKeyPath ||
@@ -2596,8 +2596,8 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
-    Optional<AccessStorage> getAccessStorage() const override {
-      return None;
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
+      return llvm::None;
     }
 
     RValue get(SILGenFunction &SGF, SILLocation loc,
@@ -2646,19 +2646,19 @@ LValue LValue::forValue(SGFAccessKind accessKind, ManagedValue value,
                                                value.getValue());
 
     LValue lv;
-    lv.add<ValueComponent>(value, None, typeData, /*isRValue=*/true);
+    lv.add<ValueComponent>(value, llvm::None, typeData, /*isRValue=*/true);
     return lv;
   } else {
     // Treat an address-only value as an lvalue we only read from.
     if (!value.isLValue())
       value = ManagedValue::forLValue(value.getValue());
-    return forAddress(accessKind, value, None,
+    return forAddress(accessKind, value, llvm::None,
                       AbstractionPattern(substFormalType), substFormalType);
   }
 }
 
 LValue LValue::forAddress(SGFAccessKind accessKind, ManagedValue address,
-                          Optional<SILAccessEnforcement> enforcement,
+                          llvm::Optional<SILAccessEnforcement> enforcement,
                           AbstractionPattern origFormalType,
                           CanType substFormalType) {
   assert(address.isLValue());
@@ -2906,7 +2906,7 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   CanType formalType = getSubstFormalRValueType(e);
   auto typeData = getValueTypeData(accessKind, formalType, rv.getValue());
   LValue lv;
-  lv.add<ValueComponent>(rv, None, typeData, /*isRValue=*/true);
+  lv.add<ValueComponent>(rv, llvm::None, typeData, /*isRValue=*/true);
   return lv;
 }
 
@@ -3022,7 +3022,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
                                             SGFAccessKind accessKind,
                                             LValueOptions options,
                                             AccessSemantics semantics,
-                                            Optional<ActorIsolation> actorIso) {
+                                            llvm::Optional<ActorIsolation> actorIso) {
   LValue lv;
 
   auto *var = cast<VarDecl>(declRef.getDecl());
@@ -3070,20 +3070,20 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                       SGFAccessKind accessKind,
                                       AccessStrategy strategy,
                                       CanType formalRValueType,
-                                      Optional<ActorIsolation> actorIso) {
+                                      llvm::Optional<ActorIsolation> actorIso) {
   struct NonMemberVarAccessEmitter :
       AccessEmitter<NonMemberVarAccessEmitter, VarDecl> {
     LValue &LV;
     SILLocation Loc;
     LValueOptions Options;
-    Optional<ActorIsolation> ActorIso;
+    llvm::Optional<ActorIsolation> ActorIso;
 
     NonMemberVarAccessEmitter(SILGenFunction &SGF, SILLocation loc,
                               VarDecl *var, SubstitutionMap subs,
                               SGFAccessKind accessKind,
                               CanType formalRValueType,
                               LValueOptions options,
-                              Optional<ActorIsolation> actorIso,
+                              llvm::Optional<ActorIsolation> actorIso,
                               LValue &lv)
       : AccessEmitter(SGF, var, subs, accessKind, formalRValueType),
         LV(lv), Loc(loc), Options(options), ActorIso(actorIso) {}
@@ -3151,10 +3151,10 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
              "Must have a physical copyable lvalue decl ref that "
              "evaluates to an address");
 
-      Optional<SILAccessEnforcement> enforcement;
+      llvm::Optional<SILAccessEnforcement> enforcement;
       if (!Storage->isLet()) {
         if (Options.IsNonAccessing) {
-          enforcement = None;
+          enforcement = llvm::None;
         } else if (Storage->getDeclContext()->isLocalContext()) {
           enforcement = SGF.getUnknownEnforcement(Storage);
         } else if (Storage->getDeclContext()->isModuleScopeContext()) {
@@ -3350,7 +3350,7 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
                                             formalRValueType,
                                             SGFAccessKind::OwnedObjectRead,
                                             LValueOptions(), semantics,
-                                            /*actorIsolation=*/None);
+                                            /*actorIsolation=*/llvm::None);
   return emitLoadOfLValue(loc, std::move(lv), C);
 }
 
@@ -3366,14 +3366,14 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                           MarkUninitializedInst::Var);
   LValue lv;
   lv.add<ValueComponent>(SGF.emitManagedBufferWithCleanup(address),
-                         None, typeData);
+                         llvm::None, typeData);
   return lv;
 }
 
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, SGFAccessKind accessKind,
                                       LValueOptions options) {
-  Optional<ActorIsolation> actorIso;
+  llvm::Optional<ActorIsolation> actorIso;
   if (e->isImplicitlyAsync())
     actorIso = getActorIsolation(e->getDecl());
 
@@ -3409,7 +3409,7 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
 
   RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(value.formalAccessBorrow(SGF, loc), None,
+  lv.add<ValueComponent>(value.formalAccessBorrow(SGF, loc), llvm::None,
                          getValueTypeData(SGF, accessKind, e));
   return lv;
 }
@@ -3436,7 +3436,7 @@ LValue SILGenLValue::visitPackElementExpr(PackElementExpr *e,
         SGF.B.createPackElementGet(e, packIndex, packAddr, elementTy);
       return LValue::forAddress(accessKind,
                                 ManagedValue::forLValue(elementAddr),
-                                /*access enforcement*/ None,
+                                /*access enforcement*/ llvm::None,
                                 origFormalType, substFormalType);
     }
   }
@@ -3454,7 +3454,7 @@ LValue SILGenLValue::visitPackElementExpr(PackElementExpr *e,
       SGF.B.createTuplePackElementAddr(e, packIndex, tupleAddr->second, elementTy);
     return LValue::forAddress(accessKind,
                               ManagedValue::forLValue(elementAddr),
-                              /*access enforcement*/ None,
+                              /*access enforcement*/ llvm::None,
                               AbstractionPattern(substFormalType),
                               substFormalType);
   }
@@ -3463,7 +3463,7 @@ LValue SILGenLValue::visitPackElementExpr(PackElementExpr *e,
                    "emission of 'each' for this kind of expression");
   auto loweredTy = SGF.getLoweredType(substFormalType).getAddressType();
   auto fakeAddr = ManagedValue::forLValue(SILUndef::get(loweredTy, SGF.F));
-  return LValue::forAddress(accessKind, fakeAddr, /*access enforcement*/ None,
+  return LValue::forAddress(accessKind, fakeAddr, /*access enforcement*/ llvm::None,
                             AbstractionPattern(substFormalType),
                             substFormalType);
 }
@@ -3588,7 +3588,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       auto subs = e->getMember().getSubstitutions();
       return emitLValueForNonMemberVarDecl(
           SGF, e, ConcreteDeclRef(arg, subs), getSubstFormalRValueType(e),
-          accessKind, options, AccessSemantics::Ordinary, None);
+          accessKind, options, AccessSemantics::Ordinary, llvm::None);
     }
   }
 
@@ -3629,7 +3629,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                        getBaseOptions(options, strategy));
   assert(lv.isValid());
 
-  Optional<ActorIsolation> actorIso;
+  llvm::Optional<ActorIsolation> actorIso;
   if (e->isImplicitlyAsync())
     actorIso = getActorIsolation(var);
 
@@ -3659,7 +3659,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
   ArgumentList *ArgListForDiagnostics;
   PreparedArguments Indices;
   // If any, holds the actor we must switch to when performing the access.
-  Optional<ActorIsolation> ActorIso;
+  llvm::Optional<ActorIsolation> ActorIso;
 
   MemberStorageAccessEmitter(SILGenFunction &SGF, SILLocation loc,
                              StorageType *storage, SubstitutionMap subs,
@@ -3667,7 +3667,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                              CanType formalRValueType, LValueOptions options,
                              LValue &lv, ArgumentList *argListForDiagnostics,
                              PreparedArguments &&indices, bool isSelf = false,
-                             Optional<ActorIsolation> actorIso = None)
+                             llvm::Optional<ActorIsolation> actorIso = llvm::None)
       : super(SGF, storage, subs, accessKind, formalRValueType), LV(lv),
         Options(options), Loc(loc), IsSuper(isSuper), IsOnSelfParameter(isSelf),
         BaseFormalType(lv.getSubstFormalType()),
@@ -3725,7 +3725,7 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                    AccessStrategy strategy,
                                    CanType formalRValueType,
                                    bool isOnSelfParameter,
-                                   Optional<ActorIsolation> actorIso) {
+                                   llvm::Optional<ActorIsolation> actorIso) {
   struct MemberVarAccessEmitter
       : MemberStorageAccessEmitter<MemberVarAccessEmitter, VarDecl> {
     using MemberStorageAccessEmitter::MemberStorageAccessEmitter;
@@ -3832,7 +3832,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
   // Now that the base components have been resolved, check the isolation for
   // this subscript decl.
-  Optional<ActorIsolation> actorIso;
+  llvm::Optional<ActorIsolation> actorIso;
   if (e->isImplicitlyAsync())
     actorIso = getActorIsolation(decl);
 
@@ -3947,7 +3947,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                          PreparedArguments &&indices,
                                          ArgumentList *argListForDiagnostics,
                                          bool isOnSelfParameter,
-                                         Optional<ActorIsolation> actorIso) {
+                                         llvm::Optional<ActorIsolation> actorIso) {
   struct MemberSubscriptAccessEmitter
       : MemberStorageAccessEmitter<MemberSubscriptAccessEmitter,
                                    SubscriptDecl> {
@@ -4085,7 +4085,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   ManagedValue valueAddr =
     getAddressOfOptionalValue(SGF, e, optAddr, valueTypeData);
   LValue valueLV;
-  valueLV.add<ValueComponent>(valueAddr, None, valueTypeData);
+  valueLV.add<ValueComponent>(valueAddr, llvm::None, valueTypeData);
   return valueLV;
 }
 
@@ -4190,7 +4190,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
     getValueTypeData(baseAccessKind, baseFormalType, base.getValue());
 
   // Refer to 'self' as the base of the lvalue.
-  lv.add<ValueComponent>(base, None, baseTypeData,
+  lv.add<ValueComponent>(base, llvm::None, baseTypeData,
                          /*isRValue=*/!base.isLValue());
 
   auto substFormalType = ivar->getValueInterfaceType().subst(subMap)

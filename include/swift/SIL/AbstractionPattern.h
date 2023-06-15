@@ -311,8 +311,8 @@ class AbstractionPattern {
 
     EncodedForeignInfo(Async_t,
                        unsigned completionParameterIndex,
-                       Optional<unsigned> completionErrorParameterIndex,
-                       Optional<unsigned> completionErrorFlagParameterIndex,
+                       llvm::Optional<unsigned> completionErrorParameterIndex,
+                       llvm::Optional<unsigned> completionErrorFlagParameterIndex,
                        bool completionErrorFlagIsZeroOnError)
     : Value(1
       + (unsigned(IsAsync) - 1)
@@ -332,8 +332,8 @@ class AbstractionPattern {
 
   public:
     static EncodedForeignInfo
-    encode(const Optional<ForeignErrorConvention> &foreignError,
-           const Optional<ForeignAsyncConvention> &foreignAsync);
+    encode(const llvm::Optional<ForeignErrorConvention> &foreignError,
+           const llvm::Optional<ForeignAsyncConvention> &foreignAsync);
 
     bool hasValue() const { return Value != 0; }
     ForeignKind getKind() const {
@@ -364,7 +364,7 @@ class AbstractionPattern {
         >> AsyncCompletionParameterIndexShift;
     }
     
-    Optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
+    llvm::Optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
       assert(getKind() == IsAsync);
 
       unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorParameterIndexMask)
@@ -375,7 +375,7 @@ class AbstractionPattern {
       return encodedValue - 1;
     }
 
-    Optional<unsigned> getAsyncCompletionHandlerErrorFlagParamIndex() const {
+    llvm::Optional<unsigned> getAsyncCompletionHandlerErrorFlagParamIndex() const {
       assert(getKind() == IsAsync);
 
       unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorFlagParameterIndexMask)
@@ -680,8 +680,8 @@ public:
   /// Objective-C method.
   static AbstractionPattern
   getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                       const Optional<ForeignErrorConvention> &foreignError,
-                       const Optional<ForeignAsyncConvention> &foreignAsync);
+                       const llvm::Optional<ForeignErrorConvention> &foreignError,
+                       const llvm::Optional<ForeignAsyncConvention> &foreignAsync);
 
   
   /// Return an abstraction pattern for the uncurried type of a C function
@@ -872,8 +872,8 @@ public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                const Optional<ForeignErrorConvention> &foreignError,
-                const Optional<ForeignAsyncConvention> &foreignAsync);
+                const llvm::Optional<ForeignErrorConvention> &foreignError,
+                const llvm::Optional<ForeignAsyncConvention> &foreignAsync);
 
 private:
   /// Return an abstraction pattern for the uncurried type of an
@@ -1342,7 +1342,7 @@ public:
   ///
   /// If the surviving element came from an expansion element, the
   /// returned element is the pattern type of the expansion.
-  Optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
+  llvm::Optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
 
   static AbstractionPattern
   projectTupleElementType(const AbstractionPattern *base, size_t index) {

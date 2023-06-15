@@ -76,7 +76,7 @@ public:
 
   /// Compute the C function type for a SIL function type.
   const clang::Type *getFunctionType(
-    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    ArrayRef<SILParameterInfo> params, llvm::Optional<SILResultInfo> result,
     SILFunctionType::Representation repr);
 
   /// Check whether the given Clang declaration is an export of a Swift

@@ -41,6 +41,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VersionTuple.h"
@@ -644,7 +645,7 @@ enum class PlatformAgnosticAvailabilityKind {
 class AvailableAttr : public DeclAttribute {
 public:
 #define INIT_VER_TUPLE(X)\
-  X(X.empty() ? Optional<llvm::VersionTuple>() : X)
+  X(X.empty() ? llvm::Optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
@@ -688,19 +689,19 @@ public:
   ValueDecl *RenameDecl;
 
   /// Indicates when the symbol was introduced.
-  const Optional<llvm::VersionTuple> Introduced;
+  const llvm::Optional<llvm::VersionTuple> Introduced;
 
   /// Indicates where the Introduced version was specified.
   const SourceRange IntroducedRange;
 
   /// Indicates when the symbol was deprecated.
-  const Optional<llvm::VersionTuple> Deprecated;
+  const llvm::Optional<llvm::VersionTuple> Deprecated;
 
   /// Indicates where the Deprecated version was specified.
   const SourceRange DeprecatedRange;
 
   /// Indicates when the symbol was obsoleted.
-  const Optional<llvm::VersionTuple> Obsoleted;
+  const llvm::Optional<llvm::VersionTuple> Obsoleted;
 
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
@@ -801,7 +802,7 @@ class ObjCAttr final : public DeclAttribute,
   void *NameData;
 
   /// Create an implicit @objc attribute with the given (optional) name.
-  explicit ObjCAttr(Optional<ObjCSelector> name, bool implicitName)
+  explicit ObjCAttr(llvm::Optional<ObjCSelector> name, bool implicitName)
     : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
       NameData(nullptr)
   {
@@ -815,7 +816,7 @@ class ObjCAttr final : public DeclAttribute,
   }
 
   /// Create an @objc attribute written in the source.
-  ObjCAttr(SourceLoc atLoc, SourceRange baseRange, Optional<ObjCSelector> name,
+  ObjCAttr(SourceLoc atLoc, SourceRange baseRange, llvm::Optional<ObjCSelector> name,
            SourceRange parenRange, ArrayRef<SourceLoc> nameLocs);
 
   /// Determine whether this attribute has trailing location information.
@@ -843,7 +844,7 @@ class ObjCAttr final : public DeclAttribute,
 
 public:
   /// Create implicit ObjC attribute with a given (optional) name.
-  static ObjCAttr *create(ASTContext &Ctx, Optional<ObjCSelector> name,
+  static ObjCAttr *create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
@@ -889,9 +890,9 @@ public:
   bool hasName() const { return NameData != nullptr; }
 
   /// Retrieve the name of this entity, if specified.
-  Optional<ObjCSelector> getName() const {
+  llvm::Optional<ObjCSelector> getName() const {
     if (!hasName())
-      return None;
+      return llvm::None;
 
     return ObjCSelector::getFromOpaqueValue(NameData);
   }
@@ -1873,7 +1874,7 @@ public:
 
   /// Returns non-optional if this attribute is active given the current platform.
   /// The value provides more details about the active platform.
-  Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
+  llvm::Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
@@ -2033,7 +2034,7 @@ struct DeclNameRefWithLoc {
   /// The declaration name location.
   DeclNameLoc Loc;
   /// An optional accessor kind.
-  Optional<AccessorKind> AccessorKind;
+  llvm::Optional<AccessorKind> AccessorKind;
 
   void print(ASTPrinter &Printer) const;
 };
@@ -2097,7 +2098,7 @@ class DerivativeAttr final
   /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
-  Optional<AutoDiffDerivativeFunctionKind> Kind = None;
+  llvm::Optional<AutoDiffDerivativeFunctionKind> Kind = llvm::None;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                           TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
@@ -2347,16 +2348,16 @@ public:
 class DocumentationAttr: public DeclAttribute {
 public:
   DocumentationAttr(SourceLoc AtLoc, SourceRange Range,
-                    StringRef Metadata, Optional<AccessLevel> Visibility,
+                    StringRef Metadata, llvm::Optional<AccessLevel> Visibility,
                     bool Implicit)
   : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
     Metadata(Metadata), Visibility(Visibility) {}
 
-  DocumentationAttr(StringRef Metadata, Optional<AccessLevel> Visibility, bool Implicit)
+  DocumentationAttr(StringRef Metadata, llvm::Optional<AccessLevel> Visibility, bool Implicit)
   : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility, Implicit) {}
 
   const StringRef Metadata;
-  const Optional<AccessLevel> Visibility;
+  const llvm::Optional<AccessLevel> Visibility;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Documentation;
@@ -2433,11 +2434,11 @@ public:
 template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   ToAttributeKind() {}
 
-  Optional<const ATTR *>
+  llvm::Optional<const ATTR *>
   operator()(const DeclAttribute *Attr) const {
     if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
       return cast<ATTR>(Attr);
-    return None;
+    return llvm::None;
   }
 };
 
@@ -2678,7 +2679,7 @@ public:
 
   OrigDeclAttrFilter(const Decl *decl) : decl(decl) {}
 
-  Optional<const DeclAttribute *>
+  llvm::Optional<const DeclAttribute *>
   operator()(const DeclAttribute *Attr) const;
 };
 
@@ -2758,16 +2759,16 @@ public:
     }
   };
 
-  Optional<Convention> ConventionArguments;
+  llvm::Optional<Convention> ConventionArguments;
 
   DifferentiabilityKind differentiabilityKind =
       DifferentiabilityKind::NonDifferentiable;
 
   // For an opened existential type, the known ID.
-  Optional<UUID> OpenedID;
+  llvm::Optional<UUID> OpenedID;
 
   // For an opened existential type, the constraint type.
-  Optional<TypeRepr *> ConstraintType;
+  llvm::Optional<TypeRepr *> ConstraintType;
 
   // For a reference to an opaque return type, the mangled name and argument
   // index into the generic signature.
@@ -2775,7 +2776,7 @@ public:
     StringRef mangledName;
     unsigned index;
   };
-  Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
+  llvm::Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
 
   TypeAttributes() {}
 

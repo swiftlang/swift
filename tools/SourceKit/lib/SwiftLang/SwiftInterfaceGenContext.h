@@ -37,11 +37,11 @@ public:
   static SwiftInterfaceGenContextRef create(StringRef DocumentName,
                                             bool IsModule,
                                             StringRef ModuleOrHeaderName,
-                                            Optional<StringRef> Group,
+                                            llvm::Optional<StringRef> Group,
                                             swift::CompilerInvocation Invocation,
                                             std::string &ErrorMsg,
                                             bool SynthesizedExtensions,
-                                            Optional<StringRef> InterestedUSR);
+                                            llvm::Optional<StringRef> InterestedUSR);
 
   static SwiftInterfaceGenContextRef
     createForTypeInterface(swift::CompilerInvocation Invocation,

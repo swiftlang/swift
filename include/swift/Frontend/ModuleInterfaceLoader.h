@@ -244,7 +244,7 @@ struct ExplicitSwiftModuleInputInfo {
                                llvm::Optional<std::vector<std::string>> headerDependencyPaths,
                                bool isFramework = false,
                                bool isSystem = false,
-                               llvm::Optional<std::string> moduleCacheKey = None)
+                               llvm::Optional<std::string> moduleCacheKey = llvm::None)
     : modulePath(modulePath),
       moduleDocPath(moduleDocPath),
       moduleSourceInfoPath(moduleSourceInfoPath),
@@ -274,7 +274,7 @@ struct ExplicitClangModuleInputInfo {
                                std::string modulePath,
                                bool isFramework = false,
                                bool isSystem = false,
-                               llvm::Optional<std::string> moduleCacheKey = None)
+                               llvm::Optional<std::string> moduleCacheKey = llvm::None)
     : moduleMapPath(moduleMapPath),
       modulePath(modulePath),
       isFramework(isFramework),

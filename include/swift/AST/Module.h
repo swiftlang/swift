@@ -34,6 +34,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 #include <set>
@@ -522,7 +523,7 @@ private:
 
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
-  Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
+  llvm::Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
 
   /// If this module is an underscored cross import overlay, gets the underlying
   /// module that declared it (which may itself be a cross-import overlay),
@@ -1051,7 +1052,7 @@ public:
   ///
   /// \returns true if there was a problem adding this file.
   bool registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
-                              Optional<ArtificialMainKind> kind);
+                              llvm::Optional<ArtificialMainKind> kind);
 
   /// \returns true if this module has a main entry point.
   bool hasEntryPoint() const {

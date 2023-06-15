@@ -13,8 +13,8 @@
 #ifndef SWIFT_REWRITELOOP_H
 #define SWIFT_REWRITELOOP_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 #include "Symbol.h"
 #include "Term.h"
@@ -24,6 +24,7 @@ namespace llvm {
 }
 
 namespace swift {
+
 
 namespace rewriting {
 
@@ -372,7 +373,7 @@ private:
 
 /// Records a sequence of zero or more rewrite rules applied to a term.
 class RewritePath {
-  SmallVector<RewriteStep, 3> Steps;
+  llvm::SmallVector<RewriteStep, 3> Steps;
 
 public:
   bool empty() const {
@@ -411,7 +412,7 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  SmallVector<unsigned, 1>
+  llvm::SmallVector<unsigned, 1>
   findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
                                        const RewriteSystem &system) const;
 
@@ -443,7 +444,7 @@ public:
 
 private:
   /// Cached value for findRulesAppearingOnceInEmptyContext().
-  SmallVector<unsigned, 1> RulesInEmptyContext;
+  llvm::SmallVector<unsigned, 1> RulesInEmptyContext;
 
   /// Cached value for getProjectionCount().
   unsigned ProjectionCount : 15;
@@ -500,7 +501,7 @@ public:
 
   bool isUseful(const RewriteSystem &system) const;
 
-  ArrayRef<unsigned>
+  llvm::ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   unsigned getProjectionCount(const RewriteSystem &system) const;
@@ -539,11 +540,11 @@ struct AppliedRewriteStep {
 ///
 struct RewritePathEvaluator {
   /// The primary stack. Most rewrite steps operate on the top of this stack.
-  SmallVector<MutableTerm, 2> Primary;
+  llvm::SmallVector<MutableTerm, 2> Primary;
 
   /// The secondary stack. The 'Shift' rewrite step moves terms between the
   /// primary and secondary stacks.
-  SmallVector<MutableTerm, 2> Secondary;
+  llvm::SmallVector<MutableTerm, 2> Secondary;
 
   explicit RewritePathEvaluator(const MutableTerm &term) {
     Primary.push_back(term);

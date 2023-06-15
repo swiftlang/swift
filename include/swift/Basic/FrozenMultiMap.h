@@ -44,7 +44,7 @@
 namespace swift {
 
 template <typename Key, typename Value,
-          typename VectorStorage = std::vector<std::pair<Key, Optional<Value>>>>
+          typename VectorStorage = std::vector<std::pair<Key, llvm::Optional<Value>>>>
 class FrozenMultiMap {
   VectorStorage storage;
   bool frozen = false;
@@ -55,7 +55,7 @@ private:
 
 public:
   using PairToSecondEltRange =
-      TransformRange<ArrayRef<std::pair<Key, Optional<Value>>>,
+      TransformRange<ArrayRef<std::pair<Key, llvm::Optional<Value>>>,
                      PairToSecondElt>;
 
   FrozenMultiMap() = default;
@@ -65,15 +65,15 @@ public:
     storage.emplace_back(key, value);
   }
 
-  Optional<PairToSecondEltRange> find(const Key &key) const {
+  llvm::Optional<PairToSecondEltRange> find(const Key &key) const {
     assert(isFrozen() &&
            "Can not perform a find operation until the map is frozen");
     // Since our array is sorted, we need to first find the first pair with our
     // inst as the first element.
     auto start = std::lower_bound(
         storage.begin(), storage.end(), std::make_pair(key, llvm::None),
-        [&](const std::pair<Key, Optional<Value>> &p1,
-            const std::pair<Key, Optional<Value>> &p2) {
+        [&](const std::pair<Key, llvm::Optional<Value>> &p1,
+            const std::pair<Key, llvm::Optional<Value>> &p2) {
           return p1.first < p2.first;
         });
 
@@ -81,17 +81,17 @@ public:
     // (signaling that we erased it), return None.
     if (start == storage.end() || start->first != key ||
         !start->second.has_value()) {
-      return None;
+      return llvm::None;
     }
 
     // Ok, we found our first element. Now scan forward until we find a pair
     // whose instruction is not our own instruction.
     auto end = find_if_not(start, storage.end(),
-                           [&](const std::pair<Key, Optional<Value>> &pair) {
+                           [&](const std::pair<Key, llvm::Optional<Value>> &pair) {
                              return pair.first == key;
                            });
     unsigned count = std::distance(start, end);
-    ArrayRef<std::pair<Key, Optional<Value>>> slice(&*start, count);
+    ArrayRef<std::pair<Key, llvm::Optional<Value>>> slice(&*start, count);
     return PairToSecondEltRange(slice, PairToSecondElt());
   }
 
@@ -102,8 +102,8 @@ public:
     // inst as the first element.
     auto start = std::lower_bound(
         storage.begin(), storage.end(), std::make_pair(key, Value()),
-        [&](const std::pair<Key, Optional<Value>> &p1,
-            const std::pair<Key, Optional<Value>> &p2) {
+        [&](const std::pair<Key, llvm::Optional<Value>> &p1,
+            const std::pair<Key, llvm::Optional<Value>> &p2) {
           return p1.first < p2.first;
         });
 
@@ -116,7 +116,7 @@ public:
 
     // Ok, we found our element. Just set its value to .none to signal it was
     // destroyed and then return true.
-    start->second = None;
+    start->second = llvm::None;
     return true;
   }
 
@@ -129,8 +129,8 @@ public:
   /// operations instead of full mutable/non-mutable vector operations.
   void setFrozen() {
     std::stable_sort(storage.begin(), storage.end(),
-                     [&](const std::pair<Key, Optional<Value>> &lhs,
-                         const std::pair<Key, Optional<Value>> &rhs) {
+                     [&](const std::pair<Key, llvm::Optional<Value>> &lhs,
+                         const std::pair<Key, llvm::Optional<Value>> &rhs) {
                        // Only compare the first entry so that we preserve
                        // insertion order.
                        return lhs.first < rhs.first;
@@ -156,7 +156,7 @@ public:
 
   struct iterator {
     using iterator_category = std::forward_iterator_tag;
-    using value_type = std::pair<Key, Optional<PairToSecondEltRange>>;
+    using value_type = std::pair<Key, llvm::Optional<PairToSecondEltRange>>;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
     using reference = value_type&;    
@@ -164,7 +164,7 @@ public:
 
     FrozenMultiMap &map;
     base_iterator baseIter;
-    Optional<std::pair<Key, Optional<PairToSecondEltRange>>> currentValue;
+    llvm::Optional<std::pair<Key, llvm::Optional<PairToSecondEltRange>>> currentValue;
 
     iterator(FrozenMultiMap &map, base_iterator iter)
         : map(map), baseIter(iter), currentValue() {
@@ -176,21 +176,21 @@ public:
 
       // If we are end, set currentValue to be None.
       if (baseIter == end) {
-        currentValue = None;
+        currentValue = llvm::None;
         return;
       }
 
       // Otherwise, determine the next range that we are visiting.
       auto rangeEnd =
           std::find_if_not(std::next(baseIter), end,
-                           [&](const std::pair<Key, Optional<Value>> &elt) {
+                           [&](const std::pair<Key, llvm::Optional<Value>> &elt) {
                              return elt.first == baseIter->first;
                            });
 
-      Optional<PairToSecondEltRange> resultRange;
+      llvm::Optional<PairToSecondEltRange> resultRange;
       if (baseIter->second.has_value()) {
         unsigned count = std::distance(baseIter, rangeEnd);
-        ArrayRef<std::pair<Key, Optional<Value>>> slice(&*baseIter, count);
+        ArrayRef<std::pair<Key, llvm::Optional<Value>>> slice(&*baseIter, count);
         resultRange.emplace(slice, PairToSecondElt());
       }
       currentValue = {baseIter->first, resultRange};
@@ -199,7 +199,7 @@ public:
     iterator &operator++() {
       baseIter =
           std::find_if_not(std::next(baseIter), map.storage.end(),
-                           [&](const std::pair<Key, Optional<Value>> &elt) {
+                           [&](const std::pair<Key, llvm::Optional<Value>> &elt) {
                              return elt.first == baseIter->first;
                            });
       updateCurrentValue();
@@ -216,7 +216,7 @@ public:
       return tmp;
     }
 
-    std::pair<Key, Optional<PairToSecondEltRange>> operator*() const {
+    std::pair<Key, llvm::Optional<PairToSecondEltRange>> operator*() const {
       return *currentValue;
     }
 
@@ -230,10 +230,10 @@ public:
   };
 
   struct ToNonErasedValues {
-    Optional<std::pair<Key, Optional<PairToSecondEltRange>>>
-    operator()(std::pair<Key, Optional<PairToSecondEltRange>> pair) const {
+    llvm::Optional<std::pair<Key, llvm::Optional<PairToSecondEltRange>>>
+    operator()(std::pair<Key, llvm::Optional<PairToSecondEltRange>> pair) const {
       if (!pair.second.has_value())
-        return None;
+        return llvm::None;
       return pair;
     }
   };
@@ -266,7 +266,7 @@ public:
   /// that all values for all keys were properly handled. One cannot perform
   /// this operation with getRange() in a nice way.
   bool allValuesHaveBeenDeleted() const {
-    return llvm::all_of(storage, [](const std::pair<Key, Optional<Value>> &pair) {
+    return llvm::all_of(storage, [](const std::pair<Key, llvm::Optional<Value>> &pair) {
       return !pair.second.hasValue();
     });
   }
@@ -296,7 +296,7 @@ template <typename Key, typename Value, typename Storage>
 struct FrozenMultiMap<Key, Value, Storage>::PairToSecondElt {
   PairToSecondElt() {}
 
-  Value operator()(const std::pair<Key, Optional<Value>> &pair) const {
+  Value operator()(const std::pair<Key, llvm::Optional<Value>> &pair) const {
     return *pair.second;
   }
 };
@@ -307,7 +307,7 @@ struct FrozenMultiMap<Key, Value,
   PairWithTypeErasedOptionalSecondElt() {}
 
   std::pair<Key, PairToSecondEltRange>
-  operator()(const std::pair<Key, Optional<PairToSecondEltRange>> &pair) const {
+  operator()(const std::pair<Key, llvm::Optional<PairToSecondEltRange>> &pair) const {
     return std::make_pair(pair.first, *pair.second);
   }
 };
@@ -315,7 +315,7 @@ struct FrozenMultiMap<Key, Value,
 template <typename Key, typename Value, unsigned SmallSize>
 using SmallFrozenMultiMap =
     FrozenMultiMap<Key, Value,
-                   SmallVector<std::pair<Key, Optional<Value>>, SmallSize>>;
+                   SmallVector<std::pair<Key, llvm::Optional<Value>>, SmallSize>>;
 
 } // namespace swift
 

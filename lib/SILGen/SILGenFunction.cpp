@@ -214,7 +214,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
 
 SILDebugLocation
 SILGenFunction::getSILDebugLocation(SILBuilder &B, SILLocation Loc,
-                                    Optional<SILLocation> CurDebugLocOverride,
+                                    llvm::Optional<SILLocation> CurDebugLocOverride,
                                     bool ForMetaInstruction) {
   const SILDebugScope *Scope = B.getCurrentDebugScope();
   if (!Scope)
@@ -381,7 +381,7 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
         ParameterConvention::Direct_Unowned, /*Params*/ {},
         /*yields*/
         {},
-        /*Results*/ {}, None, SubstitutionMap(), SubstitutionMap(), ASTContext);
+        /*Results*/ {}, llvm::None, SubstitutionMap(), SubstitutionMap(), ASTContext);
     StringRef MacroName = ASTContext.getIdentifier(Macro.Name).str();
     RegularLocation MacroLoc(Macro.SLoc);
     // Use the ExpansionLoc as the location so IRGenDebugInfo can extract the
@@ -1150,7 +1150,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto NSStringFromClassType = SILFunctionType::get(
         nullptr, extInfo, SILCoroutineKind::None, paramConvention, params,
-        /*yields*/ {}, resultInfos, /*error result*/ None, SubstitutionMap(),
+        /*yields*/ {}, resultInfos, /*error result*/ llvm::None, SubstitutionMap(),
         SubstitutionMap(), ctx);
 
     auto NSStringFromClassFn = builder.getOrCreateFunction(
@@ -1239,7 +1239,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
         ParameterConvention::Direct_Unowned, argTypes,
         /*yields*/ {},
         SILResultInfo(argc->getType().getASTType(), ResultConvention::Unowned),
-        /*error result*/ None, SubstitutionMap(), SubstitutionMap(),
+        /*error result*/ llvm::None, SubstitutionMap(), SubstitutionMap(),
         getASTContext());
 
     SILGenFunctionBuilder builder(SGM);
@@ -1629,7 +1629,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
 void SILGenFunction::emitGeneratorFunction(
     SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
-    Optional<AbstractionPattern> pattern) {
+    llvm::Optional<AbstractionPattern> pattern) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation loc(function.getDecl());
@@ -1695,10 +1695,10 @@ ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {
   return ProfileCounter();
 }
 
-Optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
+llvm::Optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
   if (SILProfiler *SP = F.getProfiler())
     return SP->getPGOParent(Node);
-  return None;
+  return llvm::None;
 }
 
 SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,

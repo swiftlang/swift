@@ -65,7 +65,7 @@ public:
   static UUID fromTime() { return UUID(FromTime); }
   
   /// Parse a UUID from a C string.
-  static Optional<UUID> fromString(const char *s);
+  static llvm::Optional<UUID> fromString(const char *s);
   
   /// Convert a UUID to its string representation.
   void toString(llvm::SmallVectorImpl<char> &out) const;

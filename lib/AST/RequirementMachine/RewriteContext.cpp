@@ -159,7 +159,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
   SmallVector<StringRef, 2> debug;
   debugFlags.split(debug, ',');
   for (auto flagStr : debug) {
-    auto flag = llvm::StringSwitch<Optional<DebugFlags>>(flagStr)
+    auto flag = llvm::StringSwitch<llvm::Optional<DebugFlags>>(flagStr)
       .Case("simplify", DebugFlags::Simplify)
       .Case("add", DebugFlags::Add)
       .Case("completion", DebugFlags::Completion)
@@ -180,7 +180,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("timers", DebugFlags::Timers)
       .Case("conflicting-rules", DebugFlags::ConflictingRules)
       .Case("split-concrete-equiv-class", DebugFlags::SplitConcreteEquivalenceClass)
-      .Default(None);
+      .Default(llvm::None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
                    << flagStr << "\n";

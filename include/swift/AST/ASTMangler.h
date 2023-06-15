@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "llvm/ADT/Optional.h"
 
 namespace clang {
 class NamedDecl;
@@ -254,7 +255,7 @@ public:
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
                                                    CanGenericSignature Sig,
-                                                   Optional<bool> FlagParamIsZeroOnError,
+                                                   llvm::Optional<bool> FlagParamIsZeroOnError,
                                                    bool predefined);
   
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
@@ -381,7 +382,7 @@ public:
     ClangImporterContext,
   };
   
-  static Optional<SpecialContext>
+  static llvm::Optional<SpecialContext>
   getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
   static bool isCXXCFOptionsDefinition(const ValueDecl *decl);

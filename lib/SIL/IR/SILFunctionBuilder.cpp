@@ -314,7 +314,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.isRuntimeAccessibleFunction())
     isRuntimeAccessible = IsRuntimeAccessible;
 
-  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
+  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, llvm::None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
                                 IsDistributed, isRuntimeAccessible,
                                 IsNotExactSelfClass, IsNotThunk,
@@ -378,7 +378,7 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
 
 SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
+    GenericEnvironment *genericEnv, llvm::Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
     IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,

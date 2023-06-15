@@ -214,12 +214,12 @@ private:
     return false;
   }
 
-  Optional<ObjectRef> getBaseKey() {
+  llvm::Optional<ObjectRef> getBaseKey() {
     auto BaseKey = Instance.getCompilerBaseKey();
     if (!BaseKey) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    "Base Key doesn't exist");
-      return None;
+      return llvm::None;
     }
 
     return *BaseKey;

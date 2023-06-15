@@ -20,6 +20,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Optional.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeAlignments.h"
@@ -154,13 +155,13 @@ public:
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
                                SubstitutionMap subMap,
-                               SubstOptions options=None) const;
+                               SubstOptions options=llvm::None) const;
 
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
                                TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
-                               SubstOptions options=None) const;
+                               SubstOptions options=llvm::None) const;
 
   /// Apply a substitution to the conforming type.
   ///
@@ -217,7 +218,7 @@ public:
 
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied, if they're possible to compute.
-  Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const;
+  llvm::Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const;
 
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied.

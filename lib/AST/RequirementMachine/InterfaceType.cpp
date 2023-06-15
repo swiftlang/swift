@@ -481,7 +481,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
   if (!schema->hasTypeParameter())
     return schema;
 
-  return schema.transformRec([&](Type t) -> Optional<Type> {
+  return schema.transformRec([&](Type t) -> llvm::Optional<Type> {
     if (t->is<GenericTypeParamType>()) {
       auto index = RewriteContext::getGenericParamIndex(t);
       auto substitution = substitutions[index];
@@ -501,7 +501,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
     }
 
     assert(!t->isTypeParameter());
-    return None;
+    return llvm::None;
   });
 }
 
@@ -535,9 +535,9 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
-  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
+  return CanType(concreteType.transformRec([&](Type t) -> llvm::Optional<Type> {
     if (!t->isTypeParameter())
-      return None;
+      return llvm::None;
 
     auto term = getRelativeTermForType(CanType(t), substitutions);
 
@@ -566,9 +566,9 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
-  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
+  return CanType(concreteType.transformRec([&](Type t) -> llvm::Optional<Type> {
     if (!t->isTypeParameter())
-      return None;
+      return llvm::None;
 
     unsigned index = result.size();
     result.push_back(getTermForType(CanType(t), proto));

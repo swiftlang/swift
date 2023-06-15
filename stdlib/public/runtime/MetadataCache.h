@@ -24,6 +24,7 @@
 
 #include <condition_variable>
 #include <atomic>
+#include <optional>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -297,9 +298,9 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
+  std::optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
     EntryType *entry = Storage.find(key);
-    if (!entry) return None;
+    if (!entry) return std::nullopt;
     return entry->await(Storage.getConcurrency(),
                         std::forward<ArgTys>(args)...);
   }
@@ -381,7 +382,7 @@ public:
   }
 
   template <class... ArgTys>
-  llvm::Optional<Status> beginAllocation(WaitQueue::Worker &worker,
+  std::optional<Status> beginAllocation(WaitQueue::Worker &worker,
                                          ArgTys &&... args) {
 
     // Delegate to the implementation class.
@@ -1126,7 +1127,7 @@ public:
 
   /// Perform the allocation operation.
   template <class... Args>
-  llvm::Optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
+  std::optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
                                          MetadataRequest request,
                                          Args &&... args) {
     // Returning a non-None value here will preempt initialization, so we
@@ -1150,7 +1151,7 @@ public:
 
       // Otherwise, go directly to the initialization phase.
       assert(worker.isWorkerThread());
-      return None;
+      return std::nullopt;
     }
 
     assert(worker.isWorkerThread());
@@ -1194,7 +1195,7 @@ public:
       verifyMangledNameRoundtrip(value);
 #endif
 
-    return None;
+    return std::nullopt;
   }
 
   template <class... Args>

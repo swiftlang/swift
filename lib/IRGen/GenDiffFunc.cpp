@@ -143,9 +143,9 @@ public:
         fields, T, getBestKnownAlignment().getValue(), *this);
   }
 
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return llvm::None; }
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-    return None;
+    return llvm::None;
   }
 };
 
@@ -318,9 +318,9 @@ public:
         fields, T, getBestKnownAlignment().getValue(), *this);
   }
 
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return llvm::None; }
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-    return None;
+    return llvm::None;
   }
 };
 

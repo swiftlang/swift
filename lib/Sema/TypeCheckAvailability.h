@@ -116,7 +116,7 @@ class ExportContext {
                 AvailabilityContext runningOSVersion,
                 FragileFunctionKind kind,
                 bool spi, bool exported, bool implicit, bool deprecated,
-                Optional<PlatformKind> unavailablePlatformKind);
+                llvm::Optional<PlatformKind> unavailablePlatformKind);
 
 public:
 
@@ -177,7 +177,7 @@ public:
   /// reference other deprecated declarations without warning.
   bool isDeprecated() const { return Deprecated; }
 
-  Optional<PlatformKind> getUnavailablePlatformKind() const;
+  llvm::Optional<PlatformKind> getUnavailablePlatformKind() const;
 
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
@@ -186,7 +186,7 @@ public:
 
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
-  Optional<ExportabilityReason> getExportabilityReason() const;
+  llvm::Optional<ExportabilityReason> getExportabilityReason() const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.
@@ -209,18 +209,18 @@ void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
 /// Diagnose uses of unavailable declarations in types.
 bool diagnoseTypeReprAvailability(const TypeRepr *T,
                                   const ExportContext &context,
-                                  DeclAvailabilityFlags flags = None);
+                                  DeclAvailabilityFlags flags = llvm::None);
 
 /// Diagnose uses of unavailable conformances in types.
 void diagnoseTypeAvailability(Type T, SourceLoc loc,
                               const ExportContext &context,
-                              DeclAvailabilityFlags flags = None);
+                              DeclAvailabilityFlags flags = llvm::None);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
 /// diagnostics by only checking the Type if the TypeRepr succeeded.
 void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                               const ExportContext &context,
-                              DeclAvailabilityFlags flags = None);
+                              DeclAvailabilityFlags flags = llvm::None);
 
 bool
 diagnoseConformanceAvailability(SourceLoc loc,
@@ -243,7 +243,7 @@ bool diagnoseSubstitutionMapAvailability(
 /// was emitted.
 bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &where,
-                              DeclAvailabilityFlags flags = None);
+                              DeclAvailabilityFlags flags = llvm::None);
 
 /// Emit a diagnostic for an available declaration that overrides an
 /// unavailable declaration.
@@ -256,7 +256,7 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                     const ExportContext &Where,
                                     const Expr *call,
-                                    DeclAvailabilityFlags Flags = None);
+                                    DeclAvailabilityFlags Flags = llvm::None);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".

@@ -58,7 +58,7 @@ bool Argument::isConst() const {
 
 ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
                                    ArrayRef<Argument> args, SourceLoc rParenLoc,
-                                   Optional<unsigned> firstTrailingClosureIndex,
+                                   llvm::Optional<unsigned> firstTrailingClosureIndex,
                                    bool isImplicit, ArgumentList *originalArgs,
                                    AllocationArena arena) {
   SmallVector<Expr *, 4> exprs;
@@ -108,7 +108,7 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
 ArgumentList *
 ArgumentList::createParsed(ASTContext &ctx, SourceLoc lParenLoc,
                            ArrayRef<Argument> args, SourceLoc rParenLoc,
-                           Optional<unsigned> firstTrailingClosureIndex) {
+                           llvm::Optional<unsigned> firstTrailingClosureIndex) {
   return create(ctx, lParenLoc, args, rParenLoc, firstTrailingClosureIndex,
                 /*implicit*/ false);
 }
@@ -117,14 +117,14 @@ ArgumentList *ArgumentList::createTypeChecked(ASTContext &ctx,
                                               ArgumentList *originalArgs,
                                               ArrayRef<Argument> newArgs) {
   return create(ctx, originalArgs->getLParenLoc(), newArgs,
-                originalArgs->getRParenLoc(), /*trailingClosureIdx*/ None,
+                originalArgs->getRParenLoc(), /*trailingClosureIdx*/ llvm::None,
                 originalArgs->isImplicit(), originalArgs);
 }
 
 ArgumentList *
 ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
                              ArrayRef<Argument> args, SourceLoc rParenLoc,
-                             Optional<unsigned> firstTrailingClosureIndex,
+                             llvm::Optional<unsigned> firstTrailingClosureIndex,
                              AllocationArena arena) {
   return create(ctx, lParenLoc, args, rParenLoc, firstTrailingClosureIndex,
                 /*implicit*/ true,
@@ -133,7 +133,7 @@ ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
 
 ArgumentList *
 ArgumentList::createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
-                             Optional<unsigned> firstTrailingClosureIndex,
+                             llvm::Optional<unsigned> firstTrailingClosureIndex,
                              AllocationArena arena) {
   return createImplicit(ctx, SourceLoc(), args, SourceLoc(),
                         firstTrailingClosureIndex, arena);
@@ -222,7 +222,7 @@ ArgumentList::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const {
   return scratch;
 }
 
-Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
+llvm::Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
                                                   bool allowSemantic) const {
   if (allowSemantic)
     expr = expr->getSemanticsProvidingExpr();
@@ -234,7 +234,7 @@ Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
     if (expr == argExpr)
       return idx;
   }
-  return None;
+  return llvm::None;
 }
 
 Expr *ArgumentList::packIntoImplicitTupleOrParen(

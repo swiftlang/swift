@@ -79,7 +79,7 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
   return false;
 }
 
-const Optional<llvm::VersionTuple>
+const llvm::Optional<llvm::VersionTuple>
 swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return llvm::VersionTuple(10, 10, 0);
@@ -99,7 +99,7 @@ swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isWatchOS())
     return llvm::VersionTuple(2, 0);
 
-  return None;
+  return llvm::None;
 }
 
 bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
@@ -335,11 +335,11 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
               .Default(tripleOSNameNoVersion);
 }
 
-static Optional<StringRef>
+static llvm::Optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
-  return llvm::StringSwitch<Optional<StringRef>>(tripleEnvironment)
-              .Cases("unknown", "", None)
+  return llvm::StringSwitch<llvm::Optional<StringRef>>(tripleEnvironment)
+              .Cases("unknown", "", llvm::None)
   // These values are also supported, but are handled by the default case below:
   //          .Case ("simulator", StringRef("simulator"))
   //          .Case ("macabi", StringRef("macabi"))
@@ -356,7 +356,7 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
     StringRef newOS = getOSForAppleTargetSpecificModuleTriple(triple);
 
-    Optional<StringRef> newEnvironment =
+    llvm::Optional<StringRef> newEnvironment =
         getEnvironmentForAppleTargetSpecificModuleTriple(triple);
 
     if (!newEnvironment)
@@ -395,7 +395,7 @@ llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
                       unversionedOSName);
 }
 
-Optional<llvm::VersionTuple>
+llvm::Optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
   #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -509,7 +509,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     }
   }
 
-  return None;
+  return llvm::None;
 }
 
 static const llvm::VersionTuple minimumMacCatalystDeploymentTarget() {
@@ -528,7 +528,7 @@ llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
     if (const auto *MacOStoMacCatalystMapping = SDKInfo.getVersionMapping(
             clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
       return MacOStoMacCatalystMapping
-          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), None)
+          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), llvm::None)
           .value_or(llvm::VersionTuple(0, 0, 0));
     }
     return llvm::VersionTuple(0, 0, 0);

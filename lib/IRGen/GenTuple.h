@@ -55,7 +55,7 @@ namespace irgen {
   /// Return the offset to the given tuple element, if it's fixed.
   ///
   /// This API is used by RemoteAST.
-  Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
+  llvm::Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
                                             SILType tupleType,
                                             unsigned fieldNo);
 
@@ -64,7 +64,7 @@ namespace irgen {
   ///
   /// Returns None if the tuple element is an empty type and therefore has no
   /// corresponding element in the llvm type.
-  Optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
+  llvm::Optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
                                                         SILType tupleType,
                                                         unsigned fieldNo);
 } // end namespace irgen

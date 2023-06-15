@@ -37,7 +37,7 @@ using namespace Lowering;
 ///
 /// Because these are builtin operations, we can make some structural
 /// assumptions about the expression used to call them.
-static Optional<SmallVector<Expr*, 2>>
+static llvm::Optional<SmallVector<Expr*, 2>>
 decomposeArguments(SILGenFunction &SGF,
                    SILLocation loc,
                    PreparedArguments &&args,
@@ -54,7 +54,7 @@ decomposeArguments(SILGenFunction &SGF,
   SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                    "argument to builtin should be a literal tuple");
 
-  return None;
+  return llvm::None;
 }
 
 static ManagedValue emitBuiltinRetain(SILGenFunction &SGF,
@@ -1789,16 +1789,16 @@ static ManagedValue emitBuiltinBuildMainActorExecutorRef(
                               BuiltinValueKind::BuildMainActorExecutorRef);
 }
 
-Optional<SpecializedEmitter>
+llvm::Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
   if (function.kind != SILDeclRef::Kind::Func)
-    return None;
+    return llvm::None;
   if (!function.hasDecl())
-    return None;  
+    return llvm::None;  
   ValueDecl *decl = function.getDecl();
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
-    return None;
+    return llvm::None;
 
   const auto name = decl->getBaseIdentifier();
   const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(name);

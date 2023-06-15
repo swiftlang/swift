@@ -210,11 +210,11 @@ public:
 /// The only operation on this component is `project`.
 class PhysicalPathComponent : public PathComponent {
   virtual void _anchor() override;
-  Optional<ActorIsolation> ActorIso;
+  llvm::Optional<ActorIsolation> ActorIso;
 
 protected:
   PhysicalPathComponent(LValueTypeData typeData, KindTy Kind,
-                        Optional<ActorIsolation> actorIso = None)
+                        llvm::Optional<ActorIsolation> actorIso = llvm::None)
     : PathComponent(typeData, Kind), ActorIso(actorIso) {
     assert(isPhysical() && "PhysicalPathComponent Kind isn't physical");
   }
@@ -222,9 +222,9 @@ protected:
 public:
   /// Obtains and consumes the actor-isolation required for any loads of
   /// this component.
-  Optional<ActorIsolation> takeActorIsolation() {
-    Optional<ActorIsolation> current = ActorIso;
-    ActorIso = None;
+  llvm::Optional<ActorIsolation> takeActorIsolation() {
+    llvm::Optional<ActorIsolation> current = ActorIso;
+    ActorIso = llvm::None;
     return current;
   }
 
@@ -289,7 +289,7 @@ public:
   };
 
   /// Get the storage accessed by this component.
-  virtual Optional<AccessStorage> getAccessStorage() const = 0;
+  virtual llvm::Optional<AccessStorage> getAccessStorage() const = 0;
 
   /// Perform a writeback on the property.
   ///
@@ -319,8 +319,8 @@ protected:
   }
 
 public:
-  Optional<AccessStorage> getAccessStorage() const override {
-    return None;
+  llvm::Optional<AccessStorage> getAccessStorage() const override {
+    return llvm::None;
   }
 
   RValue get(SILGenFunction &SGF, SILLocation loc,
@@ -368,7 +368,7 @@ public:
                          CanType substFormalType);
 
   static LValue forAddress(SGFAccessKind accessKind, ManagedValue address,
-                           Optional<SILAccessEnforcement> enforcement,
+                           llvm::Optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
 
@@ -453,7 +453,7 @@ public:
                                 SGFAccessKind accessKind,
                                 AccessStrategy strategy,
                                 CanType formalRValueType,
-                                Optional<ActorIsolation> actorIso = None);
+                                llvm::Optional<ActorIsolation> actorIso = llvm::None);
 
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
@@ -476,7 +476,7 @@ public:
                              AccessStrategy accessStrategy,
                              CanType formalRValueType,
                              bool isOnSelf = false,
-                             Optional<ActorIsolation> actorIso = None);
+                             llvm::Optional<ActorIsolation> actorIso = llvm::None);
 
   void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                    SubscriptDecl *subscript,
@@ -489,7 +489,7 @@ public:
                                    PreparedArguments &&indices,
                                    ArgumentList *argListForDiagnostics,
                                    bool isOnSelfParameter = false,
-                                   Optional<ActorIsolation> actorIso = None);
+                                   llvm::Optional<ActorIsolation> actorIso = llvm::None);
 
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted

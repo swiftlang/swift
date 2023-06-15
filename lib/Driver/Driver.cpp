@@ -95,8 +95,8 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
       DriverName = FirstArg.drop_front(OptName.size());
   }
 
-  Optional<DriverKind> Kind =
-      llvm::StringSwitch<Optional<DriverKind>>(DriverName)
+  llvm::Optional<DriverKind> Kind =
+      llvm::StringSwitch<llvm::Optional<DriverKind>>(DriverName)
           .Case("swift", DriverKind::Interactive)
           .Case("swiftc", DriverKind::Batch)
           .Case("sil-opt", DriverKind::SILOpt)
@@ -112,7 +112,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-api-extract", DriverKind::APIExtract)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
-          .Default(None);
+          .Default(llvm::None);
 
   if (Kind.has_value())
     driverKind = Kind.value();
@@ -354,7 +354,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::WatchOS:
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX: {
-    Optional<llvm::Triple> targetVariant;
+    llvm::Optional<llvm::Triple> targetVariant;
     if (const Arg *A = ArgList.getLastArg(options::OPT_target_variant))
       targetVariant = llvm::Triple(llvm::Triple::normalize(A->getValue()));
 
@@ -450,7 +450,7 @@ using InputInfoMap = Driver::InputInfoMap;
 /// Get the filename for build record. Returns true if failed.
 static bool getCompilationRecordPath(std::string &buildRecordPath,
                                      const OutputInfo &OI,
-                                     const Optional<OutputFileMap> &OFM,
+                                     const llvm::Optional<OutputFileMap> &OFM,
                                      DiagnosticEngine *Diags) {
   if (!OFM) {
     // FIXME: This should work without an output file map. We should have
@@ -786,7 +786,7 @@ getDriverBatchSeed(llvm::opt::InputArgList &ArgList,
   return DriverBatchSeed;
 }
 
-static Optional<unsigned>
+static llvm::Optional<unsigned>
 getDriverBatchCount(llvm::opt::InputArgList &ArgList,
                     DiagnosticEngine &Diags)
 {
@@ -799,7 +799,7 @@ getDriverBatchCount(llvm::opt::InputArgList &ArgList,
       return Count;
     }
   }
-  return None;
+  return llvm::None;
 }
 
 static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
@@ -885,7 +885,7 @@ computeContinueBuildingAfterErrors(const bool BatchMode,
 
 }
 
-static Optional<unsigned>
+static llvm::Optional<unsigned>
 getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
                         DiagnosticEngine &Diags)
 {
@@ -898,7 +898,7 @@ getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
       return Limit;
     }
   }
-  return None;
+  return llvm::None;
 }
 
 std::unique_ptr<Compilation>
@@ -960,7 +960,7 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  Optional<OutputFileMap> OFM = buildOutputFileMap(
+  llvm::Optional<OutputFileMap> OFM = buildOutputFileMap(
       *TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError() && !AllowErrors)
@@ -1035,9 +1035,9 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<Compilation> C;
   {
     const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
-    const Optional<unsigned> DriverBatchCount =
+    const llvm::Optional<unsigned> DriverBatchCount =
         getDriverBatchCount(*ArgList, Diags);
-    const Optional<unsigned> DriverBatchSizeLimit =
+    const llvm::Optional<unsigned> DriverBatchSizeLimit =
       getDriverBatchSizeLimit(*ArgList, Diags);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
     const bool ShowDriverTimeCompilation =
@@ -1465,7 +1465,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
     auto LTOVariant =
-        llvm::StringSwitch<Optional<OutputInfo::LTOKind>>(A->getValue())
+        llvm::StringSwitch<llvm::Optional<OutputInfo::LTOKind>>(A->getValue())
             .Case("llvm-thin", OutputInfo::LTOKind::LLVMThin)
             .Case("llvm-full", OutputInfo::LTOKind::LLVMFull)
             .Default(llvm::None);
@@ -1842,7 +1842,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   if (TC.getTriple().isOSWindows()) {
     if (const Arg *A = Args.getLastArg(options::OPT_libc)) {
       OI.RuntimeVariant =
-          llvm::StringSwitch<Optional<OutputInfo::MSVCRuntime>>(A->getValue())
+          llvm::StringSwitch<llvm::Optional<OutputInfo::MSVCRuntime>>(A->getValue())
               .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
                      OutputInfo::MSVCRuntime::MultiThreadedDLL)
               .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
@@ -2421,12 +2421,12 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-Optional<OutputFileMap>
+llvm::Optional<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                            StringRef workingDirectory) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
-    return None;
+    return llvm::None;
 
   // TODO: perform some preflight checks to ensure the file exists.
   llvm::Expected<OutputFileMap> OFM = OutputFileMap::loadFromPath(
@@ -2434,7 +2434,7 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
                    llvm::toString(std::move(Err)), A->getValue());
-    return None;
+    return llvm::None;
   }
   return *OFM;
 }
@@ -2495,7 +2495,7 @@ static void formFilenameFromBaseAndExt(StringRef base, StringRef newExt,
   }
 }
 
-static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
+static llvm::Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
     const OutputInfo &OI, const llvm::opt::DerivedArgList &Args,
     llvm::opt::OptSpecifier PathArg, file_types::ID ExpectedOutputType,
     bool TreatAsTopLevelOutput, StringRef workingDirectory,
@@ -2526,7 +2526,7 @@ static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
     return Buffer.str();
   }
 
-  return None;
+  return llvm::None;
 }
 
 static StringRef assignOutputName(Compilation &C, const JobAction *JA,
@@ -2826,7 +2826,7 @@ static void addDiagFileOutputForPersistentPCHAction(
 /// mtime has not changed), adjust the Job's condition accordingly.
 static void handleCompileJobCondition(Job *J,
                                       CompileJobAction::InputInfo inputInfo,
-                                      Optional<StringRef> input,
+                                      llvm::Optional<StringRef> input,
                                       bool alwaysRebuildDependents) {
   using InputStatus = CompileJobAction::InputInfo::Status;
 
@@ -3034,7 +3034,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                   alwaysRebuildDependents);
       }
     } else if (isa<MergeModuleJobAction>(JA)) {
-      handleCompileJobCondition(J, incrementalJob->getInputInfo(), None,
+      handleCompileJobCondition(J, incrementalJob->getInputInfo(), llvm::None,
                                 alwaysRebuildDependents);
     }
   }
@@ -3237,7 +3237,7 @@ static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
                                                 CommandOutput *Output,
                                                 file_types::ID fileID,
                                                 bool shouldUseProjectFolder = false,
-                                                Optional<options::ID> optId = llvm::None) {
+                                                llvm::Optional<options::ID> optId = llvm::None) {
   if (hasExistingAdditionalOutput(*Output, fileID))
     return;
   // Honor driver option for this path if it's given

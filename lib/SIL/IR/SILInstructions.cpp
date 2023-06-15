@@ -150,7 +150,7 @@ static void collectTypeDependentOperands(
 
 template <typename INST>
 static void *allocateDebugVarCarryingInst(SILModule &M,
-                                          Optional<SILDebugVariable> Var,
+                                          llvm::Optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
   return M.allocateInst(
       sizeof(INST) + (Var ? Var->Name.size() : 0) +
@@ -163,7 +163,7 @@ static void *allocateDebugVarCarryingInst(SILModule &M,
 }
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(
-    Optional<SILDebugVariable> Var, char *buf, SILType *AuxVarType,
+    llvm::Optional<SILDebugVariable> Var, char *buf, SILType *AuxVarType,
     SILLocation *DeclLoc, const SILDebugScope **DeclScope,
     SILDIExprElement *DIExprOps) {
   if (!Var) {
@@ -197,9 +197,9 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
   return StringRef();
 }
 
-Optional<SILDebugVariable>
+llvm::Optional<SILDebugVariable>
 SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
-  Optional<SILDebugVariable> VarInfo;
+  llvm::Optional<SILDebugVariable> VarInfo;
   if (const auto *ASI = dyn_cast_or_null<AllocStackInst>(AI))
     VarInfo = ASI->getVarInfo();
   // TODO: Support AllocBoxInst
@@ -227,7 +227,7 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
 
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
-                               SILFunction &F, Optional<SILDebugVariable> Var,
+                               SILFunction &F, llvm::Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime, bool isLexical,
                                bool usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
@@ -266,7 +266,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
 
 AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
                                        SILType elementType, SILFunction &F,
-                                       Optional<SILDebugVariable> Var,
+                                       llvm::Optional<SILDebugVariable> Var,
                                        bool hasDynamicLifetime, bool isLexical,
                                        bool wasMoved) {
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -374,7 +374,7 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, Optional<SILDebugVariable> Var,
+                           SILFunction &F, llvm::Optional<SILDebugVariable> Var,
                            bool hasDynamicLifetime, bool reflection,
                            bool usesMoveableValueDebugInfo,
                            bool hasPointerEscape)
@@ -396,7 +396,7 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                                    SILFunction &F,
-                                   Optional<SILDebugVariable> Var,
+                                   llvm::Optional<SILDebugVariable> Var,
                                    bool hasDynamicLifetime, bool reflection,
                                    bool usesMoveableValueDebugInfo,
                                    bool hasPointerEscape) {
@@ -568,7 +568,7 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
 ApplyInst *
 ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
                   ArrayRef<SILValue> Args, ApplyOptions Options,
-                  Optional<SILModuleConventions> ModuleConventions,
+                  llvm::Optional<SILModuleConventions> ModuleConventions,
                   SILFunction &F,
                   const GenericSpecializationInformation *SpecializationInfo) {
   SILType SubstCalleeSILTy = Callee->getType().substGenericArgs(
@@ -615,7 +615,7 @@ BeginApplyInst *
 BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
                        SubstitutionMap subs, ArrayRef<SILValue> args,
                        ApplyOptions options,
-                       Optional<SILModuleConventions> moduleConventions,
+                       llvm::Optional<SILModuleConventions> moduleConventions,
                        SILFunction &F,
                   const GenericSpecializationInformation *specializationInfo) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
@@ -809,7 +809,7 @@ DifferentiableFunctionInst::DifferentiableFunctionInst(
 DifferentiableFunctionInst *DifferentiableFunctionInst::create(
     SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
     IndexSubset *ResultIndices, SILValue OriginalFunction,
-    Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
+    llvm::Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
     ValueOwnershipKind forwardingOwnershipKind) {
   auto derivativeFunctions =
       VJPAndJVPFunctions.has_value()
@@ -836,7 +836,7 @@ SILType LinearFunctionInst::getLinearFunctionType(
 
 LinearFunctionInst::LinearFunctionInst(
     SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
+    SILValue OriginalFunction, llvm::Optional<SILValue> TransposeFunction,
     ValueOwnershipKind forwardingOwnershipKind)
     : InstructionBaseWithTrailingOperands(
           OriginalFunction,
@@ -850,7 +850,7 @@ LinearFunctionInst::LinearFunctionInst(
 
 LinearFunctionInst *LinearFunctionInst::create(
     SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
+    SILValue OriginalFunction, llvm::Optional<SILValue> TransposeFunction,
     ValueOwnershipKind forwardingOwnershipKind) {
   size_t size = totalSizeToAlloc<Operand>(TransposeFunction.has_value() ? 2 : 1);
   void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
@@ -884,7 +884,7 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
 DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
     NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
-    ValueOwnershipKind forwardingOwnershipKind, Optional<SILType> extracteeType)
+    ValueOwnershipKind forwardingOwnershipKind, llvm::Optional<SILType> extracteeType)
     : UnaryInstructionBase(debugLoc, function,
                            extracteeType
                                ? *extracteeType
@@ -947,7 +947,7 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
 DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
     DifferentiabilityWitnessFunctionKind witnessKind,
-    SILDifferentiabilityWitness *witness, Optional<SILType> functionType)
+    SILDifferentiabilityWitness *witness, llvm::Optional<SILType> functionType)
     : InstructionBase(debugLoc, functionType
                                     ? *functionType
                                     : getDifferentiabilityWitnessType(
@@ -1979,7 +1979,7 @@ template <typename SELECT_ENUM_INST>
 SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
     SILDebugLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
     ArrayRef<std::pair<EnumElementDecl *, SILValue>> DeclsAndValues,
-    SILModule &Mod, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    SILModule &Mod, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnership) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
@@ -2007,7 +2007,7 @@ SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
 SelectEnumInst *SelectEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
     ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount,
+    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount,
     ValueOwnershipKind forwardingOwnership) {
   return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
                                           CaseValues, M, CaseCounts,
@@ -2017,7 +2017,7 @@ SelectEnumInst *SelectEnumInst::create(
 SelectEnumAddrInst *SelectEnumAddrInst::create(
     SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
     ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
   // We always pass in false since SelectEnumAddrInst doesn't use ownership. We
   // have to pass something in since SelectEnumInst /does/ need to consider
@@ -2070,7 +2070,7 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
     return nullptr;
 
   // Try to find a single literal "true" case.
-  Optional<EnumElementDecl*> TrueElement;
+  llvm::Optional<EnumElementDecl*> TrueElement;
   for (unsigned i = 0, e = getNumCases(); i < e; ++i) {
     auto casePair = getCase(i);
     if (auto intLit = dyn_cast<IntegerLiteralInst>(casePair.second)) {
@@ -2079,7 +2079,7 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
           TrueElement = casePair.first;
         else
           // Use Optional(nullptr) to represent more than one.
-          TrueElement = Optional<EnumElementDecl*>(nullptr);
+          TrueElement = llvm::Optional<EnumElementDecl*>(nullptr);
       }
     }
   }
@@ -2094,7 +2094,7 @@ template <typename SWITCH_ENUM_INST, typename... RestTys>
 SWITCH_ENUM_INST *SwitchEnumInstBase<BaseTy>::createSwitchEnum(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount, RestTys &&... restArgs) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
@@ -2114,7 +2114,7 @@ SWITCH_ENUM_INST *SwitchEnumInstBase<BaseTy>::createSwitchEnum(
 SwitchEnumInst *SwitchEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind) {
   return createSwitchEnum<SwitchEnumInst>(Loc, Operand, DefaultBB, CaseBBs, F,
                                           CaseCounts, DefaultCount,
@@ -2124,7 +2124,7 @@ SwitchEnumInst *SwitchEnumInst::create(
 SwitchEnumAddrInst *SwitchEnumAddrInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
   return createSwitchEnum<SwitchEnumAddrInst>(Loc, Operand, DefaultBB, CaseBBs,
                                               F, CaseCounts, DefaultCount);

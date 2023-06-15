@@ -991,9 +991,9 @@ struct SILInstruction::NonTypeDependentOperandToValue {
 
   NonTypeDependentOperandToValue(const SILInstruction &i): i(i) {}
 
-  Optional<SILValue> operator()(const Operand &use) const {
+  llvm::Optional<SILValue> operator()(const Operand &use) const {
     if (i.isTypeDependentOperand(use))
-      return None;
+      return llvm::None;
     return use.get();
   }
 };
@@ -1010,9 +1010,9 @@ struct SILInstruction::OperandToTransformedValue {
       : i(i), transformFn(transformFn),
         skipTypeDependentOps(skipTypeDependentOps) {}
 
-  Optional<SILValue> operator()(const Operand &use) const {
+  llvm::Optional<SILValue> operator()(const Operand &use) const {
     if (skipTypeDependentOps && i.isTypeDependentOperand(use))
-      return None;
+      return llvm::None;
     return transformFn(&use);
   }
 };
@@ -1047,9 +1047,9 @@ struct SILInstruction::OperandToType {
 
   OperandToType(const SILInstruction &i) : i(i) {}
 
-  Optional<SILType> operator()(const Operand &use) const {
+  llvm::Optional<SILType> operator()(const Operand &use) const {
     if (i.isTypeDependentOperand(use))
-      return None;
+      return llvm::None;
     return use.get()->getType();
   }
 };
@@ -1440,7 +1440,7 @@ public:
 
   /// Return the index of \p Target if it is a result in the given
   /// MultipleValueInstructionResult. Otherwise, returns None.
-  Optional<unsigned> getIndexOfResult(SILValue Target) const;
+  llvm::Optional<unsigned> getIndexOfResult(SILValue Target) const;
 
   unsigned getNumResults() const { return getResults().size(); }
 
@@ -1871,7 +1871,7 @@ class TailAllocatedDebugVariable {
     } Data;
   } Bits;
 public:
-  TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf,
+  TailAllocatedDebugVariable(llvm::Optional<SILDebugVariable>, char *buf,
                              SILType *AuxVarType = nullptr,
                              SILLocation *DeclLoc = nullptr,
                              const SILDebugScope **DeclScope = nullptr,
@@ -1889,13 +1889,13 @@ public:
   bool isImplicit() const { return Bits.Data.Implicit; }
   void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
 
-  Optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, Optional<SILType> AuxVarType = {},
-      Optional<SILLocation> DeclLoc = {},
+  llvm::Optional<SILDebugVariable>
+  get(VarDecl *VD, const char *buf, llvm::Optional<SILType> AuxVarType = {},
+      llvm::Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
-      return None;
+      return llvm::None;
 
     StringRef name = getName(buf);
     if (VD && name.empty())
@@ -1991,11 +1991,11 @@ class AllocStackInst final
 
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-                 Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+                 llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
                  bool isLexical, bool usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
-                                SILFunction &F, Optional<SILDebugVariable> Var,
+                                SILFunction &F, llvm::Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime, bool isLexical,
                                 bool usesMoveableValueDebugInfo);
 
@@ -2050,15 +2050,15 @@ public:
   void setIsLexical() { sharedUInt8().AllocStackInst.lexical = true; }
 
   /// Return the debug variable information attached to this instruction.
-  Optional<SILDebugVariable> getVarInfo() const {
+  llvm::Optional<SILDebugVariable> getVarInfo() const {
     // If we used to have debug info attached but our debug info is now
     // invalidated, just bail.
     if (sharedUInt8().AllocStackInst.hasInvalidatedVarInfo) {
-      return None;
+      return llvm::None;
     }
 
-    Optional<SILType> AuxVarType;
-    Optional<SILLocation> VarDeclLoc;
+    llvm::Optional<SILType> AuxVarType;
+    llvm::Optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
@@ -2379,12 +2379,12 @@ class AllocBoxInst final
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+               llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
                bool reflection = false, bool usesMoveableValueDebugInfo = false,
                bool hasPointerEscape = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
-                              SILFunction &F, Optional<SILDebugVariable> Var,
+                              SILFunction &F, llvm::Optional<SILDebugVariable> Var,
                               bool hasDynamicLifetime, bool reflection = false,
                               bool usesMoveableValueDebugInfo = false,
                               bool hasPointerEscape = false);
@@ -2420,7 +2420,7 @@ public:
   SILType getAddressType() const;
 
   /// Return the debug variable information attached to this instruction.
-  Optional<SILDebugVariable> getVarInfo() const {
+  llvm::Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 
@@ -2742,11 +2742,11 @@ public:
 
   /// Check whether the given operand index is a call-argument index
   /// and, if so, return that index.
-  Optional<unsigned> getArgumentIndexForOperandIndex(unsigned index) {
+  llvm::Optional<unsigned> getArgumentIndexForOperandIndex(unsigned index) {
     assert(index < getNumAllOperands());
-    if (index < NumStaticOperands) return None;
+    if (index < NumStaticOperands) return llvm::None;
     index -= NumStaticOperands;
-    if (index >= NumCallArguments) return None;
+    if (index >= NumCallArguments) return llvm::None;
     return index;
   }
 
@@ -2807,10 +2807,10 @@ struct OperandToInoutArgument {
       : paramInfos(paramInfos), arguments(arguments) {
     assert(paramInfos.size() == arguments.size());
   }
-  Optional<SILValue> operator()(size_t i) const {
+  llvm::Optional<SILValue> operator()(size_t i) const {
     if (paramInfos[i].isIndirectMutating())
       return arguments[i];
-    return None;
+    return llvm::None;
   }
 };
 
@@ -2885,10 +2885,10 @@ public:
     return OperandValueArrayRef(opsWithoutSelf);
   }
 
-  Optional<SILResultInfo> getSingleResult() const {
+  llvm::Optional<SILResultInfo> getSingleResult() const {
     auto SubstCallee = getSubstCalleeType();
     if (SubstCallee->getNumResults() != 1)
-      return None;
+      return llvm::None;
     return SubstCallee->getSingleResult();
   }
 
@@ -2950,7 +2950,7 @@ class ApplyInst final
   create(SILDebugLocation DebugLoc, SILValue Callee,
          SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
          ApplyOptions options,
-         Optional<SILModuleConventions> ModuleConventions,
+         llvm::Optional<SILModuleConventions> ModuleConventions,
          SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo);
 };
@@ -3039,7 +3039,7 @@ class BeginApplyInst final
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue Callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
-         ApplyOptions options, Optional<SILModuleConventions> moduleConventions,
+         ApplyOptions options, llvm::Optional<SILModuleConventions> moduleConventions,
          SILFunction &F,
          const GenericSpecializationInformation *specializationInfo);
 
@@ -3945,16 +3945,16 @@ public:
   llvm::Optional<llvm::Intrinsic::ID> getIntrinsicID() const {
     auto I = getIntrinsicInfo();
     if (I.ID == llvm::Intrinsic::not_intrinsic)
-      return None;
+      return llvm::None;
     return I.ID;
   }
 
   /// Looks up the BuiltinKind of this builtin. Returns None if this is
   /// not a builtin.
-  Optional<BuiltinValueKind> getBuiltinKind() const {
+  llvm::Optional<BuiltinValueKind> getBuiltinKind() const {
     auto I = getBuiltinInfo();
     if (I.ID == BuiltinValueKind::None)
-      return None;
+      return llvm::None;
     return I.ID;
   }
 
@@ -5071,9 +5071,9 @@ public:
   VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
-  Optional<SILDebugVariable> getVarInfo() const {
-    Optional<SILType> AuxVarType;
-    Optional<SILLocation> VarDeclLoc;
+  llvm::Optional<SILDebugVariable> getVarInfo() const {
+    llvm::Optional<SILType> AuxVarType;
+    llvm::Optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
@@ -5951,7 +5951,7 @@ public:
     auto *F = getFunction();
     ArrayRef<Operand> Ops = getAllOperands();
 
-    Optional<unsigned> Index;
+    llvm::Optional<unsigned> Index;
     // For each operand...
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
       // If the operand is not trivial...
@@ -6243,7 +6243,7 @@ public:
     auto *F = getFunction();
     ArrayRef<Operand> Ops = getAllOperands();
 
-    Optional<unsigned> Index;
+    llvm::Optional<unsigned> Index;
     // For each operand...
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
       // If the operand is not trivial...
@@ -6276,7 +6276,7 @@ class EnumInst
   friend SILBuilder;
   enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
 
-  Optional<FixedOperandList<1>> OptionalOperand;
+  llvm::Optional<FixedOperandList<1>> OptionalOperand;
   EnumElementDecl *Element;
   USE_SHARED_UINT32;
 
@@ -6535,7 +6535,7 @@ class SelectEnumInstBase
 protected:
   SelectEnumInstBase(SILInstructionKind kind, SILDebugLocation debugLoc,
                      SILType type, bool defaultValue,
-                     Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                     llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
                      ProfileCounter DefaultCount)
       : SelectInstBase(kind, debugLoc, type) {
     sharedUInt8().SelectEnumInstBase.hasDefault = defaultValue;
@@ -6545,7 +6545,7 @@ protected:
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                   SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                   SILModule &M, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
                    ProfileCounter DefaultCount,
                    ValueOwnershipKind forwardingOwnershipKind);
 
@@ -6606,7 +6606,7 @@ class OwnershipForwardingSelectEnumInstBase : public SelectEnumInstBase,
 protected:
   OwnershipForwardingSelectEnumInstBase(
       SILInstructionKind kind, SILDebugLocation debugLoc, SILType type,
-      bool defaultValue, Optional<ArrayRef<ProfileCounter>> caseCounts,
+      bool defaultValue, llvm::Optional<ArrayRef<ProfileCounter>> caseCounts,
       ProfileCounter defaultCount, ValueOwnershipKind ownershipKind)
       : SelectEnumInstBase(kind, debugLoc, type, defaultValue, caseCounts,
                            defaultCount),
@@ -6646,7 +6646,7 @@ private:
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                  bool DefaultValue, ArrayRef<SILValue> CaseValues,
                  ArrayRef<EnumElementDecl *> CaseDecls,
-                 Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                 llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
                  ProfileCounter DefaultCount,
                  ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBaseWithTrailingOperands(
@@ -6660,7 +6660,7 @@ private:
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         SILModule &M, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount,
          ValueOwnershipKind forwardingOwnershipKind);
 };
@@ -6676,7 +6676,7 @@ class SelectEnumAddrInst final
   SelectEnumAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                      bool DefaultValue, ArrayRef<SILValue> CaseValues,
                      ArrayRef<EnumElementDecl *> CaseDecls,
-                     Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                     llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
                      ProfileCounter DefaultCount,
                      ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
@@ -6691,7 +6691,7 @@ class SelectEnumAddrInst final
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         SILModule &M, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount);
 };
 
@@ -9614,13 +9614,13 @@ public:
     return getSuccessorBuf()[getNumCases()];
   }
 
-  Optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
+  llvm::Optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
     for (unsigned i = 0; i < getNumCases(); ++i) {
       if (getCase(i).second == bb) {
         return i + 1;
       }
     }
-    return None;
+    return llvm::None;
   }
 };
 
@@ -9662,7 +9662,7 @@ protected:
       SILInstructionKind Kind, SILDebugLocation DebugLoc, SILValue Operand,
       SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<ProfileCounter>> Counts, ProfileCounter DefaultCount,
+      llvm::Optional<ArrayRef<ProfileCounter>> Counts, ProfileCounter DefaultCount,
       Rest &&... rest)
       : BaseTy(Kind, DebugLoc, std::forward<Rest>(rest)...),
         Operands(this, Operand) {
@@ -9690,7 +9690,7 @@ protected:
   static SWITCH_ENUM_INST *createSwitchEnum(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      SILFunction &F, Optional<ArrayRef<ProfileCounter>> Counts,
+      SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> Counts,
       ProfileCounter DefaultCount, RestTys &&... restArgs);
 
 public:
@@ -9852,14 +9852,14 @@ private:
   SwitchEnumInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
       ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
                         DefaultCount, forwardingOwnershipKind) {}
   static SwitchEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount,
          ValueOwnershipKind forwardingOwnershipKind);
 
@@ -9883,14 +9883,14 @@ private:
   SwitchEnumAddrInst(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
       ProfileCounter DefaultCount)
       : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
                         DefaultCount) {}
   static SwitchEnumAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount);
 };
 
@@ -10277,7 +10277,7 @@ public:
   static DifferentiableFunctionInst *
   create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
          IndexSubset *ResultIndices, SILValue OriginalFunction,
-         Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
+         llvm::Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
          ValueOwnershipKind forwardingOwnershipKind);
 
   /// Returns the original function operand.
@@ -10294,10 +10294,10 @@ public:
 
   /// Returns the derivative function operands if they exist.
   /// Otherwise, return `None`.
-  Optional<std::pair<SILValue, SILValue>>
+  llvm::Optional<std::pair<SILValue, SILValue>>
   getOptionalDerivativeFunctionPair() const {
     if (!HasDerivativeFunctions)
-      return None;
+      return llvm::None;
     return std::make_pair(getOperand(1), getOperand(2));
   }
 
@@ -10376,20 +10376,20 @@ private:
 public:
   LinearFunctionInst(SILDebugLocation Loc, IndexSubset *ParameterIndices,
                      SILValue OriginalFunction,
-                     Optional<SILValue> TransposeFunction,
+                     llvm::Optional<SILValue> TransposeFunction,
                      ValueOwnershipKind forwardingOwnershipKind);
 
   static LinearFunctionInst *create(SILModule &Module, SILDebugLocation Loc,
                                     IndexSubset *ParameterIndices,
                                     SILValue OriginalFunction,
-                                    Optional<SILValue> TransposeFunction,
+                                    llvm::Optional<SILValue> TransposeFunction,
                                     ValueOwnershipKind forwardingOwnershipKind);
 
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
   bool hasTransposeFunction() const { return HasTransposeFunction; }
   SILValue getOriginalFunction() const { return getOperand(0); }
-  Optional<SILValue> getOptionalTransposeFunction() const {
-    return HasTransposeFunction ? Optional<SILValue>(getOperand(1)) : None;
+  llvm::Optional<SILValue> getOptionalTransposeFunction() const {
+    return HasTransposeFunction ? llvm::Optional<SILValue>(getOperand(1)) : llvm::None;
   }
   SILValue getTransposeFunction() const {
     assert(HasTransposeFunction);
@@ -10450,7 +10450,7 @@ public:
       SILModule &module, SILDebugLocation debugLoc,
       NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
       ValueOwnershipKind forwardingOwnershipKind,
-      Optional<SILType> extracteeType = None);
+      llvm::Optional<SILType> extracteeType = llvm::None);
 
   NormalDifferentiableFunctionTypeComponent getExtractee() const {
     return Extractee;
@@ -10554,7 +10554,7 @@ public:
   DifferentiabilityWitnessFunctionInst(
       SILModule &module, SILDebugLocation loc,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      SILDifferentiabilityWitness *witness, Optional<SILType> FunctionType);
+      SILDifferentiabilityWitness *witness, llvm::Optional<SILType> FunctionType);
 
   DifferentiabilityWitnessFunctionKind getWitnessKind() const {
     return witnessKind;
