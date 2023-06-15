@@ -126,18 +126,27 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::XCC:
       extendedInfo.addExtraClangImporterOption(blobData);
       break;
-    case options_block::PLUGIN_SEARCH_PATH:
-      extendedInfo.addPluginSearchPath(blobData);
+    case options_block::PLUGIN_SEARCH_OPTION: {
+      unsigned optKind;
+      StringRef optStr;
+      options_block::ResilienceStrategyLayout::readRecord(scratch, optKind);
+      switch (PluginSearchOptionKind(optKind)) {
+      case PluginSearchOptionKind::PluginPath:
+        optStr = "-plugin-path";
+        break;
+      case PluginSearchOptionKind::ExternalPluginPath:
+        optStr = "-external-plugin-path";
+        break;
+      case PluginSearchOptionKind::LoadPluginLibrary:
+        optStr = "-load-plugin-library";
+        break;
+      case PluginSearchOptionKind::LoadPluginExecutable:
+        optStr = "-load-plugin-executable";
+        break;
+      }
+      extendedInfo.addPluginSearchOption({optStr, blobData});
       break;
-    case options_block::EXTERNAL_SEARCH_PLUGIN_PATH:
-      extendedInfo.addExternalPluginSearchPath(blobData);
-      break;
-    case options_block::COMPILER_PLUGIN_LIBRARY_PATH:
-      extendedInfo.addCompilerPluginLibraryPath(blobData);
-      break;
-    case options_block::COMPILER_PLUGIN_EXECUTABLE_PATH:
-      extendedInfo.addCompilerPluginExecutablePath(blobData);
-      break;
+    }
     case options_block::IS_SIB:
       bool IsSIB;
       options_block::IsSIBLayout::readRecord(scratch, IsSIB);
