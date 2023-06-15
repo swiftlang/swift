@@ -89,15 +89,10 @@ static bool validateModule(
       llvm::outs() << ", system=" << (searchPath.IsSystem ? "true" : "false")
                    << "\n";
     }
-    llvm::outs() << "- Macro Search Paths:\n";
-    for (auto path : extendedInfo.getPluginSearchPaths())
-      llvm::outs() << "    -plugin-path: " << path << "\n";
-    for (auto path : extendedInfo.getExternalPluginSearchPaths())
-      llvm::outs() << "    -external-plugin-path: " << path << "\n";
-    for (auto path : extendedInfo.getCompilerPluginLibraryPaths())
-      llvm::outs() << "    -load-plugin-library: " << path << "\n";
-    for (auto path : extendedInfo.getCompilerPluginExecutablePaths())
-      llvm::outs() << "    -load-plugin-executable: " << path << "\n";
+    llvm::outs() << "- Plugin Search Options:\n";
+    for (auto opt : extendedInfo.getPluginSearchOptions()) {
+      llvm::outs() << "    " << opt.first << " " << opt.second << "\n";
+    }
   }
 
   return true;
