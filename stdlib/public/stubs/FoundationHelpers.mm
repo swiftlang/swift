@@ -54,7 +54,6 @@ extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
                                        const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
 
 static void _initializeBridgingFunctionsFromCFImpl(void *ctxt) {
-  assert(!bridgingState);
   bridgingState = (CFBridgingState *)ctxt;
 }
 
@@ -77,30 +76,37 @@ static void _initializeBridgingFunctionsImpl(void *ctxt) {
   bridgingState->NSSetClass = objc_lookUpClass("NSSet");
   bridgingState->NSDictionaryClass = objc_lookUpClass("NSDictionary");
   bridgingState->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
-  assert(bridgingState->NSStringClass);
-  assert(bridgingState->NSArrayClass);
-  assert(bridgingState->NSMutableArrayClass);
-  assert(bridgingState->NSSetClass);
-  assert(bridgingState->NSDictionaryClass);
-  assert(bridgingState->NSEnumeratorClass);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (bridgingState->NSErrorClass) {
     class_setSuperclass(objc_lookUpClass("__SwiftNativeNSError"), bridgingState->NSErrorClass);
   }
-  class_setSuperclass(objc_lookUpClass("__SwiftNativeNSArrayBase"), bridgingState->NSArrayClass);
-  class_setSuperclass(objc_lookUpClass("__SwiftNativeNSMutableArrayBase"), bridgingState->NSMutableArrayClass);
-  class_setSuperclass(objc_lookUpClass("__SwiftNativeNSDictionaryBase"), bridgingState->NSDictionaryClass);
-  class_setSuperclass(objc_lookUpClass("__SwiftNativeNSSetBase"), bridgingState->NSSetClass);
-  class_setSuperclass(objc_lookUpClass("__SwiftNativeNSStringBase"), bridgingState->NSStringClass);
-  class_setSuperclass(objc_lookUpClass("__SwiftNativeNSEnumeratorBase"), bridgingState->NSEnumeratorClass);
+  if (bridgingState->NSArrayClass) {
+    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSArrayBase"), bridgingState->NSArrayClass);
+  }
+  if (bridgingState->NSMutableArrayClass) {
+    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSMutableArrayBase"), bridgingState->NSMutableArrayClass);
+  }
+  if (bridgingState->NSDictionaryClass) {
+    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSDictionaryBase"), bridgingState->NSDictionaryClass);
+  }
+  if (bridgingState->NSSetClass) {
+    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSSetBase"), bridgingState->NSSetClass);
+  }
+  if (bridgingState->NSStringClass) {
+    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSStringBase"), bridgingState->NSStringClass);
+  }
+  if (bridgingState->NSEnumeratorClass) {
+    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSEnumeratorBase"), bridgingState->NSEnumeratorClass);
+  }
 #pragma clang diagnostic pop
 }
 
-static inline void initializeBridgingFunctions() {
+static inline bool initializeBridgingFunctions() {
   swift_once(&initializeBridgingStateOnce,
              _initializeBridgingFunctionsImpl,
              nullptr);
+  return bridgingState->NSStringClass != nullptr;
 }
 
 SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState *state) {
@@ -114,33 +120,32 @@ Class getNSErrorClass();
 }
 
 Class swift::getNSErrorClass() {
-  initializeBridgingFunctions();
+  assert(initializeBridgingFunctions());
   return bridgingState->NSErrorClass;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 swift_stdlib_connectNSBaseClasses() {
-  initializeBridgingFunctions();
-  return true;
+  return initializeBridgingFunctions();
 }
 
 __swift_uint8_t
 _swift_stdlib_isNSString(id obj) {
-  initializeBridgingFunctions();
+  assert(initializeBridgingFunctions());
   return bridgingState->_CFGetTypeID((CFTypeRef)obj) == bridgingState->_CFStringTypeID ? 1 : 0;
 }
 
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
-  initializeBridgingFunctions();
+  assert(initializeBridgingFunctions());
   return bridgingState->_CFStringHashNSString(obj);
 }
 
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length) {
-  initializeBridgingFunctions();
+  assert(initializeBridgingFunctions());
   return bridgingState->_CFStringHashCString(bytes, length);
 }
 
