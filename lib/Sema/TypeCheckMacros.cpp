@@ -345,25 +345,8 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
 
   std::string libraryPath;
   std::string executablePath;
-
-  // '-load-plugin-libarary'.
-  if (auto found = loader.lookupExplicitLibraryPluginByModuleName(moduleName)) {
-    libraryPath = found.value();
-  }
-  // '-load-plugin-executable'.
-  else if (auto found = loader.lookupExecutablePluginByModuleName(moduleName)) {
-    executablePath = found->str();
-  }
-  // '-plugin-path'.
-  else if (auto found =
-               loader.lookupLibraryPluginInSearchPathByModuleName(moduleName)) {
-    libraryPath = found.value();
-  }
-  // '-external-plugin-path'.
-  else if (auto found =
-               loader.lookupExternalLibraryPluginByModuleName(moduleName)) {
-    std::tie(libraryPath, executablePath) = found.value();
-  }
+  std::tie(libraryPath, executablePath) =
+      loader.lookupPluginByModuleName(moduleName);
 
   if (!executablePath.empty()) {
     if (LoadedExecutablePlugin *executablePlugin =
