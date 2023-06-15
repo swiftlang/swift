@@ -1810,48 +1810,10 @@ namespace {
       if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
-          ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          auto specializations = expr->getUnresolvedParams();
-
-          // If we have too many generic arguments, complain.
-          if (specializations.size() > typeVars.size()) {
-            de.diagnose(expr->getSubExpr()->getLoc(),
-                        diag::type_parameter_count_mismatch,
-                        bgt->getDecl()->getName(), typeVars.size(),
-                        specializations.size(),
-                        /*too many arguments*/ false,
-                        /*isParameterPack?*/ false)
-                .highlight(
-                    SourceRange(expr->getLAngleLoc(), expr->getRAngleLoc()));
-            de.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,
-                        DescriptiveDeclKind::GenericType,
-                        bgt->getDecl()->getName());
+          auto *overloadLocator = CS.getConstraintLocator(expr->getSubExpr());
+          if (addSpecializationConstraint(overloadLocator, bgt,
+                                          expr->getUnresolvedParams())) {
             return Type();
-          }
-
-          // Bind the specified generic arguments to the type variables in the
-          // open type.
-          auto *const locator = CS.getConstraintLocator(expr);
-          auto options =
-              TypeResolutionOptions(TypeResolverContext::InExpression);
-          for (size_t i = 0, e = specializations.size(); i < e; ++i) {
-            PackExpansionExpr *elementEnv = nullptr;
-            if (!PackElementEnvironments.empty()) {
-              options |= TypeResolutionFlags::AllowPackReferences;
-              elementEnv = PackElementEnvironments.back();
-            }
-
-            const auto result = TypeResolution::resolveContextualType(
-                specializations[i], CS.DC, options,
-                // Introduce type variables for unbound generics.
-                OpenUnboundGenericType(CS, locator),
-                HandlePlaceholderType(CS, locator),
-                OpenPackElementType(CS, locator, elementEnv));
-            if (result->hasError())
-              return Type();
-
-            CS.addConstraint(ConstraintKind::Bind, typeVars[i], result,
-                             locator);
           }
           
           return baseTy;
