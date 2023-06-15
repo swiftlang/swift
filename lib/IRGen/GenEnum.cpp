@@ -663,13 +663,42 @@ namespace {
                                       metadata);
     }
 
-    void initializeMetadataWithLayoutString(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T,
-                        MetadataDependencyCollector *collector) const override {
-      // Not yet supported on this type, so forward to regular method
-      initializeMetadata(IGF, metadata, isVWTMutable, T, collector);
+    void initializeMetadataWithLayoutString(
+        IRGenFunction &IGF, llvm::Value *metadata, bool isVWTMutable, SILType T,
+        MetadataDependencyCollector *collector) const override {
+      if (TIK >= Fixed)
+        return;
+
+      assert(ElementsWithPayload.size() == 1 &&
+             "empty singleton enum should not be dynamic!");
+
+      auto payloadTy =
+          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
+                               IGM.getMaximalTypeExpansionContext());
+
+      auto request = DynamicMetadataRequest::getNonBlocking(
+          MetadataState::LayoutComplete, collector);
+      auto payloadMetadata =
+          IGF.emitTypeMetadataRefForLayout(payloadTy, request);
+
+      auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
+      IGF.Builder.CreateCall(
+          IGF.IGM
+              .getInitEnumMetadataSingleCaseWithLayoutStringFunctionPointer(),
+          {metadata, flags, payloadMetadata});
+
+      // Pre swift-5.1 runtimes were missing the initialization of the
+      // the extraInhabitantCount field. Do it here instead.
+      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
+      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
+          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadExtraInhabitantCount =
+          IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
+              Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
+              Size(IGF.IGM.DataLayout.getTypeAllocSize(IGF.IGM.SizeTy) * 2 +
+                   IGF.IGM.DataLayout.getTypeAllocSize(IGF.IGM.Int32Ty))));
+      emitStoreOfExtraInhabitantCount(IGF, payloadExtraInhabitantCount,
+                                      metadata);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -973,11 +1002,9 @@ namespace {
       // witness table initialization.
     }
 
-    void initializeMetadataWithLayoutString(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T,
-                        MetadataDependencyCollector *collector) const override {
+    void initializeMetadataWithLayoutString(
+        IRGenFunction &IGF, llvm::Value *metadata, bool isVWTMutable, SILType T,
+        MetadataDependencyCollector *collector) const override {
       // No-payload enums are always fixed-size so never need dynamic value
       // witness table initialization.
     }
@@ -3207,11 +3234,9 @@ namespace {
           {metadata, flags, payloadLayout, emptyCasesVal});
     }
 
-    void initializeMetadataWithLayoutString(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T,
-                        MetadataDependencyCollector *collector) const override {
+    void initializeMetadataWithLayoutString(
+        IRGenFunction &IGF, llvm::Value *metadata, bool isVWTMutable, SILType T,
+        MetadataDependencyCollector *collector) const override {
       // Not yet supported on this type, so forward to regular method
       initializeMetadata(IGF, metadata, isVWTMutable, T, collector);
     }
@@ -5335,11 +5360,9 @@ namespace {
           {metadata, flags, numPayloadsVal, payloadLayoutArray});
     }
 
-    void initializeMetadataWithLayoutString(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T,
-                        MetadataDependencyCollector *collector) const override {
+    void initializeMetadataWithLayoutString(
+        IRGenFunction &IGF, llvm::Value *metadata, bool isVWTMutable, SILType T,
+        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic metadata initialization.
       if (TIK >= Fixed) return;
 
@@ -6035,11 +6058,9 @@ namespace {
       llvm_unreachable("resilient enums cannot be defined");
     }
 
-    void initializeMetadataWithLayoutString(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T,
-                        MetadataDependencyCollector *collector) const override {
+    void initializeMetadataWithLayoutString(
+        IRGenFunction &IGF, llvm::Value *metadata, bool isVWTMutable, SILType T,
+        MetadataDependencyCollector *collector) const override {
       llvm_unreachable("resilient enums cannot be defined");
     }
 

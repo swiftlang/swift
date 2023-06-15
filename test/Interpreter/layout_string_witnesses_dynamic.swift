@@ -243,6 +243,34 @@ func testGenericEnum() {
 
 testGenericEnum()
 
+func testGenericEnumSingleton() {
+    let ptr = allocateInternalGenericPtr(of: SingletonEnum<TestClass>.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: SingletonEnum<TestClass>.only(x, 23))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: SingletonEnum<TestClass>.only(y, 32))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: SingletonEnum<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericEnumSingleton()
+
 func testRecursive() {
     let ptr = allocateInternalGenericPtr(of: Recursive<TestClass>.self)
 
