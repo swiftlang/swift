@@ -444,3 +444,24 @@ func test_memberwise_ordering() {
 
   _ = Test5(_a: 0, _b: 1, c: 2) // Ok
 }
+
+func test_default_arguments_are_analyzed() {
+  struct Test {
+    var pair: (Int, Int) = (0, 1) { // Ok
+      init {}
+    }
+
+    var other: (Int, String) = ("", 42) {
+      // expected-error@-1 {{cannot convert value of type '(String, Int)' to specified type '(Int, String)'}}
+      init(initialValue) {}
+    }
+
+    var otherPair = (0, 1) {
+      // expected-error@-1 {{computed property must have an explicit type}}
+      init(initalValue) {}
+
+      get { 42 }
+      // expected-error@-1 {{cannot convert return expression of type 'Int' to return type '(Int, Int)'}}
+    }
+  }
+}
