@@ -5321,6 +5321,12 @@ public:
   /// with it.
   bool hasInitAccessor() const;
 
+  /// Return true if this is a property that either has storage
+  /// or init accessor associated with it.
+  bool supportsInitialization() const {
+    return hasStorage() || hasInitAccessor();
+  }
+
   /// Return true if this storage has the basic accessors/capability
   /// to be mutated.  This is generally constant after the accessors are
   /// installed by the parser/importer/whatever.
