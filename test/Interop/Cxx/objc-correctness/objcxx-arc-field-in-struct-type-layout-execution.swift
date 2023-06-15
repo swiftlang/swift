@@ -4,7 +4,9 @@
 
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fignore-exceptions -Xlinker %t2/objc-class-impl.o) | %FileCheck %s
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fignore-exceptions -O -Xlinker %t2/objc-class-impl.o) | %FileCheck %s
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fignore-exceptions -Xcc -DS_NONTRIVIAL_DESTRUCTOR -Xlinker %t2/objc-class-impl.o) | %FileCheck %s
+
+// RUN: %target-interop-build-clangxx -c %S/Inputs/objc-class-with-non-trivial-cxx-record.mm -o %t2/objc-class-impl-non-trivial.o -fobjc-arc -DS_NONTRIVIAL_DESTRUCTOR
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fignore-exceptions -Xcc -DS_NONTRIVIAL_DESTRUCTOR -Xlinker %t2/objc-class-impl-non-trivial.o) | %FileCheck %s
 //
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
