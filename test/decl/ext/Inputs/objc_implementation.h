@@ -142,3 +142,6 @@
 struct ObjCStruct {
   int foo;
 };
+
+@protocol EmptyObjCProto
+@end
