@@ -1,5 +1,7 @@
-// RUN: %swift -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
-// RUN: %swift -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport -primary-file %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// RUN: %swift %use_no_opaque_pointers -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
+// RUN: %swift -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S
+// RUN: %swift %use_no_opaque_pointers -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport -primary-file %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// RUN: %swift -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport -primary-file %s -o - -enable-source-import -I %S
 
 // REQUIRES: CODEGENERATOR=ARM
 

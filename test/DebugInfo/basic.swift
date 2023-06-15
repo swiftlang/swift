@@ -20,19 +20,23 @@
 // CHECK-LINETABLES-NOT: DIBasicType
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
-// RUN: %target-swift-frontend %/s -emit-ir -g -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %/s -emit-ir -g -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
+// RUN: %target-swift-frontend %/s -emit-ir -g -o -
 // --------------------------------------------------------------------
 // Currently -gdwarf-types should give the same results as -g.
-// RUN: %target-swift-frontend %/s -emit-ir -gdwarf-types -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers  %/s -emit-ir -gdwarf-types -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
+// RUN: %target-swift-frontend %/s -emit-ir -gdwarf-types -o -
 // --------------------------------------------------------------------
 // Verify that -g -debug-info-format=dwarf gives the same results as -g.
-// RUN: %target-swift-frontend %/s -emit-ir -g -debug-info-format=dwarf -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %/s -emit-ir -g -debug-info-format=dwarf -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
+// RUN: %target-swift-frontend %/s -emit-ir -g -debug-info-format=dwarf -o -
 // --------------------------------------------------------------------
-// RUN: %target-swift-frontend %/s -emit-ir -g -debug-info-format=codeview -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %/s -emit-ir -g -debug-info-format=codeview -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,CV-CHECK
+// RUN: %target-swift-frontend %/s -emit-ir -g -debug-info-format=codeview -o -
 // --------------------------------------------------------------------
 //
 // CHECK: foo

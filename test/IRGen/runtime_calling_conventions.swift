@@ -1,6 +1,8 @@
 
-// RUN: %target-swift-frontend -module-name runtime_calling_conventions -parse-as-library -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name runtime_calling_conventions -parse-as-library -O -emit-ir %s | %FileCheck --check-prefix=OPT-CHECK %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name runtime_calling_conventions -parse-as-library -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name runtime_calling_conventions -parse-as-library -O -emit-ir %s | %FileCheck --check-prefix=OPT-CHECK %s
+// RUN: %target-swift-frontend -module-name runtime_calling_conventions -parse-as-library -emit-ir %s
+// RUN: %target-swift-frontend -module-name runtime_calling_conventions -parse-as-library -O -emit-ir %s
 
 // Test that runtime functions are invoked using the new calling convention.
 

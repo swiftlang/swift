@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %swift -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -emit-module-path %t/module.swiftmodule -module-name module -module-link-name module %s
-// RUN: %swift -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -emit-ir -o - %s | %FileCheck %s -check-prefix CHECK-GNU-IR
-// RUN: %swift -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -S -o - %s | %FileCheck %s -check-prefix CHECK-GNU-ASM
+// RUN: %swift %use_no_opaque_pointers -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -emit-ir -o - %s | %FileCheck %s -check-prefix CHECK-GNU-IR
+// RUN: %swift %use_no_opaque_pointers -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -emit-ir -o - %s | %FileCheck %s -check-prefix CHECK-GNU-IR
+// RUN: %swift -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -S -o - %s
+// RUN: %swift -target x86_64--windows-gnu -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -S -o - %s
 
 // REQUIRES: CODEGENERATOR=X86
 

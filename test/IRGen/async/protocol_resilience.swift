@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module  -disable-availability-checking -g -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-ir  -disable-availability-checking -g -enable-library-evolution %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -I %t -emit-ir  -disable-availability-checking -g -enable-library-evolution %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type %s
+// RUN: %target-swift-frontend -I %t -emit-ir  -disable-availability-checking -g -enable-library-evolution %s
 // REQUIRES: concurrency
 
 import resilient_protocol

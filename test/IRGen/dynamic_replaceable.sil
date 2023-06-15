@@ -1,5 +1,8 @@
-// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=COMPAT
-// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop -target x86_64-apple-macosx10.15 | %FileCheck %s --check-prefix=CHECK --check-prefix=NONCOMPAT
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=COMPAT
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -disable-objc-interop -target x86_64-apple-macosx10.15 | %FileCheck %s --check-prefix=CHECK --check-prefix=NONCOMPAT
+// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop
+// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop -target x86_64-apple-macosx10.15
+
 
 // REQUIRES: objc_interop
 

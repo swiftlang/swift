@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
-// RUN: %swift-target-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o - | %FileCheck %t/A.swift -check-prefix CHECK
-// RUN: %swift-target-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o - | %FileCheck %t/B.swift -check-prefix CHECK
+// RUN: %swift-target-frontend %use_no_opaque_pointers -disable-availability-checking -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o - | %FileCheck %t/A.swift -check-prefix CHECK
+// RUN: %swift-target-frontend %use_no_opaque_pointers -disable-availability-checking -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o - | %FileCheck %t/B.swift -check-prefix CHECK
+// RUN: %swift-target-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o -
+// RUN: %swift-target-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o -
 
 // Verify that we can link successfully.
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking -O %t/A.swift %t/B.swift -o %t/a.out

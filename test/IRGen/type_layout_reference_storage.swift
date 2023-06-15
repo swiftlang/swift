@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s -enable-objc-interop  | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize
-// RUN: %target-swift-frontend -emit-ir %s -disable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native-%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -enable-objc-interop  | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -disable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s -enable-objc-interop
+// RUN: %target-swift-frontend -emit-ir %s -disable-objc-interop
 
 class C {}
 protocol P: class {}

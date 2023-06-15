@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -g -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -g -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -g -emit-ir -o -
 
 class X {
   init (i : Int64) { x = i }

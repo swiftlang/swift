@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefixes=CHECK-LARGE-ALLOC,CHECK-LARGE-ALLOC-%target-vendor -DWORD=i%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-STACK-ALLOC -DWORD=i%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-HEAP-ALLOC -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -O -emit-ir | %FileCheck %s --check-prefixes=CHECK-LARGE-ALLOC,CHECK-LARGE-ALLOC-%target-vendor -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-STACK-ALLOC -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-HEAP-ALLOC -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir
 
 @_silgen_name("blackHole")
 func blackHole(_ value: UnsafeMutableRawPointer?) -> Void

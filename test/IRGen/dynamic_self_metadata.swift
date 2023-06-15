@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization %s -emit-ir -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-generic-metadata-prespecialization %s -emit-ir -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization %s -emit-ir -parse-as-library
 
 // UNSUPPORTED: OS=windows-msvc
 // REQUIRES: CPU=x86_64
