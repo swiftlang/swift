@@ -558,7 +558,8 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
 
     // Walk backwards from consuming blocks.
     while (auto *block = worklist.pop()) {
-      originalLiveBlocks.insert(block);
+      if (!originalLiveBlocks.insert(block))
+        continue;
       for (auto *predecessor : block->getPredecessorBlocks()) {
         // If the block was discovered by liveness, we already added it to the
         // set.
