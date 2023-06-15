@@ -4,7 +4,7 @@
 
 // (1) Build library swiftmodule
 // RUN: %target-build-swift %s -DLIBRARY -module-name Library -experimental-hermetic-seal-at-link -lto=llvm-full %lto_flags \
-// RUN:     -Xfrontend -disable-reflection-metadata -Xfrontend -disable-reflection-names -Xfrontend -disable-objc-interop \
+// RUN:     -Xfrontend -disable-reflection-metadata -Xfrontend -disable-reflection-names \
 // RUN:     -emit-library -static -o %t/libLibrary.a \
 // RUN:     -emit-module -emit-module-path %t/Library.swiftmodule
 
@@ -13,7 +13,7 @@
 
 // (3) Build client
 // RUN: %target-build-swift %s -DCLIENT -parse-as-library -module-name Main -experimental-hermetic-seal-at-link -lto=llvm-full %lto_flags \
-// RUN:     -Xfrontend -disable-reflection-metadata -Xfrontend -disable-reflection-names -Xfrontend -disable-objc-interop \
+// RUN:     -Xfrontend -disable-reflection-metadata -Xfrontend -disable-reflection-names \
 // RUN:     -I%t -L%t -lLibrary -o %t/main
 // RUN: %target-codesign %t/main
 
