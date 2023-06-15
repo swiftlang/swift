@@ -839,6 +839,7 @@ static std::string gatherGenericParamBindingsText(
   SmallString<128> result;
   llvm::raw_svector_ostream OS(result);
   auto options = PrintOptions::forDiagnosticArguments();
+  options.PrintExplicitAny = false;
 
   for (auto gp : genericParams) {
     auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
