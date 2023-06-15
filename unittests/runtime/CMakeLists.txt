@@ -52,6 +52,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       ${FOUNDATION_LIBRARY}
       swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
       swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      swiftStdlibStubs
       )
   elseif(SWIFT_HOST_VARIANT STREQUAL "Linux")
     if(SWIFT_HOST_VARIANT_ARCH MATCHES "armv6|armv7|i686")
