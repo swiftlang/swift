@@ -456,7 +456,8 @@ function should_execute_host_actions_for_phase() {
 function verify_host_is_supported() {
     local host="$1"
     case ${host} in
-      freebsd-x86_64            \
+      freebsd-arm64             \
+      | freebsd-x86_64          \
       | openbsd-amd64           \
       | cygwin-x86_64           \
       | haiku-x86_64            \
