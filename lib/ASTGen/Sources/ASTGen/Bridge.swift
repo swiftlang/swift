@@ -9,12 +9,14 @@ extension ASTGenVisitor {
     return BridgedSourceLoc(at: position, in: base)
   }
 
-  /// Form a source location at the given node's position in the current file.
-  public func bridgedSourceLoc<Node: SyntaxProtocol>(for node: Node?) -> BridgedSourceLoc {
-    guard let node = node else {
+  /// Obtains the bridged start location of the given node in the current file, excluding leading trivia.
+  @inline(__always)
+  func bridgedSourceLoc(for node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
+    guard let node else {
       return nil
     }
-    return BridgedSourceLoc(at: node.position, in: base)
+
+    return BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 }
 
@@ -89,7 +91,7 @@ extension Optional<TokenSyntax> {
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
-  /// source buffer provided by `astgen`.
+  /// source buffer provided by `astgen` excluding leading trivia.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
   @inline(__always)
