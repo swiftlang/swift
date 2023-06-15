@@ -5317,6 +5317,10 @@ public:
   /// it.
   bool hasStorage() const;
 
+  /// Return true if this is a VarDecl that has init accessor associated
+  /// with it.
+  bool hasInitAccessor() const;
+
   /// Return true if this storage has the basic accessors/capability
   /// to be mutated.  This is generally constant after the accessors are
   /// installed by the parser/importer/whatever.
