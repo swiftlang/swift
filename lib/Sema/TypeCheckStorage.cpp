@@ -457,6 +457,13 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
       return &pbe;
     }
 
+    // Local variable packs are not allowed.
+    if (binding->getDeclContext()->isLocalContext() &&
+        binding->getInit(entryNumber)->getType()->is<PackExpansionType>()) {
+      binding->diagnose(diag::expansion_not_allowed,
+                        binding->getInit(entryNumber)->getType());
+    }
+
     // A pattern binding at top level is not allowed to pick up another decl's
     // opaque result type as its type by type inference.
     if (!binding->getDeclContext()->isLocalContext() &&
