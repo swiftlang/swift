@@ -3359,7 +3359,7 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
   auto dc = storage->getDeclContext();
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (!info.hasStorage()) {
+    if (!info.hasStorage() && !var->hasInitAccessor()) {
       if (auto *init = var->getParentExecutableInitializer()) {
         auto &Diags = var->getASTContext().Diags;
         Diags.diagnose(init->getLoc(), diag::getset_init)
