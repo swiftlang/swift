@@ -1808,22 +1808,14 @@ namespace {
       }
       
       if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
-        if (BoundGenericType *bgt
-              = meta->getInstanceType()->getAs<BoundGenericType>()) {
-          auto *overloadLocator = CS.getConstraintLocator(expr->getSubExpr());
-          if (addSpecializationConstraint(overloadLocator, bgt,
-                                          expr->getUnresolvedParams())) {
-            return Type();
-          }
-          
-          return baseTy;
-        } else {
-          de.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type,
-                      meta->getInstanceType());
-          de.diagnose(expr->getLAngleLoc(),
-                      diag::while_parsing_as_left_angle_bracket);
+        auto *overloadLocator = CS.getConstraintLocator(expr->getSubExpr());
+        if (addSpecializationConstraint(overloadLocator,
+                                        meta->getInstanceType(),
+                                        expr->getUnresolvedParams())) {
           return Type();
         }
+
+        return baseTy;
       }
 
       // FIXME: If the base type is a type variable, constrain it to a metatype
