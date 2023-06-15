@@ -1879,6 +1879,11 @@ struct MemberLookupResult {
     /// This is a static member being access through a protocol metatype
     /// but its result type doesn't conform to this protocol.
     UR_InvalidStaticMemberOnProtocolMetatype,
+
+    /// This is a member that doesn't appear in 'initializes' and/or
+    /// 'accesses' attributes of the init accessor and therefore canno
+    /// t be referenced in its body.
+    UR_UnavailableWithinInitAccessor,
   };
 
   /// This is a list of considered (but rejected) candidates, along with a

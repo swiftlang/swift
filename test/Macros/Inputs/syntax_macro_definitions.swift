@@ -184,7 +184,7 @@ public enum AddBlocker: ExpressionMacro {
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
     let visitor = AddVisitor()
-    let result = visitor.visit(Syntax(node))
+    let result = visitor.rewrite(Syntax(node))
 
     for diag in visitor.diagnostics {
       context.diagnose(diag)

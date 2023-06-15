@@ -76,6 +76,7 @@ set(swift_runtime_sources
     SwiftDtoa.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
+    Tracing.cpp
     AccessibleFunction.cpp
     Win32.cpp)
 

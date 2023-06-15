@@ -3003,16 +3003,17 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
+  bool useLayoutStrings = IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+        IGM.Context.LangOpts.hasFeature(
+            Feature::LayoutStringValueWitnessesInstantiation) &&
+        IGM.getOptions().EnableLayoutStringValueWitnesses &&
+        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
 
   if (isa<StructDecl>(nominalDecl)) {
     auto &fixedTI = IGM.getTypeInfo(loweredTy);
     if (isa<FixedTypeInfo>(fixedTI)) return;
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.Context.LangOpts.hasFeature(
-            Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+    if (useLayoutStrings) {
       emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,
                                                       isVWTMutable, collector);
     } else {
@@ -3021,9 +3022,16 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
     }
   } else {
     assert(isa<EnumDecl>(nominalDecl));
+
     auto &strategy = getEnumImplStrategy(IGM, loweredTy);
-    strategy.initializeMetadata(IGF, metadata, isVWTMutable, loweredTy,
-                                collector);
+
+    if (useLayoutStrings) {
+      strategy.initializeMetadataWithLayoutString(IGF, metadata, isVWTMutable,
+                                                  loweredTy, collector);
+    } else {
+      strategy.initializeMetadata(IGF, metadata, isVWTMutable, loweredTy,
+                                  collector);
+    }
   }
 }
 
@@ -5721,10 +5729,28 @@ namespace {
       return {global, offset, structSize};
     }
 
+    bool hasLayoutString() {
+      if (!IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+        return false;
+      }
+
+      auto &strategy = getEnumImplStrategy(IGM, getLoweredType());
+
+      return !!getLayoutString() ||
+             (IGM.Context.LangOpts.hasFeature(
+                 Feature::LayoutStringValueWitnessesInstantiation) &&
+              IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+                    (HasDependentVWT || HasDependentMetadata) &&
+                      !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) &&
+                      strategy.getElementsWithPayload().size() > 1);
+    }
+
     llvm::Constant *emitNominalTypeDescriptor() {
       return EnumContextDescriptorBuilder(
                  IGM, Target, RequireMetadata,
-                 /*hasLayoutString*/ !!getLayoutString())
+                 /*hasLayoutString*/ hasLayoutString())
           .emit();
     }
 
@@ -5746,7 +5772,7 @@ namespace {
 
     bool hasCompletionFunction() {
       return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) ||
-             !!getLayoutString();
+             hasLayoutString();
     }
   };
 
