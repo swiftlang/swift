@@ -13520,7 +13520,26 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   auto genericParamDepth = genericParams->getParams()[0]->getDepth();
   for (const auto &openedType : getOpenedTypes(overloadLocator)) {
     if (openedType.first->getDepth() == genericParamDepth) {
-      openedGenericParams.push_back(Type(openedType.second));
+      // A generic argument list containing pack references expects
+      // those packs to be wrapped in pack expansion types. If this
+      // opened type represents the generic argument for a parameter
+      // pack, wrap generate the appropriate shape constraints and
+      // add a pack expansion to the argument list.
+      if (openedType.first->isParameterPack()) {
+        auto patternType = openedType.second;
+        auto *shapeLoc = getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::PackShape));
+        auto *shapeType = createTypeVariable(shapeLoc,
+                                            TVO_CanBindToPack |
+                                            TVO_CanBindToHole);
+        addConstraint(ConstraintKind::ShapeOf,
+                      shapeType, patternType, shapeLoc);
+
+        auto *expansion = PackExpansionType::get(patternType, shapeType);
+        openedGenericParams.push_back(expansion);
+      } else {
+        openedGenericParams.push_back(Type(openedType.second));
+      }
     }
   }
   assert(openedGenericParams.size() == genericParams->size());
