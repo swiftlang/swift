@@ -6021,7 +6021,8 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    Printer << "Pack{";
+    if (Options.PrintExplicitPackTypes)
+      Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
@@ -6030,7 +6031,9 @@ public:
       Type EltType = Fields[i];
       visit(EltType);
     }
-    Printer << "}";
+
+    if (Options.PrintExplicitPackTypes)
+      Printer << "}";
   }
 
   void visitSILPackType(SILPackType *T) {

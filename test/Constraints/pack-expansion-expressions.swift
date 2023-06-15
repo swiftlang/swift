@@ -138,7 +138,7 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1, with: repeat each tuple1.element) // legacy syntax
 
   _ = zip(repeat each tuple1, with: repeat each tuple2)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each T' and 'each U' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'repeat each T' and 'repeat each U' have the same shape}}
 
   _ = forward(repeat each tuple3)
 }

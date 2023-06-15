@@ -557,6 +557,12 @@ struct PrintOptions {
   /// Whether to always desugar optional types from `base_type?` to `Optional<base_type>`
   bool AlwaysDesugarOptionalTypes = false;
 
+  /// Whether to always print explicit `Pack{...}` around pack
+  /// types.
+  ///
+  /// This is set to \c false for diagnostic arguments.
+  bool PrintExplicitPackTypes = true;
+
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
     Never,
@@ -611,6 +617,7 @@ struct PrintOptions {
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitAny = true;
+    result.PrintExplicitPackTypes = false;
     return result;
   }
 
