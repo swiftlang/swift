@@ -52,7 +52,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       ${FOUNDATION_LIBRARY}
       swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
       swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX}
-      swiftStdlibStubs
       )
   elseif(SWIFT_HOST_VARIANT STREQUAL "Linux")
     if(SWIFT_HOST_VARIANT_ARCH MATCHES "armv6|armv7|i686")
@@ -120,6 +119,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftStdlibStubs${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
