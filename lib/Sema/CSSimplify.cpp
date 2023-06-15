@@ -13535,18 +13535,32 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   if (simplifiedBoundType->isTypeVariableOrMember())
     return formUnsolved();
 
-  // If the overload hasn't been resolved, we can't simplify this constraint.
-  auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
-  auto selectedOverload = findSelectedOverloadFor(overloadLocator);
-  if (!selectedOverload)
-    return formUnsolved();
+  ValueDecl *decl;
+  SmallVector<OpenedType, 2> openedTypes;
+  if (auto *bound = dyn_cast<TypeAliasType>(type1.getPointer())) {
+    decl = bound->getDecl();
+    for (auto argType : bound->getDirectGenericArgs()) {
+      auto *typeVar = argType->getAs<TypeVariableType>();
+      auto *genericParam = typeVar->getImpl().getGenericParameter();
+      openedTypes.push_back({genericParam, typeVar});
+    }
+  } else {
+    // If the overload hasn't been resolved, we can't simplify this constraint.
+    auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+    auto selectedOverload = findSelectedOverloadFor(overloadLocator);
+    if (!selectedOverload)
+      return formUnsolved();
 
-  auto overloadChoice = selectedOverload->choice;
-  if (!overloadChoice.isDecl()) {
-    return SolutionKind::Error;
+    auto overloadChoice = selectedOverload->choice;
+    if (!overloadChoice.isDecl()) {
+      return SolutionKind::Error;
+    }
+
+    decl = overloadChoice.getDecl();
+    auto openedOverloadTypes = getOpenedTypes(overloadLocator);
+    openedTypes.append(openedOverloadTypes.begin(), openedOverloadTypes.end());
   }
 
-  auto decl = overloadChoice.getDecl();
   auto genericContext = decl->getAsGenericContext();
   if (!genericContext)
     return SolutionKind::Error;
@@ -13560,9 +13574,28 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   // Map the generic parameters we have over to their opened types.
   SmallVector<Type, 2> openedGenericParams;
   auto genericParamDepth = genericParams->getParams()[0]->getDepth();
-  for (const auto &openedType : getOpenedTypes(overloadLocator)) {
+  for (const auto &openedType : openedTypes) {
     if (openedType.first->getDepth() == genericParamDepth) {
-      openedGenericParams.push_back(Type(openedType.second));
+      // A generic argument list containing pack references expects
+      // those packs to be wrapped in pack expansion types. If this
+      // opened type represents the generic argument for a parameter
+      // pack, wrap generate the appropriate shape constraints and
+      // add a pack expansion to the argument list.
+      if (openedType.first->isParameterPack()) {
+        auto patternType = openedType.second;
+        auto *shapeLoc = getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::PackShape));
+        auto *shapeType = createTypeVariable(shapeLoc,
+                                            TVO_CanBindToPack |
+                                            TVO_CanBindToHole);
+        addConstraint(ConstraintKind::ShapeOf,
+                      shapeType, patternType, shapeLoc);
+
+        auto *expansion = PackExpansionType::get(patternType, shapeType);
+        openedGenericParams.push_back(expansion);
+      } else {
+        openedGenericParams.push_back(Type(openedType.second));
+      }
     }
   }
   assert(openedGenericParams.size() == genericParams->size());

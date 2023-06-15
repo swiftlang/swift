@@ -1808,60 +1808,14 @@ namespace {
       }
       
       if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
-        if (BoundGenericType *bgt
-              = meta->getInstanceType()->getAs<BoundGenericType>()) {
-          ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          auto specializations = expr->getUnresolvedParams();
-
-          // If we have too many generic arguments, complain.
-          if (specializations.size() > typeVars.size()) {
-            de.diagnose(expr->getSubExpr()->getLoc(),
-                        diag::type_parameter_count_mismatch,
-                        bgt->getDecl()->getName(), typeVars.size(),
-                        specializations.size(),
-                        /*too many arguments*/ false,
-                        /*isParameterPack?*/ false)
-                .highlight(
-                    SourceRange(expr->getLAngleLoc(), expr->getRAngleLoc()));
-            de.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,
-                        DescriptiveDeclKind::GenericType,
-                        bgt->getDecl()->getName());
-            return Type();
-          }
-
-          // Bind the specified generic arguments to the type variables in the
-          // open type.
-          auto *const locator = CS.getConstraintLocator(expr);
-          auto options =
-              TypeResolutionOptions(TypeResolverContext::InExpression);
-          for (size_t i = 0, e = specializations.size(); i < e; ++i) {
-            PackExpansionExpr *elementEnv = nullptr;
-            if (!PackElementEnvironments.empty()) {
-              options |= TypeResolutionFlags::AllowPackReferences;
-              elementEnv = PackElementEnvironments.back();
-            }
-
-            const auto result = TypeResolution::resolveContextualType(
-                specializations[i], CS.DC, options,
-                // Introduce type variables for unbound generics.
-                OpenUnboundGenericType(CS, locator),
-                HandlePlaceholderType(CS, locator),
-                OpenPackElementType(CS, locator, elementEnv));
-            if (result->hasError())
-              return Type();
-
-            CS.addConstraint(ConstraintKind::Bind, typeVars[i], result,
-                             locator);
-          }
-          
-          return baseTy;
-        } else {
-          de.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type,
-                      meta->getInstanceType());
-          de.diagnose(expr->getLAngleLoc(),
-                      diag::while_parsing_as_left_angle_bracket);
+        auto *overloadLocator = CS.getConstraintLocator(expr->getSubExpr());
+        if (addSpecializationConstraint(overloadLocator,
+                                        meta->getInstanceType(),
+                                        expr->getUnresolvedParams())) {
           return Type();
         }
+
+        return baseTy;
       }
 
       // FIXME: If the base type is a type variable, constrain it to a metatype
