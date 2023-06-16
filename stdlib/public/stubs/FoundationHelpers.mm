@@ -59,9 +59,11 @@ static void _initializeBridgingFunctionsFromCFImpl(void *ctxt) {
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
   assert(!bridgingState);
-  bridgingState = (CFBridgingState *)calloc(1, sizeof(CFBridgingState));
   auto getStringTypeID = (CFTypeID(*)(void))dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
-  assert(getStringTypeID);
+  if (!getStringTypeID) {
+    return; //CF not loaded
+  }
+  bridgingState = (CFBridgingState *)calloc(1, sizeof(CFBridgingState));
   bridgingState->version = 0;
   bridgingState->_CFStringTypeID = getStringTypeID();
   bridgingState->_CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
@@ -104,7 +106,7 @@ static inline bool initializeBridgingFunctions() {
   swift_once(&initializeBridgingStateOnce,
              _initializeBridgingFunctionsImpl,
              nullptr);
-  return bridgingState->NSStringClass != nullptr;
+  return bridgingState && bridgingState->NSStringClass != nullptr;
 }
 
 SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState const * const state) {
