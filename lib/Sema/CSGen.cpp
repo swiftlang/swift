@@ -2921,9 +2921,9 @@ namespace {
       SmallVector<TypeVariableType *, 4> referencedVars{
           collectVarRefs.varRefs.begin(), collectVarRefs.varRefs.end()};
 
-      CS.addUnsolvedConstraint(Constraint::create(
-          CS, ConstraintKind::DefaultClosureType, closureType, inferredType,
-          locator, referencedVars));
+      CS.addUnsolvedConstraint(
+          Constraint::create(CS, ConstraintKind::FallbackType, closureType,
+                             inferredType, locator, referencedVars));
 
       CS.setClosureType(closure, inferredType);
       return closureType;
