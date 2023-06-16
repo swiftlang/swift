@@ -103,11 +103,10 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 }
 
 namespace {
-  enum class SearchPathKind : uint8_t {
-    Import = 1 << 0,
-    Framework = 1 << 1,
-    CompilerPlugin = 1 << 2
-  };
+enum class SearchPathKind : uint8_t {
+  Import = 1 << 0,
+  Framework = 1 << 1,
+};
 } // end anonymous namespace
 
 using AssociativityCacheType =
@@ -694,8 +693,6 @@ ASTContext::ASTContext(
     getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
   for (const auto &framepath : SearchPathOpts.getFrameworkSearchPaths())
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
-  for (StringRef path : SearchPathOpts.getCompilerPluginLibraryPaths())
-    getImpl().SearchPathsSet[path] |= SearchPathKind::CompilerPlugin;
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);

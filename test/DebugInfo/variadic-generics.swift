@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s -g -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -g -o - \
 // RUN:    -parse-as-library -module-name a | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -g -o - \
+// RUN:    -parse-as-library -module-name a
 
 public func foo<each T>(args: repeat each T) {
   // CHECK: define {{.*}} @"$s1a3foo4argsyxxQp_tRvzlF"

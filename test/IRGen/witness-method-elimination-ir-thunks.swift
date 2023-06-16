@@ -3,7 +3,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -enable-llvm-wme -parse-as-library %s -DLIBRARY -module-name Library -emit-module -o %t/Library.swiftmodule
-// RUN: %target-build-swift -Xfrontend -enable-llvm-wme -parse-as-library %s -DCLIENT -module-name Main -I%t -emit-ir -o - | %FileCheck %s
+// RUN: %target-build-swift %use_no_opaque_pointers -Xfrontend -enable-llvm-wme -parse-as-library %s -DCLIENT -module-name Main -I%t -emit-ir -o - | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-llvm-wme -parse-as-library %s -DCLIENT -module-name Main -I%t -emit-ir -o -
 
 #if LIBRARY
 

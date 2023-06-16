@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-type-layout -module-name main -I %t -emit-ir -primary-file %s %S/Inputs/ABIInaccessible.swift | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-type-layout -module-name main -I %t -emit-ir -primary-file %s %S/Inputs/ABIInaccessible.swift | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout -module-name main -I %t -emit-ir -primary-file %s %S/Inputs/ABIInaccessible.swift
 
 public struct AnotherType<T> {
   init(_ t: T) {

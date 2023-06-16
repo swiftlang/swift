@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu
+// RUN: %target-swift-frontend -emit-ir -o - -primary-file %s
 // REQUIRES: concurrency
 
 import Swift

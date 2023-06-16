@@ -2,7 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/weaklinked_import_helper.swiftmodule -parse-as-library %S/Inputs/weaklinked_import_helper.swift -enable-library-evolution
 //
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -I %t -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir
 
 // UNSUPPORTED: OS=windows-msvc
 

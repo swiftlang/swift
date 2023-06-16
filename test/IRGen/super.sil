@@ -8,7 +8,8 @@
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
 
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -enable-library-evolution -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Xllvm -sil-disable-pass=simplification -enable-library-evolution -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -enable-library-evolution -parse-sil -parse-as-library -emit-ir -I %t %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

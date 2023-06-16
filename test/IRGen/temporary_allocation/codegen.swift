@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -O -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir
 
 @_silgen_name("blackHole")
 func blackHole(_ value: UnsafeMutableRawPointer?) -> Void

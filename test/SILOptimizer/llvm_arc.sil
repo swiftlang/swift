@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -O -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir %s
 //
 // Test LLVM ARC Optimization
 

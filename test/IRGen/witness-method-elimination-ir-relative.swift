@@ -1,9 +1,12 @@
 // Tests that under -enable-llvm-wme, IRGen marks wtables and wcall sites with
 // the right attributes and intrinsics.
 
-// RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-wme \
+// RUN: %target-build-swift %use_no_opaque_pointers -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-wme \
 // RUN:    -Xfrontend -enable-relative-protocol-witness-tables \
 // RUN:    %s -emit-ir -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
+// RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-wme \
+// RUN:    -Xfrontend -enable-relative-protocol-witness-tables \
+// RUN:    %s -emit-ir -o -
 
 // REQUIRES: PTRSIZE=64
 

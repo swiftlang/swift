@@ -222,6 +222,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
         auto eltAddr =
           SGF.B.createPackElementGet(loc, packIndex, arg, eltTy);
         ManagedValue eltMV = emitManagedParameter(SGF, eltAddr, argIsConsumed);
+        eltMV = SGF.B.createLoadIfLoadable(loc, eltMV);
         eltInit->copyOrInitValueInto(SGF, loc, eltMV, argIsConsumed);
         eltInit->finishInitialization(SGF);
       });
@@ -232,19 +233,16 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 
   ManagedValue mvArg = emitManagedParameter(SGF, arg, argIsConsumed);
 
+  // This can happen if the value is resilient in the calling convention
+  // but not resilient locally.
+  if (argType.isAddress()) {
+    mvArg = SGF.B.createLoadIfLoadable(loc, mvArg);
+  }
+
   if (argInit) {
     argInit->copyOrInitValueInto(SGF, loc, mvArg, argIsConsumed);
     argInit->finishInitialization(SGF);
     return RValue::forInContext();
-  }
-
-  // This can happen if the value is resilient in the calling convention
-  // but not resilient locally.
-  if (argType.isLoadable(SGF.F) && argType.isAddress()) {
-    if (mvArg.isPlusOne(SGF))
-      mvArg = SGF.B.createLoadTake(loc, mvArg);
-    else
-      mvArg = SGF.B.createLoadBorrow(loc, mvArg);
   }
 
   return RValue(SGF, loc, type, mvArg);

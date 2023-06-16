@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -swift-version 4 -emit-module -o %t/regex.swiftmodule %S/Inputs/deserialize-clang-importer-witness-tables/regex.swift
-// RUN: %target-swift-frontend -swift-version 4 -emit-ir %s -I %t | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -swift-version 4 -emit-ir %s -I %t | %FileCheck %s
+// RUN: %target-swift-frontend -swift-version 4 -emit-ir %s -I %t
 // REQUIRES: objc_interop
 import regex
 

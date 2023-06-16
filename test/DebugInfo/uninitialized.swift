@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -O -c -emit-ir -g -o - | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -c -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -c -emit-ir -g -o -
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -O -c -emit-ir -g -o - | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend %s -O -c -emit-ir -g -o -
 class MyClass {}
 
 // CHECK-LABEL: define {{.*}} @"$s13uninitialized1fyyF"

@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) -parse-stdlib %S/../Inputs/print-shims-stdlib.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
-// RUN: %target-build-swift -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -Onone | %FileCheck %s --check-prefixes=CHECK-LL,CHECK-LL-UNOPT
-// RUN: %target-build-swift -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -O | %FileCheck %s --check-prefixes=CHECK-LL,CHECK-LL-OPT
+// RUN: %target-build-swift %use_no_opaque_pointers -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -Onone | %FileCheck %s --check-prefixes=CHECK-LL,CHECK-LL-UNOPT
+// RUN: %target-build-swift %use_no_opaque_pointers -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -O | %FileCheck %s --check-prefixes=CHECK-LL,CHECK-LL-OPT
+// RUN: %target-build-swift -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -Onone
+// RUN: %target-build-swift -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -O
 // RUN: %target-build-swift -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s

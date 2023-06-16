@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -g -emit-ir -Xllvm '-sil-inline-never-functions=next' %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -g -emit-ir -Xllvm '-sil-inline-never-functions=next' %s | %FileCheck %s
+// RUN: %target-swift-frontend -g -emit-ir -Xllvm '-sil-inline-never-functions=next' %s
+
 // FIXME: This test should be testing a non-shadow-copied value instead.
 for i in 0 ..< 3 {
   // CHECK: %[[ALLOCA:[0-9]+]] = alloca %TSiSg

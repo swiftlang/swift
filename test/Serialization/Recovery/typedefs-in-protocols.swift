@@ -7,8 +7,10 @@
 
 // RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -DVERIFY %s -verify
 
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s
 
 #if TEST
 

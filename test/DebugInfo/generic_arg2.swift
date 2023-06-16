@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o -
 
 // CHECK: define hidden swiftcc void @"$s12generic_arg25ClassC3foo{{.*}}, %swift.type* %U
 // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %y.debug, metadata ![[U:.*]], metadata !DIExpression(DW_OP_deref))

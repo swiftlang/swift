@@ -3,7 +3,8 @@
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(ResilientClass)) %S/Inputs/class-1instance-void_to_void.swift  -Xfrontend -disable-availability-checking -g -module-name ResilientClass -emit-module -emit-module-path %t/ResilientClass.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(ResilientClass)
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -lResilientClass | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift %use_no_opaque_pointers -Xfrontend -disable-availability-checking -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -lResilientClass | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim -lResilientClass
 // RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims -lResilientClass %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) %t/%target-library-name(ResilientClass) | %FileCheck %s

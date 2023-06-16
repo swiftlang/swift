@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -enable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s
-// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
+// RUN: %target-swift-frontend %use_no_opaque_pointers -enable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
+// RUN: %target-swift-frontend -enable-type-layout %s -emit-ir -sil-verify-all
+// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir -sil-verify-all
 
 sil_stage canonical
 import Builtin

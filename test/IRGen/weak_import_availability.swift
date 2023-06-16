@@ -1,12 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.50 -emit-module -emit-module-path %t/weak_import_availability_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_availability_helper.swift -enable-library-evolution
 //
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
 
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target
 
 // REQUIRES: OS=macosx
 

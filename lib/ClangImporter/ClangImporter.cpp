@@ -845,7 +845,7 @@ importer::addCommonInvocationArguments(
   invocationArgStrs.push_back("-fansi-escape-codes");
 
   invocationArgStrs.push_back("-Xclang");
-  invocationArgStrs.push_back("-no-opaque-pointers");
+  invocationArgStrs.push_back("-opaque-pointers");
 
   if (importerOpts.ValidateModulesOnce) {
     invocationArgStrs.push_back("-fmodules-validate-once-per-build-session");
@@ -6877,14 +6877,25 @@ const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
   if (!enumDecl->getDeclName().isEmpty())
     return nullptr;
 
-  if (auto typedefType = dyn_cast<clang::TypedefType>(
-          enumDecl->getIntegerType().getTypePtr())) {
-    if (auto enumExtensibilityAttr =
-            typedefType->getDecl()->getAttr<clang::EnumExtensibilityAttr>();
-        enumExtensibilityAttr &&
+  const clang::ElaboratedType *elaboratedType =
+      dyn_cast<clang::ElaboratedType>(enumDecl->getIntegerType().getTypePtr());
+  if (auto typedefType =
+          elaboratedType
+              ? dyn_cast<clang::TypedefType>(elaboratedType->desugar())
+              : dyn_cast<clang::TypedefType>(
+                    enumDecl->getIntegerType().getTypePtr())) {
+    auto enumExtensibilityAttr =
+        elaboratedType
+            ? enumDecl->getAttr<clang::EnumExtensibilityAttr>()
+            : typedefType->getDecl()->getAttr<clang::EnumExtensibilityAttr>();
+    const bool hasFlagEnumAttr =
+        elaboratedType ? enumDecl->hasAttr<clang::FlagEnumAttr>()
+                       : typedefType->getDecl()->hasAttr<clang::FlagEnumAttr>();
+
+    if (enumExtensibilityAttr &&
         enumExtensibilityAttr->getExtensibility() ==
             clang::EnumExtensibilityAttr::Open &&
-        typedefType->getDecl()->hasAttr<clang::FlagEnumAttr>()) {
+        hasFlagEnumAttr) {
       return Impl.isUnavailableInSwift(typedefType->getDecl()) ? typedefType
                                                                : nullptr;
     }

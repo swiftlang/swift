@@ -1,4 +1,5 @@
-// RUN: %target-swiftc_driver -g -emit-ir %s | %FileCheck %s
+// RUN: %target-swiftc_driver %use_no_opaque_pointers -g -emit-ir %s | %FileCheck %s
+// RUN: %target-swiftc_driver -g -emit-ir %s
 sil_stage canonical
 
 import Builtin

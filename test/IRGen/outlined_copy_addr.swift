@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-type-layout -emit-ir -module-name outcopyaddr -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-type-layout -emit-ir -module-name outcopyaddr -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout -emit-ir -module-name outcopyaddr -primary-file %s
 
 public protocol BaseProt {
 }

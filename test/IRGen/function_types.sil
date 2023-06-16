@@ -1,9 +1,10 @@
-// RUN: %swift -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name function_types %s -emit-ir -o - | %FileCheck %s
-// RUN: %swift -disable-legacy-type-info -target i386-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -disable-legacy-type-info -target x86_64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -disable-legacy-type-info -target armv7-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -disable-legacy-type-info -target arm64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -disable-legacy-type-info -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name function_types %s -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name function_types %s -emit-ir -o -
+// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target i386-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target x86_64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target armv7-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target arm64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -emit-ir -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM

@@ -2,7 +2,8 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECKIR %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECKIR %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 // REQUIRES: executable_test
 
 protocol Proto {

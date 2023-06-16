@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -static -emit-module -emit-module-path %t/module.swiftmodule -module-name module -DMODULE %s
-// RUN: %target-swift-frontend -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -S -emit-ir %s -module-name main -o - -I%t | %FileCheck %s -check-prefix CHECK-STATIC
+// RUN: %target-swift-frontend %use_no_opaque_pointers -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -S -emit-ir %s -module-name main -o - -I%t | %FileCheck %s -check-prefix CHECK-STATIC
+// RUN: %target-swift-frontend -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -S -emit-ir %s -module-name main -o - -I%t
 // RUN: %target-swift-frontend -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -emit-module -emit-module-path %t/module.swiftmodule -module-name module -DMODULE %s
-// RUN: %target-swift-frontend -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -S -emit-ir %s -module-name main -o - -I%t | %FileCheck %s -check-prefix CHECK-SHARED
+// RUN: %target-swift-frontend %use_no_opaque_pointers -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -S -emit-ir %s -module-name main -o - -I%t | %FileCheck %s -check-prefix CHECK-SHARED
+// RUN: %target-swift-frontend -target x86_64-unknown-windows-msvc -parse-as-library -parse-stdlib -S -emit-ir %s -module-name main -o - -I%t
 
 #if MODULE
 
