@@ -59,10 +59,8 @@ static void _initializeBridgingFunctionsFromCFImpl(void *ctxt) {
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
   assert(!bridgingState);
-  bridgingState = (CFBridgingState *)calloc(1, sizeof(bridgingState));
-  auto getStringTypeID =
-    (CFTypeID(*)(void))
-    dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
+  bridgingState = (CFBridgingState *)calloc(1, sizeof(CFBridgingState));
+  auto getStringTypeID = (CFTypeID(*)(void))dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
   assert(getStringTypeID);
   bridgingState->version = 0;
   bridgingState->_CFStringTypeID = getStringTypeID();
