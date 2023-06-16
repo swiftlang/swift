@@ -350,6 +350,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
   Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
+  for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
+    Opts.BlocklistConfigFilePaths.push_back(A);
+  }
   return false;
 }
 
