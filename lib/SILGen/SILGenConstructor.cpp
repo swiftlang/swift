@@ -1474,6 +1474,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
+      // Skip properties with init accessors, they could only be used
+      // explicitly and in memberwise initializers.
+      if (auto *var = pbd->getSingleVar()) {
+        if (var->hasInitAccessor())
+          continue;
+      }
+
       for (auto i : range(pbd->getNumPatternEntries())) {
         auto init = pbd->getExecutableInit(i);
         if (!init) continue;

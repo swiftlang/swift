@@ -1302,9 +1302,11 @@ Optional<unsigned> swift::expandAccessors(
     !accessorMacroOnlyIntroducesObservers(macro, roleAttr);
   if (foundNonObservingAccessor) {
     // If any non-observing accessor was added, mark the initializer as
-    // subsumed.
+    // subsumed unless it has init accessor, because the initializer in
+    // such cases could be used for memberwise initialization.
     if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (auto binding = var->getParentPatternBinding()) {
+      if (auto binding = var->getParentPatternBinding();
+          !var->getAccessor(AccessorKind::Init)) {
         unsigned index = binding->getPatternEntryIndexForVarDecl(var);
         binding->setInitializerSubsumed(index);
       }
