@@ -564,6 +564,15 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
 
+    /// Limit the diagnostic behavior to warning if the context is a
+    /// swiftinterface.
+    ///
+    /// This is useful for diagnostics for restrictions that may be lifted by a
+    /// future version of the compiler. In such cases, it may be helpful to
+    /// avoid failing to build a module from its interface if the interface was
+    /// emitted using a compiler that no longer has the restriction.
+    InFlightDiagnostic &warnInSwiftInterface(const DeclContext *context);
+
     /// Conditionally limit the diagnostic behavior to warning until
     /// the specified version.  If the condition is false, no limit is
     /// imposed, meaning (presumably) it is treated as an error.
