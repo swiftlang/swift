@@ -28,6 +28,13 @@ class ASTContext;
 ///  * Load plugins resolving VFS paths
 ///  * Track plugin dependencies
 class PluginLoader {
+public:
+  struct PluginEntry {
+    StringRef libraryPath;
+    StringRef executablePath;
+  };
+
+private:
   /// Plugin registry. Lazily populated by get/setRegistry().
   /// NOTE: Do not reference this directly. Use getRegistry().
   PluginRegistry *Registry = nullptr;
@@ -38,16 +45,15 @@ class PluginLoader {
   ASTContext &Ctx;
   DependencyTracker *DepTracker;
 
-  /// Map a module name to an executable plugin path that provides the module.
-  llvm::DenseMap<swift::Identifier, llvm::StringRef> ExecutablePluginPaths;
+  /// Map a module name to an plugin entry that provides the module.
+  llvm::Optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
 
-  void createModuleToExecutablePluginMap();
+  /// Get or lazily create and populate 'PluginMap'.
+  llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
 public:
   PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker)
-      : Ctx(Ctx), DepTracker(DepTracker) {
-    createModuleToExecutablePluginMap();
-  }
+      : Ctx(Ctx), DepTracker(DepTracker) {}
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();
@@ -63,8 +69,7 @@ public:
   ///    'loadExecutablePlugin()'.
   ///  * (libPath: some,  execPath: some) - load the executable path by
   ///    'loadExecutablePlugin()' and let the plugin load the libPath via IPC.
-  std::pair<std::string, std::string>
-  lookupPluginByModuleName(Identifier moduleName);
+  const PluginEntry &lookupPluginByModuleName(Identifier moduleName);
 
   /// Load the specified dylib plugin path resolving the path with the
   /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
