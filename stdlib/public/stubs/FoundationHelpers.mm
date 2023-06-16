@@ -107,7 +107,7 @@ static inline bool initializeBridgingFunctions() {
   return bridgingState->NSStringClass != nullptr;
 }
 
-SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState *state) {
+SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState const * const state) {
   swift_once(&initializeBridgingStateOnce,
              _initializeBridgingFunctionsFromCFImpl,
              (void *)state);
@@ -118,8 +118,10 @@ Class getNSErrorClass();
 }
 
 Class swift::getNSErrorClass() {
-  assert(initializeBridgingFunctions());
-  return bridgingState->NSErrorClass;
+  if (initializeBridgingFunctions()) {
+    return bridgingState->NSErrorClass;
+  }
+  return nullptr;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
