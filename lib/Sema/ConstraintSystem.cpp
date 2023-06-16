@@ -5313,12 +5313,18 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 /// provided set.
 static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   llvm::SmallPtrSet<void *, 4> uniqueChoices;
-  unsigned result = 0;
   for (auto choice : choices) {
-    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
-      ++result;
+    uniqueChoices.insert(choice.getOpaqueChoiceSimple());
   }
-  return result;
+  return uniqueChoices.size();
+}
+
+static Type getOverloadChoiceType(ConstraintLocator *overloadLoc,
+                                  const Solution &solution) {
+  auto selectedOverload = solution.overloadChoices.find(overloadLoc);
+  if (selectedOverload == solution.overloadChoices.end())
+    return Type();
+  return solution.simplifyType(selectedOverload->second.adjustedOpenedType);
 }
 
 /// Determine the name of the overload in a set of overload choices.
@@ -5399,6 +5405,25 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
     auto &overload = diff.overloads[i];
     auto *locator = overload.locator;
+
+    // If there is only one overload difference, it's the best.
+    if (n == 1) {
+      bestOverload = i;
+      break;
+    }
+
+    // If there are multiple overload sets involved, let's pick the
+    // one that has choices with different types, because that is
+    // most likely the source of ambiguity.
+    {
+      auto overloadTy = getOverloadChoiceType(locator, solutions.front());
+      if (std::all_of(solutions.begin() + 1, solutions.end(),
+                      [&](const Solution &solution) {
+                        return overloadTy->isEqual(
+                          getOverloadChoiceType(locator, solution));
+                      }))
+        continue;
+    }
 
     ASTNode anchor;
 
