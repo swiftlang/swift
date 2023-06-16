@@ -7394,7 +7394,7 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
 PotentialBinding
 TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
   assert(constraint->getKind() == ConstraintKind::Defaultable ||
-         constraint->getKind() == ConstraintKind::DefaultClosureType);
+         constraint->getKind() == ConstraintKind::FallbackType);
 
   auto type = constraint->getSecondType();
   Binding binding{type, BindingKind::Exact, constraint};
