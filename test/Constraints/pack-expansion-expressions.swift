@@ -561,3 +561,45 @@ func configure<T, each Element>(
   repeat item[keyPath: (each configuration).0] = (each configuration).1
   return item
 }
+
+// rdar://110819621 - generic parameter is bound before pack expansion type which result in inference failures
+func test_that_expansions_are_bound_early() {
+  struct Data {
+    let prop: Int?
+  }
+
+  struct Value<each T> {
+    init(_ body: (repeat each T) -> Bool) {}
+  }
+
+  func compute<Root, Value>(
+    root: Root,
+    keyPath: KeyPath<Root, Value>,
+    other: Value) -> Bool { true }
+
+  func test_keypath(v: Int) {
+    let _: Value<Data> = Value({
+        compute(
+          root: $0,
+          keyPath: \.prop,
+          other: v
+        )
+      }) // Ok
+
+    let _: Value = Value<Data>({
+        compute(
+          root: $0,
+          keyPath: \.prop,
+          other: v
+        )
+      }) // Ok
+  }
+
+  func equal<Value>(_: Value, _: Value) -> Bool {}
+
+  func test_equality(i: Int) {
+    let _: Value<Data> = Value({
+        equal($0.prop, i) // Ok
+      })
+  }
+}

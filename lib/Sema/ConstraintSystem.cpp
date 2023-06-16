@@ -1031,7 +1031,7 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   // This constraint is important to make sure that pack expansion always
   // has a binding and connect pack expansion var to any type variables
   // that appear in pattern and shape types.
-  addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::Defaultable,
+  addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::FallbackType,
                                            expansionVar, openedPackExpansion,
                                            expansionLoc));
 
