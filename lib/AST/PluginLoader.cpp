@@ -61,27 +61,31 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
 
   // FIXME: Should we create a lookup table keyed by module name?
   for (auto &entry : Ctx.SearchPathOpts.PluginSearchOpts) {
-    using namespace PluginSearchOption;
+    switch (entry.getKind()) {
     // Try '-load-plugin-library'.
-    if (auto *val = entry.dyn_cast<LoadPluginLibrary>()) {
-      if (llvm::sys::path::filename(val->LibraryPath) == pluginLibBasename) {
-        return {val->LibraryPath, ""};
+    case PluginSearchOption::Kind::LoadPluginLibrary: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginLibrary>();
+      if (llvm::sys::path::filename(val.LibraryPath) == pluginLibBasename) {
+        return {val.LibraryPath, ""};
       }
       continue;
     }
 
     // Try '-load-plugin-executable'.
-    if (auto *v = entry.dyn_cast<LoadPluginExecutable>()) {
+    case PluginSearchOption::Kind::LoadPluginExecutable: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
       auto found = ExecutablePluginPaths.find(moduleName);
-      if (found != ExecutablePluginPaths.end()) {
-        return {"", std::string(found->second)};
+      if (found != ExecutablePluginPaths.end() &&
+          found->second == val.ExecutablePath) {
+        return {"", val.ExecutablePath};
       }
       continue;
     }
 
     // Try '-plugin-path'.
-    if (auto *v = entry.dyn_cast<PluginPath>()) {
-      SmallString<128> fullPath(v->SearchPath);
+    case PluginSearchOption::Kind::PluginPath: {
+      auto &val = entry.get<PluginSearchOption::PluginPath>();
+      SmallString<128> fullPath(val.SearchPath);
       llvm::sys::path::append(fullPath, pluginLibBasename);
       if (fs->exists(fullPath)) {
         return {std::string(fullPath), ""};
@@ -90,13 +94,15 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
     }
 
     // Try '-external-plugin-path'.
-    if (auto *v = entry.dyn_cast<ExternalPluginPath>()) {
-      SmallString<128> fullPath(v->SearchPath);
+    case PluginSearchOption::Kind::ExternalPluginPath: {
+      auto &val = entry.get<PluginSearchOption::ExternalPluginPath>();
+      SmallString<128> fullPath(val.SearchPath);
       llvm::sys::path::append(fullPath, pluginLibBasename);
       if (fs->exists(fullPath)) {
-        return {std::string(fullPath), v->ServerPath};
+        return {std::string(fullPath), val.ServerPath};
       }
       continue;
+    }
     }
   }
 

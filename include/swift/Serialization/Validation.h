@@ -111,7 +111,8 @@ struct ValidationInfo {
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
 
-  SmallVector<std::pair<StringRef, StringRef>, 2> PluginSearchOptions;
+  SmallVector<std::pair<PluginSearchOption::Kind, StringRef>, 2>
+      PluginSearchOptions;
 
   std::string SDKPath;
   StringRef ModuleABIName;
@@ -146,10 +147,12 @@ public:
     ExtraClangImporterOpts.push_back(option);
   }
 
-  ArrayRef<std::pair<StringRef, StringRef>> getPluginSearchOptions() const {
+  ArrayRef<std::pair<PluginSearchOption::Kind, StringRef>>
+  getPluginSearchOptions() const {
     return PluginSearchOptions;
   }
-  void addPluginSearchOption(const std::pair<StringRef, StringRef> &opt) {
+  void addPluginSearchOption(
+      const std::pair<PluginSearchOption::Kind, StringRef> &opt) {
     PluginSearchOptions.push_back(opt);
   }
 

@@ -91,7 +91,22 @@ static bool validateModule(
     }
     llvm::outs() << "- Plugin Search Options:\n";
     for (auto opt : extendedInfo.getPluginSearchOptions()) {
-      llvm::outs() << "    " << opt.first << " " << opt.second << "\n";
+      StringRef optStr;
+      switch (opt.first) {
+      case swift::PluginSearchOption::Kind::PluginPath:
+        optStr = "-plugin-path";
+        break;
+      case swift::PluginSearchOption::Kind::ExternalPluginPath:
+        optStr = "-external-plugin-path";
+        break;
+      case swift::PluginSearchOption::Kind::LoadPluginLibrary:
+        optStr = "-load-plugin-library";
+        break;
+      case swift::PluginSearchOption::Kind::LoadPluginExecutable:
+        optStr = "-load-plugin-executable";
+        break;
+      }
+      llvm::outs() << "    " << optStr << " " << opt.second << "\n";
     }
   }
 

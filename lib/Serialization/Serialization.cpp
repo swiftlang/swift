@@ -1137,38 +1137,41 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         // Macro plugins
         options_block::PluginSearchOptionLayout PluginSearchOpt(Out);
         for (auto &elem : options.PluginSearchOptions) {
-          if (auto *opt = elem.dyn_cast<PluginSearchOption::PluginPath>()) {
+          switch (elem.getKind()) {
+          case PluginSearchOption::Kind::PluginPath: {
+            auto &opt = elem.get<PluginSearchOption::PluginPath>();
             PluginSearchOpt.emit(ScratchRecord,
                                  uint8_t(PluginSearchOptionKind::PluginPath),
-                                 opt->SearchPath);
+                                 opt.SearchPath);
             continue;
           }
-          if (auto *opt =
-                  elem.dyn_cast<PluginSearchOption::ExternalPluginPath>()) {
+          case PluginSearchOption::Kind::ExternalPluginPath: {
+            auto &opt = elem.get<PluginSearchOption::ExternalPluginPath>();
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::ExternalPluginPath),
-                opt->SearchPath + "#" + opt->ServerPath);
+                opt.SearchPath + "#" + opt.ServerPath);
             continue;
           }
-          if (auto *opt =
-                  elem.dyn_cast<PluginSearchOption::LoadPluginLibrary>()) {
+          case PluginSearchOption::Kind::LoadPluginLibrary: {
+            auto &opt = elem.get<PluginSearchOption::LoadPluginLibrary>();
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::LoadPluginLibrary),
-                opt->LibraryPath);
+                opt.LibraryPath);
             continue;
           }
-          if (auto *opt =
-                  elem.dyn_cast<PluginSearchOption::LoadPluginExecutable>()) {
-            std::string optStr = opt->ExecutablePath + "#";
+          case PluginSearchOption::Kind::LoadPluginExecutable: {
+            auto &opt = elem.get<PluginSearchOption::LoadPluginExecutable>();
+            std::string optStr = opt.ExecutablePath + "#";
             llvm::interleave(
-                opt->ModuleNames, [&](auto &name) { optStr += name; },
+                opt.ModuleNames, [&](auto &name) { optStr += name; },
                 [&]() { optStr += ","; });
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::LoadPluginExecutable), optStr);
             continue;
+          }
           }
         }
       }
