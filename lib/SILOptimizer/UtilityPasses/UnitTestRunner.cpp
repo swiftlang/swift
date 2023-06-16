@@ -89,6 +89,7 @@
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ParseTestSpecification.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
 #include <memory>
@@ -284,6 +285,19 @@ struct OwnershipUtilsHasPointerEscape : UnitTest {
     value->print(llvm::errs());
     auto *boolString = has ? "true" : "false";
     llvm::errs() << boolString << "\n";
+  }
+};
+
+// Arguments:
+// - value: whose type will be printed
+// Dumps:
+// - the type lowering of the type
+struct PrintTypeLowering : UnitTest {
+  PrintTypeLowering(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    auto ty = value->getType();
+    getFunction()->getTypeLowering(ty).print(llvm::dbgs());
   }
 };
 
@@ -899,6 +913,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
     ADD_UNIT_TEST_SUBCLASS("has-pointer-escape", OwnershipUtilsHasPointerEscape)
+    ADD_UNIT_TEST_SUBCLASS("print-type-lowering", PrintTypeLowering)
     ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)
