@@ -1394,6 +1394,9 @@ FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
 FuncDecl *
 ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
     auto *func = dyn_cast<FuncDecl>(result);
     if (func &&
@@ -1407,6 +1410,9 @@ ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
 
 AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{nominal},
@@ -1415,6 +1421,9 @@ AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncode
 
 AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{nominal},
@@ -1423,6 +1432,9 @@ AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEnco
 
 AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{nominal},
@@ -1431,6 +1443,9 @@ AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncod
 
 AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDecoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{nominal},
@@ -1439,6 +1454,9 @@ AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDe
 
 AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResultHandler(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{nominal},
