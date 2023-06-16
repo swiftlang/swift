@@ -209,30 +209,35 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
 
-  // '-plugin-path' options.
-  for (const auto &path : getSearchPathOptions().PluginSearchPaths) {
-    serializationOpts.PluginSearchPaths.push_back(path);
-  }
-  // '-external-plugin-path' options.
-  for (const ExternalPluginSearchPathAndServerPath &pair :
-       getSearchPathOptions().ExternalPluginSearchPaths) {
-    serializationOpts.ExternalPluginSearchPaths.push_back(
-        pair.SearchPath + "#" +
-        pair.ServerPath);
-  }
-  // '-load-plugin-library' options.
-  for (const auto &path :
-       getSearchPathOptions().getCompilerPluginLibraryPaths()) {
-    serializationOpts.CompilerPluginLibraryPaths.push_back(path);
-  }
-  // '-load-plugin-executable' options.
-  for (const PluginExecutablePathAndModuleNames &pair :
-       getSearchPathOptions().getCompilerPluginExecutablePaths()) {
-    std::string optStr = pair.ExecutablePath + "#";
-    llvm::interleave(
-        pair.ModuleNames, [&](auto &name) { optStr += name; },
-        [&]() { optStr += ","; });
-    serializationOpts.CompilerPluginExecutablePaths.push_back(optStr);
+  // FIXME: Preserve the order of these options.
+  for (auto &elem : getSearchPathOptions().PluginSearchOpts) {
+    // '-plugin-path' options.
+    if (auto *arg = elem.dyn_cast<PluginSearchOption::PluginPath>()) {
+      serializationOpts.PluginSearchPaths.push_back(arg->SearchPath);
+      continue;
+    }
+
+    // '-external-plugin-path' options.
+    if (auto *arg = elem.dyn_cast<PluginSearchOption::ExternalPluginPath>()) {
+      serializationOpts.ExternalPluginSearchPaths.push_back(
+          arg->SearchPath + "#" + arg->ServerPath);
+      continue;
+    }
+
+    // '-load-plugin-library' options.
+    if (auto *arg = elem.dyn_cast<PluginSearchOption::LoadPluginLibrary>()) {
+      serializationOpts.CompilerPluginLibraryPaths.push_back(arg->LibraryPath);
+      continue;
+    }
+
+    // '-load-plugin-executable' options.
+    if (auto *arg = elem.dyn_cast<PluginSearchOption::LoadPluginExecutable>()) {
+      std::string optStr = arg->ExecutablePath + "#";
+      llvm::interleave(
+          arg->ModuleNames, [&](auto &name) { optStr += name; },
+          [&]() { optStr += ","; });
+      serializationOpts.CompilerPluginExecutablePaths.push_back(optStr);
+    }
   }
 
   serializationOpts.DisableCrossModuleIncrementalInfo =

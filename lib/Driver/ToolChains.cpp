@@ -236,8 +236,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
-  inputArgs.AddAllArgs(arguments, options::OPT_plugin_path);
-  inputArgs.AddAllArgs(arguments, options::OPT_external_plugin_path);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
@@ -325,8 +323,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
-  inputArgs.AddLastArg(arguments, options::OPT_load_plugin_library);
-  inputArgs.AddLastArg(arguments, options::OPT_load_plugin_executable);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
 
   // Pass on any build config options
@@ -376,9 +372,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     inputArgs.AddAllArgs(arguments, options::OPT_file_compilation_dir);
   }
 
-  // Add plugin path options.
-  inputArgs.AddAllArgs(arguments, options::OPT_plugin_path);
-
+  // Specify default plugin search path options after explicitly specified
+  // options.
+  inputArgs.AddAllArgs(arguments, options::OPT_plugin_search_Group);
   {
     SmallString<64> pluginPath;
     auto programPath = getDriver().getSwiftProgramPath();

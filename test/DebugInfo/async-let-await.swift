@@ -1,6 +1,11 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - \
 // RUN:    -module-name M  -disable-availability-checking \
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// RUN: %target-swift-frontend %s -emit-ir -g -o - \
+// RUN:    -module-name M  -disable-availability-checking \
+// RUN:    -parse-as-library
+
 // REQUIRES: concurrency
 
 public func getVegetables() async -> [String] {

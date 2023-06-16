@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking -static -enable-library-evolution -emit-module-path %t/opaque_result_type_metadata_external.swiftmodule %S/Inputs/opaque_result_type_metadata_external.swift
-// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking -emit-ir -I %t %s | %FileCheck %s --check-prefix=CHECK --check-prefix=DEFAULT
-// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking -emit-ir -I %t %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=CHECK --check-prefix=IMPLICIT-DYNAMIC
+// RUN: %target-swift-frontend %use_no_opaque_pointers -swift-version 5 -disable-availability-checking -emit-ir -I %t %s | %FileCheck %s --check-prefix=CHECK --check-prefix=DEFAULT
+// RUN: %target-swift-frontend %use_no_opaque_pointers -swift-version 5 -disable-availability-checking -emit-ir -I %t %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=CHECK --check-prefix=IMPLICIT-DYNAMIC
+// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking -emit-ir -I %t %s
+// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking -emit-ir -I %t %s -enable-implicit-dynamic
+
 
 import opaque_result_type_metadata_external
 

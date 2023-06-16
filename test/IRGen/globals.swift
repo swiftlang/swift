@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -disable-availability-checking -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -disable-availability-checking -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-availability-checking
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: PTRSIZE=64

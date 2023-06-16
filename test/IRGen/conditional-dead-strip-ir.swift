@@ -2,7 +2,8 @@
 // enum, protocol, and protocol conformance records as conditionally removable
 // via !llvm.used.conditional metadata.
 
-// RUN: %target-build-swift -Xfrontend -conditional-runtime-records -Xfrontend -disable-objc-interop %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-build-swift %use_no_opaque_pointers -Xfrontend -conditional-runtime-records -Xfrontend -disable-objc-interop %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -conditional-runtime-records -Xfrontend -disable-objc-interop %s -emit-ir -o -
 
 public protocol TheProtocol {
 }

@@ -2819,6 +2819,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     llvm::DIExpression *Expr, unsigned Line, unsigned Col,
     llvm::DILocalScope *Scope, const SILDebugScope *DS, bool InCoroContext,
     AddrDbgInstrKind AddrDInstKind) {
+  Storage = Storage->stripPointerCasts();
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
   auto DL =

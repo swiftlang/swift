@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir
 public protocol P {
   associatedtype DT1
   func getDT() -> DT1

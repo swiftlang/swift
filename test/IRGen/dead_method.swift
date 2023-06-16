@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -O | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -O | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir -O
 
 // Test to make sure that methods removed by dead code elimination still appear
 // in the vtable in both the nominal type descriptor and class metadata.

@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/checkfile
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s -import-objc-header %S/Inputs/error_domains.h > %t/out.ir
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %use_no_opaque_pointers -enable-objc-interop -emit-ir -o - -primary-file %s -import-objc-header %S/Inputs/error_domains.h > %t/out.ir
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s -import-objc-header %S/Inputs/error_domains.h
 // RUN: %FileCheck --input-file=%t/out.ir %t/checkfile --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 sil_stage canonical

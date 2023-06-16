@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking | %IRGenFileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -swift-version 5  -disable-availability-checking | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking
 // REQUIRES: concurrency
 
 

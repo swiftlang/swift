@@ -15,7 +15,6 @@
 // CHECK:     -plugin-path: {{.*}}plugins
 // CHECK:     -plugin-path: {{.*}}plugins
 // CHECK:     -plugin-path: {{.*}}plugins
-// CHECK:     -plugin-path: {{.*}}plugins
 // CHECK:     -external-plugin-path: {{.*}}plugins#{{.*}}swift-plugin-server
 // CHECK:     -load-plugin-library: {{.*}}MacroDefinition.{{dylib|so|dll}}
 // CHECK:     -load-plugin-executable: {{.*}}mock-plugin#TestPlugin

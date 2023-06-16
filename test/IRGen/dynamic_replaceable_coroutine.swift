@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -module-name A -enable-implicit-dynamic -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name A -enable-implicit-dynamic -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name A -enable-implicit-dynamic -emit-ir %s
 
 
 extension Int {

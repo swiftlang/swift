@@ -1,9 +1,13 @@
 // Check we don't crash when verifying debug info.
 // Ideally this should print the output after loadable by address runs
 // but there's no way of doing this in SIL (for IRGen passes).
-// RUN: %target-swift-frontend -emit-sil %s -Onone \
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-sil %s -Onone \
 // RUN:   -sil-verify-all -Xllvm -verify-di-holes -emit-ir \
 // RUN:   -Xllvm -sil-print-debuginfo -g -o - | %FileCheck %s
+
+// RUN: %target-swift-frontend -emit-sil %s -Onone \
+// RUN:   -sil-verify-all -Xllvm -verify-di-holes -emit-ir \
+// RUN:   -Xllvm -sil-print-debuginfo -g -o -
 
 struct m {
   let major: Int

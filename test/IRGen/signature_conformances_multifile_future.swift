@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -prespecialize-generic-metadata -target %module-target-future -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios

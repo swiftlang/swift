@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test | %FileCheck %s
+// RUN: %target-swift-frontend -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test
 
 // REQUIRES: objc_interop
 

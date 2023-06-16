@@ -15,7 +15,8 @@
 
 // IRGen test.
 
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 // `shell` is required only to run `sed` as a
 // https://github.com/apple/swift/issues/54526 workaround.

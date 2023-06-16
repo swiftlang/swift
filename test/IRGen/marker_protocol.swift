@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -o -
 
 // Marker protocols should have no ABI impact at all, so this source file checks
 // for the absence of symbols related to marker protocols.

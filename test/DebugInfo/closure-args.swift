@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o -
 
 import Swift
 
@@ -22,9 +23,9 @@ func main() -> Void
     // CHECK: store %TSS* %{{.*}}, %TSS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
     // CHECK-DAG: !DILocalVariable(name: "lhs",{{.*}} line: [[@LINE+5]],
     // CHECK-DAG: !DILocalVariable(name: "rhs",{{.*}} line: [[@LINE+4]],
-    // CHECK-DAG: !DILocalVariable(name: "random_string",{{.*}} line: 8,
-    // CHECK-DAG: !DILocalVariable(name: "random_int",{{.*}} line: 9,
-    // CHECK-DAG: !DILocalVariable(name: "out_only",{{.*}} line: 10,
+    // CHECK-DAG: !DILocalVariable(name: "random_string",{{.*}} line: 9,
+    // CHECK-DAG: !DILocalVariable(name: "random_int",{{.*}} line: 10,
+    // CHECK-DAG: !DILocalVariable(name: "out_only",{{.*}} line: 11,
         { (lhs : String, rhs : String) -> Bool in
             if rhs == random_string
                || rhs.unicodeScalars.count == random_int

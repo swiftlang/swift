@@ -1,6 +1,11 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - \
 // RUN:    -module-name M  -disable-availability-checking \
 // RUN:    -parse-as-library | %FileCheck %s
+
+// RUN: %target-swift-frontend %s -emit-ir -g -o - \
+// RUN:    -module-name M  -disable-availability-checking \
+// RUN:    -parse-as-library
+
 // REQUIRES: concurrency
 
 func use<T>(_ t: T) {}

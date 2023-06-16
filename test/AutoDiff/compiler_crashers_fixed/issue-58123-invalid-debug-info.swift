@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O -g %s
 
 // https://github.com/apple/swift/issues/58123
 // Mutating functions with control flow can cause assertion failure for

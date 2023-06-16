@@ -1,6 +1,9 @@
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -Onone -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o -
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -Onone -emit-ir -g -o - \
 // RUN:   -disable-debugger-shadow-copies | %FileCheck %s --check-prefix=NOCOPY
+// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - \
+// RUN:   -disable-debugger-shadow-copies
 class ClassA
 {
     var x : Int64

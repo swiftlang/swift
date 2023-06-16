@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrauth
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrauth
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module
 
 // REQUIRES: PTRSIZE=64
 

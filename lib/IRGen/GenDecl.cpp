@@ -5190,7 +5190,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
 
   if (auto *GV = dyn_cast<llvm::GlobalVariable>(addr.getValue()))
-    GV->setComdat(nullptr);
+    if (GV->isDeclaration())
+      GV->setComdat(nullptr);
 
   // FIXME: MC breaks when emitting alias references on some platforms
   // (rdar://problem/22450593 ). Work around this by referring to the aliasee
