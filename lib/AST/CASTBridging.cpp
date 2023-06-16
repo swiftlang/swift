@@ -11,6 +11,7 @@
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 
@@ -319,6 +320,13 @@ void *BooleanLiteralExpr_create(BridgedASTContext cContext, bool value,
   return new (context) BooleanLiteralExpr(value, convertSourceLoc(cTokenLoc));
 }
 
+void *NilLiteralExpr_create(BridgedASTContext cContext,
+                            BridgedSourceLoc cNilKeywordLoc) {
+  Expr *e = new (convertASTContext(cContext))
+      NilLiteralExpr(convertSourceLoc(cNilKeywordLoc));
+  return e;
+}
+
 void *VarDecl_create(BridgedASTContext cContext,
                      BridgedDeclContext cDeclContext,
                      BridgedSourceLoc cBindingKeywordLoc, void *opaqueNameExpr,
@@ -402,20 +410,34 @@ void *
 ParamDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
                  BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-                 BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType) {
+                 BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType,
+                 void *_Nullable opaqueDefaultValue) {
   assert((bool)cSecondNameLoc.raw == (bool)cSecondName.raw);
   if (!cSecondName.raw) {
     cSecondName = cFirstName;
     cSecondNameLoc = cFirstNameLoc;
   }
 
-  ASTContext &context = convertASTContext(cContext);
+  auto *declContext = convertDeclContext(cDeclContext);
 
-  auto *paramDecl = new (context) ParamDecl(
+  auto *defaultValue = static_cast<Expr *>(opaqueDefaultValue);
+  DefaultArgumentKind defaultArgumentKind;
+
+  if (declContext->getParentSourceFile()->Kind == SourceFileKind::Interface &&
+      isa<SuperRefExpr>(defaultValue)) {
+    defaultValue = nullptr;
+    defaultArgumentKind = DefaultArgumentKind::Inherited;
+  } else {
+    defaultArgumentKind = getDefaultArgKind(defaultValue);
+  }
+
+  auto *paramDecl = new (convertASTContext(cContext)) ParamDecl(
       convertSourceLoc(cSpecifierLoc), convertSourceLoc(cFirstNameLoc),
       convertIdentifier(cFirstName), convertSourceLoc(cSecondNameLoc),
-      convertIdentifier(cSecondName), convertDeclContext(cDeclContext));
+      convertIdentifier(cSecondName), declContext);
   paramDecl->setTypeRepr(static_cast<TypeRepr *>(opaqueType));
+  paramDecl->setDefaultExpr(defaultValue, /*isTypeChecked*/ false);
+  paramDecl->setDefaultArgumentKind(defaultArgumentKind);
 
   return paramDecl;
 }

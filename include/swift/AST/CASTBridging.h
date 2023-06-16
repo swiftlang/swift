@@ -289,6 +289,9 @@ void *IntegerLiteralExpr_create(BridgedASTContext cContext, BridgedString cStr,
 void *BooleanLiteralExpr_create(BridgedASTContext cContext, _Bool value,
                                 BridgedSourceLoc cTokenLoc);
 
+void *NilLiteralExpr_create(BridgedASTContext cContext,
+                            BridgedSourceLoc cNilKeywordLoc);
+
 void *ArrayExpr_create(BridgedASTContext cContext, BridgedSourceLoc cLLoc,
                        BridgedArrayRef elements, BridgedArrayRef commas,
                        BridgedSourceLoc cRLoc);
@@ -315,7 +318,8 @@ void *
 ParamDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
                  BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-                 BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType);
+                 BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType,
+                 void *_Nullable opaqueDefaultValue);
 
 struct BridgedFuncDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,

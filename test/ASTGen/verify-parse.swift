@@ -49,7 +49,7 @@ func test2(e b: Bool) {
     true
 }
 
-func test3(y: Int) -> Int {
+func test3(y: Int = 0, oi: Int? = nil) -> Int {
   let x =
     y
   return x

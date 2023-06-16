@@ -41,7 +41,8 @@ extension ASTGenVisitor {
         self.bridgedSourceLoc(for: node.firstName),
         secondName,
         secondNameLoc,
-        self.visit(node.type).rawValue
+        self.visit(node.type).rawValue,
+        self.visit(node.defaultValue?.value)?.rawValue
       )
     )
   }
