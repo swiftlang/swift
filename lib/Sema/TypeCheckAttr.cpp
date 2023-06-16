@@ -4349,6 +4349,14 @@ void AttributeChecker::checkBackDeployedAttrs(
       }
     }
 
+    if (VD->getOpaqueResultTypeDecl()) {
+      diagnoseAndRemoveAttr(Attr,
+                            diag::backdeployed_opaque_result_not_supported,
+                            Attr, D->getDescriptiveKind())
+          .warnInSwiftInterface(D->getDeclContext());
+      continue;
+    }
+
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
 
