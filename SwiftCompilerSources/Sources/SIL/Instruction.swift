@@ -399,6 +399,10 @@ final public class BuiltinInst : SingleValueInstruction {
     return bridged.BuiltinInst_getID()
   }
 
+  public var intrinsicID: BridgedInstruction.IntrinsicID {
+    return bridged.BuiltinInst_getIntrinsicID()
+  }
+
   public var substitutionMap: SubstitutionMap {
     SubstitutionMap(bridged.BuiltinInst_getSubstitutionMap())
   }
