@@ -127,24 +127,24 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       extendedInfo.addExtraClangImporterOption(blobData);
       break;
     case options_block::PLUGIN_SEARCH_OPTION: {
-      unsigned optKind;
-      StringRef optStr;
-      options_block::ResilienceStrategyLayout::readRecord(scratch, optKind);
-      switch (PluginSearchOptionKind(optKind)) {
+      unsigned kind;
+      options_block::ResilienceStrategyLayout::readRecord(scratch, kind);
+      PluginSearchOption::Kind optKind;
+      switch (PluginSearchOptionKind(kind)) {
       case PluginSearchOptionKind::PluginPath:
-        optStr = "-plugin-path";
+        optKind = PluginSearchOption::Kind::PluginPath;
         break;
       case PluginSearchOptionKind::ExternalPluginPath:
-        optStr = "-external-plugin-path";
+        optKind = PluginSearchOption::Kind::ExternalPluginPath;
         break;
       case PluginSearchOptionKind::LoadPluginLibrary:
-        optStr = "-load-plugin-library";
+        optKind = PluginSearchOption::Kind::LoadPluginLibrary;
         break;
       case PluginSearchOptionKind::LoadPluginExecutable:
-        optStr = "-load-plugin-executable";
+        optKind = PluginSearchOption::Kind::LoadPluginExecutable;
         break;
       }
-      extendedInfo.addPluginSearchOption({optStr, blobData});
+      extendedInfo.addPluginSearchOption({optKind, blobData});
       break;
     }
     case options_block::IS_SIB:
