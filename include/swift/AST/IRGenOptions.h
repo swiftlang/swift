@@ -479,7 +479,7 @@ public:
   std::string TrapFuncName = "";
 
   /// The calling convention used to perform non-swift calls.
-  llvm::CallingConv::ID ExperimentalPlatformCCallingConvention;
+  llvm::CallingConv::ID PlatformCCallingConvention;
 
   IRGenOptions()
       : DWARFVersion(2),
@@ -522,7 +522,7 @@ public:
         UseRelativeProtocolWitnessTables(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
-        ExperimentalPlatformCCallingConvention(llvm::CallingConv::C) {
+        PlatformCCallingConvention(llvm::CallingConv::C) {
 #ifndef NDEBUG
     DisableRoundTripDebugTypes = false;
 #else

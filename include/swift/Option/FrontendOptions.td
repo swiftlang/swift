@@ -1225,12 +1225,11 @@ def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;
 
-def experimental_platform_c_calling_convention :
+def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,
     HelpText<"Which calling convention is used to perform non-swift calls. "
-             "Defaults to llvm's standard C calling convention.">,
-    MetaVarName<"standard|task-to-thread">;
-def experimental_platform_c_calling_convention_EQ :
+             "Defaults to llvm's standard C calling convention.">;
+def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
-    Alias<experimental_platform_c_calling_convention>;
+    Alias<platform_c_calling_convention>;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
