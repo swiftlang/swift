@@ -306,6 +306,9 @@ enum class FixKind : uint8_t {
   /// This issue should already have been diagnosed elsewhere.
   IgnoreUnresolvedPatternVar,
 
+  /// Ignore a nested UnresolvedPatternExpr in an ExprPattern, which is invalid.
+  IgnoreInvalidPatternInExpr,
+
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
 
@@ -2960,6 +2963,33 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreUnresolvedPatternVar;
+  }
+};
+
+class IgnoreInvalidPatternInExpr final : public ConstraintFix {
+  Pattern *P;
+
+  IgnoreInvalidPatternInExpr(ConstraintSystem &cs, Pattern *pattern,
+                             ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidPatternInExpr, locator),
+        P(pattern) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid Pattern nested in Expr";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidPatternInExpr *
+  create(ConstraintSystem &cs, Pattern *pattern, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidPatternInExpr;
   }
 };
 
