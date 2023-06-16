@@ -6720,6 +6720,12 @@ Type AbstractStorageDecl::getValueInterfaceType() const {
   return cast<SubscriptDecl>(this)->getElementInterfaceType();
 }
 
+bool AbstractStorageDecl::hasInitAccessor() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      HasInitAccessorRequest{const_cast<AbstractStorageDecl *>(this)}, false);
+}
+
 VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
                  SourceLoc nameLoc, Identifier name,
                  DeclContext *dc, StorageIsMutable_t supportsMutation)
