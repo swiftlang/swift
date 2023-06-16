@@ -14,8 +14,8 @@ func f() -> Int {
 // CHECK: sil_scope [[S2:[0-9]+]] { loc "{{.*}}":10:44 parent [[S0]] }
 // CHECK: sil_scope [[S3:[0-9]+]] { loc "{{.*}}":10:68 parent [[S2]] }
 // CHECK: sil_scope [[S4:[0-9]+]] { loc "{{.*}}":10:78 parent [[S3]] }
-// CHECK: debug_value {{.*}}: $Optional<Int>, let, name "nextValue", {{.*}}:10:31, scope [[S0]]
-// CHECK: debug_value {{.*}}: $Int, let, name "nextValue", {{.*}}:10:56, scope [[S2]]
+// CHECK: debug_value {{.*}}: $Optional<Int>, let, name "nextValue", {{.*}}:10:31, scope [[S2]]
+// CHECK: debug_value {{.*}}: $Int, let, name "nextValue", {{.*}}:10:56, scope [[S3]]
         return nextValue
     }
     return 0

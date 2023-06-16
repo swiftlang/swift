@@ -8,15 +8,14 @@ public class S {
   public func f(_ i: Int) throws  -> C {
     guard let x = c[i], let x else {
       // CHECK: sil_scope [[P:[0-9]+]] { loc "{{.*}}":9:5
-      // CHECK: sil_scope [[X1_:[0-9]+]] { loc "{{.*}}":9:19 parent [[P]]
+      // CHECK: sil_scope [[X1_RHS:[0-9]+]] { loc "{{.*}}":9:19 parent [[P]]
       // CHECK: sil_scope [[X1:[0-9]+]] { loc "{{.*}}":9:19 parent [[P]]
       // CHECK: sil_scope [[X2:[0-9]+]] { loc "{{.*}}":9:29 parent [[X1]]
-      // CHECK: sil_scope [[X2_:[0-9]+]] { loc "{{.*}}":9:29 parent [[X1]]
       // CHECK: sil_scope [[GUARD:[0-9]+]] { loc "{{.*}}":9:36 parent [[P]]
-      // CHECK: debug_value {{.*}} : $Optional<C>, let, name "x", {{.*}}, scope [[P]]
+      // CHECK: debug_value {{.*}} : $Optional<C>, let, name "x", {{.*}}, scope [[X1]]
       // CHECK: debug_value {{.*}} : $C, let, name "x", {{.*}}, scope [[X2]]
-      // FIXME: This source location & scope are a little wild.
-      // CHECK-NEXT: strong_retain{{.*}}:[[@LINE+4]]:12, scope [[X2_]]
+      // FIXME: This source location is a little wild.
+      // CHECK-NEXT: strong_retain{{.*}}:[[@LINE+4]]:12, scope [[X2]]
       throw MyError()
       // CHECK: function_ref {{.*}}MyError{{.*}}:[[@LINE-1]]:13, scope [[GUARD]]
     }

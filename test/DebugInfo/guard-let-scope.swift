@@ -14,8 +14,8 @@ func f(c: AnyObject??) {
   // CHECK: sil_scope [[S9:[0-9]+]] { loc "{{.*}}":7:28 parent [[S8]] }
   // CHECK: sil_scope [[S10:[0-9]+]] { loc "{{.*}}":7:28 parent [[S8]] }
   // CHECK: debug_value %{{.*}} : $Optional<Optional<AnyObject>>, let, name "x"{{.*}} scope [[S5]]
-  // CHECK: debug_value %{{.*}} : $Optional<AnyObject>, let, name "x", {{.*}} scope [[S6]]
-  // CHECK: debug_value %{{.*}} : $AnyObject, let, name "x", {{.*}} scope [[S8]]
+  // CHECK: debug_value %{{.*}} : $Optional<AnyObject>, let, name "x", {{.*}} scope [[S8]]
+  // CHECK: debug_value %{{.*}} : $AnyObject, let, name "x", {{.*}} scope [[S10]]
     fatalError()
   }
   // CHECK: function_ref {{.*3use.*}} scope [[S10]]
