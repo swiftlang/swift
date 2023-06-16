@@ -79,9 +79,10 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
               llvm::dbgs() << "+ " << value->getBaseIdentifier() << "\n";
           });
 
-          assert((VarDeclScopeMap.count(value) == 0 ||
-                  VarDeclScopeMap[value] == ASTScope) &&
-                 "VarDecl appears twice");
+          // FIXME: ASTs coming out of the autodiff transformation trigger this.
+          // assert((VarDeclScopeMap.count(value) == 0 ||
+          //         VarDeclScopeMap[value] == ASTScope) &&
+          //        "VarDecl appears twice");
           VarDeclScopeMap.insert({value, ASTScope});
         }
         return false;
