@@ -209,36 +209,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
 
-  // FIXME: Preserve the order of these options.
-  for (auto &elem : getSearchPathOptions().PluginSearchOpts) {
-    // '-plugin-path' options.
-    if (auto *arg = elem.dyn_cast<PluginSearchOption::PluginPath>()) {
-      serializationOpts.PluginSearchPaths.push_back(arg->SearchPath);
-      continue;
-    }
-
-    // '-external-plugin-path' options.
-    if (auto *arg = elem.dyn_cast<PluginSearchOption::ExternalPluginPath>()) {
-      serializationOpts.ExternalPluginSearchPaths.push_back(
-          arg->SearchPath + "#" + arg->ServerPath);
-      continue;
-    }
-
-    // '-load-plugin-library' options.
-    if (auto *arg = elem.dyn_cast<PluginSearchOption::LoadPluginLibrary>()) {
-      serializationOpts.CompilerPluginLibraryPaths.push_back(arg->LibraryPath);
-      continue;
-    }
-
-    // '-load-plugin-executable' options.
-    if (auto *arg = elem.dyn_cast<PluginSearchOption::LoadPluginExecutable>()) {
-      std::string optStr = arg->ExecutablePath + "#";
-      llvm::interleave(
-          arg->ModuleNames, [&](auto &name) { optStr += name; },
-          [&]() { optStr += ","; });
-      serializationOpts.CompilerPluginExecutablePaths.push_back(optStr);
-    }
-  }
+  serializationOpts.PluginSearchOptions =
+      getSearchPathOptions().PluginSearchOpts;
 
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
