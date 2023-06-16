@@ -1156,6 +1156,12 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
 bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
   LivenessState livenessState(*this, def);
 
+  // Don't canonicalize the lifetimes of values of move-only type.  According to
+  // language rules, they are fixed.
+  if (def->getType().isMoveOnly()) {
+    return false;
+  }
+
   // Step 1: Compute liveness.
   if (!computeLiveness()) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute liveness boundary!\n");
