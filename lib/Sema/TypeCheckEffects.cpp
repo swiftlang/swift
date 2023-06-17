@@ -2867,8 +2867,13 @@ private:
         awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
     }
 
-    Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
-      .fixItInsert(awaitInsertLoc, "await ")
+    auto anchorDecl = dyn_cast<DeclRefExpr>(anchor);
+    auto anchorVar = dyn_cast<VarDecl>(anchorDecl->getDecl());
+    auto anchorIdentifier = anchorVar->getName().str().str();
+    auto awaitInsertString = anchorIdentifier + " = await ";
+    
+    Ctx.Diags.diagnose(awaitInsertLoc, diag::async_expr_without_await)
+      .fixItInsert(awaitInsertLoc, StringRef(awaitInsertString))
       .highlight(anchor->getSourceRange());
 
     for (const DiagnosticInfo &diag: errors) {
