@@ -4604,24 +4604,11 @@ namespace {
     Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       return simplifyExprType(expr);
     }
-    
+
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
-      // If we end up here, we should have diagnosed somewhere else
-      // already.
-      Expr *simplified = simplifyExprType(expr);
-      // Invalidate 'VarDecl's inside the pattern.
-      expr->getSubPattern()->forEachVariable([](VarDecl *VD) {
-        VD->setInvalid();
-      });
-      if (!SuppressDiagnostics
-          && !cs.getType(simplified)->is<UnresolvedType>()) {
-        auto &de = cs.getASTContext().Diags;
-        de.diagnose(simplified->getLoc(), diag::pattern_in_expr,
-                    expr->getSubPattern()->getDescriptiveKind());
-      }
-      return simplified;
+      llvm_unreachable("Should have diagnosed");
     }
-    
+
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {
       return simplifyExprType(expr);
     }
