@@ -82,7 +82,8 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -131,7 +132,8 @@ public func testIntPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -342,7 +344,8 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -390,7 +393,8 @@ public func testIntEnumPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
