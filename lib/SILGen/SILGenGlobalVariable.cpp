@@ -50,6 +50,9 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
   if (gDecl->getAttrs().hasAttribute<SILGenNameAttr>()) {
     silLinkage = SILLinkage::DefaultForDeclaration;
+    if (! gDecl->hasInitialValue()) {
+      forDef = NotForDefinition;
+    }
   }
 
   // Check if it is already created, and update linkage if necessary.
