@@ -193,6 +193,11 @@ ERROR(ivar_not_initialized_by_init_accessor,none,
       "property %0 not initialized by init accessor",
       (DeclName))
 
+ERROR(noncopyable_dynamic_lifetime_unsupported,none,
+      "conditional initialization or destruction of noncopyable types is not "
+      "supported; this variable must be consistently in an initialized or "
+      "uninitialized state through every code path", ())
+
 ERROR(self_use_before_fully_init,none,
       "'self' used in %select{method call|property access}1 %0 before "
       "%select{all stored properties are initialized|"
