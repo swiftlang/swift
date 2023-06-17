@@ -1220,6 +1220,11 @@ void LifetimeChecker::doIt() {
     } else if (auto *ABI = dyn_cast<AllocBoxInst>(memAddr)) {
       ABI->setDynamicLifetime();
     }
+    // We don't support noncopyable types with dynamic lifetimes currently.
+    if (TheMemory.getType().isMoveOnly()) {
+      diagnose(Module, TheMemory.getUninitializedValue()->getLoc(),
+               diag::noncopyable_dynamic_lifetime_unsupported);
+    }
   }
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);
