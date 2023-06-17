@@ -454,7 +454,7 @@ public enum SinglePayloadEnumManyXI {
     case empty4
     case empty5
     case empty6
-    case nonEmpty(Builtin.Int127, SimpleClass)
+    case nonEmpty(Builtin.Int63, SimpleClass)
 }
 
 public struct PrespecializedStruct<T> {

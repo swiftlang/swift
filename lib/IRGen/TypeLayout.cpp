@@ -15,6 +15,7 @@
 #include "FixedTypeInfo.h"
 #include "GenOpaque.h"
 #include "IRGen.h"
+#include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenericArguments.h"
 #include "IRGenFunction.h"
@@ -510,7 +511,8 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
         auto castEnumPtr = IGF.Builder.CreateBitCast(enumPtr, enumType);
         auto enumAddr = typeInfo->getAddressForPointer(castEnumPtr);
 
-        auto tag = entry.getEnumTag(IGF, enumAddr);
+        auto &strategy = getEnumImplStrategy(IGM, entry.ty);
+        auto tag = strategy.emitGetEnumTag(IGF, entry.ty, enumAddr);
         IGF.Builder.CreateRet(tag);
       });
 
