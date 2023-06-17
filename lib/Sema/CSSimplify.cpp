@@ -2284,7 +2284,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
-  case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
@@ -2643,7 +2643,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::ValueWitness:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
-  case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
@@ -3161,7 +3161,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
-  case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
@@ -6814,7 +6814,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ValueWitness:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::OneWayBindParam:
-    case ConstraintKind::DefaultClosureType:
+    case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PropertyWrapper:
     case ConstraintKind::SyntacticElement:
@@ -10950,18 +10950,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyDefaultableConstraint(
   return SolutionKind::Solved;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDefaultClosureTypeConstraint(
-    Type closureType, Type inferredType,
-    ArrayRef<TypeVariableType *> referencedOuterParameters,
-    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-  closureType = getFixedTypeRecursive(closureType, flags, /*wantRValue=*/true);
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyFallbackTypeConstraint(
+    Type defaultableType, Type fallbackType,
+    ArrayRef<TypeVariableType *> referencedVars, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  defaultableType =
+      getFixedTypeRecursive(defaultableType, flags, /*wantRValue=*/true);
 
-  if (closureType->isTypeVariableOrMember()) {
+  if (defaultableType->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(Constraint::create(
-          *this, ConstraintKind::DefaultClosureType, closureType, inferredType,
-          getConstraintLocator(locator), referencedOuterParameters));
+          *this, ConstraintKind::FallbackType, defaultableType, fallbackType,
+          getConstraintLocator(locator), referencedVars));
       return SolutionKind::Solved;
     }
 
@@ -15014,7 +15014,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Conjunction:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
-  case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::FallbackType:
   case ConstraintKind::SyntacticElement:
     llvm_unreachable("Use the correct addConstraint()");
   }
@@ -15546,12 +15546,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          /*flags*/ None,
                                          constraint.getLocator());
 
-  case ConstraintKind::DefaultClosureType:
-    return simplifyDefaultClosureTypeConstraint(constraint.getFirstType(),
-                                                constraint.getSecondType(),
-                                                constraint.getTypeVariables(),
-                                                /*flags*/ None,
-                                                constraint.getLocator());
+  case ConstraintKind::FallbackType:
+    return simplifyFallbackTypeConstraint(constraint.getFirstType(),
+                                          constraint.getSecondType(),
+                                          constraint.getTypeVariables(),
+                                          /*flags*/ None,
+                                          constraint.getLocator());
 
   case ConstraintKind::PropertyWrapper:
     return simplifyPropertyWrapperConstraint(constraint.getFirstType(),
