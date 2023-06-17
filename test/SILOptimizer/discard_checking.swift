@@ -165,7 +165,7 @@ struct Basics: ~Copyable {
     }
   }
 
-  consuming func test8_stillMissingAConsume1(_ c: Color) throws { // expected-error {{must consume 'self' before exiting method that discards self}}
+  consuming func test8_stillMissingAConsume1(_ c: Color) throws {
     if case .red = c {
       discard self // expected-note {{discarded self here}}
       return
@@ -174,7 +174,7 @@ struct Basics: ~Copyable {
       _ = consume self
       fatalError("hi")
     }
-  }
+  } // expected-error {{must consume 'self' before exiting method that discards self}}
 
   consuming func test8_stillMissingAConsume2(_ c: Color) throws {
     if case .red = c {
@@ -251,7 +251,7 @@ struct Basics: ~Copyable {
     }
   }
 
-  consuming func test11(_ c: Color) { // expected-error {{must consume 'self' before exiting method that discards self}}
+  consuming func test11(_ c: Color) {
     guard case .red = c else {
       discard self // expected-note {{discarded self here}}
       return
@@ -264,7 +264,7 @@ struct Basics: ~Copyable {
     let x = self
     self = x
     mutator()
-  }
+  } // expected-error {{must consume 'self' before exiting method that discards self}}
 
   consuming func test11_fixed(_ c: Color) {
     guard case .red = c else {
@@ -328,13 +328,13 @@ struct Basics: ~Copyable {
     _ = consume self
   }
 
-  consuming func test13(_ c: Color) async { // expected-error {{must consume 'self' before exiting method that discards self}}
+  consuming func test13(_ c: Color) async {
     guard case .red = c else {
       discard self // expected-note {{discarded self here}}
       return
     }
     await asyncer()
-  }
+  } // expected-error {{must consume 'self' before exiting method that discards self}}
 
   consuming func test13_fixed(_ c: Color) async {
     guard case .red = c else {
@@ -345,7 +345,7 @@ struct Basics: ~Copyable {
     _ = consume self
   }
 
-  consuming func test14(_ c: Color) async { // expected-error {{must consume 'self' before exiting method that discards self}}
+  consuming func test14(_ c: Color) async {
     guard case .red = c else {
       discard self // expected-note {{discarded self here}}
       return
@@ -354,7 +354,7 @@ struct Basics: ~Copyable {
       cont.resume()
     }
     print("back!")
-  }
+  } // expected-error {{must consume 'self' before exiting method that discards self}}
 
   consuming func test14_fixed(_ c: Color) async {
     guard case .red = c else {
