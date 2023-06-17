@@ -280,6 +280,12 @@
 using namespace swift;
 using namespace swift::siloptimizer;
 
+llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
+    "move-only-address-checker-disable-lifetime-extension",
+    llvm::cl::init(false),
+    llvm::cl::desc("Disable the lifetime extension of non-consumed fields of "
+                   "move-only values."));
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Memory Utilities
 //===----------------------------------------------------------------------===//
@@ -3181,8 +3187,10 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
-  ExtendUnconsumedLiveness extension(addressUseState, liveness, boundary);
-  extension.run();
+  if (!DisableMoveOnlyAddressCheckerLifetimeExtension) {
+    ExtendUnconsumedLiveness extension(addressUseState, liveness, boundary);
+    extension.run();
+  }
   boundary.clear();
   liveness.computeBoundary(boundary);
   insertDestroysOnBoundary(markedAddress, liveness, boundary);
