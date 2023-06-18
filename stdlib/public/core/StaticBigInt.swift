@@ -175,7 +175,7 @@ extension StaticBigInt {
   @warn_unqualified_access
   public func sequence<Element>(
     of elementType: Element.Type
-  ) -> some Sequence<Element> where
+  ) -> UnfoldSequence<Element, (bitIndex: Int, word: UInt)> where
     Element: _ExpressibleByBuiltinIntegerLiteral,
     Element: FixedWidthInteger,
     Element: UnsignedInteger
