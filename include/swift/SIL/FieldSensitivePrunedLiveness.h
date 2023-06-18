@@ -528,7 +528,7 @@ public:
     assert(!discoveredBlocks || discoveredBlocks->empty());
   }
 
-  bool isInitialized() const { return numBitsToTrack.hasValue(); }
+  bool isInitialized() const { return numBitsToTrack.has_value(); }
 
   unsigned getNumBitsToTrack() const { return *numBitsToTrack; }
 
