@@ -301,8 +301,12 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
-/// Determine whether the given variable has an init accessor.
-static bool hasInitAccessor(VarDecl *var) {
+bool HasInitAccessorRequest::evaluate(Evaluator &evaluator,
+                                      AbstractStorageDecl *decl) const {
+  auto *var = dyn_cast<VarDecl>(decl);
+  if (!var)
+    return false;
+
   if (var->getAccessor(AccessorKind::Init))
     return true;
 
@@ -340,7 +344,7 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
   SmallVector<VarDecl *, 4> results;
   for (auto *member : decl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
-    if (!var || var->isStatic() || !hasInitAccessor(var)) {
+    if (!var || var->isStatic() || !var->hasInitAccessor()) {
       continue;
     }
 
@@ -471,6 +475,13 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
                                              options)) {
       binding->setInvalid();
       return &pbe;
+    }
+
+    // Local variable packs are not allowed.
+    if (binding->getDeclContext()->isLocalContext() &&
+        binding->getInit(entryNumber)->getType()->is<PackExpansionType>()) {
+      binding->diagnose(diag::expansion_not_allowed,
+                        binding->getInit(entryNumber)->getType());
     }
 
     // A pattern binding at top level is not allowed to pick up another decl's
@@ -3355,7 +3366,7 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
   auto dc = storage->getDeclContext();
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (!info.hasStorage()) {
+    if (!info.hasStorage() && !var->hasInitAccessor()) {
       if (auto *init = var->getParentExecutableInitializer()) {
         auto &Diags = var->getASTContext().Diags;
         Diags.diagnose(init->getLoc(), diag::getset_init)

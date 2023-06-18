@@ -1059,14 +1059,14 @@ bool Parser::isStartOfGetSetAccessor() {
   // The only case this can happen is if the accessor label is immediately after
   // a brace (possibly preceded by attributes).  "get" is implicit, so it can't
   // be checked for.  Conveniently however, get/set properties are not allowed
-  // to have initializers, so we don't have an ambiguity, we just have to check
-  // for observing accessors.
+  // to have initializers unless they have `init` accessor, so we don't have an
+  // ambiguity, we just have to check for observing accessors and init accessor.
   //
   // If we have a 'didSet' or a 'willSet' label, disambiguate immediately as
   // an accessor block.
   Token NextToken = peekToken();
   if (NextToken.isContextualKeyword("didSet") ||
-      NextToken.isContextualKeyword("willSet"))
+      NextToken.isContextualKeyword("willSet") || NextToken.is(tok::kw_init))
     return true;
 
   // If we don't have attributes, then it cannot be an accessor block.
@@ -1087,9 +1087,9 @@ bool Parser::isStartOfGetSetAccessor() {
       skipSingle();
   }
 
-  // Check if we have 'didSet'/'willSet' after attributes.
+  // Check if we have 'didSet'/'willSet' or 'init' after attributes.
   return Tok.isContextualKeyword("didSet") ||
-         Tok.isContextualKeyword("willSet");
+         Tok.isContextualKeyword("willSet") || Tok.is(tok::kw_init);
 }
 
 /// Recover invalid uses of trailing closures in a situation
@@ -2301,16 +2301,7 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
   bool hasWhitespaceBeforeName = poundEndLoc != Tok.getLoc();
 
-  // Diagnose and parse keyword right after `#`.
-  if (Tok.isKeyword() && !hasWhitespaceBeforeName) {
-    diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
-    diagnose(Tok, diag::backticks_to_escape)
-        .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
-
-    // Let 'parseDeclNameRef' to parse this as an identifier.
-    Tok.setKind(tok::identifier);
-  }
-  macroNameRef = parseDeclNameRef(macroNameLoc, diag, DeclNameOptions());
+  macroNameRef = parseDeclNameRef(macroNameLoc, diag, DeclNameFlag::AllowKeywords);
   if (!macroNameRef)
     return makeParserError();
 

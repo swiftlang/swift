@@ -558,7 +558,8 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
 
     // Walk backwards from consuming blocks.
     while (auto *block = worklist.pop()) {
-      originalLiveBlocks.insert(block);
+      if (!originalLiveBlocks.insert(block))
+        continue;
       for (auto *predecessor : block->getPredecessorBlocks()) {
         // If the block was discovered by liveness, we already added it to the
         // set.
@@ -1155,6 +1156,12 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
 /// Canonicalize a single extended owned lifetime.
 bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
   LivenessState livenessState(*this, def);
+
+  // Don't canonicalize the lifetimes of values of move-only type.  According to
+  // language rules, they are fixed.
+  if (def->getType().isMoveOnly()) {
+    return false;
+  }
 
   // Step 1: Compute liveness.
   if (!computeLiveness()) {

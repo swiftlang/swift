@@ -14,8 +14,8 @@
 #define SWIFT_AST_SEARCHPATHOPTIONS_H
 
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/PathRemapper.h"
-#include "swift/Basic/TaggedUnion.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
@@ -187,25 +187,81 @@ struct ExternalPluginSearchPathAndServerPath {
   std::string ServerPath;
 };
 
-namespace PluginSearchOption {
-struct LoadPluginLibrary {
-  std::string LibraryPath;
-};
-struct LoadPluginExecutable {
-  std::string ExecutablePath;
-  std::vector<std::string> ModuleNames;
-};
-struct PluginPath {
-  std::string SearchPath;
-};
-struct ExternalPluginPath {
-  std::string SearchPath;
-  std::string ServerPath;
-};
+class PluginSearchOption {
+public:
+  struct LoadPluginLibrary {
+    std::string LibraryPath;
+  };
+  struct LoadPluginExecutable {
+    std::string ExecutablePath;
+    std::vector<std::string> ModuleNames;
+  };
+  struct PluginPath {
+    std::string SearchPath;
+  };
+  struct ExternalPluginPath {
+    std::string SearchPath;
+    std::string ServerPath;
+  };
 
-using Value = TaggedUnion<LoadPluginLibrary, LoadPluginExecutable, PluginPath,
-                          ExternalPluginPath>;
-} // namespace PluginSearchOption
+  enum class Kind : uint8_t {
+    LoadPluginLibrary,
+    LoadPluginExecutable,
+    PluginPath,
+    ExternalPluginPath,
+  };
+
+private:
+  using Members = ExternalUnionMembers<LoadPluginLibrary, LoadPluginExecutable,
+                                       PluginPath, ExternalPluginPath>;
+  static Members::Index getIndexForKind(Kind kind) {
+    switch (kind) {
+    case Kind::LoadPluginLibrary:
+      return Members::indexOf<LoadPluginLibrary>();
+    case Kind::LoadPluginExecutable:
+      return Members::indexOf<LoadPluginExecutable>();
+    case Kind::PluginPath:
+      return Members::indexOf<PluginPath>();
+    case Kind::ExternalPluginPath:
+      return Members::indexOf<ExternalPluginPath>();
+    }
+  };
+  using Storage = ExternalUnion<Kind, Members, getIndexForKind>;
+
+  Kind kind;
+  Storage storage;
+
+public:
+  PluginSearchOption(const LoadPluginLibrary &v)
+      : kind(Kind::LoadPluginLibrary) {
+    storage.emplace<LoadPluginLibrary>(kind, v);
+  }
+  PluginSearchOption(const LoadPluginExecutable &v)
+      : kind(Kind::LoadPluginExecutable) {
+    storage.emplace<LoadPluginExecutable>(kind, v);
+  }
+  PluginSearchOption(const PluginPath &v) : kind(Kind::PluginPath) {
+    storage.emplace<PluginPath>(kind, v);
+  }
+  PluginSearchOption(const ExternalPluginPath &v)
+      : kind(Kind::ExternalPluginPath) {
+    storage.emplace<ExternalPluginPath>(kind, v);
+  }
+
+  Kind getKind() const { return kind; }
+
+  template <typename T>
+  const T *dyn_cast() const {
+    if (Members::indexOf<T>() != getIndexForKind(kind))
+      return nullptr;
+    return &storage.get<T>(kind);
+  }
+
+  template <typename T>
+  const T &get() const {
+    return storage.get<T>(kind);
+  }
+};
 
 /// Options for controlling search path behavior.
 class SearchPathOptions {
@@ -383,7 +439,7 @@ public:
   std::vector<std::string> RuntimeLibraryPaths;
 
   /// Plugin search path options.
-  std::vector<PluginSearchOption::Value> PluginSearchOpts;
+  std::vector<PluginSearchOption> PluginSearchOpts;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;

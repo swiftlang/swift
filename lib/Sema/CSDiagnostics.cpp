@@ -8295,6 +8295,32 @@ bool InvalidEmptyKeyPathFailure::diagnoseAsError() {
   return true;
 }
 
+bool InvalidPatternInExprFailure::diagnoseAsError() {
+  // Check to see if we have something like 'case <fn>(let foo)', where <fn>
+  // has a fix associated with it. In such a case, it's more likely than not
+  // that the user is trying to write an EnumElementPattern, but has made some
+  // kind of mistake in the function expr that causes it to be treated as an
+  // ExprPattern. Emitting an additional error for the out of place 'let foo' is
+  // just noise in that case, so let's avoid diagnosing.
+  llvm::SmallPtrSet<Expr *, 4> fixAnchors;
+  for (auto *fix : getSolution().Fixes) {
+    if (auto *anchor = getAsExpr(fix->getAnchor()))
+      fixAnchors.insert(anchor);
+  }
+  {
+    auto *E = castToExpr(getLocator()->getAnchor());
+    while (auto *parent = findParentExpr(E)) {
+      if (auto *CE = dyn_cast<CallExpr>(parent)) {
+        if (fixAnchors.contains(CE->getFn()))
+          return false;
+      }
+      E = parent;
+    }
+  }
+  emitDiagnostic(diag::pattern_in_expr, P->getDescriptiveKind());
+  return true;
+}
+
 bool MissingContextualTypeForNil::diagnoseAsError() {
   auto *expr = castToExpr<NilLiteralExpr>(getAnchor());
 

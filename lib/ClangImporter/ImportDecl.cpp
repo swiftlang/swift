@@ -2447,15 +2447,39 @@ namespace {
       }
 
       if (cxxRecordDecl) {
+        // FIXME: Swift right now uses AddressOnly type layout
+        // in a way that conflates C++ types
+        // that need to be destroyed or copied explicitly with C++
+        // types that have to be passed indirectly, because
+        // only AddressOnly types can be copied or destroyed using C++
+        // semantics. However, in actuality these two concepts are
+        // separate and don't map to one notion of AddressOnly type
+        // layout cleanly. We should reserve the use of AddressOnly
+        // type layout when types have to use C++ copy/move/destroy
+        // operations, but allow AddressOnly types to be passed
+        // directly as well. This will help unify the MSVC and
+        // Itanium difference here, and will allow us to support
+        // trivial_abi C++ types as well.
         auto isNonTrivialForPurposeOfCalls =
             [](const clang::CXXRecordDecl *decl) -> bool {
           return decl->hasNonTrivialCopyConstructor() ||
                  decl->hasNonTrivialMoveConstructor() ||
                  !decl->hasTrivialDestructor();
         };
+        auto isAddressOnlySwiftStruct =
+            [&](const clang::CXXRecordDecl *decl) -> bool {
+          // MSVC ABI allows non-trivially destroyed C++ types
+          // to be passed in register. This is not supported, as such
+          // type wouldn't be destroyed in Swift correctly. Therefore,
+          // force AddressOnly type layout using the old heuristic.
+          // FIXME: Support can pass in registers for MSVC correctly.
+          if (Impl.SwiftContext.LangOpts.Target.isWindowsMSVCEnvironment())
+            return isNonTrivialForPurposeOfCalls(decl);
+          return !decl->canPassInRegisters();
+        };
         if (auto structResult = dyn_cast<StructDecl>(result))
           structResult->setIsCxxNonTrivial(
-              isNonTrivialForPurposeOfCalls(cxxRecordDecl));
+              isAddressOnlySwiftStruct(cxxRecordDecl));
 
         for (auto &getterAndSetter : Impl.GetterSetterMap[result]) {
           auto getter = getterAndSetter.second.first;
@@ -2717,6 +2741,17 @@ namespace {
       auto result = VisitRecordDecl(decl);
       if (!result)
         return nullptr;
+
+      if (decl->hasAttr<clang::TrivialABIAttr>()) {
+        // We cannot yet represent trivial_abi C++ records in Swift.
+        // Clang tells us such type can be passed in registers, so
+        // we avoid using AddressOnly type-layout for such type, which means
+        // that it then does not use C++'s copy and destroy semantics from
+        // Swift.
+        Impl.markUnavailable(cast<ValueDecl>(result),
+                             "C++ classes with `trivial_abi` Clang attribute "
+                             "are not yet available in Swift");
+      }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);

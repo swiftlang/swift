@@ -14,6 +14,7 @@
 
 #include "MoveOnlyDiagnostics.h"
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Defer.h"
@@ -226,6 +227,12 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
       return true;
 
     case SILLocation::RegularKind: {
+      Decl *decl = loc.getAsASTNode<Decl>();
+      if (decl && isa<AbstractFunctionDecl>(decl)) {
+        // Having the function itself as a location results in a location at the
+        // first line of the function.  Find another location.
+        return false;
+      }
       Stmt *stmt = loc.getAsASTNode<Stmt>();
       if (!stmt)
         return true; // For non-statements, assume it is exiting the func.

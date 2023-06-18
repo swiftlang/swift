@@ -100,12 +100,12 @@ bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEP_3:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.k
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP_3]]
 // CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
 // CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
 // CHECK-NEXT:   destroy_addr [[GEP_1]]
 // CHECK-NEXT:   destroy_addr [[GEP_2]]
-// CHECK-NEXT:   [[GEP_3:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.k
-// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP_3]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyField'
@@ -125,10 +125,6 @@ bb0(%0 : @owned $NonTrivialStruct):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
-// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK-NEXT:   destroy_addr [[GEP_1]]
-// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
@@ -142,6 +138,10 @@ bb0(%0 : @owned $NonTrivialStruct):
 // CHECK-NEXT:   br bb3([[RESULT]] :
 
 // CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock'
@@ -172,18 +172,14 @@ bb3(%5 : @owned $Klass):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
-// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK-NEXT:   destroy_addr [[GEP_1]]
-// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
-// CHECK-NEXT:   destroy_addr [[GEP]]
 // CHECK-NEXT:   function_ref get_klass
 // CHECK-NEXT:   [[FUNC:%.*]] = function_ref @get_klass :
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUNC]]()
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   destroy_addr [[GEP]]
 // CHECK-NEXT:   br bb3([[RESULT]] :
 //
 // CHECK: bb2:
@@ -192,6 +188,10 @@ bb3(%5 : @owned $Klass):
 // CHECK-NEXT:   br bb3([[RESULT]] :
 
 // CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock2'
@@ -222,19 +222,15 @@ bb3(%5 : @owned $Klass):
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
 // CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
 // CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
-// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK-NEXT:   destroy_addr [[GEP_1]]
-// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
-// CHECK-NEXT:   destroy_addr [[GEP]]
 // CHECK-NEXT:   function_ref get_klass
 // CHECK-NEXT:   [[FUNC:%.*]] = function_ref @get_klass :
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUNC]]()
 // CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEPP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   destroy_addr [[GEPP]]
 // CHECK-NEXT:   store [[RESULT]] to [init] [[GEP]]
 // CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
 // CHECK-NEXT:   br bb3([[RESULT]] :
@@ -245,6 +241,10 @@ bb3(%5 : @owned $Klass):
 // CHECK-NEXT:   br bb3([[RESULT]] :
 //
 // CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
 // CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
 // CHECK-NEXT:   return [[RESULT]]
 // CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock3'
@@ -310,8 +310,8 @@ bb0(%arg : @owned $Klass):
 // CHECK-LABEL: sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 // CHECK: [[STACK:%.*]] = alloc_stack [lexical] $Klass, var, name "x2"
 // CHECK: store {{%.*}} to [init] [[STACK]]
-// CHECK: destroy_addr [[STACK]]
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] [[STACK]]
+// CHECK: destroy_addr [[STACK]]
 // CHECK: store {{%.*}} to [init] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[STACK]]
@@ -574,4 +574,121 @@ bb0(%0 : @owned $NonTrivialStruct):
   dealloc_stack %1 : $*NonTrivialStruct
   %9999 = tuple()
   return %9999 : $()
+}
+
+@_moveOnly
+struct M {
+  deinit {}
+}
+@_moveOnly
+struct M2 {
+  let s1: M
+  let s2: M
+}
+
+sil @get_M2 : $@convention(thin) () -> @owned M2
+sil @end_addr_see_addr : $@convention(thin) (@in M, @in_guaranteed M) -> ()
+
+/// A single instruction, apply @end_addr_see_addr, consumes one field and
+/// borrows another.  
+
+/// Varify that the consumed value isn't destroyed twice and that the borrowed
+/// value isn't destroyed before it's used.
+///
+/// Note: This test case doesn't have valid SIL (#M2.s1 is consumed twice), but
+///       the invalidity wasn't the cause of the miscompile.  With the fix, this
+///       is transformed into valid SIL.
+///
+///       Once verification is enabled, feel free to modify this test case to
+///       have a destroy_addr of %second_addr instead, though not that this will
+///       no longer verify the fix.
+// CHECK-LABEL: sil [ossa] @rdar110909290 : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $M2
+// CHECK:         [[GET_M2:%[^,]+]] = function_ref @get_M2
+// CHECK:         [[M2:%[^,]+]] = apply [[GET_M2]]()
+// CHECK:         store [[M2]] to [init] [[STACK]] : $*M2
+// CHECK-NOT:     destroy_addr
+// CHECK:         [[S1_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M2, #M2.s1
+// CHECK:         [[S2_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M2, #M2.s2
+// CHECK:         [[END_ADDR_SEE_ADDR:%[^,]+]] = function_ref @end_addr_see_addr
+// CHECK:         apply [[END_ADDR_SEE_ADDR]]([[S1_ADDR]], [[S2_ADDR]])
+// CHECK-NOT:     struct_element_addr [[STACK]] : $*M2, #M2.s1
+// CHECK:         [[S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M2, #M2.s2
+// CHECK:         destroy_addr [[S2_ADDR_2]] : $*M
+// CHECK-LABEL: } // end sil function 'rdar110909290'
+sil [ossa] @rdar110909290 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $M2
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*M2
+  %3 = function_ref @get_M2 : $@convention(thin) () -> @owned M2
+  %4 = apply %3() : $@convention(thin) () -> @owned M2
+  store %4 to [init] %1 : $*M2
+  %first_addr = struct_element_addr %1 : $*M2, #M2.s1
+  %second_addr = struct_element_addr %1 : $*M2, #M2.s2
+  %end_addr_see_addr = function_ref @end_addr_see_addr : $@convention(thin) (@in M, @in_guaranteed M) -> ()
+  apply %end_addr_see_addr(%first_addr, %second_addr) : $@convention(thin) (@in M, @in_guaranteed M) -> ()
+  destroy_addr %1 : $*M2
+  dealloc_stack %0 : $*M2
+  %22 = tuple ()
+  return %22 : $()
+}
+
+@_moveOnly
+struct M4 {
+  let s1: M
+  let s2: M
+  let s3: M
+  let s4: M
+}
+
+sil @get_M4 : $@convention(thin) () -> @owned M4
+sil @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
+
+
+/// Two non-contiguous fields (#M4.s2, #M4.s4) are borrowed by @see_addr_2.
+/// Two non-contiguous fields (#M4.s1, #M$.s3) are consumed by @end_2.
+///
+/// Verify that #M4.s2 and #M4.s4 both survive past the apply of @see_addr_2.
+// CHECK-LABEL:  sil [ossa] @rdar110676577 : {{.*}} {
+// CHECK:          [[STACK:%[^,]+]] = alloc_stack $M4
+// CHECK:          [[GET_M4:%[^,]+]] = function_ref @get_M4
+// CHECK:          [[M4:%[^,]+]] = apply [[GET_M4]]() : $@convention(thin) () -> @owned M4
+// CHECK:          store [[M4]] to [init] [[STACK]] : $*M4
+// CHECK:          [[M4_S2_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:          [[M4_S4_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:          [[SEE_ADDR_2:%[^,]+]] = function_ref @see_addr_2
+// CHECK:          apply [[SEE_ADDR_2]]([[M4_S2_ADDR]], [[M4_S4_ADDR]])
+// CHECK:          [[M4_S1_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s1
+// CHECK:          [[M4_S1:%[^,]+]] = load [take] [[M4_S1_ADDR]] : $*M
+// CHECK:          [[M4_S3_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s3
+// CHECK:          [[M4_S3:%[^,]+]] = load [take] [[M4_S3_ADDR]] : $*M
+// CHECK:          [[END_2:%[^,]+]] = function_ref @end_2
+// CHECK:          apply [[END_2]]([[M4_S1]], [[M4_S3]])
+// CHECK:          [[M4_S4_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:          destroy_addr [[M4_S4_ADDR_2]]
+// CHECK:          [[M4_S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:          destroy_addr [[M4_S2_ADDR_2]]
+// CHECK-LABEL: } // end sil function 'rdar110676577'
+sil [ossa] @rdar110676577 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $M4
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*M4
+  %3 = function_ref @get_M4 : $@convention(thin) () -> @owned M4
+  %4 = apply %3() : $@convention(thin) () -> @owned M4
+  store %4 to [init] %1 : $*M4
+  %6 = struct_element_addr %1 : $*M4, #M4.s2
+  %6a = struct_element_addr %1 : $*M4, #M4.s4
+  %see_addr_2 = function_ref @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
+  apply %see_addr_2(%6, %6a) : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
+  %12 = struct_element_addr %1 : $*M4, #M4.s1
+  %13 = load [copy] %12 : $*M
+  %14 = struct_element_addr %1 : $*M4, #M4.s3
+  %15 = load [copy] %14 : $*M
+  %16 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+  %17 = apply %16(%13, %15) : $@convention(thin) (@owned M, @owned M) -> ()
+  destroy_addr %1 : $*M4
+  dealloc_stack %0 : $*M4
+  %22 = tuple ()
+  return %22 : $()
 }

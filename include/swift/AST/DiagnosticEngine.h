@@ -1458,6 +1458,22 @@ namespace swift {
     }
   };
 
+  /// A RAII object that adds and removes a diagnostic consumer from an engine.
+  class DiagnosticConsumerRAII final {
+    DiagnosticEngine &Diags;
+    DiagnosticConsumer &Consumer;
+
+  public:
+    DiagnosticConsumerRAII(DiagnosticEngine &diags,
+                           DiagnosticConsumer &consumer)
+        : Diags(diags), Consumer(consumer) {
+      Diags.addConsumer(Consumer);
+    }
+    ~DiagnosticConsumerRAII() {
+      Diags.removeConsumer(Consumer);
+    }
+  };
+
   inline void
   DiagnosticEngine::diagnoseWithNotes(InFlightDiagnostic parentDiag,
                                       llvm::function_ref<void(void)> builder) {

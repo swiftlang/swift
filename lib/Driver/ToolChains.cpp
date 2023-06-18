@@ -375,6 +375,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // Specify default plugin search path options after explicitly specified
   // options.
   inputArgs.AddAllArgs(arguments, options::OPT_plugin_search_Group);
+  addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
+  
+  // Toolchain-relative plugin paths
   {
     SmallString<64> pluginPath;
     auto programPath = getDriver().getSwiftProgramPath();
@@ -401,6 +404,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
+}
+
+void ToolChain::addPlatformSpecificPluginFrontendArgs(
+    const OutputInfo &OI,
+    const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  // Overridden where necessary.
 }
 
 static void addRuntimeLibraryFlags(const OutputInfo &OI,
