@@ -106,18 +106,19 @@ set(sdk "${SWIFT_HOST_VARIANT_SDK}")
 if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
+  set(static_binary_lnk_src "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/${lowercase_sdk}/static-executable-args.lnk")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
   add_custom_command_target(swift_static_binary_${sdk}_args
     COMMAND
       "${CMAKE_COMMAND}" -E copy
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
+      "${static_binary_lnk_src}"
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     OUTPUT
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     DEPENDS
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
+      "${static_binary_lnk_src}")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
