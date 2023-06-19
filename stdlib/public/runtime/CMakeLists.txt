@@ -76,10 +76,15 @@ set(swift_runtime_sources
     SwiftDtoa.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
-    ThreadSanitizer.cpp
     Tracing.cpp
     AccessibleFunction.cpp
     Win32.cpp)
+
+# We pull this in separately here because other dylibs will need it, but only
+# will have the __tsan_on_initialize called, and on Darwin, RTLD_NEXT can't be
+# used to call subsequence dylibs' copies of that.
+set(swift_runtime_threading_sources
+  ${SWIFT_SOURCE_DIR}/lib/Threading/ThreadSanitizer.cpp)
 
 set(swift_runtime_backtracing_sources
   Backtrace.cpp
@@ -133,6 +138,7 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
+  ${swift_runtime_threading_sources}
   C_COMPILE_FLAGS
     ${swift_runtime_library_compile_flags}
   LINK_FLAGS ${swift_runtime_linker_flags}

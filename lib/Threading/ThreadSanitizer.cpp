@@ -25,15 +25,18 @@
 namespace swift {
 namespace threading_impl {
 
-SWIFT_RUNTIME_EXPORT bool _swift_tsan_enabled = false;
-SWIFT_RUNTIME_EXPORT void (*_swift_tsan_acquire)(const void *) = nullptr;
-SWIFT_RUNTIME_EXPORT void (*_swift_tsan_release)(const void *) = nullptr;
+extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
+bool _swift_tsan_enabled = false;
+extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
+void (*_swift_tsan_acquire)(const void *) = nullptr;
+extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
+void (*_swift_tsan_release)(const void *) = nullptr;
 
 #if __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 
 // The TSan library code will call this function when it starts up
-SWIFT_RUNTIME_EXPORT
+extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
 void __tsan_on_initialize() {
   _swift_tsan_enabled = true;
   _swift_tsan_acquire = (void (*)(const void *))dlsym(RTLD_DEFAULT,
