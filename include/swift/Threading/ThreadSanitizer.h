@@ -20,6 +20,8 @@
 #ifndef SWIFT_THREADING_THREAD_SANITIZER_H
 #define SWIFT_THREADING_THREAD_SANITIZER_H
 
+#include "swift/shims/Visibility.h"
+
 namespace swift {
 
 #if defined(_WIN32) || defined(__wasi__) || !__has_include(<dlfcn.h>)
@@ -34,9 +36,9 @@ template <typename T> T *release(T *ptr) { return ptr; }
 
 namespace threading_impl {
 
-extern bool tsan_enabled;
-extern void (*tsan_acquire)(const void *ptr);
-extern void (*tsan_release)(const void *ptr);
+SWIFT_RUNTIME_EXPORT bool _swift_tsan_enabled;
+SWIFT_RUNTIME_EXPORT void (*_swift_tsan_acquire)(const void *ptr);
+SWIFT_RUNTIME_EXPORT void (*_swift_tsan_release)(const void *ptr);
 
 } // namespace threading_impl
 
@@ -44,7 +46,7 @@ namespace tsan {
 
 /// Returns true if TSan is enabled
 inline bool enabled() {
-  return threading_impl::tsan_enabled;
+  return threading_impl::_swift_tsan_enabled;
 }
 
 /// Indicate to TSan that an acquiring load has occurred on the current
@@ -54,8 +56,8 @@ inline bool enabled() {
 /// `acquire()`.
 template <typename T>
 T *acquire(T *ptr) {
-  if (threading_impl::tsan_acquire) {
-    threading_impl::tsan_acquire(ptr);
+  if (threading_impl::_swift_tsan_acquire) {
+    threading_impl::_swift_tsan_acquire(ptr);
   }
   return ptr;
 }
@@ -66,8 +68,8 @@ T *acquire(T *ptr) {
 /// see all writes that happened before the `release()`.
 template <typename T>
 T *release(T *ptr) {
-  if (threading_impl::tsan_release) {
-    threading_impl::tsan_release(ptr);
+  if (threading_impl::_swift_tsan_release) {
+    threading_impl::_swift_tsan_release(ptr);
   }
   return ptr;
 }

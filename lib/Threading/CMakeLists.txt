@@ -10,5 +10,4 @@ add_swift_host_library(swiftThreading STATIC
   Linux.cpp
   Pthreads.cpp
   Win32.cpp
-  Errors.cpp
-  ThreadSanitizer.cpp)
+  Errors.cpp)

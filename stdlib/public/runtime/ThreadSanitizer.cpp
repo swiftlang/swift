@@ -20,28 +20,35 @@
 #include "swift/Threading/ThreadSanitizer.h"
 #include "swift/shims/Visibility.h"
 
+#include <cstdio>
+
 namespace swift {
 namespace threading_impl {
 
-bool tsan_enabled = false;
-void (*tsan_acquire)(const void *) = nullptr;
-void (*tsan_release)(const void *) = nullptr;
+SWIFT_RUNTIME_EXPORT bool _swift_tsan_enabled = false;
+SWIFT_RUNTIME_EXPORT void (*_swift_tsan_acquire)(const void *) = nullptr;
+SWIFT_RUNTIME_EXPORT void (*_swift_tsan_release)(const void *) = nullptr;
 
 #if __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 
 // The TSan library code will call this function when it starts up
-extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
+SWIFT_RUNTIME_EXPORT
 void __tsan_on_initialize() {
-  tsan_enabled = true;
-  tsan_acquire = (void (*)(const void *))dlsym(RTLD_DEFAULT, "__tsan_acquire");
-  tsan_release = (void (*)(const void *))dlsym(RTLD_DEFAULT, "__tsan_release");
+  _swift_tsan_enabled = true;
+  _swift_tsan_acquire = (void (*)(const void *))dlsym(RTLD_DEFAULT,
+                                                      "__tsan_acquire");
+  _swift_tsan_release = (void (*)(const void *))dlsym(RTLD_DEFAULT,
+                                                      "__tsan_release");
 
-  // Always call through to the next image
+  // Always call through to the next image; this won't work on macOS, but it's
+  // important on Linux to allow others to hook into the thread sanitizer if
+  // they wish.
   void (*next_init)(void);
   next_init = (void (*)(void))dlsym(RTLD_NEXT, "__tsan_on_initialize");
-  if (next_init)
+  if (next_init) {
     next_init();
+  }
 }
 #endif
 
