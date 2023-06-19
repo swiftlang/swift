@@ -313,7 +313,21 @@ ValueDecl *RequirementFailure::getDeclRef() const {
       return cast<ValueDecl>(getDC()->getParent()->getAsDecl());
     }
 
-    return getAffectedDeclFromType(contextualTy);
+    // We check for a contextual type here because we form a
+    // ContextualType(CTP_Initialization) LocatorPathElt for pattern bindings
+    // when there is no TypedPattern present. In such a case, there will be
+    // no recorded contextual type (though the pattern may produce a type that
+    // could be considered contextual).
+    if (contextualTy) {
+      // If the contextual type is e.g a tuple, we may not be able to resolve
+      // a decl. Fall through to getting the 'owner type' in that case.
+      if (auto *D = getAffectedDeclFromType(contextualTy))
+        return D;
+    } else {
+      assert((contextualPurpose == CTP_Initialization ||
+              contextualPurpose == CTP_Unused) &&
+             "Should have had a contextual type");
+    }
   }
 
   if (getLocator()->isFirstElement<LocatorPathElt::CoercionOperand>())
