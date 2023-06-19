@@ -5749,20 +5749,24 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   std::unique_ptr<TemplateInstantiationError> error =
       ctx.getClangTemplateArguments(func->getTemplateParameters(),
                                     subst.getReplacementTypes(), templateSubst);
+
+  auto getFuncName = [&]() -> std::string {
+    std::string funcName;
+    llvm::raw_string_ostream funcNameStream(funcName);
+    func->printQualifiedName(funcNameStream);
+    return funcName;
+  };
+
   if (error) {
     std::string failedTypesStr;
     llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
     llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
 
-    std::string funcName;
-    llvm::raw_string_ostream funcNameStream(funcName);
-    func->printQualifiedName(funcNameStream);
-
     // TODO: Use the location of the apply here.
     // TODO: This error message should not reference implementation details.
     // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
     ctx.Diags.diagnose(SourceLoc(), diag::unable_to_convert_generic_swift_types,
-                       funcName, failedTypesStr);
+                       getFuncName(), failedTypesStr);
     return nullptr;
   }
 
@@ -5772,6 +5776,20 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   auto &sema = getClangInstance().getSema();
   auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
                                                    clang::SourceLocation());
+  if (!spec) {
+    std::string templateParams;
+    llvm::raw_string_ostream templateParamsStream(templateParams);
+    llvm::interleaveComma(templateArgList->asArray(), templateParamsStream,
+                          [&](const clang::TemplateArgument &arg) {
+                            arg.print(func->getASTContext().getPrintingPolicy(),
+                                      templateParamsStream,
+                                      /*IncludeType*/ true);
+                          });
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::unable_to_substitute_cxx_function_template,
+                       getFuncName(), templateParams);
+    return nullptr;
+  }
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
   return spec;
 }
