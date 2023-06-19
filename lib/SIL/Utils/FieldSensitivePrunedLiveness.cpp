@@ -801,35 +801,9 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
 template <typename LivenessWithDefs>
 void FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse(
     SILInstruction *user, TypeTreeLeafTypeRange range, bool lifetimeEnding) {
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs()
-      << "Begin FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse "
-         "for: "
-      << *user);
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs() << "Looking for def instruction earlier in the block!\n");
-
-  auto *parentBlock = user->getParent();
-  for (auto ii = std::next(user->getReverseIterator()),
-            ie = parentBlock->rend();
-       ii != ie; ++ii) {
-    // If we find the def, just mark this instruction as being an interesting
-    // instruction.
-    if (asImpl().isDef(&*ii, range)) {
-      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found def: " << *ii);
-      PRUNED_LIVENESS_LOG(llvm::dbgs()
-                 << "    Marking inst as interesting user and returning!\n");
-      addInterestingUser(user, range, lifetimeEnding);
-      return;
-    }
-  }
-
-  // Otherwise, just delegate to our parent class's update for use. This will
-  // update liveness for our predecessor blocks and add this instruction as an
-  // interesting user.
-  PRUNED_LIVENESS_LOG(llvm::dbgs() << "No defs found! Delegating to "
-                             "FieldSensitivePrunedLiveness::updateForUse.\n");
-  FieldSensitivePrunedLiveness::updateForUse(user, range, lifetimeEnding);
+  SmallBitVector bits(getNumSubElements());
+  range.setBits(bits);
+  updateForUse(user, bits, lifetimeEnding);
 }
 
 template <typename LivenessWithDefs>
