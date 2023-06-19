@@ -1,4 +1,4 @@
-//===--- TSan.h - TSan support functions ----------------------------------===//
+//===--- ThreadSanitizer.cpp - Thread Sanitizer support -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Threading/TSan.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include "swift/shims/Visibility.h"
 
 namespace swift {

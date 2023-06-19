@@ -12,13 +12,18 @@
 // UNSUPPORTED: remote_run
 
 // Test that we do not report a race on initialization; Swift doesn't initialize
-// globals at start-up, but rather uses swift_once().  This is thread safe, but
+// globals at start-up, but rather uses `swift_once()`.  This is thread safe, but
 // on some platforms TSan wasn't seeing the synchronization, so would report
 // a false positive.
 
 import Dispatch
 
 var count = 0
+
+// This initialization will be done via a call to `swift_once()`.  Prior to
+// the fix for rdar://110665213, the addition to `count` would trigger a
+// TSan message on Linux because the sanitizer couldn't see the lock we're
+// using to make `swift_once()` thread safe.
 let foo = {
   count += 1
   return count

@@ -18,7 +18,7 @@
 
 #include "swift/Threading/Impl.h"
 #include "swift/Threading/Errors.h"
-#include "swift/Threading/TSan.h"
+#include "swift/Threading/ThreadSanitizer.h"
 
 namespace {
 

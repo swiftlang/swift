@@ -29,7 +29,7 @@
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Thread.h"
-#include "swift/Threading/TSan.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
 #include <new>
 
@@ -100,17 +100,22 @@ void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
 /// should generally use a higher-level function.
 void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
 
-/// Tell TSAN about an acquiring load
+/// Tell TSan about an acquiring load
 inline void _swift_tsan_acquire(void *addr) {
   swift::tsan::acquire(addr);
 }
-/// Tell TSAN about a releasing store
+/// Tell TSan about a releasing store
 inline void _swift_tsan_release(void *addr) {
   swift::tsan::release(addr);
 }
-/// Tell TSAN about a consuming load
+/// Tell TSan about a consuming load
 inline void _swift_tsan_consume(void *addr) {
-  swift::tsan::consume(addr);
+  // TSan doesn't support consume, so pretend it's an acquire.
+  //
+  // Note that that means that TSan won't generate errors for non-dependent
+  // reads, so this isn't entirely safe if you're relying solely on TSan to
+  // spot bugs.
+  swift::tsan::acquire(addr);
 }
 
 /// Special values used with DispatchQueueIndex to indicate the global and main

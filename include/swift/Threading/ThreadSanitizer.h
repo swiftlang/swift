@@ -1,4 +1,4 @@
-//===--- TSan.h - TSan support functions ---------------------- -*- C++ -*-===//
+//===--- ThreadSanitizer.h - Thread Sanitizer support --------- -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_THREADING_TSAN_H
-#define SWIFT_THREADING_TSAN_H
+#ifndef SWIFT_THREADING_THREAD_SANITIZER_H
+#define SWIFT_THREADING_THREAD_SANITIZER_H
 
 namespace swift {
 
@@ -28,7 +28,6 @@ namespace tsan {
 inline bool enabled() { return false; }
 template <typename T> T *acquire(T *ptr) { return ptr; }
 template <typename T> T *release(T *ptr) { return ptr; }
-template <typename T> T *consume(T *ptr) { return ptr; }
 
 } // namespace tsan
 #else
@@ -71,19 +70,6 @@ T *release(T *ptr) {
     threading_impl::tsan_release(ptr);
   }
   return ptr;
-}
-
-/// Indicate to TSan that a consuming load has occurred on the current
-/// thread.  If some other thread does a releasing store with the same
-/// pointer, we are indicating to TSan that all writes that happened
-/// before that store will be visible *to those operations that carry a
-/// dependency on the loaded value*.
-///
-/// TSan doesn't currently know about consume, so we lie and say it's an
-/// acquire instead.
-template <typename T>
-T *consume(T *ptr) {
-  return acquire(ptr);
 }
 
 } // namespace tsan

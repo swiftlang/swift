@@ -34,7 +34,7 @@
 #include <atomic>
 #include <cstdint>
 
-#include "swift/Threading/TSan.h"
+#include "swift/Threading/ThreadSanitizer.h"
 
 namespace swift {
 namespace threading_impl {
@@ -84,6 +84,8 @@ inline bool ulock_trylock(ulock_t *lock) {
 }
 
 inline void ulock_unlock(ulock_t *lock) {
+  tsan::release(lock);
+
   const ulock_t tid = ulock_get_tid();
   do {
     ulock_t expected = tid;
@@ -92,8 +94,6 @@ inline void ulock_unlock(ulock_t *lock) {
                                                    __ATOMIC_RELAXED)))
       break;
   } while (ulock_futex(lock, FUTEX_UNLOCK_PI) != 0);
-
-  tsan::release(lock);
 }
 
 } // namespace linux
