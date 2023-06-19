@@ -525,6 +525,19 @@ struct BridgedInstruction {
     return getAs<swift::BuiltinInst>()->getBuiltinInfo().ID;
   }
 
+  enum class IntrinsicID {
+    memcpy, memmove,
+    unknown
+  };
+
+  IntrinsicID BuiltinInst_getIntrinsicID() const {
+    switch (getAs<swift::BuiltinInst>()->getIntrinsicInfo().ID) {
+      case llvm::Intrinsic::memcpy:  return IntrinsicID::memcpy;
+      case llvm::Intrinsic::memmove: return IntrinsicID::memmove;
+      default: return IntrinsicID::unknown;
+    }
+  }
+
   SWIFT_IMPORT_UNSAFE
   swift::SubstitutionMap BuiltinInst_getSubstitutionMap() const {
     return getAs<swift::BuiltinInst>()->getSubstitutions();
