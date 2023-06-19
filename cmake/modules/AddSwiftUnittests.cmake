@@ -58,7 +58,8 @@ function(add_swift_unittest test_dirname)
 
   string(TOUPPER "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_THREADING_PACKAGE}" _threading_package)
   target_compile_definitions("${test_dirname}" PRIVATE
-    "SWIFT_THREADING_${_threading_package}")
+    "SWIFT_THREADING_${_threading_package}"
+    "SWIFT_THREADING_STATIC")
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     if(SWIFT_USE_LINKER)

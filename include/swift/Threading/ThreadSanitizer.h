@@ -34,11 +34,20 @@ template <typename T> T *release(T *ptr) { return ptr; }
 } // namespace tsan
 #else
 
+// If we're static linking to libswiftThreading.a, these symbols can come
+// from there.  If, on the other hand, we're dynamically linked, we want
+// to get them from libswiftCore.dylib instead.
+#if SWIFT_THREADING_STATIC
+#define SWIFT_THREADING_EXPORT extern "C"
+#else
+#define SWIFT_THREADING_EXPORT SWIFT_RUNTIME_EXPORT
+#endif
+
 namespace threading_impl {
 
-SWIFT_RUNTIME_EXPORT bool _swift_tsan_enabled;
-SWIFT_RUNTIME_EXPORT void (*_swift_tsan_acquire)(const void *ptr);
-SWIFT_RUNTIME_EXPORT void (*_swift_tsan_release)(const void *ptr);
+SWIFT_THREADING_EXPORT bool _swift_tsan_enabled;
+SWIFT_THREADING_EXPORT void (*_swift_tsan_acquire)(const void *ptr);
+SWIFT_THREADING_EXPORT void (*_swift_tsan_release)(const void *ptr);
 
 } // namespace threading_impl
 

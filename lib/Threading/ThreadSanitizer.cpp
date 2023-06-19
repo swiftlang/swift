@@ -25,12 +25,9 @@
 namespace swift {
 namespace threading_impl {
 
-extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
-bool _swift_tsan_enabled = false;
-extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
-void (*_swift_tsan_acquire)(const void *) = nullptr;
-extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
-void (*_swift_tsan_release)(const void *) = nullptr;
+SWIFT_THREADING_EXPORT bool _swift_tsan_enabled = false;
+SWIFT_THREADING_EXPORT void (*_swift_tsan_acquire)(const void *) = nullptr;
+SWIFT_THREADING_EXPORT void (*_swift_tsan_release)(const void *) = nullptr;
 
 #if __has_include(<dlfcn.h>)
 #include <dlfcn.h>
