@@ -533,92 +533,6 @@ static bool isCopyableValue(SILValue value) {
 }
 
 //===----------------------------------------------------------------------===//
-//                       MARK: Partial Apply Utilities
-//===----------------------------------------------------------------------===//
-
-static bool findNonEscapingPartialApplyUses(
-    PartialApplyInst *pai, TypeTreeLeafTypeRange leafRange,
-    llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4>
-        &livenessUses) {
-  StackList<Operand *> worklist(pai->getFunction());
-  for (auto *use : pai->getUses())
-    worklist.push_back(use);
-
-  LLVM_DEBUG(llvm::dbgs() << "Searching for partial apply uses!\n");
-  while (!worklist.empty()) {
-    auto *use = worklist.pop_back_val();
-
-    if (use->isTypeDependent())
-      continue;
-
-    auto *user = use->getUser();
-
-    // These instructions do not cause us to escape.
-    if (isIncidentalUse(user) || isa<DestroyValueInst>(user))
-      continue;
-
-    // Look through these instructions.
-    if (isa<BeginBorrowInst>(user) || isa<CopyValueInst>(user) ||
-        isa<MoveValueInst>(user) ||
-        // If we capture this partial_apply in another partial_apply, then we
-        // know that said partial_apply must not have escaped the value since
-        // otherwise we could not have an inout_aliasable argument or be
-        // on_stack. Process it recursively so that we treat uses of that
-        // partial_apply and applies of that partial_apply as uses of our
-        // partial_apply.
-        //
-        // We have this separately from the other look through sections so that
-        // we can make it clearer what we are doing here.
-        isa<PartialApplyInst>(user)) {
-      for (auto *use : cast<SingleValueInstruction>(user)->getUses())
-        worklist.push_back(use);
-      continue;
-    }
-
-    // If we have a mark_dependence and are the value, look through the
-    // mark_dependence.
-    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-      if (mdi->getValue() == use->get()) {
-        for (auto *use : mdi->getUses())
-          worklist.push_back(use);
-        continue;
-      }
-    }
-
-    if (auto apply = FullApplySite::isa(user)) {
-      // If we apply the function or pass the function off to an apply, then we
-      // need to treat the function application as a liveness use of the
-      // variable since if the partial_apply is invoked within the function
-      // application, we may access the captured variable.
-      livenessUses.insert({user, leafRange});
-      if (apply.beginsCoroutineEvaluation()) {
-        // If we have a coroutine, we need to treat the abort_apply and
-        // end_apply as liveness uses since once we execute one of those
-        // instructions, we have returned control to the coroutine which means
-        // that we could then access the captured variable again.
-        auto *bai = cast<BeginApplyInst>(user);
-        SmallVector<EndApplyInst *, 4> endApplies;
-        SmallVector<AbortApplyInst *, 4> abortApplies;
-        bai->getCoroutineEndPoints(endApplies, abortApplies);
-        for (auto *eai : endApplies)
-          livenessUses.insert({eai, leafRange});
-        for (auto *aai : abortApplies)
-          livenessUses.insert({aai, leafRange});
-      }
-      continue;
-    }
-
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "Found instruction we did not understand... returning false!\n");
-    LLVM_DEBUG(llvm::dbgs() << "Instruction: " << *user);
-    return false;
-  }
-
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 //                   MARK: Find Candidate Mark Must Checks
 //===----------------------------------------------------------------------===//
 
@@ -648,8 +562,7 @@ namespace {
 struct UseState {
   MarkMustCheckInst *address;
 
-  /// The number of fields in the exploded type.  Set in initializeLiveness.
-  unsigned fieldCount = UINT_MAX;
+  Optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
   ///
@@ -662,7 +575,7 @@ struct UseState {
 
   /// A map from a liveness requiring use to the part of the type that it
   /// requires liveness for.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> livenessUses;
+  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> livenessUses;
 
   /// A map from a load [copy] or load [take] that we determined must be
   /// converted to a load_borrow to the part of the type tree that it needs to
@@ -731,6 +644,34 @@ struct UseState {
 
   SILFunction *getFunction() const { return address->getFunction(); }
 
+  /// The number of fields in the exploded type.
+  unsigned getNumSubelements() {
+    if (!cachedNumSubelements) {
+      cachedNumSubelements = TypeSubElementCount(address);
+    }
+    return *cachedNumSubelements;
+  }
+
+  SmallBitVector &getOrCreateLivenessUse(SILInstruction *inst) {
+    auto iter = livenessUses.find(inst);
+    if (iter == livenessUses.end()) {
+      iter = livenessUses.insert({inst, SmallBitVector(getNumSubelements())})
+                 .first;
+    }
+    return iter->second;
+  }
+
+  void recordLivenessUse(SILInstruction *inst, SmallBitVector const &bits) {
+    getOrCreateLivenessUse(inst) |= bits;
+  }
+
+  void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    auto &bits = getOrCreateLivenessUse(inst);
+    for (auto element : range.getRange()) {
+      bits.set(element);
+    }
+  }
+
   /// Returns true if this is a terminator instruction that although it doesn't
   /// use our inout argument directly is used by the pass to ensure that we
   /// reinit said argument if we consumed it in the body of the function.
@@ -765,6 +706,7 @@ struct UseState {
 
   void clear() {
     address = nullptr;
+    cachedNumSubelements = llvm::None;
     consumingBlocks.clear();
     destroys.clear();
     livenessUses.clear();
@@ -825,7 +767,9 @@ struct UseState {
   void recordConsumingBlock(SILBasicBlock *block, TypeTreeLeafTypeRange range) {
     auto iter = consumingBlocks.find(block);
     if (iter == consumingBlocks.end()) {
-      iter = consumingBlocks.insert({block, SmallBitVector(fieldCount)}).first;
+      iter =
+          consumingBlocks.insert({block, SmallBitVector(getNumSubelements())})
+              .first;
     }
     range.setBits(iter->second);
   }
@@ -879,7 +823,7 @@ struct UseState {
     {
       auto iter = livenessUses.find(inst);
       if (iter != livenessUses.end()) {
-        if (span.setIntersection(iter->second))
+        if (span.intersects(iter->second))
           return true;
       }
     }
@@ -929,10 +873,94 @@ struct UseState {
 
 } // namespace
 
+//===----------------------------------------------------------------------===//
+//                       MARK: Partial Apply Utilities
+//===----------------------------------------------------------------------===//
+
+static bool findNonEscapingPartialApplyUses(PartialApplyInst *pai,
+                                            TypeTreeLeafTypeRange leafRange,
+                                            UseState &useState) {
+  StackList<Operand *> worklist(pai->getFunction());
+  for (auto *use : pai->getUses())
+    worklist.push_back(use);
+
+  LLVM_DEBUG(llvm::dbgs() << "Searching for partial apply uses!\n");
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+
+    if (use->isTypeDependent())
+      continue;
+
+    auto *user = use->getUser();
+
+    // These instructions do not cause us to escape.
+    if (isIncidentalUse(user) || isa<DestroyValueInst>(user))
+      continue;
+
+    // Look through these instructions.
+    if (isa<BeginBorrowInst>(user) || isa<CopyValueInst>(user) ||
+        isa<MoveValueInst>(user) ||
+        // If we capture this partial_apply in another partial_apply, then we
+        // know that said partial_apply must not have escaped the value since
+        // otherwise we could not have an inout_aliasable argument or be
+        // on_stack. Process it recursively so that we treat uses of that
+        // partial_apply and applies of that partial_apply as uses of our
+        // partial_apply.
+        //
+        // We have this separately from the other look through sections so that
+        // we can make it clearer what we are doing here.
+        isa<PartialApplyInst>(user)) {
+      for (auto *use : cast<SingleValueInstruction>(user)->getUses())
+        worklist.push_back(use);
+      continue;
+    }
+
+    // If we have a mark_dependence and are the value, look through the
+    // mark_dependence.
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      if (mdi->getValue() == use->get()) {
+        for (auto *use : mdi->getUses())
+          worklist.push_back(use);
+        continue;
+      }
+    }
+
+    if (auto apply = FullApplySite::isa(user)) {
+      // If we apply the function or pass the function off to an apply, then we
+      // need to treat the function application as a liveness use of the
+      // variable since if the partial_apply is invoked within the function
+      // application, we may access the captured variable.
+      useState.recordLivenessUse(user, leafRange);
+      if (apply.beginsCoroutineEvaluation()) {
+        // If we have a coroutine, we need to treat the abort_apply and
+        // end_apply as liveness uses since once we execute one of those
+        // instructions, we have returned control to the coroutine which means
+        // that we could then access the captured variable again.
+        auto *bai = cast<BeginApplyInst>(user);
+        SmallVector<EndApplyInst *, 4> endApplies;
+        SmallVector<AbortApplyInst *, 4> abortApplies;
+        bai->getCoroutineEndPoints(endApplies, abortApplies);
+        for (auto *eai : endApplies)
+          useState.recordLivenessUse(eai, leafRange);
+        for (auto *aai : abortApplies)
+          useState.recordLivenessUse(aai, leafRange);
+      }
+      continue;
+    }
+
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "Found instruction we did not understand... returning false!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Instruction: " << *user);
+    return false;
+  }
+
+  return true;
+}
+
 void UseState::initializeLiveness(
     FieldSensitiveMultiDefPrunedLiveRange &liveness) {
-  fieldCount = liveness.getNumSubElements();
-
+  assert(liveness.getNumSubElements() == getNumSubelements());
   // We begin by initializing all of our init uses.
   for (auto initInstAndValue : initInsts) {
     LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
@@ -1764,7 +1792,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found copy of copyable type. Treating as liveness use! "
                  << *user);
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
 
@@ -1816,7 +1844,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
       if (!leafRange)
         return false;
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
 
@@ -1924,7 +1952,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                                  "since they will become end_borrows.\n");
       for (auto *consumeUse : li->getConsumingUses()) {
         auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-        useState.livenessUses.insert({dvi, *leafRange});
+        useState.recordLivenessUse(dvi, *leafRange);
       }
 
       return true;
@@ -1963,7 +1991,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                                  "since they will become end_borrows.\n");
       for (auto *consumeUse : li->getConsumingUses()) {
         auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-        useState.livenessUses.insert({dvi, *leafRange});
+        useState.recordLivenessUse(dvi, *leafRange);
       }
     } else {
       // If we had a load [copy], store this into the copy list. These are the
@@ -2030,7 +2058,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (!leafRange)
         return false;
 
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
 
@@ -2055,7 +2083,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (!leafRange)
         return false;
 
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
   }
@@ -2089,8 +2117,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       // where the partial apply is passed to a function. We treat those as
       // liveness uses. If we find a use we don't understand, we return false
       // here.
-      if (!findNonEscapingPartialApplyUses(pas, *leafRange,
-                                           useState.livenessUses)) {
+      if (!findNonEscapingPartialApplyUses(pas, *leafRange, useState)) {
         LLVM_DEBUG(
             llvm::dbgs()
             << "Failed to understand use of a non-escaping partial apply?!\n");
@@ -2113,7 +2140,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return false;
     }
 
-    useState.livenessUses.insert({user, *leafRange});
+    useState.recordLivenessUse(user, *leafRange);
     return true;
   }
 
@@ -2132,7 +2159,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     llvm_unreachable("standard failure");
   }
 #endif
-  useState.livenessUses.insert({user, *leafRange});
+  useState.recordLivenessUse(user, *leafRange);
 
   return true;
 }

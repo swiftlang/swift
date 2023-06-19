@@ -609,6 +609,16 @@ void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
   addInterestingUser(user, range, lifetimeEnding);
 }
 
+void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
+                                                SmallBitVector const &bits,
+                                                bool lifetimeEnding) {
+  for (auto bit : bits.set_bits()) {
+    liveBlocks.updateForUse(user, bit);
+  }
+
+  addInterestingUser(user, bits, lifetimeEnding);
+}
+
 //===----------------------------------------------------------------------===//
 //                    MARK: FieldSensitivePrunedLiveRange
 //===----------------------------------------------------------------------===//
@@ -820,6 +830,42 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse(
   PRUNED_LIVENESS_LOG(llvm::dbgs() << "No defs found! Delegating to "
                              "FieldSensitivePrunedLiveness::updateForUse.\n");
   FieldSensitivePrunedLiveness::updateForUse(user, range, lifetimeEnding);
+}
+
+template <typename LivenessWithDefs>
+void FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse(
+    SILInstruction *user, SmallBitVector const &bits, bool lifetimeEnding) {
+  PRUNED_LIVENESS_LOG(
+      llvm::dbgs()
+      << "Begin FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse "
+         "for: "
+      << *user);
+  PRUNED_LIVENESS_LOG(llvm::dbgs()
+                      << "Looking for def instruction earlier in the block!\n");
+
+  auto *parentBlock = user->getParent();
+  for (auto ii = std::next(user->getReverseIterator()),
+            ie = parentBlock->rend();
+       ii != ie; ++ii) {
+    // If we find the def, just mark this instruction as being an interesting
+    // instruction.
+    if (asImpl().isDef(&*ii, bits)) {
+      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found def: " << *ii);
+      PRUNED_LIVENESS_LOG(
+          llvm::dbgs()
+          << "    Marking inst as interesting user and returning!\n");
+      addInterestingUser(user, bits, lifetimeEnding);
+      return;
+    }
+  }
+
+  // Otherwise, just delegate to our parent class's update for use. This will
+  // update liveness for our predecessor blocks and add this instruction as an
+  // interesting user.
+  PRUNED_LIVENESS_LOG(llvm::dbgs()
+                      << "No defs found! Delegating to "
+                         "FieldSensitivePrunedLiveness::updateForUse.\n");
+  FieldSensitivePrunedLiveness::updateForUse(user, bits, lifetimeEnding);
 }
 
 //===----------------------------------------------------------------------===//
