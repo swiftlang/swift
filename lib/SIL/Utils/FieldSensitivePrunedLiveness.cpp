@@ -498,41 +498,6 @@ void FieldSensitivePrunedLiveBlocks::computeScalarUseBlockLiveness(
   }
 }
 
-/// Update the current def's liveness based on one specific use instruction.
-///
-/// Return the updated liveness of the \p use block (LiveOut or LiveWithin).
-///
-/// Terminators are not live out of the block.
-void FieldSensitivePrunedLiveBlocks::updateForUse(
-    SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
-    SmallVectorImpl<IsLive> &resultingLivenessInfo) {
-  assert(isInitialized());
-  resultingLivenessInfo.clear();
-
-  SWIFT_ASSERT_ONLY(seenUse = true);
-
-  auto *bb = user->getParent();
-  getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
-  assert(resultingLivenessInfo.size() == (endBitNo - startBitNo));
-
-  for (unsigned index : indices(resultingLivenessInfo)) {
-    unsigned specificBitNo = startBitNo + index;
-    switch (resultingLivenessInfo[index]) {
-    case LiveOut:
-    case LiveWithin:
-      continue;
-    case Dead: {
-      // This use block has not yet been marked live. Mark it and its
-      // predecessor blocks live.
-      computeScalarUseBlockLiveness(bb, specificBitNo);
-      resultingLivenessInfo[index] = getBlockLiveness(bb, specificBitNo);
-      continue;
-    }
-    }
-    llvm_unreachable("covered switch");
-  }
-}
-
 llvm::StringRef
 FieldSensitivePrunedLiveBlocks::getStringRef(IsLive isLive) const {
   switch (isLive) {
@@ -598,16 +563,6 @@ void FieldSensitivePrunedLivenessBoundary::dump() const {
 //===----------------------------------------------------------------------===//
 //                        MARK: FieldSensitiveLiveness
 //===----------------------------------------------------------------------===//
-
-void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
-                                                TypeTreeLeafTypeRange range,
-                                                bool lifetimeEnding) {
-  SmallVector<FieldSensitivePrunedLiveBlocks::IsLive, 8> resultingLiveness;
-  liveBlocks.updateForUse(user, range.startEltOffset, range.endEltOffset,
-                          resultingLiveness);
-
-  addInterestingUser(user, range, lifetimeEnding);
-}
 
 void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
                                                 SmallBitVector const &bits,

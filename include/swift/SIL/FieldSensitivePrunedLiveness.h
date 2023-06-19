@@ -581,11 +581,6 @@ public:
     return getBlockLiveness(block, bitNo);
   }
 
-  /// Update this range of liveness results for a single use.
-  void updateForUse(SILInstruction *user, unsigned startBitNo,
-                    unsigned endBitNo,
-                    SmallVectorImpl<IsLive> &resultingLiveness);
-
   IsLive getBlockLiveness(SILBasicBlock *bb, unsigned bitNo) const {
     assert(isInitialized());
     auto liveBlockIter = liveBlocks.find(bb);
@@ -853,9 +848,6 @@ public:
   ///
   /// Also for flexibility, \p affectedAddress must be a derived projection from
   /// the base that \p user is affecting.
-  void updateForUse(SILInstruction *user, TypeTreeLeafTypeRange span,
-                    bool lifetimeEnding);
-
   void updateForUse(SILInstruction *user, SmallBitVector const &bits,
                     bool lifetimeEnding);
 
@@ -946,11 +938,6 @@ protected:
   ///
   /// This call is not considered the end of %val's lifetime. The @owned
   /// argument must be copied.
-  void addInterestingUser(SILInstruction *user, TypeTreeLeafTypeRange range,
-                          bool lifetimeEnding) {
-    getOrCreateInterestingUser(user).addUses(range, lifetimeEnding);
-  }
-
   void addInterestingUser(SILInstruction *user, SmallBitVector const &bits,
                           bool lifetimeEnding) {
     getOrCreateInterestingUser(user).addUses(bits, lifetimeEnding);
