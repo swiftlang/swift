@@ -358,6 +358,13 @@ struct TypeTreeLeafTypeRange {
            endEltOffset >= range.endEltOffset;
   }
 
+  /// Sets each bit in \p bits corresponding to an element of this range.
+  void setBits(SmallBitVector &bits) {
+    for (auto element : getRange()) {
+      bits.set(element);
+    }
+  }
+
   IntRange<unsigned> getRange() const {
     return range(startEltOffset, endEltOffset);
   }
@@ -666,17 +673,60 @@ class FieldSensitivePrunedLiveness {
   FieldSensitivePrunedLiveBlocks liveBlocks;
 
 public:
+  enum IsInterestingUser { NonUser, NonLifetimeEndingUse, LifetimeEndingUse };
+
   struct InterestingUser {
-    TypeTreeLeafTypeRange subEltSpan;
-    bool isConsuming;
+    SmallBitVector liveBits;
+    SmallBitVector consumingBits;
 
-    InterestingUser() : subEltSpan(), isConsuming(false) {}
-    InterestingUser(TypeTreeLeafTypeRange subEltSpan, bool isConsuming)
-        : subEltSpan(subEltSpan), isConsuming(isConsuming) {}
+    InterestingUser(unsigned bitCount)
+        : liveBits(bitCount), consumingBits(bitCount) {}
 
-    InterestingUser &operator&=(bool otherValue) {
-      isConsuming &= otherValue;
-      return *this;
+    InterestingUser(unsigned bitCount, TypeTreeLeafTypeRange range,
+                    bool lifetimeEnding)
+        : liveBits(bitCount), consumingBits(bitCount) {
+      addUses(range, lifetimeEnding);
+    }
+
+    /// Record that the instruction uses the bits of the value in \p range.
+    void addUses(TypeTreeLeafTypeRange range, bool lifetimeEnding) {
+      range.setBits(liveBits);
+      if (lifetimeEnding) {
+        range.setBits(consumingBits);
+      }
+    }
+
+    /// Populates the provided vector with contiguous ranges of bits which are
+    /// users of the same sort.
+    void getContiguousRanges(
+        SmallVectorImpl<std::pair<TypeTreeLeafTypeRange, IsInterestingUser>>
+            &ranges) const {
+      if (liveBits.size() == 0)
+        return;
+
+      assert(ranges.empty());
+      Optional<std::pair<unsigned, IsInterestingUser>> current = llvm::None;
+      for (unsigned bit = 0, size = liveBits.size(); bit < size; ++bit) {
+        auto interesting = isInterestingUser(bit);
+        if (!current) {
+          current = {bit, interesting};
+          continue;
+        }
+        if (current->second != interesting) {
+          ranges.push_back(
+              {TypeTreeLeafTypeRange(current->first, bit), current->second});
+          current = {bit, interesting};
+        }
+      }
+      ranges.push_back({TypeTreeLeafTypeRange(current->first, liveBits.size()),
+                        current->second});
+    }
+
+    IsInterestingUser isInterestingUser(unsigned element) const {
+      if (!liveBits.test(element))
+        return NonUser;
+      return consumingBits.test(element) ? LifetimeEndingUse
+                                         : NonLifetimeEndingUse;
     }
   };
 
@@ -758,42 +808,6 @@ public:
     return llvm::make_range(users.begin(), users.end());
   }
 
-  using LifetimeEndingUserRange = OptionalTransformRange<
-      UserRange,
-      function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
-          const std::pair<SILInstruction *, InterestingUser> &)>>;
-  LifetimeEndingUserRange getAllLifetimeEndingUses() const {
-    assert(isInitialized());
-    function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
-        const std::pair<SILInstruction *, InterestingUser> &)>
-        op;
-    op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
-        -> Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>> {
-      if (pair.second.isConsuming)
-        return {{pair.first, pair.second.subEltSpan}};
-      return None;
-    };
-    return LifetimeEndingUserRange(getAllUsers(), op);
-  }
-
-  using NonLifetimeEndingUserRange = OptionalTransformRange<
-      UserRange,
-      function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
-          const std::pair<SILInstruction *, InterestingUser> &)>>;
-  NonLifetimeEndingUserRange getAllNonLifetimeEndingUses() const {
-    assert(isInitialized());
-    function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
-        const std::pair<SILInstruction *, InterestingUser> &)>
-        op;
-    op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
-        -> Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>> {
-      if (!pair.second.isConsuming)
-        return {{pair.first, pair.second.subEltSpan}};
-      return None;
-    };
-    return NonLifetimeEndingUserRange(getAllUsers(), op);
-  }
-
   using UserBlockRange = TransformRange<
       UserRange, function_ref<SILBasicBlock *(
                      const std::pair<SILInstruction *, InterestingUser> &)>>;
@@ -848,19 +862,37 @@ public:
                         SmallBitVector &liveOutBits,
                         SmallBitVector &deadBits) const;
 
-  enum IsInterestingUser { NonUser, NonLifetimeEndingUse, LifetimeEndingUse };
+  /// If \p user has had uses recored, return a pointer to the InterestingUser
+  /// where they've been recorded.
+  InterestingUser const *getInterestingUser(SILInstruction *user) const {
+    auto iter = users.find(user);
+    if (iter == users.end())
+      return nullptr;
+    return &iter->second;
+  }
 
-  /// Return a result indicating whether the given user was identified as an
-  /// interesting use of the current def and whether it ends the lifetime.
-  std::pair<IsInterestingUser, Optional<TypeTreeLeafTypeRange>>
-  isInterestingUser(SILInstruction *user) const {
+  /// How \p user uses the field at \p element.
+  IsInterestingUser isInterestingUser(SILInstruction *user,
+                                      unsigned element) const {
     assert(isInitialized());
-    auto useIter = users.find(user);
-    if (useIter == users.end())
-      return {NonUser, None};
-    auto isInteresting =
-        useIter->second.isConsuming ? LifetimeEndingUse : NonLifetimeEndingUse;
-    return {isInteresting, useIter->second.subEltSpan};
+    auto *record = getInterestingUser(user);
+    if (!record)
+      return NonUser;
+    return record->isInterestingUser(element);
+  }
+
+  /// Whether \p user uses the fields in \p range as indicated by \p kind.
+  bool isInterestingUserOfKind(SILInstruction *user, IsInterestingUser kind,
+                               TypeTreeLeafTypeRange range) const {
+    auto *record = getInterestingUser(user);
+    if (!record)
+      return kind == IsInterestingUser::NonUser;
+
+    for (auto element : range.getRange()) {
+      if (isInterestingUser(user, element) != kind)
+        return false;
+    }
+    return true;
   }
 
   unsigned getNumSubElements() const { return liveBlocks.getNumBitsToTrack(); }
@@ -886,10 +918,11 @@ protected:
   /// argument must be copied.
   void addInterestingUser(SILInstruction *user, TypeTreeLeafTypeRange range,
                           bool lifetimeEnding) {
-    auto iterAndSuccess =
-        users.insert({user, InterestingUser(range, lifetimeEnding)});
-    if (!iterAndSuccess.second)
-      iterAndSuccess.first->second &= lifetimeEnding;
+    auto iter = users.find(user);
+    if (iter == users.end()) {
+      iter = users.insert({user, InterestingUser(getNumSubElements())}).first;
+    }
+    iter->second.addUses(range, lifetimeEnding);
   }
 };
 

@@ -564,6 +564,38 @@ void FieldSensitivePrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
 void FieldSensitivePrunedLiveBlocks::dump() const { print(llvm::dbgs()); }
 
 //===----------------------------------------------------------------------===//
+//                   FieldSensitivePrunedLivenessBoundary
+//===----------------------------------------------------------------------===//
+
+void FieldSensitivePrunedLivenessBoundary::print(llvm::raw_ostream &OS) const {
+  for (auto pair : lastUsers) {
+    auto *user = pair.first;
+    auto bits = pair.second;
+    OS << "last user: " << *user 
+       << "\tat " << bits << "\n";
+  }
+  for (auto pair : boundaryEdges) {
+    auto *block = pair.first;
+    auto bits = pair.second;
+    OS << "boundary edge: ";
+    block->printAsOperand(OS);
+    OS << "\n" << "\tat " << bits << "\n";
+  }
+  if (!deadDefs.empty()) {
+    for (auto pair : deadDefs) {
+      auto *deadDef = pair.first;
+      auto bits = pair.second;
+      OS << "dead def: " << *deadDef 
+         << "\tat " << bits << "\n";
+    }
+  }
+}
+
+void FieldSensitivePrunedLivenessBoundary::dump() const {
+  print(llvm::dbgs());
+}
+
+//===----------------------------------------------------------------------===//
 //                        MARK: FieldSensitiveLiveness
 //===----------------------------------------------------------------------===//
 
@@ -673,9 +705,7 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
         // If we are not live and have an interesting user that maps to our bit,
         // mark this bit as being live again.
         if (!isLive) {
-          auto interestingUser = isInterestingUser(&blockInst);
-          bool isInteresting =
-              interestingUser.first && interestingUser.second->contains(bit);
+          bool isInteresting = isInterestingUser(&blockInst, bit);
           PRUNED_LIVENESS_LOG(llvm::dbgs()
                      << "        Inst was dead... Is InterestingUser: "
                      << (isInteresting ? "true" : "false") << '\n');
@@ -806,8 +836,7 @@ void findBoundaryInNonDefBlock(SILBasicBlock *block, unsigned bitNo,
   PRUNED_LIVENESS_LOG(llvm::dbgs() << "Looking for boundary in non-def block\n");
   for (SILInstruction &inst : llvm::reverse(*block)) {
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting: " << inst);
-    auto interestingUser = liveness.isInterestingUser(&inst);
-    if (interestingUser.first && interestingUser.second->contains(bitNo)) {
+    if (liveness.isInterestingUser(&inst, bitNo)) {
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Is interesting user for this bit!\n");
       boundary.getLastUserBits(&inst).set(bitNo);
       return;
@@ -837,8 +866,7 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
       boundary.getDeadDefsBits(cast<SILNode>(&inst)).set(bitNo);
       return;
     }
-    auto interestingUser = liveness.isInterestingUser(&inst);
-    if (interestingUser.first && interestingUser.second->contains(bitNo)) {
+    if (liveness.isInterestingUser(&inst, bitNo)) {
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found interesting user: " << inst);
       boundary.getLastUserBits(&inst).set(bitNo);
       return;
@@ -973,8 +1001,7 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
     PRUNED_LIVENESS_LOG(llvm::dbgs()
                << "    Checking if this inst is also a last user...\n");
     if (!isLive) {
-      auto interestingUser = isInterestingUser(&inst);
-      if (interestingUser.first && interestingUser.second->contains(bitNo)) {
+      if (isInterestingUser(&inst, bitNo)) {
         PRUNED_LIVENESS_LOG(
             llvm::dbgs()
             << "        Was interesting user! Moving from dead -> live!\n");
