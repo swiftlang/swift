@@ -4312,6 +4312,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class HasInitAccessorRequest
+    : public SimpleRequest<HasInitAccessorRequest, bool(AbstractStorageDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class InitAccessorReferencedVariablesRequest
     : public SimpleRequest<InitAccessorReferencedVariablesRequest,
                            ArrayRef<VarDecl *>(DeclAttribute *, AccessorDecl *,
