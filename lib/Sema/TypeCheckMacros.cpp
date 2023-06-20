@@ -342,21 +342,17 @@ LoadedCompilerPlugin
 CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                     Identifier moduleName) const {
   PluginLoader &loader = ctx->getPluginLoader();
+  const auto &entry = loader.lookupPluginByModuleName(moduleName);
 
-  std::string libraryPath;
-  std::string executablePath;
-  std::tie(libraryPath, executablePath) =
-      loader.lookupPluginByModuleName(moduleName);
-
-  if (!executablePath.empty()) {
+  if (!entry.executablePath.empty()) {
     if (LoadedExecutablePlugin *executablePlugin =
-            loader.loadExecutablePlugin(executablePath)) {
-      return initializeExecutablePlugin(*ctx, executablePlugin, libraryPath,
-                                        moduleName);
+            loader.loadExecutablePlugin(entry.executablePath)) {
+      return initializeExecutablePlugin(*ctx, executablePlugin,
+                                        entry.libraryPath, moduleName);
     }
-  } else if (!libraryPath.empty()) {
+  } else if (!entry.libraryPath.empty()) {
     if (LoadedLibraryPlugin *libraryPlugin =
-            loader.loadLibraryPlugin(libraryPath)) {
+            loader.loadLibraryPlugin(entry.libraryPath)) {
       return libraryPlugin;
     }
   }
