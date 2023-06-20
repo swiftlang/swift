@@ -157,6 +157,10 @@ class ReabstractionInfo {
     LoadableAndTrivial
   };
   
+  unsigned param2ArgIndex(unsigned ParamIdx) const  {
+    return ParamIdx + NumFormalIndirectResults;
+  }
+
   // Create a new substituted type with the updated signature.
   CanSILFunctionType createSubstitutedType(SILFunction *OrigF,
                                            SubstitutionMap SubstMap,
@@ -195,8 +199,8 @@ public:
                     ApplySite Apply, SILFunction *Callee,
                     SubstitutionMap ParamSubs,
                     IsSerialized_t Serialized,
-                    bool ConvertIndirectToDirect,
-                    bool dropMetatypeArgs,
+                    bool ConvertIndirectToDirect = true,
+                    bool dropMetatypeArgs = false,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
@@ -210,11 +214,7 @@ public:
   IsSerialized_t isSerialized() const {
     return Serialized;
   }
-
-  unsigned param2ArgIndex(unsigned ParamIdx) const  {
-    return ParamIdx + NumFormalIndirectResults;
-  }
-
+  
   /// Returns true if the specialized function needs an alternative mangling.
   /// See hasConvertedResilientParams.
   bool needAlternativeMangling() const {
@@ -313,8 +313,6 @@ public:
   /// SubstFTy by applying the re-abstractions.
   CanSILFunctionType createSpecializedType(CanSILFunctionType SubstFTy,
                                            SILModule &M) const;
-
-  CanSILFunctionType createThunkType(PartialApplyInst *forPAI) const;
 
   SILFunction *getNonSpecializedFunction() const { return Callee; }
 
