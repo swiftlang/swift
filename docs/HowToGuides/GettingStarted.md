@@ -157,6 +157,7 @@ toolchain as a one-off, there are a couple of differences:
 ### Linux
 
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
+   * [Ubuntu 18.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/18.04/Dockerfile)
    * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
    * [Ubuntu 22.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/22.04/Dockerfile)
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
