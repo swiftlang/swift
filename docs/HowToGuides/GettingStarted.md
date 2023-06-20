@@ -163,7 +163,7 @@ toolchain as a one-off, there are a couple of differences:
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
-3. To install [Sccache][] (optional):
+2. To install [Sccache][] (optional):
    * If you're not building within a Docker container:
      ```sh
      sudo snap install sccache --candidate --classic
