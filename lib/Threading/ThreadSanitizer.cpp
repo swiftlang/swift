@@ -18,6 +18,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Threading/ThreadSanitizer.h"
+
+#if SWIFT_THREADING_TSAN_SUPPORT
+
 #include "swift/shims/Visibility.h"
 
 #include <cstdio>
@@ -50,7 +53,9 @@ void __tsan_on_initialize() {
     next_init();
   }
 }
-#endif
+#endif // __has_include(<dlfcn.h>)
 
 } // namespace threading_impl
 } // namespace swift
+
+#endif // SWIFT_THREADING_TSAN_SUPPORT

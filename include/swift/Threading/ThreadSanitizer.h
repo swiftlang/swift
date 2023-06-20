@@ -25,6 +25,9 @@
 namespace swift {
 
 #if defined(_WIN32) || defined(__wasi__) || !__has_include(<dlfcn.h>)
+
+#define SWIFT_THREADING_TSAN_SUPPORT 0
+
 namespace tsan {
 
 inline bool enabled() { return false; }
@@ -33,6 +36,8 @@ template <typename T> T *release(T *ptr) { return ptr; }
 
 } // namespace tsan
 #else
+
+#define SWIFT_THREADING_TSAN_SUPPORT 1
 
 // If we're static linking to libswiftThreading.a, these symbols can come
 // from there.  If, on the other hand, we're dynamically linked, we want
