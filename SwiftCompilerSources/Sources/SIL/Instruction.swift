@@ -1004,6 +1004,9 @@ final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
 final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
+  public var source: Value { operand.value }
+  public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
+  public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
 }
 
 final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
