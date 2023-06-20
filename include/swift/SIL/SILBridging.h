@@ -787,6 +787,12 @@ struct BridgedInstruction {
   }
 
   SWIFT_IMPORT_UNSAFE
+  inline BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedBasicBlock CheckedCastBranch_getFailureBlock() const;
+
+  SWIFT_IMPORT_UNSAFE
   swift::SubstitutionMap ApplySite_getSubstitutionMap() const {
     auto as = swift::ApplySite(getInst());
     return as.getSubstitutionMap();
@@ -1258,6 +1264,17 @@ struct BridgedBuilder{
     return {builder().createStore(regularLoc(), src.getSILValue(), dst.getSILValue(),
                                   (swift::StoreOwnershipQualifier)ownership)};
   }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createInitExistentialRef(BridgedValue instance,
+                                              swift::SILType type,
+                                              BridgedInstruction useConformancesOf) const {
+    auto *src = useConformancesOf.getAs<swift::InitExistentialRefInst>();
+    return {builder().createInitExistentialRef(regularLoc(), type,
+                                               src->getFormalConcreteType(),
+                                               instance.getSILValue(),
+                                               src->getConformances())};
+  }
 };
 
 // AST bridging
@@ -1350,6 +1367,14 @@ BridgedBasicBlock BridgedInstruction::BranchInst_getTargetBlock() const {
 
 void BridgedInstruction::TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const {
   getAs<swift::TermInst>()->replaceBranchTarget(from.getBlock(), to.getBlock());
+}
+
+BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const {
+  return {getAs<swift::CheckedCastBranchInst>()->getSuccessBB()};
+}
+
+inline BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const {
+  return {getAs<swift::CheckedCastBranchInst>()->getFailureBB()};
 }
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {
