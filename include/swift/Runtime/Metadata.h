@@ -1037,6 +1037,12 @@ SWIFT_RUNTIME_STDLIB_SPI
 void _swift_registerConcurrencyStandardTypeDescriptors(
     const ConcurrencyStandardTypeDescriptors *descriptors);
 
+/// Walk the parent descriptor chain to find the nominal type parent of the
+/// provided type.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *_swift_getParentType(const Metadata *type);
+
 #pragma clang diagnostic pop
 
 } // end namespace swift

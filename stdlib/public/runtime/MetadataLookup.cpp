@@ -3084,6 +3084,54 @@ static void _gatherWrittenGenericArgs(
   }
 }
 
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *swift::_swift_getParentType(const Metadata *type) {
+  auto descriptor = type->getTypeContextDescriptor();
+
+  // We cannot provide the parent type of a type who cannot produce a
+  // descriptor.
+  if (!descriptor) {
+    return nullptr;
+  }
+
+  auto parentCd = descriptor->Parent.get();
+
+  // Walk the parent chain until we get to a type descriptor.
+  while (parentCd) {
+    // If this parent is a type descriptor, we're done.
+    if (isa<TypeContextDescriptor>(parentCd)) {
+      break;
+    }
+
+    // If this type is in an extension, demangle the extended context to figure
+    // out who our real parent is.
+    if (isa<ExtensionContextDescriptor>(parentCd)) {
+      DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+      parentCd = _findExtendedTypeContextDescriptor(parentCd, demangler);
+
+      break;
+    }
+
+    parentCd = parentCd->Parent;
+  }
+
+  if (!parentCd) {
+    return nullptr;
+  }
+
+  auto parent = cast<TypeContextDescriptor>(parentCd);
+
+  // We don't handle generic types for the time being.
+  if (parent->isGeneric()) {
+    return nullptr;
+  }
+
+  // Our type isn't generic, so the accessor call is just a simple request.
+  return parent->getAccessFunction()(MetadataState::Complete).Value;
+}
+
 struct InitializeDynamicReplacementLookup {
   InitializeDynamicReplacementLookup() {
     initializeDynamicReplacementLookup();
