@@ -569,14 +569,8 @@ private:
     if (FuncDecl *FD = L.getAsASTNode<FuncDecl>())
       return getName(*FD);
 
-    if (L.isASTNode<ConstructorDecl>())
-      return "init";
-
-    if (L.isASTNode<DestructorDecl>())
-      return "deinit";
-
     if (ValueDecl *D = L.getAsASTNode<ValueDecl>())
-      return D->getBaseIdentifier().str();
+      return D->getBaseName().userFacingName();
 
     if (auto *D = L.getAsASTNode<MacroExpansionDecl>())
       return D->getMacroName().getBaseIdentifier().str();
