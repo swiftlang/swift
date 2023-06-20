@@ -2301,16 +2301,7 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
   bool hasWhitespaceBeforeName = poundEndLoc != Tok.getLoc();
 
-  // Diagnose and parse keyword right after `#`.
-  if (Tok.isKeyword() && !hasWhitespaceBeforeName) {
-    diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
-    diagnose(Tok, diag::backticks_to_escape)
-        .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
-
-    // Let 'parseDeclNameRef' to parse this as an identifier.
-    Tok.setKind(tok::identifier);
-  }
-  macroNameRef = parseDeclNameRef(macroNameLoc, diag, DeclNameOptions());
+  macroNameRef = parseDeclNameRef(macroNameLoc, diag, DeclNameFlag::AllowKeywords);
   if (!macroNameRef)
     return makeParserError();
 
