@@ -5229,8 +5229,8 @@ WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"
         "exiting %4 context in call to non-isolated %2 %3|"
         "passed in implicitly asynchronous call to %4 %2 %3|"
-        "in parameter of %4 %2 %3 satisfying protocol requirement|"
-        "in parameter of %4 overriding %2 %3|"
+        "in parameter of the protocol requirement satisfied by %4 %2 %3|"
+        "in parameter of superclass method overridden by %4 %2 %3|"
         "in parameter of %4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_param_type,none,
