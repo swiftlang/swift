@@ -62,7 +62,7 @@ $ utils/build-script \
     --android \                                # Build for Android.
     --android-ndk $NDK_PATH \                  # Path to an Android NDK.
     --android-arch aarch64 \                   # Optionally specify Android architecture, alternately armv7 or x86_64
-    --android-api-level 21 \                   # The Android API level to target. Swift only supports 21 or greater.
+    --android-api-level 23 \                   # The Android API level to target. Swift only supports 21 or greater.
     --stdlib-deployment-targets=android-aarch64 \ # Only cross-compile the stdlib for Android, ie don't build the native stdlib for Linux
     --native-swift-tools-path=$SWIFT_PATH \    # Path to your prebuilt Swift compiler
     --native-clang-tools-path=$SWIFT_PATH \    # Path to a prebuilt clang compiler, one comes with the Swift toolchain
