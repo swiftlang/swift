@@ -487,6 +487,7 @@ function verify_host_is_supported() {
       | watchsimulator-arm64    \
       | watchos-armv7k          \
       | watchos-arm64_32        \
+      | wasi-wasm32             \
       | android-armv7           \
       | android-aarch64         \
       | android-x86_64          \

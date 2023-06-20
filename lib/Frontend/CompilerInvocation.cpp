@@ -2807,6 +2807,16 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     return true;
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_platform_c_calling_convention)) {
+    Opts.PlatformCCallingConvention =
+      llvm::StringSwitch<llvm::CallingConv::ID>(A->getValue())
+        .Case("c", llvm::CallingConv::C)
+        .Case("arm_apcs", llvm::CallingConv::ARM_APCS)
+        .Case("arm_aapcs", llvm::CallingConv::ARM_AAPCS)
+        .Case("arm_aapcs_vfp", llvm::CallingConv::ARM_AAPCS_VFP)
+        .Default(llvm::CallingConv::C);
+  }
+
   return false;
 }
 
