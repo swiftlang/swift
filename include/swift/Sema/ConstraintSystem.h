@@ -4852,11 +4852,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify the given defaultable closure type constraint.
-  SolutionKind simplifyDefaultClosureTypeConstraint(
-      Type closureType, Type inferredType,
-      ArrayRef<TypeVariableType *> referencedOuterParameters,
-      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+  /// Attempt to simplify the given fallback type constraint.
+  SolutionKind
+  simplifyFallbackTypeConstraint(Type defaultableType, Type fallbackType,
+                                 ArrayRef<TypeVariableType *> referencedVars,
+                                 TypeMatchOptions flags,
+                                 ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify a property wrapper constraint.
   SolutionKind simplifyPropertyWrapperConstraint(Type wrapperType, Type wrappedValueType,
