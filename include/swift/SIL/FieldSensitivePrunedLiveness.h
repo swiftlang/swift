@@ -571,19 +571,22 @@ public:
   }
 
   /// Update this liveness result for a single use.
-  IsLive updateForUse(SILInstruction *user, unsigned bitNo) {
+  IsLive updateForUse(SILInstruction *user, unsigned bitNo,
+                      bool isUserBeforeDef) {
     assert(isInitialized());
     auto *block = user->getParent();
-    auto liveness = getBlockLiveness(block, bitNo);
-    if (liveness != Dead)
-      return liveness;
+    if (!isUserBeforeDef) {
+      auto liveness = getBlockLiveness(block, bitNo);
+      if (liveness != Dead)
+        return liveness;
+    }
     computeScalarUseBlockLiveness(block, bitNo);
     return getBlockLiveness(block, bitNo);
   }
 
   /// Update this range of liveness results for a single use.
   void updateForUse(SILInstruction *user, unsigned startBitNo,
-                    unsigned endBitNo,
+                    unsigned endBitNo, SmallBitVector const &useBeforeDefBits,
                     SmallVectorImpl<IsLive> &resultingLiveness);
 
   IsLive getBlockLiveness(SILBasicBlock *bb, unsigned bitNo) const {
@@ -854,10 +857,12 @@ public:
   /// Also for flexibility, \p affectedAddress must be a derived projection from
   /// the base that \p user is affecting.
   void updateForUse(SILInstruction *user, TypeTreeLeafTypeRange span,
-                    bool lifetimeEnding);
+                    bool lifetimeEnding,
+                    SmallBitVector const &useBeforeDefBits);
 
   void updateForUse(SILInstruction *user, SmallBitVector const &bits,
-                    bool lifetimeEnding);
+                    bool lifetimeEnding,
+                    SmallBitVector const &useBeforeDefBits);
 
   void getBlockLiveness(SILBasicBlock *bb, TypeTreeLeafTypeRange span,
                         SmallVectorImpl<FieldSensitivePrunedLiveBlocks::IsLive>
@@ -1160,6 +1165,12 @@ public:
     return def.first->getParentBlock() == block && def.second->contains(bit);
   }
 
+  template <typename Iterable>
+  void isUserBeforeDef(SILInstruction *user, Iterable const &iterable,
+                       SmallBitVector &useBeforeDefBits) const {
+    assert(useBeforeDefBits.none());
+  }
+
   void
   findBoundariesInBlock(SILBasicBlock *block, unsigned bitNo, bool isLiveOut,
                         FieldSensitivePrunedLivenessBoundary &boundary) const;
@@ -1241,6 +1252,36 @@ public:
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
       return span.setIntersection(storedSpan).has_value();
     });
+  }
+
+  bool isDefBlock(SILBasicBlock *block, SmallBitVector const &bits) const {
+    assert(isInitialized());
+    auto iter = defBlocks.find(block);
+    if (!iter)
+      return false;
+    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
+      return storedSpan.intersects(bits);
+    });
+  }
+
+  /// Return true if \p user occurs before the first def in the same basic
+  /// block. In classical liveness dataflow terms, gen/kill conditions over all
+  /// users in 'bb' are:
+  ///
+  ///   Gen(bb)  |= !isDefBlock(bb) || isUserBeforeDef(bb)
+  ///   Kill(bb) &= isDefBlock(bb) && !isUserBeforeDef(bb)
+  ///
+  /// If 'bb' has no users, it is neither a Gen nor Kill. Otherwise, Gen and
+  /// Kill are complements.
+  bool isUserBeforeDef(SILInstruction *user, unsigned element) const;
+  template <typename Iterable>
+  void isUserBeforeDef(SILInstruction *user, Iterable const &iterable,
+                       SmallBitVector &useBeforeDefBits) const {
+    for (auto bit : iterable) {
+      if (isUserBeforeDef(user, bit)) {
+        useBeforeDefBits.set(bit);
+      }
+    }
   }
 
   bool isDef(SILInstruction *inst, unsigned bit) const {
