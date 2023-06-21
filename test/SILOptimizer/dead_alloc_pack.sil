@@ -1,0 +1,101 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
+
+import Swift
+import Builtin
+import SwiftShims
+
+sil @makeTuple : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> @pack_out Pack{repeat each T} {
+  
+}
+
+// CHECK-LABEL: sil @makeEmptyPack : $@convention(thin) () -> () {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: %0 = tuple ()
+// CHECK-NEXT: return %0 : $()
+sil @makeEmptyPack : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_pack $Pack{}
+  debug_value %0 : $*Pack{}
+  dealloc_pack %0 : $*Pack{}
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @makeConcretePack : $@convention(thin) () -> () {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: %0 = tuple ()
+// CHECK-NEXT: return %0 : $()
+sil @makeConcretePack : $@convention(thin) () -> () {
+  %0 = alloc_pack $Pack{Bool, Bool}
+  %1 = scalar_pack_index 0 of $Pack{Bool, Bool}
+  %2 = scalar_pack_index 1 of $Pack{Bool, Bool}
+
+  %3 = alloc_stack $Bool
+  %4 = integer_literal $Builtin.Int1, 1
+  %5 = struct $Bool (%4 : $Builtin.Int1)
+  store %5 to %3 : $*Bool
+
+  %6 = alloc_stack $Bool
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = struct $Bool (%7 : $Builtin.Int1)
+  store %8 to %6 : $*Bool
+
+  pack_element_set %3 : $*Bool into %1 of %0 : $*Pack{Bool, Bool}
+  pack_element_set %6 : $*Bool into %2 of %0 : $*Pack{Bool, Bool}
+
+  dealloc_stack %6 : $*Bool
+  dealloc_stack %3 : $*Bool
+  dealloc_pack %0 : $*Pack{Bool, Bool}
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// FIXME: This should get eliminated, but the load (pack_element_get) prevents
+// deletion. Add logic in DeadStore/LSLocation to potentially remove these.
+//
+// CHECK-LABEL: sil @makePackGet : $@convention(thin) () -> () {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: %0 = alloc_pack $Pack{Bool}
+sil @makePackGet : $@convention(thin) () -> () {
+  %0 = alloc_pack $Pack{Bool}
+  %1 = scalar_pack_index 0 of $Pack{Bool}
+
+  %2 = alloc_stack $Bool
+  %3 = integer_literal $Builtin.Int1, 1
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  store %4 to %2 : $*Bool
+
+  pack_element_set %2 : $*Bool into %1 of %0 : $*Pack{Bool}
+
+  %5 = pack_element_get %1 of %0 : $*Pack{Bool} as $*Bool
+  %6 = load %5 : $*Bool
+
+  dealloc_stack %2 : $*Bool
+  dealloc_pack %0 : $*Pack{Bool}
+
+  %tup = tuple ()
+  return %tup : $()
+}
+
+// FIXME: This should get eliminated as well
+//
+// CHECK-LABEL: sil @makeNonTrivialPack : $@convention(thin) () -> () {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: %0 = alloc_pack $Pack{Builtin.BridgeObject}
+sil @makeNonTrivialPack : $@convention(thin) () -> () {
+  %0 = alloc_pack $Pack{Builtin.BridgeObject}
+
+  %1 = integer_literal $Builtin.IntLiteral, 123
+  %2 = value_to_bridge_object %1 : $Builtin.IntLiteral
+  %3 = scalar_pack_index 0 of $Pack{Builtin.BridgeObject}
+  %4 = alloc_stack $Builtin.BridgeObject
+  store %2 to %4 : $*Builtin.BridgeObject
+  pack_element_set %4 : $*Builtin.BridgeObject into %3 of %0 : $*Pack{Builtin.BridgeObject}
+
+  dealloc_stack %4 : $*Builtin.BridgeObject
+  dealloc_pack %0 : $*Pack{Builtin.BridgeObject}
+
+  %tup = tuple ()
+  return %tup : $()
+}
