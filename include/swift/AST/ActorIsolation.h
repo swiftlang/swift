@@ -269,18 +269,24 @@ void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 struct DeferredSendableDiagnostic {
 private:
   bool ProducesErrors;
+  bool ProducesDiagnostics;
   std::function<void()> ProduceDiagnostics;
 
 public:
-  DeferredSendableDiagnostic() : ProducesErrors(false), ProduceDiagnostics([](){}) {}
+  DeferredSendableDiagnostic() : ProducesErrors(false), ProducesDiagnostics(false), ProduceDiagnostics([](){}) {}
 
   DeferredSendableDiagnostic(bool ProducesErrors, std::function<void()> ProduceDiagnostics)
-      : ProducesErrors(ProducesErrors), ProduceDiagnostics(ProduceDiagnostics) {
+      : ProducesErrors(ProducesErrors), ProducesDiagnostics(true),
+        ProduceDiagnostics(ProduceDiagnostics) {
     assert(ProduceDiagnostics && "Empty diagnostics function");
   }
 
   bool producesErrors() const {
     return ProducesErrors;
+  }
+
+  bool producesDiagnostics() const {
+    return ProducesDiagnostics;
   }
 
   void produceDiagnostics() const {
@@ -293,6 +299,8 @@ public:
 
   void addDiagnostic(std::function<void()> produceMoreDiagnostics) {
     assert(produceMoreDiagnostics && "Empty diagnostics function");
+
+    ProducesDiagnostics = true;
 
     ProduceDiagnostics = [=, ProduceDiagnostics=ProduceDiagnostics]() {
       ProduceDiagnostics();
@@ -310,10 +318,11 @@ public:
   }
 
   void followWith(DeferredSendableDiagnostic other) {
-    setProducesErrors(producesErrors() || other.producesErrors());
     addDiagnostic([other](){
       other.produceDiagnostics();
     });
+    ProducesDiagnostics = ProducesDiagnostics || other.ProducesDiagnostics;
+    ProducesErrors = ProducesErrors || other.ProducesErrors;
   }
 };
 
