@@ -333,8 +333,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     auto error = _checkGenericRequirements(
         getConditionalRequirements(), conditionalArgs,
         [&substitutions](unsigned depth, unsigned index) {
-          // FIXME: Variadic generics
-          return substitutions.getMetadata(depth, index).getMetadataOrNull();
+          return substitutions.getMetadata(depth, index).Ptr;
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -1548,7 +1547,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
 
   case GenericRequirementKind::SameShape: {
     auto result = swift::getTypePackByMangledName(
-        req.getParam(), extraArguments.data(),
+        req.getMangledTypeName(), extraArguments.data(),
         substGenericParam, substWitnessTable);
     if (result.getError())
       return *result.getError();

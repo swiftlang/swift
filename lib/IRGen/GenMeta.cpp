@@ -566,21 +566,7 @@ namespace {
       B.addInt(IGM.Int16Ty, shapes.size());
 
       // Emit each GenericPackShapeDescriptor collected previously.
-      for (const auto &packArg : packArgs) {
-        // Kind
-        B.addInt(IGM.Int16Ty, uint16_t(packArg.Kind));
-
-        // Index
-        B.addInt(IGM.Int16Ty, packArg.Index);
-
-        // ShapeClass
-        auto found = std::find(shapes.begin(), shapes.end(), packArg.ReducedShape);
-        assert(found != shapes.end());
-        B.addInt(IGM.Int16Ty, found - shapes.begin());
-
-        // Unused
-        B.addInt(IGM.Int16Ty, 0);
-      }
+      irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
     }
 
     uint8_t getVersion() {
@@ -6572,6 +6558,27 @@ GenericArgumentMetadata irgen::addGenericRequirements(
   }
 
   return metadata;
+}
+
+void irgen::addGenericPackShapeDescriptors(IRGenModule &IGM,
+                                           ConstantStructBuilder &B,
+                                           ArrayRef<CanType> shapes,
+                                           ArrayRef<GenericPackArgument> packArgs) {
+  for (const auto &packArg : packArgs) {
+    // Kind
+    B.addInt(IGM.Int16Ty, uint16_t(packArg.Kind));
+
+    // Index
+    B.addInt(IGM.Int16Ty, packArg.Index);
+
+    // ShapeClass
+    auto found = std::find(shapes.begin(), shapes.end(), packArg.ReducedShape);
+    assert(found != shapes.end());
+    B.addInt(IGM.Int16Ty, found - shapes.begin());
+
+    // Unused
+    B.addInt(IGM.Int16Ty, 0);
+  }
 }
 
 //===----------------------------------------------------------------------===//

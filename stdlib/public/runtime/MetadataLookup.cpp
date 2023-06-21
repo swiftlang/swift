@@ -1288,6 +1288,9 @@ _gatherGenericParameters(const ContextDescriptor *context,
       }
 
       // Add metadata for each canonical generic parameter.
+      auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
+      unsigned packIdx = 0;
+
       for (unsigned i = 0; i != n; ++i) {
         const auto &param = genericParams[i];
         auto arg = allGenericArgs[i];
@@ -1318,7 +1321,20 @@ _gatherGenericParameters(const ContextDescriptor *context,
           }
 
           if (param.hasKeyArgument()) {
-            allGenericArgsVec.push_back(arg.getMetadataPack().getPointer());
+            auto packShapeDescriptor = packShapeDescriptors[packIdx];
+            assert(packShapeDescriptor.Kind == GenericPackKind::Metadata);
+            assert(packShapeDescriptor.Index == allGenericArgsVec.size());
+            assert(packShapeDescriptor.ShapeClass < packShapeHeader.NumShapeClasses);
+
+            auto argPack = arg.getMetadataPack();
+            assert(argPack.getLifetime() == PackLifetime::OnHeap);
+
+            // Fill in the length for each shape class.
+            allGenericArgsVec[packShapeDescriptor.ShapeClass] =
+                reinterpret_cast<const void *>(argPack.getNumElements());
+
+            allGenericArgsVec.push_back(argPack.getPointer());
+            ++packIdx;
           }
 
           break;
@@ -1331,22 +1347,6 @@ _gatherGenericParameters(const ContextDescriptor *context,
                    std::to_string(static_cast<uint8_t>(param.getKind()));
           });
         }
-      }
-
-      // Fill in the length for each shape class.
-      auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
-      for (auto packShapeDescriptor : packShapeDescriptors) {
-        if (packShapeDescriptor.Kind != GenericPackKind::Metadata)
-          continue;
-
-        assert(packShapeDescriptor.Index < allGenericArgsVec.size());
-        assert(packShapeDescriptor.ShapeClass < packShapeHeader.NumShapeClasses);
-
-        MetadataPackPointer pack(allGenericArgsVec[packShapeDescriptor.Index]);
-        assert(pack.getLifetime() == PackLifetime::OnHeap);
-
-        allGenericArgsVec[packShapeDescriptor.ShapeClass] =
-            reinterpret_cast<const void *>(pack.getNumElements());
       }
     }
 
@@ -2855,16 +2855,20 @@ void SubstGenericParametersFromMetadata::setup() const {
     assert(baseContext);
     DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
     numKeyGenericParameters = buildDescriptorPath(baseContext, demangler);
+    if (auto *genericCtx = baseContext->getGenericContext())
+      numShapeClasses = genericCtx->getGenericPackShapeHeader().NumShapeClasses;
     return;
   }
   case SourceKind::Environment: {
     assert(environment);
     numKeyGenericParameters = buildEnvironmentPath(environment);
+    // FIXME: Variadic generics
     return;
   }
   case SourceKind::Shape: {
     assert(shape);
     numKeyGenericParameters = buildShapePath(shape);
+    // FIXME: Variadic generics
     return;
   }
   }
@@ -2888,7 +2892,7 @@ SubstGenericParametersFromMetadata::getMetadata(
     return MetadataOrPack();
 
   // Compute the flat index.
-  unsigned flatIndex = pathElement.numKeyGenericParamsInParent;
+  unsigned flatIndex = pathElement.numKeyGenericParamsInParent + numShapeClasses;
   if (pathElement.hasNonKeyGenericParams > 0) {
     // We have non-key generic parameters at this level, so the index needs to
     // be checked more carefully.
@@ -2917,7 +2921,8 @@ SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
   // On first access, compute the descriptor path.
   setup();
 
-  return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
+  return (const WitnessTable *)genericArgs[
+      index + numKeyGenericParameters + numShapeClasses];
 }
 
 MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadata(
