@@ -9,6 +9,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import _Concurrency
+
 @available(SwiftStdlib 5.9, *)
 public struct ObservedValues<Element> {
   private class Storage: ObservationRegistrar.ValueObservationStorage {
