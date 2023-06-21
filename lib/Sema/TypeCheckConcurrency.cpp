@@ -838,9 +838,9 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   }
 }
 
-bool swift::diagnoseSendabilityErrorBasedOn(
+DeferredSendableDiagnostic swift::deferredDiagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
-    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<DeferredSendableDiagnostic(DiagnosticBehavior)> diagnose) {
   auto behavior = DiagnosticBehavior::Unspecified;
 
   if (nominal) {
@@ -849,12 +849,12 @@ bool swift::diagnoseSendabilityErrorBasedOn(
     behavior = fromContext.implicitSendableDiagnosticBehavior();
   }
 
-  bool wasSuppressed = diagnose(behavior);
+  DeferredSendableDiagnostic deferred = diagnose(behavior);
 
   SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
   if (sourceFile && shouldDiagnosePreconcurrencyImports(*sourceFile)) {
     bool emittedDiagnostics =
-        behavior != DiagnosticBehavior::Ignore && !wasSuppressed;
+        behavior != DiagnosticBehavior::Ignore && deferred.producesErrors();
 
     // When the type is explicitly Sendable *or* explicitly non-Sendable, we
     // assume it has been audited and `@preconcurrency` is not recommended even
@@ -880,18 +880,36 @@ bool swift::diagnoseSendabilityErrorBasedOn(
         SourceLoc importLoc = import->importLoc;
         ASTContext &ctx = nominal->getASTContext();
 
-        ctx.Diags
-            .diagnose(importLoc, diag::add_predates_concurrency_import,
-                      ctx.LangOpts.isSwiftVersionAtLeast(6),
-                      nominal->getParentModule()->getName())
-            .fixItInsert(importLoc, "@preconcurrency ");
+        deferred.addDiagnostic([=, ctx=&ctx]() {
+          ctx->Diags
+              .diagnose(importLoc, diag::add_predates_concurrency_import,
+                        ctx->LangOpts.isSwiftVersionAtLeast(6),
+                        nominal->getParentModule()->getName())
+              .fixItInsert(importLoc, "@preconcurrency ");
+        });
 
         sourceFile->setImportUsedPreconcurrency(*import);
       }
     }
   }
 
-  return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
+  deferred.setProducesErrors(behavior == DiagnosticBehavior::Unspecified && deferred.producesErrors());
+
+  return deferred;
+}
+
+/// This function overloads diagnoseSendabilityErrorBasedOn to obtain a
+/// non-defering version with the same semantics - the same is done to
+/// diagnoseNonSendableTypes
+bool swift::diagnoseSendabilityErrorBasedOn(
+    NominalTypeDecl *nominal, SendableCheckContext fromContext,
+    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
+  DeferredSendableDiagnostic deferred = deferredDiagnoseSendabilityErrorBasedOn(nominal, fromContext, [=](DiagnosticBehavior behavior) {
+    bool wasSuppressed = diagnose(behavior);
+    return DeferredSendableDiagnostic(!wasSuppressed, [](){});
+  });
+  deferred.produceDiagnostics();
+  return deferred.producesErrors();
 }
 
 void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
@@ -915,45 +933,49 @@ void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
   }
 }
 
-/// Produce a diagnostic for a single instance of a non-Sendable type where
-/// a Sendable type is required.
-static bool diagnoseSingleNonSendableType(
+DeferredSendableDiagnostic swift::diagnoseSingleNonSendableType(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
 
   auto module = fromContext.fromDC->getParentModule();
   auto nominal = type->getAnyNominal();
 
-  return diagnoseSendabilityErrorBasedOn(nominal, fromContext,
-                                         [&](DiagnosticBehavior behavior) {
-    bool wasSuppressed = diagnose(type, behavior);
+  return deferredDiagnoseSendabilityErrorBasedOn(nominal, fromContext,
+                                         [=](DiagnosticBehavior behavior) {
+    DeferredSendableDiagnostic deferred = diagnose(type, behavior);
 
     // Don't emit the following notes if we didn't have any diagnostics to
     // attach them to.
-    if (wasSuppressed || behavior == DiagnosticBehavior::Ignore)
-      return true;
+    if (!deferred.producesErrors() || behavior == DiagnosticBehavior::Ignore)
+      return deferred;
 
     if (type->is<FunctionType>()) {
-      module->getASTContext().Diags
-          .diagnose(loc, diag::nonsendable_function_type);
+      deferred.addDiagnostic([=](){
+        module->getASTContext().Diags.diagnose(
+            loc, diag::nonsendable_function_type);
+      });
     } else if (nominal && nominal->getParentModule() == module) {
       // If the nominal type is in the current module, suggest adding
       // `Sendable` if it might make sense. Otherwise, just complain.
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-        auto note = nominal->diagnose(
-            diag::add_nominal_sendable_conformance,
-            nominal->getDescriptiveKind(), nominal->getName());
-        addSendableFixIt(nominal, note, /*unchecked=*/false);
+        deferred.addDiagnostic([=](){
+          auto note = nominal->diagnose(diag::add_nominal_sendable_conformance,
+                                        nominal->getDescriptiveKind(),
+                                        nominal->getName());
+          addSendableFixIt(nominal, note, /*unchecked=*/false);
+        });
       } else {
-        nominal->diagnose(
-            diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-            nominal->getName());
+        deferred.addDiagnostic([=](){
+          nominal->diagnose(diag::non_sendable_nominal,
+                            nominal->getDescriptiveKind(), nominal->getName());
+        });
       }
     } else if (nominal) {
       // Note which nominal type does not conform to `Sendable`.
-      nominal->diagnose(
-          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-          nominal->getName());
+      deferred.addDiagnostic([=](){
+        nominal->diagnose(diag::non_sendable_nominal,
+                          nominal->getDescriptiveKind(), nominal->getName());
+      });
     } else if (auto genericArchetype = type->getAs<ArchetypeType>()) {
       auto interfaceType = genericArchetype->getInterfaceType();
       if (auto genericParamType =
@@ -961,26 +983,28 @@ static bool diagnoseSingleNonSendableType(
         auto *genericParamTypeDecl = genericParamType->getDecl();
         if (genericParamTypeDecl &&
             genericParamTypeDecl->getModuleContext() == module) {
-          auto diag = genericParamTypeDecl->diagnose(
-              diag::add_generic_parameter_sendable_conformance, type);
-          addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+          deferred.addDiagnostic([=](){
+            auto diag = genericParamTypeDecl->diagnose(
+                diag::add_generic_parameter_sendable_conformance, type);
+            addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+          });
         }
       }
     }
 
-    return false;
+    return deferred;
   });
 }
 
-bool swift::diagnoseNonSendableTypes(
+DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
   auto module = fromContext.fromDC->getParentModule();
 
   // If the Sendable protocol is missing, do nothing.
   auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
-    return false;
+    return DeferredSendableDiagnostic();
 
   // FIXME: More detail for unavailable conformances.
   auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
@@ -989,21 +1013,36 @@ bool swift::diagnoseNonSendableTypes(
   }
 
   // Walk the conformance, diagnosing any missing Sendable conformances.
-  bool anyMissing = false;
+  DeferredSendableDiagnostic deferred = DeferredSendableDiagnostic();
+
   conformance.forEachMissingConformance(module,
       [&](BuiltinProtocolConformance *missing) {
-        if (diagnoseSingleNonSendableType(
-                missing->getType(), fromContext, loc, diagnose)) {
-          anyMissing = true;
-        }
+        deferred.followWith(diagnoseSingleNonSendableType(
+            missing->getType(), fromContext, loc, diagnose));
 
         return false;
       });
 
-  return anyMissing;
+  return deferred;
 }
 
-bool swift::diagnoseNonSendableTypesInReference(
+/// This function overloads diagnoseNonSendableTypes to obtain a
+/// non-defering version with the same semantics - the same is done to
+/// diagnoseSendabilityErrorBasedOn
+bool swift::diagnoseNonSendableTypes(
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+  DeferredSendableDiagnostic deferred = diagnoseNonSendableTypes(
+      type, fromContext, loc,
+      [=](Type type, DiagnosticBehavior behavior) {
+        bool wasSuppressed = diagnose(type, behavior);
+        return DeferredSendableDiagnostic(!wasSuppressed, [](){});
+      });
+  deferred.produceDiagnostics();
+  return deferred.producesErrors();
+}
+
+DeferredSendableDiagnostic swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind, Optional<ActorIsolation> knownIsolation,
     FunctionCheckKind funcCheckKind, SourceLoc diagnoseLoc) {
@@ -1023,12 +1062,15 @@ bool swift::diagnoseNonSendableTypesInReference(
       // only check params if funcCheckKind specifies so
       for (auto param : *function->getParameters()) {
         Type paramType = param->getInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
+
+        auto deferred = diagnoseNonSendableTypes(
             paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                diag::non_sendable_param_type,
+            diag::non_sendable_param_type,
             (unsigned)refKind, function->getDescriptiveKind(),
-            function->getName(), getActorIsolation()))
-          return true;
+            function->getName(), getActorIsolation());
+
+        if (deferred.producesErrors())
+          return deferred;
       }
     }
 
@@ -1037,30 +1079,34 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (funcCheckKind != FunctionCheckKind::Params) {
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
+        auto deferred = diagnoseNonSendableTypes(
             resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_result_type,
             (unsigned)refKind, func->getDescriptiveKind(), func->getName(),
-            getActorIsolation()))
-          return true;
+            getActorIsolation());
+
+        if (deferred.producesErrors())
+          return deferred;
       }
     }
 
-    return false;
+    return DeferredSendableDiagnostic();
   }
 
   if (auto var = dyn_cast<VarDecl>(declRef.getDecl())) {
     Type propertyType = var->isLocalCapture()
         ? var->getType()
         : var->getValueInterfaceType().subst(subs);
-    if (diagnoseNonSendableTypes(
-            propertyType, fromDC, refLoc,
-            diag::non_sendable_property_type,
-            var->getDescriptiveKind(), var->getName(),
+    auto deferred = diagnoseNonSendableTypes(
+        propertyType, fromDC, refLoc,
+        diag::non_sendable_property_type,
+        var->getDescriptiveKind(), var->getName(),
             var->isLocalCapture(),
-            (unsigned)refKind,
-            getActorIsolation()))
-      return true;
+        (unsigned)refKind,
+        getActorIsolation());
+
+    if (deferred.producesErrors())
+      return deferred;
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(declRef.getDecl())) {
@@ -1068,36 +1114,41 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (funcCheckKind != FunctionCheckKind::Results) {
         // Check params of this subscript override for sendability
         Type paramType = param->getInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
+        auto deferred = diagnoseNonSendableTypes(
                 paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
                 (unsigned)refKind, subscript->getDescriptiveKind(),
-                subscript->getName(), getActorIsolation()))
-          return true;
+                subscript->getName(), getActorIsolation());
+
+        if (deferred.producesErrors())
+            return deferred;
       }
     }
 
     if (funcCheckKind != FunctionCheckKind::Results) {
       // Check the element type of a subscript.
       Type resultType = subscript->getElementInterfaceType().subst(subs);
-      if (diagnoseNonSendableTypes(
+      auto deferred = diagnoseNonSendableTypes(
           resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
               diag::non_sendable_result_type,
           (unsigned)refKind, subscript->getDescriptiveKind(),
-          subscript->getName(), getActorIsolation()))
-        return true;
+          subscript->getName(), getActorIsolation());
+
+      if (deferred.producesErrors())
+        return deferred;
     }
 
-    return false;
+    return DeferredSendableDiagnostic();
   }
 
-  return false;
+  return DeferredSendableDiagnostic();
 }
 
 void swift::diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, const DeclContext *fromDC) {
   diagnoseNonSendableTypes(
-      type, fromDC, loc, diag::non_sendable_type);
+      type, fromDC, loc, diag::non_sendable_type)
+      .produceDiagnostics();
 }
 
 namespace {
@@ -1992,9 +2043,12 @@ namespace {
     }
 
     /// Check closure captures for Sendable violations.
-    void checkClosureCaptures(AbstractClosureExpr *closure) {
+    DeferredSendableDiagnostic checkClosureCaptures(AbstractClosureExpr *closure) {
       SmallVector<CapturedValue, 2> captures;
       closure->getCaptureInfo().getLocalCaptures(captures);
+
+      auto deferred = DeferredSendableDiagnostic();
+
       for (const auto &capture : captures) {
         if (capture.isDynamicSelfMetadata())
           continue;
@@ -2014,21 +2068,23 @@ namespace {
         if (closure->isImplicit()) {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
-            diagnoseNonSendableTypes(
+            deferred.followWith(diagnoseNonSendableTypes(
                 type, getDeclContext(), capture.getLoc(),
-                diag::implicit_async_let_non_sendable_capture, decl->getName());
+                diag::implicit_async_let_non_sendable_capture, decl->getName()));
           } else {
             // Fallback to a generic implicit capture missing sendable
             // conformance diagnostic.
-            diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
+            deferred.followWith(diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
                                      diag::implicit_non_sendable_capture,
-                                     decl->getName());
+                                     decl->getName()));
           }
         } else {
-          diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
-                                   diag::non_sendable_capture, decl->getName());
+          deferred.followWith(diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
+                                   diag::non_sendable_capture, decl->getName()));
         }
       }
+
+      return deferred;
     }
 
   public:
@@ -2122,6 +2178,20 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      auto defersDiagnostics =
+          ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking);
+
+      auto processDeferredDiagnostic = [=, &expr](DeferredSendableDiagnostic deferred) {
+        if (defersDiagnostics) {
+          if (deferred.producesErrors()) {
+            expr = new (ctx) SendNonSendableExpr(
+                ctx, deferred, expr, expr->getType());
+          }
+        } else {
+          deferred.produceDiagnostics();
+        }
+      };
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -2131,14 +2201,15 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
-        checkClosureCaptures(closure);
+        processDeferredDiagnostic(checkClosureCaptures(closure));
         contextStack.push_back(closure);
         return Action::Continue(expr);
       }
 
       if (auto inout = dyn_cast<InOutExpr>(expr)) {
         if (!applyStack.empty())
-          diagnoseInOutArg(applyStack.back(), inout, false);
+          processDeferredDiagnostic(diagnoseInOutArg(
+              applyStack.back(), inout, false));
 
         if (mutableLocalVarParent.count(inout) == 0)
           recordMutableVarParent(inout, inout->getSubExpr());
@@ -2156,10 +2227,11 @@ namespace {
         recordMutableVarParent(load, load->getSubExpr());
 
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
-        checkReference(lookup->getBase(), lookup->getMember(),
+        processDeferredDiagnostic(checkReference(
+            lookup->getBase(), lookup->getMember(),
                              lookup->getLoc(),
                              /*partialApply*/None,
-                             lookup);
+                             lookup));
         return Action::Continue(expr);
       }
 
@@ -2170,9 +2242,11 @@ namespace {
 
         //FIXME: Should this be subsumed in reference checking?
         if (value->isLocalCapture())
-          checkLocalCapture(valueRef, loc, declRef);
+          processDeferredDiagnostic(checkLocalCapture(
+              valueRef, loc, declRef));
         else
-          checkReference(nullptr, valueRef, loc, None, declRef);
+          processDeferredDiagnostic(checkReference(
+              nullptr, valueRef, loc, None, declRef));
         return Action::Continue(expr);
       }
 
@@ -2180,7 +2254,7 @@ namespace {
         applyStack.push_back(apply);  // record this encounter
 
         // Check the call itself.
-        (void)checkApply(apply);
+        processDeferredDiagnostic(checkApply(apply));
 
         // If this is a call to a partial apply thunk, decompose it to check it
         // like based on the original written syntax, e.g., "self.method".
@@ -2189,9 +2263,9 @@ namespace {
           if (auto memberRef = findReference(partialApply->fn)) {
             // NOTE: partially-applied thunks are never annotated as
             // implicitly async, regardless of whether they are escaping.
-            checkReference(
+            processDeferredDiagnostic(checkReference(
                 partialApply->base, memberRef->first, memberRef->second,
-                partialApply);
+                partialApply));
 
             partialApply->base->walk(*this);
 
@@ -2208,9 +2282,9 @@ namespace {
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
         if (auto memberRef = findReference(fn)) {
-          checkReference(
+          processDeferredDiagnostic(checkReference(
               call->getBase(), memberRef->first, memberRef->second,
-              /*partialApply=*/None, call);
+              /*partialApply=*/None, call));
 
           call->getBase()->walk(*this);
 
@@ -2221,7 +2295,8 @@ namespace {
               // If the partial application take a value inout, it is bad.
               if (InOutExpr *inoutArg = dyn_cast<InOutExpr>(
                       call->getBase()->getSemanticsProvidingExpr()))
-                diagnoseInOutArg(outerCall, inoutArg, true);
+                processDeferredDiagnostic(diagnoseInOutArg(
+                  outerCall, inoutArg, true));
             }
           }
 
@@ -2235,7 +2310,7 @@ namespace {
 
 
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr))
-        checkKeyPathExpr(keyPath);
+        processDeferredDiagnostic(checkKeyPathExpr(keyPath));
 
       // The children of #selector expressions are not evaluated, so we do not
       // need to do isolation checking there. This is convenient because such
@@ -2496,12 +2571,12 @@ namespace {
     /// Diagnose a reference to an unsafe entity.
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
-    bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
+    DeferredSendableDiagnostic diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
       switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
       case StrictConcurrency::Minimal:
       case StrictConcurrency::Targeted:
         // Never diagnose.
-        return false;
+        return DeferredSendableDiagnostic();
 
       case StrictConcurrency::Complete:
         break;
@@ -2510,37 +2585,38 @@ namespace {
       // Only diagnose direct references to mutable global state.
       auto var = dyn_cast<VarDecl>(value);
       if (!var || var->isLet())
-        return false;
+        return DeferredSendableDiagnostic();
 
       if (!var->getDeclContext()->isModuleScopeContext() &&
           !(var->getDeclContext()->isTypeContext() && !var->isInstanceMember()))
-        return false;
+        return DeferredSendableDiagnostic();
 
       if (!var->hasStorage())
-        return false;
+        return DeferredSendableDiagnostic();
 
       // If it's actor-isolated, it's already been dealt with.
       if (getActorIsolation(value).isActorIsolated())
-        return false;
+        return DeferredSendableDiagnostic();
 
-      ctx.Diags.diagnose(
-          loc, diag::shared_mutable_state_access,
-          value->getDescriptiveKind(), value->getName());
-      value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
-      return true;
+      return DeferredSendableDiagnostic(true, [=, ctx=&ctx]() {
+        ctx->Diags.diagnose(loc, diag::shared_mutable_state_access,
+                           value->getDescriptiveKind(), value->getName());
+        value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
+      });
     }
 
     /// Diagnose an inout argument passed into an async call
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
-    bool diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
+    DeferredSendableDiagnostic diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
                           bool isPartialApply) {
       // check that the call is actually async
       if (!isAsyncCall(call))
-        return false;
+        return DeferredSendableDiagnostic();
 
-      bool result = false;
-      auto checkDiagnostic = [this, call, isPartialApply, &result](
+      auto deferred = DeferredSendableDiagnostic();
+
+      auto checkDiagnostic = [this, call, isPartialApply, &deferred](
           ConcreteDeclRef declRef, SourceLoc argLoc) {
         auto decl = declRef.getDecl();
         auto isolation = getActorIsolationForReference(decl, getDeclContext());
@@ -2554,21 +2630,23 @@ namespace {
           if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
             if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
               ValueDecl *fnDecl = declRef->getDecl();
-              ctx.Diags.diagnose(call->getLoc(),
-                                 diag::actor_isolated_mutating_func,
-                                 fnDecl->getName(), decl->getDescriptiveKind(),
-                                 decl->getName());
-              result = true;
+              deferred.addErrorProducingDiagnostic([=, ctx=&ctx]() {
+                ctx->Diags.diagnose(call->getLoc(),
+                                   diag::actor_isolated_mutating_func,
+                                   fnDecl->getName(), decl->getDescriptiveKind(),
+                                   decl->getName());
+                });
               return;
             }
           }
         }
 
-        ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
-                           decl->getDescriptiveKind(), decl->getName(),
-                           call->isImplicitlyAsync().has_value());
-        decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
-        result = true;
+        deferred.addErrorProducingDiagnostic([=, ctx=&ctx]() {
+          ctx->Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
+                             decl->getDescriptiveKind(), decl->getName(),
+                             call->isImplicitlyAsync().has_value());
+          decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
+          });
         return;
       };
       auto expressionWalker = [baseArg = arg->getSubExpr(),
@@ -2588,7 +2666,7 @@ namespace {
         return expr;
       };
       arg->getSubExpr()->forEachChildExpr(expressionWalker);
-      return result;
+      return deferred;
     }
 
     enum class AsyncMarkingResult {
@@ -2764,11 +2842,12 @@ namespace {
 
       if (result == AsyncMarkingResult::FoundAsync) {
         // Check for non-sendable types.
-        bool problemFound =
+        auto deferred =
             diagnoseNonSendableTypesInReference(
               concDeclRef, getDeclContext(), declLoc,
               SendableCheckReason::SynchronousAsAsync);
-        if (problemFound)
+        deferred.produceDiagnostics();
+        if (deferred.producesErrors())
           result = AsyncMarkingResult::NotSendable;
       }
 
@@ -2776,14 +2855,14 @@ namespace {
     }
 
     /// Check actor isolation for a particular application.
-    bool checkApply(ApplyExpr *apply) {
+    DeferredSendableDiagnostic checkApply(ApplyExpr *apply) {
       auto fnExprType = getType(apply->getFn());
       if (!fnExprType)
-        return false;
+        return DeferredSendableDiagnostic();
 
       auto fnType = fnExprType->getAs<FunctionType>();
       if (!fnType)
-        return false;
+        return DeferredSendableDiagnostic();
 
       // The isolation of the context we're in.
       Optional<ActorIsolation> contextIsolation;
@@ -2809,7 +2888,7 @@ namespace {
       }
 
       if (isa<SelfApplyExpr>(apply) && !unsatisfiedIsolation)
-        return false;
+        return DeferredSendableDiagnostic();
 
       // Check for isolated parameters.
       for (unsigned paramIdx : range(fnType->getNumParams())) {
@@ -2842,35 +2921,44 @@ namespace {
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
-        return false;
+        return DeferredSendableDiagnostic();
 
       // If we are not in an asynchronous context, complain.
       if (!getDeclContext()->isAsyncContext()) {
+        DeferredSendableDiagnostic deferred = DeferredSendableDiagnostic();
+        deferred.setProducesErrors(true);
+
         if (auto calleeDecl = apply->getCalledValue(
                 /*skipFunctionConversions=*/true)) {
-          ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call_decl,
-              *unsatisfiedIsolation,
-              calleeDecl->getDescriptiveKind(), calleeDecl->getName(),
-              getContextIsolation())
-            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
-          calleeDecl->diagnose(
-              diag::actor_isolated_sync_func, calleeDecl->getDescriptiveKind(),
-              calleeDecl->getName());
+          deferred.addDiagnostic([=, ctx=&ctx](){
+            ctx->Diags
+                .diagnose(apply->getLoc(), diag::actor_isolated_call_decl,
+                          *unsatisfiedIsolation, calleeDecl->getDescriptiveKind(),
+                          calleeDecl->getName(), getContextIsolation())
+                .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(),
+                                         6);
+            calleeDecl->diagnose(diag::actor_isolated_sync_func,
+                                 calleeDecl->getDescriptiveKind(),
+                                 calleeDecl->getName());
+            });
         } else {
-          ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
-              getContextIsolation())
-            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
+          deferred.addDiagnostic([=, ctx=&ctx](){
+            ctx->Diags
+                .diagnose(apply->getLoc(), diag::actor_isolated_call,
+                          *unsatisfiedIsolation, getContextIsolation())
+                .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(),
+                                         6);
+            });
         }
 
         if (unsatisfiedIsolation->isGlobalActor()) {
-          noteGlobalActorOnContext(
-              const_cast<DeclContext *>(getDeclContext()),
-              unsatisfiedIsolation->getGlobalActor());
+          deferred.addDiagnostic([=](){
+            noteGlobalActorOnContext(const_cast<DeclContext *>(getDeclContext()),
+                                     unsatisfiedIsolation->getGlobalActor());
+            });
         }
 
-        return true;
+        return deferred;
       }
 
       // Mark as implicitly async.
@@ -2891,23 +2979,27 @@ namespace {
             argLoc = arg.getStartLoc();
         }
 
-        if (diagnoseNonSendableTypes(
+        auto deferred = diagnoseNonSendableTypes(
                 param.getParameterType(), getDeclContext(), argLoc,
                 diag::non_sendable_call_param_type,
                 apply->isImplicitlyAsync().has_value(),
-                *unsatisfiedIsolation))
-          return true;
+                *unsatisfiedIsolation);
+
+        if (deferred.producesErrors())
+          return deferred;
       }
 
       // Check for sendability of the result type.
-      if (diagnoseNonSendableTypes(
+      auto deferred = diagnoseNonSendableTypes(
              fnType->getResult(), getDeclContext(), apply->getLoc(),
              diag::non_sendable_call_result_type,
              apply->isImplicitlyAsync().has_value(),
-             *unsatisfiedIsolation))
-        return true;
+             *unsatisfiedIsolation);
 
-      return false;
+      if (deferred.producesErrors())
+        return deferred;
+
+      return DeferredSendableDiagnostic();
     }
 
     /// Find the innermost context in which this declaration was explicitly
@@ -2926,7 +3018,7 @@ namespace {
     }
 
     /// Check a reference to a local capture.
-    bool checkLocalCapture(
+    DeferredSendableDiagnostic checkLocalCapture(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
       auto value = valueRef.getDecl();
 
@@ -2934,14 +3026,14 @@ namespace {
       // with the context of 'self'. If not, it's safe.
       if (!mayExecuteConcurrentlyWith(
               getDeclContext(), findCapturedDeclContext(value)))
-        return false;
+        return DeferredSendableDiagnostic();
 
       // Check whether this is a local variable, in which case we can
       // determine whether it was safe to access concurrently.
       if (auto var = dyn_cast<VarDecl>(value)) {
         // Ignore interpolation variables.
         if (var->getBaseName() == ctx.Id_dollarInterpolation)
-          return false;
+          return DeferredSendableDiagnostic();
 
         auto parent = mutableLocalVarParent[declRefExpr];
 
@@ -2955,13 +3047,14 @@ namespace {
             (ctx.LangOpts.hasFeature(
                  Feature::FlowSensitiveConcurrencyCaptures) &&
              parent.dyn_cast<LoadExpr *>())) {
-          return false;
+          return DeferredSendableDiagnostic();
         }
 
         if (auto param =  dyn_cast<ParamDecl>(value)){
           if(param->isInOut()){
-              ctx.Diags.diagnose(loc, diag::concurrent_access_of_inout_param, param->getName());
-              return true;
+              return DeferredSendableDiagnostic(true, [=, ctx=&ctx]() {
+                ctx->Diags.diagnose(loc, diag::concurrent_access_of_inout_param, param->getName());
+              });
           }
         }
 
@@ -2970,44 +3063,45 @@ namespace {
             getActorIsolationOfContext(
               const_cast<DeclContext *>(getDeclContext())).preconcurrency();
 
-        ctx.Diags.diagnose(
-            loc, diag::concurrent_access_of_local_capture,
-            parent.dyn_cast<LoadExpr *>(),
-            var->getDescriptiveKind(), var->getName())
-          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
-        return true;
+        return DeferredSendableDiagnostic(true, [=, ctx=&ctx]() {
+          ctx->Diags.diagnose(
+                       loc, diag::concurrent_access_of_local_capture,
+                       parent.dyn_cast<LoadExpr *>(),
+                       var->getDescriptiveKind(), var->getName())
+              .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
+        });
       }
 
       if (auto func = dyn_cast<FuncDecl>(value)) {
         if (func->isSendable())
-          return false;
+          return DeferredSendableDiagnostic();
 
-        func->diagnose(
-            diag::local_function_executed_concurrently,
-            func->getDescriptiveKind(), func->getName())
-          .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ")
-          .warnUntilSwiftVersion(6);
+        auto deferred = DeferredSendableDiagnostic(true, [=]() {
+          func->diagnose(diag::local_function_executed_concurrently,
+                         func->getDescriptiveKind(), func->getName())
+              .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ")
+              .warnUntilSwiftVersion(6);
+        });
 
         // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
         const_cast<FuncDecl *>(func)->getAttrs().add(
             new (ctx) SendableAttr(true));
-        return true;
+        return deferred;
       }
 
       // Concurrent access to some other local.
-      ctx.Diags.diagnose(
-          loc, diag::concurrent_access_local,
-          value->getDescriptiveKind(), value->getName());
-      value->diagnose(
-          diag::kind_declared_here, value->getDescriptiveKind());
-      return true;
+      return DeferredSendableDiagnostic(true, [=, ctx=&ctx]() {
+        ctx->Diags.diagnose(loc, diag::concurrent_access_local,
+                           value->getDescriptiveKind(), value->getName());
+        value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
+      });
     }
 
     ///
     /// \return true iff a diagnostic was emitted
-    bool checkKeyPathExpr(KeyPathExpr *keyPath) {
-      bool diagnosed = false;
+    DeferredSendableDiagnostic checkKeyPathExpr(KeyPathExpr *keyPath) {
+      auto deferred = DeferredSendableDiagnostic();
 
       // check the components of the keypath.
       for (const auto &component : keyPath->getComponents()) {
@@ -3036,20 +3130,20 @@ namespace {
             // Sendable.
             if (isAccessibleAcrossActors(
                     decl, isolation, getDeclContext(), None)) {
-              if (diagnoseNonSendableTypes(
+              deferred.followWith(diagnoseNonSendableTypes(
                              component.getComponentType(), getDeclContext(),
                              component.getLoc(),
-                             diag::non_sendable_keypath_access)) {
-                diagnosed = true;
-              }
+                             diag::non_sendable_keypath_access));
               break;
             }
 
-            ctx.Diags.diagnose(component.getLoc(),
-                               diag::actor_isolated_keypath_component,
-                               isolation.isDistributedActor(),
-                               decl->getDescriptiveKind(), decl->getName());
-            diagnosed = true;
+            deferred.addDiagnostic([=, ctx=&ctx](){
+              ctx->Diags.diagnose(component.getLoc(),
+                                 diag::actor_isolated_keypath_component,
+                                 isolation.isDistributedActor(),
+                                 decl->getDescriptiveKind(), decl->getName());
+              });
+            deferred.setProducesErrors(true);
             break;
           }
         }
@@ -3060,17 +3154,16 @@ namespace {
         if (auto *args = component.getSubscriptArgs()) {
           for (auto arg : *args) {
             auto type = getType(arg.getExpr());
-            if (type &&
-                shouldDiagnoseExistingDataRaces(getDeclContext()) &&
-                diagnoseNonSendableTypes(
-                    type, getDeclContext(), component.getLoc(),
-                    diag::non_sendable_keypath_capture))
-              diagnosed = true;
+            if (type && shouldDiagnoseExistingDataRaces(getDeclContext())) {
+              deferred.followWith(diagnoseNonSendableTypes(
+                  type, getDeclContext(), component.getLoc(),
+                  diag::non_sendable_keypath_capture));
+            }
           }
         }
       }
 
-      return diagnosed;
+      return deferred;
     }
 
     /// Check a reference to the given declaration.
@@ -3080,12 +3173,12 @@ namespace {
     ///
     /// \returns true if the reference is invalid, in which case a diagnostic
     /// has already been emitted.
-    bool checkReference(
+    DeferredSendableDiagnostic checkReference(
         Expr *base, ConcreteDeclRef declRef, SourceLoc loc,
         Optional<PartialApplyThunkInfo> partialApply = None,
         Expr *context = nullptr) {
       if (!declRef)
-        return false;
+        return DeferredSendableDiagnostic();
 
       auto decl = declRef.getDecl();
       Optional<ReferencedActor> isolatedActor;
@@ -3096,19 +3189,19 @@ namespace {
           isolatedActor, None, None, getClosureActorIsolation);
       switch (result) {
       case ActorReferenceResult::SameConcurrencyDomain:
-        if (diagnoseReferenceToUnsafeGlobal(decl, loc))
-          return true;
+        return diagnoseReferenceToUnsafeGlobal(decl, loc);
 
-        return false;
+      case ActorReferenceResult::ExitsActorToNonisolated: {
+        auto deferred = diagnoseReferenceToUnsafeGlobal(decl, loc);
+        if (deferred.producesErrors())
+          return deferred;
 
-      case ActorReferenceResult::ExitsActorToNonisolated:
-        if (diagnoseReferenceToUnsafeGlobal(decl, loc))
-          return true;
+        deferred.followWith(diagnoseNonSendableTypesInReference(
+            declRef, getDeclContext(), loc, SendableCheckReason::ExitingActor,
+            result.isolation));
 
-        return diagnoseNonSendableTypesInReference(
-                   declRef, getDeclContext(), loc,
-                   SendableCheckReason::ExitingActor,
-                   result.isolation);
+        return deferred;
+      }
 
       case ActorReferenceResult::EntersActor:
         // Handle all of the checking below.
@@ -3119,7 +3212,7 @@ namespace {
       // okay, because the global actor is part of the resulting function
       // type.
       if (partialApply && result.isolation.isGlobalActor())
-        return false;
+        return DeferredSendableDiagnostic();
 
       // A call to a global-actor-isolated function, or a function with an
       // isolated parameter, is diagnosed elsewhere.
@@ -3128,16 +3221,15 @@ namespace {
            (result.isolation == ActorIsolation::ActorInstance &&
             result.isolation.getActorInstanceParameter() > 0)) &&
           isa<AbstractFunctionDecl>(decl))
-        return false;
+        return DeferredSendableDiagnostic();
 
       // An escaping partial application of something that is part of
       // the actor's isolated state is never permitted.
       if (partialApply && partialApply->isEscaping && !isAsyncDecl(declRef)) {
-        ctx.Diags.diagnose(
-            loc, diag::actor_isolated_partial_apply,
-            decl->getDescriptiveKind(),
-            decl->getName());
-        return true;
+        return DeferredSendableDiagnostic(true, [=, ctx=&ctx](){
+          ctx->Diags.diagnose(loc, diag::actor_isolated_partial_apply,
+                             decl->getDescriptiveKind(), decl->getName());
+        });
       }
 
       // If we do not need any async/throws/distributed checks, just perform
@@ -3158,12 +3250,12 @@ namespace {
       switch (implicitAsyncResult) {
       case AsyncMarkingResult::FoundAsync:
         // Success! We're done.
-        return false;
+        return DeferredSendableDiagnostic();
 
       case AsyncMarkingResult::NotDistributed:
       case AsyncMarkingResult::NotSendable:
         // Failed, but diagnostics have already been emitted.
-        return true;
+        return DeferredSendableDiagnostic(true, [](){});
 
       case AsyncMarkingResult::SyncContext:
       case AsyncMarkingResult::NotFound:
@@ -3203,24 +3295,20 @@ namespace {
         bool preconcurrencyContext =
           result.options.contains(ActorReferenceResult::Flags::Preconcurrency);
 
-        ctx.Diags.diagnose(
-            loc, diag::actor_isolated_non_self_reference,
-            decl->getDescriptiveKind(),
-            decl->getName(),
-            useKind,
-            refKind + 1, refGlobalActor,
-            result.isolation)
-          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
+        return DeferredSendableDiagnostic(true, [=,ctx=&ctx](){
+          ctx->Diags
+              .diagnose(loc, diag::actor_isolated_non_self_reference,
+                        decl->getDescriptiveKind(), decl->getName(), useKind,
+                        refKind + 1, refGlobalActor, result.isolation)
+              .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
 
-        noteIsolatedActorMember(decl, context);
+          noteIsolatedActorMember(decl, context);
 
-        if (result.isolation.isGlobalActor()) {
-          noteGlobalActorOnContext(
-              const_cast<DeclContext *>(getDeclContext()),
-              result.isolation.getGlobalActor());
-        }
-
-        return true;
+          if (result.isolation.isGlobalActor()) {
+            noteGlobalActorOnContext(const_cast<DeclContext *>(getDeclContext()),
+                                     result.isolation.getGlobalActor());
+          }
+        });
       }
     }
 
