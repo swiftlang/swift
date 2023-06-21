@@ -688,9 +688,10 @@ inline LayoutStringFlags &operator|=(LayoutStringFlags &a, LayoutStringFlags b) 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 size_t _swift_refCountBytesForMetatype(const Metadata *type);
 
+struct LayoutStringWriter;
+
 SWIFT_RUNTIME_STDLIB_INTERNAL
-void _swift_addRefCountStringForMetatype(uint8_t *layoutStr,
-                                         size_t &layoutStrOffset,
+void _swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
                                          LayoutStringFlags &flags,
                                          const Metadata *fieldType,
                                          size_t &fullOffset,
