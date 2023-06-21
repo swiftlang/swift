@@ -3815,6 +3815,10 @@ bool ValueDecl::shouldHideFromEditor() const {
       getBaseIdentifier().str().startswith("$__"))
     return true;
 
+  // Macro unique names are only intended to be used inside the expanded code.
+  if (MacroDecl::isUniqueMacroName(getBaseName()))
+    return true;
+
   return false;
 }
 
