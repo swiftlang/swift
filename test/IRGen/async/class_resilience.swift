@@ -44,7 +44,7 @@ open class MyBaseClass<T> {
 // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYalF"(ptr noalias nocapture %0, ptr swiftasync %1{{.*}})
 // CHECK-DIRECT: ptr @"$s15resilient_class9BaseClassC4waitxyYaFTjTu"
 // CHECK-INDIRECT: [[LOAD:%[0-9]+]] = load ptr, ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 -2) to ptr), align {{4|8}}
-// CHECK-INDIRECT-NEXT: %14 = select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 1), i64 0),
+// CHECK-INDIRECT-NEXT: select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 1), i64 0),
 // CHECK-INDIRECT-SAME: ptr inttoptr (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1) to ptr),
 // CHECK-INDIRECT-SAME: ptr [[LOAD]]
 // CHECK: ret void
