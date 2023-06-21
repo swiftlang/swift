@@ -7301,6 +7301,11 @@ ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
       "'@_noImplicitCopy' has no effect when applied to a noncopyable type", ())
+ERROR(noncopyable_types_cannot_be_resilient, none,
+      "noncopyable %0 %1 must be @frozen in library evolution mode; "
+      "non-@frozen public and @usableFromInline noncopyable types are not "
+      "supported",
+      (DescriptiveDeclKind, Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)
