@@ -297,9 +297,12 @@ bool SinkAddressProjections::cloneProjections() {
       auto *useBB = use->getUser()->getParent();
       auto *firstUse = firstBlockUse.lookup(useBB);
       SingleValueInstruction *newProj;
-      if (use == firstUse)
+      if (use == firstUse) {
         newProj = cast<SingleValueInstruction>(oldProj->clone(use->getUser()));
-      else {
+        if (newProjections) {
+          newProjections->push_back(newProj);
+        }
+      } else {
         newProj = cast<SingleValueInstruction>(firstUse->get());
         assert(newProj->getParent() == useBB);
         newProj->moveFront(useBB);
