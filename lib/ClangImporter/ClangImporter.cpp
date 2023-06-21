@@ -939,6 +939,27 @@ std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
       Impl.Instance->getPCHContainerReader(), Impl.Instance->getDiagnostics());
 }
 
+void ClangImporter::addClangInvovcationDependencies(
+    std::vector<std::string> &files) {
+  auto addFiles = [&files](const auto &F) {
+    files.insert(files.end(), F.begin(), F.end());
+  };
+  auto &invocation = *Impl.Invocation;
+  // FIXME: Add file dependencies that are not accounted. The long term solution
+  // is to do a dependency scanning for clang importer and use that directly.
+  SmallVector<std::string, 4> HeaderMapFileNames;
+  Impl.Instance->getPreprocessor().getHeaderSearchInfo().getHeaderMapFileNames(
+      HeaderMapFileNames);
+  addFiles(HeaderMapFileNames);
+  addFiles(invocation.getHeaderSearchOpts().VFSOverlayFiles);
+  // FIXME: Should not depend on working directory. Build system/swift driver
+  // should not pass working directory here but if that option is passed,
+  // repect that and add that into CASFS.
+  auto CWD = invocation.getFileSystemOpts().WorkingDir;
+  if (!CWD.empty())
+    files.push_back(CWD);
+}
+
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {

@@ -804,7 +804,7 @@ void writeAttrInformation(llvm::json::OStream &JSON,
 }
 
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_fd_ostream &OS) {
+                       llvm::raw_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
   JSON.array([&] {
     for (const auto &TypeInfo : ConstValueInfos) {
