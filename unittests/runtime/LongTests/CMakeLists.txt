@@ -3,8 +3,18 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   set(PLATFORM_SOURCES)
   set(PLATFORM_TARGET_LINK_LIBRARIES)
+  set(PLATFORM_TARGET_RUNTIME_ARCHIVES)
+  
+  list(APPEND PLATFORM_TARGET_RUNTIME_ARCHIVES
+    $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    )
 
   if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
+    list(APPEND PLATFORM_TARGET_RUNTIME_ARCHIVES
+      $<TARGET_OBJECTS:swiftStdlibStubs${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+      )
 #   Placeholder for Darwin Foundation tests (currently none)
 #    find_library(FOUNDATION_LIBRARY Foundation)
 #    list(APPEND PLATFORM_SOURCES
@@ -42,9 +52,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # The runtime tests link to internal runtime symbols, which aren't exported
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
-    $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
-    $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
-    $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    ${PLATFORM_TARGET_RUNTIME_ARCHIVES}
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
