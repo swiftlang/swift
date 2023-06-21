@@ -589,6 +589,12 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
             Type interfaceType = opaque->getInterfaceType();
             auto genericSig =
                 opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+
+            SmallVector<GenericTypeParamType *, 2> params;
+            SmallVector<Requirement, 2> newRequirements;
+
+            newRequirements.append(sig.getRequirements().begin(), sig.getRequirements().end());
+            genericSig = buildGenericSignature(getASTContext(), genericSig, params, newRequirements);
             return genericSig->getNonDependentUpperBounds(interfaceType);
           }
         }
