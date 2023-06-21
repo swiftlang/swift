@@ -2055,13 +2055,13 @@ public:
 };
 
 class SendNonSendableExpr : public IdentityExpr {
-  DeferredSendableDiagnostic Diagnostic;
+  DeferredSendableDiagnostic *Diagnostic;
 public:
   SendNonSendableExpr(
       ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub,
       Type type = Type());
 
-  void produceDiagnostics() { Diagnostic.produceDiagnostics(); }
+  void produceDiagnostics() { Diagnostic->produceDiagnostics(); }
 
   SourceLoc getStartLoc() const { return getSubExpr()->getStartLoc(); }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
