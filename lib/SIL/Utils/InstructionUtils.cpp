@@ -901,7 +901,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       if (pa->isOnStack()) {
         for (SILValue arg : pa->getArguments()) {
           if (!arg->getType().isTrivial(*pa->getFunction()))
-            rt |= RuntimeEffect::RefCounting;
+            rt |= ifNonTrivial(arg->getType(), RuntimeEffect::RefCounting);
         }
       } else {
         rt |= RuntimeEffect::Allocating | RuntimeEffect::Releasing;

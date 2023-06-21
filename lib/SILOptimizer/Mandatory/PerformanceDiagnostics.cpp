@@ -217,6 +217,8 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = tfi->getOperand();
     } else if (auto *cp = dyn_cast<CopyValueInst>(closure)) {
       closure = cp->getOperand();
+    } else if (auto *bb = dyn_cast<BeginBorrowInst>(closure)) {
+      closure = bb->getOperand();
     } else if (auto *cv = dyn_cast<ConvertFunctionInst>(closure)) {
       closure = cv->getOperand();
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
