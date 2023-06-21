@@ -106,7 +106,7 @@ if(SWIFT_BUILD_STATIC_STDLIB)
   set(static_binary_lnk_file_list)
 
   foreach(sdk ${SWIFT_SDKS})
-    if(NOT "${sdk}" STREQUAL "LINUX" AND NOT "${sdk}" STREQUAL "WASI")
+    if(NOT "${sdk}" STREQUAL "LINUX")
       continue()
     endif()
 
