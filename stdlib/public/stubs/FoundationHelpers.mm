@@ -57,6 +57,42 @@ static void _initializeBridgingFunctionsFromCFImpl(void *ctxt) {
   bridgingState = (CFBridgingState *)ctxt;
 }
 
+@class __SwiftNativeNSStringBase, __SwiftNativeNSError, __SwiftNativeNSArrayBase, __SwiftNativeNSMutableArrayBase, __SwiftNativeNSDictionaryBase, __SwiftNativeNSSetBase, __SwiftNativeNSEnumeratorBase;
+
+static void _reparentClasses() {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  if (bridgingState->NSStringClass) {
+    [bridgingState->NSStringClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSStringBase class],  bridgingState->NSStringClass);
+  }
+  if (bridgingState->NSErrorClass) {
+    [bridgingState->NSErrorClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSError class], bridgingState->NSErrorClass);
+  }
+  if (bridgingState->NSArrayClass) {
+    [bridgingState->NSArrayClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSArrayBase class],  bridgingState->NSArrayClass);
+  }
+  if (bridgingState->NSMutableArrayClass) {
+    [bridgingState->NSMutableArrayClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSMutableArrayBase class],  bridgingState->NSMutableArrayClass);
+  }
+  if (bridgingState->NSDictionaryClass) {
+    [bridgingState->NSDictionaryClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSDictionaryBase class],  bridgingState->NSDictionaryClass);
+  }
+  if (bridgingState->NSSetClass) {
+    [bridgingState->NSSetClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSSetBase class],  bridgingState->NSSetClass);
+  }
+  if (bridgingState->NSEnumeratorClass) {
+    [bridgingState->NSEnumeratorClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSEnumeratorBase class],  bridgingState->NSEnumeratorClass);
+  }
+#pragma clang diagnostic pop
+}
+
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
   assert(!bridgingState);
   auto getStringTypeID = (CFTypeID(*)(void))dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
@@ -76,30 +112,7 @@ static void _initializeBridgingFunctionsImpl(void *ctxt) {
   bridgingState->NSSetClass = objc_lookUpClass("NSSet");
   bridgingState->NSDictionaryClass = objc_lookUpClass("NSDictionary");
   bridgingState->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (bridgingState->NSErrorClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSError"), bridgingState->NSErrorClass);
-  }
-  if (bridgingState->NSArrayClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSArrayBase"), bridgingState->NSArrayClass);
-  }
-  if (bridgingState->NSMutableArrayClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSMutableArrayBase"), bridgingState->NSMutableArrayClass);
-  }
-  if (bridgingState->NSDictionaryClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSDictionaryBase"), bridgingState->NSDictionaryClass);
-  }
-  if (bridgingState->NSSetClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSSetBase"), bridgingState->NSSetClass);
-  }
-  if (bridgingState->NSStringClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSStringBase"), bridgingState->NSStringClass);
-  }
-  if (bridgingState->NSEnumeratorClass) {
-    class_setSuperclass(objc_lookUpClass("__SwiftNativeNSEnumeratorBase"), bridgingState->NSEnumeratorClass);
-  }
-#pragma clang diagnostic pop
+  _reparentClasses();
 }
 
 static inline bool initializeBridgingFunctions() {
@@ -113,6 +126,9 @@ SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState co
   swift_once(&initializeBridgingStateOnce,
              _initializeBridgingFunctionsFromCFImpl,
              (void *)state);
+  //It's fine if this runs more than once, it's a noop if it's been done before
+  //and we want to make sure it happens if CF loads late after it failed initially
+  _reparentClasses();
 }
 
 namespace swift {
