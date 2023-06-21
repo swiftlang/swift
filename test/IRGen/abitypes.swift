@@ -145,10 +145,9 @@ class Foo {
   // x86_64 returns an HA of four floats directly in two <2 x float>
   // x86_64-macosx:      define hidden swiftcc float @"$s8abitypes3FooC4barc{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // x86_64-macosx:      load ptr, ptr @"\01L_selector(newRect)", align 8
-  // x86_64-macosx:      [[RESULT:%.*]] = call { <2 x float>, <2 x float> } bitcast (ptr @objc_msgSend
+  // x86_64-macosx:      [[RESULT:%.*]] = call { <2 x float>, <2 x float> } @objc_msgSend
   // x86_64-macosx:      store { <2 x float>, <2 x float> } [[RESULT]]
-  // x86_64-macosx:      [[CAST:%.*]] = bitcast ptr
-  // x86_64-macosx:      load { float, float, float, float }, ptr [[CAST]]
+  // x86_64-macosx:      load { float, float, float, float }, ptr
   // x86_64-macosx:      ret float
   //
   // armv7 returns an HA of four floats indirectly
@@ -174,7 +173,7 @@ class Foo {
   // armv7k returns an HA of four floats directly
   // armv7k-watchos:      define hidden swiftcc float @"$s8abitypes3FooC4barc{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // armv7k-watchos:      load ptr, ptr @"\01L_selector(newRect)", align 4
-  // armv7k-watchos:      [[RESULT:%.*]] = call [[ARMV7K_MYRECT]] bitcast (ptr @objc_msgSend
+  // armv7k-watchos:      [[RESULT:%.*]] = call [[ARMV7K_MYRECT]] @objc_msgSend
   // armv7k-watchos:      store [[ARMV7K_MYRECT]] [[RESULT]]
   // armv7k-watchos:      [[CAST:%.*]] = bitcast ptr
   // armv7k-watchos:      load { float, float, float, float }, ptr [[CAST]]
@@ -191,7 +190,6 @@ class Foo {
 
   // x86_64-macosx:      define hidden swiftcc double @"$s8abitypes3FooC4bazc{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // x86_64-macosx:      load ptr, ptr @"\01L_selector(newTrio)", align 8
-  // x86_64-macosx:      [[CAST:%[0-9]+]] = bitcast ptr %0
   // x86_64-macosx:      call void @objc_msgSend_stret
   func bazc(_ p: StructReturns) -> Double {
     return p.newTrio().j
@@ -215,13 +213,11 @@ class Foo {
 
   // x86_64-macosx:      define hidden swiftcc i64 @"$s8abitypes3FooC9getnested{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // x86_64-macosx:      call i64 @objc_msgSend
-  // x86_64-macosx:      bitcast
   // x86_64-macosx:      call void @llvm.lifetime.start
   // x86_64-macosx:      store i32 {{.*}}
   // x86_64-macosx:      store i32 {{.*}}
-  // x86_64-macosx:      [[T0:%.*]] = getelementptr inbounds { i64 }, { i64 }
+  // x86_64-macosx:      [[T0:%.*]] = getelementptr inbounds { i64 }, ptr
   // x86_64-macosx:      load i64, ptr [[T0]], align 8
-  // x86_64-macosx:      bitcast
   // x86_64-macosx:      call void @llvm.lifetime.end
   // x86_64-macosx:      ret i64
   func getnested(_ p: StructReturns) -> NestedInts {
@@ -237,17 +233,15 @@ class Foo {
   }
 
   // x86_64-macosx:      define internal ptr @"$s8abitypes3FooC9copyProto{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1, ptr %2) {{[#0-9]*}} {
-  // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc [[TYPE:%.*]] @"$s8abitypes3FooC9copyProto{{[_0-9a-zA-Z]*}}F"
-  // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE:%.*]] [[VALUE]] to ptr
-  // x86_64-macosx:      ret ptr [[RESULT]]
+  // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc ptr @"$s8abitypes3FooC9copyProto{{[_0-9a-zA-Z]*}}F"
+  // x86_64-macosx:      ret ptr [[VALUE]]
   @objc dynamic func copyProto(_ a: AnyObject) -> AnyObject {
     return a
   }
 
   // x86_64-macosx:      define internal ptr @"$s8abitypes3FooC13copyProtoComp{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1, ptr %2) {{[#0-9]*}} {
-  // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc [[TYPE:%.*]] @"$s8abitypes3FooC13copyProtoComp{{[_0-9a-zA-Z]*}}F"
-  // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to ptr
-  // x86_64-macosx:      ret ptr [[RESULT]]
+  // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc ptr @"$s8abitypes3FooC13copyProtoComp{{[_0-9a-zA-Z]*}}F"
+  // x86_64-macosx:      ret ptr [[VALUE]]
   @objc dynamic func copyProtoComp(_ a: P1 & P2) -> P1 & P2 {
     return a
   }
