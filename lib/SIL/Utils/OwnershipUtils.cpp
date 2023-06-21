@@ -112,28 +112,30 @@ bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
       if (ti->mayHaveTerminatorResult())
-        return OwnershipForwardingMixin::get(ti)->preservesOwnership();
+        return ForwardingInstruction::get(ti)->preservesOwnership();
 
   if (auto *inst = value->getDefiningInstruction())
-    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+    if (auto *mixin = ForwardingInstruction::get(inst))
       return mixin->preservesOwnership() &&
-             !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
+             !ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(inst);
 
   return false;
 }
 
 bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
-  if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
-    return mixin->preservesOwnership() &&
-           !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
+  if (auto *fwi = ForwardingInstruction::get(use->getUser()))
+    return fwi->preservesOwnership() &&
+           !ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(
+               use->getUser());
   return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   if (auto *inst = value->getDefiningInstructionOrTerminator()) {
-    if (auto *mixin = OwnershipForwardingMixin::get(inst)) {
-      return mixin->preservesOwnership() &&
-             !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
+    if (auto *fwi = ForwardingInstruction::get(inst)) {
+      return fwi->preservesOwnership() &&
+             !ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(
+                 inst);
     }
   }
   return false;
@@ -141,9 +143,10 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
-  if (auto *mixin = OwnershipForwardingMixin::get(user))
-    return mixin->preservesOwnership() &&
-           !isa<GuaranteedFirstArgForwardingSingleValueInst>(user);
+  if (auto *fwi = ForwardingInstruction::get(user))
+    return fwi->preservesOwnership() &&
+           !ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(
+               user);
   return false;
 }
 
@@ -1366,14 +1369,8 @@ ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
   // NOTE: This if chain is meant to be a covered switch, so make sure to return
   // in each if itself since we have an unreachable at the bottom to ensure if a
   // new subclass of OwnershipForwardingInst is added
-  if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     return ofsvi->getForwardingOwnershipKind();
-
-  if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
-    return ofsvi->getForwardingOwnershipKind();
-
-  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    return ofci->getForwardingOwnershipKind();
 
   if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
     return ofseib->getForwardingOwnershipKind();
@@ -1389,13 +1386,6 @@ ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
     return ofti->getForwardingOwnershipKind();
   }
 
-  if (auto *move = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-    return move->getForwardingOwnershipKind();
-  }
-
-  if (auto *move = dyn_cast<MoveOnlyWrapperToCopyableBoxInst>(user))
-    return move->getForwardingOwnershipKind();
-
   llvm_unreachable("Unhandled forwarding inst?!");
 }
 
@@ -1405,12 +1395,8 @@ void ForwardingOperand::setForwardingOwnershipKind(
   // NOTE: This if chain is meant to be a covered switch, so make sure to return
   // in each if itself since we have an unreachable at the bottom to ensure if a
   // new subclass of OwnershipForwardingInst is added
-  if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     return ofsvi->setForwardingOwnershipKind(newKind);
-  if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
-    return ofsvi->setForwardingOwnershipKind(newKind);
-  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    return ofci->setForwardingOwnershipKind(newKind);
   if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
     return ofseib->setForwardingOwnershipKind(newKind);
   if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
@@ -1471,17 +1457,9 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
                                              ValueOwnershipKind newKind) const {
   auto *user = use->getUser();
 
-  if (auto *fInst = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
+  if (auto *fInst = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     if (fInst->getForwardingOwnershipKind() == oldKind)
       return fInst->setForwardingOwnershipKind(newKind);
-
-  if (auto *fInst = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
-    if (fInst->getForwardingOwnershipKind() == oldKind)
-      return fInst->setForwardingOwnershipKind(newKind);
-
-  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    if (ofci->getForwardingOwnershipKind() == oldKind)
-      return ofci->setForwardingOwnershipKind(newKind);
 
   if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
     if (ofseib->getForwardingOwnershipKind() == oldKind)
@@ -1733,19 +1711,11 @@ bool swift::visitForwardedGuaranteedOperands(
   if (inst->getNumRealOperands() == 0) {
     return false;
   }
-  if (isa<FirstArgOwnershipForwardingSingleValueInst>(inst)
-      || isa<OwnershipForwardingConversionInst>(inst)
-      || isa<OwnershipForwardingSelectEnumInstBase>(inst)
-      || isa<OwnershipForwardingMultipleValueInstruction>(inst)
-      || isa<MoveOnlyWrapperToCopyableValueInst>(inst)
-      || isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
-    assert(!isa<SingleValueInstruction>(inst)
-           || !BorrowedValue(cast<SingleValueInstruction>(inst))
-                  && "forwarded operand cannot begin a borrow scope");
+  if (ForwardingInstruction::canForwardFirstOperandOnly(inst)) {
     visitOperand(&inst->getOperandRef(0));
     return true;
   }
-  if (isa<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+  if (ForwardingInstruction::canForwardAllOperands(inst)) {
     assert(inst->getNumOperands() > 0 && "checked above");
     assert(inst->getNumOperands() == inst->getNumRealOperands() &&
            "mixin expects all readl operands");

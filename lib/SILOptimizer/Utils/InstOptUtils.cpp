@@ -1808,8 +1808,10 @@ SILValue swift::makeValueAvailable(SILValue value, SILBasicBlock *inBlock) {
 
 bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks) {
-  if (!OwnershipForwardingMixin::isa(forwardingInst) ||
-      isa<AllArgOwnershipForwardingSingleValueInst>(forwardingInst))
+  if (!ForwardingInstruction::isa(forwardingInst))
+    return false;
+
+  if (ForwardingInstruction::canForwardAllOperands(forwardingInst))
     return false;
 
   SmallVector<Operand *, 32> worklist(getNonDebugUses(forwardingInst));

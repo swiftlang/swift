@@ -791,7 +791,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   SmallVector<Operand *, 8> parentLifetimeEndingUses;
   for (auto *origValueUse : originalValue->getUses())
     if (origValueUse->isLifetimeEnding() &&
-        !OwnershipForwardingMixin::isa(origValueUse->getUser()))
+        !ForwardingInstruction::isa(origValueUse->getUser()))
       parentLifetimeEndingUses.push_back(origValueUse);
 
   // Ok, we have an owned value. If we do not have any non-destroying consuming

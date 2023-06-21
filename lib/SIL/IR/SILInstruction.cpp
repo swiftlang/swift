@@ -15,16 +15,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
-#include "swift/Basic/type_traits.h"
+#include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DynamicCasts.h"
-#include "swift/Basic/AssertImplements.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1768,8 +1769,8 @@ DestroyValueInst::getNonescapingClosureAllocation() const {
       // Stop at a conversion from escaping closure, since there's no stack
       // allocation in that case.
       return nullptr;
-    } else if (auto conv = dyn_cast<ConversionInst>(operand)) {
-      operand = conv->getConverted();
+    } else if (auto convert = ConversionOperation(operand)) {
+      operand = convert.getConverted();
       continue;
     } else if (auto pa = dyn_cast<PartialApplyInst>(operand)) {
       // If we found the `[on_stack]` partial apply, we're done.
