@@ -2182,11 +2182,14 @@ namespace {
       auto defersDiagnostics =
           ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking);
 
-      auto processDeferredDiagnostic = [=, &expr](DeferredSendableDiagnostic deferred) {
+      //in the AST, replace expr with newExpr when this call returns
+      Expr *newExpr = expr;
+
+      auto processDeferredDiagnostic = [=, &newExpr](DeferredSendableDiagnostic deferred) {
         if (defersDiagnostics) {
-          if (deferred.producesErrors()) {
-            expr = new (ctx) SendNonSendableExpr(
-                ctx, deferred, expr, expr->getType());
+          if (deferred.producesDiagnostics()) {
+            newExpr = new (ctx) SendNonSendableExpr(
+                ctx, deferred, newExpr, expr->getType());
           }
         } else {
           deferred.produceDiagnostics();
@@ -2197,14 +2200,14 @@ namespace {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
             openExistential->getExistentialValue()});
-        return Action::Continue(expr);
+        return Action::Continue(newExpr);
       }
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
         processDeferredDiagnostic(checkClosureCaptures(closure));
         contextStack.push_back(closure);
-        return Action::Continue(expr);
+        return Action::Continue(newExpr);
       }
 
       if (auto inout = dyn_cast<InOutExpr>(expr)) {
@@ -2221,7 +2224,7 @@ namespace {
         if (auto destExpr = assign->getDest())
           recordMutableVarParent(assign, destExpr);
 
-        return Action::Continue(expr);
+        return Action::Continue(newExpr);
       }
 
       if (auto load = dyn_cast<LoadExpr>(expr))
@@ -2233,7 +2236,7 @@ namespace {
                              lookup->getLoc(),
                              /*partialApply*/None,
                              lookup));
-        return Action::Continue(expr);
+        return Action::Continue(newExpr);
       }
 
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
@@ -2248,7 +2251,7 @@ namespace {
         else
           processDeferredDiagnostic(checkReference(
               nullptr, valueRef, loc, None, declRef));
-        return Action::Continue(expr);
+        return Action::Continue(newExpr);
       }
 
       if (auto apply = dyn_cast<ApplyExpr>(expr)) {
@@ -2274,7 +2277,7 @@ namespace {
             assert(applyStack.back() == apply);
             applyStack.pop_back();
 
-            return Action::SkipChildren(expr);
+            return Action::SkipChildren(newExpr);
           }
         }
       }
@@ -2305,7 +2308,7 @@ namespace {
           assert(applyStack.back() == dyn_cast<ApplyExpr>(expr));
           applyStack.pop_back();
 
-          return Action::SkipChildren(expr);
+          return Action::SkipChildren(newExpr);
         }
       }
 
@@ -2318,7 +2321,7 @@ namespace {
       // expressions tend to violate restrictions on the use of instance
       // methods.
       if (isa<ObjCSelectorExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipChildren(newExpr);
 
       // Track the capture contexts for variables.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
@@ -2333,7 +2336,7 @@ namespace {
         checkFunctionConversion(funcConv);
       }
 
-      return Action::Continue(expr);
+      return Action::Continue(newExpr);
     }
 
     PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
