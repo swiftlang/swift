@@ -47,8 +47,12 @@ typedef struct _CFBridgingState {
   //version 0 ends here
 } CFBridgingState;
 
-static CFBridgingState const * bridgingState;
+static std::atomic<CFBridgingState const *> bridgingState;
 static swift_once_t initializeBridgingStateOnce;
+
+static CFBridgingState const *getBridgingState() {
+  return bridgingState.load(std::memory_order_acquire);
+}
 
 extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
                                        const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
@@ -56,42 +60,43 @@ extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
 @class __SwiftNativeNSStringBase, __SwiftNativeNSError, __SwiftNativeNSArrayBase, __SwiftNativeNSMutableArrayBase, __SwiftNativeNSDictionaryBase, __SwiftNativeNSSetBase, __SwiftNativeNSEnumeratorBase;
 
 static void _reparentClasses() {
+  auto state = getBridgingState();
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (bridgingState->NSStringClass) {
-    [bridgingState->NSStringClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSStringBase class],  bridgingState->NSStringClass);
+  if (state->NSStringClass) {
+    [state->NSStringClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSStringBase class],  state->NSStringClass);
   }
-  if (bridgingState->NSErrorClass) {
-    [bridgingState->NSErrorClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSError class], bridgingState->NSErrorClass);
+  if (state->NSErrorClass) {
+    [state->NSErrorClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSError class], state->NSErrorClass);
   }
-  if (bridgingState->NSArrayClass) {
-    [bridgingState->NSArrayClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSArrayBase class],  bridgingState->NSArrayClass);
+  if (state->NSArrayClass) {
+    [state->NSArrayClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSArrayBase class],  state->NSArrayClass);
   }
-  if (bridgingState->NSMutableArrayClass) {
-    [bridgingState->NSMutableArrayClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSMutableArrayBase class],  bridgingState->NSMutableArrayClass);
+  if (state->NSMutableArrayClass) {
+    [state->NSMutableArrayClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSMutableArrayBase class],  state->NSMutableArrayClass);
   }
-  if (bridgingState->NSDictionaryClass) {
-    [bridgingState->NSDictionaryClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSDictionaryBase class],  bridgingState->NSDictionaryClass);
+  if (state->NSDictionaryClass) {
+    [state->NSDictionaryClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSDictionaryBase class],  state->NSDictionaryClass);
   }
-  if (bridgingState->NSSetClass) {
-    [bridgingState->NSSetClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSSetBase class],  bridgingState->NSSetClass);
+  if (state->NSSetClass) {
+    [state->NSSetClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSSetBase class],  state->NSSetClass);
   }
-  if (bridgingState->NSEnumeratorClass) {
-    [bridgingState->NSEnumeratorClass class]; //make sure the class is realized
-    class_setSuperclass([__SwiftNativeNSEnumeratorBase class],  bridgingState->NSEnumeratorClass);
+  if (state->NSEnumeratorClass) {
+    [state->NSEnumeratorClass class]; //make sure the class is realized
+    class_setSuperclass([__SwiftNativeNSEnumeratorBase class],  state->NSEnumeratorClass);
   }
 #pragma clang diagnostic pop
 }
 
 static inline bool initializeBridgingFunctions() {
   swift::once(initializeBridgingStateOnce, [](){
-    assert(!bridgingState);
+    assert(!getBridgingState());
     auto getStringTypeID = (CFTypeID(*)(void))dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
     if (!getStringTypeID) {
       return; //CF not loaded
@@ -109,21 +114,21 @@ static inline bool initializeBridgingFunctions() {
     state->NSSetClass = objc_lookUpClass("NSSet");
     state->NSDictionaryClass = objc_lookUpClass("NSDictionary");
     state->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
-    bridgingState = state;
+    bridgingState.store(state);
     _reparentClasses();
   });
-  return bridgingState && bridgingState->NSStringClass != nullptr;
+  auto state = getBridgingState();
+  return state && state->NSStringClass != nullptr;
 }
 
 SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState const * const state) {
   //Consume the once token to make sure that the lazy version of this in initializeBridgingFunctions only runs if we didn't hit this
   swift::once(initializeBridgingStateOnce, [state](){
-    bridgingState = state;
+    bridgingState.store(state);
   });
   //It's fine if this runs more than once, it's a noop if it's been done before
   //and we want to make sure it still happens if CF loads late after it failed initially
-  bridgingState = state;
-  std::atomic_thread_fence(std::memory_order_seq_cst); //This is probably unnecessary, but thinking through why it's unnecessary has given multiple people headaches now, and since this only runs once it's not a big deal to just have the barrier.
+  bridgingState.store(state);
   _reparentClasses();
 }
 
@@ -133,7 +138,7 @@ Class getNSErrorClass();
 
 Class swift::getNSErrorClass() {
   if (initializeBridgingFunctions()) {
-    return bridgingState->NSErrorClass;
+    return getBridgingState()->NSErrorClass;
   }
   return nullptr;
 }
@@ -147,20 +152,21 @@ swift_stdlib_connectNSBaseClasses() {
 __swift_uint8_t
 _swift_stdlib_isNSString(id obj) {
   assert(initializeBridgingFunctions());
-  return bridgingState->_CFGetTypeID((CFTypeRef)obj) == bridgingState->_CFStringTypeID ? 1 : 0;
+  auto state = getBridgingState();
+  return state->_CFGetTypeID((CFTypeRef)obj) == state->_CFStringTypeID ? 1 : 0;
 }
 
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
   assert(initializeBridgingFunctions());
-  return bridgingState->_CFStringHashNSString(obj);
+  return getBridgingState()->_CFStringHashNSString(obj);
 }
 
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length) {
   assert(initializeBridgingFunctions());
-  return bridgingState->_CFStringHashCString(bytes, length);
+  return getBridgingState()->_CFStringHashCString(bytes, length);
 }
 
 const __swift_uint8_t *
