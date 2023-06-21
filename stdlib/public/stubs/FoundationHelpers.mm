@@ -123,6 +123,7 @@ SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState co
   //It's fine if this runs more than once, it's a noop if it's been done before
   //and we want to make sure it still happens if CF loads late after it failed initially
   bridgingState = state;
+  std::atomic_thread_fence(std::memory_order_seq_cst); //This is probably unnecessary, but thinking through why it's unnecessary has given multiple people headaches now, and since this only runs once it's not a big deal to just have the barrier.
   _reparentClasses();
 }
 
