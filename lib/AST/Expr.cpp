@@ -370,6 +370,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
+  PASS_THROUGH_REFERENCE(SendNonSendable, getSubExpr);
   PASS_THROUGH_REFERENCE(Consume, getSubExpr);
   PASS_THROUGH_REFERENCE(Copy, getSubExpr);
   PASS_THROUGH_REFERENCE(Borrow, getSubExpr);
@@ -750,6 +751,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
   case ExprKind::InOut:
+  case ExprKind::SendNonSendable:
     return false;
 
   case ExprKind::RebindSelfInConstructor:
@@ -939,6 +941,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Consume:
   case ExprKind::Copy:
   case ExprKind::Borrow:
+  case ExprKind::SendNonSendable:
   case ExprKind::UnresolvedMemberChainResult:
   case ExprKind::Try:
   case ExprKind::ForceTry:
@@ -2784,4 +2787,9 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
-
+SendNonSendableExpr::SendNonSendableExpr(ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub, Type type)
+    : IdentityExpr(ExprKind::SendNonSendable, sub, type, /*implicit=*/true) {
+  void *mem = ctx.Allocate(sizeof(DeferredSendableDiagnostic), alignof(DeferredSendableDiagnostic));
+  Diagnostic = new (mem) DeferredSendableDiagnostic(std::move(diagnostic));
+  ctx.addDestructorCleanup(*Diagnostic);
+}

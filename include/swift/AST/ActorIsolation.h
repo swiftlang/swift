@@ -262,6 +262,61 @@ bool safeToDropGlobalActor(
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 
+/// DeferredSendableDiagnostic captures the information of whether errors
+/// should be produced by a given check, and provides an std::function that
+/// can be called to produce any diagnostics including those errors associated
+/// with the check
+struct DeferredSendableDiagnostic {
+private:
+  bool ProducesErrors;
+  std::function<void()> ProduceDiagnostics;
+
+public:
+  DeferredSendableDiagnostic() : ProducesErrors(false), ProduceDiagnostics([](){}) {}
+
+  DeferredSendableDiagnostic(bool ProducesErrors, std::function<void()> ProduceDiagnostics)
+      : ProducesErrors(ProducesErrors), ProduceDiagnostics(ProduceDiagnostics) {
+    assert(ProduceDiagnostics && "Empty diagnostics function");
+  }
+
+  bool producesErrors() const {
+    return ProducesErrors;
+  }
+
+  void produceDiagnostics() const {
+    ProduceDiagnostics();
+  }
+
+  void setProducesErrors(bool producesErrors) {
+    ProducesErrors = producesErrors;
+  }
+
+  void addDiagnostic(std::function<void()> produceMoreDiagnostics) {
+    assert(produceMoreDiagnostics && "Empty diagnostics function");
+
+    ProduceDiagnostics = [=, ProduceDiagnostics=ProduceDiagnostics]() {
+      ProduceDiagnostics();
+      produceMoreDiagnostics();
+    };
+  }
+
+  /// this variation on addErrorProducingDiagnostic should be called
+  /// when the passed lambda will definitely through a diagnostic
+  /// for the sake of maintaining existing control flow paths, it
+  /// is not used everywhere
+  void addErrorProducingDiagnostic(std::function<void()> produceMoreDiagnostics) {
+    addDiagnostic(produceMoreDiagnostics);
+    setProducesErrors(true);
+  }
+
+  void followWith(DeferredSendableDiagnostic other) {
+    setProducesErrors(producesErrors() || other.producesErrors());
+    addDiagnostic([other](){
+      other.produceDiagnostics();
+    });
+  }
+};
+
 } // end namespace swift
 
 #endif /* SWIFT_AST_ACTORISOLATIONSTATE_H */

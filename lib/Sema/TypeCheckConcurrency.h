@@ -285,7 +285,7 @@ enum class FunctionCheckKind {
 /// warnings and diagnostics are reported at `refLoc`.
 ///
 /// \returns true if an problem was detected, false otherwise.
-bool diagnoseNonSendableTypesInReference(
+DeferredSendableDiagnostic diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind,
     Optional<ActorIsolation> knownIsolation = None,
@@ -362,6 +362,12 @@ struct SendableCheckContext {
   bool isExplicitSendableConformance() const;
 };
 
+/// Produce a diagnostic for a single instance of a non-Sendable type where
+/// a Sendable type is required.
+DeferredSendableDiagnostic diagnoseSingleNonSendableType(
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose);
+
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
@@ -374,6 +380,10 @@ struct SendableCheckContext {
 bool diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
+
+DeferredSendableDiagnostic diagnoseNonSendableTypes(
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose);
 
 namespace detail {
   template<typename T>
@@ -393,7 +403,7 @@ namespace detail {
 /// \returns \c true if any errors were produced, \c false if no diagnostics or
 /// only warnings and notes were produced.
 template<typename ...DiagArgs>
-bool diagnoseNonSendableTypes(
+DeferredSendableDiagnostic diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext,
     SourceLoc typeLoc, SourceLoc diagnoseLoc,
     Diag<Type, DiagArgs...> diag,
@@ -403,13 +413,14 @@ bool diagnoseNonSendableTypes(
     return diagnoseNonSendableTypes(
         type, fromContext, typeLoc, [&](Type specificType,
                                         DiagnosticBehavior behavior) {
-
-          if (behavior != DiagnosticBehavior::Ignore) {
-            ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-                .limitBehavior(behavior);
+          if (behavior == DiagnosticBehavior::Ignore) {
+            return DeferredSendableDiagnostic(true, [](){});
+          } else {
+            return DeferredSendableDiagnostic(true, [=, ctx=&ctx]() {
+              ctx->Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
+                  .limitBehavior(behavior);
+            });
           }
-
-          return false;
         });
 }
 
@@ -419,7 +430,7 @@ bool diagnoseNonSendableTypes(
 /// \returns \c true if any errors were produced, \c false if no diagnostics or
 /// only warnings and notes were produced.
 template<typename ...DiagArgs>
-bool diagnoseNonSendableTypes(
+DeferredSendableDiagnostic diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     Diag<Type, DiagArgs...> diag,
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
@@ -447,6 +458,10 @@ bool diagnoseNonSendableTypes(
 bool diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
     llvm::function_ref<bool(DiagnosticBehavior)> diagnose);
+
+DeferredSendableDiagnostic deferredDiagnoseSendabilityErrorBasedOn(
+    NominalTypeDecl *nominal, SendableCheckContext fromContext,
+    llvm::function_ref<DeferredSendableDiagnostic(DiagnosticBehavior)> diagnose);
 
 /// If any of the imports in this source file was @preconcurrency but
 /// there were no diagnostics downgraded or suppressed due to that
