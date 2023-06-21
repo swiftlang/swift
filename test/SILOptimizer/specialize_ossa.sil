@@ -1466,3 +1466,20 @@ bb0:
   return %2 : $@callee_owned (@in_guaranteed Int, @thin GenericKlass<Int>.Type) -> @out Int
 }
 
+sil [ossa] @method_with_dynamic_self_arg : $@convention(method) <T> (@thick @dynamic_self GenericKlass<T>.Type) -> () {
+bb0(%0 : $@thick @dynamic_self GenericKlass<T>.Type):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callMethodWithDynamicSelfArg :
+// CHECK:         = function_ref @$s28method_with_dynamic_self_argSi_Tg5 : $@convention(method) (@thick @dynamic_self GenericKlass<Int>.Type) -> ()
+// CHECK-LABEL: } // end sil function 'callMethodWithDynamicSelfArg'
+sil [ossa] @callMethodWithDynamicSelfArg : $@convention(method) (@guaranteed GenericKlass<Int>) -> () {
+bb0(%0 : @guaranteed $GenericKlass<Int>):
+  %1 = metatype $@thick @dynamic_self GenericKlass<Int>.Type
+  %2 = function_ref @method_with_dynamic_self_arg : $@convention(method) <T> (@thick @dynamic_self GenericKlass<T>.Type) -> ()
+  %3 = apply %2<Int>(%1) : $@convention(method) <T> (@thick @dynamic_self GenericKlass<T>.Type) -> ()
+  return %3 : $()
+}
+

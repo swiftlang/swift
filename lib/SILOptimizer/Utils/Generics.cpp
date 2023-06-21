@@ -3062,6 +3062,9 @@ static bool canDropMetatypeArgs(ApplySite apply, SILFunction *callee) {
     if (isUsedAsDynamicSelf(calleeArg))
       return false;
 
+    if (calleeArg->getType().getASTType()->hasDynamicSelfType())
+      return false;
+
     // We don't drop metatype arguments of not applied arguments (in case of `partial_apply`).
     if (firstAppliedArgIdx > calleeArgIdx)
       return false;
