@@ -47,15 +47,11 @@ typedef struct _CFBridgingState {
   //version 0 ends here
 } CFBridgingState;
 
-static CFBridgingState *bridgingState;
+static CFBridgingState const * bridgingState;
 static swift_once_t initializeBridgingStateOnce;
 
 extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
                                        const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
-
-static void _initializeBridgingFunctionsFromCFImpl(void *ctxt) {
-  bridgingState = (CFBridgingState *)ctxt;
-}
 
 @class __SwiftNativeNSStringBase, __SwiftNativeNSError, __SwiftNativeNSArrayBase, __SwiftNativeNSMutableArrayBase, __SwiftNativeNSDictionaryBase, __SwiftNativeNSSetBase, __SwiftNativeNSEnumeratorBase;
 
@@ -93,41 +89,40 @@ static void _reparentClasses() {
 #pragma clang diagnostic pop
 }
 
-static void _initializeBridgingFunctionsImpl(void *ctxt) {
-  assert(!bridgingState);
-  auto getStringTypeID = (CFTypeID(*)(void))dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
-  if (!getStringTypeID) {
-    return; //CF not loaded
-  }
-  bridgingState = (CFBridgingState *)calloc(1, sizeof(CFBridgingState));
-  bridgingState->version = 0;
-  bridgingState->_CFStringTypeID = getStringTypeID();
-  bridgingState->_CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
-  bridgingState->_CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT, "CFStringHashNSString");
-  bridgingState->_CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(RTLD_DEFAULT, "CFStringHashCString");
-  bridgingState->NSErrorClass = objc_lookUpClass("NSError");
-  bridgingState->NSStringClass = objc_lookUpClass("NSString");
-  bridgingState->NSArrayClass = objc_lookUpClass("NSArray");
-  bridgingState->NSMutableArrayClass = objc_lookUpClass("NSMutableArray");
-  bridgingState->NSSetClass = objc_lookUpClass("NSSet");
-  bridgingState->NSDictionaryClass = objc_lookUpClass("NSDictionary");
-  bridgingState->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
-  _reparentClasses();
-}
-
 static inline bool initializeBridgingFunctions() {
-  swift_once(&initializeBridgingStateOnce,
-             _initializeBridgingFunctionsImpl,
-             nullptr);
+  swift::once(initializeBridgingStateOnce, [](){
+    assert(!bridgingState);
+    auto getStringTypeID = (CFTypeID(*)(void))dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
+    if (!getStringTypeID) {
+      return; //CF not loaded
+    }
+    auto state = (CFBridgingState *)calloc(1, sizeof(CFBridgingState));
+    state->version = 0;
+    state->_CFStringTypeID = getStringTypeID();
+    state->_CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
+    state->_CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT, "CFStringHashNSString");
+    state->_CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(RTLD_DEFAULT, "CFStringHashCString");
+    state->NSErrorClass = objc_lookUpClass("NSError");
+    state->NSStringClass = objc_lookUpClass("NSString");
+    state->NSArrayClass = objc_lookUpClass("NSArray");
+    state->NSMutableArrayClass = objc_lookUpClass("NSMutableArray");
+    state->NSSetClass = objc_lookUpClass("NSSet");
+    state->NSDictionaryClass = objc_lookUpClass("NSDictionary");
+    state->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
+    bridgingState = state;
+    _reparentClasses();
+  });
   return bridgingState && bridgingState->NSStringClass != nullptr;
 }
 
 SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState const * const state) {
-  swift_once(&initializeBridgingStateOnce,
-             _initializeBridgingFunctionsFromCFImpl,
-             (void *)state);
+  //Consume the once token to make sure that the lazy version of this in initializeBridgingFunctions only runs if we didn't hit this
+  swift::once(initializeBridgingStateOnce, [state](){
+    bridgingState = state;
+  });
   //It's fine if this runs more than once, it's a noop if it's been done before
-  //and we want to make sure it happens if CF loads late after it failed initially
+  //and we want to make sure it still happens if CF loads late after it failed initially
+  bridgingState = state;
   _reparentClasses();
 }
 
