@@ -45,4 +45,18 @@ conformances.test("conditional") {
   expectEqual(["Int", "String"], callFoobar(G<Int, String>()))
 }
 
+func cast<T, U>(_ value: T, to: U.Type) -> Bool {
+  return value is U
+}
+
+conformances.test("cast") {
+  expectEqual(true, cast(G< >(), to: (any P).self))
+  expectEqual(true, cast(G<Int>(), to: (any P).self))
+  expectEqual(true, cast(G<Int, String>(), to: (any P).self))
+
+  expectEqual(false, cast(G<Bool>(), to: (any P).self))
+  expectEqual(false, cast(G<Int, Bool>(), to: (any P).self))
+  expectEqual(false, cast(G<Bool, Int>(), to: (any P).self))
+}
+
 runAllTests()
