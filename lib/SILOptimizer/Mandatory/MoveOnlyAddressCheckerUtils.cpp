@@ -909,7 +909,11 @@ static bool findNonEscapingPartialApplyUses(PartialApplyInst *pai,
         //
         // We have this separately from the other look through sections so that
         // we can make it clearer what we are doing here.
-        isa<PartialApplyInst>(user)) {
+        isa<PartialApplyInst>(user) ||
+        // Likewise with convert_function. Any valid function conversion that
+        // doesn't prevent stack promotion of the closure must retain the
+        // invariants on its transitive uses.
+        isa<ConvertFunctionInst>(user)) {
       for (auto *use : cast<SingleValueInstruction>(user)->getUses())
         worklist.push_back(use);
       continue;
