@@ -299,7 +299,7 @@ public struct ContainsSinglePayloadSimpleClassEnum {
 
 public enum SinglePayloadEnum<T> {
     case empty
-    case nonEmpty(T?)
+    case nonEmpty(Int, T?)
 }
 
 public struct SinglePayloadEnumWrapper<T> {

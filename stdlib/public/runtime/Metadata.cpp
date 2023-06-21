@@ -2709,8 +2709,11 @@ void swift::swift_initStructMetadataWithLayoutString(
   const size_t fixedLayoutStringSize = layoutStringHeaderSize +
                                        sizeof(uint64_t) * 2;
 
-  uint8_t *layoutStr = (uint8_t *)MetadataAllocator(LayoutStringTag)
-      .Allocate(fixedLayoutStringSize + refCountBytes, alignof(uint8_t));
+  uint8_t *layoutStr =
+      (uint8_t *)MetadataAllocator(LayoutStringTag)
+          .Allocate(llvm::alignTo(fixedLayoutStringSize + refCountBytes,
+                                  sizeof(void *)),
+                    alignof(uint8_t));
 
   size_t layoutStrOffset = sizeof(uint64_t);
 
