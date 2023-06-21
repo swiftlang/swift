@@ -232,9 +232,9 @@ extension FunctionDeclSyntax {
   var signatureStandin: SignatureStandin {
     var parameters = [String]()
     for parameter in signature.input.parameterList {
-      parameters.append(parameter.firstName.text + ":" + (parameter.type.genericSubstitution(genericParameterClause?.genericParameterList) ?? "" ))
+      parameters.append(parameter.firstName.text + ":" + (parameter.type.genericSubstitution(genericParameterClause?.parameters) ?? "" ))
     }
-    let returnType = signature.output?.returnType.genericSubstitution(genericParameterClause?.genericParameterList) ?? "Void"
+    let returnType = signature.output?.returnType.genericSubstitution(genericParameterClause?.parameters) ?? "Void"
     return SignatureStandin(isInstance: isInstance, identifier: identifier.text, parameters: parameters, returnType: returnType)
   }
   
@@ -249,12 +249,12 @@ enum SyntaxVisibility {
   case `private`
   case `fileprivate`
   
-  var description: TokenSyntax {
+  var description: String {
     switch self {
-    case .public: "public"
-    case .internal: "internal"
-    case .private: "private"
-    case .fileprivate: "fileprivate"
+    case .public: return "public"
+    case .internal: return "internal"
+    case .private: return "private"
+    case .fileprivate: return "fileprivate"
     }
   }
 }

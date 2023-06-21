@@ -428,8 +428,8 @@ extension ObservableValuesMacro: PeerMacro {
     if property.isComputed {
       let values: DeclSyntax =
         """
-        \(raw: modifiers)var \(identifier)Values: \(raw: qualifiedValuesTypeName)<\(type)> {
-          \(raw: qualifiedValuesTypeName)(of: self, computed: \\.\(identifier))
+        \(raw: modifiers)var \(identifier)Values: \(raw: ObservableMacro.qualifiedValuesTypeName)<\(type)> {
+          \(raw: ObservableMacro.qualifiedValuesTypeName)(of: self, computed: \\.\(identifier))
         }
         """
       return [values]
@@ -437,8 +437,8 @@ extension ObservableValuesMacro: PeerMacro {
       let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.valuesAttribute))
       let values: DeclSyntax =
         """
-        \(raw: modifiers)var \(identifier)Values: \(raw: qualifiedValuesTypeName)<\(type)> {
-          \(raw: qualifiedValuesTypeName)(of: self, stored: \\.\(identifier), registrar: \(raw: ObservableMacro.registrarVariableName))
+        \(raw: modifiers)var \(identifier)Values: \(raw: ObservableMacro.qualifiedValuesTypeName)<\(type)> {
+          \(raw: ObservableMacro.qualifiedValuesTypeName)(of: self, stored: \\.\(identifier), registrar: \(raw: ObservableMacro.registrarVariableName))
         }
         """
       return [storage, values]
