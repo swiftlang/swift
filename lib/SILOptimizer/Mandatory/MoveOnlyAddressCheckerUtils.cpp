@@ -3140,7 +3140,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this
-  // to categorize the uses of this address into their ownership behavior (e.x.:
+  // to categorize the uses of this address into their ownership behavior (e.g.:
   // init, reinit, take, destroy, etc.).
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
                             diagnosticEmitter);
