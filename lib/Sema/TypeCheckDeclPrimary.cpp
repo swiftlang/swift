@@ -2672,7 +2672,7 @@ public:
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
-    if (ED->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+    if (ED->isMoveOnly()) {
       if (ED->isIndirect())
         ED->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
@@ -2681,6 +2681,13 @@ public:
           elt->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                         ED->getBaseIdentifier());
         }
+      }
+
+      if (!ED->getASTContext().LangOpts.hasFeature(
+              Feature::MoveOnlyResilientTypes) &&
+          ED->isResilient()) {
+        ED->diagnose(diag::noncopyable_types_cannot_be_resilient,
+                     ED->getDescriptiveKind(), ED->getBaseIdentifier());
       }
     }
   }
@@ -2722,6 +2729,13 @@ public:
     diagnoseCopyableTypeContainingMoveOnlyType(SD);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
+
+    if (!SD->getASTContext().LangOpts.hasFeature(
+            Feature::MoveOnlyResilientTypes) &&
+        SD->isResilient() && SD->isMoveOnly()) {
+      SD->diagnose(diag::noncopyable_types_cannot_be_resilient,
+                   SD->getDescriptiveKind(), SD->getBaseIdentifier());
+    }
   }
 
   /// Check whether the given properties can be @NSManaged in this class.

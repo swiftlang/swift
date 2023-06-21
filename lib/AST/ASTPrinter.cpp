@@ -3294,6 +3294,12 @@ static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
+  if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl))
+    return nomDecl->isResilient() && usesFeatureMoveOnly(decl);
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
