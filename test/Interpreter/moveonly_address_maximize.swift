@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 struct S : ~Copyable {
   let s: String
   init(_ s: String) { self.s = s }
