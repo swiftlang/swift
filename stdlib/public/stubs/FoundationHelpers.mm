@@ -32,7 +32,7 @@ typedef enum {
 using namespace swift;
 
 typedef struct _CFBridgingState {
-  int version;
+  long version;
   CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
   CFHashCode(*_CFStringHashNSString)(id str);
   CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
