@@ -470,7 +470,7 @@ func testCompleteInMatchOfAssociatedValueInSwitchCase() {
     }
   })
 
-// IN_ASSOC_OF_CASE_IN_CLOSURE-DAG: Decl[LocalVar]/Local:               str[#String#]; name=str
+// IN_ASSOC_OF_CASE_IN_CLOSURE-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:               str[#String#]; name=str
 }
 
 }
