@@ -117,6 +117,9 @@ inline static bool handleNextRefCount(const Metadata *metadata,
                             RefCountingKind::SinglePayloadEnumFNResolved)) {
     Handler::handleSinglePayloadEnumFN(typeLayout, offset, true, addrOffset,
                                        std::forward<Params>(params)...);
+  } else if (SWIFT_UNLIKELY(tag == RefCountingKind::SinglePayloadEnumGeneric)) {
+    Handler::handleSinglePayloadEnumGeneric(typeLayout, offset, addrOffset,
+                                            std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::MultiPayloadEnumFN)) {
     Handler::handleMultiPayloadEnumFN(metadata, typeLayout, offset, false,
                                       addrOffset,
@@ -126,8 +129,7 @@ inline static bool handleNextRefCount(const Metadata *metadata,
     Handler::handleMultiPayloadEnumFN(metadata, typeLayout, offset, true,
                                       addrOffset,
                                       std::forward<Params>(params)...);
-  } else if (SWIFT_UNLIKELY(tag ==
-                            RefCountingKind::MultiPayloadEnumGeneric)) {
+  } else if (SWIFT_UNLIKELY(tag == RefCountingKind::MultiPayloadEnumGeneric)) {
     Handler::handleMultiPayloadEnumGeneric(metadata, typeLayout, offset,
                                            addrOffset,
                                            std::forward<Params>(params)...);
@@ -256,6 +258,51 @@ static void handleSinglePayloadEnumFN(const uint8_t *typeLayout, size_t &offset,
   }
 }
 
+static void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
+                                           size_t &offset, uint8_t *addr,
+                                           uintptr_t &addrOffset) {
+  auto tagBytesAndOffset = readBytes<uint64_t>(typeLayout, offset);
+  auto extraTagBytesPattern = (uint8_t)(tagBytesAndOffset >> 62);
+  auto xiTagBytesOffset =
+      tagBytesAndOffset & std::numeric_limits<uint32_t>::max();
+  const Metadata *xiType = nullptr;
+
+  if (extraTagBytesPattern) {
+    auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
+    auto payloadSize = readBytes<size_t>(typeLayout, offset);
+    auto tagBytes =
+        readTagBytes(addr + addrOffset + payloadSize, extraTagBytes);
+    if (tagBytes) {
+      offset += sizeof(uint64_t) + sizeof(size_t);
+      goto noPayload;
+    }
+  } else {
+    offset += sizeof(size_t);
+  }
+
+  xiType = readBytes<const Metadata *>(typeLayout, offset);
+
+  if (xiType) {
+    auto numEmptyCases = readBytes<unsigned>(typeLayout, offset);
+
+    auto tag = xiType->vw_getEnumTagSinglePayload(
+        (const OpaqueValue *)(addr + addrOffset + xiTagBytesOffset),
+        numEmptyCases);
+    if (tag == 0) {
+      offset += sizeof(size_t) * 2;
+      return;
+    }
+  } else {
+    offset += sizeof(uint64_t) + sizeof(size_t);
+  }
+
+noPayload:
+  auto refCountBytes = readBytes<size_t>(typeLayout, offset);
+  auto skip = readBytes<size_t>(typeLayout, offset);
+  offset += refCountBytes;
+  addrOffset += skip;
+}
+
 template <typename Handler, typename... Params>
 static void handleMultiPayloadEnumFN(const Metadata *metadata,
                                      const uint8_t *typeLayout, size_t &offset,
@@ -363,6 +410,13 @@ struct DestroyHandler {
     ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, addr, addrOffset);
   }
 
+  static inline void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
+                                                    size_t &offset,
+                                                    uintptr_t &addrOffset,
+                                                    uint8_t *addr) {
+    ::handleSinglePayloadEnumGeneric(typeLayout, offset, addr, addrOffset);
+  }
+
   static inline void handleMultiPayloadEnumFN(const Metadata *metadata,
                                               const uint8_t *typeLayout,
                                               size_t &offset, bool resolved,
@@ -466,6 +520,14 @@ struct CopyHandler {
     ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, src, addrOffset);
   }
 
+  static inline void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
+                                                    size_t &offset,
+                                                    uintptr_t &addrOffset,
+                                                    uint8_t *dest,
+                                                    uint8_t *src) {
+    ::handleSinglePayloadEnumGeneric(typeLayout, offset, src, addrOffset);
+  }
+
   static inline void handleMultiPayloadEnumFN(const Metadata *metadata,
                                               const uint8_t *typeLayout,
                                               size_t &offset, bool resolved,
@@ -531,6 +593,14 @@ struct TakeHandler {
                                                uintptr_t &addrOffset,
                                                uint8_t *dest, uint8_t *src) {
     ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, src, addrOffset);
+  }
+
+  static inline void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
+                                                    size_t &offset,
+                                                    uintptr_t &addrOffset,
+                                                    uint8_t *dest,
+                                                    uint8_t *src) {
+    ::handleSinglePayloadEnumGeneric(typeLayout, offset, src, addrOffset);
   }
 
   static inline void handleMultiPayloadEnumFN(const Metadata *metadata,

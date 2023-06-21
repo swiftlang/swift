@@ -5736,18 +5736,12 @@ namespace {
         return false;
       }
 
-      auto &strategy = getEnumImplStrategy(IGM, getLoweredType());
-      bool isSupportedCase = strategy.getElementsWithPayload().size() > 1 ||
-                             (strategy.getElementsWithPayload().size() == 1 &&
-                              strategy.getElementsWithNoPayload().empty());
-
       return !!getLayoutString() ||
              (IGM.Context.LangOpts.hasFeature(
                   Feature::LayoutStringValueWitnessesInstantiation) &&
               IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
               (HasDependentVWT || HasDependentMetadata) &&
-              !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) &&
-              isSupportedCase);
+              !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {

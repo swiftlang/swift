@@ -460,6 +460,34 @@ func testMixedEnumWrapperWrapperGeneric() {
 
 testMixedEnumWrapperWrapperGeneric()
 
+func testGenericSinglePayloadEnum() {
+    let ptr = allocateInternalGenericPtr(of: SinglePayloadEnum<SimpleClass>.self)
+
+    do {
+        let x = SinglePayloadEnum.nonEmpty(23, SimpleClass(x: 23))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadEnum.nonEmpty(32, SimpleClass(x: 32))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericDestroy(ptr, of: SinglePayloadEnum<SimpleClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericSinglePayloadEnum()
+
 func testGenericSinglePayloadEnumManyXI() {
     let ptr = allocateInternalGenericPtr(of: SinglePayloadEnumManyXI.self)
 

@@ -63,6 +63,11 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
                                          const TypeLayout *payload,
                                          unsigned emptyCases);
 
+SWIFT_RUNTIME_EXPORT
+void swift_initEnumMetadataSinglePayloadWithLayoutString(
+    EnumMetadata *enumType, EnumLayoutFlags flags, const Metadata *payload,
+    unsigned emptyCases);
+
 using getExtraInhabitantTag_t =
   SWIFT_CC(swift) unsigned (const OpaqueValue *value,
                             unsigned numExtraInhabitants,
