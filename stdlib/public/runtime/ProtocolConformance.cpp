@@ -1539,7 +1539,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
 
   case GenericRequirementKind::SameShape: {
     auto result = swift::getTypePackByMangledName(
-        req.getParam(), extraArguments.data(),
+        req.getMangledTypeName(), extraArguments.data(),
         substGenericParam, substWitnessTable);
     if (result.getError())
       return *result.getError();
