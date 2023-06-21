@@ -5594,7 +5594,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
       return true;
   }
 
-  for (auto member : ext->getMembers()) {
+  for (auto member : ext->getAllMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (requiresObjCMethodDescriptor(func))
         return true;
