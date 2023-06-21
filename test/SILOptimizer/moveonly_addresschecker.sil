@@ -3,6 +3,7 @@
 sil_stage raw
 
 import Swift
+import Builtin
 
 public class CopyableKlass {}
 
@@ -51,6 +52,17 @@ sil @useNonTrivialStruct2 : $@convention(thin) (@guaranteed NonTrivialStruct2) -
 final class ClassContainingMoveOnly {
   var value = NonTrivialStruct()
 }
+
+struct SingleTrivialFieldAndDeinit: ~Copyable {
+    var value: Builtin.IntLiteral
+
+    consuming func finalize()
+
+    deinit
+}
+
+sil @getSingleTrivialFieldAndDeinit : $@convention(thin) () -> @owned SingleTrivialFieldAndDeinit
+sil @finalizeSingleTrivialFieldAndDeinit : $@convention(thin) (@owned SingleTrivialFieldAndDeinit) -> ()
 
 @_hasStorage @_hasInitialValue var varGlobal: NonTrivialStruct { get set }
 @_hasStorage @_hasInitialValue let letGlobal: NonTrivialStruct { get }
@@ -631,4 +643,37 @@ bb0:
   dealloc_stack %0 : $*M2
   %22 = tuple ()
   return %22 : $()
+}
+
+// rdar://110232973 ([move-only] Checker should distinguish in between field of single field struct
+// vs parent field itself (was: mutation of field in noncopyable struct should not trigger deinit))
+//
+// Test that the SingleTrivialFieldAndDeinit aggregate is not
+// deinitialized when it's only field is consumed.
+//
+// CHECK-LABEL: sil hidden [ossa] @testNoFieldReinit : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%.*]] = alloc_stack [lexical] $SingleTrivialFieldAndDeinit
+// CHECK-NOT: destroy_addr [[ALLOC]]
+// CHECK-LABEL: } // end sil function 'testNoFieldReinit'
+sil hidden [ossa] @testNoFieldReinit : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] $SingleTrivialFieldAndDeinit, var
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*SingleTrivialFieldAndDeinit
+  %3 = function_ref @getSingleTrivialFieldAndDeinit : $@convention(thin) () -> @owned SingleTrivialFieldAndDeinit
+  %4 = apply %3() : $@convention(thin) () -> @owned SingleTrivialFieldAndDeinit
+  store %4 to [init] %1 : $*SingleTrivialFieldAndDeinit
+  %6 = integer_literal $Builtin.IntLiteral, 20
+  %10 = begin_access [modify] [static] %1 : $*SingleTrivialFieldAndDeinit
+  %11 = struct_element_addr %10 : $*SingleTrivialFieldAndDeinit, #SingleTrivialFieldAndDeinit.value
+  store %6 to [trivial] %11 : $*Builtin.IntLiteral
+  end_access %10 : $*SingleTrivialFieldAndDeinit
+  %14 = begin_access [deinit] [static] %1 : $*SingleTrivialFieldAndDeinit
+  %15 = load [take] %14 : $*SingleTrivialFieldAndDeinit
+  %16 = function_ref @finalizeSingleTrivialFieldAndDeinit : $@convention(thin) (@owned SingleTrivialFieldAndDeinit) -> ()
+  %17 = apply %16(%15) : $@convention(thin) (@owned SingleTrivialFieldAndDeinit) -> ()
+  end_access %14 : $*SingleTrivialFieldAndDeinit
+  destroy_addr %1 : $*SingleTrivialFieldAndDeinit
+  dealloc_stack %0 : $*SingleTrivialFieldAndDeinit
+  %21 = tuple ()
+  return %21 : $()
 }

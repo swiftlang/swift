@@ -47,6 +47,15 @@ static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
   return structDecl;
 }
 
+static bool isValueTypeWithDeinit(SILType type) {
+  // Do not look inside an aggregate type that has a user-deinit, for which
+  // memberwise-destruction is not equivalent to aggregate destruction.
+  if (auto *nominal = type.getNominalOrBoundGenericNominal()) {
+    return nominal->getValueTypeDestructor() != nullptr;
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                         MARK: TypeSubElementCount
 //===----------------------------------------------------------------------===//
@@ -70,8 +79,13 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
           type.getFieldType(fieldDecl, mod, context), mod, context);
     number = numElements;
 
+    if (isValueTypeWithDeinit(type)) {
+      // 'self' has its own liveness represented as an additional field at the
+      // end of the structure.
+      ++number;
+    }
     // If we do not have any elements, just set our size to 1.
-    if (numElements == 0)
+    if (number == 0)
       number = 1;
 
     return;
@@ -349,6 +363,10 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
           builder.createStructElementAddr(insertPt->getLoc(), value, varDecl);
       callback(newValue, TypeTreeLeafTypeRange(start, next));
       start = next;
+    }
+    if (isValueTypeWithDeinit(type)) {
+      // 'self' has its own liveness
+      ++start;
     }
     assert(start == endEltOffset);
     return;

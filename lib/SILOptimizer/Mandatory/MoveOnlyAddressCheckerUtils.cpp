@@ -437,6 +437,7 @@ static bool memInstMustConsume(Operand *memOper) {
 
   SILInstruction *memInst = memOper->getUser();
 
+  // FIXME: drop_deinit must be handled here!
   switch (memInst->getKind()) {
   default:
     return false;
