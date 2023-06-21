@@ -3041,7 +3041,8 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
 
   case ActorReferenceResult::ExitsActorToNonisolated:
     diagnoseNonSendableTypesInReference(
-        getDeclRefInContext(witness), DC, loc, SendableCheckReason::Conformance);
+        getDeclRefInContext(witness), DC, loc, SendableCheckReason::Conformance)
+        .produceDiagnostics();
     return None;
 
   case ActorReferenceResult::EntersActor:
@@ -3126,7 +3127,8 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
     // Check that the results of the witnessing method are sendable
     diagnoseNonSendableTypesInReference(
         getDeclRefInContext(witness), DC, loc, SendableCheckReason::Conformance,
-        getActorIsolation(witness), FunctionCheckKind::Results);
+        getActorIsolation(witness), FunctionCheckKind::Results)
+        .produceDiagnostics();
 
     // If this requirement is a function, check that its parameters are Sendable as well
     if (isa<AbstractFunctionDecl>(requirement)) {
@@ -3134,7 +3136,8 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
           getDeclRefInContext(requirement),
           requirement->getInnermostDeclContext(), requirement->getLoc(),
           SendableCheckReason::Conformance, getActorIsolation(witness),
-          FunctionCheckKind::Params, loc);
+          FunctionCheckKind::Params, loc)
+          .produceDiagnostics();
     }
 
     // If the witness is accessible across actors, we don't need to consider it
