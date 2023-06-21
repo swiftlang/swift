@@ -4489,14 +4489,16 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
     diagnoseNonSendableTypesInReference(
         getDeclRefInContext(value), value->getInnermostDeclContext(),
         value->getLoc(), SendableCheckReason::Override,
-        getActorIsolation(value), FunctionCheckKind::Results);
+        getActorIsolation(value), FunctionCheckKind::Results)
+        .produceDiagnostics();
 
     // Check that the parameters of the overridden method are sendable
     diagnoseNonSendableTypesInReference(
         getDeclRefInContext(overridden), overridden->getInnermostDeclContext(),
         overridden->getLoc(), SendableCheckReason::Override,
         getActorIsolation(value), FunctionCheckKind::Params,
-        value->getLoc());
+        value->getLoc())
+        .produceDiagnostics();
     return;
 
   case OverrideIsolationResult::Disallowed:
