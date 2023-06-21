@@ -16,33 +16,135 @@
 /// of a type.
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar: Sendable {
-  struct State: @unchecked Sendable {
-    struct Observation {
-      var properties: Set<AnyKeyPath>
-      var observer: @Sendable () -> Void
+  internal class ValueObservationStorage {
+    func emit<Element>(_ element: Element) -> Bool { return false }
+    func cancel() { }
+  }
+  
+  private struct ValuesObserver {
+    private let storage: ValueObservationStorage
+    
+    internal init(storage: ValueObservationStorage) {
+      self.storage = storage
     }
     
-    var id = 0
-    var observations = [Int : Observation]()
-    var lookups = [AnyKeyPath : Set<Int>]()
+    internal func emit<Element>(_ element: Element) -> Bool {
+      storage.emit(element)
+    }
     
-    mutating func generateId() -> Int {
+    internal func cancel() {
+      storage.cancel()
+    }
+  }
+  
+  private struct State: @unchecked Sendable {
+    private enum ObservationKind {
+      case tracking(@Sendable () -> Void)
+      case computed(@Sendable (Any) -> Void)
+      case values(ValuesObserver)
+    }
+    
+    private struct Observation {
+      private var kind: ObservationKind
+      internal var properties: Set<AnyKeyPath>
+      
+      internal init(kind: ObservationKind, properties: Set<AnyKeyPath>) {
+        self.kind = kind
+        self.properties = properties
+      }
+      
+      var tracker: (@Sendable () -> Void)? {
+        switch kind {
+        case .tracking(let tracker):
+          return tracker
+        default:
+          return nil
+        }
+      }
+      
+      var observer: (@Sendable (Any) -> Void)? {
+        switch kind {
+        case .computed(let observer):
+          return observer
+        default:
+          return nil
+        }
+      }
+      
+      var isValueObserver: Bool {
+        switch kind {
+        case .values:
+          return true
+        default:
+          return false
+        }
+      }
+      
+      func emit<Element>(_ value: Element) -> Bool {
+        switch kind {
+        case .values(let observer):
+          return observer.emit(value)
+        default:
+          return false
+        }
+      }
+      
+      func cancel() {
+        switch kind {
+        case .values(let observer):
+          observer.cancel()
+        default:
+          break
+        }
+      }
+    }
+    
+    private var id = 0
+    private var observations = [Int : Observation]()
+    private var lookups = [AnyKeyPath : Set<Int>]()
+    
+    internal mutating func generateId() -> Int {
       defer { id &+= 1 }
       return id
     }
     
-    mutating func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping () -> Void) -> Int {
+    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping () -> Void) -> Int {
       let id = generateId()
-      observations[id] = Observation(properties: properties, observer: observer)
+      observations[id] = Observation(kind: .tracking(observer), properties: properties)
       for keyPath in properties {
         lookups[keyPath, default: []].insert(id)
       }
       return id
     }
     
-    mutating func cancel(_ id: Int) {
-      if let tracking = observations.removeValue(forKey: id) {
-        for keyPath in tracking.properties {
+    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping (Any) -> Void) -> Int {
+      let id = generateId()
+      observations[id] = Observation(kind: .computed(observer), properties: properties)
+      for keyPath in properties {
+        lookups[keyPath, default: []].insert(id)
+      }
+      return id
+    }
+    
+    internal mutating func registerValues(for properties: Set<AnyKeyPath>, storage: ValueObservationStorage) -> Int {
+      let id = generateId()
+      observations[id] = Observation(kind: .values(ValuesObserver(storage: storage)), properties: properties)
+      for keyPath in properties {
+        lookups[keyPath, default: []].insert(id)
+      }
+      return id
+    }
+    
+    internal func valueObservers(for keyPath: AnyKeyPath) -> Set<Int> {
+      guard let ids = lookups[keyPath] else {
+        return []
+      }
+      return ids.filter { observations[$0]?.isValueObserver == true }
+    }
+    
+    internal mutating func cancel(_ id: Int) {
+      if let observation = observations.removeValue(forKey: id) {
+        for keyPath in observation.properties {
           if var ids = lookups[keyPath] {
             ids.remove(id)
             if ids.count == 0 {
@@ -52,37 +154,76 @@ public struct ObservationRegistrar: Sendable {
             }
           }
         }
+        observation.cancel()
       }
     }
+
+    internal mutating func cancelAll() {
+      observations.removeAll()
+      lookups.removeAll()
+    }
     
-    mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable () -> Void] {
-      var observers = [@Sendable () -> Void]()
+    internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable () -> Void] {
+      var trackers = [@Sendable () -> Void]()
       if let ids = lookups[keyPath] {
         for id in ids {
-          if let observation = observations[id] {
-            observers.append(observation.observer)
+          if let tracker = observations[id]?.tracker {
+            trackers.append(tracker)
+            cancel(id)
+          }
+        }
+      }
+      return trackers
+    }
+    
+    internal mutating func didSet<Subject: Observable, Member>(keyPath: KeyPath<Subject, Member>) -> [@Sendable (Any) -> Void] {
+      var observers = [@Sendable (Any) -> Void]()
+      if let ids = lookups[keyPath] {
+        for id in ids {
+          if let observer = observations[id]?.observer {
+            observers.append(observer)
             cancel(id)
           }
         }
       }
       return observers
     }
+    
+    internal mutating func emit<Element>(_ value: Element, ids: Set<Int>) {
+      for id in ids {
+        if observations[id]?.emit(value) == true {
+          cancel(id)
+        }
+      }
+    }
   }
   
-  struct Context: Sendable {
-    let state = _ManagedCriticalState(State())
+  internal struct Context: Sendable {
+    private let state = _ManagedCriticalState(State())
     
-    var id: ObjectIdentifier { state.id }
+    internal var id: ObjectIdentifier { state.id }
     
-    func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping () -> Void) -> Int {
+    internal func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping () -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, observer: observer) }
     }
     
-    func cancel(_ id: Int) {
-      state.withCriticalRegion { $0.cancel(id) }
+    internal func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping (Any) -> Void) -> Int {
+      state.withCriticalRegion { $0.registerTracking(for: properties, observer: observer) }
     }
     
-    func willSet<Subject, Member>(
+    internal func registerValues(for properties: Set<AnyKeyPath>, storage: ValueObservationStorage) -> Int {
+      state.withCriticalRegion { $0.registerValues(for: properties, storage: storage) }
+    }
+    
+    internal func cancel(_ id: Int) {
+      state.withCriticalRegion { $0.cancel(id) }
+    }
+
+    internal func cancelAll() {
+      state.withCriticalRegion { $0.cancelAll() }
+    }
+    
+    internal func willSet<Subject: Observable, Member>(
        _ subject: Subject,
        keyPath: KeyPath<Subject, Member>
     ) {
@@ -91,10 +232,39 @@ public struct ObservationRegistrar: Sendable {
         action()
       }
     }
+    
+    internal func didSet<Subject: Observable, Member>(
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
+    ) {
+      let (ids, actions) = state.withCriticalRegion { ($0.valueObservers(for: keyPath), $0.didSet(keyPath: keyPath)) }
+      if !ids.isEmpty {
+        let value = subject[keyPath: keyPath]
+        state.withCriticalRegion { $0.emit(value, ids: ids) }
+      }
+      for action in actions {
+        action(subject)
+      }
+    }
+  }
+
+  private final class Extent: @unchecked Sendable {
+    let context = Context()
+
+    init() {
+    }
+
+    deinit {
+      context.cancelAll()
+    }
   }
   
-  let context = Context()
+  internal var context: Context {
+    return extent.context
+  }
   
+  private var extent = Extent()
+
   /// Creates an instance of the observation registrar.
   ///
   /// You don't need to create an instance of
@@ -133,6 +303,16 @@ public struct ObservationRegistrar: Sendable {
   ) {
     context.willSet(subject, keyPath: keyPath)
   }
+
+  public mutating func uniqueWillSet<Subject: Observable, Member>(
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
+  ) {
+    if !isKnownUniquelyReferenced(&extent) {
+      extent = Extent()
+    }
+    context.willSet(subject, keyPath: keyPath)
+  }
   
   /// A property observation called after setting the value of the subject.
   ///
@@ -143,7 +323,7 @@ public struct ObservationRegistrar: Sendable {
       _ subject: Subject,
       keyPath: KeyPath<Subject, Member>
   ) {
-    
+    context.didSet(subject, keyPath: keyPath)
   }
   
   /// Identifies mutations to the transactions registered for observers.
@@ -161,5 +341,40 @@ public struct ObservationRegistrar: Sendable {
     willSet(subject, keyPath: keyPath)
     defer { didSet(subject, keyPath: keyPath) }
     return try mutation()
+  }
+
+  public mutating func withUniqueMutation<Subject: Observable, Member, T>(
+    of subject: Subject,
+    keyPath: KeyPath<Subject, Member>,
+    _ mutation: () throws -> T
+  ) rethrows -> T {
+    uniqueWillSet(subject, keyPath: keyPath)
+    defer { didSet(subject, keyPath: keyPath) }
+    return try mutation()
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar: Codable {
+  public init(from decoder: Decoder) throws {
+    self.init()
+  }
+  
+  public func encode(to encoder: Encoder) throws {
+    // intentionally encodes nothing
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar: Equatable {
+  public static func == (_ lhs: ObservationRegistrar, _ rhs: ObservationRegistrar) -> Bool {
+    return true
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    // intentionally hashes nothing
   }
 }

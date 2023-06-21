@@ -18,6 +18,7 @@ add_swift_target_library(swift_Observation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Observable.swift
   ObservationRegistrar.swift
   ObservationTracking.swift
+  ObservedValues.swift
   ThreadLocal.cpp
   ThreadLocal.swift
 

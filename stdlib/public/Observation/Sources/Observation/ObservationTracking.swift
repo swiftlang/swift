@@ -13,25 +13,24 @@
 @_spi(SwiftUI)
 public struct ObservationTracking {
   struct Entry: @unchecked Sendable {
-    let registerTracking: @Sendable (Set<AnyKeyPath>, @Sendable @escaping () -> Void) -> Int
-    let cancel: @Sendable (Int) -> Void
+    let context: ObservationRegistrar.Context
+    
     var properties = Set<AnyKeyPath>()
     
     init(_ context: ObservationRegistrar.Context) {
-      registerTracking = { properties, observer in
-        context.registerTracking(for: properties, observer: observer)
-      }
-      cancel = { id in
-        context.cancel(id)
-      }
+      self.context = context
     }
     
     func addObserver(_ changed: @Sendable @escaping () -> Void) -> Int {
-      return registerTracking(properties, changed)
+      return context.registerTracking(for: properties, observer: changed)
+    }
+    
+    func addObserver(_ changed: @Sendable @escaping (Any) -> Void) -> Int {
+      return context.registerTracking(for: properties, observer: changed)
     }
     
     func removeObserver(_ token: Int) {
-      cancel(token)
+      context.cancel(token)
     }
     
     mutating func insert(_ keyPath: AnyKeyPath) {
