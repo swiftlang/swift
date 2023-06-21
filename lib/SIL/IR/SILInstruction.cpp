@@ -1138,6 +1138,7 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::HopToExecutorInst:
     return true;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
