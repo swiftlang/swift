@@ -24,6 +24,7 @@
 #import <objc/runtime.h>
 #include "swift/Runtime/Once.h"
 #include <dlfcn.h>
+#include "swift/Runtime/Atomic.h"
 
 typedef enum {
     dyld_objc_string_kind
@@ -51,7 +52,7 @@ static std::atomic<CFBridgingState const *> bridgingState;
 static swift_once_t initializeBridgingStateOnce;
 
 static CFBridgingState const *getBridgingState() {
-  return bridgingState.load(std::memory_order_acquire);
+  return bridgingState.load(SWIFT_MEMORY_ORDER_CONSUME);
 }
 
 extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
@@ -114,7 +115,7 @@ static inline bool initializeBridgingFunctions() {
     state->NSSetClass = objc_lookUpClass("NSSet");
     state->NSDictionaryClass = objc_lookUpClass("NSDictionary");
     state->NSEnumeratorClass = objc_lookUpClass("NSEnumerator");
-    bridgingState.store(state);
+    bridgingState.store(state, std::memory_order_relaxed);
     _reparentClasses();
   });
   auto state = getBridgingState();
@@ -124,11 +125,11 @@ static inline bool initializeBridgingFunctions() {
 SWIFT_RUNTIME_EXPORT void swift_initializeCoreFoundationState(CFBridgingState const * const state) {
   //Consume the once token to make sure that the lazy version of this in initializeBridgingFunctions only runs if we didn't hit this
   swift::once(initializeBridgingStateOnce, [state](){
-    bridgingState.store(state);
+    bridgingState.store(state, std::memory_order_relaxed);
   });
   //It's fine if this runs more than once, it's a noop if it's been done before
   //and we want to make sure it still happens if CF loads late after it failed initially
-  bridgingState.store(state);
+  bridgingState.store(state, std::memory_order_release);
   _reparentClasses();
 }
 
