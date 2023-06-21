@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 // REQUIRES: PTRSIZE=64
+// UNSUPPORTED: CPU=arm64e
 
 protocol A { func a() }
 protocol B { func b() }
