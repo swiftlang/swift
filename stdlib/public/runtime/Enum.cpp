@@ -510,7 +510,6 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
     writer.writeBytes(payloadRefCountBytes);
     writer.writeBytes(size_t(totalSize));
 
-    size_t fullOffset = 0;
     LayoutStringFlags flags = LayoutStringFlags::Empty;
 
     LayoutStringWriter offsetWriter{layoutStr, writer.offset};
@@ -525,6 +524,7 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
 
       size_t layoutStrOffsetBefore = writer.offset;
       size_t previousFieldOffset = 0;
+      size_t fullOffset = 0;
       _swift_addRefCountStringForMetatype(writer, flags, payloadType,
                                           fullOffset, previousFieldOffset);
 
