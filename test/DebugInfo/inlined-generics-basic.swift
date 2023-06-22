@@ -51,7 +51,7 @@ public class C<R> {
     // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
     // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
     // IR: dbg.value(metadata ptr %[[ARG_S]], metadata ![[MD_1_0:[0-9]+]]
-    // IR: %[[RS_PAIR:.*]] = alloca i8, i64 %
+    // IR: %[[RS_PAIR:.*]] = alloca i8, i{{.*}} %
     // IR: dbg.declare(metadata ptr %[[RS_PAIR]], metadata ![[GRS_T:[0-9]+]],
     // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[S:[0-9]+]]
     // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[GS_T:[0-9]+]]
