@@ -1086,7 +1086,6 @@ WeakReference *swift::swift_unknownObjectWeakTakeAssign(WeakReference *dest,
 /*****************************************************************************/
 
 #if SWIFT_OBJC_INTEROP
-
 static const void *
 swift_dynamicCastObjCClassImpl(const void *object,
                                const ClassMetadata *targetType) {
