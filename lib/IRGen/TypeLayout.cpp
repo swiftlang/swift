@@ -501,7 +501,7 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
 
   IRGenMangler mangler;
   auto symbol = mangler.mangleSymbolNameForMangledGetEnumTagForLayoutString(
-      entry.ty.getASTType());
+      entry.ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
 
   auto helperFn = IGM.getOrCreateHelperFunction(
       symbol, IGM.Int32Ty /*retTy*/, IGM.Int8PtrTy /*argTys*/,
