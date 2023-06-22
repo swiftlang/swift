@@ -7195,7 +7195,15 @@ ERROR(self_ownership_specifier_copyable,none,
       (SelfAccessKind, DescriptiveDeclKind))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics, none, "noncopyable type %0 cannot be used with generics yet", (Type))
+ERROR(noncopyable_generics, none,
+      "noncopyable type %0 cannot be used with generics yet",
+      (Type))
+ERROR(noncopyable_generics_variadic, none,
+      "noncopyable type %0 cannot be used within a variadic type yet",
+      (Type))
+ERROR(noncopyable_generics_specific, none,
+      "noncopyable type %0 cannot be used with generic type %1 yet",
+      (Type, Type))
 ERROR(noncopyable_effectful_getter,none,
       "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noncopyable_enums_do_not_support_indirect,none,
