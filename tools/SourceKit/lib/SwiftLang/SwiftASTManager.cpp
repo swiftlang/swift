@@ -1240,14 +1240,41 @@ bool ASTBuildOperation::addConsumer(SwiftASTConsumerRef Consumer) {
   return true;
 }
 
+/// Returns a build operation that `Consumer` can use, in order of the
+/// following:
+///   1. The latest finished build operation that either exactly matches, or
+///      can be used with snapshots
+///   2. If none, the latest in-progress build operation with the same
+///      conditions
+///   3. `nullptr` otherwise
 ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SwiftASTManagerRef Mgr) {
+  ASTBuildOperationRef LatestUsableOp;
+  Statistic *StatCount = nullptr;
   for (auto &BuildOp : llvm::reverse(BuildOperations)) {
-    if (BuildOp->isCancelled()) {
+    if (BuildOp->isCancelled())
+      continue;
+
+    // No point checking for a match, we already have one - we're just looking
+    // for a finished operation that can be used with the file contents of
+    // `BuildOp` at this point (which we will prefer over an incomplete
+    // operation, whether that exactly matches or not).
+    if (LatestUsableOp && !BuildOp->isFinished())
+      continue;
+
+    // Check for an exact match
+    if (BuildOp->matchesSourceState(FileSystem)) {
+      LatestUsableOp = BuildOp;
+      StatCount = &Mgr->Impl.Stats->numASTCacheHits;
+      if (BuildOp->isFinished())
+        break;
       continue;
     }
+
+    // Check for whether the operation can be used taking into account
+    // snapshots
     std::vector<ImmutableTextSnapshotRef> Snapshots;
     Snapshots.reserve(BuildOp->getFileContents().size());
     for (auto &FileContent : BuildOp->getFileContents()) {
@@ -1255,15 +1282,19 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
         Snapshots.push_back(FileContent.Snapshot);
       }
     }
-    if (BuildOp->matchesSourceState(FileSystem)) {
-      ++Mgr->Impl.Stats->numASTCacheHits;
-      return BuildOp;
-    } else if (Consumer->canUseASTWithSnapshots(Snapshots)) {
-      ++Mgr->Impl.Stats->numASTsUsedWithSnapshots;
-      return BuildOp;
+
+    if (Consumer->canUseASTWithSnapshots(Snapshots)) {
+      LatestUsableOp = BuildOp;
+      StatCount = &Mgr->Impl.Stats->numASTsUsedWithSnapshots;
+      if (BuildOp->isFinished())
+        break;
     }
   }
-  return nullptr;
+
+  if (StatCount) {
+    ++(*StatCount);
+  }
+  return LatestUsableOp;
 }
 
 void ASTProducer::enqueueConsumer(
