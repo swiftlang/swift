@@ -63,11 +63,35 @@ inline bool enabled() {
   return threading_impl::_swift_tsan_enabled;
 }
 
-/// Indicate to TSan that an acquiring load has occurred on the current
-/// thread.  If some other thread does a releasing store with the same
-/// pointer, we are indicating to TSan that all writes that happened
-/// before that store will be visible to the current thread after the
-/// `acquire()`.
+/// Inform TSan about a synchronization operation.
+///
+/// This is used when TSan cannot see the synchronization operation, for
+/// example, if it is using a custom primitive for which TSan doesn't have
+/// a built-in interceptor.  This does not necessarily mean a lock or a C(++)
+/// atomic operation - it could be any kind of synchronization mechanism.
+///
+/// An acquire-release pair using the same address establishes an ordering
+/// constraint in TSan's happens-before graph, which TSan uses to determine
+/// whether two memory accesses from different threads have a well-defined
+/// order.
+///
+/// For instance, in
+///
+///     Thread 1                                Thread 2
+///
+///     access to y
+///     tsan::release(x)
+///     lock given away
+///
+///                      --> sync point -->
+///
+///                                             lock taken
+///                                             tsan::acquire(x)
+///                                             access to y
+///
+/// the access to y from Thread 2 is safe relative to the preceding access to
+/// y on Thread 1 because it is preceded by an acquire of x that was itself
+/// preceded by a release of x.
 template <typename T>
 T *acquire(T *ptr) {
   if (threading_impl::_swift_tsan_acquire) {
@@ -76,10 +100,9 @@ T *acquire(T *ptr) {
   return ptr;
 }
 
-/// Indicate to TSan that a releasing store has occurred on the current
-/// thread.  If some other thread does an acquiring load with the same
-/// pointer, we are indicating to TSan that that thread will be able to
-/// see all writes that happened before the `release()`.
+/// Inform TSan about a synchronization operation.
+///
+/// This is the counterpart to tsan::acquire.
 template <typename T>
 T *release(T *ptr) {
   if (threading_impl::_swift_tsan_release) {
