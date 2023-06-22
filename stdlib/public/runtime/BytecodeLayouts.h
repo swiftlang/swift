@@ -94,17 +94,30 @@ struct LayoutStringWriter {
 };
 
 SWIFT_RUNTIME_EXPORT
-void swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata);
+void swift_generic_destroy(swift::OpaqueValue *address,
+                           const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_assignWithCopy(swift::OpaqueValue *dest,
+                                                 swift::OpaqueValue *src,
+                                                 const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_assignWithTake(swift::OpaqueValue *dest,
+                                                 swift::OpaqueValue *src,
+                                                 const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_initWithCopy(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void swift_generic_instantiateLayoutString(const uint8_t *layoutStr, Metadata *type);
+unsigned swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                                  const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+void swift_generic_instantiateLayoutString(const uint8_t *layoutStr,
+                                           Metadata *type);
 
 void swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                       size_t layoutStrOffset,
