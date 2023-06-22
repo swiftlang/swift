@@ -3,7 +3,7 @@
 
 public func foo<each T>(args: repeat each T) {
   // CHECK: define {{.*}} @"$s1a3foo4argsyxxQp_tRvzlF"
-  // CHECK-SAME: ptr {{.*}} %[[ARG_0:.*]], i64 %{{.*}},
+  // CHECK-SAME: ptr {{.*}} %[[ARG_0:.*]], i{{.*}} %{{.*}},
   // CHECK-SAME: ptr %[[TYPE_PACK_ARG:.*]])
   // CHECK: %[[TYPE_PACK_ALLOCA:.*]] = alloca ptr
   // CHECK: call void @llvm.dbg.declare(metadata ptr %[[TYPE_PACK_ALLOCA]], metadata ![[TYPE_PACK_VAR:[0-9]+]], metadata !DIExpression())
