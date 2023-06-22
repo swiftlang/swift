@@ -294,13 +294,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
-    decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
-
     for (auto var : decl->getMemberwiseInitProperties()) {
-      if (initializedViaAccessor.count(var))
-        continue;
-
       accessLevel = std::min(accessLevel, var->getFormalAccess());
       params.push_back(createMemberwiseInitParameter(decl, Loc, var));
     }
@@ -1401,8 +1395,7 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   auto accessLevel = AccessLevel::Public;
   for (auto *member : decl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
-    if (!var ||
-        !var->isMemberwiseInitialized(/*preferDeclaredProperties*/ true))
+    if (!var || !var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
       continue;
     accessLevel = std::min(accessLevel, var->getFormalAccess());
   }
