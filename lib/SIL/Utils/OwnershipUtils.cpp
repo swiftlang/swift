@@ -25,54 +25,11 @@
 
 using namespace swift;
 
-bool swift::hasPointerEscape(BorrowedValue original) {
-  ValueWorklist worklist(original->getFunction());
-  worklist.push(*original);
-
-  if (auto *phi = SILArgument::asPhi(*original)) {
-    phi->visitTransitiveIncomingPhiOperands([&](auto *phi, auto *operand) {
-      worklist.pushIfNotVisited(operand->get());
-      return true;
-    });
+bool swift::findPointerEscape(SILValue original) {
+  if (original->getOwnershipKind() != OwnershipKind::Owned &&
+      original->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
   }
-
-  while (auto value = worklist.pop()) {
-    for (auto *op : value->getUses()) {
-      switch (op->getOperandOwnership()) {
-      case OperandOwnership::ForwardingUnowned:
-      case OperandOwnership::PointerEscape:
-        return true;
-
-      case OperandOwnership::Reborrow: {
-        SILArgument *phi = PhiOperand(op).getValue();
-        worklist.pushIfNotVisited(phi);
-        break;
-      }
-
-      case OperandOwnership::GuaranteedForwarding: {
-        // This may follow guaranteed phis.
-        ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
-          // Do not include transitive uses with 'none' ownership
-          if (result->getOwnershipKind() == OwnershipKind::None)
-            return true;
-          worklist.pushIfNotVisited(result);
-          return true;
-        });
-        break;
-      }
-      default:
-        break;
-      }
-    }
-  }
-  return false;
-}
-
-bool swift::hasPointerEscape(SILValue original) {
-  if (auto borrowedValue = BorrowedValue(original)) {
-    return hasPointerEscape(borrowedValue);
-  }
-  assert(original->getOwnershipKind() == OwnershipKind::Owned);
 
   ValueWorklist worklist(original->getFunction());
   worklist.push(original);
@@ -82,6 +39,7 @@ bool swift::hasPointerEscape(SILValue original) {
       return true;
     });
   }
+
   while (auto value = worklist.pop()) {
     for (auto use : value->getUses()) {
       switch (use->getOperandOwnership()) {
@@ -96,6 +54,36 @@ bool swift::hasPointerEscape(SILValue original) {
         }
         auto *phi = branch->getDestBB()->getArgument(use->getOperandNumber());
         worklist.pushIfNotVisited(phi);
+        break;
+      }
+      case OperandOwnership::Borrow: {
+        auto borrowOp = BorrowingOperand(use);
+        if (auto borrowValue = borrowOp.getBorrowIntroducingUserResult()) {
+          worklist.pushIfNotVisited(borrowValue.value);
+        }
+        break;
+      }
+      case OperandOwnership::Reborrow: {
+        SILArgument *phi = PhiOperand(use).getValue();
+        worklist.pushIfNotVisited(phi);
+        break;
+      }
+      case OperandOwnership::GuaranteedForwarding: {
+        // This may follow guaranteed phis.
+        ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+          // Do not include transitive uses with 'none' ownership
+          if (result->getOwnershipKind() == OwnershipKind::None)
+            return true;
+          worklist.pushIfNotVisited(result);
+          return true;
+        });
+        break;
+      }
+      case OperandOwnership::InteriorPointer: {
+        if (InteriorPointerOperand(use).findTransitiveUses() !=
+            AddressUseKind::NonEscaping) {
+          return true;
+        }
         break;
       }
       default:
@@ -2282,7 +2270,7 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   //
   // Check this in two ways, one cheaper than the other.
 
-  // First, avoid calling hasPointerEscape(original).
+  // First, avoid calling findPointerEscape(original).
   //
   // If the original value is not a phi (a phi's incoming values might have
   // escaping uses) and its only user is the move, then it doesn't escape. Also
@@ -2290,19 +2278,19 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   auto *singleUser =
       original->getSingleUse() ? original->getSingleUse()->getUser() : nullptr;
   if (mvi == singleUser && !SILArgument::asPhi(original)) {
-    assert(!hasPointerEscape(original));
+    assert(!findPointerEscape(original));
     assert(original->getSingleConsumingUse()->getUser() == mvi);
     // - !escaping(original)
     // - singleConsumingUser(original) == move
     return true;
   }
 
-  // Second, call hasPointerEscape(original).
+  // Second, call findPointerEscape(original).
   //
   // Explicitly check both
   // - !escaping(original)
   // - singleConsumingUser(original) == move
-  auto originalHasEscape = hasPointerEscape(original);
+  auto originalHasEscape = findPointerEscape(original);
   auto *singleConsumingUser = original->getSingleConsumingUse()
                                   ? original->getSingleConsumingUse()->getUser()
                                   : nullptr;
@@ -2311,6 +2299,6 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   }
 
   // (3) Escaping matches?  (Expensive check, saved for last.)
-  auto moveHasEscape = hasPointerEscape(mvi);
+  auto moveHasEscape = findPointerEscape(mvi);
   return moveHasEscape == originalHasEscape;
 }

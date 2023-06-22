@@ -281,7 +281,7 @@ struct OwnershipUtilsHasPointerEscape : UnitTest {
   OwnershipUtilsHasPointerEscape(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
     auto value = arguments.takeValue();
-    auto has = hasPointerEscape(value);
+    auto has = findPointerEscape(value);
     value->print(llvm::errs());
     auto *boolString = has ? "true" : "false";
     llvm::errs() << boolString << "\n";
