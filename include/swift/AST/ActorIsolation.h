@@ -318,10 +318,11 @@ public:
   }
 
   void followWith(DeferredSendableDiagnostic other) {
+    bool thisProducesDiagnostics = ProducesDiagnostics;
     addDiagnostic([other](){
       other.produceDiagnostics();
     });
-    ProducesDiagnostics = ProducesDiagnostics || other.ProducesDiagnostics;
+    ProducesDiagnostics = thisProducesDiagnostics || other.ProducesDiagnostics;
     ProducesErrors = ProducesErrors || other.ProducesErrors;
   }
 };
