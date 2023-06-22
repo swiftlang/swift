@@ -105,7 +105,7 @@ static Optional<Path> getLibStdCxxModuleMapPath(
     SearchPathOptions &opts, const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   return getActualModuleMapPath("libstdcxx.modulemap", opts, triple,
-                                /*isArchSpecific*/ true, vfs);
+                                /*isArchSpecific*/ false, vfs);
 }
 
 Optional<SmallString<128>>
