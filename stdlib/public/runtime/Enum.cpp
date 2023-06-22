@@ -89,25 +89,23 @@ void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
                                   sizeof(void *)),
                     alignof(uint8_t));
 
-  size_t layoutStrOffset = sizeof(uint64_t);
-  writeBytes(layoutStr, layoutStrOffset, refCountBytes);
+  LayoutStringWriter writer{layoutStr, sizeof(uint64_t)};
+  writer.writeBytes(refCountBytes);
   size_t fullOffset = 0;
   size_t previousFieldOffset = 0;
   LayoutStringFlags flags = LayoutStringFlags::Empty;
 
-  _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
-                                      payloadType, fullOffset,
+  _swift_addRefCountStringForMetatype(writer, flags, payloadType, fullOffset,
                                       previousFieldOffset);
 
-  writeBytes(layoutStr, layoutStrOffset, (uint64_t)previousFieldOffset);
-  writeBytes(layoutStr, layoutStrOffset, (uint64_t)0);
+  writer.writeBytes((uint64_t)previousFieldOffset);
+  writer.writeBytes((uint64_t)0);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
-  layoutStrOffset = 0;
-  writeBytes(layoutStr, layoutStrOffset,
-             ((uint64_t)flags) &
-                 ~((uint64_t)LayoutStringFlags::HasRelativePointers));
+  writer.offset = 0;
+  writer.writeBytes(((uint64_t)flags) &
+                    ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
   vwtable->destroy = swift_generic_destroy;
   vwtable->initializeWithCopy = swift_generic_initWithCopy;
@@ -279,46 +277,45 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
                                   sizeof(void *)),
                     alignof(uint8_t));
 
-  size_t layoutStrOffset = sizeof(uint64_t);
-  writeBytes(layoutStr, layoutStrOffset, refCountBytes);
+  LayoutStringWriter writer{layoutStr, sizeof(uint64_t)};
+
+  writer.writeBytes(refCountBytes);
 
   uint64_t tagAndOffset = ((uint64_t)RefCountingKind::SinglePayloadEnumGeneric)
                           << 56;
-  writeBytes(layoutStr, layoutStrOffset, tagAndOffset);
+  writer.writeBytes(tagAndOffset);
 
   uint64_t compactExtraTagByteCount = std::min(extraTagBytes, 3u);
-  writeBytes(layoutStr, layoutStrOffset,
-             compactExtraTagByteCount << 62 | xiElement.offset);
+  writer.writeBytes(compactExtraTagByteCount << 62 | xiElement.offset);
 
-  writeBytes(layoutStr, layoutStrOffset, payloadSize);
+  writer.writeBytes(payloadSize);
 
-  writeBytes(layoutStr, layoutStrOffset, xiElement.type);
-  writeBytes(layoutStr, layoutStrOffset, emptyCases);
-  writeBytes(layoutStr, layoutStrOffset, payloadRefCountBytes);
+  writer.writeBytes(xiElement.type);
+  writer.writeBytes(emptyCases);
+  writer.writeBytes(payloadRefCountBytes);
 
   // skip for now and fill in after writing the payload ref count string
-  auto skipBytesOffset = layoutStrOffset;
-  layoutStrOffset += sizeof(size_t);
+  auto skipBytesOffset = writer.offset;
+  writer.skip(sizeof(size_t));
 
   size_t fullOffset = 0;
   size_t previousFieldOffset = 0;
   LayoutStringFlags flags = LayoutStringFlags::Empty;
 
-  _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
-                                      payloadType, fullOffset,
+  _swift_addRefCountStringForMetatype(writer, flags, payloadType, fullOffset,
                                       previousFieldOffset);
 
-  writeBytes(layoutStr, skipBytesOffset, size - previousFieldOffset);
+  writer.writeBytes((uint64_t)previousFieldOffset);
+  writer.writeBytes((uint64_t)0);
 
-  writeBytes(layoutStr, layoutStrOffset, (uint64_t)previousFieldOffset);
-  writeBytes(layoutStr, layoutStrOffset, (uint64_t)0);
+  writer.offset = skipBytesOffset;
+  writer.writeBytes(size - previousFieldOffset);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
-  layoutStrOffset = 0;
-  writeBytes(layoutStr, layoutStrOffset,
-             ((uint64_t)flags) &
-                 ~((uint64_t)LayoutStringFlags::HasRelativePointers));
+  writer.offset = 0;
+  writer.writeBytes(((uint64_t)flags) &
+                    ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
   self->setLayoutString(layoutStr);
   vwtable->destroy = swift_generic_destroy;
@@ -499,53 +496,54 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
             .Allocate(llvm::alignTo(allocationSize, sizeof(void *)),
                       alignof(uint8_t));
 
-    size_t layoutStrOffset = sizeof(uint64_t);
-    uint64_t tagAndOffset = ((uint64_t)RefCountingKind::MultiPayloadEnumGeneric) << 56;
+    LayoutStringWriter writer{layoutStr, sizeof(uint64_t)};
+
+    uint64_t tagAndOffset = ((uint64_t)RefCountingKind::MultiPayloadEnumGeneric)
+                            << 56;
 
     size_t refCountBytes = allocationSize - layoutStringHeaderSize -
                            (sizeof(uint64_t) * 2);
-    writeBytes(layoutStr, layoutStrOffset, refCountBytes);
-    writeBytes(layoutStr, layoutStrOffset, tagAndOffset);
-    writeBytes(layoutStr, layoutStrOffset, size_t(tagCounts.numTagBytes));
-    writeBytes(layoutStr, layoutStrOffset, size_t(numPayloads));
-    writeBytes(layoutStr, layoutStrOffset, payloadRefCountBytes);
-    writeBytes(layoutStr, layoutStrOffset, size_t(totalSize));
+    writer.writeBytes(refCountBytes);
+    writer.writeBytes(tagAndOffset);
+    writer.writeBytes(size_t(tagCounts.numTagBytes));
+    writer.writeBytes(size_t(numPayloads));
+    writer.writeBytes(payloadRefCountBytes);
+    writer.writeBytes(size_t(totalSize));
 
     size_t fullOffset = 0;
     LayoutStringFlags flags = LayoutStringFlags::Empty;
 
-    size_t payloadRefCountOffsetOffset = layoutStrOffset;
+    LayoutStringWriter offsetWriter{layoutStr, writer.offset};
     size_t payloadRefCountOffset = 0;
 
-    layoutStrOffset += sizeof(size_t) * numPayloads;
+    writer.skip(sizeof(size_t) * numPayloads);
 
     for (unsigned i = 0; i < numPayloads; ++i) {
       const Metadata *payloadType = payloadLayouts[i];
 
-      writeBytes(layoutStr, payloadRefCountOffsetOffset, payloadRefCountOffset);
+      offsetWriter.writeBytes(payloadRefCountOffset);
 
-      size_t layoutStrOffsetBefore = layoutStrOffset;
+      size_t layoutStrOffsetBefore = writer.offset;
       size_t previousFieldOffset = 0;
-      _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
-                                          payloadType, fullOffset,
-                                          previousFieldOffset);
+      _swift_addRefCountStringForMetatype(writer, flags, payloadType,
+                                          fullOffset, previousFieldOffset);
 
       // NUL terminator
-      writeBytes<uint64_t>(layoutStr, layoutStrOffset, 0);
+      writer.writeBytes<uint64_t>(0);
 
-      payloadRefCountOffset += (layoutStrOffset - layoutStrOffsetBefore);
+      payloadRefCountOffset += (writer.offset - layoutStrOffsetBefore);
     }
 
     // Last skip bytes (always 0 for enums)
-    writeBytes<uint64_t>(layoutStr, layoutStrOffset, 0);
+    writer.writeBytes<uint64_t>(0);
     // NUL terminator
-    writeBytes<uint64_t>(layoutStr, layoutStrOffset, 0);
+    writer.writeBytes<uint64_t>(0);
 
     // we mask out HasRelativePointers, because at this point they have all been
     // resolved to metadata pointers
-    layoutStrOffset = 0;
-    writeBytes(layoutStr, layoutStrOffset,
-        ((uint64_t)flags) & ~((uint64_t)LayoutStringFlags::HasRelativePointers));
+    writer.offset = 0;
+    writer.writeBytes(((uint64_t)flags) &
+                      ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
     enumType->setLayoutString(layoutStr);
 

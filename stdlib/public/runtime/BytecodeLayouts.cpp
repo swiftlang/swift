@@ -42,13 +42,12 @@ static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
 }
 
 template <typename FnTy>
-static const FnTy readRelativeFunctionPointer(const uint8_t *layoutStr,
-                                              size_t &offset) {
+static const FnTy readRelativeFunctionPointer(LayoutStringReader &reader) {
   static_assert(std::is_pointer<FnTy>::value);
 
-  auto absolute = layoutStr + offset;
+  auto absolute = reader.layoutStr + reader.offset;
   auto relativeOffset =
-      (uintptr_t)(intptr_t)(int32_t)readBytes<intptr_t>(layoutStr, offset);
+      (uintptr_t)(intptr_t)(int32_t)reader.readBytes<intptr_t>();
   FnTy fn;
 
 #if SWIFT_PTRAUTH
@@ -65,9 +64,8 @@ static const FnTy readRelativeFunctionPointer(const uint8_t *layoutStr,
 typedef Metadata *(*MetadataAccessor)(const Metadata *const *);
 
 static const Metadata *getResilientTypeMetadata(const Metadata *metadata,
-                                                const uint8_t *layoutStr,
-                                                size_t &offset) {
-  auto fn = readRelativeFunctionPointer<MetadataAccessor>(layoutStr, offset);
+                                                LayoutStringReader &reader) {
+  auto fn = readRelativeFunctionPointer<MetadataAccessor>(reader);
   return fn(metadata->getGenericArgs());
 }
 
@@ -91,9 +89,9 @@ static void existential_destroy(OpaqueValue* object) {
 
 template <typename Handler, typename... Params>
 inline static bool handleNextRefCount(const Metadata *metadata,
-                                      const uint8_t *typeLayout, size_t &offset,
+                                      LayoutStringReader &reader,
                                       uintptr_t &addrOffset, Params... params) {
-  uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
+  uint64_t skip = reader.readBytes<uint64_t>();
   auto tag = static_cast<RefCountingKind>(skip >> 56);
   skip &= ~(0xffULL << 56);
   addrOffset += skip;
@@ -101,37 +99,34 @@ inline static bool handleNextRefCount(const Metadata *metadata,
   if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
     return false;
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-    auto *type = readBytes<const Metadata*>(typeLayout, offset);
+    auto *type = reader.readBytes<const Metadata *>();
     Handler::handleMetatype(type, addrOffset, std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-    auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
+    auto *type = getResilientTypeMetadata(metadata, reader);
     Handler::handleMetatype(type, addrOffset, std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag ==
                             RefCountingKind::SinglePayloadEnumSimple)) {
-    Handler::handleSinglePayloadEnumSimple(typeLayout, offset, addrOffset,
+    Handler::handleSinglePayloadEnumSimple(reader, addrOffset,
                                            std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::SinglePayloadEnumFN)) {
-    Handler::handleSinglePayloadEnumFN(typeLayout, offset, false, addrOffset,
+    Handler::handleSinglePayloadEnumFN(reader, false, addrOffset,
                                        std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag ==
                             RefCountingKind::SinglePayloadEnumFNResolved)) {
-    Handler::handleSinglePayloadEnumFN(typeLayout, offset, true, addrOffset,
+    Handler::handleSinglePayloadEnumFN(reader, true, addrOffset,
                                        std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::SinglePayloadEnumGeneric)) {
-    Handler::handleSinglePayloadEnumGeneric(typeLayout, offset, addrOffset,
+    Handler::handleSinglePayloadEnumGeneric(reader, addrOffset,
                                             std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::MultiPayloadEnumFN)) {
-    Handler::handleMultiPayloadEnumFN(metadata, typeLayout, offset, false,
-                                      addrOffset,
+    Handler::handleMultiPayloadEnumFN(metadata, reader, false, addrOffset,
                                       std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag ==
                             RefCountingKind::MultiPayloadEnumFNResolved)) {
-    Handler::handleMultiPayloadEnumFN(metadata, typeLayout, offset, true,
-                                      addrOffset,
+    Handler::handleMultiPayloadEnumFN(metadata, reader, true, addrOffset,
                                       std::forward<Params>(params)...);
   } else if (SWIFT_UNLIKELY(tag == RefCountingKind::MultiPayloadEnumGeneric)) {
-    Handler::handleMultiPayloadEnumGeneric(metadata, typeLayout, offset,
-                                           addrOffset,
+    Handler::handleMultiPayloadEnumGeneric(metadata, reader, addrOffset,
                                            std::forward<Params>(params)...);
   } else {
     Handler::handleReference(tag, addrOffset, std::forward<Params>(params)...);
@@ -142,15 +137,15 @@ inline static bool handleNextRefCount(const Metadata *metadata,
 
 template <unsigned N, typename Handler, typename... Params>
 inline static void handleRefCounts(const Metadata *metadata,
-                                   const uint8_t *typeLayout, size_t &offset,
+                                   LayoutStringReader &reader,
                                    uintptr_t &addrOffset, Params... params) {
   if (N == 0) {
-    while (handleNextRefCount<Handler>(metadata, typeLayout, offset, addrOffset,
+    while (handleNextRefCount<Handler>(metadata, reader, addrOffset,
                                        std::forward<Params>(params)...)) {
     }
   } else {
     for (int i = 0; i < N; i++) {
-      handleNextRefCount<Handler>(metadata, typeLayout, offset, addrOffset,
+      handleNextRefCount<Handler>(metadata, reader, addrOffset,
                                   std::forward<Params>(params)...);
     }
   }
@@ -158,10 +153,10 @@ inline static void handleRefCounts(const Metadata *metadata,
 
 template <unsigned N, typename Handler, typename... Params>
 inline static void handleRefCounts(const Metadata *metadata, Params... params) {
-  const uint8_t *typeLayout = metadata->getLayoutString();
-  size_t offset = layoutStringHeaderSize;
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
-  handleRefCounts<N, Handler>(metadata, typeLayout, offset, addrOffset,
+  handleRefCounts<N, Handler>(metadata, reader, addrOffset,
                               std::forward<Params>(params)...);
 }
 
@@ -189,10 +184,10 @@ static uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
   }
 }
 
-static void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
-                                          size_t &offset, uint8_t *addr,
+static void handleSinglePayloadEnumSimple(LayoutStringReader &reader,
+                                          uint8_t *addr,
                                           uintptr_t &addrOffset) {
-  auto byteCountsAndOffset = readBytes<uint64_t>(typeLayout, offset);
+  auto byteCountsAndOffset = reader.readBytes<uint64_t>();
   auto extraTagBytesPattern = (uint8_t)(byteCountsAndOffset >> 62);
   auto xiTagBytesPattern = ((uint8_t)(byteCountsAndOffset >> 59)) & 0x7;
   auto xiTagBytesOffset =
@@ -200,68 +195,67 @@ static void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
 
   if (extraTagBytesPattern) {
     auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
-    auto payloadSize = readBytes<size_t>(typeLayout, offset);
+    auto payloadSize = reader.readBytes<size_t>();
     auto tagBytes =
         readTagBytes(addr + addrOffset + payloadSize, extraTagBytes);
     if (tagBytes) {
-      offset += sizeof(uint64_t) + sizeof(size_t);
+      reader.skip(sizeof(uint64_t) + sizeof(size_t));
       goto noPayload;
     }
   } else {
-    offset += sizeof(size_t);
+    reader.skip(sizeof(size_t));
   }
 
   if (xiTagBytesPattern) {
-    auto zeroTagValue = readBytes<uint64_t>(typeLayout, offset);
-    auto xiTagValues = readBytes<size_t>(typeLayout, offset);
+    auto zeroTagValue = reader.readBytes<uint64_t>();
+    auto xiTagValues = reader.readBytes<size_t>();
 
     auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
     uint64_t tagBytes =
         readTagBytes(addr + addrOffset + xiTagBytesOffset, xiTagBytes) -
         zeroTagValue;
     if (tagBytes >= xiTagValues) {
-      offset += sizeof(size_t) * 2;
+      reader.skip(sizeof(size_t) * 2);
       return;
     }
   } else {
-    offset += sizeof(uint64_t) + sizeof(size_t);
+    reader.skip(sizeof(uint64_t) + sizeof(size_t));
   }
 
 noPayload:
-  auto refCountBytes = readBytes<size_t>(typeLayout, offset);
-  auto skip = readBytes<size_t>(typeLayout, offset);
-  offset += refCountBytes;
+  auto refCountBytes = reader.readBytes<size_t>();
+  auto skip = reader.readBytes<size_t>();
+  reader.skip(refCountBytes);
   addrOffset += skip;
 }
 
 typedef unsigned (*GetEnumTagFn)(const uint8_t *);
 
-static void handleSinglePayloadEnumFN(const uint8_t *typeLayout, size_t &offset,
-                                      bool resolved, uint8_t *addr,
-                                      uintptr_t &addrOffset) {
+static void handleSinglePayloadEnumFN(LayoutStringReader &reader, bool resolved,
+                                      uint8_t *addr, uintptr_t &addrOffset) {
   GetEnumTagFn getEnumTag;
   if (resolved) {
-    getEnumTag = readBytes<GetEnumTagFn>(typeLayout, offset);
+    getEnumTag = reader.readBytes<GetEnumTagFn>();
   } else {
-    getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(typeLayout, offset);
+    getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
   }
 
   unsigned enumTag = getEnumTag(addr + addrOffset);
 
   if (enumTag == 0) {
-    offset += sizeof(size_t) * 2;
+    reader.skip(sizeof(size_t) * 2);
   } else {
-    auto refCountBytes = readBytes<size_t>(typeLayout, offset);
-    auto skip = readBytes<size_t>(typeLayout, offset);
-    offset += refCountBytes;
+    auto refCountBytes = reader.readBytes<size_t>();
+    auto skip = reader.readBytes<size_t>();
+    reader.skip(refCountBytes);
     addrOffset += skip;
   }
 }
 
-static void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
-                                           size_t &offset, uint8_t *addr,
+static void handleSinglePayloadEnumGeneric(LayoutStringReader &reader,
+                                           uint8_t *addr,
                                            uintptr_t &addrOffset) {
-  auto tagBytesAndOffset = readBytes<uint64_t>(typeLayout, offset);
+  auto tagBytesAndOffset = reader.readBytes<uint64_t>();
   auto extraTagBytesPattern = (uint8_t)(tagBytesAndOffset >> 62);
   auto xiTagBytesOffset =
       tagBytesAndOffset & std::numeric_limits<uint32_t>::max();
@@ -269,100 +263,96 @@ static void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
 
   if (extraTagBytesPattern) {
     auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
-    auto payloadSize = readBytes<size_t>(typeLayout, offset);
+    auto payloadSize = reader.readBytes<size_t>();
     auto tagBytes =
         readTagBytes(addr + addrOffset + payloadSize, extraTagBytes);
     if (tagBytes) {
-      offset += sizeof(uint64_t) + sizeof(size_t);
+      reader.skip(sizeof(uint64_t) + sizeof(size_t));
       goto noPayload;
     }
   } else {
-    offset += sizeof(size_t);
+    reader.skip(sizeof(size_t));
   }
 
-  xiType = readBytes<const Metadata *>(typeLayout, offset);
+  xiType = reader.readBytes<const Metadata *>();
 
   if (xiType) {
-    auto numEmptyCases = readBytes<unsigned>(typeLayout, offset);
+    auto numEmptyCases = reader.readBytes<unsigned>();
 
     auto tag = xiType->vw_getEnumTagSinglePayload(
         (const OpaqueValue *)(addr + addrOffset + xiTagBytesOffset),
         numEmptyCases);
     if (tag == 0) {
-      offset += sizeof(size_t) * 2;
+      reader.skip(sizeof(size_t) * 2);
       return;
     }
   } else {
-    offset += sizeof(uint64_t) + sizeof(size_t);
+    reader.skip(sizeof(uint64_t) + sizeof(size_t));
   }
 
 noPayload:
-  auto refCountBytes = readBytes<size_t>(typeLayout, offset);
-  auto skip = readBytes<size_t>(typeLayout, offset);
-  offset += refCountBytes;
+  auto refCountBytes = reader.readBytes<size_t>();
+  auto skip = reader.readBytes<size_t>();
+  reader.skip(refCountBytes);
   addrOffset += skip;
 }
 
 template <typename Handler, typename... Params>
 static void handleMultiPayloadEnumFN(const Metadata *metadata,
-                                     const uint8_t *typeLayout, size_t &offset,
-                                     bool resolved, uintptr_t &addrOffset,
-                                     uint8_t *addr, Params... params) {
+                                     LayoutStringReader &reader, bool resolved,
+                                     uintptr_t &addrOffset, uint8_t *addr,
+                                     Params... params) {
   GetEnumTagFn getEnumTag;
   if (resolved) {
-    getEnumTag = readBytes<GetEnumTagFn>(typeLayout, offset);
+    getEnumTag = reader.readBytes<GetEnumTagFn>();
   } else {
-    getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(typeLayout, offset);
+    getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
   }
 
-  size_t numPayloads = readBytes<size_t>(typeLayout, offset);
-  size_t refCountBytes = readBytes<size_t>(typeLayout, offset);
-  size_t enumSize = readBytes<size_t>(typeLayout, offset);
+  size_t numPayloads = reader.readBytes<size_t>();
+  size_t refCountBytes = reader.readBytes<size_t>();
+  size_t enumSize = reader.readBytes<size_t>();
 
   unsigned enumTag = getEnumTag(addr + addrOffset);
 
   if (enumTag < numPayloads) {
-    size_t nestedOffset = offset + (enumTag * sizeof(size_t));
-    size_t refCountOffset = readBytes<size_t>(typeLayout, nestedOffset);
-    nestedOffset = offset + (numPayloads * sizeof(size_t)) + refCountOffset;
+    size_t refCountOffset = reader.peekBytes<size_t>(enumTag * sizeof(size_t));
 
+    LayoutStringReader nestedReader = reader;
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
     uintptr_t nestedAddrOffset = addrOffset;
-    handleRefCounts<0, Handler>(metadata, typeLayout, nestedOffset,
-                                nestedAddrOffset, addr,
+    handleRefCounts<0, Handler>(metadata, nestedReader, nestedAddrOffset, addr,
                                 std::forward<Params>(params)...);
   }
 
-  offset += refCountBytes + (numPayloads * sizeof(size_t));
+  reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
   addrOffset += enumSize;
 }
 
 template <typename Handler, typename... Params>
 static void handleMultiPayloadEnumGeneric(const Metadata *metadata,
-                                          const uint8_t *typeLayout,
-                                          size_t &offset,
-                                          uintptr_t &addrOffset,
-                                          uint8_t *addr,
+                                          LayoutStringReader &reader,
+                                          uintptr_t &addrOffset, uint8_t *addr,
                                           Params... params) {
-  auto tagBytes = readBytes<size_t>(typeLayout, offset);
-  auto numPayloads = readBytes<size_t>(typeLayout, offset);
-  auto refCountBytes = readBytes<size_t>(typeLayout, offset);
-  auto enumSize = readBytes<size_t>(typeLayout, offset);
+  auto tagBytes = reader.readBytes<size_t>();
+  auto numPayloads = reader.readBytes<size_t>();
+  auto refCountBytes = reader.readBytes<size_t>();
+  auto enumSize = reader.readBytes<size_t>();
   auto tagBytesOffset = enumSize - tagBytes;
 
   auto enumTag = readTagBytes(addr + addrOffset + tagBytesOffset, tagBytes);
 
   if (enumTag < numPayloads) {
-    size_t nestedOffset = offset + (enumTag * sizeof(size_t));
-    size_t refCountOffset = readBytes<size_t>(typeLayout, nestedOffset);
-    nestedOffset = offset + (numPayloads * sizeof(size_t)) + refCountOffset;
+    size_t refCountOffset = reader.peekBytes<size_t>(enumTag * sizeof(size_t));
 
+    LayoutStringReader nestedReader = reader;
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
     uintptr_t nestedAddrOffset = addrOffset;
-    handleRefCounts<0, Handler>(metadata, typeLayout, nestedOffset,
-                                nestedAddrOffset, addr,
+    handleRefCounts<0, Handler>(metadata, nestedReader, nestedAddrOffset, addr,
                                 std::forward<Params>(params)...);
   }
 
-  offset += refCountBytes + (numPayloads * sizeof(size_t));
+  reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
   addrOffset += enumSize;
 }
 
@@ -396,42 +386,39 @@ struct DestroyHandler {
     type->vw_destroy((OpaqueValue *)(addr + addrOffset));
   }
 
-  static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
-                                                   size_t &offset,
+  static inline void handleSinglePayloadEnumSimple(LayoutStringReader &reader,
                                                    uintptr_t &addrOffset,
                                                    uint8_t *addr) {
-    ::handleSinglePayloadEnumSimple(typeLayout, offset, addr, addrOffset);
+    ::handleSinglePayloadEnumSimple(reader, addr, addrOffset);
   }
 
-  static inline void handleSinglePayloadEnumFN(const uint8_t *typeLayout,
-                                               size_t &offset, bool resolved,
+  static inline void handleSinglePayloadEnumFN(LayoutStringReader &reader,
+                                               bool resolved,
                                                uintptr_t &addrOffset,
                                                uint8_t *addr) {
-    ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, addr, addrOffset);
+    ::handleSinglePayloadEnumFN(reader, resolved, addr, addrOffset);
   }
 
-  static inline void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
-                                                    size_t &offset,
+  static inline void handleSinglePayloadEnumGeneric(LayoutStringReader &reader,
                                                     uintptr_t &addrOffset,
                                                     uint8_t *addr) {
-    ::handleSinglePayloadEnumGeneric(typeLayout, offset, addr, addrOffset);
+    ::handleSinglePayloadEnumGeneric(reader, addr, addrOffset);
   }
 
   static inline void handleMultiPayloadEnumFN(const Metadata *metadata,
-                                              const uint8_t *typeLayout,
-                                              size_t &offset, bool resolved,
+                                              LayoutStringReader &reader,
+                                              bool resolved,
                                               uintptr_t &addrOffset,
                                               uint8_t *addr) {
-    ::handleMultiPayloadEnumFN<DestroyHandler>(metadata, typeLayout, offset,
-                                               resolved, addrOffset, addr);
+    ::handleMultiPayloadEnumFN<DestroyHandler>(metadata, reader, resolved,
+                                               addrOffset, addr);
   }
 
   static inline void handleMultiPayloadEnumGeneric(const Metadata *metadata,
-                                                   const uint8_t *typeLayout,
-                                                   size_t &offset,
+                                                   LayoutStringReader &reader,
                                                    uintptr_t &addrOffset,
                                                    uint8_t *addr) {
-    ::handleMultiPayloadEnumGeneric<DestroyHandler>(metadata, typeLayout, offset,
+    ::handleMultiPayloadEnumGeneric<DestroyHandler>(metadata, reader,
                                                     addrOffset, addr);
   }
 
@@ -505,46 +492,43 @@ struct CopyHandler {
                                 (OpaqueValue*)((uintptr_t)src + addrOffset));
   }
 
-  static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
-                                                   size_t &offset,
+  static inline void handleSinglePayloadEnumSimple(LayoutStringReader &reader,
                                                    uintptr_t &addrOffset,
                                                    uint8_t *dest,
                                                    uint8_t *src) {
-    ::handleSinglePayloadEnumSimple(typeLayout, offset, src, addrOffset);
+    ::handleSinglePayloadEnumSimple(reader, src, addrOffset);
   }
 
-  static inline void handleSinglePayloadEnumFN(const uint8_t *typeLayout,
-                                               size_t &offset, bool resolved,
+  static inline void handleSinglePayloadEnumFN(LayoutStringReader &reader,
+                                               bool resolved,
                                                uintptr_t &addrOffset,
                                                uint8_t *dest, uint8_t *src) {
-    ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, src, addrOffset);
+    ::handleSinglePayloadEnumFN(reader, resolved, src, addrOffset);
   }
 
-  static inline void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
-                                                    size_t &offset,
+  static inline void handleSinglePayloadEnumGeneric(LayoutStringReader &reader,
                                                     uintptr_t &addrOffset,
                                                     uint8_t *dest,
                                                     uint8_t *src) {
-    ::handleSinglePayloadEnumGeneric(typeLayout, offset, src, addrOffset);
+    ::handleSinglePayloadEnumGeneric(reader, src, addrOffset);
   }
 
   static inline void handleMultiPayloadEnumFN(const Metadata *metadata,
-                                              const uint8_t *typeLayout,
-                                              size_t &offset, bool resolved,
+                                              LayoutStringReader &reader,
+                                              bool resolved,
                                               uintptr_t &addrOffset,
                                               uint8_t *dest, uint8_t *src) {
-    ::handleMultiPayloadEnumFN<CopyHandler>(metadata, typeLayout, offset,
-                                            resolved, addrOffset, dest, src);
+    ::handleMultiPayloadEnumFN<CopyHandler>(metadata, reader, resolved,
+                                            addrOffset, dest, src);
   }
 
   static inline void handleMultiPayloadEnumGeneric(const Metadata *metadata,
-                                                   const uint8_t *typeLayout,
-                                                   size_t &offset,
+                                                   LayoutStringReader &reader,
                                                    uintptr_t &addrOffset,
                                                    uint8_t *dest,
                                                    uint8_t *src) {
-    ::handleMultiPayloadEnumGeneric<CopyHandler>(metadata, typeLayout, offset,
-                                                 addrOffset, dest, src);
+    ::handleMultiPayloadEnumGeneric<CopyHandler>(metadata, reader, addrOffset,
+                                                 dest, src);
   }
 
   static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset,
@@ -580,46 +564,43 @@ struct TakeHandler {
     }
   }
 
-  static inline void handleSinglePayloadEnumSimple(const uint8_t *typeLayout,
-                                                   size_t &offset,
+  static inline void handleSinglePayloadEnumSimple(LayoutStringReader &reader,
                                                    uintptr_t &addrOffset,
                                                    uint8_t *dest,
                                                    uint8_t *src) {
-    ::handleSinglePayloadEnumSimple(typeLayout, offset, src, addrOffset);
+    ::handleSinglePayloadEnumSimple(reader, src, addrOffset);
   }
 
-  static inline void handleSinglePayloadEnumFN(const uint8_t *typeLayout,
-                                               size_t &offset, bool resolved,
+  static inline void handleSinglePayloadEnumFN(LayoutStringReader &reader,
+                                               bool resolved,
                                                uintptr_t &addrOffset,
                                                uint8_t *dest, uint8_t *src) {
-    ::handleSinglePayloadEnumFN(typeLayout, offset, resolved, src, addrOffset);
+    ::handleSinglePayloadEnumFN(reader, resolved, src, addrOffset);
   }
 
-  static inline void handleSinglePayloadEnumGeneric(const uint8_t *typeLayout,
-                                                    size_t &offset,
+  static inline void handleSinglePayloadEnumGeneric(LayoutStringReader &reader,
                                                     uintptr_t &addrOffset,
                                                     uint8_t *dest,
                                                     uint8_t *src) {
-    ::handleSinglePayloadEnumGeneric(typeLayout, offset, src, addrOffset);
+    ::handleSinglePayloadEnumGeneric(reader, src, addrOffset);
   }
 
   static inline void handleMultiPayloadEnumFN(const Metadata *metadata,
-                                              const uint8_t *typeLayout,
-                                              size_t &offset, bool resolved,
+                                              LayoutStringReader &reader,
+                                              bool resolved,
                                               uintptr_t &addrOffset,
                                               uint8_t *dest, uint8_t *src) {
-    ::handleMultiPayloadEnumFN<TakeHandler>(metadata, typeLayout, offset,
-                                            resolved, addrOffset, dest, src);
+    ::handleMultiPayloadEnumFN<TakeHandler>(metadata, reader, resolved,
+                                            addrOffset, dest, src);
   }
 
   static inline void handleMultiPayloadEnumGeneric(const Metadata *metadata,
-                                                   const uint8_t *typeLayout,
-                                                   size_t &offset,
+                                                   LayoutStringReader &reader,
                                                    uintptr_t &addrOffset,
                                                    uint8_t *dest,
                                                    uint8_t *src) {
-    ::handleMultiPayloadEnumGeneric<TakeHandler>(metadata, typeLayout, offset,
-                                                 addrOffset, dest, src);
+    ::handleMultiPayloadEnumGeneric<TakeHandler>(metadata, reader, addrOffset,
+                                                 dest, src);
   }
 
   static inline void handleReference(RefCountingKind tag, uintptr_t addrOffset,
@@ -674,10 +655,11 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                              size_t layoutStrOffset,
                                              const uint8_t *fieldLayoutStr,
                                              const Metadata *fieldType) {
-  size_t i = layoutStringHeaderSize;
+  LayoutStringWriter writer{layoutStr, layoutStrOffset};
+  LayoutStringReader reader{fieldLayoutStr, layoutStringHeaderSize};
   while (true) {
-    size_t currentOffset = i;
-    uint64_t size = readBytes<uint64_t>(fieldLayoutStr, i);
+    size_t currentOffset = reader.offset;
+    uint64_t size = reader.readBytes<uint64_t>();
     RefCountingKind tag = (RefCountingKind)(size >> 56);
     size &= ~(0xffULL << 56);
 
@@ -685,62 +667,58 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
     case RefCountingKind::End:
       return;
     case RefCountingKind::Resilient: {
-      auto *type = getResilientTypeMetadata(fieldType, fieldLayoutStr, i);
-      size_t writeOffset = layoutStrOffset + currentOffset -
-                           layoutStringHeaderSize;
+      auto *type = getResilientTypeMetadata(fieldType, reader);
+      writer.offset = layoutStrOffset + currentOffset - layoutStringHeaderSize;
       uint64_t tagAndOffset =
           (((uint64_t)RefCountingKind::Metatype) << 56) | size;
-      writeBytes(layoutStr, writeOffset, tagAndOffset);
-      writeBytes(layoutStr, writeOffset, type);
+      writer.writeBytes(tagAndOffset);
+      writer.writeBytes(type);
       break;
     }
     case RefCountingKind::Metatype:
-      i += sizeof(uintptr_t);
+      reader.skip(sizeof(uintptr_t));
       break;
     case RefCountingKind::SinglePayloadEnumSimple:
-      i += (3 * sizeof(uint64_t)) + (4 * sizeof(size_t));
+      reader.skip((3 * sizeof(uint64_t)) + (4 * sizeof(size_t)));
       break;
 
     case RefCountingKind::SinglePayloadEnumFN: {
-      auto getEnumTag =
-          readRelativeFunctionPointer<GetEnumTagFn>(fieldLayoutStr, i);
-      size_t writeOffset =
-          layoutStrOffset + currentOffset - layoutStringHeaderSize;
+      auto getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
+      writer.offset = layoutStrOffset + currentOffset - layoutStringHeaderSize;
       uint64_t tagAndOffset =
           (((uint64_t)RefCountingKind::SinglePayloadEnumFNResolved) << 56) |
           size;
-      writeBytes(layoutStr, writeOffset, tagAndOffset);
-      writeBytes(layoutStr, writeOffset, getEnumTag);
-      i += 2 * sizeof(size_t);
+      writer.writeBytes(tagAndOffset);
+      writer.writeBytes(getEnumTag);
+      reader.skip(2 * sizeof(size_t));
       break;
     }
 
     case RefCountingKind::SinglePayloadEnumFNResolved:
-      i += 3 * sizeof(size_t);
+      reader.skip(3 * sizeof(size_t));
       break;
 
     case RefCountingKind::MultiPayloadEnumFN: {
-      auto getEnumTag =
-          readRelativeFunctionPointer<GetEnumTagFn>(fieldLayoutStr, i);
-      size_t writeOffset =
-          layoutStrOffset + currentOffset - layoutStringHeaderSize;
+      auto getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
+      writer.offset = layoutStrOffset + currentOffset - layoutStringHeaderSize;
       uint64_t tagAndOffset =
           (((uint64_t)RefCountingKind::MultiPayloadEnumFNResolved) << 56) |
           size;
-      writeBytes(layoutStr, writeOffset, tagAndOffset);
-      writeBytes(layoutStr, writeOffset, getEnumTag);
+      writer.writeBytes(tagAndOffset);
+      writer.writeBytes(getEnumTag);
 
-      size_t numCases = readBytes<size_t>(fieldLayoutStr, i);
+      size_t numCases = reader.readBytes<size_t>();
       // skip ref count bytes
-      i += sizeof(size_t);
+      reader.skip(sizeof(size_t));
 
       size_t casesBeginOffset =
-          layoutStrOffset + i + (numCases * sizeof(size_t));
+          layoutStrOffset + reader.offset + (numCases * sizeof(size_t));
 
       for (size_t j = 0; j < numCases; j++) {
-        size_t caseOffset = readBytes<size_t>(fieldLayoutStr, i);
-        const uint8_t *caseLayoutString =
-            fieldLayoutStr + i + (numCases * sizeof(size_t)) + caseOffset;
+        size_t caseOffset = reader.readBytes<size_t>();
+        const uint8_t *caseLayoutString = fieldLayoutStr + reader.offset +
+                                          (numCases * sizeof(size_t)) +
+                                          caseOffset;
         swift_resolve_resilientAccessors(layoutStr,
                                          casesBeginOffset + caseOffset,
                                          caseLayoutString, fieldType);
@@ -750,11 +728,11 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
 
     case RefCountingKind::MultiPayloadEnumFNResolved: {
       // skip function pointer
-      i += sizeof(uintptr_t);
-      size_t numCases = readBytes<size_t>(fieldLayoutStr, i);
-      size_t refCountBytes = readBytes<size_t>(fieldLayoutStr, i);
+      reader.skip(sizeof(uintptr_t));
+      size_t numCases = reader.readBytes<size_t>();
+      size_t refCountBytes = reader.readBytes<size_t>();
       // skip enum size, offsets and ref counts
-      i += sizeof(size_t) + (numCases * sizeof(size_t)) + refCountBytes;
+      reader.skip(sizeof(size_t) + (numCases * sizeof(size_t)) + refCountBytes);
       break;
     }
 
