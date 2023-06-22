@@ -28,6 +28,7 @@
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Thread.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
 #include <new>
 
@@ -97,10 +98,14 @@ void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
 /// should generally use a higher-level function.
 void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
 
-/// release() establishes a happens-before relation with a preceding acquire()
-/// on the same address.
-void _swift_tsan_acquire(void *addr);
-void _swift_tsan_release(void *addr);
+/// Tell TSan about an acquiring load
+inline void _swift_tsan_acquire(void *addr) {
+  swift::tsan::acquire(addr);
+}
+/// Tell TSan about a releasing store
+inline void _swift_tsan_release(void *addr) {
+  swift::tsan::release(addr);
+}
 
 /// Special values used with DispatchQueueIndex to indicate the global and main
 /// executors.
