@@ -109,7 +109,7 @@ func checkBasicBoxes() {
   _ = rb.get()
   _ = rb.val
 
-  let vb2: ValBox<MO> = .init(MO())  // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let vb2: ValBox<MO> = .init(MO())  // expected-error {{noncopyable type 'MO' cannot be used with generic type 'ValBox<T>' yet}}
 }
 
 func checkExistential() {
@@ -127,13 +127,13 @@ func checkExistential() {
 }
 
 func checkMethodCalls() {
-  let tg: NotStoredGenerically<MO> = NotStoredGenerically() // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let tg: NotStoredGenerically<MO> = NotStoredGenerically() // expected-error {{noncopyable type 'MO' cannot be used with generic type 'NotStoredGenerically<T>' yet}}
   tg.take(MO())
   tg.give()
 
-  let _: Maybe<MO> = .none // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  let _ = Maybe<MO>.just(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  let _: Maybe<MO> = .just(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: Maybe<MO> = .none // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
+  let _ = Maybe<MO>.just(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
+  let _: Maybe<MO> = .just(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
   takeMaybe(.just(MO())) // expected-error 2{{noncopyable type 'MO' cannot be used with generics yet}}
 
   takeMaybe(true ? .none : .just(MO())) // expected-error 3{{noncopyable type 'MO' cannot be used with generics yet}}
@@ -142,7 +142,7 @@ func checkMethodCalls() {
 func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
   // casting dynamically is allowed, but should always fail since you can't
   // construct such a type.
-  let box = b as! ValBox<MO> // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let box = b as! ValBox<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'ValBox<T>' yet}}
   let dup = box
 
   let _: MO = dup.get()
@@ -226,18 +226,18 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 }
 
 func checkStdlibTypes(_ mo: borrowing MO) {
-  let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       [MO(), MO()]
-  let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       []
-  let _: [String: MO] = // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: [String: MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
       ["hello" : MO()]  // expected-error{{tuples with noncopyable elements are not supported}}
 
   // i think this one's only caught b/c of the 'Any' change
   _ = [MO()] // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
 
-  let _: Array<MO> = .init() // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  _ = [MO]() // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: Array<MO> = .init() // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  _ = [MO]() // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
 
   let s: String = "hello \(mo)" // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
 }
