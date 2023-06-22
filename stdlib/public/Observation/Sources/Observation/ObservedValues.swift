@@ -13,7 +13,7 @@ import _Concurrency
 
 @available(SwiftStdlib 5.9, *)
 public struct ObservedValues<Element> {
-  private class Storage: ObservationRegistrar.ValueObservationStorage {
+  internal class Storage: ObservationRegistrar.ValueObservationStorage {
     func next() async -> Element? {
       return nil
     }
@@ -88,7 +88,7 @@ public struct ObservedValues<Element> {
   
   private final class ComputedPropertyStorage<Subject: Observable>: Storage {
     private struct State {
-      private var observers = [ObjectIdentifier: Int]()
+      internal var observers = [ObjectIdentifier: Int]()
       private var terminal = false
       private var buffer = [Element]()
       private var continuations = [UnsafeContinuation<Element?, Never>]()
@@ -203,7 +203,7 @@ public struct ObservedValues<Element> {
 @available(SwiftStdlib 5.9, *)
 extension ObservedValues: AsyncSequence {
   public struct Iterator: AsyncIteratorProtocol {
-    let storage: Storage
+    internal let storage: Storage
     
     init(storage: Storage) {
       self.storage = storage
