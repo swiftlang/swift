@@ -175,8 +175,7 @@ class Foo {
   // armv7k-watchos:      load ptr, ptr @"\01L_selector(newRect)", align 4
   // armv7k-watchos:      [[RESULT:%.*]] = call [[ARMV7K_MYRECT]] @objc_msgSend
   // armv7k-watchos:      store [[ARMV7K_MYRECT]] [[RESULT]]
-  // armv7k-watchos:      [[CAST:%.*]] = bitcast ptr
-  // armv7k-watchos:      load { float, float, float, float }, ptr [[CAST]]
+  // armv7k-watchos:      load { float, float, float, float }, ptr
   // armv7k-watchos:      ret float
   func barc(_ p: StructReturns) -> Float {
     return p.newRect().y
