@@ -3428,10 +3428,6 @@ collectMembersForInit(ResolvedCursorInfoPtr CursorInfo,
       continue;
     }
 
-    if (!varDecl->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
-      continue;
-    }
-
     auto patternBinding = varDecl->getParentPatternBinding();
     if (!patternBinding)
       continue;
