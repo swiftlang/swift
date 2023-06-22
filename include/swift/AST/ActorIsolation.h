@@ -268,14 +268,32 @@ void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 /// with the check
 struct DeferredSendableDiagnostic {
 private:
+
+  // This field indicates whether any errors (as opposed to just warnings
+  // and notes) are produced by this DeferredSendableDiagnostic instance.
+  // This exists to allow existing control flow through the call stack in
+  // ActorIsolationChecker's walk methods. Because that control flow wasn't
+  // entirely principled, sometime the use of this field doesn't exactly
+  // align with the presence of errors vs warnings, for example in
+  // diagnoseReferenceToUnsafeGlobal and diagnoseInOutArg.
   bool ProducesErrors;
+
+  // This field is true iff a diagnostic closure was passed to this
+  // DeferredSendanbleDiagnostic that will run when produceDiagnostics is
+  // called. Using the {} constructor sets this to false, but using the
+  // 2-ary constructor with any closure (even the empty one, unfortunately)
+  // will set this to true.
   bool ProducesDiagnostics;
   std::function<void()> ProduceDiagnostics;
 
 public:
   DeferredSendableDiagnostic() : ProducesErrors(false), ProducesDiagnostics(false), ProduceDiagnostics([](){}) {}
 
-  DeferredSendableDiagnostic(bool ProducesErrors, std::function<void()> ProduceDiagnostics)
+  // In general, an empty no-op closure should not be passed to
+  // ProduceDiagnostics here, or ProducesDiagnostics will contain an
+  // imprecise value.
+  DeferredSendableDiagnostic(
+      bool ProducesErrors, std::function<void()> ProduceDiagnostics)
       : ProducesErrors(ProducesErrors), ProducesDiagnostics(true),
         ProduceDiagnostics(ProduceDiagnostics) {
     assert(ProduceDiagnostics && "Empty diagnostics function");
@@ -297,6 +315,9 @@ public:
     ProducesErrors = producesErrors;
   }
 
+  // In general, an empty no-op closure should not be passed to
+  // produceMoreDiagnostics here, or ProducesDiagnostics will contain an
+  // imprecise value.
   void addDiagnostic(std::function<void()> produceMoreDiagnostics) {
     assert(produceMoreDiagnostics && "Empty diagnostics function");
 
@@ -308,15 +329,18 @@ public:
     };
   }
 
-  /// this variation on addErrorProducingDiagnostic should be called
+  /// This variation on addErrorProducingDiagnostic should be called
   /// when the passed lambda will definitely through a diagnostic
   /// for the sake of maintaining existing control flow paths, it
-  /// is not used everywhere
+  /// is not used everywhere.
   void addErrorProducingDiagnostic(std::function<void()> produceMoreDiagnostics) {
     addDiagnostic(produceMoreDiagnostics);
     setProducesErrors(true);
   }
 
+  // compose this DeferredSendableDiagnostic with another - calling their
+  // wrapped ProduceDiagnostics closure in sequence and disjuncting their
+  // respective flags
   void followWith(DeferredSendableDiagnostic other) {
     bool thisProducesDiagnostics = ProducesDiagnostics;
     addDiagnostic([other](){

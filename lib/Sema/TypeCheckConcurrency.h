@@ -257,8 +257,9 @@ enum class FunctionCheckKind {
   Results,
 };
 
-/// Diagnose the presence of any non-sendable types when referencing a
-/// given declaration from a particular declaration context.
+/// Compute a DeferredSendableDiagnostics instance diagnosing the presence
+/// of any non-sendable types when referencing a given declaration from a
+/// particular declaration context.
 ///
 /// This function should be invoked any time that the given declaration
 /// reference is will move values of the declaration's types across a
@@ -284,7 +285,8 @@ enum class FunctionCheckKind {
 /// to be used for reporting the top level diagnostic while auxiliary
 /// warnings and diagnostics are reported at `refLoc`.
 ///
-/// \returns true if an problem was detected, false otherwise.
+/// \returns a DeferredSendableDiagnostic instance whose ProduceDiagnostics
+/// method emits the diagnostics computed by this call.
 DeferredSendableDiagnostic diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind,
@@ -292,7 +294,9 @@ DeferredSendableDiagnostic diagnoseNonSendableTypesInReference(
     FunctionCheckKind funcCheckKind = FunctionCheckKind::ParamsResults,
     SourceLoc diagnoseLoc = SourceLoc());
 
-/// Produce a diagnostic for a missing conformance to Sendable.
+/// Produce a diagnostic for a missing conformance to Sendable. Note that
+/// no version of this method uses DeferredSendableDiagnostics as these sendable
+/// diagnostics cannot be solved by ownership checking.
 void diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, const DeclContext *fromDC);
 
@@ -362,14 +366,20 @@ struct SendableCheckContext {
   bool isExplicitSendableConformance() const;
 };
 
-/// Produce a diagnostic for a single instance of a non-Sendable type where
-/// a Sendable type is required.
+/// Produce a DeferredSendableDiagnostic instance for a single instance of a
+/// non-Sendable type where a Sendable type is required.
 DeferredSendableDiagnostic diagnoseSingleNonSendableType(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose);
 
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
+///
+/// This function wraps the overload of diagnoseNonSendableTypes that takes and
+/// returns DeferredSendableDiagnostics by extracting \c ProducesErrors from the
+/// inner call's result to form this function's result, and calling
+/// \c ProduceDiagnostics on the inner call's result to obtain the desired side
+/// effects.
 ///
 /// \param diagnose Emit a diagnostic indicating that the current type
 /// is non-Sendable, with the suggested behavior limitation. Returns \c true
@@ -381,6 +391,12 @@ bool diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
 
+/// Produce a DeferredSendableDiagnostic instance diagnosing any non-Sendable
+/// types that occur within the given type, using the given diagnostic-generating
+/// function \c diagnose.
+///
+/// \returns a DeferredSendableDiagnostic instance whose ProduceDiagnostics
+/// method emits the diagnostics computed by this call.
 DeferredSendableDiagnostic diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose);
@@ -392,16 +408,18 @@ namespace detail {
   };
 }
 
-/// Diagnose any non-Sendable types that occur within the given type, using
-/// the given diagnostic.
+/// Produce a DeferredSendableDiagnostic instance diagnosing any non-Sendable
+/// types that occur within the given type, using the given diagnostic.
 ///
 /// \param typeLoc is the source location of the type being diagnosed
 ///
 /// \param diagnoseLoc is the source location at which the main diagnostic should
 /// be reported, which can differ from typeLoc
 ///
-/// \returns \c true if any errors were produced, \c false if no diagnostics or
-/// only warnings and notes were produced.
+/// \returns a DeferredSendableDiagnostic instance whose ProduceDiagnostics
+/// method emits the diagnostics computed by this call, and whose ProducesError
+/// flag is \c true if any errors were produced, and \c false if no diagnostics
+/// or only warnings and notes were produced.
 template<typename ...DiagArgs>
 DeferredSendableDiagnostic diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext,
@@ -424,11 +442,13 @@ DeferredSendableDiagnostic diagnoseNonSendableTypes(
         });
 }
 
-/// Diagnose any non-Sendable types that occur within the given type, using
-/// the given diagnostic.
+/// Produce a DeferredSendableDiagnostic instance diagnosing any non-Sendable
+/// types that occur within the given type, using the given diagnostic.
 ///
-/// \returns \c true if any errors were produced, \c false if no diagnostics or
-/// only warnings and notes were produced.
+/// \returns a DeferredSendableDiagnostic instance whose ProduceDiagnostics
+/// method emits the diagnostics computed by this call, and whose ProducesError
+/// flag is \c true if any errors were produced, and \c false if no diagnostics
+/// or only warnings and notes were produced.
 template<typename ...DiagArgs>
 DeferredSendableDiagnostic diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
@@ -459,6 +479,14 @@ bool diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
     llvm::function_ref<bool(DiagnosticBehavior)> diagnose);
 
+/// Produce a DeferredSendableDiagnostic diagnosing this sendability error with
+/// behavior based on the import of \p nominal . For instance, depending on how
+/// \p nominal is imported into  \p fromContext , the diagnostic behavior
+/// limitation may be lower or the compiler might emit a fix-it adding
+/// \c \@preconcurrency to the \c import.
+///
+/// \returns a DeferredSendableDiagnostic whose ProduceDiagnostics method can
+/// be called to produce any diagnostics generated by this method.
 DeferredSendableDiagnostic deferredDiagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
     llvm::function_ref<DeferredSendableDiagnostic(DiagnosticBehavior)> diagnose);

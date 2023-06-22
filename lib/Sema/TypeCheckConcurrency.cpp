@@ -899,7 +899,7 @@ DeferredSendableDiagnostic swift::deferredDiagnoseSendabilityErrorBasedOn(
 }
 
 /// This function overloads diagnoseSendabilityErrorBasedOn to obtain a
-/// non-defering version with the same semantics - the same is done to
+/// non-deferring version with the same semantics - the same is done to
 /// diagnoseNonSendableTypes
 bool swift::diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
@@ -1000,6 +1000,8 @@ DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
   auto module = fromContext.fromDC->getParentModule();
+  // maintain a running DeferredSendableDiagnostic instance
+  // for any diagnostics computed by this function
   auto deferred = DeferredSendableDiagnostic();
 
 // If the Sendable protocol is missing, do nothing.
@@ -1027,7 +1029,7 @@ DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
 }
 
 /// This function overloads diagnoseNonSendableTypes to obtain a
-/// non-defering version with the same semantics - the same is done to
+/// non-deferring version with the same semantics - the same is done to
 /// diagnoseSendabilityErrorBasedOn
 bool swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
@@ -1046,6 +1048,8 @@ DeferredSendableDiagnostic swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind, Optional<ActorIsolation> knownIsolation,
     FunctionCheckKind funcCheckKind, SourceLoc diagnoseLoc) {
+  // maintain a running DeferredSendableDiagnostic instance
+  // for any diagnostics computed by this function
   auto deferred = DeferredSendableDiagnostic();
 
   // Retrieve the actor isolation to use in diagnostics.
@@ -2053,6 +2057,8 @@ namespace {
       SmallVector<CapturedValue, 2> captures;
       closure->getCaptureInfo().getLocalCaptures(captures);
 
+      // maintain a running DeferredSendableDiagnostic instance
+      // for any diagnostics computed by this function
       auto deferred = DeferredSendableDiagnostic();
 
       for (const auto &capture : captures) {
@@ -2184,16 +2190,23 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+
+      // if we've already wrapped \c expr in a SendNonSendable node, then
+      // it's already been pre-walked so continue
       if (sendNonSendableWrappedExprs.contains(expr)) {
         return Action::Continue(expr);
       }
 
+      // check if language features ask us to defer sendable diagnostics
       auto defersDiagnostics =
           ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking);
 
       //in the AST, replace expr with newExpr when this call returns
       Expr *newExpr = expr;
 
+      // if we're deferring sendable diagnostics, then use the newExpr ptr
+      // to insert a new wrapping SendNonSendableExpr instance, but if we're
+      // not then just produce the passed diagnostics eagerly
       auto processDeferredDiagnostic = [=, &newExpr](DeferredSendableDiagnostic deferred) {
         if (defersDiagnostics) {
           if (deferred.producesDiagnostics()) {
@@ -2582,9 +2595,12 @@ namespace {
       return nullptr;
     }
 
-    /// Diagnose a reference to an unsafe entity.
+    /// Compute a DeferredSendableDiagnostic diagnosing a reference to an
+    /// unsafe entity.
     ///
-    /// \returns true if we diagnosed the entity, \c false otherwise.
+    /// \returns a DeferredSendableDiagnostic whose ProducesErrors field
+    /// indicates whether we diagnosed the global, and whose
+    /// ProduceDiagnostics method can be called to emit those diagnostics.
     DeferredSendableDiagnostic diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
       switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
       case StrictConcurrency::Minimal:
@@ -2619,11 +2635,16 @@ namespace {
       });
     }
 
-    /// Diagnose an inout argument passed into an async call
+    /// Compute a DeferredSendableDiagnostic diagnosing an inout argument
+    /// passed into an async call
     ///
-    /// \returns true if we diagnosed the entity, \c false otherwise.
+    /// \returns a DeferredSendableDiagnostic whose ProducesErrors field
+    /// indicates whether we diagnosed the global, and whose
+    /// ProduceDiagnostics method can be called to emit those diagnostics.
     DeferredSendableDiagnostic diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
                           bool isPartialApply) {
+      // maintain a running DeferredSendableDiagnostic instance
+      // for any diagnostics computed by this function
       auto deferred = DeferredSendableDiagnostic();
 
     // check that the call is actually async
@@ -2857,6 +2878,7 @@ namespace {
 
       if (result == AsyncMarkingResult::FoundAsync) {
         // Check for non-sendable types.
+
         auto deferred =
             diagnoseNonSendableTypesInReference(
               concDeclRef, getDeclContext(), declLoc,
@@ -2869,8 +2891,11 @@ namespace {
       return result;
     }
 
-    /// Check actor isolation for a particular application.
+    /// Compute a DefferedSendableDiagnostic checking actor isolation for a
+    /// particular application.
     DeferredSendableDiagnostic checkApply(ApplyExpr *apply) {
+      // maintain a running DeferredSendableDiagnostic instance
+      // for any diagnostics computed by this function
       auto deferred = DeferredSendableDiagnostic();
       auto fnExprType = getType(apply->getFn());
       if (!fnExprType)
@@ -3029,9 +3054,12 @@ namespace {
       return knownContexts->second.back();
     }
 
-    /// Check a reference to a local capture.
+    /// Compute a DefferedSendableDiagnostic checkin a reference to a
+    /// local capture.
     DeferredSendableDiagnostic checkLocalCapture(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
+      // maintain a running DeferredSendableDiagnostic instance
+      // for any diagnostics computed by this function
       auto deferred = DeferredSendableDiagnostic();
 
       auto value = valueRef.getDecl();
@@ -3116,9 +3144,10 @@ namespace {
       return deferred;
     }
 
-    ///
-    /// \return true iff a diagnostic was emitted
+    /// Compute a DeferredSendableDiagnostic checking this key path expression
     DeferredSendableDiagnostic checkKeyPathExpr(KeyPathExpr *keyPath) {
+      // maintain a running DeferredSendableDiagnostic instance
+      // for any diagnostics computed by this function
       auto deferred = DeferredSendableDiagnostic();
 
       // check the components of the keypath.
@@ -3184,17 +3213,21 @@ namespace {
       return deferred;
     }
 
-    /// Check a reference to the given declaration.
+    /// Compute a DeferredSendableDiagnostic check a reference to the
+    /// given declaration.
     ///
     /// \param base For a reference to a member, the base expression. May be
     /// nullptr for non-member referenced.
     ///
-    /// \returns true if the reference is invalid, in which case a diagnostic
-    /// has already been emitted.
+    /// \returns a DeferredSendableDiagnostic whose ProducesErrors field
+    /// indicates whether the reference is invalid in which case a diagnostic
+    /// has already been computed elsewhere.
     DeferredSendableDiagnostic checkReference(
         Expr *base, ConcreteDeclRef declRef, SourceLoc loc,
         Optional<PartialApplyThunkInfo> partialApply = None,
         Expr *context = nullptr) {
+      // maintain a running DeferredSendableDiagnostic instance
+      // for any diagnostics computed by this function
       auto deferred = DeferredSendableDiagnostic();
 
       if (!declRef)
