@@ -185,6 +185,10 @@ using namespace swift::hashable_support;
 
 @end
 
+Class swift::getNSErrorClass() {
+  return SWIFT_LAZY_CONSTANT(objc_lookUpClass("NSError"));
+}
+
 const Metadata *swift::getNSErrorMetadata() {
   return SWIFT_LAZY_CONSTANT(
     swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass()));
@@ -216,8 +220,16 @@ id swift::dynamicCastValueToNSError(OpaqueValue *src,
 }
 
 static Class getAndBridgeSwiftNativeNSErrorClass() {
-  (void)getNSErrorClass(); //make sure the bridge is set up
-  return [__SwiftNativeNSError class];
+  Class nsErrorClass = swift::getNSErrorClass();
+  Class ourClass = [__SwiftNativeNSError class];
+  // We want "err as AnyObject" to do *something* even without Foundation
+  if (nsErrorClass) {
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+      class_setSuperclass(ourClass, nsErrorClass);
+    #pragma clang diagnostic pop
+  }
+  return ourClass;
 }
 
 static Class getSwiftNativeNSErrorClass() {
