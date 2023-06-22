@@ -1857,6 +1857,11 @@ namespace {
     llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
       captureContexts;
 
+    /// keep track of expressions that have already been
+    /// wrapped in SendNonSendable expressions to ensure that they
+    /// are not wrapped twice
+    llvm::SmallPtrSet<Expr*, 4> sendNonSendableWrappedExprs;
+
     using MutableVarSource
         = llvm::PointerUnion<DeclRefExpr *, InOutExpr *, LookupExpr *>;
 
@@ -2179,6 +2184,10 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      if (sendNonSendableWrappedExprs.contains(expr)) {
+        return Action::Continue(expr);
+      }
+
       auto defersDiagnostics =
           ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking);
 
@@ -2188,6 +2197,7 @@ namespace {
       auto processDeferredDiagnostic = [=, &newExpr](DeferredSendableDiagnostic deferred) {
         if (defersDiagnostics) {
           if (deferred.producesDiagnostics()) {
+            sendNonSendableWrappedExprs.insert(expr);
             newExpr = new (ctx) SendNonSendableExpr(
                 ctx, deferred, newExpr, expr->getType());
           }
