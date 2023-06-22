@@ -333,22 +333,10 @@ bool HasInitAccessorRequest::evaluate(Evaluator &evaluator,
 ArrayRef<VarDecl *>
 InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
                                         NominalTypeDecl *decl) const {
-  IterableDeclContext *implDecl = decl->getImplementationContext();
-
-  if (!hasStoredProperties(decl, implDecl))
-    return ArrayRef<VarDecl *>();
-
-  // Make sure we expand what we need to to get all of the properties.
-  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
-
   SmallVector<VarDecl *, 4> results;
-  for (auto *member : decl->getMembers()) {
-    auto *var = dyn_cast<VarDecl>(member);
-    if (!var || var->isStatic() || !var->hasInitAccessor()) {
-      continue;
-    }
-
-    results.push_back(var);
+  for (auto var : decl->getMemberwiseInitProperties()) {
+    if (var->hasInitAccessor())
+      results.push_back(var);
   }
 
   return decl->getASTContext().AllocateCopy(results);
