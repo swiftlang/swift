@@ -62,7 +62,7 @@ $ utils/build-script \
     --android \                                # Build for Android.
     --android-ndk $NDK_PATH \                  # Path to an Android NDK.
     --android-arch aarch64 \                   # Optionally specify Android architecture, alternately armv7 or x86_64
-    --android-api-level 23 \                   # The Android API level to target. Swift only supports 21 or greater.
+    --android-api-level 23 \                   # The Android API level to target. Swift only supports 23 or greater.
     --stdlib-deployment-targets=android-aarch64 \ # Only cross-compile the stdlib for Android, ie don't build the native stdlib for Linux
     --native-swift-tools-path=$SWIFT_PATH \    # Path to your prebuilt Swift compiler
     --native-clang-tools-path=$SWIFT_PATH \    # Path to a prebuilt clang compiler, one comes with the Swift toolchain
@@ -88,7 +88,7 @@ $ SWIFT_PATH=path/to/swift-DEVELOPMENT-SNAPSHOT-2022-05-31-a-ubuntu20.04/usr/bin
 $ $SWIFT_PATH/swiftc \                                               # The prebuilt Swift compiler you downloaded
                                                                      # The location of the tools used to build Android binaries
     -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
-    -target aarch64-unknown-linux-android21 \                        # Targeting Android aarch64 at API 21
+    -target aarch64-unknown-linux-android23 \                        # Targeting Android aarch64 at API 23
     -sdk ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/sysroot \ # The SDK is the Android unified sysroot and the resource-dir is where you just built the Swift stdlib.
     -resource-dir build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift
     hello.swift
@@ -178,7 +178,7 @@ $ utils/build-script \
   --android \                        # Build for Android.
   --android-ndk ~/android-ndk-r25b \  # Path to an Android NDK.
   --android-arch aarch64 \           # Optionally specify Android architecture, alternately armv7
-  --android-api-level 21
+  --android-api-level 23
 ```
 
 This will build the Swift compiler and other host tools first, so expect a much
