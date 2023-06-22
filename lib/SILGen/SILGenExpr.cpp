@@ -6325,6 +6325,8 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitSendNonSendableExpr(
     SendNonSendableExpr *E, SGFContext C) {
+
+  // produce deferred diagnostics
   E->produceDiagnostics();
 
   return visit(E->getSubExpr(), C);
