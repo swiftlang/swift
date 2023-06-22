@@ -554,6 +554,7 @@ namespace {
     RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
+    RValue visitSendNonSendableExpr(SendNonSendableExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -6320,6 +6321,15 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
     return RValue();
   }
   return RValue();
+}
+
+RValue RValueEmitter::visitSendNonSendableExpr(
+    SendNonSendableExpr *E, SGFContext C) {
+
+  // produce deferred diagnostics
+  E->produceDiagnostics();
+
+  return visit(E->getSubExpr(), C);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

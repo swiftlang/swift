@@ -284,10 +284,15 @@ private:
   // 2-ary constructor with any closure (even the empty one, unfortunately)
   // will set this to true.
   bool ProducesDiagnostics;
+
+  // This function emits the desired diagnostics when called
   std::function<void()> ProduceDiagnostics;
 
 public:
-  DeferredSendableDiagnostic() : ProducesErrors(false), ProducesDiagnostics(false), ProduceDiagnostics([](){}) {}
+  DeferredSendableDiagnostic()
+      : ProducesErrors(false),
+        ProducesDiagnostics(false),
+        ProduceDiagnostics([](){}) {}
 
   // In general, an empty no-op closure should not be passed to
   // ProduceDiagnostics here, or ProducesDiagnostics will contain an
@@ -307,8 +312,12 @@ public:
     return ProducesDiagnostics;
   }
 
-  void produceDiagnostics() const {
+  // Idempotent operation: call the contained ProduceDiagnostics method
+  void produceDiagnostics() {
     ProduceDiagnostics();
+    ProducesErrors = false;
+    ProducesDiagnostics = false;
+    ProduceDiagnostics = [](){};
   }
 
   void setProducesErrors(bool producesErrors) {
@@ -344,7 +353,7 @@ public:
   void followWith(DeferredSendableDiagnostic other) {
     bool thisProducesDiagnostics = ProducesDiagnostics;
     addDiagnostic([other](){
-      other.produceDiagnostics();
+      other.ProduceDiagnostics();
     });
     ProducesDiagnostics = thisProducesDiagnostics || other.ProducesDiagnostics;
     ProducesErrors = ProducesErrors || other.ProducesErrors;

@@ -903,6 +903,12 @@ public:
   }
 
   SelfApplyExpr *getAsMethodSelfApply(Expr *e) {
+    // we need to look through any SendNonSendableExpr's that could
+    // wrap the SelfApplyExpr we're looking for
+    if (auto *SNS = dyn_cast<SendNonSendableExpr>(e)) {
+      SNS->produceDiagnostics();
+      return getAsMethodSelfApply(SNS->getSubExpr());
+    }
     auto *SAE = dyn_cast<SelfApplyExpr>(e);
     if (!SAE)
       return nullptr;
