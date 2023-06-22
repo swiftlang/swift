@@ -698,6 +698,18 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
       reader.skip(3 * sizeof(size_t));
       break;
 
+    case RefCountingKind::SinglePayloadEnumGeneric: {
+      reader.skip(sizeof(uint64_t) +  // tag + offset
+                  sizeof(uint64_t) +  // extra tag bytes + XI offset
+                  sizeof(size_t) +    // payload size
+                  sizeof(uintptr_t) + // XI metadata
+                  sizeof(unsigned));  // num empty cases
+      auto refCountBytes = reader.readBytes<size_t>();
+      reader.skip(sizeof(size_t) + // bytes to skip if no payload case
+                  refCountBytes);
+      break;
+    }
+
     case RefCountingKind::MultiPayloadEnumFN: {
       auto getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
       writer.offset = layoutStrOffset + currentOffset - layoutStringHeaderSize;
