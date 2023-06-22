@@ -613,6 +613,13 @@ struct SwiftASTManager::Implementation {
   WorkQueue ASTBuildQueue{ WorkQueue::Dequeuing::Serial,
                            "sourcekit.swift.ASTBuilding" };
 
+  /// Queue on which consumers may be notified about results and cancellation.
+  /// This is essentially just a background queue to which we can jump to inform
+  /// consumers while making sure that no locks are currently claimed.
+  WorkQueue ConsumerNotificationQueue{
+      WorkQueue::Dequeuing::Concurrent,
+      "SwiftASTManager::Implementation::ConsumerNotificationQueue"};
+
   /// Remove all scheduled consumers that don't exist anymore. This is just a
   /// garbage-collection operation to make sure the \c ScheduledConsumers vector
   /// doesn't explode. One should never make assumptions that all consumers in
@@ -782,9 +789,11 @@ void SwiftASTManager::processASTAsync(
       // Cancel any consumers with the same OncePerASTToken.
       for (auto ScheduledConsumer : Impl.ScheduledConsumers) {
         if (ScheduledConsumer.OncePerASTToken == OncePerASTToken) {
-          if (auto Consumer = ScheduledConsumer.Consumer.lock()) {
-            Consumer->requestCancellation();
-          }
+          Impl.ConsumerNotificationQueue.dispatch([ScheduledConsumer]() {
+            if (auto Consumer = ScheduledConsumer.Consumer.lock()) {
+              Consumer->requestCancellation();
+            }
+          });
         }
       }
     }
@@ -794,11 +803,17 @@ void SwiftASTManager::processASTAsync(
   Producer->enqueueConsumer(ASTConsumer, fileSystem, shared_from_this());
 
   auto WeakConsumer = SwiftASTConsumerWeakRef(ASTConsumer);
-  Impl.ReqTracker->setCancellationHandler(CancellationToken, [WeakConsumer] {
-    if (auto Consumer = WeakConsumer.lock()) {
-      Consumer->requestCancellation();
-    }
-  });
+  auto WeakThis = std::weak_ptr<SwiftASTManager>(shared_from_this());
+  Impl.ReqTracker->setCancellationHandler(
+      CancellationToken, [WeakConsumer, WeakThis] {
+        if (auto This = WeakThis.lock()) {
+          This->Impl.ConsumerNotificationQueue.dispatch([WeakConsumer]() {
+            if (auto Consumer = WeakConsumer.lock()) {
+              Consumer->requestCancellation();
+            }
+          });
+        }
+      });
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
@@ -950,12 +965,14 @@ void ASTBuildOperation::requestConsumerCancellation(
     return;
   }
   Consumers.erase(ConsumerIndex);
-  Consumer->cancelled();
   if (Consumers.empty()) {
     // If there are no more consumers waiting for this result, cancel the AST
     // build.
     CancellationFlag->store(true, std::memory_order_relaxed);
   }
+  ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer] {
+    Consumer->cancelled();
+  });
 }
 
 static void collectModuleDependencies(ModuleDecl *TopMod,
@@ -1027,11 +1044,15 @@ void ASTBuildOperation::informConsumer(SwiftASTConsumerRef Consumer) {
                     "more consumers attached to it and should not accept any "
                     "new consumers if the build operation was cancelled. Thus "
                     "this case should never happen.");
-    Consumer->cancelled();
+    ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer] {
+      Consumer->cancelled();
+    });
   } else if (Result.AST) {
     Result.AST->Impl.consumeAsync(Consumer, Result.AST);
   } else {
-    Consumer->failed(Result.Error);
+    ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer, Error = Result.Error] {
+      Consumer->failed(Error);
+    });
   }
 }
 
