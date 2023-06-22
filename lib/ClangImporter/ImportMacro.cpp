@@ -422,9 +422,11 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::sema::DelayedDiagnosticPool diagPool{
           impl.getClangSema().DelayedDiagnostics.getCurrentPool()};
       auto diagState = impl.getClangSema().DelayedDiagnostics.push(diagPool);
+      auto scope = impl.SwiftContext.LangOpts.EnableObjCInterop
+        ? impl.getClangSema().TUScope : nullptr;
       auto parsedType = impl.getClangSema().getTypeName(identifier,
                                                         clang::SourceLocation(),
-                                                        impl.getClangSema().TUScope);
+                                                        scope);
       impl.getClangSema().DelayedDiagnostics.popWithoutEmitting(diagState);
 
       if (parsedType && diagPool.empty()) {
