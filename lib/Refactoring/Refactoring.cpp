@@ -3415,7 +3415,7 @@ collectMembersForInit(ResolvedCursorInfoPtr CursorInfo,
 
   SourceManager &SM = nominalDecl->getASTContext().SourceMgr;
 
-  for (auto member : nominalDecl->getMembers()) {
+  for (auto member : nominalDecl->getMemberwiseInitProperties()) {
     auto varDecl = dyn_cast<VarDecl>(member);
     if (!varDecl) {
       continue;

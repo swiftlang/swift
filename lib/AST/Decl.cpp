@@ -4920,6 +4920,16 @@ NominalTypeDecl::getInitAccessorProperties() const {
       {});
 }
 
+ArrayRef<VarDecl *>
+NominalTypeDecl::getMemberwiseInitProperties() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      MemberwiseInitPropertiesRequest{mutableThis},
+      {});
+}
+
 void NominalTypeDecl::collectPropertiesInitializableByInitAccessors(
     std::multimap<VarDecl *, VarDecl *> &result) const {
   for (auto *property : getInitAccessorProperties()) {

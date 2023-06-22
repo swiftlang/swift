@@ -297,14 +297,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
     decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
 
-    for (auto member : decl->getMembers()) {
-      auto var = dyn_cast<VarDecl>(member);
-      if (!var)
-        continue;
-
-      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
-
+    for (auto var : decl->getMemberwiseInitProperties()) {
       if (initializedViaAccessor.count(var))
         continue;
 
