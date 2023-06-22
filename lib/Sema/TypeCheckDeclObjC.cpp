@@ -2943,7 +2943,7 @@ private:
     if (auto func = dyn_cast<AbstractFunctionDecl>(req)) {
       auto asyncFunc = func->getAsyncAlternative();
 
-      if (auto asyncAccessor = dyn_cast<AccessorDecl>(asyncFunc))
+      if (auto asyncAccessor = dyn_cast_or_null<AccessorDecl>(asyncFunc))
         return asyncAccessor->getStorage();
 
       return asyncFunc;

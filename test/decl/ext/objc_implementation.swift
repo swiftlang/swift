@@ -327,6 +327,14 @@ protocol EmptySwiftProto {}
 
   public func doSomethingFunAndAsynchronous(completionHandler: @escaping (Any?, Error?) -> Void) {
   }
+
+  @available(SwiftStdlib 5.1, *)
+  @objc(doSomethingOverloadedWithCompletionHandler:)
+  public func doSomethingOverloaded() async {}
+
+  @available(*, noasync)
+  @objc(doSomethingOverloaded)
+  public func doSomethingOverloaded() {}
 }
 
 @_objcImplementation(Conformance) extension ObjCClass {
