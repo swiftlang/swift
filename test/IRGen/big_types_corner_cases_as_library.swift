@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-type-layout %s -emit-ir  -parse-as-library | %FileCheck %s
-// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir  -parse-as-library
+// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir  -parse-as-library | %FileCheck %s
 
 public struct BigStruct {
   var i0 : Int32 = 0
@@ -13,9 +12,8 @@ public struct BigStruct {
   var i8 : Int32 = 8
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.opaque* @"$s33big_types_corner_cases_as_library9BigStructVwCP"
-// CHECK: [[RETVAL:%.*]] = bitcast %T33big_types_corner_cases_as_library9BigStructV* {{.*}} to %swift.opaque*
-// CHECK: ret %swift.opaque* [[RETVAL]]
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal ptr @"$s33big_types_corner_cases_as_library9BigStructVwCP"
+// CHECK: ret ptr {{.*}}
 let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]

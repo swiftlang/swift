@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -parse-sil %s -module-name Swift -parse-stdlib | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -parse-sil %s -module-name Swift -parse-stdlib
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -module-name Swift -parse-stdlib | %FileCheck %s
 
 import Builtin
 
@@ -17,7 +16,7 @@ bb0(%0 : $@thin MyInt.Type):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc i1 @isConcrete_false(%swift.type* %T) {{.*}} {
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc i1 @isConcrete_false(ptr %T) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK:         ret i1 false
 // CHECK-NEXT:  }

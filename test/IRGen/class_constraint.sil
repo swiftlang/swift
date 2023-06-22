@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -primary-file %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s
 
 protocol P {}
 class A : P {}
@@ -23,5 +22,5 @@ bb0(%0 : $T):
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK: define {{.*}}void @foo(%T16class_constraint1AC* %0, %swift.type* %T)
-// CHECK: store i8** @"$s16class_constraint1ACAA1PAAWP",
+// CHECK: define {{.*}}void @foo(ptr %0, ptr %T)
+// CHECK: store ptr @"$s16class_constraint1ACAA1PAAWP",

@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -parse-sil %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -parse-sil %s -emit-ir
+// RUN: %target-swift-frontend -parse-sil %s -emit-ir | %FileCheck %s
 
 import Swift
 
-// CHECK: define{{.*}}swiftcc void @takeInoutAliasable(%TSP* nocapture dereferenceable({{[0-9]+}}) %0, %swift.type* %T)
+// CHECK: define{{.*}}swiftcc void @takeInoutAliasable(ptr nocapture dereferenceable({{[0-9]+}}) %0, ptr %T)
 sil @takeInoutAliasable : $<T> (@inout_aliasable UnsafePointer<T>) -> () {
 entry(%ptr : $*UnsafePointer<T>):
   %retval = tuple ()
