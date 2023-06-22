@@ -740,7 +740,7 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
       reader.skip(sizeof(size_t));
       auto numPayloads = reader.readBytes<size_t>();
       auto refCountBytes = reader.readBytes<size_t>();
-      reader.skip(sizeof(size_t) * (refCountBytes + 1) + refCountBytes);
+      reader.skip(sizeof(size_t) * (numPayloads + 1) + refCountBytes);
       break;
     }
 
