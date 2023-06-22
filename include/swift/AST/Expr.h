@@ -68,7 +68,6 @@ namespace swift {
   class CallExpr;
   class KeyPathExpr;
   class CaptureListExpr;
-  struct SendableCheckContext;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -2054,20 +2053,6 @@ public:
   }
 };
 
-class SendNonSendableExpr : public IdentityExpr {
-  DeferredSendableDiagnostic *Diagnostic;
-public:
-  SendNonSendableExpr(
-      ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub,
-      Type type = Type());
-
-  void produceDiagnostics() { Diagnostic->produceDiagnostics(); }
-
-  SourceLoc getStartLoc() const { return getSubExpr()->getStartLoc(); }
-  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
-};
-
-
 /// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
 /// lvalue as needing to be moved.
 class ConsumeExpr final : public Expr {
@@ -3095,6 +3080,19 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::LinearToDifferentiableFunction;
   }
+};
+
+class SendNonSendableExpr : public ImplicitConversionExpr {
+  DeferredSendableDiagnostic *Diagnostic;
+public:
+  SendNonSendableExpr(
+      ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub,
+      Type type = Type());
+
+  void produceDiagnostics() { Diagnostic->produceDiagnostics(); }
+
+  SourceLoc getStartLoc() const { return getSubExpr()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 };
 
 /// Use an opaque type to abstract a value of the underlying concrete type,

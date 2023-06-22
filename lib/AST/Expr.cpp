@@ -2788,7 +2788,7 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
 SendNonSendableExpr::SendNonSendableExpr(ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub, Type type)
-    : IdentityExpr(ExprKind::SendNonSendable, sub, type, /*implicit=*/true) {
+    : ImplicitConversionExpr(ExprKind::SendNonSendable, sub, type) {
   void *mem = ctx.Allocate(sizeof(DeferredSendableDiagnostic), alignof(DeferredSendableDiagnostic));
   Diagnostic = new (mem) DeferredSendableDiagnostic(std::move(diagnostic));
   ctx.addDestructorCleanup(*Diagnostic);
