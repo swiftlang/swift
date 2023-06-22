@@ -149,6 +149,21 @@ protocol EmptySwiftProto {}
     // OK
   }
 
+  @objc(initFromProtocol1:)
+  required public init?(fromProtocol1: CInt) {
+    // OK
+  }
+
+  @objc(initFromProtocol2:)
+  public init?(fromProtocol2: CInt) {
+    // expected-warning@-1 {{initializer 'init(fromProtocol2:)' should be 'required' to match initializer declared by the header}} {{3-3=required }}
+  }
+
+  @objc(initNotFromProtocol:)
+  required public init?(notFromProtocol: CInt) {
+    // expected-warning@-1 {{initializer 'init(notFromProtocol:)' should not be 'required' to match initializer declared by the header}} {{3-12=}}
+  }
+
   class func classMethod1(_: CInt) {
     // OK
   }
