@@ -748,6 +748,14 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
       break;
     }
 
+    case RefCountingKind::MultiPayloadEnumGeneric: {
+      reader.skip(sizeof(size_t));
+      auto numPayloads = reader.readBytes<size_t>();
+      auto refCountBytes = reader.readBytes<size_t>();
+      reader.skip(sizeof(size_t) * (numPayloads + 1) + refCountBytes);
+      break;
+    }
+
     default:
       break;
     }
