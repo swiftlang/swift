@@ -290,12 +290,8 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
     //          / \        / \
     //         d   d      .   .
     //
-    BasicBlockSet visited(destroyPoint->getFunction());
-    std::deque<SILBasicBlock *> bfsWorklist = {destroyPoint->getParent()};
-    while (auto *bb = bfsWorklist.front()) {
-      visited.insert(bb);
-      bfsWorklist.pop_front();
-
+    BasicBlockWorkqueue bfsWorklist = {destroyPoint->getParent()};
+    while (auto *bb = bfsWorklist.pop()) {
       TermInst *term = bb->getTerminator();
 
       // Looking for a block that exits the function or terminates the program.
@@ -315,8 +311,7 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
       }
 
       for (auto *nextBB : term->getSuccessorBlocks())
-        if (!visited.contains(nextBB))
-          bfsWorklist.push_back(nextBB);
+        bfsWorklist.pushIfNotVisited(nextBB);
     }
   }
 
