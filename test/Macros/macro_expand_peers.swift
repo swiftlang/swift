@@ -217,8 +217,7 @@ macro AddPeerStoredProperty() =
 
 struct SomeStructWithPeerProperties {
   @AddPeerStoredProperty
-
-  func foo() {}
+  var foo: String = "hello"
 }
 
 func testStructWithPeers() {

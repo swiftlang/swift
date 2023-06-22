@@ -354,6 +354,36 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
+ArrayRef<VarDecl *>
+MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
+                                        NominalTypeDecl *decl) const {
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
+    return ArrayRef<VarDecl *>();
+
+  // Make sure we expand what we need to to get all of the properties.
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+
+  SmallVector<VarDecl *, 4> results;
+  auto maybeAddProperty = [&](VarDecl *var) {
+    if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+      results.push_back(var);
+  };
+
+  for (auto *member : decl->getCurrentMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      maybeAddProperty(var);
+
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
+        maybeAddProperty(auxVar);
+    });
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,

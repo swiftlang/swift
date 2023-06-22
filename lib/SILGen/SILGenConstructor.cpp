@@ -406,7 +406,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       storedProperties.insert(properties.begin(), properties.end());
     }
 
-    for (auto *member : decl->getMembers()) {
+    for (auto *member : decl->getAllMembers()) {
       auto *field = dyn_cast<VarDecl>(member);
       if (!field)
         continue;
