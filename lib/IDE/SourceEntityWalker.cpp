@@ -636,6 +636,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   } else if (auto FT = dyn_cast<FixedTypeRepr>(T)) {
     if (ValueDecl *VD = FT->getType()->getAnyGeneric()) {
       auto Data = ReferenceMetaData(SemaReferenceKind::TypeRef, None);
+      Data.isImplicitCtorType = true;
       auto Continue = passReference(VD, FT->getType(), FT->getLoc(),
                                     FT->getSourceRange(), Data);
       return Action::StopIf(!Continue);
