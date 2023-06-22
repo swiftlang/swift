@@ -1138,6 +1138,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
     M = getLoadedModule(Id_Cxx);
