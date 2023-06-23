@@ -98,7 +98,7 @@ doit()
 
 // CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4]]CySiGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]}} {{(section)?.*}}{
 // CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
-// CHECK-SAME:    $s4main5Value[[UNIQUE_ID_1]]CySiGMf
+// CHECK-apple-SAME:    $s4main5Value[[UNIQUE_ID_1]]CySiGMf
 // CHECK-apple:   [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, ptr [[INITIALIZED_CLASS]], 0
 // CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
 // CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
