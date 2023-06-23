@@ -307,12 +307,12 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(ptr noalias nocapture sret({{.*}}) %0)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-arm64e-NEXT: ptrtoint ptr {{.*}} to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: [[WITNESSTABLE_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr [[METADATA]], i64 -1
 // CHECK-NEXT: %.valueWitnesses = load ptr, ptr [[WITNESSTABLE_ADDR]]
 // CHECK-NEXT: [[WITNESS_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %.valueWitnesses, i32 7
 // CHECK-NEXT: [[WITNESS_FN:%[0-9]+]] = load ptr, ptr [[WITNESS_ADDR]]
+// CHECK-arm64e-NEXT: ptrtoint ptr {{.*}} to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call void [[WITNESS_FN]](ptr noalias %0, i32 1, i32 1, ptr [[METADATA]])
 // CHECK-NEXT: ret void
 // CHECK-NEXT: {{^}$}}

@@ -252,7 +252,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:[[L2]]:
 // CHECK-arm64e:  [[P0:%.*]] = ptrtoint ptr [[T_INHERITED]] to i64
 // CHECK-arm64e:  [[P1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[P0]], i32 2, i64 47152)
-// CHECK-arm64e:  [[P2:%.*]] = inttoptr i64 [[P1]] to ptr
+// CHECK-arm64e:  [[T_INHERITED:%.*]] = inttoptr i64 [[P1]] to ptr
 // CHECK:  [[T9:%.*]] = getelementptr inbounds i32, ptr [[T_INHERITED]], i32 1
 // CHECK:  [[T10:%.*]] = load i32, ptr [[T9]]
 // CHECK:  [[T11:%.*]] = sext i32 [[T10]] to i64
@@ -261,12 +261,11 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:  [[T14:%.*]] = inttoptr i64 [[T13]] to ptr
 // CHECK-arm64e:  [[T16:%.*]] = ptrtoint ptr [[T14]] to i64
 // CHECK-arm64e:  [[T17:%.*]] = call i64 @llvm.ptrauth.sign(i64 [[T16]], i32 2, i64 47152)
-// CHECK-arm64e:  [[T15:%.*]] = inttoptr i64 [[T17]] to ptr
+// CHECK-arm64e:  [[T14:%.*]] = inttoptr i64 [[T17]] to ptr
 // CHECK:  br label %[[L3:.*]]
 
 // CHECK:[[L3]]:
 // CHECK:  phi ptr [ [[T6]], %[[L1]] ], [ [[T14]], %[[L2]] ]
-// CHECK-arm64e:  phi ptr [ [[T6]], %[[L1]] ], [ [[T15]], %[[L2]] ]
 
 // Passing the witness table.
 

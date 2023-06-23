@@ -22,6 +22,9 @@ import _Concurrency
 // CHECK: [[CTX:%[0-9+]+]] = load ptr, ptr [[CTX_ADDR]], align 8
 // CHECK: [[CONT_ADDR:%[0-9]+]] = getelementptr inbounds <{ ptr, ptr }>, ptr [[CTX]], i32 0, i32 1
 // CHECK: [[RET_CONTINUATION:%.*]] = load ptr, ptr [[CONT_ADDR]], align 8
+// CHECK-arm64e:  [[T0:%.*]] = ptrtoint ptr [[RET_CONTINUATION]] to i64
+// CHECK-arm64e:  [[T1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[T0]]
+// CHECK-arm64e:  [[RET_CONTINUATION:%.*]] = inttoptr i64 [[T1]] to ptr
 // CHECK: call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{.*}}, i1 false, ptr @[[TAIL_CALL_FUNC:.*]], ptr [[RET_CONTINUATION]]
 // CHECK: unreachable
 
