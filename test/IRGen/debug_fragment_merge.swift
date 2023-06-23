@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
 // RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-ir -disable-llvm-optzns -O -g | %FileCheck %s
 
+// UNSUPPORTED: OS=watchos
+
 protocol External {
   func use(str: String);
   func decode<T>(_: T.Type) -> T
