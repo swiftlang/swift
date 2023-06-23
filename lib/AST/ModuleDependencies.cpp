@@ -419,7 +419,7 @@ void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(
 
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
-  if (!Instance.getInvocation().getFrontendOptions().EnableCAS)
+  if (!Instance.getInvocation().getFrontendOptions().EnableCaching)
     return false;
 
   if (CASOpts) {

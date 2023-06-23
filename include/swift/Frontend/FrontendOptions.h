@@ -123,8 +123,14 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
-  /// Use CAS.
-  bool EnableCAS = false;
+  /// Enable compiler caching.
+  bool EnableCaching = false;
+
+  /// Enable compiler caching remarks.
+  bool EnableCachingRemarks = false;
+
+  /// Skip replaying outputs from cache.
+  bool CacheSkipReplay = false;
 
   /// CASOptions
   clang::CASOptions CASOpts;

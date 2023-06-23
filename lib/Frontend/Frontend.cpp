@@ -403,7 +403,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 
 bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getFrontendOptions();
-  if (!Opts.EnableCAS)
+  if (!Opts.EnableCaching)
     return false;
 
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
@@ -520,7 +520,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  if (Invocation.getFrontendOptions().EnableCAS &&
+  if (Invocation.getFrontendOptions().EnableCaching &&
       (!Invocation.getFrontendOptions().CASFSRootIDs.empty() ||
        !Invocation.getFrontendOptions().ClangIncludeTrees.empty())) {
     // Set up CASFS as BaseFS.
@@ -537,7 +537,7 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
 
   // If we have a bridging header cache key, try load it now and overlay it.
   if (!Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey.empty() &&
-      Invocation.getFrontendOptions().EnableCAS) {
+      Invocation.getFrontendOptions().EnableCaching) {
     auto loadedBridgingBuffer = loadCachedCompileResultFromCacheKey(
         getObjectStore(), getActionCache(), Diagnostics,
         Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey,
@@ -681,7 +681,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (ExplicitModuleBuild ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
-    if (Invocation.getFrontendOptions().EnableCAS)
+    if (Invocation.getFrontendOptions().EnableCaching)
       ESML = ExplicitCASModuleLoader::create(
           *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
           MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
@@ -1106,7 +1106,7 @@ bool CompilerInstance::canImportCxxShim() const {
 }
 
 bool CompilerInstance::supportCaching() const {
-  if (!Invocation.getFrontendOptions().EnableCAS)
+  if (!Invocation.getFrontendOptions().EnableCaching)
     return false;
 
   return FrontendOptions::supportCompilationCaching(

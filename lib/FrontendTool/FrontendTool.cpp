@@ -1394,7 +1394,8 @@ static bool performAction(CompilerInstance &Instance,
 /// Return true if all the outputs are fetched from cache. Otherwise, return
 /// false and will not replay any output.
 static bool tryReplayCompilerResults(CompilerInstance &Instance) {
-  if (!Instance.supportCaching())
+  if (!Instance.supportCaching() ||
+      Instance.getInvocation().getFrontendOptions().CacheSkipReplay)
     return false;
 
   assert(Instance.getCompilerBaseKey() &&
@@ -1409,7 +1410,8 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   bool replayed = replayCachedCompilerOutputs(
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
-      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP);
+      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
+      Instance.getInvocation().getFrontendOptions().EnableCachingRemarks);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)

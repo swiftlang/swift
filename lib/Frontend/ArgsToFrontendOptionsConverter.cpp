@@ -351,7 +351,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
 
-  Opts.EnableCAS = Args.hasArg(OPT_enable_cas);
+  Opts.EnableCaching = Args.hasArg(OPT_cache_compile_job);
+  Opts.EnableCachingRemarks = Args.hasArg(OPT_cache_remarks);
+  Opts.CacheSkipReplay = Args.hasArg(OPT_cache_disable_replay);
   Opts.CASOpts.CASPath =
       Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
   Opts.CASOpts.PluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
@@ -365,7 +367,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
   Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
 
-  if (Opts.EnableCAS && Opts.CASFSRootIDs.empty() &&
+  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
       Opts.ClangIncludeTrees.empty() &&
       FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
     if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
