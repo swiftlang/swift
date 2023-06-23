@@ -96,6 +96,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   Pipe p2; // Parent: read, child: write (child's STDOUT).
   if (!p2)
     return std::error_code(errno, std::system_category());
+  Pipe p3; // Parent: read, child: write (child's STDERR).
 
   llvm::BumpPtrAllocator Alloc;
   const char **argv = toNullTerminatedCStringArray(args, Alloc);
@@ -119,6 +120,9 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   posix_spawn_file_actions_adddup2(&FileActions, p2.write, STDOUT_FILENO);
   posix_spawn_file_actions_addclose(&FileActions, p2.read);
 
+  posix_spawn_file_actions_adddup2(&FileActions, p3.write, STDERR_FILENO);
+  posix_spawn_file_actions_addclose(&FileActions, p3.read);
+
   // Spawn the subtask.
   int error = posix_spawn(&pid, progCStr, &FileActions, nullptr,
                           const_cast<char **>(argv), const_cast<char **>(envp));
@@ -127,10 +131,12 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 
   close(p1.read);
   close(p2.write);
+  close(p3.write);
 
   if (error != 0 || pid == 0) {
     close(p1.write);
     close(p2.read);
+    close(p3.read);
     return std::error_code(error, std::system_category());
   }
 #else
@@ -142,16 +148,20 @@ swift::ExecuteWithPipe(llvm::StringRef program,
     close(p1.write);
     close(p2.read);
     close(p2.write);
+    close(p3.read);
+    close(p3.write);
     return std::error_code(errno, std::system_category());
 
   // Child process.
   case 0:
     close(p1.write);
     close(p2.read);
+    close(p3.read);
 
     // Redirect file descriptors...
     dup2(p1.read, STDIN_FILENO);
     dup2(p2.write, STDOUT_FILENO);
+    dup2(p3.write, STDERR_FILENO);
 
     // Execute the program.
     if (envp) {
@@ -170,12 +180,13 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 
   // Parent process.
   default:
+    close(p1.read);
+    close(p2.write);
+    close(p3.write);
     break;
   }
 #endif
-  close(p1.read);
-  close(p2.write);
-  return ChildProcessInfo(pid, p1.write, p2.read);
+  return ChildProcessInfo(pid, p1.write, p2.read, p3.read);
 }
 
 #else // HAVE_UNISTD_H

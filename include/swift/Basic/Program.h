@@ -43,11 +43,13 @@ struct ChildProcessInfo {
   llvm::sys::procid_t Pid;
   int WriteFileDescriptor;
   int ReadFileDescriptor;
+  int ErrOutFileDescriptor;
 
   ChildProcessInfo(llvm::sys::procid_t Pid, int WriteFileDescriptor,
-                   int ReadFileDescriptor)
+                   int ReadFileDescriptor, int ErrOutFileDescriptor)
       : Pid(Pid), WriteFileDescriptor(WriteFileDescriptor),
-        ReadFileDescriptor(ReadFileDescriptor) {}
+        ReadFileDescriptor(ReadFileDescriptor),
+        ErrOutFileDescriptor(ErrOutFileDescriptor) {}
 };
 
 /// This function executes the program using the argument provided.
