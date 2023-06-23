@@ -304,6 +304,12 @@ public:
     assert(ProduceDiagnostics && "Empty diagnostics function");
   }
 
+  DeferredSendableDiagnostic(DeferredSendableDiagnostic const &other)
+      : ProducesErrors(other.ProducesErrors),
+        ProducesDiagnostics(other.ProducesDiagnostics),
+        ProduceDiagnostics(other.ProduceDiagnostics) {
+  }
+
   bool producesErrors() const {
     return ProducesErrors;
   }

@@ -3086,7 +3086,7 @@ class SendNonSendableExpr : public ImplicitConversionExpr {
   DeferredSendableDiagnostic *Diagnostic;
 public:
   SendNonSendableExpr(
-      ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub,
+      ASTContext &ctx, DeferredSendableDiagnostic const &diagnostic, Expr *sub,
       Type type = Type());
 
   void produceDiagnostics() { Diagnostic->produceDiagnostics(); }
