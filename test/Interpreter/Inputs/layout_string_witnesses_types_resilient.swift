@@ -18,3 +18,14 @@ public struct GenericResilient<C, T> {
         self.y = y
     }
 }
+
+public enum ResilientMultiPayloadEnum<T> {
+    case empty0
+    case empty1
+    case nonEmpty0(AnyObject)
+    case nonEmpty1(T)
+}
+
+public func getResilientMultiPayloadEnumEmpty0<T>(_ t: T.Type) -> ResilientMultiPayloadEnum<T> {
+    return .empty0
+}

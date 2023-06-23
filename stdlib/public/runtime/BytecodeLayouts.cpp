@@ -18,6 +18,7 @@
 
 #include "BytecodeLayouts.h"
 #include "../SwiftShims/swift/shims/HeapObject.h"
+#include "EnumImpl.h"
 #include "WeakReference.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
@@ -160,7 +161,7 @@ inline static void handleRefCounts(const Metadata *metadata, Params... params) {
                               std::forward<Params>(params)...);
 }
 
-static uint64_t readTagBytes(uint8_t *addr, uint8_t byteCount) {
+static uint64_t readTagBytes(const uint8_t *addr, uint8_t byteCount) {
   switch (byteCount) {
   case 1:
     return addr[0];
@@ -649,6 +650,35 @@ swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                              const Metadata *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithTake(dest, src, metadata);
+}
+
+extern "C" unsigned
+swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                         const Metadata *metadata) {
+  auto addr = reinterpret_cast<const uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+
+  auto tagBytes = reader.readBytes<size_t>();
+  auto numPayloads = reader.readBytes<size_t>();
+  reader.skip(sizeof(size_t));
+  auto enumSize = reader.readBytes<size_t>();
+  auto payloadSize = enumSize - tagBytes;
+
+  auto enumTag = (unsigned)readTagBytes(addr + payloadSize, tagBytes);
+  if (enumTag < numPayloads) {
+    return enumTag;
+  }
+
+  auto payloadValue = loadEnumElement(addr, payloadSize);
+
+  if (payloadSize >= 4) {
+    return numPayloads + payloadValue;
+  } else {
+    unsigned numPayloadBits = payloadSize * CHAR_BIT;
+    return (payloadValue | (enumTag - numPayloads) << numPayloadBits) +
+           numPayloads;
+  }
 }
 
 void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
