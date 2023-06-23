@@ -255,7 +255,7 @@ else()
   # step 2: build a library containing that source file. This library depends on all the included header files.
   #         The swift modules can now depend on that target.
   #         Note that this library is unused, i.e. not linked to anything.   
-  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
+  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp" ../include/swift/AST/ActorIsolation.cpp)
   add_dependencies(importedHeaderDependencies swift-ast-generated-headers)
   target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
 

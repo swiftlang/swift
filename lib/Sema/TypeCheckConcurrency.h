@@ -432,9 +432,9 @@ DeferredSendableDiagnostic diagnoseNonSendableTypes(
         type, fromContext, typeLoc, [&](Type specificType,
                                         DiagnosticBehavior behavior) {
           if (behavior == DiagnosticBehavior::Ignore) {
-            return DeferredSendableDiagnostic(true, [](){});
+            return DeferredSendableDiagnostic(__LINE__, true, [](){});
           } else {
-            return DeferredSendableDiagnostic(true, [=, ctx=&ctx]() {
+            return DeferredSendableDiagnostic(__LINE__, true, [=, ctx=&ctx]() {
               ctx->Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
                   .limitBehavior(behavior);
             });

@@ -18,10 +18,8 @@
 
 #include "swift/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
-
-namespace llvm {
-class raw_ostream;
-}
+#include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class DeclContext;
@@ -288,32 +286,55 @@ private:
   // This function emits the desired diagnostics when called
   std::function<void()> ProduceDiagnostics;
 
+  std::string blame;
+
+
+  class PrettyDeferredSendableDiagnostic : public llvm::PrettyStackTraceEntry {
+    const DeferredSendableDiagnostic &DSD;
+    const std::string methodName;
+  public:
+    PrettyDeferredSendableDiagnostic(
+        const DeferredSendableDiagnostic &DSD, std::string methodName) :
+        DSD(DSD), methodName(methodName) {}
+
+    void print(raw_ostream &os) const override {
+      os << "While executing method <" << methodName << "> of DeferredSendableDiagnostic <" << DSD.blame << ">\n";
+    }
+  };
+
 public:
-  DeferredSendableDiagnostic()
+  DeferredSendableDiagnostic(int lineNum)
       : ProducesErrors(false),
         ProducesDiagnostics(false),
-        ProduceDiagnostics([](){}) {}
+        ProduceDiagnostics([](){}),
+        blame(std::to_string(lineNum)) {
+    PrettyDeferredSendableDiagnostic _(*this, "0-arg init");
+  }
 
   // In general, an empty no-op closure should not be passed to
   // ProduceDiagnostics here, or ProducesDiagnostics will contain an
   // imprecise value.
-  DeferredSendableDiagnostic(
+  DeferredSendableDiagnostic(int lineNum,
       bool ProducesErrors, std::function<void()> ProduceDiagnostics)
       : ProducesErrors(ProducesErrors), ProducesDiagnostics(true),
-        ProduceDiagnostics(ProduceDiagnostics) {
+        ProduceDiagnostics(ProduceDiagnostics), blame(std::to_string(lineNum)) {
+    PrettyDeferredSendableDiagnostic _(*this, "3-arg init");
     assert(ProduceDiagnostics && "Empty diagnostics function");
   }
 
   bool producesErrors() const {
+    PrettyDeferredSendableDiagnostic _(*this, "producesErrors");
     return ProducesErrors;
   }
 
   bool producesDiagnostics() const {
+    PrettyDeferredSendableDiagnostic _(*this, "producesDiagnostics");
     return ProducesDiagnostics;
   }
 
   // Idempotent operation: call the contained ProduceDiagnostics method
   void produceDiagnostics() {
+    PrettyDeferredSendableDiagnostic _(*this, "produceDiagnostics");
     ProduceDiagnostics();
     ProducesErrors = false;
     ProducesDiagnostics = false;
@@ -321,38 +342,46 @@ public:
   }
 
   void setProducesErrors(bool producesErrors) {
+    PrettyDeferredSendableDiagnostic _(*this, "setProducesErrors");
     ProducesErrors = producesErrors;
   }
 
   // In general, an empty no-op closure should not be passed to
   // produceMoreDiagnostics here, or ProducesDiagnostics will contain an
   // imprecise value.
-  void addDiagnostic(std::function<void()> produceMoreDiagnostics) {
-    assert(produceMoreDiagnostics && "Empty diagnostics function");
+  void addDiagnostic(std::string dBlame, std::function<void()> produceMoreDiagnostics) {
+    PrettyDeferredSendableDiagnostic _(*this, "addDiagnostic");
+    assert(produceMoreDiagnostics&& "Empty diagnostics function");
 
     ProducesDiagnostics = true;
 
     ProduceDiagnostics = [=, ProduceDiagnostics=ProduceDiagnostics]() {
+      PrettyDeferredSendableDiagnostic _(*this, "producesErrors");
       ProduceDiagnostics();
       produceMoreDiagnostics();
     };
+
+    blame += ("+addDiagnostic(" + dBlame + ")");
   }
 
   /// This variation on addErrorProducingDiagnostic should be called
   /// when the passed lambda will definitely through a diagnostic
   /// for the sake of maintaining existing control flow paths, it
   /// is not used everywhere.
-  void addErrorProducingDiagnostic(std::function<void()> produceMoreDiagnostics) {
-    addDiagnostic(produceMoreDiagnostics);
+  void addErrorProducingDiagnostic(int lineNum, std::function<void()> produceMoreDiagnostics) {
+    PrettyDeferredSendableDiagnostic _(*this, "addErrorProducingDiagnostic");
+    addDiagnostic(std::to_string(lineNum), produceMoreDiagnostics);
     setProducesErrors(true);
   }
 
   // compose this DeferredSendableDiagnostic with another - calling their
   // wrapped ProduceDiagnostics closure in sequence and disjuncting their
   // respective flags
-  void followWith(DeferredSendableDiagnostic other) {
+  void followWith(int lineNum, DeferredSendableDiagnostic other) {
+    PrettyDeferredSendableDiagnostic _(*this, "followWith");
     bool thisProducesDiagnostics = ProducesDiagnostics;
-    addDiagnostic([other](){
+    blame += ("+followWith(" + std::to_string(lineNum) + "):");
+    addDiagnostic(other.blame, [other](){
       other.ProduceDiagnostics();
     });
     ProducesDiagnostics = thisProducesDiagnostics || other.ProducesDiagnostics;
