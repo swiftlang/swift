@@ -3208,7 +3208,7 @@ namespace {
             return false;
           return d->getName() == "abs" || d->getName() == "div" ||
               d->getName() == "strstr" || d->getName() == "sin" ||
-              d->getName() == "cos";
+              d->getName() == "cos" || d->getName() == "exit";
         };
         if (decl->getOwningModule() &&
             (decl->getOwningModule()
