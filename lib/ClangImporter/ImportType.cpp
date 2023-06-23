@@ -618,6 +618,80 @@ namespace {
       if (!elementType)
         return Type();
 
+      if (Impl.SwiftContext.LangOpts.CxxInteropStaticArrayAsCollection) {
+        auto &ctx = Impl.SwiftContext;
+        auto wrapperModule = ctx.getLoadedModule(ctx.getIdentifier("CxxShim"));
+        assert(wrapperModule &&
+               "CxxShim module is required when using members of a base class. "
+               "Make sure you `import CxxShim`.");
+
+        SmallVector<ValueDecl *, 1> results;
+        ctx.lookupInModule(wrapperModule, "_UnsafeCxxStaticArrayImpl", results);
+        assert(results.size() == 1 &&
+               "Did you forget to define a _UnsafeCxxStaticArray struct?");
+        StructDecl *staticArrayImpl = cast<StructDecl>(results.back());
+
+        ArrayRef<clang::TemplateArgument> templateArguments = {
+            clang::TemplateArgument(type->getElementType()),
+            clang::TemplateArgument(Impl.getClangASTContext(),
+                                    llvm::APSInt(type->getSize()),
+                                    Impl.getClangASTContext().getSizeType())};
+
+        auto *clangModuleLoader = ctx.getClangModuleLoader();
+        auto instantiatedDecl = clangModuleLoader->instantiateCXXClassTemplate(
+            const_cast<clang::ClassTemplateDecl *>(
+                cast<clang::ClassTemplateDecl>(
+                    staticArrayImpl->getClangDecl())),
+            templateArguments);
+
+        // Manually substitute in all the associated types that the protocol
+        // needs.
+        auto staticArrayProto =
+            ctx.getProtocol(KnownProtocolKind::_UnsafeCxxStaticArray);
+        auto iteratorDecl =
+            staticArrayProto->getAssociatedType(ctx.Id_Iterator);
+        auto iteratorTy = iteratorDecl->getDefaultDefinitionType();
+        // Substitute generic `Self` parameter.
+        auto cxxSequenceSelfTy = staticArrayProto->getSelfInterfaceType();
+        auto declSelfTy = instantiatedDecl->getDeclaredInterfaceType();
+        iteratorTy = iteratorTy.subst(
+            [&](SubstitutableType *dependentType) {
+              if (dependentType->isEqual(cxxSequenceSelfTy))
+                return declSelfTy;
+              return Type(dependentType);
+            },
+            LookUpConformanceInModule(instantiatedDecl->getModuleContext()));
+
+        auto sliceTy = ctx.getSliceType();
+        sliceTy = sliceTy.subst(
+            [&](SubstitutableType *dependentType) {
+              if (dependentType->isEqual(cxxSequenceSelfTy))
+                return declSelfTy;
+              return Type(dependentType);
+            },
+            LookUpConformanceInModule(instantiatedDecl->getModuleContext()));
+
+        auto indicesTy = ctx.getRangeType();
+        indicesTy = indicesTy.subst(
+            [&](SubstitutableType *dependentType) {
+              if (dependentType->isEqual(cxxSequenceSelfTy))
+                return ctx.getIntType();
+              return Type(dependentType);
+            },
+            LookUpConformanceInModule(instantiatedDecl->getModuleContext()));
+
+        Impl.addSynthesizedTypealias(instantiatedDecl, ctx.Id_Iterator,
+                                     iteratorTy);
+        Impl.addSynthesizedTypealias(
+            instantiatedDecl, ctx.getIdentifier("Index"), ctx.getIntType());
+        Impl.addSynthesizedTypealias(instantiatedDecl,
+                                     ctx.getIdentifier("SubSequence"), sliceTy);
+        Impl.addSynthesizedTypealias(instantiatedDecl,
+                                     ctx.getIdentifier("Indices"), indicesTy);
+
+        return instantiatedDecl->getDeclaredType();
+      }
+
       auto size = type->getSize().getZExtValue();
       // An array of size N is imported as an N-element tuple which
       // takes very long to compile. We chose 4096 as the upper limit because
