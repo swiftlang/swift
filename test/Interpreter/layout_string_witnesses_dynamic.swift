@@ -516,8 +516,21 @@ func testGenericSinglePayloadEnumManyXI() {
 
 testGenericSinglePayloadEnumManyXI()
 
+func testResilientSinglePayloadEnumComplexTag() {
+    let x = switch getResilientSinglePayloadEnumComplexEmpty0() {
+    case .nonEmpty: 0
+    case .empty0: 1
+    case .empty1: 2
+    }
+
+    // CHECK: Enum case: 1
+    print("Enum case: \(x)")
+}
+
+testResilientSinglePayloadEnumComplexTag()
+
 func testResilientMultiPayloadEnumTag() {
-    let x = switch getResilientMultiPayloadEnumEmpty0(AnyObject.self) {
+    let x = switch getResilientMultiPayloadEnumEmpty0() {
     case .nonEmpty0: 0
     case .nonEmpty1: 1
     case .empty0: 2
@@ -529,6 +542,20 @@ func testResilientMultiPayloadEnumTag() {
 }
 
 testResilientMultiPayloadEnumTag()
+
+func testResilientMultiPayloadEnumGenericTag() {
+    let x = switch getResilientMultiPayloadEnumGenericEmpty0(AnyObject.self) {
+    case .nonEmpty0: 0
+    case .nonEmpty1: 1
+    case .empty0: 2
+    case .empty1: 3
+    }
+
+    // CHECK: Enum case: 2
+    print("Enum case: \(x)")
+}
+
+testResilientMultiPayloadEnumGenericTag()
 
 #if os(macOS)
 

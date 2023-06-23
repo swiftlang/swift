@@ -19,13 +19,34 @@ public struct GenericResilient<C, T> {
     }
 }
 
-public enum ResilientMultiPayloadEnum<T> {
+public enum ResilientMultiPayloadEnumGeneric<T> {
     case empty0
     case empty1
     case nonEmpty0(AnyObject)
     case nonEmpty1(T)
 }
 
-public func getResilientMultiPayloadEnumEmpty0<T>(_ t: T.Type) -> ResilientMultiPayloadEnum<T> {
+public enum ResilientMultiPayloadEnum {
+    case empty0
+    case empty1
+    case nonEmpty0(AnyObject, Bool)
+    case nonEmpty1(AnyObject)
+}
+
+public enum ResilientSinglePayloadEnumComplex {
+    case empty0
+    case empty1
+    case nonEmpty(ResilientMultiPayloadEnum)
+}
+
+public func getResilientMultiPayloadEnumGenericEmpty0<T>(_ t: T.Type) -> ResilientMultiPayloadEnumGeneric<T> {
+    return .empty0
+}
+
+public func getResilientMultiPayloadEnumEmpty0() -> ResilientMultiPayloadEnum {
+    return .empty0
+}
+
+public func getResilientSinglePayloadEnumComplexEmpty0() -> ResilientSinglePayloadEnumComplex {
     return .empty0
 }
