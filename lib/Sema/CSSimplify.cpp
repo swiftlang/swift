@@ -1912,7 +1912,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           !cs.isArgumentGenericFunction(argTy, argExpr)) {
         for (const auto &opened : openedExistentials) {
           paramTy = typeEraseOpenedExistentialReference(
-              paramTy, opened.second->getExistentialType(), opened.first,
+              paramTy, opened.second, opened.first,
               TypePosition::Contravariant);
         }
       }
@@ -12942,7 +12942,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (result2->hasTypeVariable() && !openedExistentials.empty()) {
       for (const auto &opened : openedExistentials) {
         result2 = typeEraseOpenedExistentialReference(
-            result2, opened.second->getExistentialType(), opened.first,
+            result2, opened.second, opened.first,
             TypePosition::Covariant);
       }
 

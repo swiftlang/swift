@@ -2032,6 +2032,7 @@ public:
   friend class ConjunctionElement;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
+  friend class AddExplicitExistentialCoercion;
   friend struct ClosureIsolatedByPreconcurrency;
 
   class SolverScope;
@@ -4172,6 +4173,15 @@ public:
         [](const ClosureExpr *closure) {
           return closure->isIsolatedByPreconcurrency();
         });
+  
+  /// Type-erase occurrences of covariant 'Self'-rooted type parameters to their
+  /// most specific non-dependent bounds throughout the given type, using
+  /// \p baseTy as the existential base object type.
+  ///
+  /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
+  /// routine will recurse into the concrete type.
+  static Type typeEraseExistentialSelfReferences(Type refTy,  OpenedArchetypeType *baseTy,
+                                                 TypePosition outermostPosition);
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
@@ -5619,7 +5629,7 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// Given a type that includes an existential type that has been opened to
 /// the given type variable, type-erase occurrences of that opened type
 /// variable and anything that depends on it to their non-dependent bounds.
-Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
+Type typeEraseOpenedExistentialReference(Type type, OpenedArchetypeType *existentialBaseType,
                                          TypeVariableType *openedTypeVar,
                                          TypePosition outermostPosition);
 

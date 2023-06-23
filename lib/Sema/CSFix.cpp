@@ -2492,16 +2492,18 @@ bool AddExplicitExistentialCoercion::isRequired(
 
     ConstraintSystem &cs;
     ExistentialTypeFinder GetExistentialType;
+    ConstraintLocatorBuilder Locator;
 
     CoercionChecker(ConstraintSystem &cs,
-                    ExistentialTypeFinder getExistentialType)
-        : cs(cs), GetExistentialType(getExistentialType) {}
+                    ExistentialTypeFinder getExistentialType, ConstraintLocatorBuilder locator)
+        : cs(cs), GetExistentialType(getExistentialType), Locator(locator) {}
 
     Action walkToTypePre(Type componentTy) override {
       // In cases where result references a member type, we need to check
       // whether such type would is resolved to concrete or not.
       if (auto *member = componentTy->getAs<DependentMemberType>()) {
         auto memberBaseTy = getBaseTypeOfDependentMemberChain(member);
+        
 
         auto typeVar = memberBaseTy->getAs<TypeVariableType>();
         if (!typeVar)
@@ -2515,9 +2517,11 @@ bool AddExplicitExistentialCoercion::isRequired(
         auto existentialType = GetExistentialType(typeVar);
         if (!existentialType)
           return Action::SkipChildren;
+        
+        auto openedArchetype = cs.OpenedExistentialTypes.lookup(cs.getConstraintLocator(Locator));
 
         auto erasedMemberTy = typeEraseOpenedExistentialReference(
-            Type(member), *existentialType, typeVar, TypePosition::Covariant);
+            Type(member), openedArchetype, typeVar, TypePosition::Covariant);
 
         // If result is an existential type and the base has `where` clauses
         // associated with its associated types, the call needs a coercion.
@@ -2690,7 +2694,7 @@ bool AddExplicitExistentialCoercion::isRequired(
       return false;
   }
 
-  CoercionChecker check(cs, findExistentialType);
+  CoercionChecker check(cs, findExistentialType, locator);
   resultTy.walk(check);
 
   return check.RequiresCoercion;
