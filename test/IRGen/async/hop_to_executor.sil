@@ -14,14 +14,14 @@ import _Concurrency
 
 // CHECK-LABEL: define{{.*}} void @test_simple(
 // CHECK-SAME: ptr swiftasync %0, [[INT]] %1, [[INT]] %2)
-// CHECK: store ptr %0, ptr [[CTX_ADDR:%[0-9]+]], align 8
+// CHECK: store ptr %0, ptr [[CTX_ADDR:%[0-9]+]]
 // CHECK: [[RESUME:%[0-9]+]] = call ptr @llvm.coro.async.resume()
 // CHECK: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, ptr [[RESUME]], ptr @__swift_async_resume_get_context, ptr @test_simple.1, ptr [[RESUME]], [[INT]] %1, [[INT]] %2, ptr {{%[0-9]+}})
 // CHECK: [[RESUME_CTX:%[0-9]+]] = call ptr @__swift_async_resume_get_context(
-// CHECK: store ptr [[RESUME_CTX]], ptr [[CTX_ADDR]], align 8
-// CHECK: [[CTX:%[0-9+]+]] = load ptr, ptr [[CTX_ADDR]], align 8
+// CHECK: store ptr [[RESUME_CTX]], ptr [[CTX_ADDR]]
+// CHECK: [[CTX:%[0-9+]+]] = load ptr, ptr [[CTX_ADDR]]
 // CHECK: [[CONT_ADDR:%[0-9]+]] = getelementptr inbounds <{ ptr, ptr }>, ptr [[CTX]], i32 0, i32 1
-// CHECK: [[RET_CONTINUATION:%.*]] = load ptr, ptr [[CONT_ADDR]], align 8
+// CHECK: [[RET_CONTINUATION:%.*]] = load ptr, ptr [[CONT_ADDR]]
 // CHECK-arm64e:  [[T0:%.*]] = ptrtoint ptr [[RET_CONTINUATION]] to i64
 // CHECK-arm64e:  [[T1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[T0]]
 // CHECK-arm64e:  [[RET_CONTINUATION:%.*]] = inttoptr i64 [[T1]] to ptr

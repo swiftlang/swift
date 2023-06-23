@@ -26,7 +26,7 @@ bb0(%0 : $A):
   %4 = begin_access [read] [dynamic] %3 : $*Int
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[INT:%TSi]], ptr %1, i32 0, i32 0
-  // CHECK: load i64, ptr [[T0]]
+  // CHECK: load {{(i64|i32)}}, ptr [[T0]]
   %5 = load %4 : $*Int
 
   // CHECK: call void @swift_endAccess(ptr [[SCRATCH0]])

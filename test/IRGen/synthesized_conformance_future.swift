@@ -38,7 +38,7 @@ extension Nonfinal: Encodable where T: Encodable {}
 func doEquality<T: Equatable>(_: T) {}
 // CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s30synthesized_conformance_future8equalityyyF"()
 public func equality() {
-    // CHECK: [[TMP:%.*]] = alloca %TSi, align 8
+    // CHECK: [[TMP:%.*]] = alloca %TSi
     // CHECK: call swiftcc void @"$s30synthesized_conformance_future6StructV1xACyxGx_tcfC"(ptr noalias nocapture {{[^,]*}}, ptr noalias nocapture [[TMP]], ptr @"$sSiN")
     // CHECK: [[Struct_Equatable:%.*]] = call ptr @"$s30synthesized_conformance_future6StructVySiGACyxGSQAASQRzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future10doEqualityyyxSQRzlF"(

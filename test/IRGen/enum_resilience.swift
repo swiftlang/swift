@@ -307,7 +307,7 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(ptr noalias nocapture sret({{.*}}) %0)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT: [[WITNESSTABLE_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr [[METADATA]], i64 -1
+// CHECK-NEXT: [[WITNESSTABLE_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr [[METADATA]], {{(i64|i32)}} -1
 // CHECK-NEXT: %.valueWitnesses = load ptr, ptr [[WITNESSTABLE_ADDR]]
 // CHECK-NEXT: [[WITNESS_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %.valueWitnesses, i32 7
 // CHECK-NEXT: [[WITNESS_FN:%[0-9]+]] = load ptr, ptr [[WITNESS_ADDR]]
