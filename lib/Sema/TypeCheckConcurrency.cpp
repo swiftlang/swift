@@ -840,7 +840,7 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
 
 DeferredSendableDiagnostic swift::deferredDiagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
-    llvm::function_ref<DeferredSendableDiagnostic(DiagnosticBehavior)> diagnose) {
+    std::function<DeferredSendableDiagnostic(DiagnosticBehavior)> diagnose) {
   auto behavior = DiagnosticBehavior::Unspecified;
 
   if (nominal) {
@@ -903,7 +903,7 @@ DeferredSendableDiagnostic swift::deferredDiagnoseSendabilityErrorBasedOn(
 /// diagnoseNonSendableTypes
 bool swift::diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
-    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
+    std::function<bool(DiagnosticBehavior)> diagnose) {
   DeferredSendableDiagnostic deferred = deferredDiagnoseSendabilityErrorBasedOn(nominal, fromContext, [=](DiagnosticBehavior behavior) {
     bool wasSuppressed = diagnose(behavior);
     return DeferredSendableDiagnostic(!wasSuppressed, [](){});
@@ -935,7 +935,7 @@ void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 
 DeferredSendableDiagnostic swift::diagnoseSingleNonSendableType(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
+    std::function<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
 
   auto module = fromContext.fromDC->getParentModule();
   auto nominal = type->getAnyNominal();
@@ -998,7 +998,7 @@ DeferredSendableDiagnostic swift::diagnoseSingleNonSendableType(
 
 DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
+    std::function<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
   auto module = fromContext.fromDC->getParentModule();
   // maintain a running DeferredSendableDiagnostic instance
   // for any diagnostics computed by this function
@@ -1033,7 +1033,7 @@ DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
 /// diagnoseSendabilityErrorBasedOn
 bool swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    std::function<bool(Type, DiagnosticBehavior)> diagnose) {
   DeferredSendableDiagnostic deferred = diagnoseNonSendableTypes(
       type, fromContext, loc,
       [=](Type type, DiagnosticBehavior behavior) {
