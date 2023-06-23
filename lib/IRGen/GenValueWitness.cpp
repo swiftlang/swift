@@ -918,8 +918,10 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
     auto tzCount = mask.countTrailingZeros();
     auto shiftedMask = mask.lshr(tzCount);
     auto toCount = shiftedMask.countTrailingOnes();
-    if (mask.countPopulation() > 64 || toCount != mask.countPopulation() ||
-        (tzCount % toCount != 0)) {
+    if (payloadTI.mayHaveExtraInhabitants(IGM) &&
+        (mask.countPopulation() > 64 ||
+         toCount != mask.countPopulation() ||
+         (tzCount % toCount != 0))) {
       return IGM.getEnumFnGetEnumTagFn();
     } else {
       return nullptr;
