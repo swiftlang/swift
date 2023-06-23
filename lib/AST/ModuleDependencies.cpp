@@ -622,8 +622,8 @@ Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependency(
                                                           scannerContextHash);
   // During a scan, only produce the cached source module info for the current
   // module under scan.
-  if (optionalDep.hasValue()) {
-    auto dep = optionalDep.getValue();
+  if (optionalDep) {
+    auto dep = *optionalDep;
     if (dep->getAsSwiftSourceModule() &&
         moduleName != mainScanModuleName &&
         moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {

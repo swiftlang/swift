@@ -408,12 +408,12 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
   std::vector<std::string> commandLineArgs =
       getClangDepScanningInvocationArguments(ctx);
   auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
-  if (!optionalWorkingDir.hasValue()) {
+  if (!optionalWorkingDir) {
     ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                        "Missing '-working-directory' argument");
     return None;
   }
-  std::string workingDir = optionalWorkingDir.getValue();
+  std::string workingDir = *optionalWorkingDir;
 
   auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
   auto lookupModuleOutput =
@@ -473,12 +473,12 @@ bool ClangImporter::addBridgingHeaderDependencies(
   std::vector<std::string> commandLineArgs =
       getClangDepScanningInvocationArguments(ctx, StringRef(bridgingHeader));
   auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
-  if (!optionalWorkingDir.hasValue()) {
+  if (!optionalWorkingDir) {
     ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                        "Missing '-working-directory' argument");
     return true;
   }
-  std::string workingDir = optionalWorkingDir.getValue();
+  std::string workingDir = *optionalWorkingDir;
 
   auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
   auto lookupModuleOutput =
