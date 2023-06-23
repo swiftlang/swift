@@ -23,6 +23,8 @@
 
 #include "swift/shims/Visibility.h"
 
+#include <dlfcn.h>
+
 #include <cstdio>
 
 namespace swift {
@@ -31,9 +33,6 @@ namespace threading_impl {
 SWIFT_THREADING_EXPORT bool _swift_tsan_enabled = false;
 SWIFT_THREADING_EXPORT void (*_swift_tsan_acquire)(const void *) = nullptr;
 SWIFT_THREADING_EXPORT void (*_swift_tsan_release)(const void *) = nullptr;
-
-#if __has_include(<dlfcn.h>)
-#include <dlfcn.h>
 
 // The TSan library code will call this function when it starts up
 extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
@@ -53,7 +52,6 @@ void __tsan_on_initialize() {
     next_init();
   }
 }
-#endif // __has_include(<dlfcn.h>)
 
 } // namespace threading_impl
 } // namespace swift
