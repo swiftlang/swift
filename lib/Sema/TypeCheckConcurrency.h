@@ -397,7 +397,7 @@ bool diagnoseNonSendableTypes(
 ///
 /// \returns a DeferredSendableDiagnostic instance whose ProduceDiagnostics
 /// method emits the diagnostics computed by this call.
-DeferredSendableDiagnostic diagnoseNonSendableTypes(
+DeferredSendableDiagnostic deferredDiagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose);
 
@@ -428,7 +428,7 @@ DeferredSendableDiagnostic diagnoseNonSendableTypes(
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
 
     ASTContext &ctx = fromContext.fromDC->getASTContext();
-    return diagnoseNonSendableTypes(
+    return deferredDiagnoseNonSendableTypes(
         type, fromContext, typeLoc, [&](Type specificType,
                                         DiagnosticBehavior behavior) {
           if (behavior == DiagnosticBehavior::Ignore) {

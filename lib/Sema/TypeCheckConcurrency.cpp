@@ -996,7 +996,7 @@ DeferredSendableDiagnostic swift::diagnoseSingleNonSendableType(
   });
 }
 
-DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
+DeferredSendableDiagnostic swift::deferredDiagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
   auto module = fromContext.fromDC->getParentModule();
@@ -1034,7 +1034,7 @@ DeferredSendableDiagnostic swift::diagnoseNonSendableTypes(
 bool swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
-  DeferredSendableDiagnostic deferred = diagnoseNonSendableTypes(
+  DeferredSendableDiagnostic deferred = deferredDiagnoseNonSendableTypes(
       type, fromContext, loc,
       [=](Type type, DiagnosticBehavior behavior) {
         bool wasSuppressed = diagnose(type, behavior);
