@@ -7204,6 +7204,12 @@ ERROR(noncopyable_generics_variadic, none,
 ERROR(noncopyable_generics_specific, none,
       "noncopyable type %0 cannot be used with generic type %1 yet",
       (Type, Type))
+ERROR(noncopyable_generics_erasure, none,
+      "noncopyable type %0 cannot be erased to copyable existential type %1",
+      (Type, Type))
+ERROR(noncopyable_generics_metatype_cast, none,
+      "metatype %0 cannot be cast to %1 because %2 is noncopyable",
+      (Type, Type, Type))
 ERROR(noncopyable_effectful_getter,none,
       "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noncopyable_enums_do_not_support_indirect,none,

@@ -1368,19 +1368,24 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
   return failure.diagnose(asNote);
 }
 
-MustBeCopyable::MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator)
+MustBeCopyable::MustBeCopyable(ConstraintSystem &cs,
+                               Type noncopyableTy,
+                               NoncopyableMatchFailure failure,
+                               ConstraintLocator *locator)
     : ConstraintFix(cs, FixKind::MustBeCopyable, locator, FixBehavior::Error),
-      noncopyableTy(noncopyableTy) {}
+      noncopyableTy(noncopyableTy), failure(failure) {}
 
 bool MustBeCopyable::diagnose(const Solution &solution, bool asNote) const {
-  NotCopyableFailure failure(solution, noncopyableTy, getLocator());
-  return failure.diagnose(asNote);
+  NotCopyableFailure failDiag(solution, noncopyableTy, failure, getLocator());
+  return failDiag.diagnose(asNote);
 }
 
 MustBeCopyable* MustBeCopyable::create(ConstraintSystem &cs,
                                               Type noncopyableTy,
+                                              NoncopyableMatchFailure failure,
                                               ConstraintLocator *locator) {
-  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy, locator);
+  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy,
+                                                failure, locator);
 }
 
 bool MustBeCopyable::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {

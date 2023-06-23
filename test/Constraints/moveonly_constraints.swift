@@ -67,8 +67,8 @@ takeGeneric(globalMO) // expected-error {{noncopyable type 'MO' cannot be used w
 
 
 func testAny() {
-  let _: Any = MO() // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  takeAny(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: Any = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  takeAny(MO()) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
 }
 
 func testBasic(_ mo: borrowing MO) {
@@ -79,8 +79,8 @@ func testBasic(_ mo: borrowing MO) {
   takeGeneric(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
   takeGeneric(mo) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
 
-  takeAny(mo) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  print(mo) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  takeAny(mo) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  print(mo) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
   _ = "\(mo)" // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
   let _: String = String(describing: mo) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
 
@@ -94,8 +94,8 @@ func testBasic(_ mo: borrowing MO) {
   let singleton : (MO) = (mo)
   takeGeneric(singleton) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
 
-  takeAny((mo)) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  takeAny((mo, mo)) // expected-error {{noncopyable type '(MO, MO)' cannot be used with generics yet}}
+  takeAny((mo)) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  takeAny((mo, mo)) // expected-error {{noncopyable type '(MO, MO)' cannot be erased to copyable existential type 'Any'}}
 }
 
 func checkBasicBoxes() {
@@ -148,23 +148,23 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
   let _: MO = dup.get()
   let _: MO = dup.val
 
-  let _: Any = MO.self // expected-error {{noncopyable type 'MO.Type' cannot be used with generics yet}}
-  let _: AnyObject = MO.self // expected-error {{noncopyable type 'MO.Type' cannot be used with generics yet}}
-  let _ = MO.self as Any // expected-error {{noncopyable type 'MO.Type' cannot be used with generics yet}}
+  let _: Any = MO.self // expected-error {{metatype 'MO.Type' cannot be cast to 'Any' because 'MO' is noncopyable}}
+  let _: AnyObject = MO.self // expected-error {{metatype 'MO.Type' cannot be cast to 'AnyObject' because 'MO' is noncopyable}}
+  let _ = MO.self as Any // expected-error {{metatype 'MO.Type' cannot be cast to 'Any' because 'MO' is noncopyable}}
   let _ = MO.self is Any // expected-warning {{cast from 'MO.Type' to unrelated type 'Any' always fails}}
 
-  let _: Sendable = (MO(), MO()) // expected-error {{noncopyable type '(MO, MO)' cannot be used with generics yet}}
-  let _: Sendable = MO() // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  let _: Sendable = (MO(), MO()) // expected-error {{noncopyable type '(MO, MO)' cannot be erased to copyable existential type 'any Sendable'}}
+  let _: Sendable = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any Sendable'}}
   let _: _Copyable = mo // expected-error {{'_Copyable' is unavailable}}
-                        // expected-error@-1 {{noncopyable type 'MO' cannot be used with generics yet}}
-  let _: AnyObject = MO() // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  let _: Any = mo // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+                        // expected-error@-1 {{noncopyable type 'MO' cannot be erased to copyable existential type 'any _Copyable'}}
+  let _: AnyObject = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'AnyObject'}}
+  let _: Any = mo // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
 
-  _ = MO() as P // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  _ = MO() as any P // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  _ = MO() as Any // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  _ = MO() as P // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any P'}}
+  _ = MO() as any P // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any P'}}
+  _ = MO() as Any // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
   _ = MO() as MO
-  _ = MO() as AnyObject // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  _ = MO() as AnyObject // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'AnyObject'}}
   _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
   _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
   _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}
