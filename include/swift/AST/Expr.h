@@ -3091,8 +3091,9 @@ public:
 
   void produceDiagnostics() { Diagnostic->produceDiagnostics(); }
 
-  SourceLoc getStartLoc() const { return getSubExpr()->getStartLoc(); }
-  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SendNonSendable;
+  }
 };
 
 /// Use an opaque type to abstract a value of the underlying concrete type,
