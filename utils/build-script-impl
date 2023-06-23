@@ -207,6 +207,8 @@ KNOWN_SETTINGS=(
     swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
     swift-stdlib-reflection-metadata              "enabled"         "whether to build stdlib with runtime metadata (valid options are 'enabled', 'disabled' and 'debugger-only')"
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
+    swift-stdlib-has-dlsym                        "1"               "whether to build stdlib assuming the runtime environment provides the dlsym API"
+    swift-stdlib-has-filesystem                   "1"               "whether to build stdlib assuming the runtime environment provides a filesystem"
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-threading-package                       ""                "override the threading package for the host build; this is either a single package or a semicolon-separated list of sdk:package pairs.  Valid packages are empty string (no override), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
@@ -1828,6 +1830,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY}")
                     -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
                     -DSWIFT_STDLIB_HAS_DLADDR:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLADDR}")
+                    -DSWIFT_STDLIB_HAS_DLSYM:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLSYM}")
+                    -DSWIFT_STDLIB_HAS_FILESYSTEM:BOOL=$(true_false "${SWIFT_STDLIB_HAS_FILESYSTEM}")
                     -DSWIFT_RUNTIME_STATIC_IMAGE_INSPECTION:BOOL=$(true_false "${SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION}")
                     -DSWIFT_STDLIB_OS_VERSIONING:BOOL=$(true_false "${SWIFT_STDLIB_OS_VERSIONING}")
                     -DSWIFT_STDLIB_HAS_COMMANDLINE:BOOL=$(true_false "${SWIFT_STDLIB_HAS_COMMANDLINE}")

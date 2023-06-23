@@ -24,7 +24,10 @@
 
 namespace swift {
 
-#if defined(_WIN32) || defined(__wasi__) || !__has_include(<dlfcn.h>)
+#if SWIFT_THREADING_NONE                                                \
+  || defined(_WIN32) || defined(__wasi__)                               \
+  || !__has_include(<dlfcn.h>)                                          \
+  || (defined(SWIFT_STDLIB_HAS_DLSYM) && !SWIFT_STDLIB_HAS_DLSYM)
 
 #define SWIFT_THREADING_TSAN_SUPPORT 0
 
@@ -35,6 +38,7 @@ template <typename T> T *acquire(T *ptr) { return ptr; }
 template <typename T> T *release(T *ptr) { return ptr; }
 
 } // namespace tsan
+
 #else
 
 #define SWIFT_THREADING_TSAN_SUPPORT 1
