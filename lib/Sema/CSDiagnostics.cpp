@@ -6140,7 +6140,27 @@ bool NotCompileTimeConstFailure::diagnoseAsError() {
 }
 
 bool NotCopyableFailure::diagnoseAsError() {
-  emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
+  switch (failure.reason) {
+  case NoncopyableMatchFailure::CastToExistential: {
+    assert(failure.type->is<ExistentialType>());
+
+    if (noncopyableTy->is<AnyMetatypeType>())
+      emitDiagnostic(diag::noncopyable_generics_metatype_cast,
+                     noncopyableTy,
+                     failure.type,
+                     noncopyableTy->getMetatypeInstanceType());
+    else
+      emitDiagnostic(diag::noncopyable_generics_erasure,
+                     noncopyableTy,
+                     failure.type);
+    break;
+  }
+  case NoncopyableMatchFailure::Unknown:
+    emitDiagnostic(diag::noncopyable_generics,
+                   noncopyableTy);
+    break;
+  }
+
   return true;
 }
 

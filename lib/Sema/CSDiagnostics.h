@@ -539,16 +539,16 @@ public:
         ResultTypeIsOptional(resultOptional) {}
 
   bool diagnoseAsError() override;
-  
+
   Type getMemberBaseType() const {
     return MemberBaseType;
   }
-  
+
   SourceLoc getLoc() const override {
     // The end location points to the dot in the member access.
     return getSourceRange().End;
   }
-  
+
   SourceRange getSourceRange() const override;
 
 };
@@ -670,7 +670,7 @@ public:
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
-  
+
   /// Diagnose failed conversion in a `CoerceExpr`.
   bool diagnoseCoercionToUnrelatedType() const;
 
@@ -1829,9 +1829,14 @@ public:
 
 class NotCopyableFailure final : public FailureDiagnostic {
   Type noncopyableTy;
+  NoncopyableMatchFailure failure;
 public:
-  NotCopyableFailure(const Solution &solution, Type noncopyableTy, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), noncopyableTy(noncopyableTy) {}
+  NotCopyableFailure(const Solution &solution,
+                     Type noncopyableTy,
+                     NoncopyableMatchFailure failure,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        noncopyableTy(noncopyableTy), failure(failure) {}
 
   bool diagnoseAsError() override;
 };
