@@ -646,6 +646,11 @@ option(SWIFT_THREADING_PACKAGE
    Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
    or the empty string for the SDK default.")
 
+option(SWIFT_THREADING_HAS_DLSYM
+  "Enable the use of the dlsym() function.  This gets used to provide TSan
+   support on some platforms."
+  TRUE)
+
 option(SWIFT_ENABLE_MACCATALYST
   "Build the Standard Library and overlays with MacCatalyst support"
   FALSE)
