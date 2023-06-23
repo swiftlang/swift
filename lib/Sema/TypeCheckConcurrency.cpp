@@ -2212,7 +2212,7 @@ namespace {
           if (deferred.producesDiagnostics()) {
             sendNonSendableWrappedExprs.insert(expr);
             newExpr = new (ctx) SendNonSendableExpr(
-                ctx, deferred, newExpr, expr->getType());
+                ctx, std::move(deferred), newExpr, expr->getType());
           }
         } else {
           deferred.produceDiagnostics();

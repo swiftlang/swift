@@ -2787,7 +2787,7 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
-SendNonSendableExpr::SendNonSendableExpr(ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub, Type type)
+SendNonSendableExpr::SendNonSendableExpr(ASTContext &ctx, DeferredSendableDiagnostic &&diagnostic, Expr *sub, Type type)
     : ImplicitConversionExpr(ExprKind::SendNonSendable, sub, type) {
   void *mem = ctx.Allocate(sizeof(DeferredSendableDiagnostic), alignof(DeferredSendableDiagnostic));
   Diagnostic = new (mem) DeferredSendableDiagnostic(std::move(diagnostic));
