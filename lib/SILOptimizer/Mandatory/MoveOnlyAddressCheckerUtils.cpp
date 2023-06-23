@@ -1070,11 +1070,11 @@ void UseState::initializeLiveness(
   // Now at this point, we have defined all of our defs so we can start adding
   // uses to the liveness.
   for (auto reinitInstAndValue : reinitInsts) {
+    recordConsumingBlock(reinitInstAndValue.first->getParent(),
+                         reinitInstAndValue.second);
     if (!isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
       liveness.updateForUse(reinitInstAndValue.first, reinitInstAndValue.second,
                             false /*lifetime ending*/);
-      recordConsumingBlock(reinitInstAndValue.first->getParent(),
-                           reinitInstAndValue.second);
       LLVM_DEBUG(llvm::dbgs() << "Added liveness for reinit: "
                               << *reinitInstAndValue.first;
                  liveness.print(llvm::dbgs()));
