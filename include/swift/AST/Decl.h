@@ -3995,6 +3995,10 @@ public:
   /// this type.
   ArrayRef<VarDecl *> getInitAccessorProperties() const;
 
+  /// Return a collection of all properties that will be part of the memberwise
+  ///  initializer.
+  ArrayRef<VarDecl *> getMemberwiseInitProperties() const;
+  
   /// Establish a mapping between properties that could be iniitalized
   /// via other properties by means of init accessors. This mapping is
   /// one-to-many because we allow intersecting `initializes(...)`.

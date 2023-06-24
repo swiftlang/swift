@@ -4924,6 +4924,16 @@ NominalTypeDecl::getInitAccessorProperties() const {
       {});
 }
 
+ArrayRef<VarDecl *>
+NominalTypeDecl::getMemberwiseInitProperties() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      MemberwiseInitPropertiesRequest{mutableThis},
+      {});
+}
+
 void NominalTypeDecl::collectPropertiesInitializableByInitAccessors(
     std::multimap<VarDecl *, VarDecl *> &result) const {
   for (auto *property : getInitAccessorProperties()) {
@@ -7181,8 +7191,10 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // If this is a computed property with `init` accessor, it's
   // memberwise initializable when it could be used to initialize
   // other stored properties.
-  if (auto *init = getAccessor(AccessorKind::Init))
-    return init->getAttrs().hasAttribute<InitializesAttr>();
+  if (hasInitAccessor()) {
+    if (auto *init = getAccessor(AccessorKind::Init))
+      return init->getAttrs().hasAttribute<InitializesAttr>();
+  }
 
   // If this is a computed property, it's not memberwise initialized unless
   // the caller has asked for the declared properties and it is either a
