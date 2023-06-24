@@ -81,6 +81,12 @@ struct AddOne {
 // CHECK: [[@LINE-5]]:1 | function/Swift | freeLog() | [[FREE_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | freeFunc() | [[FREE_FUNC_USR]]
 
+func testExpr() {
+  #freestandingExpr
+  // CHECK: [[@LINE-1]]:3 | function/Swift | exprLog() | [[EXPR_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | testExpr()
+}
+
 // CHECK: [[@LINE+4]]:40 | macro/Swift | Peer() | [[PEER_USR]] | Ref
 // CHECK: [[@LINE+3]]:23 | macro/Swift | MemberAttribute() | [[MEMBER_ATTRIBUTE_USR]] | Ref
 // CHECK: [[@LINE+2]]:15 | macro/Swift | Member() | [[MEMBER_USR]] | Ref
@@ -112,11 +118,6 @@ struct TestAttached {
 // CHECK: [[@LINE-24]]:39 | function/Swift | peerLog() | [[PEER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | peerFunc() | [[PEER_FUNC_USR]]
 
-// `Conformance` adds `TestProto` as a conformance on an extension of `TestAttached`
-// CHECK: [[@LINE-28]]:1 | extension/ext-struct/Swift | TestAttached | {{.*}} | Def,Impl
-// CHECK: [[@LINE-29]]:1 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
-// CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestAttached
-
 // CHECK: [[@LINE+1]]:8 | struct/Swift | Outer | [[OUTER_USR:.*]] | Def
 struct Outer {
   // CHECK: [[@LINE+1]]:4 | macro/Swift | PeerMember() | [[PEER_MEMBER_USR]] | Ref
@@ -137,16 +138,19 @@ struct Outer {
 // CHECK: [[@LINE-6]]:16 | function/Swift | memberLog() | [[MEMBER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | memberFunc() | [[INNER_FUNC_USR]]
 
+
+// Expanded extensions are visited last
+
+// `Conformance` adds `TestProto` as a conformance on an extension of `TestAttached`
+// CHECK: [[@LINE-51]]:1 | extension/ext-struct/Swift | TestAttached | {{.*}} | Def,Impl
+// CHECK: [[@LINE-52]]:1 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
+// CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestAttached
+
 // `Conformance` adds `TestProto` as a conformance on an extension of `TestInner`
-// CHECK: [[@LINE-10]]:3 | extension/ext-struct/Swift | TestInner | {{.*}} | Def,Impl
-// CHECK: [[@LINE-11]]:3 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
+// CHECK: [[@LINE-18]]:3 | extension/ext-struct/Swift | TestInner | {{.*}} | Def,Impl
+// CHECK: [[@LINE-19]]:3 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
 // CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestInner
 
-func testExpr() {
-  #freestandingExpr
-  // CHECK: [[@LINE-1]]:3 | function/Swift | exprLog() | [[EXPR_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
-  // CHECK-NEXT: RelCall,RelCont | function/Swift | testExpr()
-}
 
 //--- IndexMacros.swift
 import SwiftSyntax

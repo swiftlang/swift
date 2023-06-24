@@ -1936,6 +1936,11 @@ public:
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
     }
+
+    // Visit macro-generated extensions.
+    decl->forEachExpandedExtension([&](ExtensionDecl *extension) {
+      DeclVisitor<DeclChecker>::visit(extension);
+    });
   }
 
 
