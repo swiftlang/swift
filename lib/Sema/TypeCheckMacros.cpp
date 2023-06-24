@@ -292,6 +292,15 @@ initializeExecutablePlugin(ASTContext &ctx,
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
       return nullptr;
     }
+
+    // Resend the compiler capability on reconnect.
+    auto *callback = new std::function<void(void)>(
+        [executablePlugin]() {
+          (void)swift_ASTGen_initializePlugin(
+              executablePlugin, /*diags=*/nullptr);
+        });
+    executablePlugin->addOnReconnect(callback);
+
     executablePlugin->setCleanup([executablePlugin] {
       swift_ASTGen_deinitializePlugin(executablePlugin);
     });
