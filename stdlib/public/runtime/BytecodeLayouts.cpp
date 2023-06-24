@@ -692,6 +692,51 @@ swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   }
 }
 
+extern "C" unsigned
+swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                          const Metadata *metadata) {
+  auto addr = reinterpret_cast<const uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+
+  auto tagBytesAndOffset = reader.readBytes<uint64_t>();
+  auto extraTagBytesPattern = (uint8_t)(tagBytesAndOffset >> 62);
+  auto xiTagBytesOffset =
+      tagBytesAndOffset & std::numeric_limits<uint32_t>::max();
+  const Metadata *xiType = nullptr;
+
+  if (extraTagBytesPattern) {
+    auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
+    auto payloadSize = reader.readBytes<size_t>();
+    auto tagBytes = readTagBytes(addr + payloadSize, extraTagBytes);
+    if (tagBytes) {
+      xiType = reader.readBytes<const Metadata *>();
+      unsigned payloadNumExtraInhabitants =
+          xiType ? xiType->vw_getNumExtraInhabitants() : 0;
+      unsigned caseIndexFromExtraTagBits =
+          payloadSize >= 4 ? 0 : (tagBytes - 1U) << (payloadSize * 8U);
+      unsigned caseIndexFromValue = loadEnumElement(addr, payloadSize);
+      unsigned noPayloadIndex =
+          (caseIndexFromExtraTagBits | caseIndexFromValue) +
+          payloadNumExtraInhabitants;
+      return noPayloadIndex + 1;
+    }
+  } else {
+    reader.skip(sizeof(size_t));
+  }
+
+  xiType = reader.readBytes<const Metadata *>();
+
+  if (xiType) {
+    auto numEmptyCases = reader.readBytes<unsigned>();
+
+    return xiType->vw_getEnumTagSinglePayload(
+        (const OpaqueValue *)(addr + xiTagBytesOffset), numEmptyCases);
+  }
+
+  return 0;
+}
+
 void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                              size_t layoutStrOffset,
                                              const uint8_t *fieldLayoutStr,

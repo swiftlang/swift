@@ -2335,6 +2335,16 @@ FUNCTION(MultiPayloadEnumGenericGetEnumTag,
          ATTRS(NoUnwind),
          EFFECT(NoEffect))
 
+// unsigned swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+//                                                    const Metadata *metadata);
+FUNCTION(SinglePayloadEnumGenericGetEnumTag,
+         swift_singlePayloadEnumGeneric_getEnumTag,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect))
+
 // void swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 //                                            Metadata* type);
 FUNCTION(GenericInstantiateLayoutString,
