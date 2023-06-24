@@ -652,6 +652,17 @@ swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   return swift_generic_initWithTake(dest, src, metadata);
 }
 
+extern "C"
+unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
+                                 const Metadata *metadata) {
+  auto addr = reinterpret_cast<const uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+  auto getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
+
+  return getEnumTag(addr);
+}
+
 extern "C" unsigned
 swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
                                          const Metadata *metadata) {
