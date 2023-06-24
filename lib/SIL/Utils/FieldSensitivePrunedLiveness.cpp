@@ -514,6 +514,7 @@ void FieldSensitivePrunedLiveBlocks::computeScalarUseBlockLiveness(
 /// Terminators are not live out of the block.
 void FieldSensitivePrunedLiveBlocks::updateForUse(
     SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
+    SmallBitVector const &useBeforeDefBits,
     SmallVectorImpl<IsLive> &resultingLivenessInfo) {
   assert(isInitialized());
   resultingLivenessInfo.clear();
@@ -526,10 +527,15 @@ void FieldSensitivePrunedLiveBlocks::updateForUse(
 
   for (unsigned index : indices(resultingLivenessInfo)) {
     unsigned specificBitNo = startBitNo + index;
+    auto isUseBeforeDef = useBeforeDefBits.test(specificBitNo);
     switch (resultingLivenessInfo[index]) {
     case LiveOut:
     case LiveWithin:
-      continue;
+      if (!isUseBeforeDef) {
+        continue;
+      } else {
+        LLVM_FALLTHROUGH;
+      }
     case Dead: {
       // This use block has not yet been marked live. Mark it and its
       // predecessor blocks live.
@@ -608,21 +614,21 @@ void FieldSensitivePrunedLivenessBoundary::dump() const {
 //                        MARK: FieldSensitiveLiveness
 //===----------------------------------------------------------------------===//
 
-void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
-                                                TypeTreeLeafTypeRange range,
-                                                bool lifetimeEnding) {
+void FieldSensitivePrunedLiveness::updateForUse(
+    SILInstruction *user, TypeTreeLeafTypeRange range, bool lifetimeEnding,
+    SmallBitVector const &useBeforeDefBits) {
   SmallVector<FieldSensitivePrunedLiveBlocks::IsLive, 8> resultingLiveness;
   liveBlocks.updateForUse(user, range.startEltOffset, range.endEltOffset,
-                          resultingLiveness);
+                          useBeforeDefBits, resultingLiveness);
 
   addInterestingUser(user, range, lifetimeEnding);
 }
 
-void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
-                                                SmallBitVector const &bits,
-                                                bool lifetimeEnding) {
+void FieldSensitivePrunedLiveness::updateForUse(
+    SILInstruction *user, SmallBitVector const &bits, bool lifetimeEnding,
+    SmallBitVector const &useBeforeDefBits) {
   for (auto bit : bits.set_bits()) {
-    liveBlocks.updateForUse(user, bit);
+    liveBlocks.updateForUse(user, bit, useBeforeDefBits.test(bit));
   }
 
   addInterestingUser(user, bits, lifetimeEnding);
@@ -807,74 +813,46 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
   }
 }
 
+bool FieldSensitiveMultiDefPrunedLiveRange::isUserBeforeDef(
+    SILInstruction *user, unsigned element) const {
+  auto *block = user->getParent();
+  if (!isDefBlock(block, element))
+    return false;
+
+  if (llvm::any_of(block->getArguments(), [this, element](SILArgument *arg) {
+        return isDef(arg, element);
+      })) {
+    return false;
+  }
+
+  auto *current = user;
+  while (true) {
+    // If user is also a def, then the use is considered before the def.
+    current = current->getPreviousInstruction();
+    if (!current)
+      return true;
+
+    if (isDef(current, element))
+      return false;
+  }
+}
+
 template <typename LivenessWithDefs>
 void FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse(
     SILInstruction *user, TypeTreeLeafTypeRange range, bool lifetimeEnding) {
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs()
-      << "Begin FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse "
-         "for: "
-      << *user);
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs() << "Looking for def instruction earlier in the block!\n");
-
-  auto *parentBlock = user->getParent();
-  for (auto ii = std::next(user->getReverseIterator()),
-            ie = parentBlock->rend();
-       ii != ie; ++ii) {
-    // If we find the def, just mark this instruction as being an interesting
-    // instruction.
-    if (asImpl().isDef(&*ii, range)) {
-      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found def: " << *ii);
-      PRUNED_LIVENESS_LOG(llvm::dbgs()
-                 << "    Marking inst as interesting user and returning!\n");
-      addInterestingUser(user, range, lifetimeEnding);
-      return;
-    }
-  }
-
-  // Otherwise, just delegate to our parent class's update for use. This will
-  // update liveness for our predecessor blocks and add this instruction as an
-  // interesting user.
-  PRUNED_LIVENESS_LOG(llvm::dbgs() << "No defs found! Delegating to "
-                             "FieldSensitivePrunedLiveness::updateForUse.\n");
-  FieldSensitivePrunedLiveness::updateForUse(user, range, lifetimeEnding);
+  SmallBitVector useBeforeDefBits(getNumSubElements());
+  asImpl().isUserBeforeDef(user, range.getRange(), useBeforeDefBits);
+  FieldSensitivePrunedLiveness::updateForUse(user, range, lifetimeEnding,
+                                             useBeforeDefBits);
 }
 
 template <typename LivenessWithDefs>
 void FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse(
     SILInstruction *user, SmallBitVector const &bits, bool lifetimeEnding) {
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs()
-      << "Begin FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse "
-         "for: "
-      << *user);
-  PRUNED_LIVENESS_LOG(llvm::dbgs()
-                      << "Looking for def instruction earlier in the block!\n");
-
-  auto *parentBlock = user->getParent();
-  for (auto ii = std::next(user->getReverseIterator()),
-            ie = parentBlock->rend();
-       ii != ie; ++ii) {
-    // If we find the def, just mark this instruction as being an interesting
-    // instruction.
-    if (asImpl().isDef(&*ii, bits)) {
-      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found def: " << *ii);
-      PRUNED_LIVENESS_LOG(
-          llvm::dbgs()
-          << "    Marking inst as interesting user and returning!\n");
-      addInterestingUser(user, bits, lifetimeEnding);
-      return;
-    }
-  }
-
-  // Otherwise, just delegate to our parent class's update for use. This will
-  // update liveness for our predecessor blocks and add this instruction as an
-  // interesting user.
-  PRUNED_LIVENESS_LOG(llvm::dbgs()
-                      << "No defs found! Delegating to "
-                         "FieldSensitivePrunedLiveness::updateForUse.\n");
-  FieldSensitivePrunedLiveness::updateForUse(user, bits, lifetimeEnding);
+  SmallBitVector useBeforeDefBits(getNumSubElements());
+  asImpl().isUserBeforeDef(user, bits.set_bits(), useBeforeDefBits);
+  FieldSensitivePrunedLiveness::updateForUse(user, bits, lifetimeEnding,
+                                             useBeforeDefBits);
 }
 
 //===----------------------------------------------------------------------===//

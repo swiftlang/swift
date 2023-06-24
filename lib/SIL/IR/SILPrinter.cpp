@@ -855,6 +855,12 @@ public:
     *this << ')';
   }
 
+#ifndef NDEBUG
+  void printID(const SILBasicBlock *BB) {
+    *this << Ctx.getID(BB) << "\n";
+  }
+#endif
+
   void print(const SILBasicBlock *BB) {
     // Output uses for BB arguments. These are put into place as comments before
     // the block header.
@@ -3085,6 +3091,21 @@ void SILBasicBlock::print(raw_ostream &OS) const {
 void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
+
+#ifndef NDEBUG
+void SILBasicBlock::dumpID() const {
+  printID(llvm::errs());
+}
+
+void SILBasicBlock::printID(llvm::raw_ostream &OS) const {
+  SILPrintContext Ctx(OS);
+  printID(Ctx);
+}
+
+void SILBasicBlock::printID(SILPrintContext &Ctx) const {
+  SILPrinter(Ctx).printID(this);
+}
+#endif
 
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {

@@ -473,14 +473,11 @@ struct Basics: ~Copyable {
   }
 
   consuming func reinitAfterDiscard3_bad(_ c: Color) throws {
-    // expected-error@-1 {{must consume 'self' before exiting method that discards self}}
-    // FIXME: ^ this error is related to rdar://110239087
-
     repeat {
       self = Basics() // expected-error {{cannot reinitialize 'self' after 'discard self'}}
       discard self // expected-note 2{{discarded self here}}
     } while false
-  }
+  } // expected-error {{must consume 'self' before exiting method that discards self}}
 
   consuming func reinitAfterDiscard3_ok(_ c: Color) throws {
     self = Basics()
