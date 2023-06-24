@@ -543,6 +543,19 @@ func testResilientMultiPayloadEnumTag() {
 
 testResilientMultiPayloadEnumTag()
 
+func testResilientSinglePayloadEnumGenericTag() {
+    let x = switch getResilientSinglePayloadEnumGenericEmpty0(AnyObject.self) {
+    case .nonEmpty0: 0
+    case .empty0: 1
+    case .empty1: 2
+    }
+
+    // CHECK: Enum case: 1
+    print("Enum case: \(x)")
+}
+
+testResilientSinglePayloadEnumGenericTag()
+
 func testResilientMultiPayloadEnumGenericTag() {
     let x = switch getResilientMultiPayloadEnumGenericEmpty0(AnyObject.self) {
     case .nonEmpty0: 0
