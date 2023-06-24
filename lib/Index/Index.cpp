@@ -1142,6 +1142,9 @@ void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod) {
     if (!handleSourceOrModuleFile(*SrcFile))
       return;
     walk(*SrcFile);
+    if (auto *synthesizedSF = SrcFile->getSynthesizedFile()) {
+      walk(synthesizedSF);
+    }
   } else {
     IsModuleFile = true;
     isSystemModule = Mod.isNonUserModule();

@@ -407,20 +407,6 @@ void Decl::visitAuxiliaryDecls(
     }
   }
 
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(mutableThis)) {
-    auto conformanceBuffers =
-        evaluateOrDefault(ctx.evaluator,
-                          ExpandConformanceMacros{nominal},
-                          {});
-    for (auto bufferID : conformanceBuffers) {
-      auto startLoc = sourceMgr.getLocForBufferStart(bufferID);
-      auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
-      for (auto *extension : sourceFile->getTopLevelDecls()) {
-        callback(extension);
-      }
-    }
-  }
-
   if (visitFreestandingExpanded) {
     if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
       if (auto bufferID = evaluateOrDefault(
@@ -434,6 +420,29 @@ void Decl::visitAuxiliaryDecls(
   }
 
   // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
+}
+
+void
+Decl::forEachExpandedExtension(ExtensionCallback callback) const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<Decl *>(this);
+  auto *nominal = dyn_cast<NominalTypeDecl>(mutableThis);
+  if (!nominal)
+    return;
+
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  auto *moduleDecl = getModuleContext();
+  auto conformanceBuffers =
+      evaluateOrDefault(ctx.evaluator,
+                        ExpandConformanceMacros{nominal},
+                        {});
+  for (auto bufferID : conformanceBuffers) {
+    auto startLoc = sourceMgr.getLocForBufferStart(bufferID);
+    auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+    for (auto *extension : sourceFile->getTopLevelDecls()) {
+      callback(cast<ExtensionDecl>(extension));
+    }
+  }
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,
