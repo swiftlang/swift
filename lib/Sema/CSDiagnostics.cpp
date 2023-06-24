@@ -6095,27 +6095,60 @@ bool NotCompileTimeConstFailure::diagnoseAsError() {
 }
 
 bool NotCopyableFailure::diagnoseAsError() {
-  switch (failure.reason) {
-  case NoncopyableMatchFailure::CastToExistential: {
-    assert(failure.type->is<ExistentialType>());
-
+  switch (failure.getKind()) {
+  case NoncopyableMatchFailure::ExistentialCast: {
     if (noncopyableTy->is<AnyMetatypeType>())
       emitDiagnostic(diag::noncopyable_generics_metatype_cast,
                      noncopyableTy,
-                     failure.type,
+                     failure.getType(),
                      noncopyableTy->getMetatypeInstanceType());
     else
       emitDiagnostic(diag::noncopyable_generics_erasure,
                      noncopyableTy,
-                     failure.type);
-    break;
-  }
-  case NoncopyableMatchFailure::Unknown:
-    emitDiagnostic(diag::noncopyable_generics,
-                   noncopyableTy);
-    break;
+                     failure.getType());
+    return true;
   }
 
+  case NoncopyableMatchFailure::CopyableConstraint: {
+    auto *loc = getLocator();
+    // a bit paranoid of nulls and such...
+    if (auto *genericParam = loc->getGenericParameter()) {
+      if (auto *paramDecl = genericParam->getDecl()) {
+        if (auto *owningDecl =
+            dyn_cast_or_null<ValueDecl>(paramDecl->getDeclContext()->getAsDecl())) {
+
+          // FIXME: these owningDecl names are kinda bad. like just `init(describing:)`
+          if (noncopyableTy->is<AnyMetatypeType>())
+            emitDiagnostic(diag::noncopyable_generics_generic_param_metatype,
+                           noncopyableTy->getMetatypeInstanceType(),
+                           paramDecl->getDescriptiveKind(),
+                           genericParam,
+                           owningDecl->getName(),
+                           noncopyableTy);
+          else
+            emitDiagnostic(diag::noncopyable_generics_generic_param,
+                           noncopyableTy,
+                           paramDecl->getDescriptiveKind(),
+                           genericParam,
+                           owningDecl->getName());
+
+          // If we have a location for the parameter, point it out in a note.
+          if (auto loc = paramDecl->getNameLoc()) {
+            emitDiagnosticAt(loc,
+                             diag::noncopyable_generics_implicit_copyable,
+                             paramDecl->getDescriptiveKind(),
+                             genericParam);
+          }
+
+          return true;
+        }
+      }
+    }
+    break;
+  }
+  }
+
+  emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
   return true;
 }
 

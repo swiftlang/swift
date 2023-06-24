@@ -2084,17 +2084,41 @@ public:
 
 /// Describes the reason why the type must be copyable
 struct NoncopyableMatchFailure {
-  enum Reason {
-    Unknown,
-    CastToExistential,
+  enum Kind {
+    CopyableConstraint,
+    ExistentialCast,
   };
 
-  Type type;
-  Reason reason;
+private:
+  Kind reason;
+  union {
+    Type type;
+  };
 
-  NoncopyableMatchFailure() : type(Type()), reason(Unknown) {}
-  NoncopyableMatchFailure(Type type, Reason reason)
-      : type(type), reason(reason) {}
+  NoncopyableMatchFailure(Kind reason, Type type)
+      : reason(reason), type(type) {}
+
+public:
+  Kind getKind() const { return reason; }
+
+  Type getType() const {
+    switch (reason) {
+    case ExistentialCast:
+      return type;
+
+    case CopyableConstraint:
+      llvm_unreachable("no type payload");
+    };
+  }
+
+  static NoncopyableMatchFailure forCopyableConstraint() {
+    return NoncopyableMatchFailure(CopyableConstraint, Type());
+  }
+
+  static NoncopyableMatchFailure forExistentialCast(Type existential) {
+    assert(existential->isAnyExistentialType());
+    return NoncopyableMatchFailure(ExistentialCast, existential);
+  }
 };
 
 class MustBeCopyable final : public ConstraintFix {
