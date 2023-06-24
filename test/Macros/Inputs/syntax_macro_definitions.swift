@@ -1604,6 +1604,21 @@ extension SelfAlwaysEqualOperator: MemberMacro {
   }
 }
 
+public struct AddPeerStoredPropertyMacro: PeerMacro, Sendable {
+  public static func expansion(
+    of attribute: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+
+      private var _foo: Int = 100
+      """
+    ]
+  }
+}
+
 public struct InitializableMacro: ConformanceMacro, MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
