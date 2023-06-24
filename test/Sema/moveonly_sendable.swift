@@ -91,7 +91,7 @@ enum Wrong_NoncopyableOption<T> : Sendable { // expected-note {{consider making 
 }
 
 func takeAnySendable(_ s: any Sendable) {}
-func takeSomeSendable(_ s: some Sendable) {}
+func takeSomeSendable(_ s: some Sendable) {} // expected-note {{generic parameter 'some Sendable' has an implicit Copyable requirement}}
 
 // expected-error@+1 {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
 func mkSendable() -> Sendable { return FileDescriptor(id: 0) }
@@ -101,7 +101,7 @@ func tryToCastIt(_ fd: borrowing FileDescriptor) {
   let _: Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
 
   takeAnySendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
-  takeSomeSendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be used with generics yet}}
+  takeSomeSendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'some Sendable' in 'takeSomeSendable'}}
 
   let _ = fd as Sendable // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
 
@@ -159,7 +159,8 @@ extension Sendable {
 }
 
 func tryToDupe(_ fd: borrowing FileDescriptor) {
-  fd.doIllegalThings() // expected-error {{noncopyable type 'FileDescriptor' cannot be used with generics yet}}
+  // FIXME: this should describe 'Self' as 'any Sendable' or something.
+  fd.doIllegalThings() // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'Self' in 'Sendable'}}
 }
 
 @_moveOnly
