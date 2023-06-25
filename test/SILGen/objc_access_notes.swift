@@ -551,6 +551,15 @@ func useWotsit(_ w: Wotsit<String>) {
 
 func other() { }
 
+// expected-remark@+2 {{implicitly added '@usableFromInline' to this struct, as specified by access note for fancy test suite}}
+// expected-note@+1 {{add '@usableFromInline' explicitly to silence this warning}} {{1-1=@usableFromInline}}
+struct MyStruct {
+
+  // expected-remark@+2 {{implicitly added 'public dynamic' to this property, as specified by access note for fancy test suite}}
+  // expected-note@+1 {{add 'public dynamic' explicitly to silence this warning}} {{3-3=public dynamic }}
+  var body: Int { 2 }
+}
+
 class X { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks8propertyySiSo5GizmoCF

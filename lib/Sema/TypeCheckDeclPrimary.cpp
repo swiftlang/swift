@@ -1600,7 +1600,7 @@ static StringRef prettyPrintAttrs(const ValueDecl *VD,
 
   PrintOptions opts = PrintOptions::printDeclarations();
   VD->getAttrs().print(printer, opts, attrs, VD);
-  return StringRef(out.begin(), out.size()).drop_back();
+  return StringRef(out.begin(), out.size()).trim(' ');
 }
 
 static void diagnoseChangesByAccessNote(
@@ -1679,17 +1679,31 @@ swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
-                            const AccessNotesFile &notes) {
+                            const AccessNotesFile &notes,
+                            const AccessNoteRequestFlags flags) {
   ASTContext &ctx = VD->getASTContext();
-  SmallVector<DeclAttribute *, 2> removedAttrs;
+  SmallVector<DeclAttribute *, 4> removedAttrs;
 
-  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, removedAttrs, [&]{
-    return ObjCAttr::create(ctx, note.ObjCName, false);
-  });
-
-  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, removedAttrs, [&]{
-    return new (ctx) DynamicAttr(true);
-  });
+  if (flags & AccessNoteRequestFlags::ObjCVisibility) {
+    addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, removedAttrs, [&] {
+      return ObjCAttr::create(ctx, note.ObjCName, false);
+    });
+  }
+  if (flags & AccessNoteRequestFlags::Dynamic) {
+    addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, removedAttrs,
+                                 [&] { return new (ctx) DynamicAttr(true); });
+  }
+  if (flags & AccessNoteRequestFlags::AccessLevel) {
+    addOrRemoveAttr<AccessControlAttr>(
+        VD, notes, note.Public, removedAttrs, [&] {
+          return new (ctx) AccessControlAttr(
+              VD->getAttributeInsertionLoc(/*isModifier=*/true),
+              VD->getSourceRange(), AccessLevel::Public);
+        });
+    addOrRemoveAttr<UsableFromInlineAttr>(
+        VD, notes, note.UsableFromInline, removedAttrs,
+        [&] { return new (ctx) UsableFromInlineAttr(true); });
+  }
 
   // FIXME: If we ever have more attributes, we'll need to sort removedAttrs by
   // SourceLoc. As it is, attrs are always before modifiers, so we're okay now.
@@ -1732,11 +1746,6 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   }
 }
 
-void TypeChecker::applyAccessNote(ValueDecl *VD) {
-  (void)evaluateOrDefault(VD->getASTContext().evaluator,
-                          ApplyAccessNoteRequest{VD}, {});
-}
-
 void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
   if (!SF.getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess())
     return;
@@ -1770,10 +1779,11 @@ void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
 }
 
 evaluator::SideEffect
-ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD,
+                                 AccessNoteRequestFlags flags) const {
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
   if (auto note = notes.lookup(VD))
-    applyAccessNote(VD, *note.get(), notes);
+    applyAccessNote(VD, *note.get(), notes, flags);
   return {};
 }
 
@@ -1870,8 +1880,11 @@ public:
                                     "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
 
-    if (auto VD = dyn_cast<ValueDecl>(decl))
-      TypeChecker::applyAccessNote(VD);
+    if (auto VD = dyn_cast<ValueDecl>(decl)) {
+      (void)evaluateOrDefault(
+          VD->getASTContext().evaluator,
+          ApplyAccessNoteRequest{VD, AccessNoteRequestFlags::All}, {});
+    }
 
     DeclVisitor<DeclChecker>::visit(decl);
 
@@ -2132,7 +2145,9 @@ public:
     // when the VarDecl is merely used from another file.
 
     // Compute these requests in case they emit diagnostics.
-    TypeChecker::applyAccessNote(VD);
+    (void)evaluateOrDefault(
+        VD->getASTContext().evaluator,
+        ApplyAccessNoteRequest{VD, AccessNoteRequestFlags::All}, {});
     (void) VD->getInterfaceType();
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();

@@ -1628,7 +1628,9 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
 
   // Access notes may add attributes that affect this calculus.
-  TypeChecker::applyAccessNote(VD);
+  (void)evaluateOrDefault(
+      VD->getASTContext().evaluator,
+      ApplyAccessNoteRequest{VD, AccessNoteRequestFlags::ObjCVisibility}, {});
 
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;

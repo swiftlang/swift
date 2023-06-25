@@ -581,6 +581,25 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
+                           AccessNoteRequestFlags flags) {
+  using Flag = std::pair<AccessNoteRequestFlags, StringRef>;
+  Flag possibleFlags[] = {
+#define FLAG(Name) {AccessNoteRequestFlags::Name, #Name},
+    FLAG(ObjCVisibility) FLAG(Dynamic) FLAG(AccessLevel)
+#undef FLAG
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return flags & flag.first; });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
                            FragileFunctionKind value) {
   switch (value.kind) {
   case FragileFunctionKind::Transparent:

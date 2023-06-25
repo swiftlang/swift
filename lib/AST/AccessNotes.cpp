@@ -157,6 +157,10 @@ void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
     os << " objc_name='" << *ObjCName << "'";
   if (Dynamic)
     os << " dynamic=" << *Dynamic;
+  if (Public)
+    os << " public=" << *Public;
+  if (UsableFromInline)
+    os << " usableFromInline=" << *UsableFromInline;
 
   os << ")";
 }
@@ -256,6 +260,8 @@ void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
   io.mapRequired("Name", note.Name);
   io.mapOptional("ObjC", note.ObjC);
   io.mapOptional("Dynamic", note.Dynamic);
+  io.mapOptional("UsableFromInline", note.UsableFromInline);
+  io.mapOptional("Public", note.Public);
   io.mapOptional("ObjCName", note.ObjCName);
 }
 

@@ -54,3 +54,8 @@ Notes:
 - Name: 'Wotsit.plain()'
   ObjC: true
   ObjCName: 'fancy'
+- Name: 'MyStruct'
+  UsableFromInline: true
+- Name: 'MyStruct.body'
+  Dynamic: true
+  Public: true

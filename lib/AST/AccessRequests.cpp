@@ -18,6 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
 #include "llvm/Support/MathExtras.h"
@@ -39,6 +40,11 @@ namespace swift {
 AccessLevel
 AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   assert(!D->hasAccess());
+
+  // Access notes may add attributes that affect this calculus.
+  (void)evaluateOrDefault(
+      D->getASTContext().evaluator,
+      ApplyAccessNoteRequest{D, AccessNoteRequestFlags::AccessLevel}, {});
 
   // Check if the decl has an explicit access control attribute.
   if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
