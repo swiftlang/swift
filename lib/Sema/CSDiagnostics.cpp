@@ -6111,6 +6111,13 @@ bool NotCopyableFailure::diagnoseAsError() {
 
   case NoncopyableMatchFailure::CopyableConstraint: {
     auto *loc = getLocator();
+
+    if (loc->isLastElement<LocatorPathElt::AnyTupleElement>()) {
+      assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
+      emitDiagnostic(diag::tuple_move_only_not_supported, noncopyableTy);
+      return true;
+    }
+
     // a bit paranoid of nulls and such...
     if (auto *genericParam = loc->getGenericParameter()) {
       if (auto *paramDecl = genericParam->getDecl()) {

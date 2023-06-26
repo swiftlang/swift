@@ -4786,8 +4786,10 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   if (moveOnlyElementIndex.has_value()
       && !options.contains(TypeResolutionFlags::SILType)
       && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
-    diagnose(repr->getElementType(*moveOnlyElementIndex)->getLoc(),
-             diag::tuple_move_only_not_supported);
+    auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
+    auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
+    assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
+    diagnose(loc, diag::tuple_move_only_not_supported, noncopyableTy);
   }
 
   return TupleType::get(elements, ctx);

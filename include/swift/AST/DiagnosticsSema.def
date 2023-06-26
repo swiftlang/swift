@@ -5448,7 +5448,9 @@ ERROR(tuple_pack_element_label,none,
       "cannot use label with pack expansion tuple element",
       ())
 ERROR(tuple_move_only_not_supported,none,
-      "tuples with noncopyable elements are not supported", ())
+      "tuple with noncopyable element type %0 is not supported", (Type))
+ERROR(tuple_containing_move_only_not_supported,none,
+      "type %0 containing noncopyable element is not supported", (Type))
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
