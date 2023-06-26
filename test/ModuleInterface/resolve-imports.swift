@@ -13,3 +13,10 @@ public func f() -> Int {}
 private func bad1(_: NotAThing) -> DoesNotExist {}
 
 internal typealias Bad1 = NotEvenReal.DefinitelyNot
+
+// Destructors
+public class C {}
+
+// CHECK: public class C {
+// CHECK: deinit
+// CHECK: }

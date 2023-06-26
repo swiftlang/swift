@@ -2781,6 +2781,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     // We need to add implicit initializers because they
     // affect vtable layout.
     TypeChecker::addImplicitConstructors(nominal);
+
+    // Destructors don't affect vtable layout, but TBDGen needs to
+    // see them, so we also force the destructor here.
+    if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+      (void) classDecl->getDestructor();
   }
 
   // Force any conformances that may introduce more members.
