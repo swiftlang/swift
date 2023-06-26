@@ -2674,6 +2674,33 @@ namespace {
       return result;
     }
 
+    /// Find the original type of a value, looking through various implicit
+    /// conversions.
+    static Type findOriginalValueType(Expr *expr) {
+      do {
+        expr = expr->getSemanticsProvidingExpr();
+
+        if (auto inout = dyn_cast<InOutExpr>(expr)) {
+          expr = inout->getSubExpr();
+          continue;
+        }
+
+        if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
+          expr = ice->getSubExpr();
+          continue;
+        }
+
+        if (auto open = dyn_cast<OpenExistentialExpr>(expr)) {
+          expr = open->getSubExpr();
+          continue;
+        }
+
+        break;
+      } while (true);
+
+      return expr->getType()->getRValueType();
+    }
+
     /// Check actor isolation for a particular application.
     bool checkApply(ApplyExpr *apply) {
       auto fnExprType = getType(apply->getFn());
@@ -2857,18 +2884,25 @@ namespace {
 
         // Dig out the location of the argument.
         SourceLoc argLoc = apply->getLoc();
+        Type argType;
         if (auto argList = apply->getArgs()) {
           auto arg = argList->get(paramIdx);
           if (arg.getStartLoc().isValid())
             argLoc = arg.getStartLoc();
+
+          // Determine the type of the argument, ignoring any implicit
+          // conversions that could have stripped sendability.
+          if (Expr *argExpr = arg.getExpr()) {
+            argType = findOriginalValueType(argExpr);
+          }
         }
 
         bool isExiting = !unsatisfiedIsolation->isActorIsolated();
         ActorIsolation diagnoseIsolation = isExiting ? getContextIsolation()
                                                      : *unsatisfiedIsolation;
         if (diagnoseNonSendableTypes(
-                param.getParameterType(), getDeclContext(), argLoc,
-                diag::non_sendable_call_argument,
+                argType ? argType : param.getParameterType(), getDeclContext(),
+                argLoc, diag::non_sendable_call_argument,
                 isExiting, diagnoseIsolation))
           return true;
       }

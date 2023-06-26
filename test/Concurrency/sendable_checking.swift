@@ -216,3 +216,17 @@ class SubWUnsafeSubscript : SuperWUnsafeSubscript {
     }
   }
 }
+
+
+// Test implicit conversions getting in the way
+@available(SwiftStdlib 5.1, *)
+extension MyActor {
+  func f(_: Any) { }
+  func g(_: () -> Void) { }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> Void) async {
+  await a.f(s)
+  await a.g(f)
+}
