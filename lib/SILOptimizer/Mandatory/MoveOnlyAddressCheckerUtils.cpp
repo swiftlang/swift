@@ -1452,10 +1452,12 @@ struct CopiedLoadBorrowEliminationVisitor final
 //                  MARK: DestructureThroughDeinit Checking
 //===----------------------------------------------------------------------===//
 
-static void
-checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
-                                 TypeTreeLeafTypeRange usedBits,
-                                 DiagnosticEmitter &diagnosticEmitter) {
+/// When partial consumption is enabled, we only allow for destructure through
+/// deinits. When partial consumption is disabled, we error on /all/ partial
+/// consumption.
+static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
+                                TypeTreeLeafTypeRange usedBits,
+                                DiagnosticEmitter &diagnosticEmitter) {
   LLVM_DEBUG(llvm::dbgs() << "    DestructureNeedingUse: " << *use->getUser());
 
   SILFunction *fn = rootAddress->getFunction();
@@ -1473,6 +1475,29 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
   if (iterType.isMoveOnlyWrapped())
     return;
 
+  // If we are not allowing for any partial consumption, just emit an error
+  // immediately.
+  if (!rootAddress->getModule().getASTContext().LangOpts.hasFeature(
+          Feature::MoveOnlyPartialConsumption)) {
+    // If the types equal, just bail early.
+    if (iterType == targetType)
+      return;
+
+    // Otherwise, build up the path string and emit the error.
+    SmallString<128> pathString;
+    auto rootType = rootAddress->getType();
+    if (iterType != rootType) {
+      llvm::raw_svector_ostream os(pathString);
+      pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
+    }
+
+    diagnosticEmitter.emitCannotDestructureNominalError(
+        rootAddress, pathString, nullptr /*nominal*/, use->getUser(),
+        false /*is for deinit error*/);
+    return;
+  }
+
+  // Otherwise, walk the type looking for the deinit.
   while (iterType != targetType) {
     // If we have a nominal type as our parent type, see if it has a
     // deinit. We know that it must be non-copyable since copyable types
@@ -1491,8 +1516,9 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
           pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
         }
 
-        diagnosticEmitter.emitCannotDestructureDeinitNominalError(
-            rootAddress, pathString, nom, use->getUser());
+        diagnosticEmitter.emitCannotDestructureNominalError(
+            rootAddress, pathString, nom, use->getUser(),
+            true /*is for deinit error*/);
         break;
       }
     }
@@ -1702,8 +1728,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     // TODO: Add borrow checking here like below.
 
-    // TODO: Add destructure deinit checking here once address only checking is
-    // completely brought up.
+    // If we have a copy_addr, we are either going to have a take or a
+    // copy... in either case, this copy_addr /is/ going to be a consuming
+    // operation. Make sure to check if we semantically destructure.
+    checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -1769,17 +1797,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to compute leaf range for: " << *op->get());
       return false;
-    }
-
-    checkForDestructureThroughDeinit(markedValue, op, *leafRange,
-                                     diagnosticEmitter);
-
-    // If we emitted an error diagnostic, do not transform further and instead
-    // mark that we emitted an early diagnostic and return true.
-    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Emitting destructure through deinit error!\n");
-      return true;
     }
 
     // Canonicalize the lifetime of the load [take], load [copy].
@@ -1882,6 +1899,19 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         useState.recordLivenessUse(dvi, *leafRange);
       }
     } else {
+      // Now that we know that we are going to perform a take, perform a
+      // checkForDestructure.
+      checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+
+      // If we emitted an error diagnostic, do not transform further and instead
+      // mark that we emitted an early diagnostic and return true.
+      if (numDiagnostics !=
+          moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Emitting destructure through deinit error!\n");
+        return true;
+      }
+
       // If we had a load [copy], store this into the copy list. These are the
       // things that we must merge into destroy_addr or reinits after we are
       // done checking. The load [take] are already complete and good to go.
@@ -1926,8 +1956,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // error.
     unsigned numDiagnostics =
         moveChecker.diagnosticEmitter.getDiagnosticCount();
-    checkForDestructureThroughDeinit(markedValue, op, *leafRange,
-                                     diagnosticEmitter);
+    checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");
