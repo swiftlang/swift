@@ -88,8 +88,9 @@ func testBasic(_ mo: borrowing MO) {
   genericVarArg(5)
   genericVarArg(mo) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'genericVarArg'}}
 
-  takeGeneric( (mo, 5) ) // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
-  takeGenericSendable((mo, mo)) // expected-error 2{{noncopyable type 'MO' cannot be used with generics yet}}
+  takeGeneric( (mo, 5) ) // expected-error {{tuple with noncopyable element type 'MO' is not supported}}
+  takeGeneric( ((mo, 5), 19) ) // expected-error {{tuple with noncopyable element type 'MO' is not supported}}
+  takeGenericSendable((mo, mo)) // expected-error 2{{tuple with noncopyable element type 'MO' is not supported}}
 
   let singleton : (MO) = (mo)
   takeGeneric(singleton) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeGeneric'}}
@@ -235,7 +236,7 @@ func checkStdlibTypes(_ mo: borrowing MO) {
   let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       []
   let _: [String: MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
-      ["hello" : MO()]  // expected-error{{tuples with noncopyable elements are not supported}}
+      ["hello" : MO()]  // expected-error{{type '(String, MO)' containing noncopyable element is not supported}}
 
   _ = [MO()] // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
 
