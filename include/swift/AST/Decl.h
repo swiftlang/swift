@@ -924,12 +924,6 @@ public:
       bool visitFreestandingExpanded = true
   ) const;
 
-  using ExtensionCallback = llvm::function_ref<void(ExtensionDecl *)>;
-
-  /// Iterate over each macro-expanded extension for this declaration,
-  /// invoking the given callback with each extension.
-  void forEachExpandedExtension(ExtensionCallback callback) const;
-
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
   /// Iterate over each attached macro with the given role, invoking the
