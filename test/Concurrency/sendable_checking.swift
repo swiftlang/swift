@@ -81,8 +81,8 @@ public actor MyActor: MyProto {
   public func bar<B>(aBar: B) async where B: Sendable { }
 
   func g(ns1: NS1) async {
-    await nonisolatedAsyncFunc1(ns1) // expected-warning{{non-sendable type 'NS1' exiting actor-isolated context in call to non-isolated global function 'nonisolatedAsyncFunc1' cannot cross actor boundary}}
-    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by call from actor-isolated context to non-isolated global function 'nonisolatedAsyncFunc2()' cannot cross actor boundary}}
+    await nonisolatedAsyncFunc1(ns1) // expected-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
+    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
 
