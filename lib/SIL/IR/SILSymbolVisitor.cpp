@@ -578,7 +578,7 @@ public:
     if (!Ctx.getOpts().VisitMembers)
       return;
 
-    for (auto member : D->getMembers()) {
+    for (auto member : D->getABIMembers()) {
       member->visitAuxiliaryDecls([&](Decl *decl) {
         visit(decl);
       });
