@@ -21,6 +21,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
+#include "clang/CAS/CASOptions.h"
 
 #include <string>
 #include <vector>
@@ -122,11 +123,17 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
-  /// Use CAS.
-  bool EnableCAS = false;
+  /// Enable compiler caching.
+  bool EnableCaching = false;
 
-  /// The CAS Path.
-  std::string CASPath;
+  /// Enable compiler caching remarks.
+  bool EnableCachingRemarks = false;
+
+  /// Skip replaying outputs from cache.
+  bool CacheSkipReplay = false;
+
+  /// CASOptions
+  clang::CASOptions CASOpts;
 
   /// CASFS Root.
   std::vector<std::string> CASFSRootIDs;

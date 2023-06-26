@@ -417,12 +417,25 @@ void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(
   Instance.getSourceMgr().setFileSystem(depFS);
 }
 
-void SwiftDependencyScanningService::setupCachingDependencyScanningService(
+bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
-  if (!Instance.getInvocation().getFrontendOptions().EnableCAS)
-    return;
+  if (!Instance.getInvocation().getFrontendOptions().EnableCaching)
+    return false;
+
+  if (CASOpts) {
+    // If CASOption matches, the service is initialized already.
+    if (*CASOpts == Instance.getInvocation().getFrontendOptions().CASOpts)
+      return false;
+
+    // CASOption mismatch, return error.
+    Instance.getDiags().diagnose(
+        SourceLoc(), diag::error_cas,
+        "conflicting CAS options used in scanning service");
+    return true;
+  }
 
   // Setup CAS.
+  CASOpts = Instance.getInvocation().getFrontendOptions().CASOpts;
   CAS = Instance.getSharedCASInstance();
 
   // Add SDKSetting file.
@@ -454,16 +467,11 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
   if (!CachingFS) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_create_cas,
-                                 "CachingOnDiskFS",
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                  toString(CachingFS.takeError()));
-    return;
+    return true;
   }
   CacheFS = std::move(*CachingFS);
-
-  clang::CASOptions CASOpts;
-  CASOpts.CASPath = Instance.getInvocation().getFrontendOptions().CASPath;
-  CASOpts.ensurePersistentCAS();
 
   UseClangIncludeTree =
       Instance.getInvocation().getClangImporterOptions().UseClangIncludeTree;
@@ -474,10 +482,13 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      ClangScanningFormat, CASOpts, Instance.getSharedCASInstance(),
-      Instance.getSharedCacheInstance(),
+      ClangScanningFormat,
+      Instance.getInvocation().getFrontendOptions().CASOpts,
+      Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       UseClangIncludeTree ? nullptr : CacheFS,
       /* ReuseFileManager */ false, /* OptimizeArgs */ false);
+
+  return false;
 }
 
 SwiftDependencyScanningService::ContextSpecificGlobalCacheState *
@@ -611,8 +622,8 @@ Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependency(
                                                           scannerContextHash);
   // During a scan, only produce the cached source module info for the current
   // module under scan.
-  if (optionalDep.hasValue()) {
-    auto dep = optionalDep.getValue();
+  if (optionalDep) {
+    auto dep = *optionalDep;
     if (dep->getAsSwiftSourceModule() &&
         moduleName != mainScanModuleName &&
         moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {

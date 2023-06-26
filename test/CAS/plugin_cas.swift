@@ -4,7 +4,14 @@
 // RUN: mkdir -p %t/clang-module-cache
 // RUN: mkdir -p %t/cas
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas -clang-include-tree
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s \
+// RUN:   -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift \
+// RUN:   -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h \
+// RUN:   -swift-version 4 -cache-compile-job -clang-include-tree \
+// RUN:   -cas-path %t/cas \
+// RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
+// RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
 // Check the contents of the JSON output
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
@@ -14,28 +21,17 @@
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
-// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas -clang-include-tree
-// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
-
 // Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas -clang-include-tree
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s \
+// RUN:   -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders \
+// RUN:   -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h \
+// RUN:   -swift-version 4 -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -clang-include-tree \
+// RUN:   -cas-path %t/cas \
+// RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
+// RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
 // Check the contents of the JSON output
 // RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
-
-/// check cas-fs content
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
-// RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
-
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/F_tree.casid
-// RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/F_tree.casid | %FileCheck %s -check-prefix INCLUDE_TREE_F
-
-// FS_ROOT_E-DAG: E.swiftinterface
-// FS_ROOT_E-DAG: SDKSettings.json
-
-// INCLUDE_TREE_F: <module-includes>
-// INCLUDE_TREE_F: <built-in>
-// INCLUDE_TREE_F: Files:
-// INCLUDE_TREE_F-NEXT: CHeaders/F.h
 
 import C
 import E
@@ -47,7 +43,7 @@ import SubE
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
 // CHECK-NEXT: sourceFiles
-// CHECK-NEXT: module_deps_include_tree.swift
+// CHECK-NEXT: plugin_cas.swift
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
 // CHECK-DAG:     "swift": "A"
@@ -180,7 +176,7 @@ import SubE
 // CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
 
 // Check make-style dependencies
-// CHECK-MAKE-DEPS: module_deps_include_tree.swift
+// CHECK-MAKE-DEPS: plugin_cas.swift
 // CHECK-MAKE-DEPS-SAME: A.swiftinterface
 // CHECK-MAKE-DEPS-SAME: G.swiftinterface
 // CHECK-MAKE-DEPS-SAME: B.h

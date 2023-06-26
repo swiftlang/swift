@@ -421,7 +421,7 @@ static llvm::Error resolveExplicitModuleInputs(
     dependencyInfoCopy.updateCommandLine(commandLine);
 
   // Handle CAS options.
-  if (instance.getInvocation().getFrontendOptions().EnableCAS) {
+  if (instance.getInvocation().getFrontendOptions().EnableCaching) {
     // Merge CASFS from clang dependency.
     auto &CASFS = cache.getScanService().getSharedCachingFS();
     auto &CAS = CASFS.getCAS();
@@ -1764,7 +1764,9 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
     deserializeDependencyCache(instance, service);
   // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
   service.overlaySharedFilesystemCacheForCompilation(instance);
-  service.setupCachingDependencyScanningService(instance);
+  if (service.setupCachingDependencyScanningService(instance))
+    return true;
+
   ModuleDependenciesCache cache(service,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
@@ -1832,7 +1834,9 @@ bool swift::dependencies::batchScanDependencies(
 
   SwiftDependencyScanningService singleUseService;
   singleUseService.overlaySharedFilesystemCacheForCompilation(instance);
-  singleUseService.setupCachingDependencyScanningService(instance);
+  if (singleUseService.setupCachingDependencyScanningService(instance))
+    return true;
+
   ModuleDependenciesCache cache(singleUseService,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());

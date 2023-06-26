@@ -238,10 +238,21 @@ void ClangImporter::recordModuleDependencies(
     std::string IncludeTree =
         clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
 
-    if (!RootID.empty() || !IncludeTree.empty()) {
+    if (ctx.ClangImporterOpts.CASOpts) {
       swiftArgs.push_back("-enable-cas");
-      swiftArgs.push_back("-cas-path");
-      swiftArgs.push_back(ctx.ClangImporterOpts.CASPath);
+      if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
+        swiftArgs.push_back("-cas-path");
+        swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
+      }
+      if (!ctx.ClangImporterOpts.CASOpts->PluginPath.empty()) {
+        swiftArgs.push_back("-cas-plugin-path");
+        swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->PluginPath);
+        for (auto Opt : ctx.ClangImporterOpts.CASOpts->PluginOptions) {
+          swiftArgs.push_back("-cas-plugin-option");
+          swiftArgs.push_back(
+              (llvm::Twine(Opt.first) + "=" + Opt.second).str());
+        }
+      }
     }
 
     if (!RootID.empty()) {
@@ -334,10 +345,20 @@ void ClangImporter::recordBridgingHeaderOptions(
 
   llvm::for_each(clangArgs, addClangArg);
 
-  if (!ctx.ClangImporterOpts.CASPath.empty()) {
+  if (ctx.ClangImporterOpts.CASOpts) {
     swiftArgs.push_back("-enable-cas");
-    swiftArgs.push_back("-cas-path");
-    swiftArgs.push_back(ctx.ClangImporterOpts.CASPath);
+    if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
+      swiftArgs.push_back("-cas-path");
+      swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
+    }
+    if (!ctx.ClangImporterOpts.CASOpts->PluginPath.empty()) {
+      swiftArgs.push_back("-cas-plugin-path");
+      swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->PluginPath);
+      for (auto Opt : ctx.ClangImporterOpts.CASOpts->PluginOptions) {
+        swiftArgs.push_back("-cas-plugin-option");
+        swiftArgs.push_back((llvm::Twine(Opt.first) + "=" + Opt.second).str());
+      }
+    }
   }
 
   if (auto Tree = deps.IncludeTreeID) {
@@ -387,12 +408,12 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
   std::vector<std::string> commandLineArgs =
       getClangDepScanningInvocationArguments(ctx);
   auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
-  if (!optionalWorkingDir.hasValue()) {
+  if (!optionalWorkingDir) {
     ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                        "Missing '-working-directory' argument");
     return None;
   }
-  std::string workingDir = optionalWorkingDir.getValue();
+  std::string workingDir = *optionalWorkingDir;
 
   auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
   auto lookupModuleOutput =
@@ -452,12 +473,12 @@ bool ClangImporter::addBridgingHeaderDependencies(
   std::vector<std::string> commandLineArgs =
       getClangDepScanningInvocationArguments(ctx, StringRef(bridgingHeader));
   auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
-  if (!optionalWorkingDir.hasValue()) {
+  if (!optionalWorkingDir) {
     ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                        "Missing '-working-directory' argument");
     return true;
   }
-  std::string workingDir = optionalWorkingDir.getValue();
+  std::string workingDir = *optionalWorkingDir;
 
   auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
   auto lookupModuleOutput =
