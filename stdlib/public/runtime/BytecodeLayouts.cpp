@@ -653,6 +653,53 @@ swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
 }
 
 extern "C"
+unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+                                     const Metadata *metadata) {
+  auto addr = reinterpret_cast<uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+  auto byteCountsAndOffset = reader.readBytes<uint64_t>();
+  auto extraTagBytesPattern = (uint8_t)(byteCountsAndOffset >> 62);
+  auto xiTagBytesPattern = ((uint8_t)(byteCountsAndOffset >> 59)) & 0x7;
+  auto xiTagBytesOffset =
+      byteCountsAndOffset & std::numeric_limits<uint32_t>::max();
+
+  if (extraTagBytesPattern) {
+    auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
+    auto payloadSize = reader.readBytes<size_t>();
+    auto tagBytes = readTagBytes(addr + payloadSize, extraTagBytes);
+    if (tagBytes) {
+      reader.skip(sizeof(uint64_t));
+      auto payloadNumExtraInhabitants = reader.readBytes<size_t>();
+      unsigned caseIndexFromExtraTagBits =
+          payloadSize >= 4 ? 0 : (tagBytes - 1U) << (payloadSize * 8U);
+      unsigned caseIndexFromValue = loadEnumElement(addr, payloadSize);
+      unsigned noPayloadIndex =
+          (caseIndexFromExtraTagBits | caseIndexFromValue) +
+          payloadNumExtraInhabitants;
+      return noPayloadIndex + 1;
+    }
+  } else {
+    reader.skip(sizeof(size_t));
+  }
+
+  if (xiTagBytesPattern) {
+    auto zeroTagValue = reader.readBytes<uint64_t>();
+    auto xiTagValues = reader.readBytes<size_t>();
+
+    auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
+    uint64_t tagBytes =
+        readTagBytes(addr + xiTagBytesOffset, xiTagBytes) -
+        zeroTagValue;
+    if (tagBytes < xiTagValues) {
+      return tagBytes + 1;
+    }
+  }
+
+  return 0;
+}
+
+extern "C"
 unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
                                  const Metadata *metadata) {
   auto addr = reinterpret_cast<const uint8_t *>(address);

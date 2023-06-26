@@ -2315,6 +2315,16 @@ FUNCTION(GenericInitWithTake,
          ATTRS(NoUnwind),
          EFFECT(Refcounting))
 
+// unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+//                                      const Metadata *metadata);
+FUNCTION(EnumSimpleGetEnumTag,
+         swift_enumSimple_getEnumTag,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect))
+
 // unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
 //                                  const Metadata *metadata);
 FUNCTION(EnumFnGetEnumTag,
