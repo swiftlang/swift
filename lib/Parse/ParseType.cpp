@@ -154,6 +154,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
+
+  // Prevent the use of ~ as prefix for a type. We specially parse them
+  // in inheritance clauses elsewhere.
+  if (Tok.isTilde()) {
+    auto tildeLoc = consumeToken();
+    diagnose(tildeLoc, diag::cannot_suppress_here)
+        .fixItRemoveChars(tildeLoc, tildeLoc);
+  }
+
   if (Tok.is(tok::kw_inout)
       || (canHaveParameterSpecifierContextualKeyword()
           && (Tok.getRawText().equals("__shared")
