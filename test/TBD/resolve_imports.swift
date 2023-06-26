@@ -14,4 +14,8 @@
   }
 }
 
-// CHECK: symbols: [ _main ]
+public class C {}
+
+// CHECK: symbols: [ '_$s15resolve_imports1CCMa', '_$s15resolve_imports1CCMm', 
+// CHECK-NEXT:       '_$s15resolve_imports1CCMn', '_$s15resolve_imports1CCN', '_$s15resolve_imports1CCfD', 
+// CHECK-NEXT:       '_$s15resolve_imports1CCfd', _main ]
