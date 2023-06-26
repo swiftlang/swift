@@ -2615,7 +2615,6 @@ namespace {
                                               bool isDistributed) {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
-      bool isAsyncCall = false;
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
@@ -2660,58 +2659,6 @@ namespace {
             result = AsyncMarkingResult::FoundAsync;
           }
         }
-
-      } else if (isa_and_nonnull<SelfApplyExpr>(context) &&
-          isa<AbstractFunctionDecl>(decl)) {
-        // actor-isolated non-isolated-self calls are implicitly async
-        // and thus OK.
-
-        if (!getDeclContext()->isAsyncContext())
-          return AsyncMarkingResult::SyncContext;
-
-        isAsyncCall = true;
-      } else if (!applyStack.empty()) {
-        // Check our applyStack metadata from the traversal.
-        // Our goal is to identify whether the actor reference appears
-        // as the called value of the enclosing ApplyExpr. We cannot simply
-        // inspect Parent here because of expressions like (callee)()
-        // and the fact that the reference may be just an argument to an apply
-        ApplyExpr *apply = applyStack.back();
-        Expr *fn = apply->getFn()->getValueProvidingExpr();
-        if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
-          fn = fnConv->getSubExpr()->getValueProvidingExpr();
-        if (auto memberRef = findReference(fn)) {
-          auto concDecl = memberRef->first;
-          if (decl == concDecl.getDecl() && !apply->isImplicitlyAsync()) {
-
-            if (!getDeclContext()->isAsyncContext())
-              return AsyncMarkingResult::SyncContext;
-
-            // then this ValueDecl appears as the called value of the ApplyExpr.
-            isAsyncCall = true;
-          }
-        }
-      }
-
-      // Set up an implicit async call.
-      if (isAsyncCall) {
-        // If we're calling to a distributed actor, make sure the function
-        // is actually 'distributed'.
-        bool setThrows = false;
-        bool usesDistributedThunk = false;
-        if (isDistributed) {
-          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
-            std::tie(setThrows, usesDistributedThunk) = *access;
-          } else {
-            return AsyncMarkingResult::NotDistributed;
-          }
-        }
-
-        // Mark call as implicitly 'async', and also potentially as
-        // throwing and using a distributed thunk.
-        markNearestCallAsImplicitly(
-            /*setAsync=*/target, setThrows, usesDistributedThunk);
-        result = AsyncMarkingResult::FoundAsync;
       }
 
       if (result == AsyncMarkingResult::FoundAsync) {
@@ -2806,13 +2753,10 @@ namespace {
       }
 
       // Check for isolated parameters.
-      bool anyIsolatedParameters = false;
       for (unsigned paramIdx : range(fnType->getNumParams())) {
         // We only care about isolated parameters.
         if (!fnType->getParams()[paramIdx].isIsolated())
           continue;
-
-        anyIsolatedParameters = true;
 
         auto *args = apply->getArgs();
         if (paramIdx >= args->size())
@@ -2838,13 +2782,14 @@ namespace {
 
         if (!fnType->getExtInfo().isAsync())
           callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
+        mayExitToNonisolated = false;
 
         break;
       }
 
       // If we're calling an async function that's nonisolated, and we're in
       // an isolated context, then we're exiting the actor context.
-      if (mayExitToNonisolated && !anyIsolatedParameters && fnType->isAsync() &&
+      if (mayExitToNonisolated && fnType->isAsync() &&
           getContextIsolation().isActorIsolated())
         unsatisfiedIsolation = ActorIsolation::forIndependent();
 
