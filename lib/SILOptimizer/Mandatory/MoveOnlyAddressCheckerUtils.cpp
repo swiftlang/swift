@@ -1075,11 +1075,11 @@ void UseState::initializeLiveness(
   // Now at this point, we have defined all of our defs so we can start adding
   // uses to the liveness.
   for (auto reinitInstAndValue : reinitInsts) {
+    recordConsumingBlock(reinitInstAndValue.first->getParent(),
+                         reinitInstAndValue.second);
     if (!isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
       liveness.updateForUse(reinitInstAndValue.first, reinitInstAndValue.second,
                             false /*lifetime ending*/);
-      recordConsumingBlock(reinitInstAndValue.first->getParent(),
-                           reinitInstAndValue.second);
       LLVM_DEBUG(llvm::dbgs() << "Added liveness for reinit: "
                               << *reinitInstAndValue.first;
                  liveness.print(llvm::dbgs()));
@@ -1419,6 +1419,8 @@ public:
 
 private:
   bool hasDefAfter(SILInstruction *inst, unsigned element);
+  bool isLiveAtBegin(SILBasicBlock *block, unsigned element, bool isLiveAtEnd,
+                     DestroysCollection const &destroys);
 
   bool
   shouldAddDestroyToLiveness(SILInstruction *destroy, unsigned element,
@@ -2979,7 +2981,14 @@ void ExtendUnconsumedLiveness::runOnField(
     // as the other consuming uses).
     BasicBlockWorklist worklist(currentDef->getFunction());
     for (auto *consumingBlock : consumingBlocks) {
-      worklist.push(consumingBlock);
+      if (!originalLiveBlocks.insert(consumingBlock)
+          // Don't walk into the predecessors of blocks which kill liveness.
+          && !isLiveAtBegin(consumingBlock, element, /*isLiveAtEnd=*/true, destroys)) {
+        continue;
+      }
+      for (auto *predecessor : consumingBlock->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predecessor);
+      }
     }
 
     // Walk backwards from consuming blocks.
@@ -2988,10 +2997,6 @@ void ExtendUnconsumedLiveness::runOnField(
         continue;
       }
       for (auto *predecessor : block->getPredecessorBlocks()) {
-        // If the block was discovered by liveness, we already added it to the
-        // set.
-        if (originalLiveBlocks.contains(predecessor))
-          continue;
         worklist.pushIfNotVisited(predecessor);
       }
     }
@@ -3106,6 +3111,37 @@ bool ExtendUnconsumedLiveness::shouldAddDestroyToLiveness(
   // Found no uses or defs between the destroy and the top of the block.  If the
   // block was not consumed at entry, liveness can be extended to the destroy.
   return !consumedAtEntryBlocks.contains(block);
+}
+
+/// Compute the block's effect on liveness and apply it to \p isLiveAtEnd.
+bool ExtendUnconsumedLiveness::isLiveAtBegin(SILBasicBlock *block,
+                                             unsigned element, bool isLiveAtEnd,
+                                             DestroysCollection const &destroys) {
+  enum class Effect {
+    None, // 0
+    Kill, // 1
+    Gen,  // 2
+  };
+  auto effect = Effect::None;
+  for (auto &instruction : llvm::reverse(*block)) {
+    // An instruction can be both a destroy and a def.  If it is, its
+    // behavior is first to destroy and then to init.  So when walking
+    // backwards, its last action is to destroy, so its effect is that of any
+    // destroy.
+    if (destroys.find(&instruction) != destroys.end()) {
+      effect = Effect::Gen;
+    } else if (liveness.isDef(&instruction, element)) {
+      effect = Effect::Kill;
+    }
+  }
+  switch (effect) {
+  case Effect::None:
+    return isLiveAtEnd;
+  case Effect::Kill:
+    return false;
+  case Effect::Gen:
+    return true;
+  }
 }
 
 bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,
