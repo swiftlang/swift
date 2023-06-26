@@ -1626,7 +1626,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
   return false;
 }
 
-static ModuleDependencyInfo identifyMainModuleDependencies(
+static llvm::ErrorOr<ModuleDependencyInfo> identifyMainModuleDependencies(
     CompilerInstance &instance,
     Optional<SwiftDependencyTracker> tracker = None) {
   ModuleDecl *mainModule = instance.getMainModule();
@@ -1659,8 +1659,23 @@ static ModuleDependencyInfo identifyMainModuleDependencies(
         continue;
       tracker->trackFile(sf->getFilename());
     }
-    auto root = cantFail(tracker->createTreeFromDependencies());
-    rootID = root.getID().toString();
+    tracker->addCommonSearchPathDeps(
+        instance.getInvocation().getSearchPathOptions());
+    // Fetch some dependency files from clang importer.
+    std::vector<std::string> clangDependencyFiles;
+    auto clangImporter = static_cast<ClangImporter *>(
+        instance.getASTContext().getClangModuleLoader());
+    clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
+    llvm::for_each(clangDependencyFiles,
+                   [&](std::string &file) { tracker->trackFile(file); });
+
+    auto root = tracker->createTreeFromDependencies();
+    if (!root) {
+      instance.getASTContext().Diags.diagnose(SourceLoc(), diag::error_cas,
+                                              toString(root.takeError()));
+      return std::make_error_code(std::errc::io_error);
+    }
+    rootID = root->getID().toString();
   }
 
   auto mainDependencies =
@@ -1927,11 +1942,14 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   // First, identify the dependencies of the main module
   auto mainDependencies = identifyMainModuleDependencies(
       instance, cache.getScanService().createSwiftDependencyTracker());
+  if (!mainDependencies)
+    return mainDependencies.getError();
   auto &ctx = instance.getASTContext();
 
   // Add the main module.
   StringRef mainModuleName = mainModule->getNameStr();
-  auto mainModuleID = ModuleDependencyID{mainModuleName.str(), mainDependencies.getKind()};
+  auto mainModuleID =
+      ModuleDependencyID{mainModuleName.str(), mainDependencies->getKind()};
 
   ModuleDependencyIDSetVector allModules;
   allModules.insert(mainModuleID);
@@ -1943,9 +1961,9 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
     cache.updateDependency(
         std::make_pair(mainModuleName.str(),
                        ModuleDependencyKind::SwiftSource),
-        std::move(mainDependencies));
+        std::move(*mainDependencies));
   } else {
-    cache.recordDependency(mainModuleName, std::move(mainDependencies));
+    cache.recordDependency(mainModuleName, std::move(*mainDependencies));
   }
 
   auto ModuleCachePath = getModuleCachePathFromClang(
@@ -2051,8 +2069,10 @@ llvm::ErrorOr<swiftscan_import_set_t>
 swift::dependencies::performModulePrescan(CompilerInstance &instance) {
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies = identifyMainModuleDependencies(instance);
+  if (!mainDependencies)
+    return mainDependencies.getError();
   auto *importSet = new swiftscan_import_set_s;
-  importSet->imports = create_set(mainDependencies.getModuleImports());
+  importSet->imports = create_set(mainDependencies->getModuleImports());
   return importSet;
 }
 

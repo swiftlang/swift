@@ -174,6 +174,14 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     std::string RootID;
     if (dependencyTracker) {
       dependencyTracker->startTracking();
+      dependencyTracker->addCommonSearchPathDeps(Ctx.SearchPathOpts);
+      std::vector<std::string> clangDependencyFiles;
+      auto clangImporter =
+          static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+      clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
+      llvm::for_each(clangDependencyFiles, [&](std::string &file) {
+        dependencyTracker->trackFile(file);
+      });
       dependencyTracker->trackFile(moduleInterfacePath);
       auto RootOrError = dependencyTracker->createTreeFromDependencies();
       if (!RootOrError)
