@@ -6818,8 +6818,17 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
 
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
-  if (!isLet())
+  if (!isLet()) {
+    if (hasInitAccessor()) {
+      if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
+        if (base && ctor->getImplicitSelfDecl() != base->getDecl())
+          return supportsMutation();
+        return true;
+      }
+    }
+
     return supportsMutation();
+  }
 
   // Static 'let's are always immutable.
   if (isStatic()) {
