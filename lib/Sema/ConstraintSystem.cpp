@@ -837,7 +837,21 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
     result = DC->mapTypeIntoContext(result);
   }
 
-  return result.transform([&](Type type) {
+  return result.transform([&](Type type) -> Type {
+    // Although generic parameters are declared with just `each`
+    // their interface types introduce a pack expansion which
+    // means that the solver has to extact generic argument type
+    // variable from Pack{repeat ...} and drop that structure to
+    // make sure that generic argument gets inferred to a pack type.
+    if (auto *packTy = type->getAs<PackType>()) {
+      assert(packTy->getNumElements() == 1);
+      auto *expansion = packTy->getElementType(0)->castTo<PackExpansionType>();
+      auto *typeVar = expansion->getPatternType()->castTo<TypeVariableType>();
+      assert(typeVar->getImpl().getGenericParameter() &&
+             typeVar->getImpl().canBindToPack());
+      return typeVar;
+    }
+
     if (auto *expansion = dyn_cast<PackExpansionType>(type.getPointer()))
       return openPackExpansionType(expansion, replacements, locator);
     return type;
@@ -988,6 +1002,15 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
                 tuple->getASTContext());
           }
         }
+      }
+
+      // While opening variadic generic types that appear in other types
+      // we need to extract generic parameter from Pack{repeat ...} structure
+      // that gets introduced by the interface type, see
+      // \c openUnboundGenericType for more details.
+      if (auto *packTy = type->getAs<PackType>()) {
+        if (auto expansion = packTy->unwrapSingletonPackExpansion())
+          type = expansion->getPatternType();
       }
 
       if (auto *expansion = type->getAs<PackExpansionType>()) {
