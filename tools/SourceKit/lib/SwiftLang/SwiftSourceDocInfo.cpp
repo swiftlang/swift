@@ -1392,7 +1392,8 @@ class CursorRangeInfoConsumer : public SwiftASTConsumer {
 protected:
   SwiftLangSupport &Lang;
   SwiftInvocationRef ASTInvok;
-  std::string InputFile;
+  std::string PrimaryFilePath;
+  std::string InputBufferName;
   unsigned Offset;
   unsigned Length;
 
@@ -1408,11 +1409,13 @@ protected:
   }
 
 public:
-  CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
+  CursorRangeInfoConsumer(StringRef PrimaryFilePath, StringRef InputBufferName,
+                          unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                           bool TryExistingAST, bool CancelOnSubsequentRequest)
-      : Lang(Lang), ASTInvok(ASTInvok), InputFile(InputFile.str()),
-        Offset(Offset), Length(Length), TryExistingAST(TryExistingAST),
+      : Lang(Lang), ASTInvok(ASTInvok), PrimaryFilePath(PrimaryFilePath.str()),
+        InputBufferName(InputBufferName.str()), Offset(Offset), Length(Length),
+        TryExistingAST(TryExistingAST),
         CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 
   bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
@@ -1429,7 +1432,7 @@ public:
 
     ImmutableTextSnapshotRef InputSnap;
     if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(
-            InputFile, /*IsRealpath=*/true))
+            PrimaryFilePath, /*IsRealpath=*/true))
       InputSnap = EditorDoc->getLatestSnapshot();
     if (!InputSnap)
       return false;
@@ -1498,8 +1501,8 @@ static SourceFile *retrieveInputFile(StringRef inputBufferName,
 }
 
 static void resolveCursor(
-    SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
-    unsigned Length, bool Actionables, bool SymbolGraph,
+    SwiftLangSupport &Lang, StringRef PrimaryFile, StringRef InputBufferName,
+    unsigned Offset, unsigned Length, bool Actionables, bool SymbolGraph,
     SwiftInvocationRef Invok, bool TryExistingAST,
     bool CancelOnSubsequentRequest,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
@@ -1516,20 +1519,22 @@ static void resolveCursor(
 
   public:
     CursorInfoConsumer(
-        StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
-        bool SymbolGraph, SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+        StringRef PrimaryFile, StringRef InputBufferName, unsigned Offset,
+        unsigned Length, bool Actionables, bool SymbolGraph,
+        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
         bool TryExistingAST, bool CancelOnSubsequentRequest,
         SourceKitCancellationToken CancellationToken,
         std::function<void(const RequestResult<CursorInfoData> &)> Receiver)
-        : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                                  TryExistingAST, CancelOnSubsequentRequest),
+        : CursorRangeInfoConsumer(PrimaryFile, InputBufferName, Offset, Length,
+                                  Lang, ASTInvok, TryExistingAST,
+                                  CancelOnSubsequentRequest),
           Actionables(Actionables), SymbolGraph(SymbolGraph),
           CancellationToken(CancellationToken), Receiver(std::move(Receiver)) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      SourceFile *SF = retrieveInputFile(InputFile, CompIns);
+      SourceFile *SF = retrieveInputFile(InputBufferName, CompIns);
       if (!SF) {
         Receiver(RequestResult<CursorInfoData>::fromError(
             "Unable to find input file"));
@@ -1604,14 +1609,14 @@ static void resolveCursor(
             cast<ResolvedValueRefCursorInfo>(CursorInfo), Actionables,
             SymbolGraph, Actions, Lang, CompInvok, Diagnostic,
             getPreviousASTSnaps(),
-            /*DidReuseAST=*/false, Receiver);
+            /*DidReuseAST=*/!getPreviousASTSnaps().empty(), Receiver);
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
-            resolveCursor(Lang, InputFile, Offset, Length, Actionables,
-                          SymbolGraph, ASTInvok, /*TryExistingAST=*/false,
-                          CancelOnSubsequentRequest, SM.getFileSystem(),
-                          CancellationToken, Receiver);
+            resolveCursor(Lang, PrimaryFilePath, InputBufferName, Offset,
+                          Length, Actionables, SymbolGraph, ASTInvok,
+                          /*TryExistingAST=*/false, CancelOnSubsequentRequest,
+                          SM.getFileSystem(), CancellationToken, Receiver);
           } else {
             CursorInfoData Info;
             Info.InternalDiagnostic = Diagnostic;
@@ -1662,8 +1667,9 @@ static void resolveCursor(
   };
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
-      InputFile, Offset, Length, Actionables, SymbolGraph, Lang, Invok,
-      TryExistingAST, CancelOnSubsequentRequest, CancellationToken, Receiver);
+      PrimaryFile, InputBufferName, Offset, Length, Actionables, SymbolGraph,
+      Lang, Invok, TryExistingAST, CancelOnSubsequentRequest, CancellationToken,
+      Receiver);
 
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
@@ -1710,8 +1716,9 @@ static void computeDiagnostics(
 }
 
 static void resolveName(
-    SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
-    SwiftInvocationRef Invok, bool TryExistingAST, NameTranslatingInfo &Input,
+    SwiftLangSupport &Lang, StringRef PrimaryFilePath,
+    StringRef InputBufferName, unsigned Offset, SwiftInvocationRef Invok,
+    bool TryExistingAST, NameTranslatingInfo &Input,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) {
   assert(Invok);
@@ -1723,13 +1730,14 @@ static void resolveName(
 
   public:
     NameInfoConsumer(
-        StringRef InputFile, unsigned Offset, SwiftLangSupport &Lang,
-        SwiftInvocationRef ASTInvok, bool TryExistingAST,
-        NameTranslatingInfo Input, SourceKitCancellationToken CancellationToken,
+        StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+        bool TryExistingAST, NameTranslatingInfo Input,
+        SourceKitCancellationToken CancellationToken,
         std::function<void(const RequestResult<NameTranslatingInfo> &)>
             Receiver)
-        : CursorRangeInfoConsumer(InputFile, Offset, 0, Lang, ASTInvok,
-                                  TryExistingAST,
+        : CursorRangeInfoConsumer(PrimaryFilePath, InputBufferName, Offset, 0,
+                                  Lang, ASTInvok, TryExistingAST,
                                   /*CancelOnSubsequentRequest=*/false),
           Input(std::move(Input)), CancellationToken(CancellationToken),
           Receiver(std::move(Receiver)) {}
@@ -1737,7 +1745,7 @@ static void resolveName(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      SourceFile *SF = retrieveInputFile(InputFile, CompIns);
+      SourceFile *SF = retrieveInputFile(InputBufferName, CompIns);
       if (!SF) {
         Receiver(RequestResult<NameTranslatingInfo>::fromError(
             "Unable to find input file"));
@@ -1778,9 +1786,9 @@ static void resolveName(
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
-            resolveName(Lang, InputFile, Offset, ASTInvok,
-                        /*TryExistingAST=*/false, Input, CancellationToken,
-                        Receiver);
+            resolveName(
+                Lang, PrimaryFilePath, InputBufferName, Offset, ASTInvok,
+                /*TryExistingAST=*/false, Input, CancellationToken, Receiver);
           } else {
             NameTranslatingInfo Info;
             Info.InternalDiagnostic = Diagnostic;
@@ -1813,8 +1821,8 @@ static void resolveName(
   };
 
   auto Consumer = std::make_shared<NameInfoConsumer>(
-      InputFile, Offset, Lang, Invok, TryExistingAST, Input, CancellationToken,
-      Receiver);
+      PrimaryFilePath, InputBufferName, Offset, Lang, Invok, TryExistingAST,
+      Input, CancellationToken, Receiver);
 
   Lang.getASTManager()->processASTAsync(
       Invok, std::move(Consumer), /*OncePerASTToken=*/nullptr,
@@ -1822,8 +1830,9 @@ static void resolveName(
 }
 
 static void
-resolveRange(SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
-             unsigned Length, SwiftInvocationRef Invok, bool TryExistingAST,
+resolveRange(SwiftLangSupport &Lang, StringRef PrimaryFilePath,
+             StringRef InputBufferName, unsigned Offset, unsigned Length,
+             SwiftInvocationRef Invok, bool TryExistingAST,
              bool CancelOnSubsequentRequest,
              SourceKitCancellationToken CancellationToken,
              std::function<void(const RequestResult<RangeInfo> &)> Receiver) {
@@ -1835,20 +1844,21 @@ resolveRange(SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
 
   public:
     RangeInfoConsumer(
-        StringRef InputFile, unsigned Offset, unsigned Length,
-        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+        StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+        unsigned Length, SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
         bool TryExistingAST, bool CancelOnSubsequentRequest,
         SourceKitCancellationToken CancellationToken,
         std::function<void(const RequestResult<RangeInfo> &)> Receiver)
-        : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                                  TryExistingAST, CancelOnSubsequentRequest),
+        : CursorRangeInfoConsumer(PrimaryFilePath, InputBufferName, Offset,
+                                  Length, Lang, ASTInvok, TryExistingAST,
+                                  CancelOnSubsequentRequest),
           CancellationToken(CancellationToken), Receiver(std::move(Receiver)) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       // FIXME: Implement tracing
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      SourceFile *SF = retrieveInputFile(InputFile, CompIns);
+      SourceFile *SF = retrieveInputFile(InputBufferName, CompIns);
       if (!SF) {
         Receiver(
             RequestResult<RangeInfo>::fromError("Unable to find input file"));
@@ -1892,7 +1902,8 @@ resolveRange(SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
       case RangeKind::Invalid:
         if (!getPreviousASTSnaps().empty()) {
           // Attempt again using the up-to-date AST.
-          resolveRange(Lang, InputFile, Offset, Length, ASTInvok,
+          resolveRange(Lang, PrimaryFilePath, InputBufferName, Offset, Length,
+                       ASTInvok,
                        /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                        CancellationToken, Receiver);
         } else {
@@ -1913,8 +1924,8 @@ resolveRange(SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
   };
 
   auto Consumer = std::make_shared<RangeInfoConsumer>(
-      InputFile, Offset, Length, Lang, Invok, TryExistingAST,
-      CancelOnSubsequentRequest, CancellationToken, Receiver);
+      PrimaryFilePath, InputBufferName, Offset, Length, Lang, Invok,
+      TryExistingAST, CancelOnSubsequentRequest, CancellationToken, Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
@@ -2097,8 +2108,8 @@ void SwiftLangSupport::getCursorInfo(
     }
   };
 
-  resolveCursor(*this, InputBufferName, Offset, Length, Actionables,
-                SymbolGraph, Invok, /*TryExistingAST=*/true,
+  resolveCursor(*this, PrimaryFilePath, InputBufferName, Offset, Length,
+                Actionables, SymbolGraph, Invok, /*TryExistingAST=*/true,
                 CancelOnSubsequentRequest, fileSystem, CancellationToken,
                 ASTBasedReceiver);
 }
@@ -2152,17 +2163,18 @@ void SwiftLangSupport::getRangeInfo(
     Receiver(RequestResult<RangeInfo>::fromError("Invalid range length."));
     return;
   }
-  resolveRange(*this, InputBufferName, Offset, Length, Invok,
+  resolveRange(*this, PrimaryFilePath, InputBufferName, Offset, Length, Invok,
                /*TryExistingAST=*/true, CancelOnSubsequentRequest,
                CancellationToken, Receiver);
 }
 
 void SwiftLangSupport::getNameInfo(
-    StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+    NameTranslatingInfo &Input, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) {
 
-  if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
+  if (auto IFaceGenRef = IFaceGenContexts.get(PrimaryFilePath)) {
     IFaceGenRef->accessASTAsync([IFaceGenRef, Offset, Input, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
@@ -2187,15 +2199,15 @@ void SwiftLangSupport::getNameInfo(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<NameTranslatingInfo>::fromError(Error));
     return;
   }
 
-  resolveName(*this, InputFile, Offset, Invok, /*TryExistingAST=*/true, Input,
-              CancellationToken, Receiver);
+  resolveName(*this, PrimaryFilePath, InputBufferName, Offset, Invok,
+              /*TryExistingAST=*/true, Input, CancellationToken, Receiver);
 }
 
 static void resolveCursorFromUSR(
