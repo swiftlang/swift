@@ -262,10 +262,13 @@ bool safeToDropGlobalActor(
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 
-/// DeferredSendableDiagnostic captures the information of whether errors
-/// should be produced by a given check, and provides an std::function that
-/// can be called to produce any diagnostics including those errors associated
-/// with the check
+/// A DeferredSendableDiagnostic wraps a list of closures that emit
+/// Diagnostics when called. It is used to allow the logic for forming
+/// those diagnostics to take place ahead of time, while delaying the
+/// actual emission until several passes later. In particular, diagnostics
+/// that identify NonSendable types being sent between isolation domains
+/// are deferred thus so that a later flow-sensitive SIL pass can eliminate
+/// diagnostics for sends that are provably safe.
 struct DeferredSendableDiagnostic {
 private:
 
@@ -278,30 +281,22 @@ private:
   // diagnoseReferenceToUnsafeGlobal and diagnoseInOutArg.
   bool ProducesErrors;
 
-  // This field is true iff a diagnostic closure was passed to this
-  // DeferredSendanbleDiagnostic that will run when produceDiagnostics is
-  // called. Using the {} constructor sets this to false, but using the
-  // 2-ary constructor with any closure (even the empty one, unfortunately)
-  // will set this to true.
-  bool ProducesDiagnostics;
-
-  // This function emits the desired diagnostics when called
-  std::function<void()> ProduceDiagnostics;
+  // This field stores a vector, each entry of which is a closure that can be
+  // called, in order, to emit diagnostics.
+  std::vector<std::function<void()>> Diagnostics;
 
 public:
   DeferredSendableDiagnostic()
-      : ProducesErrors(false),
-        ProducesDiagnostics(false),
-        ProduceDiagnostics([](){}) {}
+      : ProducesErrors(false){}
 
   // In general, an empty no-op closure should not be passed to
-  // ProduceDiagnostics here, or ProducesDiagnostics will contain an
+  // Diagnostic here, or ProducesDiagnostics will contain an
   // imprecise value.
   DeferredSendableDiagnostic(
-      bool ProducesErrors, std::function<void()> ProduceDiagnostics)
-      : ProducesErrors(ProducesErrors), ProducesDiagnostics(true),
-        ProduceDiagnostics(ProduceDiagnostics) {
-    assert(ProduceDiagnostics && "Empty diagnostics function");
+      bool ProducesErrors, std::function<void()> Diagnostic)
+      : ProducesErrors(ProducesErrors),
+        Diagnostics({Diagnostic}) {
+    assert(Diagnostic && "Empty diagnostics function");
   }
 
   bool producesErrors() const {
@@ -309,15 +304,17 @@ public:
   }
 
   bool producesDiagnostics() const {
-    return ProducesDiagnostics;
+    return Diagnostics.size() != 0;
   }
 
-  // Idempotent operation: call the contained ProduceDiagnostics method
+  // Idempotent operation: call the contained closures in Diagnostics in order,
+  // and clear out the list so subsequent invocations are a no-op
   void produceDiagnostics() {
-    ProduceDiagnostics();
+    for (auto Diagnostic : Diagnostics) {
+      Diagnostic();
+    }
     ProducesErrors = false;
-    ProducesDiagnostics = false;
-    ProduceDiagnostics = [](){};
+    Diagnostics = {};
   }
 
   void setProducesErrors(bool producesErrors) {
@@ -325,17 +322,12 @@ public:
   }
 
   // In general, an empty no-op closure should not be passed to
-  // produceMoreDiagnostics here, or ProducesDiagnostics will contain an
+  // Diagnostic here, or ProducesDiagnostics will contain an
   // imprecise value.
-  void addDiagnostic(std::function<void()> produceMoreDiagnostics) {
-    assert(produceMoreDiagnostics && "Empty diagnostics function");
+  void addDiagnostic(std::function<void()> Diagnostic) {
+    assert(Diagnostic && "Empty diagnostics function");
 
-    ProducesDiagnostics = true;
-
-    ProduceDiagnostics = [=, ProduceDiagnostics=ProduceDiagnostics]() {
-      ProduceDiagnostics();
-      produceMoreDiagnostics();
-    };
+    Diagnostics.push_back(Diagnostic);
   }
 
   /// This variation on addErrorProducingDiagnostic should be called
@@ -348,14 +340,12 @@ public:
   }
 
   // compose this DeferredSendableDiagnostic with another - calling their
-  // wrapped ProduceDiagnostics closure in sequence and disjuncting their
-  // respective flags
+  // wrapped Diagnostics closure in sequence and disjuncting their
+  // respective ProducesErrors flags
   void followWith(DeferredSendableDiagnostic other) {
-    bool thisProducesDiagnostics = ProducesDiagnostics;
-    addDiagnostic([other](){
-      other.ProduceDiagnostics();
-    });
-    ProducesDiagnostics = thisProducesDiagnostics || other.ProducesDiagnostics;
+    for (auto Diagnostic : other.Diagnostics) {
+      Diagnostics.push_back(Diagnostic);
+    }
     ProducesErrors = ProducesErrors || other.ProducesErrors;
   }
 };

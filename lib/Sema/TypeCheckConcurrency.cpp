@@ -2968,14 +2968,15 @@ namespace {
       if (!getDeclContext()->isAsyncContext()) {
         deferred.setProducesErrors(true);
 
+        auto contextIsolation = getContextIsolation();
         if (auto calleeDecl = apply->getCalledValue(
                 /*skipFunctionConversions=*/true)) {
           deferred.addDiagnostic([=, ctx=&ctx](){
             ctx->Diags
                 .diagnose(apply->getLoc(), diag::actor_isolated_call_decl,
                           *unsatisfiedIsolation, calleeDecl->getDescriptiveKind(),
-                          calleeDecl->getName(), getContextIsolation())
-                .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(),
+                          calleeDecl->getName(), contextIsolation)
+                .warnUntilSwiftVersionIf(contextIsolation.preconcurrency(),
                                          6);
             calleeDecl->diagnose(diag::actor_isolated_sync_func,
                                  calleeDecl->getDescriptiveKind(),
@@ -2985,8 +2986,8 @@ namespace {
           deferred.addDiagnostic([=, ctx=&ctx](){
             ctx->Diags
                 .diagnose(apply->getLoc(), diag::actor_isolated_call,
-                          *unsatisfiedIsolation, getContextIsolation())
-                .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(),
+                          *unsatisfiedIsolation, contextIsolation)
+                .warnUntilSwiftVersionIf(contextIsolation.preconcurrency(),
                                          6);
             });
         }
