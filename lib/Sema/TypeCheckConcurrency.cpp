@@ -1334,10 +1334,18 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   ValueDecl *unownedEnqueueWitnessDecl = unownedEnqueueWitness.getDecl();
   ValueDecl *moveOnlyEnqueueWitnessDecl = nullptr;
   ValueDecl *legacyMoveOnlyEnqueueWitnessDecl = nullptr;
+  // true iff the nominal type's availability allows the legacy requirement
+  // to be omitted in favor of moveOnlyEnqueueRequirement
+  bool canRemoveOldDecls = false;
 
   if (moveOnlyEnqueueRequirement) {
     moveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDeclRef(
         moveOnlyEnqueueRequirement).getDecl();
+    AvailabilityContext requirementInfo
+        = AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
+    AvailabilityContext declInfo =
+        TypeChecker::overApproximateAvailabilityAtLocation(nominal->getLoc(), dyn_cast<DeclContext>(nominal));
+    canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
   }
   if (legacyMoveOnlyEnqueueRequirement) {
     legacyMoveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDeclRef(
@@ -1346,8 +1354,14 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
 
   // --- Diagnose warnings and errors
 
+  if (!canRemoveOldDecls &&
+      unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid() &&
+      moveOnlyEnqueueWitnessDecl && moveOnlyEnqueueWitnessDecl->getLoc().isValid()) {
+    diags.diagnose(moveOnlyEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_unused_implementation, nominalTy);
+  }
+
   // Old UnownedJob based impl is present, warn about it suggesting the new protocol requirement.
-  if (unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid()) {
+  if (canRemoveOldDecls && unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid()) {
     diags.diagnose(unownedEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_unowned_implementation, nominalTy);
   }
   // Old Job based impl is present, warn about it suggesting the new protocol requirement.
