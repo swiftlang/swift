@@ -2671,6 +2671,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
           }
         }
         assert(foundVarDecl && "VarDecl not declared in its parent?");
+        (void) foundVarDecl;
       } else {
         // We have some other parent stmt. Type check it completely.
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
