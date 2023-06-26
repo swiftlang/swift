@@ -306,7 +306,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
             addSymbolIfNecessary(getter, witnessDecl);
           }
         }
-      });
+      }, /*useResolver=*/true);
     }
   }
 

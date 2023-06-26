@@ -4,6 +4,7 @@
 
 // REQUIRES: OS=macosx 
 
+// Correct linkage for opaque type descriptor.
 @_alwaysEmitIntoClient public var x: some Any {
   get {
   if #available(macOS 20, *) {
@@ -14,8 +15,20 @@
   }
 }
 
+// Make sure we emit all ABI members.
 public class C {}
+
+// Edge case where protocol witness thunk is public.
+protocol PrivateProto: Equatable {}
+
+extension PrivateProto {
+  public static func ==(lhs: Self, rhs: Self) -> Bool { return false }
+}
+
+public struct S: PrivateProto {}
 
 // CHECK: symbols: [ '_$s15resolve_imports1CCMa', '_$s15resolve_imports1CCMm', 
 // CHECK-NEXT:       '_$s15resolve_imports1CCMn', '_$s15resolve_imports1CCN', '_$s15resolve_imports1CCfD', 
-// CHECK-NEXT:       '_$s15resolve_imports1CCfd', _main ]
+// CHECK-NEXT:       '_$s15resolve_imports1CCfd', '_$s15resolve_imports1SVMa', 
+// CHECK-NEXT:       '_$s15resolve_imports1SVMn', '_$s15resolve_imports1SVN', '_$s15resolve_imports1SVSQAAMc', 
+// CHECK-NEXT:       '_$s15resolve_imports1SVSQAASQ2eeoiySbx_xtFZTW', _main ]
