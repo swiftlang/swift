@@ -246,8 +246,7 @@ class TestClass {
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors9TestClassC1x1yACSi_Si_SaySSGttcfc : $@convention(method) (Int, Int, @owned Array<String>, @owned TestClass) -> @owned TestClass
   // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors9TestClassC4dataSi_Si_SaySSGttvi : $@convention(thin) (Int, Int, @owned Array<String>) -> (@out Int, @out (Int, Array<String>))
-  // CHECK: [[SELF_VALUE:%.*]] = copy_value %3 : $TestClass
-  // CHECK: [[SELF_REF:%.*]] = begin_borrow [[SELF_VALUE]] : $TestClass
+  // CHECK: [[SELF_REF:%.*]] = begin_borrow [[SELF_VALUE:%.*]] : $TestClass
   // CHECK: [[X_REF:%.*]] = ref_element_addr [[SELF_REF]] : $TestClass, #TestClass.x
   // CHECK-NEXT: [[Y_REF:%.*]] = ref_element_addr [[SELF_REF]] : $TestClass, #TestClass.y
   //
