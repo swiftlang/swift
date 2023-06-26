@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o -
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 struct __CurrentErrno {}
 struct CErrorOr<T>
@@ -12,9 +11,9 @@ struct CErrorOr<T>
     // CHECK: call void @llvm.dbg.declare
     // Self is in a dynamic alloca, hence the shadow copy.
     // CHECK: call void @llvm.dbg.declare(
-    // CHECK-SAME: metadata i8** %[[SHADOW:.*]], metadata ![[SELF:.*]], meta
+    // CHECK-SAME: metadata ptr %[[SHADOW:.*]], metadata ![[SELF:.*]], meta
     // CHECK-SAME: !DIExpression(DW_OP_deref))
-    // CHECK-DAG: store i8* %[[DYN:.*]], i8** %[[SHADOW]]
+    // CHECK-DAG: store ptr %[[DYN:.*]], ptr %[[SHADOW]]
     // CHECK-DAG: %[[DYN]] = alloca i8, i{{32|64}} %
     // CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "self", scope:{{.*}}, type: ![[TY_CONTAINER:.*]])
     // CHECK-DAG: ![[TY_CONTAINER]] = !DICompositeType({{.*}}elements: ![[TY_ELTS:[0-9]+]]

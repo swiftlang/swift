@@ -660,8 +660,9 @@ public:
                      Receiver) override;
 
   void getNameInfo(
-      StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
-      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      NameTranslatingInfo &Input, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver)
       override;
 

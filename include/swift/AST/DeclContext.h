@@ -850,8 +850,22 @@ public:
     HasNestedClassDeclarations = 1;
   }
 
-  /// Retrieve the set of members in this context.
+  /// Retrieve the current set of members in this context.
+  ///
+  /// NOTE: This operation is an alias of \c getCurrentMembers() that is considered
+  /// deprecated. Most clients should not use this or \c getCurrentMembers(), but
+  /// instead should use one of the projections of members that provides a semantic
+  /// view, e.g., \c getParsedMembers(), \c getABIMembers(), \c getAllMembers(), and so
+  /// on.
   DeclRange getMembers() const;
+
+  /// Retrieve the current set of members in this context, without triggering the
+  /// creation of new members via code synthesis, macro expansion, etc.
+  ///
+  /// This operation should only be used in narrow places where any side-effect
+  /// producing operations have been done earlier. For the most part, this means that
+  /// it should only be used in the implementation of
+  DeclRange getCurrentMembers() const;
 
   /// Get the members that were syntactically present in the source code,
   /// and will not contain any members that are implicitly synthesized by

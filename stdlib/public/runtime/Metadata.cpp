@@ -2709,12 +2709,15 @@ void swift::swift_initStructMetadataWithLayoutString(
   const size_t fixedLayoutStringSize = layoutStringHeaderSize +
                                        sizeof(uint64_t) * 2;
 
-  uint8_t *layoutStr = (uint8_t *)MetadataAllocator(LayoutStringTag)
-      .Allocate(fixedLayoutStringSize + refCountBytes, alignof(uint8_t));
+  uint8_t *layoutStr =
+      (uint8_t *)MetadataAllocator(LayoutStringTag)
+          .Allocate(llvm::alignTo(fixedLayoutStringSize + refCountBytes,
+                                  sizeof(void *)),
+                    alignof(uint8_t));
 
-  size_t layoutStrOffset = sizeof(uint64_t);
+  LayoutStringWriter writer{layoutStr, sizeof(uint64_t)};
 
-  writeBytes(layoutStr, layoutStrOffset, refCountBytes);
+  writer.writeBytes(refCountBytes);
   size_t fullOffset = 0;
   size_t previousFieldOffset = 0;
   LayoutStringFlags flags = LayoutStringFlags::Empty;
@@ -2734,7 +2737,7 @@ void swift::swift_initStructMetadataWithLayoutString(
                                      RefCountingKind::UnknownWeak;
 
         auto tagAndOffset = ((uint64_t)tag << 56) | offset;
-        writeBytes(layoutStr, layoutStrOffset, tagAndOffset);
+        writer.writeBytes(tagAndOffset);
       }
 
       fullOffset += fieldType->size;
@@ -2745,19 +2748,18 @@ void swift::swift_initStructMetadataWithLayoutString(
 
     const Metadata *fieldType = (const Metadata*)fieldTypes[i];
 
-    _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
-                                        fieldType, fullOffset,
+    _swift_addRefCountStringForMetatype(writer, flags, fieldType, fullOffset,
                                         previousFieldOffset);
   }
 
-  writeBytes(layoutStr, layoutStrOffset, (uint64_t)previousFieldOffset);
-  writeBytes(layoutStr, layoutStrOffset, (uint64_t)0);
+  writer.writeBytes((uint64_t)previousFieldOffset);
+  writer.writeBytes((uint64_t)0);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
-  layoutStrOffset = 0;
-  writeBytes(layoutStr, layoutStrOffset,
-      ((uint64_t)flags) & ~((uint64_t)LayoutStringFlags::HasRelativePointers));
+  writer.offset = 0;
+  writer.writeBytes(((uint64_t)flags) &
+                    ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
   structType->setLayoutString(layoutStr);
 
@@ -2781,7 +2783,8 @@ size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
     return 0;
   } else if (type->hasLayoutString()) {
     size_t offset = sizeof(uint64_t);
-    return readBytes<size_t>(type->getLayoutString(), offset);
+    return LayoutStringReader{type->getLayoutString(), offset}
+        .readBytes<size_t>();
   } else if (type->isClassObject() || type->isAnyExistentialType()) {
     return sizeof(uint64_t);
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(type)) {
@@ -2795,8 +2798,7 @@ size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
   }
 }
 
-void swift::_swift_addRefCountStringForMetatype(uint8_t *layoutStr,
-                                                size_t &layoutStrOffset,
+void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
                                                 LayoutStringFlags &flags,
                                                 const Metadata *fieldType,
                                                 size_t &fullOffset,
@@ -2811,44 +2813,38 @@ void swift::_swift_addRefCountStringForMetatype(uint8_t *layoutStr,
     previousFieldOffset = offset + fieldType->vw_size();
     fullOffset += fieldType->vw_size();
   } else if (fieldType->hasLayoutString()) {
-    const uint8_t *fieldLayoutStr = fieldType->getLayoutString();
-    const LayoutStringFlags fieldFlags =
-        *(const LayoutStringFlags *)fieldLayoutStr;
-    size_t refCountBytesOffset = sizeof(uint64_t);
-    const size_t fieldRefCountBytes = readBytes<size_t>(fieldLayoutStr,
-                                                        refCountBytesOffset);
+    LayoutStringReader reader{fieldType->getLayoutString(), 0};
+    const auto fieldFlags = reader.readBytes<LayoutStringFlags>();
+    const auto fieldRefCountBytes = reader.readBytes<size_t>();
     if (fieldRefCountBytes > 0) {
       flags |= fieldFlags;
-      memcpy(layoutStr + layoutStrOffset,
-             fieldLayoutStr + layoutStringHeaderSize,
-             fieldRefCountBytes);
+      memcpy(writer.layoutStr + writer.offset,
+             reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
 
       if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(layoutStr, layoutStrOffset,
-                                         fieldLayoutStr, fieldType);
+        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
+                                         reader.layoutStr, fieldType);
       }
 
       if (offset) {
-        auto layoutStrOffsetCopy = layoutStrOffset;
-        auto firstTagAndOffset =
-            readBytes<uint64_t>(layoutStr, layoutStrOffsetCopy);
-        layoutStrOffsetCopy = layoutStrOffset;
+        auto writerOffsetCopy = writer.offset;
+        reader.offset = layoutStringHeaderSize;
+        auto firstTagAndOffset = reader.readBytes<uint64_t>();
         firstTagAndOffset += offset;
-        writeBytes(layoutStr, layoutStrOffsetCopy, firstTagAndOffset);
+        writer.writeBytes(firstTagAndOffset);
+        writer.offset = writerOffsetCopy;
       }
 
-      auto previousFieldOffsetOffset =
-          layoutStringHeaderSize + fieldRefCountBytes;
-      previousFieldOffset = readBytes<uint64_t>(fieldLayoutStr,
-                                                previousFieldOffsetOffset);
-      layoutStrOffset += fieldRefCountBytes;
+      reader.offset = layoutStringHeaderSize + fieldRefCountBytes;
+      previousFieldOffset = reader.readBytes<uint64_t>();
+      writer.skip(fieldRefCountBytes);
     } else {
       previousFieldOffset += fieldType->vw_size();
     }
     fullOffset += fieldType->vw_size();
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(fieldType)) {
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
-      _swift_addRefCountStringForMetatype(layoutStr, layoutStrOffset, flags,
+      _swift_addRefCountStringForMetatype(writer, flags,
                                           tuple->getElement(i).Type, fullOffset,
                                           previousFieldOffset);
     }
@@ -2877,7 +2873,7 @@ void swift::_swift_addRefCountStringForMetatype(uint8_t *layoutStr,
       };
     }
 
-    writeBytes(layoutStr, layoutStrOffset, ((uint64_t)tag << 56) | offset);
+    writer.writeBytes(((uint64_t)tag << 56) | offset);
     previousFieldOffset = fieldType->vw_size();
     fullOffset += previousFieldOffset;
   } else if (fieldType->isAnyExistentialType()) {
@@ -2885,16 +2881,15 @@ void swift::_swift_addRefCountStringForMetatype(uint8_t *layoutStr,
     assert(existential);
     auto tag = existential->isClassBounded() ? RefCountingKind::Unknown
                                              : RefCountingKind::Existential;
-    writeBytes(layoutStr, layoutStrOffset, ((uint64_t)tag << 56) | offset);
+    writer.writeBytes(((uint64_t)tag << 56) | offset);
     previousFieldOffset = fieldType->vw_size();
     fullOffset += previousFieldOffset;
   } else {
 metadata:
-    writeBytes(layoutStr, layoutStrOffset,
-               ((uint64_t)RefCountingKind::Metatype << 56) | offset);
-    writeBytes(layoutStr, layoutStrOffset, fieldType);
-    previousFieldOffset = fieldType->vw_size();
-    fullOffset += previousFieldOffset;
+  writer.writeBytes(((uint64_t)RefCountingKind::Metatype << 56) | offset);
+  writer.writeBytes(fieldType);
+  previousFieldOffset = fieldType->vw_size();
+  fullOffset += previousFieldOffset;
   }
 }
 
@@ -5679,6 +5674,7 @@ instantiateWitnessTable(const Metadata *Type,
                         void **fullTable) {
   auto protocol = conformance->getProtocol();
   auto genericTable = conformance->getGenericWitnessTable();
+  auto *genericArgs = Type->getGenericArgs();
 
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
@@ -5720,20 +5716,38 @@ instantiateWitnessTable(const Metadata *Type,
   // requirements into the private area.
   {
     unsigned currentInstantiationArg = 0;
-    auto copyNextInstantiationArg = [&] {
-      assert(currentInstantiationArg < privateSizeInWords);
-      table[-1 - (int)currentInstantiationArg] =
-        const_cast<void *>(instantiationArgs[currentInstantiationArg]);
-      ++currentInstantiationArg;
-    };
+
+    llvm::ArrayRef<GenericPackShapeDescriptor> packShapeDescriptors =
+        conformance->getConditionalPackShapeDescriptors();
+    unsigned packIdx = 0;
 
     for (const auto &conditionalRequirement
           : conformance->getConditionalRequirements()) {
-      if (conditionalRequirement.Flags.hasKeyArgument())
-        copyNextInstantiationArg();
+      if (!conditionalRequirement.Flags.hasKeyArgument())
+        continue;
 
-      assert(!conditionalRequirement.Flags.isPackRequirement() &&
-             "Packs not supported here yet");
+      assert(currentInstantiationArg < privateSizeInWords);
+
+      auto *instantiationArg = instantiationArgs[currentInstantiationArg];
+
+      // Heap-allocate witness tables for conditional pack conformance requirements.
+      if (conditionalRequirement.Flags.isPackRequirement()) {
+        auto packShapeDescriptor = packShapeDescriptors[packIdx];
+        assert(packShapeDescriptor.Kind == GenericPackKind::WitnessTable);
+        assert(packShapeDescriptor.Index == currentInstantiationArg);
+        size_t count = reinterpret_cast<const size_t>(
+            genericArgs[packShapeDescriptor.ShapeClass]);
+
+        auto *wtable = reinterpret_cast<const WitnessTable * const*>(instantiationArg);
+        wtable = swift_allocateWitnessTablePack(wtable, count);
+
+        instantiationArg = wtable;
+        ++packIdx;
+      }
+
+      table[-1 - (int)currentInstantiationArg] = const_cast<void *>(instantiationArg);
+
+      ++currentInstantiationArg;
     }
   }
 
@@ -6048,6 +6062,9 @@ instantiateRelativeWitnessTable(const Metadata *Type,
           : conformance->getConditionalRequirements()) {
       if (conditionalRequirement.Flags.hasKeyArgument())
         copyNextInstantiationArg();
+
+      assert(!conditionalRequirement.Flags.isPackRequirement() &&
+             "Not supported yet");
     }
   }
 

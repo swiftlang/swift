@@ -2361,15 +2361,15 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
 static SILValue getActualCallee(SILValue Callee) {
   while (!isa<FunctionRefInst>(Callee)) {
     if (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee)) {
-      Callee = CFI->getConverted();
+      Callee = CFI->getOperand();
       continue;
     }
     if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
-      Callee = Cvt->getConverted();
+      Callee = Cvt->getOperand();
       continue;
     }
     if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
-      Callee = TTI->getConverted();
+      Callee = TTI->getOperand();
       continue;
     }
     break;
@@ -2391,7 +2391,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // Look through a @noescape conversion.
   auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeOperand);
   if (Cvt)
-    CalleeOperand = Cvt->getConverted();
+    CalleeOperand = Cvt->getOperand();
 
   auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeOperand);
   if (!CFI)
@@ -2400,7 +2400,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // Check if it is a conversion of a non-throwing function into
   // a throwing function. If this is the case, replace by a
   // simple apply.
-  auto OrigFnTy = CFI->getConverted()->getType().getAs<SILFunctionType>();
+  auto OrigFnTy = CFI->getOperand()->getType().getAs<SILFunctionType>();
   if (!OrigFnTy || OrigFnTy->hasErrorResult())
     return false;
   
@@ -2409,7 +2409,7 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
     return false;
 
   // Look through the conversions and find the real callee.
-  Callee = getActualCallee(CFI->getConverted());
+  Callee = getActualCallee(CFI->getOperand());
   CalleeType = Callee->getType();
   
   // If it a call of a throwing callee, bail.

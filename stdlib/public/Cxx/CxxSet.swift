@@ -13,7 +13,10 @@
 public protocol CxxSet<Element> {
   associatedtype Element
   associatedtype Size: BinaryInteger
-  associatedtype InsertionResult // std::pair<iterator, bool>
+
+  // std::pair<iterator, bool> for std::set and std::unordered_set
+  // iterator for std::multiset
+  associatedtype InsertionResult 
 
   init()
 
@@ -41,5 +44,27 @@ extension CxxSet {
   @inlinable
   public func contains(_ element: Element) -> Bool {
     return count(element) > 0
+  }
+}
+
+public protocol CxxUniqueSet<Element>: CxxSet {
+  override associatedtype Element
+  override associatedtype Size: BinaryInteger
+  associatedtype RawMutableIterator: UnsafeCxxInputIterator
+    where RawMutableIterator.Pointee == Element
+  override associatedtype InsertionResult
+    where InsertionResult: CxxPair<RawMutableIterator, Bool>
+}
+
+extension CxxUniqueSet {
+  @inlinable
+  @discardableResult
+  public mutating func insert(
+    _ element: Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    let insertionResult = self.__insertUnsafe(element)
+    let rawIterator: RawMutableIterator = insertionResult.first
+    let inserted: Bool = insertionResult.second
+    return (inserted, rawIterator.pointee)
   }
 }

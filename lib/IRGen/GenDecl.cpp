@@ -3297,7 +3297,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::Function *thunk = llvm::Function::Create(
       assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
 
-  thunk->setCallingConv(llvm::CallingConv::C);
+  thunk->setCallingConv(IGM.getOptions().PlatformCCallingConvention);
 
   llvm::AttrBuilder attrBuilder(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(attrBuilder);
@@ -5662,7 +5662,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
       return true;
   }
 
-  for (auto member : ext->getMembers()) {
+  for (auto member : ext->getAllMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (requiresObjCMethodDescriptor(func))
         return true;

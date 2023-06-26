@@ -566,21 +566,7 @@ namespace {
       B.addInt(IGM.Int16Ty, shapes.size());
 
       // Emit each GenericPackShapeDescriptor collected previously.
-      for (const auto &packArg : packArgs) {
-        // Kind
-        B.addInt(IGM.Int16Ty, uint16_t(packArg.Kind));
-
-        // Index
-        B.addInt(IGM.Int16Ty, packArg.Index);
-
-        // ShapeClass
-        auto found = std::find(shapes.begin(), shapes.end(), packArg.ReducedShape);
-        assert(found != shapes.end());
-        B.addInt(IGM.Int16Ty, found - shapes.begin());
-
-        // Unused
-        B.addInt(IGM.Int16Ty, 0);
-      }
+      irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
     }
 
     uint8_t getVersion() {
@@ -5736,18 +5722,12 @@ namespace {
         return false;
       }
 
-      auto &strategy = getEnumImplStrategy(IGM, getLoweredType());
-      bool isSupportedCase = strategy.getElementsWithPayload().size() > 1 ||
-                             (strategy.getElementsWithPayload().size() == 1 &&
-                              strategy.getElementsWithNoPayload().empty());
-
       return !!getLayoutString() ||
              (IGM.Context.LangOpts.hasFeature(
                   Feature::LayoutStringValueWitnessesInstantiation) &&
               IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
               (HasDependentVWT || HasDependentMetadata) &&
-              !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) &&
-              isSupportedCase);
+              !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -6308,6 +6288,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
   case KnownProtocolKind::Executor:
@@ -6578,6 +6559,27 @@ GenericArgumentMetadata irgen::addGenericRequirements(
   }
 
   return metadata;
+}
+
+void irgen::addGenericPackShapeDescriptors(IRGenModule &IGM,
+                                           ConstantStructBuilder &B,
+                                           ArrayRef<CanType> shapes,
+                                           ArrayRef<GenericPackArgument> packArgs) {
+  for (const auto &packArg : packArgs) {
+    // Kind
+    B.addInt(IGM.Int16Ty, uint16_t(packArg.Kind));
+
+    // Index
+    B.addInt(IGM.Int16Ty, packArg.Index);
+
+    // ShapeClass
+    auto found = std::find(shapes.begin(), shapes.end(), packArg.ReducedShape);
+    assert(found != shapes.end());
+    B.addInt(IGM.Int16Ty, found - shapes.begin());
+
+    // Unused
+    B.addInt(IGM.Int16Ty, 0);
+  }
 }
 
 //===----------------------------------------------------------------------===//

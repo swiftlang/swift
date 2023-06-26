@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir  -disable-availability-checking | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking -enable-library-evolution
 
 // REQUIRES: concurrency
@@ -21,9 +20,9 @@ public class SomeClass {}
 @_silgen_name("swift_task_future_wait_throwing")
 public func _taskFutureGetThrowing<T>(_ task: SomeClass) async throws -> T
 
-// CHECK: define{{.*}} swift{{(tail)?}}cc void @"$s5async8testThisyyAA9SomeClassCnYaF"(%swift.context* swiftasync %0{{.*}}
+// CHECK: define{{.*}} swift{{(tail)?}}cc void @"$s5async8testThisyyAA9SomeClassCnYaF"(ptr swiftasync %0{{.*}}
 // CHECK-NOT: @swift_task_alloc
-// CHECK: {{(must)?}}tail call swift{{(tail)?}}cc void @swift_task_future_wait_throwing(%swift.opaque* {{.*}}, %swift.context* {{.*}}, %T5async9SomeClassC* {{.*}}, i8* {{.*}}, %swift.context* {{.*}})
+// CHECK: {{(must)?}}tail call swift{{(tail)?}}cc void @swift_task_future_wait_throwing(ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
 public func testThis(_ task: __owned SomeClass) async {
   do {
     let _ : Int = try await _taskFutureGetThrowing(task)

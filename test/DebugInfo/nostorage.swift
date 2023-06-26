@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o %t
-// RUN: %target-swift-frontend %s -emit-ir -g
+// RUN: %target-swift-frontend %s -emit-ir -g -o %t
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK3
@@ -29,7 +28,7 @@ struct AStruct {}
 // CHECK2: define{{.*}}app
 public func app() {
   // No members? No storage!
-  // CHECK2: call void @llvm.dbg.value(metadata {{.*}}* undef,
+  // CHECK2: call void @llvm.dbg.value(metadata ptr undef,
   // CHECK2-SAME:                      metadata ![[AT:.*]], metadata
   // CHECK2: ![[AT]] = !DILocalVariable(name: "at",{{.*}}line: [[@LINE+1]]
   var at = AStruct()

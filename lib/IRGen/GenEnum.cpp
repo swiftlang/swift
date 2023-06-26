@@ -3237,8 +3237,25 @@ namespace {
     void initializeMetadataWithLayoutString(
         IRGenFunction &IGF, llvm::Value *metadata, bool isVWTMutable, SILType T,
         MetadataDependencyCollector *collector) const override {
-      // Not yet supported on this type, so forward to regular method
-      initializeMetadata(IGF, metadata, isVWTMutable, T, collector);
+      // Fixed-size enums don't need dynamic witness table initialization.
+      if (TIK >= Fixed)
+        return;
+
+      // Ask the runtime to do our layout using the payload metadata and number
+      // of empty cases.
+      auto payloadTy =
+          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
+                               IGM.getMaximalTypeExpansionContext());
+
+      auto request = DynamicMetadataRequest::getNonBlocking(
+          MetadataState::LayoutComplete, collector);
+      auto payloadLayout = IGF.emitTypeMetadataRefForLayout(payloadTy, request);
+      auto emptyCasesVal =
+          llvm::ConstantInt::get(IGM.Int32Ty, ElementsWithNoPayload.size());
+      auto flags = emitEnumLayoutFlags(IGM, isVWTMutable);
+      IGF.Builder.CreateCall(
+          IGM.getInitEnumMetadataSinglePayloadWithLayoutStringFunctionPointer(),
+          {metadata, flags, payloadLayout, emptyCasesVal});
     }
 
     /// \group Extra inhabitants

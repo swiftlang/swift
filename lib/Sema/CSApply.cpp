@@ -624,11 +624,19 @@ namespace {
                               locator, implicit, semantics);
       }
 
-      if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
-        auto typeExpr = TypeExpr::createImplicitHack(
-            loc.getBaseNameLoc(), adjustedFullType->getMetatypeInstanceType(), ctx);
-        cs.cacheType(typeExpr);
-        return typeExpr;
+      if (auto *typeDecl = dyn_cast<TypeDecl>(decl)) {
+        if (!isa<ModuleDecl>(decl)) {
+          TypeExpr *typeExpr = nullptr;
+          if (implicit) {
+            typeExpr = TypeExpr::createImplicitHack(
+                loc.getBaseNameLoc(), adjustedFullType->getMetatypeInstanceType(), ctx);
+          } else {
+            typeExpr = TypeExpr::createForDecl(loc, typeDecl, dc);
+            typeExpr->setType(adjustedFullType);
+          }
+          cs.cacheType(typeExpr);
+          return typeExpr;
+        }
       }
 
       auto ref = resolveConcreteDeclRef(decl, locator);

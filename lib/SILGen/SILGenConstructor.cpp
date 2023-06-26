@@ -406,7 +406,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       storedProperties.insert(properties.begin(), properties.end());
     }
 
-    for (auto *member : decl->getMembers()) {
+    for (auto *member : decl->getAllMembers()) {
       auto *field = dyn_cast<VarDecl>(member);
       if (!field)
         continue;
@@ -1469,7 +1469,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
 
-  for (auto member : nominal->getImplementationContext()->getMembers()) {
+  for (auto member : nominal->getImplementationContext()->getAllMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;

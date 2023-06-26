@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend %use_no_opaque_pointers -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
 
 // Ensure that same-type constraints between generic arguments get reflected
 // correctly in the type context descriptor.
@@ -69,7 +67,7 @@ where Self : CodingType,
   print(Self.ValueType.self)
 }
 
-// OSIZE: define internal swiftcc i8** @"$s21same_type_constraints12GenericKlazzCyxq_GAA1EAA4DataAaEP_AA0F4TypePWT"(%swift.type* readnone %"GenericKlazz<T, R>.Data", %swift.type* nocapture readonly %"GenericKlazz<T, R>", i8** nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
+// OSIZE: define internal swiftcc ptr @"$s21same_type_constraints12GenericKlazzCyxq_GAA1EAA4DataAaEP_AA0F4TypePWT"(ptr readnone %"GenericKlazz<T, R>.Data", ptr nocapture readonly %"GenericKlazz<T, R>", ptr nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
 
 // Check that same-typing two generic parameters together lowers correctly.

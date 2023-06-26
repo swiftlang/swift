@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -g -emit-sil -o - | %FileCheck --check-prefix=CHECK-SIL %s
-// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o -
+// RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
 import Builtin
 import Swift
 
@@ -20,9 +19,9 @@ sil hidden @test_fragment : $@convention(thin) () -> () {
 bb0:
   %2 = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":8:9, scope 1
   // CHECK: %[[MY_STRUCT:.+]] = alloca %{{.*}}MyStruct
-  // CHECK: llvm.dbg.declare(metadata {{.*}}* %[[MY_STRUCT]], metadata ![[VAR_DECL_MD:[0-9]+]]
+  // CHECK: llvm.dbg.declare(metadata {{.*}} %[[MY_STRUCT]], metadata ![[VAR_DECL_MD:[0-9]+]]
   // CHECK: %[[SMALL_STRUCT:.+]] = alloca %{{.*}}SmallStruct
-  // CHECK: llvm.dbg.declare(metadata {{.*}}* %[[SMALL_STRUCT]], metadata ![[SMALL_VAR_DECL_MD:[0-9]+]]
+  // CHECK: llvm.dbg.declare(metadata {{.*}} %[[SMALL_STRUCT]], metadata ![[SMALL_VAR_DECL_MD:[0-9]+]]
   %3 = struct_element_addr %2 : $*MyStruct, #MyStruct.x, loc "file.swift":9:17, scope 1
   // CHECK: %[[FIELD_X:.*]] = getelementptr {{.*}} %[[MY_STRUCT]]
   // CHECK-SIL: debug_value %{{[0-9]+}} : $*Builtin.Int64
@@ -50,13 +49,13 @@ sil hidden @test_alloc_stack : $@convention(thin) () -> () {
 bb0:
   %my_struct = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":15:9, scope 2
   // CHECK: %[[MY_STRUCT:.+]] = alloca %{{.*}}MyStruct
-  // CHECK: llvm.dbg.declare(metadata {{.*}}* %[[MY_STRUCT]], metadata ![[VAR_DECL_MD:[0-9]+]]
+  // CHECK: llvm.dbg.declare(metadata ptr %[[MY_STRUCT]], metadata ![[VAR_DECL_MD:[0-9]+]]
   // CHECK-SIL: alloc_stack $Int, var
   // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":15:9, scope {{[0-9]+}})
   // CHECK-SIL-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
   %field_x = alloc_stack $Int, var, (name "my_struct", loc "file.swift":15:9, scope 2), type $MyStruct, expr op_fragment:#MyStruct.x, loc "file.swift":16:17, scope 2
   // CHECK: %[[FIELD_X:.+]] = alloca %TSi
-  // CHECK: llvm.dbg.declare(metadata %TSi* %[[FIELD_X]], metadata ![[VAR_DECL_MD]]
+  // CHECK: llvm.dbg.declare(metadata ptr %[[FIELD_X]], metadata ![[VAR_DECL_MD]]
   // CHECK-SAME:             !DIExpression(DW_OP_LLVM_fragment, 0, 64)
   dealloc_stack %field_x : $*Int
   dealloc_stack %my_struct: $*MyStruct

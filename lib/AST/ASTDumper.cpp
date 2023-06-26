@@ -3352,6 +3352,22 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitSelfTypeRepr(SelfTypeRepr *T) {
+    printCommon("type_self");
+    auto Ty = T->getType();
+    if (Ty) {
+      auto &srcMgr =  Ty->getASTContext().SourceMgr;
+      if (T->getLoc().isValid()) {
+        OS << " location=@";
+        T->getLoc().print(OS, srcMgr);
+      } else {
+        OS << " location=<<invalid>>";
+      }
+    }
+    OS << " type="; Ty.dump(OS);
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
     printCommon("sil_box");
     Indent += 2;

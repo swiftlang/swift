@@ -939,6 +939,27 @@ std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
       Impl.Instance->getPCHContainerReader(), Impl.Instance->getDiagnostics());
 }
 
+void ClangImporter::addClangInvovcationDependencies(
+    std::vector<std::string> &files) {
+  auto addFiles = [&files](const auto &F) {
+    files.insert(files.end(), F.begin(), F.end());
+  };
+  auto &invocation = *Impl.Invocation;
+  // FIXME: Add file dependencies that are not accounted. The long term solution
+  // is to do a dependency scanning for clang importer and use that directly.
+  SmallVector<std::string, 4> HeaderMapFileNames;
+  Impl.Instance->getPreprocessor().getHeaderSearchInfo().getHeaderMapFileNames(
+      HeaderMapFileNames);
+  addFiles(HeaderMapFileNames);
+  addFiles(invocation.getHeaderSearchOpts().VFSOverlayFiles);
+  // FIXME: Should not depend on working directory. Build system/swift driver
+  // should not pass working directory here but if that option is passed,
+  // repect that and add that into CASFS.
+  auto CWD = invocation.getFileSystemOpts().WorkingDir;
+  if (!CWD.empty())
+    files.push_back(CWD);
+}
+
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
@@ -2736,7 +2757,7 @@ ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
                                    clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
 
-  if (sema.LookupName(lookupResult, /*scope=*/nullptr)) {
+  if (sema.LookupName(lookupResult, sema.TUScope)) {
     for (auto decl : lookupResult) {
       if (auto typedefDecl =
           dyn_cast<clang::TypedefNameDecl>(decl->getUnderlyingDecl()))
@@ -5772,20 +5793,24 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   std::unique_ptr<TemplateInstantiationError> error =
       ctx.getClangTemplateArguments(func->getTemplateParameters(),
                                     subst.getReplacementTypes(), templateSubst);
+
+  auto getFuncName = [&]() -> std::string {
+    std::string funcName;
+    llvm::raw_string_ostream funcNameStream(funcName);
+    func->printQualifiedName(funcNameStream);
+    return funcName;
+  };
+
   if (error) {
     std::string failedTypesStr;
     llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
     llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
 
-    std::string funcName;
-    llvm::raw_string_ostream funcNameStream(funcName);
-    func->printQualifiedName(funcNameStream);
-
     // TODO: Use the location of the apply here.
     // TODO: This error message should not reference implementation details.
     // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
     ctx.Diags.diagnose(SourceLoc(), diag::unable_to_convert_generic_swift_types,
-                       funcName, failedTypesStr);
+                       getFuncName(), failedTypesStr);
     return nullptr;
   }
 
@@ -5795,6 +5820,20 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   auto &sema = getClangInstance().getSema();
   auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
                                                    clang::SourceLocation());
+  if (!spec) {
+    std::string templateParams;
+    llvm::raw_string_ostream templateParamsStream(templateParams);
+    llvm::interleaveComma(templateArgList->asArray(), templateParamsStream,
+                          [&](const clang::TemplateArgument &arg) {
+                            arg.print(func->getASTContext().getPrintingPolicy(),
+                                      templateParamsStream,
+                                      /*IncludeType*/ true);
+                          });
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::unable_to_substitute_cxx_function_template,
+                       getFuncName(), templateParams);
+    return nullptr;
+  }
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
   return spec;
 }

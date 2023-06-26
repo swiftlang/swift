@@ -3827,6 +3827,10 @@ bool ValueDecl::shouldHideFromEditor() const {
       getBaseIdentifier().str().startswith("$__"))
     return true;
 
+  // Macro unique names are only intended to be used inside the expanded code.
+  if (MacroDecl::isUniqueMacroName(getBaseName()))
+    return true;
+
   return false;
 }
 
@@ -4917,6 +4921,16 @@ NominalTypeDecl::getInitAccessorProperties() const {
   return evaluateOrDefault(
       ctx.evaluator,
       InitAccessorPropertiesRequest{mutableThis},
+      {});
+}
+
+ArrayRef<VarDecl *>
+NominalTypeDecl::getMemberwiseInitProperties() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      MemberwiseInitPropertiesRequest{mutableThis},
       {});
 }
 
@@ -7177,8 +7191,10 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // If this is a computed property with `init` accessor, it's
   // memberwise initializable when it could be used to initialize
   // other stored properties.
-  if (auto *init = getAccessor(AccessorKind::Init))
-    return init->getAttrs().hasAttribute<InitializesAttr>();
+  if (hasInitAccessor()) {
+    if (auto *init = getAccessor(AccessorKind::Init))
+      return init->getAttrs().hasAttribute<InitializesAttr>();
+  }
 
   // If this is a computed property, it's not memberwise initialized unless
   // the caller has asked for the declared properties and it is either a

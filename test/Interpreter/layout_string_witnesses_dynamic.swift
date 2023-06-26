@@ -460,6 +460,34 @@ func testMixedEnumWrapperWrapperGeneric() {
 
 testMixedEnumWrapperWrapperGeneric()
 
+func testGenericSinglePayloadEnum() {
+    let ptr = allocateInternalGenericPtr(of: SinglePayloadEnum<SimpleClass>.self)
+
+    do {
+        let x = SinglePayloadEnum.nonEmpty(23, SimpleClass(x: 23))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadEnum.nonEmpty(32, SimpleClass(x: 32))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericDestroy(ptr, of: SinglePayloadEnum<SimpleClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericSinglePayloadEnum()
+
 func testGenericSinglePayloadEnumManyXI() {
     let ptr = allocateInternalGenericPtr(of: SinglePayloadEnumManyXI.self)
 
@@ -487,6 +515,60 @@ func testGenericSinglePayloadEnumManyXI() {
 }
 
 testGenericSinglePayloadEnumManyXI()
+
+func testResilientSinglePayloadEnumComplexTag() {
+    let x = switch getResilientSinglePayloadEnumComplexEmpty0() {
+    case .nonEmpty: 0
+    case .empty0: 1
+    case .empty1: 2
+    }
+
+    // CHECK: Enum case: 1
+    print("Enum case: \(x)")
+}
+
+testResilientSinglePayloadEnumComplexTag()
+
+func testResilientMultiPayloadEnumTag() {
+    let x = switch getResilientMultiPayloadEnumEmpty0() {
+    case .nonEmpty0: 0
+    case .nonEmpty1: 1
+    case .empty0: 2
+    case .empty1: 3
+    }
+
+    // CHECK: Enum case: 2
+    print("Enum case: \(x)")
+}
+
+testResilientMultiPayloadEnumTag()
+
+func testResilientSinglePayloadEnumGenericTag() {
+    let x = switch getResilientSinglePayloadEnumGenericEmpty0(AnyObject.self) {
+    case .nonEmpty0: 0
+    case .empty0: 1
+    case .empty1: 2
+    }
+
+    // CHECK: Enum case: 1
+    print("Enum case: \(x)")
+}
+
+testResilientSinglePayloadEnumGenericTag()
+
+func testResilientMultiPayloadEnumGenericTag() {
+    let x = switch getResilientMultiPayloadEnumGenericEmpty0(AnyObject.self) {
+    case .nonEmpty0: 0
+    case .nonEmpty1: 1
+    case .empty0: 2
+    case .empty1: 3
+    }
+
+    // CHECK: Enum case: 2
+    print("Enum case: \(x)")
+}
+
+testResilientMultiPayloadEnumGenericTag()
 
 #if os(macOS)
 

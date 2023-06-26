@@ -352,6 +352,16 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_DLADDR")
   endif()
 
+  if(SWIFT_STDLIB_HAS_DLSYM)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_DLSYM=1")
+  else()
+    list(APPEND result "-DSWIFT_STDLIB_HAS_DLSYM=0")
+  endif()
+
+  if(SWIFT_STDLIB_HAS_FILESYSTEM)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_FILESYSTEM")
+  endif()
+
   if(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
     list(APPEND result "-DSWIFT_RUNTIME_STATIC_IMAGE_INSPECTION")
   endif()

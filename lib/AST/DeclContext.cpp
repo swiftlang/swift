@@ -920,6 +920,10 @@ DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {
 }
 
 DeclRange IterableDeclContext::getMembers() const {
+  return getCurrentMembers();
+}
+
+DeclRange IterableDeclContext::getCurrentMembers() const {
   loadAllMembers();
 
   return getCurrentMembersWithoutLoading();
