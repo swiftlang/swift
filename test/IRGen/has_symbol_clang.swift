@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test | %FileCheck %s
-// RUN: %target-swift-frontend -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test
+// RUN: %target-swift-frontend -emit-irgen %s -I %t -I %S/Inputs/has_symbol -module-name test | %FileCheck %s
 
 // UNSUPPORTED: OS=windows-msvc
 
@@ -13,4 +12,4 @@ public func testClangDecls() {
 
 // --- clangFunc(_:) ---
 // CHECK: define linkonce_odr hidden i1 @"$sSo9clangFuncyys5Int32VFTwS"() #1 {
-// CHECK:   ret i1 icmp ne (void (i32)* @clangFunc, void (i32)* null)
+// CHECK:   ret i1 icmp ne (ptr @clangFunc, ptr null)

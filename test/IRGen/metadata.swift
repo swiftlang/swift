@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name A -I %t  %S/Inputs/metadata2.swift -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
-// RUN: %target-swift-frontend -module-name A -I %t  %S/Inputs/metadata2.swift -primary-file %s -emit-ir
+// RUN: %target-swift-frontend -module-name A -I %t  %S/Inputs/metadata2.swift -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
 
 import resilient_struct
 
@@ -21,7 +20,7 @@ class G {
   var r = ResilientInt(i:1)
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(%swift.type* %0, i8* %1, i8** %2)
+// CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(ptr %0, ptr %1, ptr %2)
 // CHECK-NOT: ret
 // CHECK:  call swiftcc %swift.metadata_response @"$s1A17InternalContainerVMa"(
 // CHECK:  ret

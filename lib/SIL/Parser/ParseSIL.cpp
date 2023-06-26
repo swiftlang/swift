@@ -4273,7 +4273,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
-    if (OwnershipForwardingMixin::isa(Opcode)) {
+    if (ForwardingInstruction::isa(Opcode)) {
       if (parseForwardingOwnershipKind(forwardingOwnership))
         return true;
     }

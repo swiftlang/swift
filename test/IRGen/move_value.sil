@@ -1,5 +1,4 @@
-// RUN: %swift %use_no_opaque_pointers -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | %FileCheck %s
-// RUN: %swift -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o -
+// RUN: %swift -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 
@@ -7,7 +6,7 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: define swiftcc %swift.refcounted* @move_value_test(
+// CHECK-LABEL: define swiftcc ptr @move_value_test(
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret
 // CHECK-NEXT: }

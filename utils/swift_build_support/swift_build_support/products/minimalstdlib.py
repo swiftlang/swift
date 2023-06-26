@@ -140,7 +140,9 @@ class MinimalStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_DLADDR:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_STDLIB_HAS_DLSYM:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_ENVIRON:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_STDLIB_HAS_FILESYSTEM:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_LOCALE:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_STDIN:BOOL', 'FALSE')
         self.cmake_options.define(

@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-CURRENT --check-prefix=CHECK-CURRENT-%target-ptrsize
-// RUN: %target-swift-frontend %use_no_opaque_pointers -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name OriginalModule | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-ORIGINAL --check-prefix=CHECK-ORIGINAL-%target-ptrsize
-// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE
-// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name OriginalModule
+// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-CURRENT --check-prefix=CHECK-CURRENT-%target-ptrsize
+// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name OriginalModule | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-ORIGINAL --check-prefix=CHECK-ORIGINAL-%target-ptrsize
 // REQUIRES: OS=macosx
 
 #if CURRENT_MODULE
@@ -59,7 +57,7 @@ func entityClient() {
 	root.addEntity(leaf)
 	// CHECK-COMMON: call swiftcc void @"$s14OriginalModule6EntityV03addC0yyACF"()
 	let moved = MovedClass()
-	// CHECK-COMMON: call swiftcc %T14OriginalModule10MovedClassC* @"$s14OriginalModule10MovedClassCACycfC"
+	// CHECK-COMMON: call swiftcc ptr @"$s14OriginalModule10MovedClassCACycfC"
 	moved.MovableFuncFoo()
 	// CHECK-COMMON: call swiftcc void @"$s14OriginalModule10MovedClassC14MovableFuncFooyyF"
 }

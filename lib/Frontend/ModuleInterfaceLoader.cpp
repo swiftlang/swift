@@ -719,15 +719,16 @@ class ModuleInterfaceLoaderImpl {
     return pathStartsWith(hostPath, path);
   }
 
-  bool isInSystemFrameworks(StringRef path) {
+  bool isInSystemFrameworks(StringRef path, bool publicFramework) {
     StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
     if (sdkPath.empty()) return false;
 
-    SmallString<128> publicFrameworksPath;
-    llvm::sys::path::append(publicFrameworksPath,
-                            sdkPath, "System", "Library", "Frameworks");
+    SmallString<128> frameworksPath;
+    llvm::sys::path::append(frameworksPath,
+                            sdkPath, "System", "Library",
+                            publicFramework ? "Frameworks" : "PrivateFrameworks");
 
-    return pathStartsWith(publicFrameworksPath, path);
+    return pathStartsWith(frameworksPath, path);
   }
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
@@ -738,11 +739,7 @@ class ModuleInterfaceLoaderImpl {
 
     // Don't use the adjacent swiftmodule for frameworks from the public
     // Frameworks folder of the SDK.
-    SmallString<128> publicFrameworksPath;
-    llvm::sys::path::append(publicFrameworksPath,
-                            ctx.SearchPathOpts.getSDKPath(),
-                            "System", "Library", "Frameworks");
-    if (isInSystemFrameworks(modulePath)) {
+    if (isInSystemFrameworks(modulePath, /*publicFramework*/true)) {
       shouldLoadAdjacentModule = false;
       rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::PublicFramework);
     } else if (isInResourceHostDir(modulePath)) {

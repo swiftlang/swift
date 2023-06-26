@@ -597,7 +597,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
           return new (Context)
-              TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
+              TypeExpr(new (Context) SelfTypeRepr(SelfType, Loc));
         }
       }
 

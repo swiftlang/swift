@@ -46,10 +46,11 @@ enum class RefCountingKind : uint8_t {
   SinglePayloadEnumSimple = 0x10,
   SinglePayloadEnumFN = 0x11,
   SinglePayloadEnumFNResolved = 0x12,
+  SinglePayloadEnumGeneric = 0x13,
 
-  MultiPayloadEnumFN = 0x13,
-  MultiPayloadEnumFNResolved = 0x14,
-  MultiPayloadEnumGeneric = 0x15,
+  MultiPayloadEnumFN = 0x14,
+  MultiPayloadEnumFNResolved = 0x15,
+  MultiPayloadEnumGeneric = 0x16,
 
   Skip = 0x80,
   // We may use the MSB as flag that a count follows,
@@ -57,37 +58,77 @@ enum class RefCountingKind : uint8_t {
   // Reserved: 0x81 - 0xFF
 };
 
+struct LayoutStringReader {
+  const uint8_t *layoutStr;
+  size_t offset;
+
+  template <typename T>
+  inline T readBytes() {
+    T returnVal;
+    memcpy(&returnVal, layoutStr + offset, sizeof(T));
+    offset += sizeof(T);
+    return returnVal;
+  }
+
+  template <typename T>
+  inline T peekBytes(size_t peekOffset = 0) const {
+    T returnVal;
+    memcpy(&returnVal, layoutStr + offset + peekOffset, sizeof(T));
+    return returnVal;
+  }
+
+  inline void skip(size_t n) { offset += n; }
+};
+
+struct LayoutStringWriter {
+  uint8_t *layoutStr;
+  size_t offset;
+
+  template <typename T>
+  inline void writeBytes(T value) {
+    memcpy(layoutStr + offset, &value, sizeof(T));
+    offset += sizeof(T);
+  }
+
+  inline void skip(size_t n) { offset += n; }
+};
+
 SWIFT_RUNTIME_EXPORT
-void swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata);
+void swift_generic_destroy(swift::OpaqueValue *address,
+                           const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_assignWithCopy(swift::OpaqueValue *dest,
+                                                 swift::OpaqueValue *src,
+                                                 const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_assignWithTake(swift::OpaqueValue *dest,
+                                                 swift::OpaqueValue *src,
+                                                 const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_initWithCopy(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
+swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void swift_generic_instantiateLayoutString(const uint8_t *layoutStr, Metadata *type);
+unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
+                                 const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+unsigned swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                                  const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+unsigned swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                                   const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+void swift_generic_instantiateLayoutString(const uint8_t *layoutStr,
+                                           Metadata *type);
 
 void swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                       size_t layoutStrOffset,
                                       const uint8_t *fieldLayoutStr,
                                       const Metadata *fieldType);
-
-template <typename T>
-inline T readBytes(const uint8_t *layoutStr, size_t &i) {
-  T returnVal;
-  memcpy(&returnVal, layoutStr + i, sizeof(T));
-  i += sizeof(T);
-  return returnVal;
-}
-
-template <typename T>
-inline void writeBytes(uint8_t *layoutStr, size_t &i, T value) {
-  memcpy(layoutStr + i, &value, sizeof(T));
-  i += sizeof(T);
-}
 
 constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 

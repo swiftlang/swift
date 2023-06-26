@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-irgen -module-name distributed_actor_accessors -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
-// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -24,7 +23,7 @@ protocol HasActorSystem {
 
 extension MyActor: HasActorSystem { }
 
-// CHECK: %T27distributed_actor_accessors7MyActorC = type <{ %swift.refcounted, %swift.defaultactor, %T27FakeDistributedActorSystems0C7AddressV, %T27FakeDistributedActorSystems0aC6SystemV, %T27distributed_actor_accessors7MyClassC* }>
+// CHECK: %T27distributed_actor_accessors7MyActorC = type <{ %swift.refcounted, %swift.defaultactor, %T27FakeDistributedActorSystems0C7AddressV, %T27FakeDistributedActorSystems0aC6SystemV, ptr }>
 @available(SwiftStdlib 5.7, *)
 public distributed actor MyActor {
   var field: MyClass = MyClass()
@@ -34,8 +33,6 @@ public distributed actor MyActor {
   }
 }
 
-// CHECK: %T27distributed_actor_accessors10MyActorIntC = type <{ %swift.refcounted, %swift.defaultactor }>
-//
 // This does not have the concrete fields in the IR type because the LocalTestingDistributedActorSystem
 // is declared in Distributed, which means that it is compiled with library evolution turned on,
 // which causes the type to be laid out at runtime.

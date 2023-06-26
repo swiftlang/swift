@@ -1086,7 +1086,8 @@ public:
                      Receiver) = 0;
 
   virtual void
-  getNameInfo(StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
+  getNameInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
+              unsigned Offset, NameTranslatingInfo &Input,
               ArrayRef<const char *> Args,
               SourceKitCancellationToken CancellationToken,
               std::function<void(const RequestResult<NameTranslatingInfo> &)>

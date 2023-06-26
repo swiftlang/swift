@@ -302,3 +302,31 @@ public func testCollectionSort(a: X) -> Int {
     return 0
 }
 
+public struct Y {
+  var a, b, c: Int
+}
+
+extension Y {
+  func with2(_ body: () -> ()) {
+    body()
+  }
+  
+  func with1(_ body: (Int) -> (Int)) -> Int {
+    with2 {
+      _ = body(48)
+    }
+    return 777
+  }
+  
+  func Xsort() -> Int {
+    with1 { i in
+      i
+    }
+  }
+}
+
+@_noLocks
+public func testClosurePassing(a: inout Y) -> Int {
+    return a.Xsort()
+}
+
