@@ -1101,11 +1101,6 @@ public:
     SGM.emitLazyConformancesForType(theType);
 
     forEachMemberToLower(theType, [&](Decl *member) {
-      // FIXME: Conformance macros can generate extension decls. These
-      // are visited as top-level decls; skip them here.
-      if (isa<ExtensionDecl>(member))
-        return;
-
       visit(member);
     });
 

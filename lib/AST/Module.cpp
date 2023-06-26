@@ -4113,8 +4113,7 @@ void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
   getTopLevelDecls(nonExpandedDecls);
   for (auto *decl : nonExpandedDecls) {
     decl->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (!isa<ExtensionDecl>(auxDecl))
-        results.push_back(auxDecl);
+      results.push_back(auxDecl);
     });
     results.push_back(decl);
   }
