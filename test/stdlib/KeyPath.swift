@@ -1070,6 +1070,16 @@ struct Dog {
   var age: Int
 }
 
+class Cat {
+  var name: String
+  var age: Int
+
+  init(name: String, age: Int) {
+    self.name = name
+    self.age = age
+  }
+}
+
 if #available(SwiftStdlib 5.9, *) {
   keyPath.test("_createOffsetBasedKeyPath") {
     let dogAgeKp = _createOffsetBasedKeyPath(
@@ -1083,6 +1093,18 @@ if #available(SwiftStdlib 5.9, *) {
     let sparky = Dog(name: "Sparky", age: 7)
 
     expectEqual(sparky[keyPath: dogAgeKp!], 7)
+
+    let catNameKp = _createOffsetBasedKeyPath(
+      root: Cat.self,
+      value: String.self,
+      offset: 16
+    ) as? KeyPath<Cat, String>
+
+    expectNotNil(catNameKp)
+
+    let chloe = Cat(name: "Chloe", age: 4)
+
+    expectEqual(chloe[keyPath: catNameKp!], "Chloe")
   }
 }
 
