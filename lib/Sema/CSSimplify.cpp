@@ -12202,7 +12202,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
              (definitelyKeyPathType && capability == ReadOnly)) {
     auto resolvedKPTy =
       BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
-    return matchTypes(keyPathTy, resolvedKPTy, ConstraintKind::Bind, subflags,
+    return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
                       loc);
   } else {
     addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::KeyPath,
