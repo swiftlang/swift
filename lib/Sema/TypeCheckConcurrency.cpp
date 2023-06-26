@@ -1334,18 +1334,10 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   ValueDecl *unownedEnqueueWitnessDecl = unownedEnqueueWitness.getDecl();
   ValueDecl *moveOnlyEnqueueWitnessDecl = nullptr;
   ValueDecl *legacyMoveOnlyEnqueueWitnessDecl = nullptr;
-  // true iff the nominal type's availability allows the legacy requirement
-  // to be omitted in favor of moveOnlyEnqueueRequirement
-  bool canRemoveOldDecls = false;
 
   if (moveOnlyEnqueueRequirement) {
     moveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDeclRef(
         moveOnlyEnqueueRequirement).getDecl();
-    AvailabilityContext requirementInfo
-        = AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
-    AvailabilityContext declInfo =
-        TypeChecker::overApproximateAvailabilityAtLocation(nominal->getLoc(), dyn_cast<DeclContext>(nominal));
-    canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
   }
   if (legacyMoveOnlyEnqueueRequirement) {
     legacyMoveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDeclRef(
@@ -1354,6 +1346,23 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
 
   // --- Diagnose warnings and errors
 
+  // true iff the nominal type's availability allows the legacy requirement
+  // to be omitted in favor of moveOnlyEnqueueRequirement
+  bool canRemoveOldDecls;
+  if (!moveOnlyEnqueueRequirement) {
+    canRemoveOldDecls = false;
+  } else if (C.LangOpts.DisableAvailabilityChecking) {
+    canRemoveOldDecls = true;
+  } else {
+    AvailabilityContext requirementInfo
+        = AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
+    AvailabilityContext declInfo =
+        TypeChecker::overApproximateAvailabilityAtLocation(nominal->getLoc(), dyn_cast<DeclContext>(nominal));
+    canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
+  }
+
+  // If both old and new enqueue are implemented, but the old one cannot be removed,
+  // emit a warning that the new enqueue is unused.
   if (!canRemoveOldDecls &&
       unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid() &&
       moveOnlyEnqueueWitnessDecl && moveOnlyEnqueueWitnessDecl->getLoc().isValid()) {
