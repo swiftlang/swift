@@ -289,5 +289,5 @@ func tryToDoBadMetatypeStuff() {
 
 func packingHeat<each T>(_ t: repeat each T) {}
 func packIt() {
-  packingHeat(MO())  // expected-error {{noncopyable type 'MO' cannot be used with generics yet}}
+  packingHeat(MO())  // expected-error {{parameter pack containing noncopyable element 'MO' is not supported}}
 }

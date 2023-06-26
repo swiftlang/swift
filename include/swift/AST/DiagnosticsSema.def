@@ -7221,6 +7221,9 @@ ERROR(noncopyable_generics_generic_param_metatype, none,
 NOTE(noncopyable_generics_implicit_copyable, none,
       "%0 %1 has an implicit Copyable requirement",
       (DescriptiveDeclKind, Type))
+ERROR(noncopyable_element_of_pack_not_supported,none,
+      "parameter pack containing noncopyable element %0 is not supported",
+      (Type))
 ERROR(noncopyable_effectful_getter,none,
       "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noncopyable_enums_do_not_support_indirect,none,

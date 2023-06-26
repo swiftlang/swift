@@ -6118,6 +6118,12 @@ bool NotCopyableFailure::diagnoseAsError() {
       return true;
     }
 
+    if (loc->isLastElement<LocatorPathElt::PackElement>()) {
+      emitDiagnostic(diag::noncopyable_element_of_pack_not_supported,
+                     noncopyableTy);
+      return true;
+    }
+
     // a bit paranoid of nulls and such...
     if (auto *genericParam = loc->getGenericParameter()) {
       if (auto *paramDecl = genericParam->getDecl()) {
