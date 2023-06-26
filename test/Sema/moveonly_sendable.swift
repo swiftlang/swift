@@ -49,8 +49,8 @@ func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   await a.takeMaybeFile(.available(anotherFile))
   _ = A(.available(anotherFile))
 
-  let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by implicitly asynchronous call to actor-isolated instance method 'getRef()' cannot cross actor boundary}}
-  await takeNotSendable(ns) // expected-warning {{non-sendable type 'NotSendableMO' exiting main actor-isolated context in call to non-isolated global function 'takeNotSendable' cannot cross actor boundary}}
+  let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by call to actor-isolated function cannot cross actor boundary}}
+  await takeNotSendable(ns) // expected-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
 
   switch (await a.giveFileDescriptor()) {
   case let .available(fd):

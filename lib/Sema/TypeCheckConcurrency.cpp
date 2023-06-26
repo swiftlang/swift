@@ -2415,41 +2415,6 @@ namespace {
       return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::NonIsolatedParameter);
     }
 
-    VarDecl *findReferencedBaseSelf(Expr *expr) {
-      if (auto selfVar = getReferencedParamOrCapture(expr))
-        if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
-          return selfVar;
-
-      // Look through identity expressions and implicit conversions.
-      Expr *prior;
-      do {
-        prior = expr;
-
-        expr = expr->getSemanticsProvidingExpr();
-
-        if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
-          expr = conversion->getSubExpr();
-        if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
-          expr = fnConv->getSubExpr();
-      } while (prior != expr);
-
-      if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
-        for (auto arg : *call->getArgs()) {
-          if (auto declRef = dyn_cast<DeclRefExpr>(arg.getExpr())) {
-            if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-              if (var->isSelfParameter()) {
-                return var;
-              }
-            }
-          }
-        }
-      }
-
-
-      // Not a self reference.
-      return nullptr;
-    }
-
     /// Note that the given actor member is isolated.
     /// @param context is allowed to be null if no context is appropriate.
     void noteIsolatedActorMember(ValueDecl const* decl, Expr *context) {
@@ -2590,13 +2555,17 @@ namespace {
     Optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                            Expr *context) {
-      // If base of the call is 'local' we permit skip distributed checks.
-      if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+      // If the actor itself is, we're not doing any distributed access.
+      if (getIsolatedActor(context).isKnownToBeLocal()) {
         return std::make_pair(
             /*setThrows=*/false,
             /*isDistributedThunk=*/false);
-        }
+      }
+
+      // If there is no declaration, it can't possibly be distributed.
+      if (!decl) {
+        ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method);
+        return None;
       }
 
       // Check that we have a distributed function or computed property.
@@ -2626,6 +2595,8 @@ namespace {
               /*isDistributedThunk=*/true);
         }
       }
+
+      // FIXME: Subscript?
 
       // This is either non-distributed variable, subscript, or something else.
       ctx.Diags.diagnose(declLoc,
@@ -2787,6 +2758,7 @@ namespace {
       // Determine from the callee whether actor isolation is unsatisfied.
       Optional<ActorIsolation> unsatisfiedIsolation;
       bool mayExitToNonisolated = true;
+      Expr *argForIsolatedParam = nullptr;
       auto calleeDecl = apply->getCalledValue(/*skipFunctionConversions=*/true);
       if (Type globalActor = fnType->getGlobalActor()) {
         // If the function type is global-actor-qualified, determine whether
@@ -2798,7 +2770,7 @@ namespace {
         }
 
         mayExitToNonisolated = false;
-      } else if (auto selfApplyFn = dyn_cast<SelfApplyExpr>(
+      } else if (auto *selfApplyFn = dyn_cast<SelfApplyExpr>(
                     apply->getFn()->getValueProvidingExpr())) {
         // If we're calling a member function, check whether the function
         // itself is isolated.
@@ -2825,6 +2797,7 @@ namespace {
           callOptions = result.options;
           mayExitToNonisolated = false;
           calleeDecl = memberRef->first.getDecl();
+          argForIsolatedParam = selfApplyFn->getBase();
         }
       } else if (calleeDecl &&
                  calleeDecl->getAttrs()
@@ -2846,6 +2819,7 @@ namespace {
           continue;
 
         auto *arg = args->getExpr(paramIdx);
+        argForIsolatedParam = arg;
         if (getIsolatedActor(arg))
           continue;
 
@@ -2861,6 +2835,10 @@ namespace {
 
         unsatisfiedIsolation =
             ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
+
+        if (!fnType->getExtInfo().isAsync())
+          callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
+
         break;
       }
 
@@ -2877,7 +2855,8 @@ namespace {
       bool requiresAsync =
           callOptions.contains(ActorReferenceResult::Flags::AsyncPromotion);
 
-      // If we are not in an asynchronous context, complain.
+      // If we need to mark the call as implicitly asynchronous, make sure
+      // we're in an asynchronous context.
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
         if (calleeDecl) {
           ctx.Diags.diagnose(
@@ -2905,9 +2884,25 @@ namespace {
         return true;
       }
 
-      // If needed, mark as implicitly async.
-      if (requiresAsync) {
-        apply->setImplicitlyAsync(*unsatisfiedIsolation);
+      // If the actor we're hopping to is distributed, we might also need
+      // to mark the call as throwing and/or using the distributed thunk.
+      // FIXME: ActorReferenceResult has this information, too.
+      bool setThrows = false;
+      bool usesDistributedThunk = false;
+      if (unsatisfiedIsolation->isDistributedActor() &&
+          !(calleeDecl && isa<ConstructorDecl>(calleeDecl))) {
+        auto distributedAccess = checkDistributedAccess(
+            apply->getFn()->getLoc(), calleeDecl, argForIsolatedParam);
+        if (!distributedAccess)
+          return true;
+
+        std::tie(setThrows, usesDistributedThunk) = *distributedAccess;
+      }
+
+      // Mark as implicitly async/throws/distributed thunk as needed.
+      if (requiresAsync || setThrows || usesDistributedThunk) {
+        markNearestCallAsImplicitly(
+            unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
       // Check for sendability of the parameter types.
