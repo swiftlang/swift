@@ -287,7 +287,7 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       auto *setterPA = dyn_cast<PartialApplyInst>(inst->getSetter());
       assert(setterPA);
 
-      auto selfValue = setterPA->getOperand(1);
+      auto selfValue = inst->getSelf();
       auto isRefSelf = selfValue->getType().getASTType()->mayHaveSuperclass();
 
       SILValue selfRef;

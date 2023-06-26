@@ -1773,7 +1773,8 @@ public:
       }
     }
 
-    *this << getIDAndType(AI->getSrc());
+    *this << "self " << getIDAndType(AI->getSelf());
+    *this << ", value " << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
   }

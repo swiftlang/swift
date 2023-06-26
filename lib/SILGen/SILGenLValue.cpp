@@ -1719,8 +1719,8 @@ namespace {
 
         // Create the assign_or_init with the initializer and setter.
         auto value = emitValue(field, FieldType, setterTy, setterConv);
-        SGF.B.createAssignOrInit(loc, value.forward(SGF), initFRef,
-                                 setterFn.getValue(),
+        SGF.B.createAssignOrInit(loc, base.getValue(), value.forward(SGF),
+                                 initFRef, setterFn.getValue(),
                                  AssignOrInitInst::Unknown);
         return;
       }

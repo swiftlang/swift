@@ -1360,6 +1360,7 @@ void SILCloner<ImplClass>::visitAssignOrInitInst(AssignOrInitInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAssignOrInit(
                 getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getSelf()),
                 getOpValue(Inst->getSrc()),
                 getOpValue(Inst->getInitializer()),
                 getOpValue(Inst->getSetter()), Inst->getMode()));
