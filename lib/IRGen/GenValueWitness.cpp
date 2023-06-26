@@ -907,7 +907,6 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
     if (typeLayoutEntry->isMultiPayloadEnum()) {
       return IGM.getMultiPayloadEnumGenericGetEnumTagFn();
     } else {
-      // TODO: implement support for single payload generic enums
       return IGM.getSinglePayloadEnumGenericGetEnumTagFn();
     }
   } else if (typeLayoutEntry->isMultiPayloadEnum()) {
