@@ -785,19 +785,11 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 
 static const ConcurrencyStandardTypeDescriptors *concurrencyDescriptors;
 
+/// Perform a fast-path lookup for standard library type references with short
+/// manglings. Returns the appropriate descriptor, or NULL if the descriptor
+/// couldn't be resolved, or if the node does not refer to one of those types.
 static const ContextDescriptor *
-_findContextDescriptor(Demangle::NodePointer node,
-                       Demangle::Demangler &Dem) {
-  NodePointer symbolicNode = node;
-  if (symbolicNode->getKind() == Node::Kind::Type)
-    symbolicNode = symbolicNode->getChild(0);
-
-  // If we have a symbolic reference to a context, resolve it immediately.
-  if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference) {
-    return cast<TypeContextDescriptor>(
-      (const ContextDescriptor *)symbolicNode->getIndex());
-  }
-
+descriptorFromStandardMangling(Demangle::NodePointer symbolicNode) {
 #if SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
   // Fast-path lookup for standard library type references with short manglings.
   if (symbolicNode->getNumChildren() >= 2
@@ -823,6 +815,24 @@ _findContextDescriptor(Demangle::NodePointer node,
 #include "swift/Demangling/StandardTypesMangling.def"
   }
 #endif
+  return nullptr;
+}
+
+static const ContextDescriptor *
+_findContextDescriptor(Demangle::NodePointer node,
+                       Demangle::Demangler &Dem) {
+  NodePointer symbolicNode = node;
+  if (symbolicNode->getKind() == Node::Kind::Type)
+    symbolicNode = symbolicNode->getChild(0);
+
+  // If we have a symbolic reference to a context, resolve it immediately.
+  if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference) {
+    return cast<TypeContextDescriptor>(
+      (const ContextDescriptor *)symbolicNode->getIndex());
+  }
+
+  if (auto *standardDescriptor = descriptorFromStandardMangling(symbolicNode))
+    return standardDescriptor;
   
   const ContextDescriptor *foundContext = nullptr;
   auto &T = TypeMetadataRecords.get();
@@ -989,8 +999,7 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
 
 static const ProtocolDescriptor *
 _findProtocolDescriptor(NodePointer node,
-                        Demangle::Demangler &Dem,
-                        std::string &mangledName) {
+                        Demangle::Demangler &Dem) {
   const ProtocolDescriptor *foundProtocol = nullptr;
   auto &T = Protocols.get();
 
@@ -1002,13 +1011,18 @@ _findProtocolDescriptor(NodePointer node,
     return cast<ProtocolDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
+  if (auto *standardDescriptor = descriptorFromStandardMangling(symbolicNode)) {
+    assert(standardDescriptor->getKind() == ContextDescriptorKind::Protocol);
+    return static_cast<const ProtocolDescriptor *>(standardDescriptor);
+  }
+
   auto mangling =
     Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
 
   if (!mangling.isSuccess())
     return nullptr;
 
-  mangledName = mangling.result().str();
+  auto mangledName = mangling.result().str();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -1622,8 +1636,7 @@ public:
 
   BuiltProtocolDecl createProtocolDecl(NodePointer node) const {
     // Look for a protocol descriptor based on its mangled name.
-    std::string mangledName;
-    if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
+    if (auto protocol = _findProtocolDescriptor(node, demangler))
       return ProtocolDescriptorRef::forSwift(protocol);;
 
 #if SWIFT_OBJC_INTEROP
