@@ -329,7 +329,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Diagnose attempts to form a tuple with any noncopyable elements.
         if (E->getType()->isPureMoveOnly()
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
-          Ctx.Diags.diagnose(E->getLoc(), diag::tuple_move_only_not_supported);
+          auto noncopyableTy = E->getType();
+          assert(noncopyableTy->is<TupleType>() && "will use poor wording");
+          Ctx.Diags.diagnose(E->getLoc(),
+                             diag::tuple_containing_move_only_not_supported,
+                             noncopyableTy);
         }
       }
 
