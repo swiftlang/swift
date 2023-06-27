@@ -6,6 +6,7 @@
 
 @freestanding(expression) public macro Print<each Value>(_ value: repeat each Value) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 @freestanding(expression) public macro OtherPrint<each Value>(_ value: repeat each Value) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
+@freestanding(expression) public macro ConcretePrint(_ value: Any) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 
 public struct Printer<Value> {
   init(_: (Value) -> Void) {}
@@ -13,6 +14,7 @@ public struct Printer<Value> {
 
 typealias Print = Printer
 typealias OtherPrint<T> = Printer<T>
+typealias ConcretePrint = Printer<Any>
 
 struct Test {
   struct Object {
@@ -26,6 +28,11 @@ struct Test {
 
     let _ = OtherPrint<Object> { // Ok
       compute(root: $0, \.prop)
+    }
+
+    let _ = ConcretePrint<Object> { // expected-error {{cannot specialize non-generic type 'ConcretePrint' (aka 'Printer<Any>')}}
+      compute(root: $0, \.prop) // expected-error {{value of type 'Any' has no member 'prop'}}
+      // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
     }
   }
 

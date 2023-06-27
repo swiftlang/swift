@@ -13658,8 +13658,15 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     }
   }
 
-  if (openedGenericParams.empty())
-    return SolutionKind::Error;
+  if (openedGenericParams.empty()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    return recordFix(AllowConcreteTypeSpecialization::create(
+               *this, type1, getConstraintLocator(locator)))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
+  }
 
   assert(openedGenericParams.size() == genericParams->size());
 
