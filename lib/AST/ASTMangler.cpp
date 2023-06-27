@@ -2647,11 +2647,34 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       appendIdentifier(protocol->getObjCRuntimeNameAsString());
     } else if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(namedDecl)) {
       // If this is a `ClassTemplateSpecializationDecl`, it was
-      // imported as a Swift decl with `__CxxTemplateInst...` name.
-      // `ClassTemplateSpecializationDecl`'s name does not include information about
-      // template arguments, and in order to prevent name clashes we use the
-      // name of the Swift decl which does include template arguments.
-      appendIdentifier(nominal->getName().str());
+      // imported as a Swift decl with `X<...>` name. Some types will be
+      // imported as X<_>, for instance, if they have non-type templated
+      // parameters. To disambiguate different specializations of the same
+      // templated type, we use a different mangling mechanism for C++ template
+      // specializations.
+      auto &clangCtx = ctsd->getASTContext();
+      // Itanium mangler produces valid Swift identifiers, use it to generate a
+      // name for this instantiation.
+      std::unique_ptr<clang::MangleContext> clangMangler{
+          clang::ItaniumMangleContext::create(clangCtx,
+                                              clangCtx.getDiagnostics())};
+
+      llvm::SmallString<128> storage;
+      llvm::raw_svector_ostream buffer(storage);
+      clangMangler->mangleTypeName(clangCtx.getRecordType(ctsd), buffer);
+      // The Itanium mangler does not provide a way to get the mangled
+      // representation of a type. Instead, we call mangleTypeName() that
+      // returns the name of the RTTI typeinfo symbol, and remove the _ZTS
+      // prefix. Then we prepend __CxxTemplateInst to reduce chances of conflict
+      // with regular C and C++ structs.
+      llvm::SmallString<128> mangledNameStorage;
+      llvm::raw_svector_ostream mangledName(mangledNameStorage);
+      assert(buffer.str().take_front(4) == "_ZTS");
+      mangledName << CXX_TEMPLATE_INST_PREFIX << buffer.str().drop_front(4);
+
+      StringRef mangledId =
+          decl->getASTContext().AllocateCopy(mangledName.str());
+      appendIdentifier(mangledId.str());
     } else {
       appendIdentifier(namedDecl->getName());
     }

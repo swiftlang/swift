@@ -156,7 +156,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: #endif
 
 
-// CHECK: SWIFT_EXTERN void $s8UseCxxTy13retNonTrivialSo2nsO0031NonTrivialTemplateInt32_fbGJhubVyF(SWIFT_INDIRECT_RESULT void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL; // retNonTrivial()
+// CHECK: SWIFT_EXTERN void $s8UseCxxTy13retNonTrivialSo2nsO02__b18TemplateInstN2ns18efH4IiEEVyF(SWIFT_INDIRECT_RESULT void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL; // retNonTrivial()
 // CHECK: SWIFT_EXTERN struct swift_interop_returnStub_UseCxxTy_uint32_t_0_4 $s8UseCxxTy10retTrivialSo0E0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retTrivial()
 
 // CHECK: ns::Immortal *_Nonnull retImmortal() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
@@ -164,7 +164,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: }
 
 // CHECK:  ns::ImmortalTemplate<int> *_Nonnull retImmortalTemplate() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT: return _impl::$s8UseCxxTy19retImmortalTemplateSo2nsO0029ImmortalTemplateInt32_hEFAhqbVyF();
+// CHECK-NEXT: return _impl::$s8UseCxxTy19retImmortalTemplateSo2nsO02__bf10InstN2ns16eF4IiEEVyF();
 // CHECK-NEXT: }
 
 // CHECK: } // end namespace
@@ -173,7 +173,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateInt
-// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO0031NonTrivialTemplateInt32_fbGJhubVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC4IiEEVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
@@ -185,7 +185,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplateInt> {
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return _impl::$sSo2nsO0031NonTrivialTemplateInt32_fbGJhubVMa(0)._0;
+// CHECK-NEXT:     return _impl::$sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC4IiEEVMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
@@ -200,7 +200,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<int> retNonTrivial() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<int>)) char storage[sizeof(ns::NonTrivialTemplate<int>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<int> *>(storage);
-// CHECK-NEXT: _impl::$s8UseCxxTy13retNonTrivialSo2nsO0031NonTrivialTemplateInt32_fbGJhubVyF(storage);
+// CHECK-NEXT: _impl::$s8UseCxxTy13retNonTrivialSo2nsO02__b18TemplateInstN2ns18efH4IiEEVyF(storage);
 // CHECK-NEXT: ns::NonTrivialTemplate<int> result(static_cast<ns::NonTrivialTemplate<int> &&>(*storageObjectPtr));
 // CHECK-NEXT: storageObjectPtr->~NonTrivialTemplate();
 // CHECK-NEXT: return result;
@@ -212,7 +212,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateTrivial
-// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC20INS_11TrivialinNSEEEVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
@@ -224,7 +224,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplateTrivial> {
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return _impl::$sSo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVMa(0)._0;
+// CHECK-NEXT:     return _impl::$sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC20INS_11TrivialinNSEEEVMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
@@ -239,7 +239,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<ns::TrivialinNS> retNonTrivial2() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<ns::TrivialinNS> *>(storage);
-// CHECK-NEXT: _impl::$s8UseCxxTy14retNonTrivial2So2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVyF(storage);
+// CHECK-NEXT: _impl::$s8UseCxxTy14retNonTrivial2So2nsO02__b18TemplateInstN2ns18e7TrivialH20INS_11TrivialinNSEEEVyF(storage);
 // CHECK-NEXT: ns::NonTrivialTemplate<ns::TrivialinNS> result(static_cast<ns::NonTrivialTemplate<ns::TrivialinNS> &&>(*storageObjectPtr));
 // CHECK-NEXT: storageObjectPtr->~NonTrivialTemplate();
 // CHECK-NEXT: return result;
@@ -268,11 +268,11 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: }
 
 // CHECK: void takeImmortalTemplate(ns::ImmortalTemplate<int> *_Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) {
-// CHECK-NEXT:   return _impl::$s8UseCxxTy20takeImmortalTemplateyySo2nsO0029ImmortalTemplateInt32_hEFAhqbVF(x);
+// CHECK-NEXT:   return _impl::$s8UseCxxTy20takeImmortalTemplateyySo2nsO02__bf10InstN2ns16eF4IiEEVF(x);
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeNonTrivial2(const ns::NonTrivialTemplate<ns::TrivialinNS>& x) noexcept SWIFT_SYMBOL({{.*}}) {
-// CHECK-NEXT:   return _impl::$s8UseCxxTy15takeNonTrivial2yySo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVF(swift::_impl::getOpaquePointer(x));
+// CHECK-NEXT:   return _impl::$s8UseCxxTy15takeNonTrivial2yySo2nsO02__b18TemplateInstN2ns18e7TrivialH20INS_11TrivialinNSEEEVF(swift::_impl::getOpaquePointer(x));
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeTrivial(const Trivial& x) noexcept SWIFT_SYMBOL({{.*}}) {
