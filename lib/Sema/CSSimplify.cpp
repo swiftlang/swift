@@ -14776,7 +14776,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch:
-  case FixKind::AllowConcreteTypeSpecialization: {
+  case FixKind::AllowConcreteTypeSpecialization:
+  case FixKind::IgnoreGenericSpecializationArityMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

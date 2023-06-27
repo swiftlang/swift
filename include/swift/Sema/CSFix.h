@@ -457,6 +457,10 @@ enum class FixKind : uint8_t {
 
   /// Ignore an attempt to specialize non-generic type.
   AllowConcreteTypeSpecialization,
+
+  /// Ignore situations when provided number of generic arguments didn't match
+  /// expected number of parameters.
+  IgnoreGenericSpecializationArityMismatch,
 };
 
 class ConstraintFix {
@@ -3674,6 +3678,42 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowConcreteTypeSpecialization;
+  }
+};
+
+class IgnoreGenericSpecializationArityMismatch final : public ConstraintFix {
+  ValueDecl *D;
+  unsigned NumParams;
+  unsigned NumArgs;
+  bool HasParameterPack;
+
+  IgnoreGenericSpecializationArityMismatch(ConstraintSystem &cs,
+                                           ValueDecl *decl, unsigned numParams,
+                                           unsigned numArgs,
+                                           bool hasParameterPack,
+                                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreGenericSpecializationArityMismatch,
+                      locator),
+        D(decl), NumParams(numParams), NumArgs(numArgs),
+        HasParameterPack(hasParameterPack) {}
+
+public:
+  std::string getName() const override {
+    return "ignore generic specialization mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreGenericSpecializationArityMismatch *
+  create(ConstraintSystem &cs, ValueDecl *decl, unsigned numParams,
+         unsigned numArgs, bool hasParameterPack, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreGenericSpecializationArityMismatch;
   }
 };
 

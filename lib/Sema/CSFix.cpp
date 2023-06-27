@@ -2842,3 +2842,19 @@ AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
   return new (cs.getAllocator())
       AllowConcreteTypeSpecialization(cs, concreteTy, locator);
 }
+
+bool IgnoreGenericSpecializationArityMismatch::diagnose(
+    const Solution &solution, bool asNote) const {
+  return false;
+}
+
+IgnoreGenericSpecializationArityMismatch *
+IgnoreGenericSpecializationArityMismatch::create(ConstraintSystem &cs,
+                                                 ValueDecl *decl,
+                                                 unsigned numParams,
+                                                 unsigned numArgs,
+                                                 bool hasParameterPack,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreGenericSpecializationArityMismatch(
+      cs, decl, numParams, numArgs, hasParameterPack, locator);
+}
