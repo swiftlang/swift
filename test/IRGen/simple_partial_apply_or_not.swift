@@ -1,5 +1,6 @@
-// RUN: %target-swift-emit-ir -module-name test %s | %FileCheck %s
-// RUN: %target-run-simple-swift %s | %FileCheck %s --check-prefix=CHECK-EXEC
+// RUN: %target-swift-emit-ir %use_no_opaque_pointers -Xllvm -sil-disable-pass=Simplification -module-name test %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -Xllvm -sil-disable-pass=Simplification -module-name test %s
+// RUN: %target-run-simple-swift -Xllvm -sil-disable-pass=Simplification %s | %FileCheck %s --check-prefix=CHECK-EXEC
 
 // REQUIRES: executable_test
 

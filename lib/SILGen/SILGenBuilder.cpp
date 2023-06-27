@@ -437,6 +437,23 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
   return cloner.clone(result);
 }
 
+ManagedValue
+SILGenBuilder::createLoadIfLoadable(SILLocation loc, ManagedValue addr) {
+  assert(addr.getType().isAddress());
+  if (!addr.getType().isLoadable(SGF.F))
+    return addr;
+  return createLoadWithSameOwnership(loc, addr);
+}
+
+ManagedValue
+SILGenBuilder::createLoadWithSameOwnership(SILLocation loc,
+                                           ManagedValue addr) {
+  if (addr.isPlusOne(SGF))
+    return createLoadTake(loc, addr);
+  else
+    return createLoadBorrow(loc, addr);
+}
+
 ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
   auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadTake(loc, v, lowering);
@@ -483,7 +500,14 @@ static ManagedValue createInputFunctionArgument(
   assert((F.isBare() || isFormalParameterPack || decl) &&
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
-  arg->setNoImplicitCopy(isNoImplicitCopy);
+  if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
+    if (!arg->getType().isPureMoveOnly()) {
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+      isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+    }
+  }
+  if (isNoImplicitCopy)
+    arg->setNoImplicitCopy(isNoImplicitCopy);
   arg->setClosureCapture(isClosureCapture);
   arg->setLifetimeAnnotation(lifetimeAnnotation);
   arg->setFormalParameterPack(isFormalParameterPack);
@@ -534,9 +558,8 @@ ManagedValue SILGenBuilder::createInputFunctionArgument(
                                        isFormalParameterPack);
 }
 
-ManagedValue
-SILGenBuilder::createInputFunctionArgument(SILType type,
-                                           Optional<SILLocation> inputLoc) {
+ManagedValue SILGenBuilder::createInputFunctionArgument(
+    SILType type, llvm::Optional<SILLocation> inputLoc) {
   assert(inputLoc.has_value() && "This optional is only for overload resolution "
                                 "purposes! Do not pass in None here!");
   return ::createInputFunctionArgument(*this, type, *inputLoc);
@@ -778,7 +801,17 @@ ManagedValue SILGenBuilder::createStoreBorrow(SILLocation loc,
                                               SILValue address) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
   auto *sbi = createStoreBorrow(loc, value.getValue(), address);
+  SGF.Cleanups.pushCleanup<EndBorrowCleanup>(sbi);
   return ManagedValue(sbi, CleanupHandle::invalid());
+}
+
+ManagedValue SILGenBuilder::createFormalAccessStoreBorrow(SILLocation loc,
+                                                          ManagedValue value,
+                                                          SILValue address) {
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  auto *sbi = createStoreBorrow(loc, value.getValue(), address);
+  return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+      loc, value.getValue(), sbi);
 }
 
 ManagedValue SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
@@ -970,11 +1003,12 @@ ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
   return ManagedValue::forUnmanaged(newValue);
 }
 
-ManagedValue SILGenBuilder::createMoveValue(SILLocation loc,
-                                            ManagedValue value) {
+ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
+                                            bool isLexical) {
   assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
   CleanupCloner cloner(*this, value);
-  auto *mdi = createMoveValue(loc, value.forward(getSILGenFunction()));
+  auto *mdi =
+      createMoveValue(loc, value.forward(getSILGenFunction()), isLexical);
   return cloner.clone(mdi);
 }
 
@@ -1017,8 +1051,9 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
 ManagedValue
 SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
                                        MarkMustCheckInst::CheckKind kind) {
-  assert((value.isPlusOne(SGF) || value.isLValue()) &&
-         "Argument must be at +1 or be an inout!");
+  assert((value.isPlusOne(SGF) || value.isLValue() ||
+          value.getType().isAddress()) &&
+         "Argument must be at +1 or be an address!");
   CleanupCloner cloner(*this, value);
   auto *mdi = SILBuilder::createMarkMustCheckInst(
       loc, value.forward(getSILGenFunction()), kind);
@@ -1039,4 +1074,10 @@ void SILGenBuilder::emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
                                           IsInitialization_t isInitialize) {
   auto &lowering = getTypeLowering(srcAddr->getType());
   lowering.emitCopyInto(*this, loc, srcAddr, destAddr, isTake, isInitialize);
+}
+
+ManagedValue SILGenBuilder::createExplicitCopyValue(SILLocation loc,
+                                                    ManagedValue operand) {
+  auto cvi = SILBuilder::createExplicitCopyValue(loc, operand.getValue());
+  return SGF.emitManagedRValueWithCleanup(cvi);
 }

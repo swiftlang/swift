@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -85,20 +86,30 @@ areIdentical(llvm::DenseMap<SILBasicBlock *, SILValue> &availableValues) {
     return true;
   }
 
-  auto *mvir =
-      dyn_cast<MultipleValueInstructionResult>(availableValues.begin()->second);
-  if (!mvir)
-    return false;
+  if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(
+          availableValues.begin()->second)) {
+    for (auto value : availableValues) {
+      auto *result = dyn_cast<MultipleValueInstructionResult>(value.second);
+      if (!result)
+        return false;
+      if (!result->getParent()->isIdenticalTo(mvir->getParent()) ||
+          result->getIndex() != mvir->getIndex()) {
+        return false;
+      }
+    }
+    return true;
+  }
 
+  auto *firstArg = cast<SILArgument>(availableValues.begin()->second);
   for (auto value : availableValues) {
-    auto *result = dyn_cast<MultipleValueInstructionResult>(value.second);
-    if (!result)
+    auto *arg = dyn_cast<SILArgument>(value.second);
+    if (!arg)
       return false;
-    if (!result->getParent()->isIdenticalTo(mvir->getParent()) ||
-        result->getIndex() != mvir->getIndex()) {
+    if (arg != firstArg) {
       return false;
     }
   }
+
   return true;
 }
 
@@ -234,6 +245,9 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
     addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second,
                             deleter);
   }
+  // Set the reborrow flag on the newly created phi.
+  phiArg->setReborrow(computeIsReborrow(phiArg));
+
   if (insertedPhis)
     insertedPhis->push_back(phiArg);
 
@@ -343,6 +357,9 @@ public:
     auto *ti = predBlock->getTerminator();
 
     changeEdgeValue(ti, phiBlock, phiArgIndex, value);
+
+    // Set the reborrow flag.
+    phi->setReborrow(computeIsReborrow(phi));
   }
 
   /// Check if an instruction is a PHI.

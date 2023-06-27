@@ -19,6 +19,9 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
+  public var addressType: Type { bridged.getAddressType().type }
+  public var objectType: Type { bridged.getObjectType().type }
+
   public func isTrivial(in function: Function) -> Bool {
     return bridged.isTrivial(function.bridged.getFunction())
   }
@@ -28,8 +31,20 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return !bridged.isNonTrivialOrContainsRawPointer(function.bridged.getFunction())
   }
 
+  /// True if this type is a value type (struct/enum) that requires deinitialization beyond
+  /// destruction of its members.
+  public var isValueTypeWithDeinit: Bool { bridged.isValueTypeWithDeinit() }
+
+  public func isLoadable(in function: Function) -> Bool {
+    return bridged.isLoadable(function.bridged.getFunction())
+  }
+
   public func isReferenceCounted(in function: Function) -> Bool {
     return bridged.isReferenceCounted(function.bridged.getFunction())
+  }
+
+  public var isUnownedStorageType: Bool {
+    return bridged.isUnownedStorageType()
   }
 
   public var hasArchetype: Bool { bridged.hasArchetype() }
@@ -41,6 +56,9 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isEnum: Bool { bridged.getEnumOrBoundGenericEnum() != nil }
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
+  public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
+
+  public var canBeClass: swift.TypeTraitResult { bridged.canBeClass() }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
@@ -48,6 +66,19 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
+
+  public var isBuiltinInteger: Bool { bridged.isBuiltinInteger() }
+  public var isBuiltinFloat: Bool { bridged.isBuiltinFloat() }
+  public var isBuiltinVector: Bool { bridged.isBuiltinVector() }
+  public var builtinVectorElementType: Type { bridged.getBuiltinVectorElementType().type }
+
+  public func isBuiltinInteger(withFixedWidth width: Int) -> Bool {
+    bridged.isBuiltinFixedWidthInteger(UInt32(width))
+  }
+
+  public func isExactSuperclass(of type: Type) -> Bool {
+    bridged.isExactSuperclassOf(type.bridged)
+  }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
@@ -78,6 +109,46 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 extension Type: Equatable {
   public static func ==(lhs: Type, rhs: Type) -> Bool { 
     lhs.bridged == rhs.bridged
+  }
+}
+
+public struct TypeArray : RandomAccessCollection, CustomReflectable {
+  private let bridged: BridgedSILTypeArray
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return bridged.getCount() }
+
+  public init(bridged: BridgedSILTypeArray) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Int) -> Type {
+    bridged.getAt(index).type
+  }
+
+  public var customMirror: Mirror {
+    let c: [Mirror.Child] = map { (label: nil, value: $0) }
+    return Mirror(self, children: c)
+  }
+}
+
+public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
+  private let bridged: BridgedTypeArray
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return bridged.getCount() }
+
+  public init(bridged: BridgedTypeArray) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Int) -> Type? {
+    bridged.getAt(index).typeOrNil
+  }
+
+  public var customMirror: Mirror {
+    let c: [Mirror.Child] = map { (label: nil, value: $0 ?? "<invalid>") }
+    return Mirror(self, children: c)
   }
 }
 
@@ -117,11 +188,14 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
 extension swift.SILType {
   var type: Type { Type(bridged: self) }
+  var typeOrNil: Type? { isNull() ? nil : type }
 }
 
 // TODO: use an AST type for this once we have it
 public struct NominalTypeDecl : Equatable {
   let bridged: BridgedNominalTypeDecl
+
+  public var name: StringRef { StringRef(bridged: bridged.getName()) }
 
   public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
     lhs.bridged.decl == rhs.bridged.decl

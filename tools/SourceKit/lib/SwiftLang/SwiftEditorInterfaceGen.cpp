@@ -115,9 +115,9 @@ public:
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
   }
 
-  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    TypeOrExtensionDecl Target,
-                                    Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPre(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      llvm::Optional<BracketOptions> Bracket) override {
     // When we start print a synthesized extension, record the target's USR.
     llvm::SmallString<64> Buf;
     llvm::raw_svector_ostream OS(Buf);
@@ -127,10 +127,9 @@ public:
     }
   }
 
-  void
-  printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                TypeOrExtensionDecl Target,
-                                Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPost(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      llvm::Optional<BracketOptions> Bracket) override {
     // When we leave a synthesized extension, clear target's USR.
     TargetUSR = "";
   }
@@ -265,13 +264,50 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
   }
 }
 
-static bool getModuleInterfaceInfo(ASTContext &Ctx,
-                                   StringRef ModuleName,
-                                   Optional<StringRef> Group,
-                                 SwiftInterfaceGenContext::Implementation &Impl,
-                                   std::string &ErrMsg,
-                                   bool SynthesizedExtensions,
-                                   Optional<StringRef> InterestedUSR) {
+namespace {
+/// A diagnostic consumer that picks up module loading errors.
+class ModuleLoadingErrorConsumer final : public DiagnosticConsumer {
+  llvm::SmallVector<std::string, 2> DiagMessages;
+
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    // Only record errors for now. In the future it might be useful to pick up
+    // some notes, but some notes are just noise.
+    if (Info.Kind != DiagnosticKind::Error)
+      return;
+
+    std::string Message;
+    {
+      llvm::raw_string_ostream Out(Message);
+      DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                             Info.FormatArgs);
+    }
+    // We're only interested in the first and last errors. For a clang module
+    // failure, the first error will be the reason why the module failed to
+    // load, and the last error will be a generic "could not build Obj-C module"
+    // error. For a Swift module, we'll typically only emit one error.
+    //
+    // NOTE: Currently when loading transitive dependencies for a Swift module,
+    // we'll only diagnose the root failure, and not record the error for the
+    // top-level module failure, as we stop emitting errors after a fatal error
+    // has been recorded. This is currently fine for our use case though, as
+    // we already include the top-level module name in the error we hand back.
+    if (DiagMessages.size() < 2) {
+      DiagMessages.emplace_back(std::move(Message));
+    } else {
+      DiagMessages.back() = std::move(Message);
+    }
+  }
+
+public:
+  ArrayRef<std::string> getDiagMessages() { return DiagMessages; }
+};
+} // end anonymous namespace
+
+static bool getModuleInterfaceInfo(
+    ASTContext &Ctx, StringRef ModuleName, llvm::Optional<StringRef> Group,
+    SwiftInterfaceGenContext::Implementation &Impl, std::string &ErrMsg,
+    bool SynthesizedExtensions, llvm::Optional<StringRef> InterestedUSR) {
   ModuleDecl *&Mod = Impl.Mod;
   SourceTextInfo &Info = Impl.Info;
 
@@ -280,21 +316,35 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     return true;
   }
 
-  // Get the (sub)module to generate.
-  Mod = Ctx.getModuleByName(ModuleName);
-  if (!Mod) {
-    ErrMsg = "Could not load module: ";
-    ErrMsg += ModuleName;
-    return true;
+  // Get the (sub)module to generate, recording the errors emitted.
+  ModuleLoadingErrorConsumer DiagConsumer;
+  {
+    DiagnosticConsumerRAII R(Ctx.Diags, DiagConsumer);
+    Mod = Ctx.getModuleByName(ModuleName);
   }
-  if (Mod->failedToLoad()) {
-    // We might fail to load the underlying Clang module
-    // for a Swift overlay module like 'CxxStdlib', or a mixed-language
-    // framework. Make sure an error is reported in this case, so that we can
-    // either retry to load with C++ interoperability enabled, and if that
-    // fails, we can report this to the user.
-    ErrMsg = "Could not load underlying module for: ";
-    ErrMsg += ModuleName;
+
+  // Check to see if we either couldn't find the module, or we failed to load
+  // it, and report an error message back that includes the diagnostics we
+  // collected, which should help pinpoint what the issue was. Note we do this
+  // even if `Mod` is null, as the clang importer currently returns nullptr
+  // when a module fails to load, and there may be interesting errors to
+  // collect there.
+  // Note that us failing here also means the caller may retry with e.g C++
+  // interoperability enabled.
+  if (!Mod || Mod->failedToLoad()) {
+    llvm::raw_string_ostream OS(ErrMsg);
+
+    OS << "Could not load module: ";
+    OS << ModuleName;
+    auto ModuleErrs = DiagConsumer.getDiagMessages();
+    if (!ModuleErrs.empty()) {
+      // We print the errors in reverse, as they are typically emitted in
+      // a bottom-up manner by module loading, and a top-down presentation
+      // makes more sense.
+      OS << " (";
+      llvm::interleaveComma(llvm::reverse(ModuleErrs), OS);
+      OS << ")";
+    }
     return true;
   }
 
@@ -308,7 +358,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
       Options.SkipInlineCXXNamespace = true;
     }
   }
-  ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
+  ModuleTraversalOptions TraversalOptions =
+      llvm::None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
@@ -373,15 +424,11 @@ SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
   return IFaceGenCtx;
 }
 
-SwiftInterfaceGenContextRef
-SwiftInterfaceGenContext::create(StringRef DocumentName,
-                                 bool IsModule,
-                                 StringRef ModuleOrHeaderName,
-                                 Optional<StringRef> Group,
-                                 CompilerInvocation Invocation,
-                                 std::string &ErrMsg,
-                                 bool SynthesizedExtensions,
-                                 Optional<StringRef> InterestedUSR) {
+SwiftInterfaceGenContextRef SwiftInterfaceGenContext::create(
+    StringRef DocumentName, bool IsModule, StringRef ModuleOrHeaderName,
+    llvm::Optional<StringRef> Group, CompilerInvocation Invocation,
+    std::string &ErrMsg, bool SynthesizedExtensions,
+    llvm::Optional<StringRef> InterestedUSR) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
   IFaceGenCtx->Impl.DocumentName = DocumentName.str();
   IFaceGenCtx->Impl.IsModule = IsModule;
@@ -599,7 +646,7 @@ llvm::Optional<std::pair<unsigned, unsigned>>
 SwiftInterfaceGenContext::findUSRRange(StringRef USR) const {
   auto Pos = Impl.Info.USRMap.find(USR);
   if (Pos == Impl.Info.USRMap.end())
-    return None;
+    return llvm::None;
 
   return std::make_pair(Pos->getValue().Range.Offset,
                         Pos->getValue().Range.Length);
@@ -679,13 +726,10 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 //===----------------------------------------------------------------------===//
 // EditorOpenInterface
 //===----------------------------------------------------------------------===//
-void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
-                                           StringRef Name,
-                                           StringRef ModuleName,
-                                           Optional<StringRef> Group,
-                                           ArrayRef<const char *> Args,
-                                           bool SynthesizedExtensions,
-                                           Optional<StringRef> InterestedUSR) {
+void SwiftLangSupport::editorOpenInterface(
+    EditorConsumer &Consumer, StringRef Name, StringRef ModuleName,
+    llvm::Optional<StringRef> Group, ArrayRef<const char *> Args,
+    bool SynthesizedExtensions, llvm::Optional<StringRef> InterestedUSR) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -827,14 +871,10 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
       Invocation.getLangOptions().EffectiveLanguageVersion =
           swiftVer.value();
   }
-  auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
-                                                      /*IsModule=*/false,
-                                                      HeaderName,
-                                                      None,
-                                                      Invocation,
-                                                      Error,
-                                                      SynthesizedExtensions,
-                                                      None);
+  auto IFaceGenRef = SwiftInterfaceGenContext::create(
+      Name,
+      /*IsModule=*/false, HeaderName, llvm::None, Invocation, Error,
+      SynthesizedExtensions, llvm::None);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(Error.c_str());
     return;

@@ -329,6 +329,9 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
+    // We want to specifically use getASTType() here instead of getRawASTType()
+    // to ensure that we can correctly get our substituted field type. If we
+    // need to rewrap the type layer, we do it below.
     substFieldTy =
         getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
@@ -655,8 +658,8 @@ CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
                             LookUpConformanceInSubstitutionMap(subMap),
                             sig);
   }
-  
-  return fieldTy.getASTType();
+
+  return fieldTy.getRawASTType();
 }
 
 ValueOwnershipKind
@@ -848,6 +851,16 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
     }
   }
 
+  // The pattern of a pack expansion is lowered.
+  if (auto formalExpansion = dyn_cast<PackExpansionType>(formalType)) {
+    if (auto loweredExpansion = loweredType.getAs<PackExpansionType>()) {
+      return loweredExpansion.getCountType() == formalExpansion.getCountType()
+         && SILType::getPrimitiveAddressType(loweredExpansion.getPatternType())
+               .isLoweringOf(context, Mod, formalExpansion.getPatternType());
+    }
+    return false;
+  }
+
   // Dynamic self has the same lowering as its contained type.
   if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
     formalType = dynamicSelf.getSelfType();
@@ -874,7 +887,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
       SmallVector<SILParameterInfo, 4> newParams;
       SmallVector<SILYieldInfo, 4> newYields;
       SmallVector<SILResultInfo, 4> newResults;
-      Optional<SILResultInfo> newErrorResult;
+      llvm::Optional<SILResultInfo> newErrorResult;
       for (auto param : sft->getParameters()) {
         auto newParamTy = param.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
@@ -1045,6 +1058,15 @@ bool SILType::isPureMoveOnly() const {
   return false;
 }
 
+bool SILType::isValueTypeWithDeinit() const {
+  // Do not look inside an aggregate type that has a user-deinit, for which
+  // memberwise-destruction is not equivalent to aggregate destruction.
+  if (auto *nominal = getNominalOrBoundGenericNominal()) {
+    return nominal->getValueTypeDestructor() != nullptr;
+  }
+  return false;
+}
+
 SILType SILType::getInstanceTypeOfMetatype(SILFunction *function) const {
   auto metaType = castTo<MetatypeType>();
   CanType instanceTy = metaType.getInstanceType();
@@ -1145,10 +1167,45 @@ intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
 }
 
 std::string SILType::getDebugDescription() const {
-    std::string str;
-    llvm::raw_string_ostream os(str);
-    print(os);
-    str.pop_back(); // Remove trailing newline.
-    return str;
-  }
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  print(os);
+  return str;
+}
 
+SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+  auto boxTy = castTo<SILBoxType>();
+  auto *oldLayout = boxTy->getLayout();
+  auto oldField = oldLayout->getFields()[0];
+  if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
+    return *this;
+  assert(!oldField.getLoweredType()->isPureMoveOnly() &&
+         "Cannot moveonlywrapped in a moveonly type");
+  auto newField =
+      SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),
+               oldField.isMutable());
+  auto *newLayout =
+      SILLayout::get(fn->getASTContext(), oldLayout->getGenericSignature(),
+                     {newField}, oldLayout->capturesGenericEnvironment());
+  auto newBoxType = SILBoxType::get(fn->getASTContext(), newLayout,
+                                    boxTy->getSubstitutions());
+  return SILType::getPrimitiveObjectType(newBoxType);
+}
+
+SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+  auto boxTy = castTo<SILBoxType>();
+  auto *oldLayout = boxTy->getLayout();
+  auto oldField = oldLayout->getFields()[0];
+  auto *moveOnlyWrapped =
+      oldField.getLoweredType()->getAs<SILMoveOnlyWrappedType>();
+  if (!moveOnlyWrapped)
+    return *this;
+  auto newField =
+      SILField(moveOnlyWrapped->getInnerType(), oldField.isMutable());
+  auto *newLayout =
+      SILLayout::get(fn->getASTContext(), oldLayout->getGenericSignature(),
+                     {newField}, oldLayout->capturesGenericEnvironment());
+  auto newBoxType = SILBoxType::get(fn->getASTContext(), newLayout,
+                                    boxTy->getSubstitutions());
+  return SILType::getPrimitiveObjectType(newBoxType);
+}

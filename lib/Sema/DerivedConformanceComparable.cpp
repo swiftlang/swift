@@ -132,7 +132,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -197,7 +197,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      defaultItem, SourceLoc(), SourceLoc(),
                                      body,
-                                     /*case body var decls*/ None));
+                                     /*case body var decls*/ llvm::None));
   }
 
   // switch (a, b) { <case statements> }
@@ -259,16 +259,12 @@ deriveComparable_lt(
   // Add the @_implements(Comparable, < (_:_:)) attribute
   if (generatedIdentifier != C.Id_LessThanOperator) {
     auto comparable = C.getProtocol(KnownProtocolKind::Comparable);
-    auto comparableType = comparable->getDeclaredInterfaceType();
-    auto comparableTypeExpr = TypeExpr::createImplicit(comparableType, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto comparableDeclName = DeclName(C, DeclBaseName(C.Id_LessThanOperator),
                                    argumentLabels);
-    comparableDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                          SourceRange(),
-                                                          comparableTypeExpr,
-                                                          comparableDeclName,
-                                                          DeclNameLoc()));
+    comparableDecl->getAttrs().add(ImplementsAttr::create(parentDC,
+                                                          comparable,
+                                                          comparableDeclName));
   }
 
   if (!C.getLessThanIntDecl()) {

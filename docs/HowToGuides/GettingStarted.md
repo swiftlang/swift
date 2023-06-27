@@ -66,6 +66,11 @@ toolchain as a one-off, there are a couple of differences:
    mkdir swift-project
    cd swift-project
    ```
+   
+    > **Warning**  
+    > Make sure the absolute path to your `swift-project` directory **does not** contain spaces, 
+        since that might cause issues during the build step.
+    
 2. Clone the sources:
    - Via SSH (recommended):
      If you plan on contributing regularly, cloning over SSH provides a better
@@ -121,9 +126,6 @@ toolchain as a one-off, there are a couple of differences:
 
 - If `update-checkout` failed, double-check that the absolute path to your
   working directory does not have non-ASCII characters.
-- If `update-checkout` failed and the absolute path to your working directory
-  had spaces in it, please [file a bug report][Swift Issues] and change the path
-  to work around it.
 - Before running `update-checkout`, double-check that `swift` is the only
   repository inside the `swift-project` directory. Otherwise,
   `update-checkout` may not clone the necessary dependencies.
@@ -155,6 +157,7 @@ toolchain as a one-off, there are a couple of differences:
 ### Linux
 
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
+   * [Ubuntu 18.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/18.04/Dockerfile)
    * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
    * [Ubuntu 22.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/22.04/Dockerfile)
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
@@ -463,25 +466,34 @@ Now that you have made some changes, you will need to rebuild...
 
 ### Incremental builds with Ninja
 
-To rebuild the compiler:
+Subsequent steps in this and the next subsections are specific to the platform you're building on, so we'll try to detect it first and reuse as a shell variable:
+
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) bin/swift-frontend
+platform=$([[ $(uname) == Darwin ]] && echo macosx || echo linux)
 ```
 
-To rebuild everything, including the standard library:
+After setting that variable you can rebuild the compiler incrementally with this command:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-${platform}-$(uname -m) bin/swift-frontend
 ```
+
+To rebuild everything that has its sources located in the `swift` repository, including the standard library:
+```sh
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-${platform}-$(uname -m)
+```
+
+Similarly, you can rebuild other projects like Foundation or Dispatch by substituting their respective subdirectories in the commands above.
 
 ### Spot checking an incremental build
 
 As a quick test, go to `lib/Basic/Version.cpp` and tweak the version
 printing code slightly. Next, do an incremental build as above. This incremental
 build should be much faster than the from-scratch build at the beginning.
-Now check if the version string has been updated:
+Now check if the version string has been updated (assumes you have `platform` shell variable
+defined as specified in the previous subsection:
 
 ```sh
-../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/bin/swift-frontend --version
+../build/Ninja-RelWithDebInfoAssert/swift-$(platform)-$(uname -m)/bin/swift-frontend --version
 ```
 
 This should print your updated version string.

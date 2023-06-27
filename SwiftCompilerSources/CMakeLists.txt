@@ -87,6 +87,10 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
+  if(NOT LLVM_ENABLE_ASSERTIONS)
+    list(APPEND swift_compile_options "-Xcc" "-DNDEBUG")
+  endif()
+
   if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
@@ -227,7 +231,7 @@ else()
   add_subdirectory(Sources)
 
   # TODO: generate this dynamically through the modulemap; this cannot use `sed`
-  # as that is not available on all paltforms (e.g. Windows).
+  # as that is not available on all platforms (e.g. Windows).
   #
   # step 1: generate a dummy source file, which just includes all headers
   # defined in include/swift/module.modulemap

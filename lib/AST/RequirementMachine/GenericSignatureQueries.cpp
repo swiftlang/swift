@@ -361,7 +361,7 @@ Type RequirementMachine::getReducedType(
     Type type,
     TypeArrayView<GenericTypeParamType> genericParams) const {
 
-  return type.transformRec([&](Type t) -> Optional<Type> {
+  return type.transformRec([&](Type t) -> llvm::Optional<Type> {
     if (!t->hasTypeParameter())
       return t;
 
@@ -377,7 +377,7 @@ Type RequirementMachine::getReducedType(
     }
 
     if (!t->isTypeParameter())
-      return None;
+      return llvm::None;
 
     // Get a simplified term T.
     auto term = Context.getMutableTermForType(t->getCanonicalType(),

@@ -192,16 +192,13 @@ SubstitutionMap SubstitutionMap::getCanonical(bool canonicalizeSignature) const 
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      SubstitutionMap substitutions) {
-  if (!genericSig) {
-    assert(!substitutions.hasAnySubstitutableParams() &&
-           "Shouldn't have substitutions here");
+  if (!genericSig)
     return SubstitutionMap();
-  }
 
   return SubstitutionMap::get(genericSig,
            [&](SubstitutableType *type) -> Type {
              return substitutions.lookupSubstitution(
-                      CanSubstitutableType(type));
+                cast<SubstitutableType>(type->getCanonicalType()));
            },
            LookUpConformanceInSubstitutionMap(substitutions));
 }
@@ -211,7 +208,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      TypeSubstitutionFn subs,
                                      LookupConformanceFn lookupConformance) {
-  InFlightSubstitution IFS(subs, lookupConformance, None);
+  InFlightSubstitution IFS(subs, lookupConformance, llvm::None);
   return get(genericSig, IFS);
 }
 
@@ -250,7 +247,8 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     CanType depTy = req.getFirstType()->getCanonicalType();
     auto replacement = depTy.subst(IFS);
     auto *proto = req.getProtocolDecl();
-    auto conformance = IFS.lookupConformance(depTy, replacement, proto);
+    auto conformance = IFS.lookupConformance(depTy, replacement, proto,
+                                             /*level=*/0);
     conformances.push_back(conformance);
   }
 
@@ -354,7 +352,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   auto genericSig = getGenericSignature();
 
   auto getSignatureConformance =
-      [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+      [&](Type type,
+          ProtocolDecl *proto) -> llvm::Optional<ProtocolConformanceRef> {
     unsigned index = 0;
     for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance) {
@@ -366,7 +365,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       }
     }
 
-    return None;
+    return llvm::None;
   };
 
   // Fast path -- check if the generic signature directly states the
@@ -420,6 +419,16 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.
+    if (conformance.isPack()) {
+      auto pack = conformance.getPack();
+      conformance = ProtocolConformanceRef(
+          pack->getAssociatedConformance(step.first, step.second));
+      if (conformance.isInvalid())
+        return conformance;
+
+      continue;
+    }
+
     auto concrete = conformance.getConcrete();
     auto normal = concrete->getRootNormalConformance();
 
@@ -443,7 +452,9 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 }
 
 SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
-  return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
+  return subst(MapTypeOutOfContext(),
+               MakeAbstractConformanceForGenericType(),
+               SubstFlags::PreservePackExpansionLevel);
 }
 
 SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap,
@@ -832,5 +843,7 @@ SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return this->subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+  return this->subst(replacer, replacer,
+                     SubstFlags::SubstituteOpaqueArchetypes |
+                     SubstFlags::PreservePackExpansionLevel);
 }

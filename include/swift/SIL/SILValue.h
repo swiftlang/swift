@@ -556,7 +556,7 @@ public:
 
   /// Return the instruction that defines this value and the appropriate
   /// result index, or None if it is not defined by an instruction.
-  Optional<DefiningInstructionResult> getDefiningInstructionResult();
+  llvm::Optional<DefiningInstructionResult> getDefiningInstructionResult();
 
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value
@@ -570,16 +570,23 @@ public:
 
   bool isLexical() const;
 
+  bool isGuaranteedForwarding() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
   ///
   /// NOTE: Please do not use this directly! It is only meant to be used by the
   /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
-  bool unsafelyEliminateMoveOnlyWrapper() {
-    if (!Type.isMoveOnlyWrapped())
+  bool unsafelyEliminateMoveOnlyWrapper(const SILFunction *fn) {
+    if (!Type.isMoveOnlyWrapped() && !Type.isBoxedMoveOnlyWrappedType(fn))
       return false;
-    Type = Type.removingMoveOnlyWrapper();
+    if (Type.isMoveOnlyWrapped()) {
+      Type = Type.removingMoveOnlyWrapper();
+    } else {
+      assert(Type.isBoxedMoveOnlyWrappedType(fn));
+      Type = Type.removingMoveOnlyWrapperToBoxedType(fn);
+    }
     return true;
   }
 

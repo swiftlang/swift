@@ -17,6 +17,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
+#include "Tracing.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
@@ -732,11 +733,23 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
+#if SWIFT_OBJC_INTEROP
+  // Classes in the __C module are ObjC classes. They never have a
+  // nominal type descriptor, so don't bother to search for one.
+  if (node && node->getKind() == Node::Kind::Class)
+    if (auto child = node->getFirstChild())
+      if (child->getKind() == Node::Kind::Module && child->hasText())
+        if (child->getText() == MANGLING_MODULE_OBJC)
+          return nullptr;
+#endif
+
+  auto traceState = runtime::trace::metadata_scan_begin(node);
+
   for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto context = record.getContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(context, node)) {
-          return context;
+          return traceState.end(context);
         }
       }
     }
@@ -770,6 +783,8 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 
 #include "swift/Demangling/StandardTypesMangling.def"
 
+static const ConcurrencyStandardTypeDescriptors *concurrencyDescriptors;
+
 static const ContextDescriptor *
 _findContextDescriptor(Demangle::NodePointer node,
                        Demangle::Demangler &Dem) {
@@ -797,7 +812,10 @@ _findContextDescriptor(Demangle::NodePointer node,
     }
   // FIXME: When the _Concurrency library gets merged into the Standard Library,
   // we will be able to reference those symbols directly as well.
-#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
+  if (concurrencyDescriptors && name.equals(#TYPENAME)) {                      \
+    return concurrencyDescriptors->TYPENAME;                                   \
+  }
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -849,6 +867,11 @@ _findContextDescriptor(Demangle::NodePointer node,
     });
 
   return foundContext;
+}
+
+void swift::_swift_registerConcurrencyStandardTypeDescriptors(
+    const ConcurrencyStandardTypeDescriptors *descriptors) {
+  concurrencyDescriptors = descriptors;
 }
 
 #pragma mark Protocol descriptor cache
@@ -950,11 +973,13 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        NodePointer node) {
+  auto traceState = runtime::trace::protocol_scan_begin(node);
+
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
         if (_contextDescriptorMatchesMangling(protocol, node))
-          return protocol;
+          return traceState.end(protocol);
       }
     }
   }
@@ -1043,13 +1068,15 @@ llvm::Optional<unsigned>
 swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
                               llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
-  if (depth >= paramCounts.size()) return None;
+  if (depth >= paramCounts.size())
+    return llvm::None;
 
   // Compute the flat index.
   unsigned flatIndex = index + (depth == 0 ? 0 : paramCounts[depth - 1]);
 
   // Out-of-bounds index.
-  if (flatIndex >= paramCounts[depth]) return None;
+  if (flatIndex >= paramCounts[depth])
+    return llvm::None;
 
   return flatIndex;
 }
@@ -1263,6 +1290,9 @@ _gatherGenericParameters(const ContextDescriptor *context,
       }
 
       // Add metadata for each canonical generic parameter.
+      auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
+      unsigned packIdx = 0;
+
       for (unsigned i = 0; i != n; ++i) {
         const auto &param = genericParams[i];
         auto arg = allGenericArgs[i];
@@ -1293,7 +1323,20 @@ _gatherGenericParameters(const ContextDescriptor *context,
           }
 
           if (param.hasKeyArgument()) {
-            allGenericArgsVec.push_back(arg.getMetadataPack().getPointer());
+            auto packShapeDescriptor = packShapeDescriptors[packIdx];
+            assert(packShapeDescriptor.Kind == GenericPackKind::Metadata);
+            assert(packShapeDescriptor.Index == allGenericArgsVec.size());
+            assert(packShapeDescriptor.ShapeClass < packShapeHeader.NumShapeClasses);
+
+            auto argPack = arg.getMetadataPack();
+            assert(argPack.getLifetime() == PackLifetime::OnHeap);
+
+            // Fill in the length for each shape class.
+            allGenericArgsVec[packShapeDescriptor.ShapeClass] =
+                reinterpret_cast<const void *>(argPack.getNumElements());
+
+            allGenericArgsVec.push_back(argPack.getPointer());
+            ++packIdx;
           }
 
           break;
@@ -1306,22 +1349,6 @@ _gatherGenericParameters(const ContextDescriptor *context,
                    std::to_string(static_cast<uint8_t>(param.getKind()));
           });
         }
-      }
-
-      // Fill in the length for each shape class.
-      auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
-      for (auto packShapeDescriptor : packShapeDescriptors) {
-        if (packShapeDescriptor.Kind != GenericPackKind::Metadata)
-          continue;
-
-        assert(packShapeDescriptor.Index < allGenericArgsVec.size());
-        assert(packShapeDescriptor.ShapeClass < packShapeHeader.NumShapeClasses);
-
-        MetadataPackPointer pack(allGenericArgsVec[packShapeDescriptor.Index]);
-        assert(pack.getLifetime() == PackLifetime::OnHeap);
-
-        allGenericArgsVec[packShapeDescriptor.ShapeClass] =
-            reinterpret_cast<const void *>(pack.getNumElements());
       }
     }
 
@@ -1366,7 +1393,8 @@ llvm::Optional<const ProtocolRequirement *>
 findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
-  if (!associatedTypeNamesPtr) return None;
+  if (!associatedTypeNamesPtr)
+    return llvm::None;
 
   // Look through the list of associated type names.
   StringRef associatedTypeNames(associatedTypeNamesPtr);
@@ -1385,7 +1413,8 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
     associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
   }
 
-  if (!found) return None;
+  if (!found)
+    return llvm::None;
 
   // We have a match on the Nth associated type; go find the Nth associated
   // type requirement.
@@ -1758,9 +1787,10 @@ public:
     return BuiltType();
   }
 
-  TypeLookupErrorOr<BuiltType> createMetatypeType(
-      BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+  TypeLookupErrorOr<BuiltType>
+  createMetatypeType(BuiltType instance,
+                     llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
+                         llvm::None) const {
     if (!instance.isMetadata())
       return TYPE_LOOKUP_ERROR_FMT("Tried to build a metatype from a pack");
     return BuiltType(swift_getMetatypeMetadata(instance.getMetadata()));
@@ -1768,7 +1798,8 @@ public:
 
   TypeLookupErrorOr<BuiltType> createExistentialMetatypeType(
       BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
+          llvm::None) const {
     if (!instance.isMetadata()) {
       return TYPE_LOOKUP_ERROR_FMT("Tried to build an existential metatype "
                                    "from a pack");
@@ -2830,16 +2861,20 @@ void SubstGenericParametersFromMetadata::setup() const {
     assert(baseContext);
     DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
     numKeyGenericParameters = buildDescriptorPath(baseContext, demangler);
+    if (auto *genericCtx = baseContext->getGenericContext())
+      numShapeClasses = genericCtx->getGenericPackShapeHeader().NumShapeClasses;
     return;
   }
   case SourceKind::Environment: {
     assert(environment);
     numKeyGenericParameters = buildEnvironmentPath(environment);
+    // FIXME: Variadic generics
     return;
   }
   case SourceKind::Shape: {
     assert(shape);
     numKeyGenericParameters = buildShapePath(shape);
+    // FIXME: Variadic generics
     return;
   }
   }
@@ -2863,7 +2898,7 @@ SubstGenericParametersFromMetadata::getMetadata(
     return MetadataOrPack();
 
   // Compute the flat index.
-  unsigned flatIndex = pathElement.numKeyGenericParamsInParent;
+  unsigned flatIndex = pathElement.numKeyGenericParamsInParent + numShapeClasses;
   if (pathElement.hasNonKeyGenericParams > 0) {
     // We have non-key generic parameters at this level, so the index needs to
     // be checked more carefully.
@@ -2892,7 +2927,8 @@ SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
   // On first access, compute the descriptor path.
   setup();
 
-  return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
+  return (const WitnessTable *)genericArgs[
+      index + numKeyGenericParameters + numShapeClasses];
 }
 
 MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadata(
@@ -2920,13 +2956,13 @@ demangleToGenericParamRef(StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
   if (!node)
-    return None;
+    return llvm::None;
 
   // Find the flat index that the right-hand side refers to.
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
   if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return None;
+    return llvm::None;
 
   return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
                                        node->getChild(1)->getIndex());

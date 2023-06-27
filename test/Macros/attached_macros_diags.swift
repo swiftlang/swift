@@ -6,17 +6,17 @@
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1()'}}
 // expected-note@-2{{'m1()' declared here}}
 
-@attached(accessor) macro m2(_: Int) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
+@attached(accessor) macro m2(_: Int) = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
 // expected-note@-2{{candidate has partially matching parameter list (Int)}}
 // expected-note@-3{{candidate expects value of type 'Int' for parameter #1 (got 'String')}}
 
-@attached(accessor) macro m2(_: Double) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
+@attached(accessor) macro m2(_: Double) = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
 // expected-note@-2{{candidate has partially matching parameter list (Double)}}
 // expected-note@-3{{candidate expects value of type 'Double' for parameter #1 (got 'String')}}
 
-@attached(accessor) macro m3(message: String) -> Void = #externalMacro(module: "MyMacros", type: "Macro3")
+@attached(accessor) macro m3(message: String) = #externalMacro(module: "MyMacros", type: "Macro3")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro3' could not be found for macro 'm3(message:)'}}
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MyMacros", type: "StringifyMacro")
@@ -38,7 +38,7 @@ struct SkipNestedType {
 
   // We select the macro, not the property wrapper.
   @m1 var x: Int = 0
-  // expected-error@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1()'; the type must be public and provided via '-load-plugin-library'}}
+  // expected-error@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1()'}}
 }
 
 struct TestMacroArgs {

@@ -59,3 +59,51 @@ struct MethodModifiers {
     borrowing consuming func tooManyC() {} // expected-error{{method must not be declared both 'borrowing' and 'consuming'}}
     borrowing mutating consuming func tooManyD() {} // expected-error 2 {{method must not be declared both }}
 }
+
+func chalk(_ a: consuming String,
+           _ b: borrowing [Int],
+           _ c: __shared [String],
+           _ d: __owned Int?)
+           {}
+
+struct Stepping {
+    consuming func perform() {}
+    borrowing func doIt() {}
+  mutating func change() {}
+  var ex: Int {
+    __consuming get { 0 }
+  }
+}
+
+class Clapping {
+    consuming func perform() {}
+    borrowing func doIt() {}
+  var ex: Int {
+    __consuming get { 0 }
+  }
+}
+
+protocol Popping {
+    consuming func perform()
+    borrowing func doIt()
+  mutating func change()
+  var ex: Int {
+    __consuming get
+  }
+}
+
+enum Exercising {
+    consuming func perform() {}
+    borrowing func doIt() {}
+  mutating func change() {}
+  var ex: Int {
+    __consuming get { 0 }
+  }
+}
+
+func consumingClosure1(_ f: consuming () -> ()) { } // expected-error {{'consuming' cannot be applied to nonescaping closure}}
+func consumingClosure2(_ f: consuming @escaping () -> ()) { }
+
+func borrowingClosure1(_ f: borrowing () -> ()) { }
+func borrowingClosure2(_ f: borrowing @escaping () -> ()) { }
+

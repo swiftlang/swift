@@ -9,49 +9,67 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _Concurrency
 
+/// A type that emits notifications to observers when underlying data changes.
+///
+/// Conforming to this protocol signals to other APIs that the type supports
+/// observation. However, applying the `Observable` protocol by itself to a
+/// type doesn't add observation functionality to the type. Instead, always use
+/// the ``Observation/Observable-swift.macro`` macro when adding observation
+/// support to a type.
 @available(SwiftStdlib 5.9, *)
-public protocol Observable {
-  nonisolated func changes<Isolation: Actor>(
-    for properties: TrackedProperties<Self>,
-    isolatedTo isolation: Isolation
-  ) -> ObservedChanges<Self, Isolation>
-  
-  nonisolated func values<Member: Sendable>(
-    for keyPath: KeyPath<Self, Member>
-  ) -> ObservedValues<Self, Member>
-  
-  nonisolated static func dependencies(
-    of keyPath: PartialKeyPath<Self>
-  ) -> TrackedProperties<Self>
-}
+@_marker public protocol Observable { }
 
+#if $Macros && hasAttribute(attached)
 
+/// Defines and implements conformance of the Observable protocol.
+///
+/// This macro adds observation support to a custom type and conforms the type
+/// to the ``Observation/Observable-swift.protocol`` protocol. For example, the
+/// following code applies the `Observable` macro to the type `Car` making it
+/// observable:
+///
+///     @Observable 
+///     class Car {
+///        var name: String = ""
+///        var needsRepairs: Bool = false
+///        
+///        init(name: String, needsRepairs: Bool = false) {
+///            self.name = name
+///            self.needsRepairs = needsRepairs
+///        }
+///     }
 @available(SwiftStdlib 5.9, *)
-extension Observable {
-  public nonisolated func changes<Member, Isolation: Actor>(
-    for keyPath: KeyPath<Self, Member>,
-    isolatedTo isolation: Isolation
-  ) -> ObservedChanges<Self, Isolation> {
-    changes(for: [keyPath], isolatedTo: isolation)
-  }
-  
-  public nonisolated func changes(
-    for properties: TrackedProperties<Self>
-  ) -> ObservedChanges<Self, MainActor.ActorType> {
-    changes(for: properties, isolatedTo: MainActor.shared)
-  }
-  
-  public nonisolated func changes<Member>(
-    for keyPath: KeyPath<Self, Member>
-  ) -> ObservedChanges<Self, MainActor.ActorType> {
-    changes(for: [keyPath], isolatedTo: MainActor.shared)
-  }
-  
-  public nonisolated static func dependencies(
-    of keyPath: PartialKeyPath<Self>
-  ) -> TrackedProperties<Self> {
-    return [keyPath]
-  }
-}
+#if OBSERVATION_SUPPORTS_PEER_MACROS
+@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation))
+#else
+@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation), arbitrary)
+#endif
+@attached(memberAttribute)
+@attached(conformance)
+public macro Observable() =
+  #externalMacro(module: "ObservationMacros", type: "ObservableMacro")
+
+/// Synthesizes a property for accessors.
+///
+/// The ``Observation`` module uses this macro. Its use outside of the
+/// framework isn't necessary.
+@available(SwiftStdlib 5.9, *)
+@attached(accessor, names: named(init), named(get), named(set))
+#if OBSERVATION_SUPPORTS_PEER_MACROS
+@attached(peer, names: prefixed(_))
+#endif
+public macro ObservationTracked() =
+  #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")
+
+/// Disables observation tracking of a property.
+///
+/// By default, an object can observe any property of an observable type that
+/// is accessible to the observing object. To prevent observation of an
+/// accessible property, attach the `ObservationIgnored` macro to the property.
+@available(SwiftStdlib 5.9, *)
+@attached(accessor, names: named(willSet))
+public macro ObservationIgnored() =
+  #externalMacro(module: "ObservationMacros", type: "ObservationIgnoredMacro")
+
+#endif

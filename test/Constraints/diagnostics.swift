@@ -297,7 +297,7 @@ func r18800223(_ i : Int) {
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-_ = { $0 }  // expected-error {{unable to infer type of a closure parameter '$0' in the current context}}
+_ = { $0 }  // expected-error {{cannot infer type of closure parameter '$0' without a type annotation}}
 
 
 
@@ -661,10 +661,7 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 
 
 struct UnaryOp {}
-
 _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
-// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Double), (Float)}}
-
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
 func f23433271(_ x : UnsafePointer<Int>) {}
@@ -1550,4 +1547,13 @@ func issue63746() {
 func rdar86611718(list: [Int]) {
   String(list.count())
   // expected-error@-1 {{cannot call value of non-function type 'Int'}}
+}
+
+// rdar://108977234 - failed to produce diagnostic when argument to AnyHashable parameter doesn't conform to Hashable protocol
+do {
+  struct NonHashable {}
+
+  func test(result: inout [AnyHashable], value: NonHashable) {
+    result.append(value) // expected-error {{argument type 'NonHashable' does not conform to expected type 'Hashable'}}
+  }
 }

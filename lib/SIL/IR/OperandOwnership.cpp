@@ -99,6 +99,7 @@ SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
 SHOULD_NEVER_VISIT_INST(AllocGlobal)
 SHOULD_NEVER_VISIT_INST(AllocStack)
 SHOULD_NEVER_VISIT_INST(AllocPack)
+SHOULD_NEVER_VISIT_INST(AllocPackMetadata)
 SHOULD_NEVER_VISIT_INST(PackLength)
 SHOULD_NEVER_VISIT_INST(DifferentiabilityWitnessFunction)
 SHOULD_NEVER_VISIT_INST(FloatLiteral)
@@ -147,6 +148,8 @@ OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
+OPERAND_OWNERSHIP(TrivialUse, MoveOnlyWrapperToCopyableAddr)
+OPERAND_OWNERSHIP(TrivialUse, CopyableToMoveOnlyWrapperAddr)
 OPERAND_OWNERSHIP(TrivialUse, BeginUnpairedAccess)
 OPERAND_OWNERSHIP(TrivialUse, BindMemory)
 OPERAND_OWNERSHIP(TrivialUse, RebindMemory)
@@ -158,6 +161,7 @@ OPERAND_OWNERSHIP(TrivialUse, ExplicitCopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeallocPack)
+OPERAND_OWNERSHIP(TrivialUse, DeallocPackMetadata)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
 OPERAND_OWNERSHIP(TrivialUse, EndAccess)
@@ -184,8 +188,6 @@ OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
-// select_value is only supported for integer types currently.
-OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -306,9 +308,8 @@ OPERAND_OWNERSHIP(ForwardingConsume, Throw)
 OPERAND_OWNERSHIP(InteriorPointer, RefElementAddr)
 OPERAND_OWNERSHIP(InteriorPointer, RefTailAddr)
 OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
-// FIXME: HopToExecutorInst should be an instantaneous use.
-OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
-OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
+OPERAND_OWNERSHIP(InstantaneousUse, HopToExecutor)
+OPERAND_OWNERSHIP(PointerEscape, ExtractExecutor)
 
 // Instructions that propagate a value within a borrow scope.
 OPERAND_OWNERSHIP(GuaranteedForwarding, TupleExtract)
@@ -370,6 +371,7 @@ FORWARDING_OWNERSHIP(MarkMustCheck)
 FORWARDING_OWNERSHIP(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP(CopyableToMoveOnlyWrapperValue)
+FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableBox)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to
@@ -435,11 +437,11 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
-  ValueOwnershipKind destBlockArgOwnershipKind =
-      bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
+  auto *destArg = bi->getDestBB()->getArgument(getOperandIndex());
+  ValueOwnershipKind destBlockArgOwnershipKind = destArg->getOwnershipKind();
 
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
-    return isGuaranteedForwarding(getValue())
+    return destArg->isGuaranteedForwarding()
                ? OperandOwnership::GuaranteedForwarding
                : OperandOwnership::Reborrow;
   }
@@ -618,6 +620,16 @@ OperandOwnershipClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i) {
     return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::InstantaneousUse; // initializer/setter closure
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitAssignOrInitInst(AssignOrInitInst *i) {
+  if (getValue() == i->getSrc()) {
+    return OperandOwnership::DestroyingConsume;
+  }
+
+  // initializer/setter closure
+  return OperandOwnership::InstantaneousUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitStoreInst(StoreInst *i) {
@@ -881,12 +893,8 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
   // The function operand is consumed by the new task.
   if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION))
     return OperandOwnership::DestroyingConsume;
-  
-  // FIXME: These are considered InteriorPointer because they may propagate a
-  // pointer into a borrowed values. If they do not propagate an interior pointer,
-  // then they should be InstantaneousUse instead and should not require a
-  // guaranteed value.
-  return OperandOwnership::InteriorPointer;
+
+  return OperandOwnership::InstantaneousUse;
 }
 
 OperandOwnership
@@ -895,12 +903,8 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
   // The function operand is consumed by the new task.
   if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION))
     return OperandOwnership::DestroyingConsume;
-  
-  // FIXME: These are considered InteriorPointer because they may propagate a
-  // pointer into a borrowed values. If they do not propagate an interior pointer,
-  // then they should be InstantaneousUse instead and should not require a
-  // guaranteed value.
-  return OperandOwnership::InteriorPointer;
+
+  return OperandOwnership::InstantaneousUse;
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::
@@ -932,12 +936,13 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CancelAsyncTask)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyDefaultActor)
 
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeNonDefaultDistributedActor)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDistributedRemoteActor)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse,
+                          InitializeNonDefaultDistributedActor)
 
 BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffAllocateSubcontext)
 BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)

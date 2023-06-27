@@ -154,6 +154,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
+
+  // Prevent the use of ~ as prefix for a type. We specially parse them
+  // in inheritance clauses elsewhere.
+  if (Tok.isTilde()) {
+    auto tildeLoc = consumeToken();
+    diagnose(tildeLoc, diag::cannot_suppress_here)
+        .fixItRemoveChars(tildeLoc, tildeLoc);
+  }
+
   if (Tok.is(tok::kw_inout)
       || (canHaveParameterSpecifierContextualKeyword()
           && (Tok.getRawText().equals("__shared")
@@ -482,8 +491,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     MutableArrayRef<TypeRepr *> patternSubsTypes;
     if (isInSILMode()) {
       auto parseSubstitutions =
-          [&](MutableArrayRef<TypeRepr*> &subs) -> Optional<bool> {
-        if (!consumeIf(tok::kw_for)) return None;
+          [&](MutableArrayRef<TypeRepr *> &subs) -> llvm::Optional<bool> {
+        if (!consumeIf(tok::kw_for))
+          return llvm::None;
 
         if (!startsWithLess(Tok)) {
           diagnose(Tok, diag::sil_function_subst_expected_l_angle);
@@ -572,6 +582,14 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
                            constLoc));
 }
 
+/// Build a TypeRepr for AST node for the type at the given source location in the specified file.
+///
+/// \param sourceLoc The source location at which to start processing a type.
+/// \param endSourceLoc Will receive the source location immediately following the type.
+extern "C" TypeRepr *swift_ASTGen_buildTypeRepr(
+    void *sourceFile, const void *_Nullable sourceLoc,
+    void *declContext, void *astContext, const void *_Nullable *endSourceLoc);
+
 /// parseType
 ///   type:
 ///     type-scalar
@@ -582,6 +600,32 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 ///
 ParserResult<TypeRepr> Parser::parseType(
     Diag<> MessageID, ParseTypeReason reason) {
+  #if SWIFT_SWIFT_PARSER
+  auto astGenResult = parseASTFromSyntaxTree<TypeRepr>(
+      [&](void *exportedSourceFile, const void *sourceLoc) {
+        const void *endLocPtr = nullptr;
+        TypeRepr *typeRepr = swift_ASTGen_buildTypeRepr(
+            exportedSourceFile, Tok.getLoc().getOpaquePointerValue(),
+            CurDeclContext, &Context, &endLocPtr);
+        return std::make_pair(typeRepr, endLocPtr);
+      });
+  if (astGenResult.isNonNull()) {
+    // Note: there is a representational difference between the swift-syntax
+    // tree and the C++ parser tree regarding variadic parameters. In the
+    // swift-syntax tree, the ellipsis is part of the parameter declaration.
+    // In the C++ parser tree, the ellipsis is part of the type. Account for
+    // this difference by consuming the ellipsis here.
+    if (Tok.isEllipsis()) {
+      Tok.setKind(tok::ellipsis);
+      SourceLoc ellipsisLoc = consumeToken();
+      return makeParserResult(astGenResult,
+          new (Context) VarargTypeRepr(astGenResult.get(), ellipsisLoc));
+    }
+
+    return astGenResult;
+  }
+  #endif
+
   // Parse pack expansion 'repeat T'
   if (Tok.is(tok::kw_repeat)) {
     SourceLoc repeatLoc = consumeToken(tok::kw_repeat);

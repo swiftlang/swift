@@ -55,6 +55,11 @@ size_t PackConformance::numTrailingObjects(
   return ConformingType->getNumElements();
 }
 
+bool PackConformance::isInvalid() const {
+  return llvm::any_of(getPatternConformances(),
+                      [&](const auto ref) { return ref.isInvalid(); });
+}
+
 ArrayRef<ProtocolConformanceRef>
 PackConformance::getPatternConformances() const {
   return {getTrailingObjects<ProtocolConformanceRef>(),

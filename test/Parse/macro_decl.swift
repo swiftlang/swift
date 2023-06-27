@@ -16,6 +16,11 @@ extension String {
 
   #memberwiseInit(flavor: .chocolate, haha: true) { "abc" }
 
+  @available(macOS 999, *)
+  public #memberwiseInit()
+
+  static internal #memberwiseInit
+
   struct Foo {
     #memberwiseInit
 
@@ -25,4 +30,27 @@ extension String {
 
   // expected-error @+1 {{expected a macro identifier for a pound literal declaration}}
   #()
+}
+
+@RandomAttr #someFunc
+
+public #someFunc
+
+#someFunc
+
+func test() {
+  @discardableResult #someFunc
+
+  dynamic #someFunc
+
+  @CustomAttr
+  isolated #someFunc
+}
+
+public # someFunc // expected-error {{extraneous whitespace between '#' and macro name is not permitted}} {{9-10=}}
+
+struct S {
+  # someFunc // expected-error {{extraneous whitespace between '#' and macro name is not permitted}} {{4-5=}}
+  #class
+  # struct Inner {} // expected-error {{expected a macro identifier for a pound literal declaration}} expected-error {{consecutive declarations on a line}}
 }

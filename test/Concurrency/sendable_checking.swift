@@ -81,8 +81,8 @@ public actor MyActor: MyProto {
   public func bar<B>(aBar: B) async where B: Sendable { }
 
   func g(ns1: NS1) async {
-    await nonisolatedAsyncFunc1(ns1) // expected-warning{{non-sendable type 'NS1' exiting actor-isolated context in call to non-isolated global function 'nonisolatedAsyncFunc1' cannot cross actor boundary}}
-    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by call from actor-isolated context to non-isolated global function 'nonisolatedAsyncFunc2()' cannot cross actor boundary}}
+    await nonisolatedAsyncFunc1(ns1) // expected-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
+    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
 
@@ -112,4 +112,121 @@ class SendableSubclass: NSClass, @unchecked Sendable { }
 @available(SwiftStdlib 5.1, *)
 func testSubclassing(obj: SendableSubclass) async {
   acceptCV(obj) // okay!
+}
+
+
+@available(SwiftStdlib 5.1, *)
+protocol P {
+  func foo (x : @Sendable () -> ()) async -> ()
+
+  func bar(x : () -> ()) async -> ()
+  // expected-note@-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+
+  func foo2<T : Sendable>(x : T) async -> ()
+
+  func bar2<T>(x : T) async -> ()
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+}
+
+// Make sure conformance to protocols checks sendability of
+// requirement parameters not witness parameters
+@available(SwiftStdlib 5.1, *)
+        actor A : P {
+  func foo(x : () -> ()) -> () {}
+
+  func bar(x : () -> ()) -> () {}
+  // expected-warning@-1 {{non-sendable type '() -> ()' in parameter of the protocol requirement satisfied by actor-isolated instance method 'bar(x:)' cannot cross actor boundary}}
+
+  func foo2<T>(x : T) -> () {}
+
+  func bar2<T>(x : T) -> () {}
+  // expected-warning@-1 {{non-sendable type 'T' in parameter of the protocol requirement satisfied by actor-isolated instance method 'bar2(x:)' cannot cross actor boundary}}
+}
+
+@available(SwiftStdlib 5.1, *)
+class Super {
+  @MainActor
+  func foo (x : @Sendable () -> ()) async {}
+
+  @MainActor
+  func bar (x : () -> ()) async {}
+  // expected-note@-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+
+  @MainActor
+  func foo2<T : Sendable>(x: T) async {}
+
+  @MainActor
+  func bar2<T>(x: T) async {}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+}
+
+// Make sure isolation crossing overrides check sendability
+// of superclass parameters not subclass parameters
+@available(SwiftStdlib 5.1, *)
+class Sub : Super {
+  override nonisolated func foo(x : () -> ()) async {}
+
+  override nonisolated func bar(x : () -> ()) async {}
+  // expected-warning@-1 {{non-sendable type '() -> ()' in parameter of superclass method overridden by nonisolated instance method 'bar(x:)' cannot cross actor boundary}}
+
+  override nonisolated func foo2<T>(x: T) async {}
+
+  override nonisolated func bar2<T>(x: T) async {}
+  // expected-warning@-1 {{non-sendable type 'T' in parameter of superclass method overridden by nonisolated instance method 'bar2(x:)' cannot cross actor boundary}}
+}
+
+@available(SwiftStdlib 5.1, *)
+class SuperWSafeSubscript {
+  @MainActor
+  subscript<T : Sendable>(x : T) -> Int {
+    get async {
+      return 0
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+class SubWSafeSubscript : SuperWSafeSubscript {
+  override nonisolated subscript<T>(x : T) -> Int {
+    get async {
+      return 0
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+class SuperWUnsafeSubscript {
+  @MainActor
+  subscript<T>(x : T) -> Int {
+    // expected-note@-1 2{{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+    get async {
+      return 0
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+class SubWUnsafeSubscript : SuperWUnsafeSubscript {
+  override nonisolated subscript<T>(x : T) -> Int {
+    get async {
+      // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated subscript 'subscript(_:)' cannot cross actor boundary}}
+      // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated getter '_' cannot cross actor boundary}}
+      // there really shouldn't be two warnings produced here, see rdar://110846040 (Sendable diagnostics reported twice for subscript getters)
+      return 0
+    }
+  }
+}
+
+
+// Test implicit conversions getting in the way
+@available(SwiftStdlib 5.1, *)
+extension MyActor {
+  func f(_: Any) { }
+  func g(_: () -> Void) { }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> Void) async {
+  await a.f(s)
+  await a.g(f)
 }

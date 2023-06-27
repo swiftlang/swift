@@ -36,7 +36,7 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// The index of the argument containing the completion location
     unsigned ArgIdx;
     /// The index of the parameter corresponding to the completion argument.
-    Optional<unsigned> ParamIdx;
+    llvm::Optional<unsigned> ParamIdx;
     /// The indices of all params that were bound to non-synthesized
     /// arguments. Used so we don't suggest them even when the args are out of
     /// order.
@@ -50,6 +50,13 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
+    /// A bitfield to mark whether the parameter at a given index is optional.
+    /// Parameters can be optional if they have a default argument or belong to
+    /// a parameter pack.
+    /// Indices are based on the parameters in \c FuncTy. Note that the number
+    /// of parameters in \c FuncTy and \c FuncD is different when a parameter
+    /// pack has been exploded.
+    llvm::BitVector DeclParamIsOptional;
 
     /// Types of variables that were determined in the solution that produced
     /// this result. This in particular includes parameters of closures that

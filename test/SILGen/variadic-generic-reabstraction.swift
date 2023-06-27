@@ -53,13 +53,13 @@ func forwardAndReabstractFunctionPack<each T>(functions: repeat (each T) -> Bool
 
 // CHECK-LABEL: sil{{.*}} @$s4main22passConcreteToVariadic2fnyS2i_SStXE_tF :
 // CHECK:         [[COPY:%.*]] = copy_value %0 : $@noescape @callee_guaranteed (Int, @guaranteed String) -> Int
-// CHECK:         [[THUNK:%.*]] = function_ref @$sSiSSSiIgygd_Si_SSQSiSiIeggd_TR
+// CHECK:         [[THUNK:%.*]] = function_ref @$sSiSSSiIgygd_Si_SSQSiSiIegpd_TR
 // CHECK:         partial_apply [callee_guaranteed] [[THUNK]]([[COPY]])
 func passConcreteToVariadic(fn: (Int, String) -> Int) {
   takesVariadicFunction(function: fn)
 }
 
-// CHECK-LABEL: sil{{.*}} @$sSiSSSiIgygd_Si_SSQSiSiIeggd_TR :
+// CHECK-LABEL: sil{{.*}} @$sSiSSSiIgygd_Si_SSQSiSiIegpd_TR :
 // CHECK:       bb0(%0 : $*Pack{Int, String}, %1 : @guaranteed $@noescape @callee_guaranteed (Int, @guaranteed String) -> Int):
 // CHECK-NEXT:    [[INT_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String}
 // CHECK-NEXT:    [[INT_ADDR:%.*]] = pack_element_get [[INT_INDEX]] of %0 : $*Pack{Int, String}
@@ -74,7 +74,7 @@ func passConcreteToVariadic(fn: (Int, String) -> Int) {
 //   FIXME: we aren't preserving that the argument is owned
 // CHECK-LABEL: sil{{.*}} @$s4main27passConcreteToOwnedVariadic2fnyS2i_SStXE_tF :
 // CHECK:         [[COPY:%.*]] = copy_value %0 : $@noescape @callee_guaranteed (Int, @guaranteed String) -> Int
-// CHECK:         [[THUNK:%.*]] = function_ref @$sSiSSSiIgygd_Si_SSQSiSiIeggd_TR
+// CHECK:         [[THUNK:%.*]] = function_ref @$sSiSSSiIgygd_Si_SSQSiSiIegpd_TR
 // CHECK:         partial_apply [callee_guaranteed] [[THUNK]]([[COPY]])
 func passConcreteToOwnedVariadic(fn: (Int, String) -> Int) {
   takesVariadicOwnedFunction(function: fn)
@@ -108,3 +108,52 @@ func passConcreteClosureToVariadic2(fn: (Int, String) -> Int, x: Int) {
   takesVariadicFunction {y in fn(x, y)}
 }
  */
+
+// rdar://109843932
+//   Test that the path where we emit closures naturally at a
+//   particular abstraction level correctly handles variadic
+//   expansion in the result type.
+func takeClosureWithVariadicResult<each Argument, each Result>(_: (repeat each Argument) -> (repeat each Result)) {}
+
+// CHECK-LABEL: sil {{.*}}@$s4main30testResultReabstractedEmissionyyFSb_SitSi_SbtXEfU_ :
+// CHECK-SAME: $@convention(thin) @substituted <each τ_0_0, each τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_1} for <Pack{Int, Bool}, Pack{Bool, Int}>
+// CHECK:       bb0(%0 : $*Pack{Bool, Int}, %1 : $*Pack{Int, Bool}):
+// CHECK-NEXT:    [[ARG_INDEX_0:%.*]] = scalar_pack_index 0 of $Pack{Int, Bool}
+// CHECK-NEXT:    [[ARG_ADDR_0:%.*]] = pack_element_get [[ARG_INDEX_0]] of %1 : $*Pack{Int, Bool} as $*Int
+// CHECK-NEXT:    [[ARG_0:%.*]] = load [trivial] [[ARG_ADDR_0]] : $*Int
+// CHECK-NEXT:    debug_value [[ARG_0]] :
+// CHECK-NEXT:    [[ARG_INDEX_1:%.*]] = scalar_pack_index 1 of $Pack{Int, Bool}
+// CHECK-NEXT:    [[ARG_ADDR_1:%.*]] = pack_element_get [[ARG_INDEX_1]] of %1 : $*Pack{Int, Bool} as $*Bool
+// CHECK-NEXT:    [[ARG_1:%.*]] = load [trivial] [[ARG_ADDR_1]] : $*Bool
+// CHECK-NEXT:    debug_value [[ARG_1]] :
+// CHECK-NEXT:    [[RET_INDEX_0:%.*]] = scalar_pack_index 0 of $Pack{Bool, Int}
+// CHECK-NEXT:    [[RET_ADDR_0:%.*]] = pack_element_get [[RET_INDEX_0]] of %0 : $*Pack{Bool, Int} as $*Bool
+// CHECK-NEXT:    [[RET_INDEX_1:%.*]] = scalar_pack_index 1 of $Pack{Bool, Int}
+// CHECK-NEXT:    [[RET_ADDR_1:%.*]] = pack_element_get [[RET_INDEX_1]] of %0 : $*Pack{Bool, Int} as $*Int
+// CHECK-NEXT:    store [[ARG_1]] to [trivial] [[RET_ADDR_0]] : $*Bool
+// CHECK-NEXT:    store [[ARG_0]] to [trivial] [[RET_ADDR_1]] : $*Int
+func testResultReabstractedEmission() {
+  takeClosureWithVariadicResult {
+    (a: Int, b: Bool) -> (Bool, Int) in (b, a)
+  }
+}
+
+// CHECK-LABEL: sil {{.*}}@$s4main40testResultReabstractedEmission_vanishingyyFSbSi_SbtXEfU_ :
+// CHECK-SAME: $@convention(thin) @substituted <each τ_0_0, each τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_1} for <Pack{Int, Bool}, Pack{Bool}>
+// CHECK:       bb0(%0 : $*Pack{Bool}, %1 : $*Pack{Int, Bool}):
+// CHECK-NEXT:    [[ARG_INDEX_0:%.*]] = scalar_pack_index 0 of $Pack{Int, Bool}
+// CHECK-NEXT:    [[ARG_ADDR_0:%.*]] = pack_element_get [[ARG_INDEX_0]] of %1 : $*Pack{Int, Bool} as $*Int
+// CHECK-NEXT:    [[ARG_0:%.*]] = load [trivial] [[ARG_ADDR_0]] : $*Int
+// CHECK-NEXT:    debug_value [[ARG_0]] :
+// CHECK-NEXT:    [[ARG_INDEX_1:%.*]] = scalar_pack_index 1 of $Pack{Int, Bool}
+// CHECK-NEXT:    [[ARG_ADDR_1:%.*]] = pack_element_get [[ARG_INDEX_1]] of %1 : $*Pack{Int, Bool} as $*Bool
+// CHECK-NEXT:    [[ARG_1:%.*]] = load [trivial] [[ARG_ADDR_1]] : $*Bool
+// CHECK-NEXT:    debug_value [[ARG_1]] :
+// CHECK-NEXT:    [[RET_INDEX_0:%.*]] = scalar_pack_index 0 of $Pack{Bool}
+// CHECK-NEXT:    [[RET_ADDR_0:%.*]] = pack_element_get [[RET_INDEX_0]] of %0 : $*Pack{Bool} as $*Bool
+// CHECK-NEXT:    store [[ARG_1]] to [trivial] [[RET_ADDR_0]] : $*Bool
+func testResultReabstractedEmission_vanishing() {
+  takeClosureWithVariadicResult {
+    (a: Int, b: Bool) -> Bool in b
+  }
+}

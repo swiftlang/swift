@@ -93,6 +93,9 @@ UID_KEYS = [
     KEY('SubStructure', 'key.substructure'),
     KEY('Ranges', 'key.ranges'),
     KEY('Fixits', 'key.fixits'),
+    KEY('GeneratedBuffers', 'key.generated_buffers'),
+    KEY('BufferText', 'key.buffer_text'),
+    KEY('OriginalLocation', 'key.original_location'),
     KEY('Diagnostics', 'key.diagnostics'),
     KEY('EducationalNotePaths', 'key.educational_note_paths'),
     KEY('FormatOptions', 'key.editor.format.options'),
@@ -204,7 +207,11 @@ UID_KEYS = [
     # in this time. For cancellation testing purposes.
     KEY('SimulateLongRequest', 'key.simulate_long_request'),
     KEY('IsSynthesized', 'key.is_synthesized'),
-    KEY('BufferName', 'key.buffer_name')
+    KEY('BufferName', 'key.buffer_name'),
+    KEY('BarriersEnabled', 'key.barriers_enabled'),
+    KEY('Expansions', 'key.expansions'),
+    KEY('MacroRoles', 'key.macro_roles'),
+    KEY('ExpandedMacroReplacements', 'key.expanded_macro_replacements'),
 ]
 
 
@@ -269,6 +276,9 @@ UID_REQUESTS = [
     REQUEST('Diagnostics', 'source.request.diagnostics'),
     REQUEST('Compile', 'source.request.compile'),
     REQUEST('CompileClose', 'source.request.compile.close'),
+    REQUEST('EnableRequestBarriers', 'source.request.enable_request_barriers'),
+    REQUEST('SyntacticMacroExpansion',
+            'source.request.syntactic_macro_expansion'),
 ]
 
 
@@ -315,6 +325,10 @@ UID_KINDS = [
          'source.lang.swift.decl.function.accessor.modify'),
     KIND('RefAccessorModify',
          'source.lang.swift.ref.function.accessor.modify'),
+    KIND('DeclAccessorInit',
+         'source.lang.swift.decl.function.accessor.init'),
+    KIND('RefAccessorInit',
+         'source.lang.swift.ref.function.accessor.init'),
     KIND('DeclConstructor', 'source.lang.swift.decl.function.constructor'),
     KIND('RefConstructor', 'source.lang.swift.ref.function.constructor'),
     KIND('DeclDestructor', 'source.lang.swift.decl.function.destructor'),
@@ -482,4 +496,12 @@ UID_KINDS = [
     KIND('StatInstructionCount', 'source.statistic.instruction-count'),
     KIND('Swift', 'source.lang.swift'),
     KIND('ObjC', 'source.lang.objc'),
+    KIND('MacroRoleExpression', 'source.lang.swift.macro_role.expression'),
+    KIND('MacroRoleDeclaration', 'source.lang.swift.macro_role.declaration'),
+    KIND('MacroRoleCodeItem', 'source.lang.swift.macro_role.codeitem'),
+    KIND('MacroRoleAccessor', 'source.lang.swift.macro_role.accessor'),
+    KIND('MacroRoleMemberAttribute', 'source.lang.swift.macro_role.member_attribute'),
+    KIND('MacroRoleMember', 'source.lang.swift.macro_role.member'),
+    KIND('MacroRolePeer', 'source.lang.swift.macro_role.peer'),
+    KIND('MacroRoleConformance', 'source.lang.swift.macro_role.conformance'),
 ]

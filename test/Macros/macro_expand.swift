@@ -4,29 +4,58 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 
 // Diagnostics testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
 
-// RUN: not %target-swift-frontend -swift-version 5 -typecheck -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics > %t/macro-printing.txt
+// Diagnostics testing by importing macros from a module
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library_2.swiftmodule %S/Inputs/freestanding_macro_library_2.swift -module-name freestanding_macro_library_2 -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t
+
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
+
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics > %t/macro-printing.txt
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
 
 // RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
 
 // Debug info SIL testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
 // Debug info IR testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-ir -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -swift-version 5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
-// RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -Xfrontend -emit-dependencies-path -Xfrontend %t/main.d -Xfrontend -emit-reference-dependencies-path -Xfrontend %t/main.swiftdeps
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // Plugin search path and loaded module trace testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -enable-experimental-feature FreestandingMacros -plugin-path %t %s -module-name MacroUser -emit-loaded-module-trace -o %t/loaded_module_trace
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -plugin-path %t %s -module-name MacroUser -emit-loaded-module-trace -o %t/loaded_module_trace
 // RUN: %FileCheck -check-prefix=CHECK-MODULE-TRACE %s < %t/loaded_module_trace.trace.json
 
 // CHECK-MODULE-TRACE: {{libMacroDefinition.dylib|libMacroDefinition.so|MacroDefinition.dll}}
+
+#if IMPORT_MACRO_LIBRARY
+import freestanding_macro_library
+import freestanding_macro_library_2
+#else
+@freestanding(declaration, names: named(StructWithUnqualifiedLookup))
+macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
+
+@freestanding(declaration)
+macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+
+@freestanding(declaration)
+macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+@freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+@freestanding(declaration, names: named(value)) macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+#endif
 
 #if TEST_DIAGNOSTICS
 @freestanding(declaration)
@@ -69,7 +98,8 @@ struct Bad {}
 
 // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
 // CHECK-DIAGS: import Swift
-// CHECK-DIAGS: precedencegroup MyPrecedence {}
+// CHECK-DIAGS: precedencegroup MyPrecedence {
+// CHECK-DIAGS: }
 // CHECK-DIAGS: @attached(member) macro myMacro()
 // CHECK-DIAGS: extension Int {
 // CHECK-DIAGS: }
@@ -93,7 +123,6 @@ struct Bad {}
 #endif
 
 @freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
-@freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
 @freestanding(expression) macro assert(_: Bool) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
@@ -181,6 +210,20 @@ func testDiscardableStringify(x: Int) {
 }
 #endif
 
+#if TEST_DIAGNOSTICS
+// This causes an error when non-'Bool' value is passed.
+@freestanding(expression) macro assertAny<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
+
+func testNested() {
+  struct Nested { }
+  _ = #stringify(#assertAny(Nested()))
+  // expected-note@-1 {{in expansion of macro 'stringify' here}}
+// CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+// CHECK-DIAGS: @__swiftmacro_9MacroUser10testNestedyyF9stringifyfMf_9assertAnyfMf_.swift:1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+// CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+}
+#endif
+
 func testStringifyWithThrows() throws {
   // Okay, we can put the try inside or outside
   _ = try #stringify(maybeThrowing())
@@ -192,11 +235,17 @@ func testStringifyWithThrows() throws {
 
     // CHECK-DIAGS: @__swiftmacro_9MacroUser23testStringifyWithThrowsyyKF9stringifyfMf1_.swift:1:2: error: call can throw but is not marked with 'try'
 #endif
-  
+
   // The macro adds the 'try' for us.
   _ = #stringifyAndTry(maybeThrowing())
 }
 
+func testStringifyWithLocalType() throws {
+  _ =  #stringify({
+    struct QuailError: Error {}
+    throw QuailError()
+    })
+}
 
 @freestanding(expression) macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
 
@@ -253,9 +302,6 @@ func testNestedDeclInExpr() {
   let _: () -> Void = #nestedDeclInExpr
 }
 
-@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
-// Test overload
-@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 // Test non-arbitrary names
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
@@ -274,12 +320,6 @@ let blah = false
 #endif
 
 // Test unqualified lookup from within a macro expansion
-@freestanding(declaration, names: named(StructWithUnqualifiedLookup))
-macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
-
-@freestanding(declaration)
-macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
-
 // FIXME: Global freestanding macros not yet supported in script mode.
 #if false
 let world = 3 // to be used by the macro expansion below
@@ -362,9 +402,6 @@ struct ContainerOfNumberedStructs {
 }
 
 // Avoid re-type-checking declaration macro arguments.
-@freestanding(declaration)
-macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
-
 func testFreestandingWithClosure(i: Int) {
   #freestandingWithClosure(i) { x in x }
 
@@ -372,4 +409,128 @@ func testFreestandingWithClosure(i: Int) {
     let x = $0
     return x
   }
+}
+
+// Nested macros with closures
+@freestanding(expression) macro coerceToInt<T>(_ value: T) -> Int = #externalMacro(module: "MacroDefinition", type: "CoerceToIntMacro")
+
+func testFreestandingClosureNesting() {
+  _ = #stringify({ () -> Int in
+    #coerceToInt(2)
+  })
+}
+
+// Freestanding declaration macros that produce local variables
+func testLocalVarsFromDeclarationMacros() {
+  #varValue
+}
+
+// Variadic macro
+@freestanding(declaration, names: arbitrary) macro emptyDecl(_: String...) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+struct TakesVariadic {
+  #emptyDecl("foo", "bar")
+}
+
+// Funkiness with static functions introduced via macro expansions.
+@freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+@freestanding(declaration, names: arbitrary) public macro staticFooFuncArbitrary() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+
+class HasAnExpandedStatic {
+  #staticFooFunc()
+}
+
+class HasAnExpandedStatic2 {
+  #staticFooFuncArbitrary()
+}
+
+func testHasAnExpandedStatic() {
+#if TEST_DIAGNOSTICS
+  foo() // expected-error{{cannot find 'foo' in scope}}
+#endif
+}
+
+@freestanding(declaration, names: named(==)) public macro addSelfEqualsOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@freestanding(declaration, names: arbitrary) public macro addSelfEqualsOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: named(==)) public macro AddSelfEqualsMemberOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: arbitrary) public macro AddSelfEqualsMemberOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+
+struct HasEqualsSelf {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2 {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3 {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4 {
+}
+
+protocol SelfEqualsBoolProto { // expected-note 4{{where 'Self' =}}
+  static func ==(lhs: Self, rhs: Bool) -> Bool
+}
+
+struct HasEqualsSelfP: SelfEqualsBoolProto {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2P: SelfEqualsBoolProto {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3P: SelfEqualsBoolProto {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4P: SelfEqualsBoolProto {
+}
+
+func testHasEqualsSelf(
+  x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4,
+  xP: HasEqualsSelfP, yP: HasEqualsSelf2P, zP: HasEqualsSelf3P,
+  wP: HasEqualsSelf4P
+) {
+#if TEST_DIAGNOSTICS
+  // Global operator lookup doesn't find member operators introduced by macros.
+  _ = (x == true) // expected-error{{referencing operator function '=='}}
+  _ = (y == true) // expected-error{{referencing operator function '=='}}
+  _ = (z == true) // expected-error{{referencing operator function '=='}}
+  _ = (w == true) // expected-error{{referencing operator function '=='}}
+#endif
+
+  // These should be found through the protocol.
+  _ = (xP == true)
+  _ = (yP == true)
+  _ = (zP == true)
+  _ = (wP == true)
+}
+
+// Macro whose implementation is both an expression and declaration macro.
+@freestanding(declaration)
+macro AsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "ExprAndDeclMacro")
+
+@freestanding(expression)
+macro AsExprMacro<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "ExprAndDeclMacro")
+
+func testExpressionAndDeclarationMacro() {
+  #AsExprMacro(1 + 1) // expected-warning{{expression of type '(Int, String)' is unused}}
+  struct Inner {
+    #AsDeclMacro(1 + 1)
+  }
+  #AsDeclMacro(1 + 1)
+}
+
+// Expression macro implementation with declaration macro role
+@freestanding(declaration) macro stringifyAsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+func testExpressionAsDeclarationMacro() {
+#if TEST_DIAGNOSTICS
+  #stringifyAsDeclMacro(1+1)
+  // expected-error@-1{{macro implementation type 'StringifyMacro' doesn't conform to required protocol 'DeclarationMacro' (from macro 'stringifyAsDeclMacro')}}
+#endif
 }

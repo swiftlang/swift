@@ -165,7 +165,7 @@ public:
   int getDebugID() const;
 
   void setDebugName(llvm::StringRef name);
-  Optional<llvm::StringRef> getDebugName() const;
+  llvm::Optional<llvm::StringRef> getDebugName() const;
 
   SILFunction *getParent() { return Parent; }
   SILFunction *getFunction() { return getParent(); }
@@ -350,24 +350,31 @@ public:
   /// replacePhiArgumentAndRAUW.
   SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
                                      ValueOwnershipKind kind,
-                                     const ValueDecl *decl = nullptr);
+                                     const ValueDecl *decl = nullptr,
+                                     bool isReborrow = false,
+                                     bool isEscaping = false);
 
   /// Replace phi argument \p i and RAUW all uses.
-  SILPhiArgument *
-  replacePhiArgumentAndReplaceAllUses(unsigned i, SILType type,
-                                      ValueOwnershipKind kind,
-                                      const ValueDecl *decl = nullptr);
+  SILPhiArgument *replacePhiArgumentAndReplaceAllUses(
+      unsigned i, SILType type, ValueOwnershipKind kind,
+      const ValueDecl *decl = nullptr, bool isReborrow = false,
+      bool isEscaping = false);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
-  /// list. Optionally you can pass in a value decl parameter.
+  /// list. Optionally you can pass in a value decl parameter, reborrow flag and
+  /// escaping flag.
   SILPhiArgument *createPhiArgument(SILType Ty, ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr);
+                                    const ValueDecl *D = nullptr,
+                                    bool isReborrow = false,
+                                    bool isEscaping = false);
 
   /// Insert a new SILPhiArgument with type \p Ty and \p Decl at position \p
   /// AtArgPos.
   SILPhiArgument *insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                     ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr);
+                                    const ValueDecl *D = nullptr,
+                                    bool isReborrow = false,
+                                    bool isEscaping = false);
 
   /// Remove all block arguments.
   void dropAllArguments();
@@ -508,6 +515,17 @@ public:
   void print(SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
+
+#ifndef NDEBUG
+  /// Print the ID of the block, bbN.
+  void dumpID() const;
+
+  /// Print the ID of the block with \p OS, bbN.
+  void printID(llvm::raw_ostream &OS) const;
+
+  /// Print the ID of the block with \p Ctx, bbN.
+  void printID(SILPrintContext &Ctx) const;
+#endif
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {

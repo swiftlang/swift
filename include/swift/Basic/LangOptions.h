@@ -23,12 +23,14 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
+#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
@@ -112,6 +114,12 @@ namespace swift {
     /// resulting binary by default in this mode.
     None,
 
+    /// Stub out code associated with unavailable declarations.
+    ///
+    /// For example, the bodies of unavailable functions should be compiled as
+    /// if they just contained a call to fatalError().
+    Stub,
+
     /// Avoid generating any code for unavailable declarations.
     ///
     /// NOTE: This optimization can be ABI breaking for a library evolution
@@ -153,10 +161,10 @@ namespace swift {
     llvm::Optional<llvm::Triple> ClangTarget;
 
     /// The SDK version, if known.
-    Optional<llvm::VersionTuple> SDKVersion;
+    llvm::Optional<llvm::VersionTuple> SDKVersion;
 
     /// The target variant SDK version, if known.
-    Optional<llvm::VersionTuple> VariantSDKVersion;
+    llvm::Optional<llvm::VersionTuple> VariantSDKVersion;
 
     /// The SDK canonical name, if known.
     std::string SDKName;
@@ -216,7 +224,7 @@ namespace swift {
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
-    Optional<DiagnosticBehavior> RequireExplicitAvailability = None;
+    llvm::Optional<DiagnosticBehavior> RequireExplicitAvailability = llvm::None;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.
@@ -237,6 +245,9 @@ namespace swift {
 
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
+
+    /// Emit remarks about contextual inconsistencies in loaded modules.
+    bool EnableModuleRecoveryRemarks = false;
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
@@ -304,6 +315,10 @@ namespace swift {
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
 
+    /// Should the compiler require C++ interoperability to be enabled
+    /// when importing Swift modules that enable C++ interoperability.
+    bool RequireCxxInteropToImportCxxInteropModule = true;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
     /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
@@ -324,9 +339,6 @@ namespace swift {
     /// Flags for developers
     ///
 
-    /// Enable named lazy member loading.
-    bool NamedLazyMemberLoading = true;
-    
     /// Whether to record request references for incremental builds.
     bool RecordRequestReferences = true;
 
@@ -389,6 +401,11 @@ namespace swift {
     /// unsafe to read.
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
+
+    /// Attempt to recover for imported modules with broken modularization
+    /// in an unsafe way. Currently applies only to xrefs where the target
+    /// decl moved to a different module that is already loaded.
+    bool ForceWorkaroundBrokenModules = false;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -805,7 +822,10 @@ namespace swift {
     std::string Optimization;
 
     /// clang CASOptions.
-    std::string CASPath;
+    llvm::Optional<clang::CASOptions> CASOpts;
+
+    /// Cache key for imported bridging header.
+    std::string BridgingHeaderPCHCacheKey;
 
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
@@ -871,6 +891,13 @@ namespace swift {
     /// to build the Clang module via Clang frontend directly,
     /// and completely bypass the Clang driver.
     bool DirectClangCC1ModuleBuild = false;
+
+    /// Disable implicitly-built Clang modules because they are explicitly
+    /// built and provided to the compiler invocation.
+    bool DisableImplicitClangModules = false;
+
+    /// Enable ClangIncludeTree for explicit module builds.
+    bool UseClangIncludeTree = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

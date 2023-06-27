@@ -296,7 +296,7 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
     // TODO: When we have ForwardingInstruction abstraction, walk the use-def
     // chain to ensure we have a partial_apply [on_stack] def.
     assert(pai && pai->isOnStack() ||
-           OwnershipForwardingMixin::get(
+           ForwardingInstruction::get(
                cast<SingleValueInstruction>(borrowEnd->get())));
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
@@ -317,14 +317,11 @@ bool OwnershipUseVisitor<Impl>::visitInteriorUses(SILValue ssaDef) {
   // Inner adjacent reborrows are considered inner borrow scopes.
   if (auto phi = SILArgument::asPhi(ssaDef)) {
     if (!visitInnerAdjacentPhis(phi, [&](SILArgument *innerPhi) {
-      // TODO: Remove this call to isGuaranteedForwarding.
-      // The phi itself should know if it is a reborrow.
-      if (isGuaranteedForwarding(innerPhi)) {
-        return visitGuaranteedUses(innerPhi);
-      } else {
-        return visitInnerAdjacentReborrow(innerPhi);
-      }
-    })) {
+          if (innerPhi->isGuaranteedForwarding()) {
+            return visitGuaranteedUses(innerPhi);
+          }
+          return visitInnerAdjacentReborrow(innerPhi);
+        })) {
       return false;
     }
   }

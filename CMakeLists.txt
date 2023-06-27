@@ -609,6 +609,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
   FALSE)
 
+option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
+  "Install the <swift/bridging> C++ interoperability header alongside compiler"
+  TRUE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
@@ -641,6 +645,11 @@ option(SWIFT_THREADING_PACKAGE
    single package name, or a semicolon separated sequence of sdk:package pairs.
    Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
    or the empty string for the SDK default.")
+
+option(SWIFT_THREADING_HAS_DLSYM
+  "Enable the use of the dlsym() function.  This gets used to provide TSan
+   support on some platforms."
+  TRUE)
 
 option(SWIFT_ENABLE_MACCATALYST
   "Build the Standard Library and overlays with MacCatalyst support"
@@ -687,13 +696,6 @@ if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
   message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
 endif()
 
-# Use dispatch as the system scheduler by default.
-# For convenience, we set this to false when concurrency is disabled.
-set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
-if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
-  set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
-endif()
-
 set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   # Only build libdispatch for the host if the host tools are being built and
@@ -702,9 +704,9 @@ if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     set(SWIFT_BUILD_HOST_DISPATCH TRUE)
   endif()
 
-  if(SWIFT_BUILD_HOST_DISPATCH OR SWIFT_CONCURRENCY_USES_DISPATCH)
+  if(SWIFT_BUILD_HOST_DISPATCH)
     if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-      message(SEND_ERROR "SourceKit and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+      message(SEND_ERROR "SourceKit requires libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
     endif()
   endif()
 endif()
@@ -1043,6 +1045,14 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
   endif()
 
   configure_sdk_unix("Android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
+  set(SWIFT_HOST_VARIANT "wasi" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [wasi]")
+
+  configure_sdk_unix("WASI" "wasm32")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 

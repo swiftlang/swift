@@ -109,8 +109,8 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // EXPAND-NEXT: 4:7-4:24 (@__swiftmacro_9MacroUser13testStringify1a1bySi_SitF9stringifyfMf_.swift) "(a + b, "a + b")"
 
 //##-- cursor-info on macro declaration
-// RUN: %sourcekitd-test -req=cursor -pos=57:1 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=CURSOR_MACRO_DECL %s
-// RUN: %sourcekitd-test -req=cursor -pos=57:2 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=CURSOR_MACRO_DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=57:1 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} -parse-as-library | %FileCheck -check-prefix=CURSOR_MACRO_DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=57:2 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} -parse-as-library | %FileCheck -check-prefix=CURSOR_MACRO_DECL %s
 // CURSOR_MACRO_DECL: source.lang.swift.ref.macro (55:7-55:21)
 // CURSOR_MACRO_DECL-LABEL: SYMBOL GRAPH BEGIN
 // CURSOR_MACRO_DECL: "identifier": {
@@ -128,24 +128,29 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // CURSOR_MACRO_DECL: ACTIONS END
 
 //##-- Expansion on macro declaration
-// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
-// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:2 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:1 %s -- ${COMPILER_ARGS[@]} -parse-as-library | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:2 %s -- ${COMPILER_ARGS[@]} -parse-as-library | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
 // EXPAND_MACRO_DECL: source.edit.kind.active:
-// EXPAND_MACRO_DECL-NEXT: 57:1-57:28 (@__swiftmacro_9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_.swift) "class $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_4namefMu_ {
+// EXPAND_MACRO_DECL-NEXT: 57:1-57:28 (@__swiftmacro_9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf_.swift) "class $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf_4namefMu_ {
 // EXPAND_MACRO_DECL-NEXT:   func hello() -> String {
 // EXPAND_MACRO_DECL-NEXT:     "hello"
 // EXPAND_MACRO_DECL-NEXT:   }
 // EXPAND_MACRO_DECL-EMPTY:
-// EXPAND_MACRO_DECL-NEXT:   func getSelf() -> Any .Type {
+// EXPAND_MACRO_DECL-NEXT:   func getSelf() -> Any.Type {
 // EXPAND_MACRO_DECL-NEXT:      return Self.self
 // EXPAND_MACRO_DECL-NEXT:   }
 // EXPAND_MACRO_DECL-NEXT: }
-// EXPAND_MACRO_DECL-NEXT: enum $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_4namefMu0_ {
+// EXPAND_MACRO_DECL-NEXT: enum $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf_4namefMu0_ {
 // EXPAND_MACRO_DECL-NEXT:   case apple
 // EXPAND_MACRO_DECL-NEXT:   case banana
 // EXPAND_MACRO_DECL-EMPTY:
 // EXPAND_MACRO_DECL-NEXT:   func hello() -> String {
 // EXPAND_MACRO_DECL-NEXT:     "hello"
+// EXPAND_MACRO_DECL-NEXT:   }
+// EXPAND_MACRO_DECL-NEXT: }
+// EXPAND_MACRO_DECL-NEXT: struct $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf_4namefMu1_: Equatable {
+// EXPAND_MACRO_DECL-NEXT:   static func == (lhs: Self, rhs: Self) -> Bool {
+// EXPAND_MACRO_DECL-NEXT:     false
 // EXPAND_MACRO_DECL-NEXT:   }
 // EXPAND_MACRO_DECL-NEXT: }"
 
@@ -172,16 +177,16 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
 // ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND-NEXT: 23:3-23:3 (@__swiftmacro_9MacroUser1SV1x13myTypeWrapperfMA_.swift) "@accessViaStorage"
+// ATTACHED_EXPAND-NEXT: 23:3-23:3 (@__swiftmacro_9MacroUser1SV1x13myTypeWrapperfMr_.swift) "@accessViaStorage"
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
-// ATTACHED_EXPAND-NEXT: 24:3-24:3 (@__swiftmacro_9MacroUser1SV1y13myTypeWrapperfMA0_.swift) "@accessViaStorage"
+// ATTACHED_EXPAND-NEXT: 24:3-24:3 (@__swiftmacro_9MacroUser1SV1y13myTypeWrapperfMr0_.swift) "@accessViaStorage"
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 25:1-25:1 (@__swiftmacro_9MacroUser1S13myTypeWrapperfMm_.swift) "private var _storage = _Storage()"
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 21:1-21:15 ""
 
 //##-- Cursor info on the attribute expanded by @myTypeWrapper
-// RUN: %sourcekitd-test -req=cursor -cursor-action -req-opts=retrieve_symbol_graph=1 -offset=1 @__swiftmacro_9MacroUser1SV1x13myTypeWrapperfMA_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_CURSOR %s
+// RUN: %sourcekitd-test -req=cursor -cursor-action -req-opts=retrieve_symbol_graph=1 -offset=1 @__swiftmacro_9MacroUser1SV1x13myTypeWrapperfMr_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_CURSOR %s
 // NESTED_ATTACHED_CURSOR: source.lang.swift.ref.macro
 // NESTED_ATTACHED_CURSOR-SAME: macro_basic.swift:10:27-10:43
 // NESTED_ATTACHED_CURSOR-LABEL: SYMBOL GRAPH BEGIN
@@ -200,7 +205,7 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // NESTED_ATTACHED_CURSOR-NEXT: ACTIONS END
 
 //##-- Expansion on the attribute expanded by @myTypeWrapper
-// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=1:1 @__swiftmacro_9MacroUser1SV1x13myTypeWrapperfMA_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_EXPAND %s
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=1:1 @__swiftmacro_9MacroUser1SV1x13myTypeWrapperfMr_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_EXPAND %s
 // NESTED_ATTACHED_EXPAND: source.edit.kind.active:
 // NESTED_ATTACHED_EXPAND-NEXT: Macros/macro_basic.swift 23:13-23:13 (@__swiftmacro_9MacroUser1SV1x16accessViaStoragefMa_.swift) "{
 // NESTED_ATTACHED_EXPAND-NEXT:  get {

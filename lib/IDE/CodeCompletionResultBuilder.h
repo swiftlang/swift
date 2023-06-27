@@ -45,7 +45,7 @@ class CodeCompletionResultBuilder {
   const Decl *AssociatedDecl = nullptr;
   bool IsAsync = false;
   bool HasAsyncAlternative = false;
-  Optional<CodeCompletionLiteralKind> LiteralKind;
+  llvm::Optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
@@ -345,10 +345,17 @@ public:
     addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Equal, "=");
   }
 
-  void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
-                               bool NeedSpecify) {
+  void addDeclAttrParamKeyword(StringRef Name, ArrayRef<StringRef> Parameters,
+                               StringRef Annotation, bool NeedSpecify) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                      DeclAttrParamKeyword, Name);
+    if (!Parameters.empty()) {
+      addLeftParen();
+      for (auto Parameter : Parameters) {
+        addSimpleNamedParameter(Parameter);
+      }
+      addRightParen();
+    }
     if (NeedSpecify)
       addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                        DeclAttrParamColon, ": ");

@@ -180,7 +180,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     DeclAndTypePrinter &declAndTypePrinter) {
   // FIXME: Add support for generic structs.
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
-  Optional<CanGenericSignature> genericSignature;
+  llvm::Optional<CanGenericSignature> genericSignature;
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
@@ -288,6 +288,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
+  // copy constructor.
   os << "  ";
   printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
@@ -306,13 +307,45 @@ void ClangValueTypePrinter::printValueTypeDecl(
         "*>(other._getOpaquePointer()), metadata._0);\n";
   os << "  }\n";
 
+  // copy assignment.
+  os << "  ";
+  printer.printInlineForThunk();
+  printer.printBaseName(typeDecl);
+  os << " &operator =(const ";
+  printer.printBaseName(typeDecl);
+  os << " &other) noexcept {\n";
+  ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+      os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+  os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
+        "*>(other._getOpaquePointer()), metadata._0);\n";
+  os << "  return *this;\n";
+  os << "  }\n";
+
+  // FIXME: implement the move assignment.
+  os << "  ";
+  printer.printInlineForThunk();
+  printer.printBaseName(typeDecl);
+  os << " &operator =(";
+  printer.printBaseName(typeDecl);
+  os << " &&other) = delete;\n";
+
   // FIXME: implement the move constructor.
   os << "  [[noreturn]] ";
-  printer.printInlineForThunk();
+  // NOTE: Do not apply attribute((used))
+  // here to ensure the linker error isn't
+  // forced, so just mark this an inline
+  // helper function instead.
+  printer.printInlineForHelperFunction();
   printer.printBaseName(typeDecl);
   os << "(";
   printer.printBaseName(typeDecl);
-  os << " &&) noexcept { abort(); }\n";
+  StringRef moveErrorMessage = "C++ does not support moving a Swift value yet";
+  os << " &&) noexcept {\n  "
+        "swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_supported_"
+        "yet();\n  swift::_impl::_swift_stdlib_reportFatalError(\"swift\", 5, "
+        "\""
+     << moveErrorMessage << "\", " << moveErrorMessage.size()
+     << ", 0);\n  abort();\n  }\n";
 
   bodyPrinter();
   if (typeDecl->isStdlibDecl())

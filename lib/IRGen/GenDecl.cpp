@@ -61,6 +61,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenCall.h"
+#include "GenConstant.h"
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
@@ -511,8 +512,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // harmless aside from code size.
   if (!IRGen.Opts.UseJIT) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
-                                StringRef libraryName) {
-      Optional<llvm::VersionTuple> compatibilityVersion;
+                                StringRef libraryName, bool forceLoad) {
+      llvm::Optional<llvm::VersionTuple> compatibilityVersion;
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
@@ -532,11 +533,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
       this->addLinkLibrary(LinkLibrary(libraryName,
                                        LibraryKind::Library,
-                                       /*forceLoad*/ true));
+                                       forceLoad));
     };
 
-    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)         \
-      addBackDeployLib(llvm::VersionTuple Version, LibraryName);
+#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
+      addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
     #include "swift/Frontend/BackDeploymentLibs.def"
   }
 }
@@ -1267,12 +1268,6 @@ void IRGenerator::emitGlobalTopLevel(
     IGM->emitSILFunction(&f);
   }
 
-  // Emit static initializers.
-  for (auto Iter : *this) {
-    IRGenModule *IGM = Iter.second;
-    IGM->emitSILStaticInitializers();
-  }
-
   // Emit witness tables.
   for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
     CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
@@ -1567,7 +1562,9 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
                                        RequireMetadata_t requireMetadata) {
   if (!type)
     return;
-  
+
+  assert(!Lowering::shouldSkipLowering(type));
+
   // Force emission of ObjC protocol descriptors used by type refs.
   if (auto proto = dyn_cast<ProtocolDecl>(type)) {
     if (proto->isObjC()) {
@@ -2102,8 +2099,20 @@ void IRGenModule::emitVTableStubs() {
     }
 
     // For each eliminated method symbol create an alias to the stub.
-    auto *alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
-                                            F.getName(), stub);
+    llvm::GlobalValue *alias = nullptr;
+    if (F.isAsync()) {
+      // TODO: We cannot directly create a pointer to `swift_deletedAsyncMethodError`
+      // to workaround a linker crash.
+      // Instead use the stub, which calls swift_deletedMethodError. This works because
+      // swift_deletedMethodError takes no parameters and simply aborts the program.
+      auto asyncLayout = getAsyncContextLayout(*this, const_cast<SILFunction *>(&F));
+      auto entity = LinkEntity::forSILFunction(const_cast<SILFunction *>(&F));
+      auto *fnPtr = emitAsyncFunctionPointer(*this, stub, entity, asyncLayout.getSize());
+      alias = fnPtr;
+    } else {
+      alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
+                                        F.getName(), stub);
+    }
 
     if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
@@ -2374,8 +2383,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
 /// Get or create an LLVM global variable with these linkage rules.
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
-    Alignment alignment, DebugTypeInfo DbgTy, Optional<SILLocation> DebugLoc,
-    StringRef DebugName) {
+    Alignment alignment, DebugTypeInfo DbgTy,
+    llvm::Optional<SILLocation> DebugLoc, StringRef DebugName) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -2639,37 +2648,36 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     fixedAlignment = getFixedBufferAlignment(*this);
   }
 
+  llvm::Constant *initVal = nullptr;
+
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
   auto gvar = Module.getGlobalVariable(link.getName(), /*allowInternal*/ true);
   if (gvar) {
-    if (forDefinition)
+    if (forDefinition) {
       updateLinkageForDefinition(*this, gvar, entity);
-  } else {
-    llvm::Type *storageTypeWithContainer = storageType;
-    if (var->isInitializedObject()) {
-      if (canMakeStaticObjectsReadOnly()) {
-        gvar = createVariable(*this, link, storageType, fixedAlignment);
-        gvar->setConstant(true);
-      } else {
-        // A statically initialized object must be placed into a container struct
-        // because the swift_initStaticObject needs a swift_once_t at offset -1:
-        //     struct Container {
-        //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
-        //       HeapObject object;
-        //     };
-        std::string typeName = storageType->getStructName().str() + 'c';
-        assert(fixedAlignment >= getPointerAlignment());
-        unsigned numTokens = fixedAlignment.getValue() /
-          getPointerAlignment().getValue();
-        storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
-                {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
-        gvar = createVariable(*this, link, storageTypeWithContainer,
-                              fixedAlignment);
+
+      if (var->getStaticInitializerValue()) {
+        assert(gvar->hasInitializer() &&
+               "global variable referenced before created");
       }
+    }
+    if (forDefinition && !gvar->hasInitializer())
+      initVal = getGlobalInitValue(var, storageType, fixedAlignment);
+  } else {
+    // The global doesn't exist yet. Create it.
+
+    initVal = getGlobalInitValue(var, storageType, fixedAlignment);
+    llvm::Type *globalTy = initVal ? initVal->getType() : storageType;
+
+    if (var->isInitializedObject()) {
+      // An initialized object is always a compiler-generated "outlined"
+      // variable. Therefore we don't generate debug info for it.
+      gvar = createVariable(*this, link, globalTy, fixedAlignment);
     } else {
+      // Create a global variable with debug info.
       StringRef name;
-      Optional<SILLocation> loc;
+      llvm::Optional<SILLocation> loc;
       if (var->getDecl()) {
         // Use the VarDecl for more accurate debugging information.
         loc = var->getDecl();
@@ -2679,20 +2687,37 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
           loc = var->getLocation();
         name = var->getName();
       }
+
       DebugTypeInfo DbgTy =
           inFixedBuffer
               ? DebugTypeInfo::getGlobalFixedBuffer(
-                    var, storageTypeWithContainer, fixedSize, fixedAlignment)
-              : DebugTypeInfo::getGlobal(var, storageTypeWithContainer, *this);
-      gvar = createVariable(*this, link, storageTypeWithContainer,
-                            fixedAlignment, DbgTy, loc, name);
+                    var, globalTy, fixedSize, fixedAlignment)
+              : DebugTypeInfo::getGlobal(var, globalTy, *this);
+
+      gvar = createVariable(*this, link, globalTy, fixedAlignment, DbgTy, loc, name);
     }
-    /// Add a zero initializer.
-    if (forDefinition)
-      gvar->setInitializer(llvm::Constant::getNullValue(storageTypeWithContainer));
-    else
+    if (!forDefinition)
       gvar->setComdat(nullptr);
+
+    // Mark as llvm.used if @_used, set section if @_section
+    if (var->markedAsUsed())
+      addUsedGlobal(gvar);
+    if (auto *sectionAttr = var->getSectionAttr())
+      gvar->setSection(sectionAttr->Name);
   }
+  if (forDefinition && !gvar->hasInitializer()) {
+    if (initVal) {
+      gvar->setInitializer(initVal);
+      if (var->isLet() ||
+          (var->isInitializedObject() && canMakeStaticObjectsReadOnly())) {
+        gvar->setConstant(true);
+      }
+    } else {
+      /// Add a zero initializer.
+      gvar->setInitializer(llvm::Constant::getNullValue(storageType));
+    }
+  }
+
   llvm::Constant *addr = gvar;
   if (var->isInitializedObject() && !canMakeStaticObjectsReadOnly()) {
     // Project out the object from the container.
@@ -2713,6 +2738,48 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     storageType = cast<ClassTypeInfo>(ti).getClassLayoutType();
 
   return Address(addr, storageType, Alignment(gvar->getAlignment()));
+}
+
+llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
+                                                llvm::Type *storageType,
+                                                Alignment alignment) {
+  if (var->isInitializedObject()) {
+    StructLayout *layout = StaticObjectLayouts[var].get();
+    ObjectInst *oi = cast<ObjectInst>(var->getStaticInitializerValue());
+    llvm::Constant *initVal = emitConstantObject(*this, oi, layout);
+    if (!canMakeStaticObjectsReadOnly()) {
+      // A statically initialized object must be placed into a container struct
+      // because the swift_initStaticObject needs a swift_once_t at offset -1:
+      //     struct Container {
+      //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
+      //       HeapObject object;
+      //     };
+      std::string typeName = storageType->getStructName().str() + 'c';
+      assert(alignment >= getPointerAlignment());
+      unsigned numTokens = alignment.getValue() /
+                           getPointerAlignment().getValue();
+      auto *containerTy = llvm::StructType::create(getLLVMContext(),
+              {llvm::ArrayType::get(OnceTy, numTokens), initVal->getType()},
+              typeName);
+      auto *zero = llvm::ConstantAggregateZero::get(containerTy->getElementType(0));
+      initVal = llvm::ConstantStruct::get(containerTy, {zero , initVal});
+    }
+    return initVal;
+  }
+  if (SILInstruction *initInst = var->getStaticInitializerValue()) {
+    Explosion initExp = emitConstantValue(*this,
+                                  cast<SingleValueInstruction>(initInst));
+    if (initExp.size() == 1) {
+      return initExp.claimNextConstant();
+    }
+    // In case of enums, the initializer might contain multiple constants,
+    // which does not match with the storage type.
+    ArrayRef<llvm::Value *> elements = initExp.claimAll();
+    ArrayRef<llvm::Constant *> constElements(
+                  (llvm::Constant *const*)elements.data(), elements.size());
+    return llvm::ConstantStruct::getAnon(constElements, /*Packed=*/ true);
+  }
+  return nullptr;
 }
 
 /// Return True if the function \p f is a 'readonly' function. Checking
@@ -3229,7 +3296,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::Function *thunk = llvm::Function::Create(
       assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
 
-  thunk->setCallingConv(llvm::CallingConv::C);
+  thunk->setCallingConv(IGM.getOptions().PlatformCCallingConvention);
 
   llvm::AttrBuilder attrBuilder(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(attrBuilder);
@@ -3275,11 +3342,9 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
     IRGenFunction &IGF, const clang::CXXConstructorDecl *ctor,
     llvm::FunctionType *ctorFnType, llvm::Constant *ctorAddress,
     llvm::ArrayRef<llvm::Value *> args) {
-  bool canThrow = IGF.IGM.isForeignExceptionHandlingEnabled();
-  if (auto *fpt = ctor->getType()->getAs<clang::FunctionProtoType>()) {
-    if (fpt->isNothrow())
-      canThrow = false;
-  }
+  bool canThrow =
+      IGF.IGM.isForeignExceptionHandlingEnabled() &&
+      !IGF.IGM.isCxxNoThrow(const_cast<clang::CXXConstructorDecl *>(ctor));
   if (!canThrow)
     return IGF.Builder.CreateCall(ctorFnType, ctorAddress, args);
   llvm::CallBase *result;
@@ -3405,6 +3470,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
+
+  // Mark as llvm.used if @_used, set section if @_section
+  if (f->markedAsUsed())
+    addUsedGlobal(fn);
+  if (!f->section().empty())
+    fn->setSection(f->section());
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition
@@ -3643,7 +3714,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     return getElementBitCast(existing, defaultType);
 
   const LazyConstantInitializer *lazyInitializer = nullptr;
-  Optional<ConstantInitBuilder> lazyBuilder;
+  llvm::Optional<ConstantInitBuilder> lazyBuilder;
   if (definition.isLazy()) {
     lazyInitializer = definition.getLazy();
     lazyBuilder.emplace(*this);
@@ -5081,7 +5152,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     }
   }
 
-  Optional<LinkEntity> entity;
+  llvm::Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
   switch (canonicality) {
@@ -5118,7 +5189,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
 
   if (auto *GV = dyn_cast<llvm::GlobalVariable>(addr.getValue()))
-    GV->setComdat(nullptr);
+    if (GV->isDeclaration())
+      GV->setComdat(nullptr);
 
   // FIXME: MC breaks when emitting alias references on some platforms
   // (rdar://problem/22450593 ). Work around this by referring to the aliasee
@@ -5399,11 +5471,10 @@ llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.
-Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
-                            ClassDecl *cd,
-                            bool isDestroyer,
-                            bool isForeign,
-                            ForDefinition_t forDefinition) {
+llvm::Optional<llvm::Function *>
+IRGenModule::getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer,
+                                      bool isForeign,
+                                      ForDefinition_t forDefinition) {
   auto silRef = SILDeclRef(cd,
                            isDestroyer
                            ? SILDeclRef::Kind::IVarDestroyer
@@ -5415,7 +5486,7 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
     return getAddrOfSILFunction(silFn, forDefinition);
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Returns the address of a value-witness function.
@@ -5479,6 +5550,8 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// The result is always a GlobalValue.
 Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
                                           ForDefinition_t forDefinition) {
+  assert(!Lowering::shouldSkipLowering(var));
+
   LinkEntity entity = LinkEntity::forFieldOffset(var);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  forDefinition);
@@ -5486,6 +5559,8 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
                                        ForDefinition_t forDefinition) {
+  assert(!Lowering::shouldSkipLowering(Case));
+
   LinkEntity entity = LinkEntity::forEnumCase(Case);
   auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, forDefinition);
 
@@ -5501,11 +5576,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     member->visitAuxiliaryDecls([&](Decl *decl) {
-      // FIXME: Conformance macros can generate extension decls. These
-      // are visited as top-level decls; skip them here.
-      if (isa<ExtensionDecl>(decl))
-        return;
-
       emitNestedTypeDecls({decl, nullptr});
     });
     switch (member->getKind()) {
@@ -5585,7 +5655,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
       return true;
   }
 
-  for (auto member : ext->getMembers()) {
+  for (auto member : ext->getAllMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (requiresObjCMethodDescriptor(func))
         return true;

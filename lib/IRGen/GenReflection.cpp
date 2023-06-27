@@ -174,7 +174,7 @@ public:
   }
 };
 
-Optional<llvm::VersionTuple>
+llvm::Optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // The Swift 5.5 runtime is the first version able to demangle types
   // related to concurrency.
@@ -215,7 +215,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     // involving them.
   }
 
-  return None;
+  return llvm::None;
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback
@@ -662,9 +662,9 @@ protected:
   // method.
   using GetAddrOfEntityFn = llvm::Constant* (IRGenModule &, ConstantInit);
 
-  llvm::GlobalVariable *emit(
-                        Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
-                        const char *section) {
+  llvm::GlobalVariable *
+  emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
+       const char *section) {
     layout();
 
     llvm::GlobalVariable *var;
@@ -698,15 +698,14 @@ protected:
   }
 
   // Helpers to guide the C++ type system into converting lambda arguments
-  // to Optional<function_ref>
+  // to llvm::Optional<function_ref>
   llvm::GlobalVariable *emit(llvm::function_ref<GetAddrOfEntityFn> getAddr,
                              const char *section) {
-    return emit(Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
+    return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
                 section);
   }
-  llvm::GlobalVariable *emit(NoneType none,
-                             const char *section) {
-    return emit(Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
+  llvm::GlobalVariable *emit(llvm::NoneType none, const char *section) {
+    return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
                 section);
   }
 
@@ -854,8 +853,11 @@ private:
     if (hasPayload && (decl->isIndirect() || enumDecl->isIndirect()))
       flags.setIsIndirectCase();
 
-    addField(flags, decl->getArgumentInterfaceType(),
-             decl->getBaseIdentifier().str());
+    Type interfaceType = Lowering::shouldSkipLowering(decl)
+                             ? nullptr
+                             : decl->getArgumentInterfaceType();
+
+    addField(flags, interfaceType, decl->getBaseIdentifier().str());
   }
 
   void layoutEnum() {
@@ -1151,7 +1153,7 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getMultiPayloadEnumDescriptorSectionName();
-    return ReflectionMetadataBuilder::emit(None, section);
+    return ReflectionMetadataBuilder::emit(llvm::None, section);
   }
 };
 
@@ -1177,7 +1179,7 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getCaptureDescriptorMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(None, section);
+    return ReflectionMetadataBuilder::emit(llvm::None, section);
   }
 };
 
@@ -1449,7 +1451,7 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getCaptureDescriptorMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(None, section);
+    return ReflectionMetadataBuilder::emit(llvm::None, section);
   }
 };
 

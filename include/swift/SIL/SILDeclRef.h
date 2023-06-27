@@ -382,6 +382,9 @@ struct SILDeclRef {
     return kind == Kind::Initializer || kind == Kind::Destroyer;
   }
 
+  /// True if the SILDeclRef references an init accessor declaration.
+  bool isInitAccessor() const;
+
   /// True if the function should be treated as transparent.
   bool isTransparent() const;
   /// True if the function should have its body serialized.
@@ -561,7 +564,7 @@ struct SILDeclRef {
                                                     AbstractFunctionDecl *func);
 
   /// Returns the availability of the decl for computing linkage.
-  Optional<AvailabilityContext> getAvailabilityForLinkage() const;
+  llvm::Optional<AvailabilityContext> getAvailabilityForLinkage() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;

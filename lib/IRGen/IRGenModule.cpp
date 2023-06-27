@@ -86,7 +86,7 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
 }
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
-                                                 llvm::LLVMContext &LLVMContext,
+                                                      llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
                                                       StringRef ModuleName,
                                                       StringRef PD) {
@@ -95,7 +95,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   assert(Importer && "No clang module loader!");
   auto &ClangContext = Importer->getClangASTContext();
 
-  auto &CGO = Importer->getClangCodeGenOpts();
+  auto &CGO = Importer->getCodeGenOpts();
   if (CGO.OpaquePointers) {
     LLVMContext.setOpaquePointers(true);
   } else {
@@ -570,7 +570,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   InvariantNode = llvm::MDNode::get(getLLVMContext(), {});
   DereferenceableID = getLLVMContext().getMDKindID("dereferenceable");
   
-  C_CC = llvm::CallingConv::C;
+  C_CC = getOptions().PlatformCCallingConvention;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;

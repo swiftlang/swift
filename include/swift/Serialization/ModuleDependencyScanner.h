@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
@@ -41,18 +42,23 @@ namespace swift {
 
       /// Location where pre-built moduels are to be built into.
       std::string moduleCachePath;
-    public:
-      Optional<ModuleDependencyInfo> dependencies;
 
-      ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                              Identifier moduleName,
-                              InterfaceSubContextDelegate &astDelegate,
-                              ScannerKind kind = MDS_plain)
+      llvm::Optional<SwiftDependencyTracker> dependencyTracker;
+
+    public:
+      llvm::Optional<ModuleDependencyInfo> dependencies;
+
+      ModuleDependencyScanner(
+          ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
+          InterfaceSubContextDelegate &astDelegate,
+          ScannerKind kind = MDS_plain,
+          llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
           : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                        /*IgnoreSwiftSourceInfoFile=*/true),
             kind(kind), moduleName(moduleName), astDelegate(astDelegate),
             moduleCachePath(getModuleCachePathFromClang(
-                ctx.getClangModuleLoader()->getClangInstance())) {}
+                ctx.getClangModuleLoader()->getClangInstance())),
+            dependencyTracker(tracker) {}
 
       std::error_code findModuleFilesInDirectory(
           ImportPath::Element ModuleID,
@@ -87,9 +93,16 @@ namespace swift {
       void parsePlaceholderModuleMap(StringRef fileName) {
         ExplicitModuleMapParser parser(Allocator);
         llvm::StringMap<ExplicitClangModuleInputInfo> ClangDependencyModuleMap;
-        auto result =
-          parser.parseSwiftExplicitModuleMap(fileName, PlaceholderDependencyModuleMap,
-                                             ClangDependencyModuleMap);
+        llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+            llvm::MemoryBuffer::getFile(fileName);
+        if (!fileBufOrErr) {
+          Ctx.Diags.diagnose(SourceLoc(),
+                             diag::explicit_swift_module_map_missing, fileName);
+          return;
+        }
+        auto result = parser.parseSwiftExplicitModuleMap(
+            (*fileBufOrErr)->getMemBufferRef(), PlaceholderDependencyModuleMap,
+            ClangDependencyModuleMap);
         if (result == std::errc::invalid_argument) {
           Ctx.Diags.diagnose(SourceLoc(),
                              diag::placeholder_dependency_module_map_corrupted,
@@ -106,12 +119,13 @@ namespace swift {
       llvm::BumpPtrAllocator Allocator;
 
     public:
-      PlaceholderSwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                                    Identifier moduleName,
-                                    StringRef PlaceholderDependencyModuleMap,
-                                    InterfaceSubContextDelegate &astDelegate)
+      PlaceholderSwiftModuleScanner(
+          ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
+          StringRef PlaceholderDependencyModuleMap,
+          InterfaceSubContextDelegate &astDelegate,
+          llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
           : ModuleDependencyScanner(ctx, LoadMode, moduleName, astDelegate,
-                                    MDS_placeholder) {
+                                    MDS_placeholder, tracker) {
 
         // FIXME: Find a better place for this map to live, to avoid
         // doing the parsing on every module.

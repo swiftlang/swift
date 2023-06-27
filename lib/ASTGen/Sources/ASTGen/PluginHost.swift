@@ -15,19 +15,32 @@ import CBasicBridging
 import SwiftSyntax
 import swiftLLVMJSON
 
-enum PluginError: Error {
-  case stalePlugin
-  case failedToSendMessage
-  case failedToReceiveMessage
-  case invalidReponseKind
+enum PluginError: String, Error, CustomStringConvertible {
+  case stalePlugin = "plugin is stale"
+  case failedToSendMessage = "failed to send request to plugin"
+  case failedToReceiveMessage = "failed to receive result from plugin"
+  case invalidReponseKind = "plugin returned invalid result"
+
+  var description: String { rawValue }
 }
 
 @_cdecl("swift_ASTGen_initializePlugin")
 public func _initializePlugin(
-  opaqueHandle: UnsafeMutableRawPointer
-) {
+  opaqueHandle: UnsafeMutableRawPointer,
+  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
+) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
-  plugin.initialize()
+  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+
+  do {
+    try plugin.initialize()
+    return true
+  } catch {
+    diagEngine?.diagnose(
+      message: "compiler plugin not loaded: '\(plugin.executableFilePath); failed to initialize",
+      severity: .warning)
+    return false
+  }
 }
 
 @_cdecl("swift_ASTGen_deinitializePlugin")
@@ -48,16 +61,18 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
   cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
 ) -> Bool {
   let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+
+  if plugin.capability?.features.contains(.loadPluginLibrary) != true {
+    // This happens only if invalid plugin server was passed to `-external-plugin-path`.
+    diagEngine?.diagnose(
+      message: "compiler plugin not loaded: '\(libraryPath); invalid plugin server",
+      severity: .warning)
+    return false
+  }
   assert(plugin.capability?.features.contains(.loadPluginLibrary) == true)
   let libraryPath = String(cString: libraryPath)
   let moduleName = String(cString: moduleName)
-
-  let diagEngine: PluginDiagnosticsEngine?
-  if let cxxDiagnosticEngine = cxxDiagnosticEngine {
-    diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
-  } else {
-    diagEngine = nil
-  }
 
   do {
     let result = try plugin.sendMessageAndWaitWithoutLock(
@@ -69,7 +84,9 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
     diagEngine?.emit(diagnostics);
     return loaded
   } catch {
-    diagEngine?.diagnose(error: error)
+    diagEngine?.diagnose(
+      message: "compiler plugin not loaded: '\(libraryPath); \(error)",
+      severity: .warning)
     return false
   }
 }
@@ -136,30 +153,39 @@ struct CompilerPlugin {
   }
 
   /// Initialize the plugin. This should be called inside lock.
-  func initialize() {
-    do {
-      // Get capability.
-      let response = try self.sendMessageAndWaitWithoutLock(.getCapability)
-      guard case .getCapabilityResult(let capability) = response else {
-        throw PluginError.invalidReponseKind
-      }
-      let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
-      ptr.initialize(to: .init(capability))
-      Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
-    } catch {
-      assertionFailure(String(describing: error))
-      return
+  func initialize() throws {
+    // Send host capability and get plugin capability.
+    let hostCapability = PluginMessage.HostCapability(
+      protocolVersion: PluginMessage.PROTOCOL_VERSION_NUMBER
+    )
+    let request = HostToPluginMessage.getCapability(capability: hostCapability)
+    let response = try self.sendMessageAndWaitWithoutLock(request)
+    guard case .getCapabilityResult(let capability) = response else {
+      throw PluginError.invalidReponseKind
+    }
+
+    deinitializePluginCapabilityIfExist()
+
+    let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
+    ptr.initialize(to: .init(capability))
+    Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
+  }
+
+  /// Deinitialize and unset the plugin capability stored in C++
+  /// 'LoadedExecutablePlugin'. This should be called inside lock.
+  func deinitializePluginCapabilityIfExist() {
+    if let ptr = Plugin_getCapability(opaqueHandle) {
+      let capabilityPtr = UnsafeMutableRawPointer(mutating: ptr)
+        .assumingMemoryBound(to: PluginMessage.PluginCapability.self)
+      capabilityPtr.deinitialize(count: 1)
+      capabilityPtr.deallocate()
+      Plugin_setCapability(opaqueHandle, nil)
     }
   }
 
   func deinitialize() {
     self.withLock {
-      if let ptr = Plugin_getCapability(opaqueHandle) {
-        let capabilityPtr = UnsafeMutableRawPointer(mutating: ptr)
-          .assumingMemoryBound(to: PluginMessage.PluginCapability.self)
-        capabilityPtr.deinitialize(count: 1)
-        capabilityPtr.deallocate()
-      }
+      deinitializePluginCapabilityIfExist()
     }
   }
 
@@ -169,14 +195,26 @@ struct CompilerPlugin {
     }
     return nil
   }
+
+  var executableFilePath: String {
+    return String(cString: Plugin_getExecutableFilePath(opaqueHandle))
+  }
 }
 
 class PluginDiagnosticsEngine {
-  private let cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>
+  private let bridgedDiagEngine: BridgedDiagnosticEngine
   private var exportedSourceFileByName: [String: UnsafePointer<ExportedSourceFile>] = [:]
 
   init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
-    self.cxxDiagnosticEngine = cxxDiagnosticEngine
+    self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
+  }
+
+  /// Failable convenience initializer for optional cxx engine pointer.
+  convenience init?(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?) {
+    guard let cxxDiagnosticEngine = cxxDiagnosticEngine else {
+      return nil
+    }
+    self.init(cxxDiagnosticEngine: cxxDiagnosticEngine)
   }
 
   /// Register an 'ExportedSourceFile' to the engine. So the engine can get
@@ -234,34 +272,34 @@ class PluginDiagnosticsEngine {
 
     // Emit the diagnostic
     var mutableMessage = message
-    let diag = mutableMessage.withUTF8 { messageBuffer in
-      SwiftDiagnostic_create(
-        cxxDiagnosticEngine, bridgedSeverity,
-        cxxSourceLocation(at: position),
-        messageBuffer.baseAddress, messageBuffer.count)
+    let diag = mutableMessage.withBridgedString { bridgedMessage in
+      Diagnostic_create(
+        bridgedDiagEngine, bridgedSeverity,
+        bridgedSourceLoc(at: position),
+        bridgedMessage)
     }
 
     // Emit highlights
     for highlight in highlights {
-      guard let (startLoc, endLoc) = cxxSourceRange(for: highlight) else {
+      guard let (startLoc, endLoc) = bridgedSourceRange(for: highlight) else {
         continue
       }
-      SwiftDiagnostic_highlight(diag, startLoc, endLoc)
+      Diagnostic_highlight(diag, startLoc, endLoc)
     }
 
     // Emit changes for a Fix-It.
     for change in fixItChanges {
-      guard let (startLoc, endLoc) = cxxSourceRange(for: change.range) else {
+      guard let (startLoc, endLoc) = bridgedSourceRange(for: change.range) else {
         continue
       }
       var newText = change.newText
-      newText.withUTF8 { textBuffer in
-        SwiftDiagnostic_fixItReplace(
-          diag, startLoc, endLoc, textBuffer.baseAddress, textBuffer.count)
+      newText.withBridgedString { bridgedFixItText in
+        Diagnostic_fixItReplace(
+          diag, startLoc, endLoc, bridgedFixItText)
       }
     }
 
-    SwiftDiagnostic_finish(diag)
+    Diagnostic_finish(diag)
   }
 
   /// Emit diagnostics.
@@ -282,42 +320,42 @@ class PluginDiagnosticsEngine {
     )
   }
 
+  func diagnose(message: String, severity: PluginMessage.Diagnostic.Severity) {
+    self.emitSingle(message: message, severity: severity, position: .invalid)
+  }
+
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
-  private func cxxSourceLocation(
+  private func bridgedSourceLoc(
     at offset: Int, in fileName: String
-  ) -> CxxSourceLoc? {
+  ) -> BridgedSourceLoc {
     // Find the corresponding exported source file.
-    guard
-      let exportedSourceFile = exportedSourceFileByName[fileName]
-    else {
+    guard let exportedSourceFile = exportedSourceFileByName[fileName] else {
       return nil
     }
 
     // Compute the resulting address.
-    guard
-      let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
-    else {
+    guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
       return nil
     }
-    return bufferBaseAddress.advanced(by: offset)
+    return SourceLoc_advanced(BridgedSourceLoc(raw: bufferBaseAddress), offset)
   }
 
   /// C++ source location from a position value from a plugin.
-  private func cxxSourceLocation(
+  private func bridgedSourceLoc(
     at position: PluginMessage.Diagnostic.Position
-  ) -> CxxSourceLoc? {
-    cxxSourceLocation(at: position.offset, in: position.fileName)
+  ) -> BridgedSourceLoc {
+    return bridgedSourceLoc(at: position.offset, in: position.fileName)
   }
 
   /// C++ source range from a range value from a plugin.
-  private func cxxSourceRange(
+  private func bridgedSourceRange(
     for range: PluginMessage.Diagnostic.PositionRange
-  ) -> (start: CxxSourceLoc, end: CxxSourceLoc)? {
-    guard
-      let start = cxxSourceLocation(at: range.startOffset, in: range.fileName),
-      let end = cxxSourceLocation(at: range.endOffset, in: range.fileName)
-    else {
+  ) -> (start: BridgedSourceLoc, end: BridgedSourceLoc)? {
+    let start = bridgedSourceLoc(at: range.startOffset, in: range.fileName)
+    let end = bridgedSourceLoc(at: range.endOffset, in: range.fileName)
+
+    if start.raw == nil || end.raw == nil {
       return nil
     }
     return (start: start, end: end )
@@ -336,9 +374,8 @@ extension PluginMessage.Syntax {
     case syntax.is(AttributeSyntax.self): kind = .attribute
     default: return nil
     }
+
     let source = syntax.description
-
-
     let sourceStr = String(decoding: sourceFilePtr.pointee.buffer, as: UTF8.self)
     let fileName = sourceFilePtr.pointee.fileName
     let fileID = "\(sourceFilePtr.pointee.moduleName)/\(sourceFilePtr.pointee.fileName.basename)"

@@ -38,6 +38,7 @@ class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
 class NodeBitfield;
+class SILPassManager;
 
 namespace Lowering {
 class TypeLowering;
@@ -73,6 +74,11 @@ enum IsRuntimeAccessible_t {
 enum ForceEnableLexicalLifetimes_t {
   DoNotForceEnableLexicalLifetimes,
   DoForceEnableLexicalLifetimes
+};
+
+enum UseStackForPackMetadata_t {
+  DoNotUseStackForPackMetadata,
+  DoUseStackForPackMetadata,
 };
 
 enum class PerformanceConstraints : uint8_t {
@@ -290,6 +296,9 @@ private:
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
+  /// Name of a section if @_section attribute was used, otherwise empty.
+  StringRef Section;
+
   /// Has value if there's a profile for this function
   /// Contains Function Entry Count
   ProfileCounter EntryCount;
@@ -344,6 +353,9 @@ private:
   /// preserved and exported more widely than its Swift linkage and usage
   /// would indicate.
   unsigned HasCReferences : 1;
+
+  /// Whether attribute @_used was present
+  unsigned MarkedAsUsed : 1;
 
   /// Whether cross-module references to this function should always use weak
   /// linking.
@@ -411,6 +423,10 @@ private:
   /// If true, the function has lexical lifetimes even if the module does not.
   unsigned ForceEnableLexicalLifetimes : 1;
 
+  /// If true, the function contains an instruction that prevents stack nesting
+  /// from running with pack metadata markers in place.
+  unsigned UseStackForPackMetadata : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -453,13 +469,12 @@ private:
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+         llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
          IsDistributed_t isDistributed,
          IsRuntimeAccessible_t isRuntimeAccessible,
-         IsExactSelfClass_t isExactSelfClass,
-         IsThunk_t isThunk = IsNotThunk,
+         IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
@@ -684,6 +699,14 @@ public:
 
   void setForceEnableLexicalLifetimes(ForceEnableLexicalLifetimes_t value) {
     ForceEnableLexicalLifetimes = value;
+  }
+
+  UseStackForPackMetadata_t useStackForPackMetadata() const {
+    return UseStackForPackMetadata_t(UseStackForPackMetadata);
+  }
+
+  void setUseStackForPackMetadata(UseStackForPackMetadata_t value) {
+    UseStackForPackMetadata = value;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type
@@ -1233,6 +1256,14 @@ public:
     return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
   }
 
+  /// Return whether this function has attribute @_used on it
+  bool markedAsUsed() const { return MarkedAsUsed; }
+  void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
+
+  /// Return custom section name if @_section was used, otherwise empty
+  StringRef section() const { return Section; }
+  void setSection(StringRef value) { Section = value; }
+
   /// Returns true if this function belongs to a declaration that returns
   /// an opaque result type with one or more availability conditions that are
   /// allowed to produce a different underlying type at runtime.
@@ -1410,18 +1441,19 @@ public:
 
   /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(bool SingleFunction = true,
+  void verify(SILPassManager *passManager = nullptr,
+              bool SingleFunction = true,
               bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
   /// blocks.
   void verifyIncompleteOSSA() const {
-    verify(/*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+    verify(/*passManager*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime();
+  void verifyMemoryLifetime(SILPassManager *passManager);
 
   /// Run the SIL ownership verifier to check that all values with ownership
   /// have a linear lifetime. Regular OSSA invariants are checked separately in

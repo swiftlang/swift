@@ -85,19 +85,11 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   // Check the availability of the opaque type runtime support.
-  if (!ctx.LangOpts.DisableAvailabilityChecking) {
-    auto runningOS =
-      TypeChecker::overApproximateAvailabilityAtLocation(
-        repr->getLoc(),
-        originatingDecl->getInnermostDeclContext());
-    auto availability = ctx.getOpaqueTypeAvailability();
-    if (!runningOS.isContainedIn(availability)) {
-      TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
-        repr->getSourceRange(),
-        originatingDecl->getInnermostDeclContext(),
-        UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
-    }
-  }
+  TypeChecker::checkAvailability(
+      repr->getSourceRange(),
+      ctx.getOpaqueTypeAvailability(),
+      diag::availability_opaque_types_only_version_newer,
+      originatingDecl->getInnermostDeclContext());
 
   // Create a generic signature for the opaque environment. This is the outer
   // generic signature with an added generic parameters representing the opaque
@@ -221,7 +213,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto opaqueDecl = OpaqueTypeDecl::get(
       originatingDecl, genericParams, parentDC, interfaceSignature,
       opaqueReprs);
-  opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);
   } else {
@@ -847,6 +838,7 @@ static std::string gatherGenericParamBindingsText(
 
   SmallString<128> result;
   llvm::raw_svector_ostream OS(result);
+  auto options = PrintOptions::forDiagnosticArguments();
 
   for (auto gp : genericParams) {
     auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
@@ -868,19 +860,7 @@ static std::string gatherGenericParamBindingsText(
     if (!type)
       return "";
 
-    if (auto *packType = type->getAs<PackType>()) {
-      bool first = true;
-      for (auto eltType : packType->getElementTypes()) {
-        if (first)
-          first = false;
-        else
-          OS << ", ";
-
-        OS << eltType;
-      }
-    } else {
-      OS << type.getString();
-    }
+    type->print(OS, options);
   }
 
   OS << "]";
@@ -1070,6 +1050,35 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
   return CheckGenericArgumentsResult::Success;
 }
 
+CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
+    ArrayRef<Requirement> requirements) {
+  SmallVector<Requirement, 4> worklist(requirements.begin(), requirements.end());
+
+  bool hadSubstFailure = false;
+
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+    switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::ConditionalConformance:
+    case CheckRequirementResult::PackRequirement:
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
+      return CheckGenericArgumentsResult::RequirementFailure;
+
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
+    }
+  }
+
+  if (hadSubstFailure)
+    return CheckGenericArgumentsResult::SubstitutionFailure;
+
+  return CheckGenericArgumentsResult::Success;
+}
+
 Requirement
 RequirementRequest::evaluate(Evaluator &evaluator,
                              WhereClauseOwner owner,
@@ -1089,7 +1098,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     options |= TypeResolutionFlags::AllowPackReferences;
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
-  Optional<TypeResolution> resolution;
+  llvm::Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution = TypeResolution::forStructural(owner.dc, options,

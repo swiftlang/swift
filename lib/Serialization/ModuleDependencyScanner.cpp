@@ -22,6 +22,10 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Subsystems.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/CAS/CachingOnDiskFileSystem.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "ModuleFileSharedCore.h"
 
 #include <algorithm>
@@ -115,7 +119,7 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
   auto realModuleName = Ctx.getRealModuleName(moduleName);
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-  Optional<ModuleDependencyInfo> Result;
+  llvm::Optional<ModuleDependencyInfo> Result;
 
   // FIXME: Consider not spawning a sub-instance for this
   std::error_code code =
@@ -151,11 +155,6 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     Args.push_back("-o");
     Args.push_back(outputPathBase.str().str());
 
-    std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
-    Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-        outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs, PCMArgs,
-        Hash, isFramework);
-
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
@@ -167,13 +166,25 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
     auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
 
-    // Dependency scanning does not require an AST, so disable Swift Parser
-    // ASTGen parsing completely.
     SourceFile::ParsingOptions parsingOpts;
-    parsingOpts |= SourceFile::ParsingFlags::DisableSwiftParserASTGen;
     auto sourceFile = new (Ctx) SourceFile(
         *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
     moduleDecl->addAuxiliaryFile(*sourceFile);
+
+    std::string RootID;
+    if (dependencyTracker) {
+      dependencyTracker->startTracking();
+      dependencyTracker->trackFile(moduleInterfacePath);
+      auto RootOrError = dependencyTracker->createTreeFromDependencies();
+      if (!RootOrError)
+        return llvm::errorToErrorCode(RootOrError.takeError());
+      RootID = RootOrError->getID().toString();
+    }
+
+    std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
+    Result = ModuleDependencyInfo::forSwiftInterfaceModule(
+        outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs,
+        PCMArgs, Hash, isFramework, RootID, /*module-cache-key*/ "");
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
@@ -197,38 +208,41 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
           });
       if (adjacentBinaryModule != compiledCandidates.end()) {
         // Required modules.
-        auto adjacentBinaryModuleRequiredImports = getModuleImportsOfModule(
+        auto adjacentBinaryModuleRequiredImports = getImportsOfModule(
             *adjacentBinaryModule, ModuleLoadingBehavior::Required, isFramework,
             isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
             Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
             Ctx.SearchPathOpts.DeserializedPathRecoverer);
         if (!adjacentBinaryModuleRequiredImports)
           return adjacentBinaryModuleRequiredImports.getError();
-
+        auto adjacentBinaryModuleRequiredModuleImports =
+          (*adjacentBinaryModuleRequiredImports).moduleImports;
 #ifndef NDEBUG
         //  Verify that the set of required modules read out from the binary
         //  module is a super-set of module imports identified in the
         //  textual interface.
         for (const auto &requiredImport : Result->getModuleImports()) {
-          assert(adjacentBinaryModuleRequiredImports->contains(requiredImport) &&
+          assert(adjacentBinaryModuleRequiredModuleImports.contains(requiredImport) &&
                  "Expected adjacent binary module's import set to contain all "
                  "textual interface imports.");
         }
 #endif
 
-        for (const auto &requiredImport : *adjacentBinaryModuleRequiredImports)
+        for (const auto &requiredImport : adjacentBinaryModuleRequiredModuleImports)
           Result->addModuleImport(requiredImport.getKey(),
                                   &alreadyAddedModules);
 
         // Optional modules. Will be looked-up on a best-effort basis
-        auto adjacentBinaryModuleOptionalImports = getModuleImportsOfModule(
+        auto adjacentBinaryModuleOptionalImports = getImportsOfModule(
             *adjacentBinaryModule, ModuleLoadingBehavior::Optional, isFramework,
             isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
             Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
             Ctx.SearchPathOpts.DeserializedPathRecoverer);
         if (!adjacentBinaryModuleOptionalImports)
           return adjacentBinaryModuleOptionalImports.getError();
-        for (const auto &optionalImport : *adjacentBinaryModuleOptionalImports)
+        auto adjacentBinaryModuleOptionalModuleImports =
+          (*adjacentBinaryModuleOptionalImports).moduleImports;
+        for (const auto &optionalImport : adjacentBinaryModuleOptionalModuleImports)
           Result->addOptionalModuleImport(optionalImport.getKey(),
                                           &alreadyAddedModules);
       }
@@ -243,7 +257,8 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
   return *Result;
 }
 
-Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDependencies(
+llvm::Optional<const ModuleDependencyInfo *>
+SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate, bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
@@ -258,9 +273,10 @@ Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDepen
   // FIXME: submodules?
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
       Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
-      delegate));
+      delegate, cache.getScanService().createSwiftDependencyTracker()));
   scanners.push_back(std::make_unique<ModuleDependencyScanner>(
-      Ctx, LoadMode, moduleId, delegate));
+      Ctx, LoadMode, moduleId, delegate, ModuleDependencyScanner::MDS_plain,
+      cache.getScanService().createSwiftDependencyTracker()));
 
   // Check whether there is a module with this name that we can import.
   assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
@@ -273,5 +289,5 @@ Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDepen
     }
   }
 
-  return None;
+  return llvm::None;
 }

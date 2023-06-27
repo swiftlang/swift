@@ -125,6 +125,13 @@ public:
   ManagedValue createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue);
 
+  using SILBuilder::createExplicitCopyValue;
+
+  /// A copy_value operation that to the move checker looks like just a normal
+  /// liveness use. Used to implement an explicit copy for no implicit copy
+  /// values.
+  ManagedValue createExplicitCopyValue(SILLocation Loc, ManagedValue operand);
+
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   using SILBuilder::createStrongCopy##Name##Value;                             \
   ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
@@ -202,6 +209,8 @@ public:
   using SILBuilder::createStoreBorrow;
   ManagedValue createStoreBorrow(SILLocation loc, ManagedValue value,
                                  SILValue address);
+  ManagedValue createFormalAccessStoreBorrow(SILLocation loc, ManagedValue value,
+                                             SILValue address);
 
   /// Create a store_borrow if we have a non-trivial value and a store [trivial]
   /// otherwise.
@@ -227,6 +236,15 @@ public:
   ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
                                                EnumElementDecl *element, SILType ty);
 
+  /// Given the address of a value, load a scalar value from it if the type
+  /// is loadable.  Most general routines in SILGen expect to work with
+  /// values with the canonical scalar-ness for their type.
+  ManagedValue createLoadIfLoadable(SILLocation loc, ManagedValue addr);
+
+  /// Given the address of a loadable value, load the value but don't
+  /// change the ownership.
+  ManagedValue createLoadWithSameOwnership(SILLocation loc, ManagedValue addr);
+
   ManagedValue createLoadTake(SILLocation loc, ManagedValue addr);
   ManagedValue createLoadTake(SILLocation loc, ManagedValue addr,
                               const TypeLowering &lowering);
@@ -250,7 +268,7 @@ public:
   /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
   /// user to be explicit that they want to use this API.
   ManagedValue createInputFunctionArgument(SILType type,
-                                           Optional<SILLocation> loc);
+                                           llvm::Optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,
@@ -432,7 +450,8 @@ public:
                                  bool isLexical = false);
 
   using SILBuilder::createMoveValue;
-  ManagedValue createMoveValue(SILLocation loc, ManagedValue value);
+  ManagedValue createMoveValue(SILLocation loc, ManagedValue value,
+                               bool isLexical = false);
 
   using SILBuilder::createOwnedMoveOnlyWrapperToCopyableValue;
   ManagedValue createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,

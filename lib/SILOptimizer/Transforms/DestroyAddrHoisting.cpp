@@ -269,7 +269,7 @@ private:
     DeinitBarriers &result;
     Dataflow::Result reachability;
     Dataflow dataflow;
-    Optional<SmallVector<SILBasicBlock *, 16>> cachedRoots;
+    llvm::Optional<SmallVector<SILBasicBlock *, 16>> cachedRoots;
     bool recordDeadUsers = false;
 
   public:
@@ -869,6 +869,11 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
                    InstructionDeleter &deleter,
                    BasicCalleeAnalysis *calleeAnalysis) {
   LLVM_DEBUG(llvm::dbgs() << "Performing destroy hoisting on " << root);
+
+  // Don't canonicalize the lifetimes of addresses of move-only type.
+  // According to language rules, they are fixed.
+  if (root->getType().isMoveOnly())
+    return false;
 
   SILFunction *function = root->getFunction();
   if (!function)

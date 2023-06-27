@@ -395,9 +395,7 @@ private:
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
 
-#ifndef NDEBUG
   BasicBlockNameMapType basicBlockNames;
-#endif
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
@@ -514,15 +512,15 @@ public:
     basicBlockNames[block] = name.str();
 #endif
   }
-  Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
+  llvm::Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
 #ifndef NDEBUG
     auto Known = basicBlockNames.find(block);
     if (Known == basicBlockNames.end())
-      return None;
+      return llvm::None;
 
     return StringRef(Known->second);
 #else
-    return None;
+    return llvm::None;
 #endif
   }
 
@@ -773,9 +771,8 @@ public:
   ///
   /// If \p linkage is provided, the deserialized function is required to have
   /// that linkage. Returns null, if this is not the case.
-  SILFunction *loadFunction(StringRef name,
-                            LinkingMode LinkMode,
-                            Optional<SILLinkage> linkage = None);
+  SILFunction *loadFunction(StringRef name, LinkingMode LinkMode,
+                            llvm::Optional<SILLinkage> linkage = llvm::None);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.
@@ -902,9 +899,13 @@ public:
   /// fetched in the given module?
   bool isTypeMetadataForLayoutAccessible(SILType type);
 
+  void verify(bool isCompleteOSSA = true,
+              bool checkLinearLifetime = true) const;
+
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify(bool isCompleteOSSA = true,
+  void verify(SILPassManager *passManager,
+              bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
@@ -1082,7 +1083,11 @@ LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
 /// Returns true if SIL/IR lowering for the given declaration should be skipped.
 /// A declaration may not require lowering if, for example, it is annotated as
 /// unavailable and optimization settings allow it to be omitted.
-LLVM_LIBRARY_VISIBILITY bool shouldSkipLowering(Decl *D);
+LLVM_LIBRARY_VISIBILITY bool shouldSkipLowering(const Decl *D);
+
+/// Returns true if SIL/IR lowering for the given declaration should produce
+/// a stub that traps at runtime because the code ought to be unreachable.
+LLVM_LIBRARY_VISIBILITY bool shouldLowerToUnavailableCodeStub(const Decl *D);
 } // namespace Lowering
 
 /// Apply the given function to each ABI member of \c D skipping the members

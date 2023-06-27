@@ -255,7 +255,7 @@ namespace {
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
+      return MacroWalking::Arguments;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -410,7 +410,6 @@ unsigned LocalDiscriminatorsRequest::evaluate(
                              LocalDiscriminatorsRequest{dc->getParent()}, 0);
   }
 
-  Optional<unsigned> expectedNextAutoclosureDiscriminator = None;
   ASTNode node;
   ParameterList *params = nullptr;
   ParamDecl *selfParam = nullptr;
@@ -436,7 +435,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
     params = closure->getParameters();
   } else if (auto topLevel = dyn_cast<TopLevelCodeDecl>(dc)) {
     node = topLevel->getBody();
-    expectedNextAutoclosureDiscriminator = ctx.NextAutoClosureDiscriminator;
+    dc = topLevel->getParentModule();
   } else if (auto patternBindingInit = dyn_cast<PatternBindingInitializer>(dc)){
     auto patternBinding = patternBindingInit->getBinding();
     node = patternBinding->getInit(patternBindingInit->getBindingIndex());
@@ -472,12 +471,11 @@ unsigned LocalDiscriminatorsRequest::evaluate(
     params = getParameterList(dc);
   }
 
+  auto startDiscriminator = ctx.getNextDiscriminator(dc);
   if (!node && !params && !selfParam)
-    return 0;
+    return startDiscriminator;
 
-  SetLocalDiscriminators visitor(
-      expectedNextAutoclosureDiscriminator.value_or(0)
-  );
+  SetLocalDiscriminators visitor(startDiscriminator);
 
   // Set local discriminator for the 'self' parameter.
   if (selfParam)
@@ -494,9 +492,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
     node.walk(visitor);
 
   unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
-  if (expectedNextAutoclosureDiscriminator) {
-    ctx.NextAutoClosureDiscriminator = nextDiscriminator;
-  }
+  ctx.setMaxAssignedDiscriminator(dc, nextDiscriminator);
 
   // Return the next discriminator.
   return nextDiscriminator;
@@ -560,11 +556,11 @@ static bool isDefer(DeclContext *dc) {
 
 /// Climb the context to find the method or accessor we're within. We do not
 /// look past local functions or closures, since those cannot contain a
-/// forget statement.
-/// \param dc the inner decl context containing the forget statement
+/// discard statement.
+/// \param dc the inner decl context containing the discard statement
 /// \return either the type member we reside in, or the offending context that
 ///         stopped the search for the type member (e.g. closure).
-static DeclContext *climbContextForForgetStmt(DeclContext *dc) {
+static DeclContext *climbContextForDiscardStmt(DeclContext *dc) {
   do {
     if (auto decl = dc->getAsDecl()) {
       auto func = dyn_cast<AbstractFunctionDecl>(decl);
@@ -880,6 +876,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
   elt.setPattern(pattern);
   elt.setInitializer(init);
+  
   isFalsable |= pattern->isRefutablePattern();
   return hadError;
 }
@@ -1213,8 +1210,8 @@ public:
     return TS;
   }
 
-  Stmt *visitForgetStmt(ForgetStmt *FS) {
-    // There are a lot of rules about whether a forget statement is even valid.
+  Stmt *visitDiscardStmt(DiscardStmt *DS) {
+    // There are a lot of rules about whether a discard statement is even valid.
     //
     // The order of the checks below roughly reflects a sort of funneling from
     // least correct to most correct usage, while aiming to not emit more than
@@ -1225,23 +1222,23 @@ public:
     auto &ctx = getASTContext();
     bool diagnosed = false;
 
-    auto *outerDC = climbContextForForgetStmt(DC);
+    auto *outerDC = climbContextForDiscardStmt(DC);
     AbstractFunctionDecl *fn = nullptr; // the type member we reside in.
     if (outerDC->getParent()->isTypeContext()) {
       fn = dyn_cast<AbstractFunctionDecl>(outerDC);
     }
 
-    // The forget statement must be in some type's member.
+    // The discard statement must be in some type's member.
     if (!fn) {
       // Then we're not in some type's member function; emit diagnostics.
       if (auto decl = outerDC->getAsDecl()) {
-        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
+        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
                            decl->getDescriptiveKind());
       } else if (auto clos = dyn_cast<AbstractClosureExpr>(outerDC)) {
-        ctx.Diags.diagnose(FS->getForgetLoc(),
-                           diag::forget_wrong_context_closure);
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_wrong_context_closure);
       } else {
-        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_misc);
+        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_misc);
       }
       diagnosed = true;
     }
@@ -1249,106 +1246,109 @@ public:
     // Member function-like-thing must have a 'self' and not be a destructor.
     if (!diagnosed) {
       // Save this for SILGen, since Stmt's don't know their decl context.
-      FS->setInnermostMethodContext(fn);
+      DS->setInnermostMethodContext(fn);
 
-      if (fn->isStatic() || isa<DestructorDecl>(fn)) {
-        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
+      if (fn->isStatic() || isa<DestructorDecl>(fn)
+          || isa<ConstructorDecl>(fn)) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
                            fn->getDescriptiveKind());
         diagnosed = true;
       }
     }
 
-    // This member function/accessor/etc has to be within a noncopyable type.
+    // check the kind of type this discard statement appears within.
     if (!diagnosed) {
+      auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
       Type nominalType =
-          fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
+          fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
+
+      // must be noncopyable
       if (!nominalType->isPureMoveOnly()) {
-        ctx.Diags.diagnose(FS->getForgetLoc(),
-                           diag::forget_wrong_context_copyable,
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_wrong_context_copyable,
                            fn->getDescriptiveKind());
+        diagnosed = true;
+
+      // has to have a deinit or else it's pointless.
+      } else if (!nominalDecl->getValueTypeDestructor()) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_no_deinit,
+                           nominalType)
+            .fixItRemove(DS->getSourceRange());
         diagnosed = true;
       } else {
         // Set the contextual type for the sub-expression before we typecheck.
-        contextualInfo = {nominalType, CTP_ForgetStmt};
+        contextualInfo = {nominalType, CTP_DiscardStmt};
 
-        // Now verify that we're not forgetting a type from another module.
+        // Now verify that we're not discarding a type from another module.
         //
         // NOTE: We could do a proper resilience check instead of just asking
-        // if the modules differ, so that you can forget a @frozen type from a
+        // if the modules differ, so that you can discard a @frozen type from a
         // resilient module. But for now the proposal simply says that it has to
         // be the same module, which is probably better for everyone.
-        auto *typeDecl = nominalType->getAnyNominal();
         auto *fnModule = fn->getModuleContext();
-        auto *typeModule = typeDecl->getModuleContext();
+        auto *typeModule = nominalDecl->getModuleContext();
         if (fnModule != typeModule) {
-          ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_module,
+          ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_module,
                              nominalType);
           diagnosed = true;
         } else {
           assert(
-              !typeDecl->isResilient(fnModule, ResilienceExpansion::Maximal) &&
-              "trying to forget a type resilient to us!");
+              !nominalDecl->isResilient(fnModule, ResilienceExpansion::Maximal)
+                  && "trying to discard a type resilient to us!");
         }
       }
     }
 
     {
       // Typecheck the sub expression unconditionally.
-      auto E = FS->getSubExpr();
+      auto E = DS->getSubExpr();
       TypeChecker::typeCheckExpression(E, DC, contextualInfo);
-      FS->setSubExpr(E);
+      DS->setSubExpr(E);
     }
 
-    // Can only 'forget self'. This check must happen after typechecking.
+    // Can only 'discard self'. This check must happen after typechecking.
     if (!diagnosed) {
       bool isSelf = false;
-      auto *checkE = FS->getSubExpr();
+      auto *checkE = DS->getSubExpr();
+      assert(fn->getImplicitSelfDecl() && "no self?");
 
       // Look through a load. Only expected if we're in an init.
       if (auto *load = dyn_cast<LoadExpr>(checkE))
           checkE = load->getSubExpr();
 
       if (auto DRE = dyn_cast<DeclRefExpr>(checkE))
-        isSelf = DRE->getDecl()->getName().isSimpleName("self");
+        isSelf = DRE->getDecl() == fn->getImplicitSelfDecl();
 
       if (!isSelf) {
         ctx.Diags
-            .diagnose(FS->getStartLoc(), diag::forget_wrong_not_self)
-            .fixItReplace(FS->getSubExpr()->getSourceRange(), "self");
+            .diagnose(DS->getStartLoc(), diag::discard_wrong_not_self)
+            .fixItReplace(DS->getSubExpr()->getSourceRange(), "self");
         diagnosed = true;
       }
     }
 
     // The 'self' parameter must be owned (aka "consuming").
     if (!diagnosed) {
-      bool isConsuming = false;
       if (auto *funcDecl = dyn_cast<FuncDecl>(fn)) {
         switch (funcDecl->getSelfAccessKind()) {
         case SelfAccessKind::LegacyConsuming:
         case SelfAccessKind::Consuming:
-          isConsuming = true;
           break;
           
         case SelfAccessKind::Borrowing:
         case SelfAccessKind::NonMutating:
         case SelfAccessKind::Mutating:
-          isConsuming = false;
+          ctx.Diags.diagnose(DS->getDiscardLoc(),
+                             diag::discard_wrong_context_nonconsuming,
+                             fn->getDescriptiveKind());
+          diagnosed = true;
           break;
         }
-      } else if (isa<ConstructorDecl>(fn)) {
-        // constructors are implicitly "consuming" of the self instance.
-        isConsuming = true;
-      }
-
-      if (!isConsuming) {
-        ctx.Diags.diagnose(FS->getForgetLoc(),
-                           diag::forget_wrong_context_nonconsuming,
-                           fn->getDescriptiveKind());
-        diagnosed = true;
       }
     }
 
-    return FS;
+    return DS;
   }
 
   Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
@@ -1749,6 +1749,16 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
 }
 
 static bool isDiscardableType(Type type) {
+  // If type is `(_: repeat ...)`, it can be discardable.
+  if (auto *tuple = type->getAs<TupleType>()) {
+    if (tuple->isSingleUnlabeledPackExpansion()) {
+      type = tuple->getElementType(0);
+    }
+  }
+
+  if (auto *expansion = type->getAs<PackExpansionType>())
+    return isDiscardableType(expansion->getPatternType());
+
   return (type->hasError() ||
           type->isUninhabited() ||
           type->lookThroughAllOptionalTypes()->isVoid());
@@ -2170,6 +2180,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
                               DeclNameRef::createConstructor(),
+                              apply->getLoc(),
                               subOptions, lookupResults);
 
     for (auto decl : lookupResults) {
@@ -2366,13 +2377,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         }
       }
     } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
-        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-        (void)Param->getTypeCheckedDefaultExpr();
-        return false;
-      }
-      if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
-        auto *Param = SD->getIndices()->get(defaultArg->getIndex());
+      if (const ParamDecl *Param =
+              getParameterAt(defaultArg->getParent(), defaultArg->getIndex())) {
         (void)Param->getTypeCheckedDefaultExpr();
         return false;
       }
@@ -2617,7 +2623,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                                        AbstractFunctionDecl *AFD) const {
   ASTContext &ctx = AFD->getASTContext();
 
-  Optional<FunctionBodyTimer> timer;
+  llvm::Optional<FunctionBodyTimer> timer;
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
@@ -2755,7 +2761,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
   BraceStmt *body = closure->getBody();
 
-  Optional<FunctionBodyTimer> timer;
+  llvm::Optional<FunctionBodyTimer> timer;
   const auto &tyOpts = closure->getASTContext().TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(closure);

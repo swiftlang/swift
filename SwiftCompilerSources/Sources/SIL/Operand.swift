@@ -76,6 +76,10 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
       base: OptionalBridgedOperand(op: base.advancedBy(bounds.lowerBound).op),
       count: bounds.upperBound - bounds.lowerBound)
   }
+
+  public var values: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
+    self.lazy.map { $0.value }
+  }
 }
 
 public struct UseList : CollectionLikeSequence {
@@ -105,6 +109,19 @@ public struct UseList : CollectionLikeSequence {
       return Operand(bridged: op)
     }
     return nil
+  }
+
+  public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
+    var result: I? = nil
+    for use in self {
+      if let user = use.instruction as? I {
+        if result != nil {
+          return nil
+        }
+        result = user
+      }
+    }
+    return result
   }
 
   public var isSingleUse: Bool { singleUse != nil }

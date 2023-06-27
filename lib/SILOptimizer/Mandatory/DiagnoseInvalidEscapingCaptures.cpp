@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-diagnose-invalid-escaping-captures"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -181,6 +183,7 @@ bool isUseOfSelfInInitializer(Operand *oper) {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(value)) {
       switch (MUI->getMarkUninitializedKind()) {
       case MarkUninitializedInst::Kind::Var:
+      case MarkUninitializedInst::Kind::Out:
         return false;
       case MarkUninitializedInst::Kind::RootSelf:
       case MarkUninitializedInst::Kind::CrossModuleRootSelf:
@@ -199,6 +202,8 @@ bool isUseOfSelfInInitializer(Operand *oper) {
 }
 
 static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking for escaping partial apply uses.\n");
+
   // Avoid exponential path exploration.
   SmallVector<Operand *, 8> uses;
   llvm::SmallDenseSet<Operand *, 8> visited;
@@ -215,10 +220,16 @@ static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
   bool foundEscapingUse = false;
   while (!uses.empty()) {
     Operand *oper = uses.pop_back_val();
-    foundEscapingUse |= checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
+    LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *oper->getUser());
+    bool localFoundEscapingUse = checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
       for (Operand *use : V->getUses())
         uselistInsert(use);
     });
+    LLVM_DEBUG(
+        if (localFoundEscapingUse)
+          llvm::dbgs() << "    Escapes!\n";
+    );
+    foundEscapingUse |= localFoundEscapingUse;
   }
 
   // If there aren't any, we're fine.
@@ -350,6 +361,8 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   if (isPartialApplyOfReabstractionThunk(PAI))
     return;
 
+  LLVM_DEBUG(llvm::dbgs() << "Checking Partial Apply: " << *PAI);
+
   ApplySite apply(PAI);
 
   // Collect any non-escaping captures.
@@ -402,7 +415,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
-    Optional<Identifier> paramName = None;
+    llvm::Optional<Identifier> paramName = llvm::None;
     if (isUseOfSelfInInitializer(inoutCapture)) {
       emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
@@ -517,11 +530,11 @@ static void checkApply(ASTContext &Context, FullApplySite site) {
     auto arg = pair.first;
     bool capture = pair.second;
 
-    if (auto *CI = dyn_cast<ConversionInst>(arg)) {
-      arglistInsert(CI->getConverted(), /*capture=*/false);
+    if (auto CI = ConversionOperation(arg)) {
+      arglistInsert(CI.getConverted(), /*capture=*/false);
       continue;
     }
-    
+
     if (auto *Copy = dyn_cast<CopyValueInst>(arg)) {
       arglistInsert(Copy->getOperand(), capture);
     }
@@ -584,6 +597,8 @@ private:
     if (F->wasDeserializedCanonical())
       return;
 
+    LLVM_DEBUG(llvm::dbgs() << "*** Diagnosing escaping captures in function: "
+                            << F->getName() << '\n');
     checkEscapingCaptures(F);
   }
 };

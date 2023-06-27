@@ -25,8 +25,9 @@ using namespace swift;
 
 using Path = SmallString<128>;
 
-static Optional<Path> getActualModuleMapPath(
+static llvm::Optional<Path> getActualModuleMapPath(
     StringRef name, SearchPathOptions &Opts, const llvm::Triple &triple,
+    bool isArchSpecific,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   StringRef platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
@@ -37,7 +38,11 @@ static Optional<Path> getActualModuleMapPath(
   if (!SDKPath.empty()) {
     result.append(SDKPath.begin(), SDKPath.end());
     llvm::sys::path::append(result, "usr", "lib", "swift");
-    llvm::sys::path::append(result, platform, arch, name);
+    llvm::sys::path::append(result, platform, arch);
+    if (isArchSpecific) {
+      llvm::sys::path::append(result, arch);
+    }
+    llvm::sys::path::append(result, name);
 
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
@@ -50,7 +55,11 @@ static Optional<Path> getActualModuleMapPath(
     result.clear();
     result.append(Opts.RuntimeResourcePath.begin(),
                   Opts.RuntimeResourcePath.end());
-    llvm::sys::path::append(result, platform, arch, name);
+    llvm::sys::path::append(result, platform);
+    if (isArchSpecific) {
+      llvm::sys::path::append(result, arch);
+    }
+    llvm::sys::path::append(result, name);
 
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
@@ -59,7 +68,7 @@ static Optional<Path> getActualModuleMapPath(
       return result;
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Given an include path directory, returns a path to inject the module map to.
@@ -70,12 +79,12 @@ static llvm::Optional<Path> getInjectedModuleMapPath(
   Path legacyPath(dir);
   llvm::sys::path::append(legacyPath, "module.map");
   if (vfs->exists(legacyPath))
-    return None;
+    return llvm::None;
 
   Path path(dir);
   llvm::sys::path::append(path, "module.modulemap");
   if (vfs->exists(path))
-    return None;
+    return llvm::None;
 
   return path;
 }
@@ -85,22 +94,25 @@ static llvm::Optional<Path> getInjectedModuleMapPath(
 /// Note that the module map used for Glibc depends on the target we're
 /// compiling for, and is not included in the resource directory with the other
 /// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
-static Optional<Path> getGlibcModuleMapPath(
+static llvm::Optional<Path> getGlibcModuleMapPath(
     SearchPathOptions &Opts, const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  return getActualModuleMapPath("glibc.modulemap", Opts, triple, vfs);
+  return getActualModuleMapPath("glibc.modulemap", Opts, triple,
+                                /*isArchSpecific*/ true, vfs);
 }
 
-static Optional<Path> getLibStdCxxModuleMapPath(
+static llvm::Optional<Path> getLibStdCxxModuleMapPath(
     SearchPathOptions &opts, const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  return getActualModuleMapPath("libstdcxx.modulemap", opts, triple, vfs);
+  return getActualModuleMapPath("libstdcxx.modulemap", opts, triple,
+                                /*isArchSpecific*/ false, vfs);
 }
 
-Optional<SmallString<128>>
+llvm::Optional<SmallString<128>>
 swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
                                const llvm::Triple &triple) {
   return getActualModuleMapPath("libcxxshim.modulemap", opts, triple,
+                                /*isArchSpecific*/ false,
                                 llvm::vfs::getRealFileSystem());
 }
 
@@ -158,7 +170,7 @@ static llvm::Optional<Path> findFirstIncludeDir(
       return dir;
     }
   }
-  return None;
+  return llvm::None;
 }
 
 static llvm::opt::InputArgList

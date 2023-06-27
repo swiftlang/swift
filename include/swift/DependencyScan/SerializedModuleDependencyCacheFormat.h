@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 4;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 1;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -139,7 +139,11 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDField,                         // bridgingHeaderFile
                    FileIDArrayIDField,                  // sourceFiles
                    FileIDArrayIDField,                  // bridgingSourceFiles
-                   FileIDArrayIDField                   // bridgingModuleDependencies
+                   FileIDArrayIDField,                  // bridgingModuleDependencies
+                   DependencyIDArrayIDField,            // swiftOverlayDependencies
+                   IdentifierIDField,                   // CASFileSystemRootID
+                   IdentifierIDField,                   // bridgingHeaderIncludeTree
+                   IdentifierIDField                    // moduleCacheKey
                    >;
 
 using SwiftSourceModuleDetailsLayout =
@@ -148,7 +152,12 @@ using SwiftSourceModuleDetailsLayout =
                    FileIDField,                      // bridgingHeaderFile
                    FileIDArrayIDField,               // sourceFiles
                    FileIDArrayIDField,               // bridgingSourceFiles
-                   FileIDArrayIDField                // bridgingModuleDependencies
+                   FileIDArrayIDField,               // bridgingModuleDependencies
+                   DependencyIDArrayIDField,         // swiftOverlayDependencies
+                   IdentifierIDField,                // CASFileSystemRootID
+                   IdentifierIDField,                // bridgingHeaderIncludeTree
+                   FlagIDArrayIDField,               // buildCommandLine
+                   FlagIDArrayIDField                // bridgingHeaderBuildCommandLine
                    >;
 
 using SwiftBinaryModuleDetailsLayout =
@@ -156,7 +165,9 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // compiledModulePath
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
-                   IsFrameworkField                  // isFramework
+                   ImportArrayIDField,               // headerImports
+                   IsFrameworkField,                 // isFramework
+                   IdentifierIDField                 // moduleCacheKey
                    >;
 
 using SwiftPlaceholderModuleDetailsLayout =
@@ -173,7 +184,10 @@ using ClangModuleDetailsLayout =
                    ContextHashIDField,        // contextHash
                    FlagIDArrayIDField,        // commandLine
                    FileIDArrayIDField,        // fileDependencies
-                   FlagIDArrayIDField         // capturedPCMArgs
+                   FlagIDArrayIDField,        // capturedPCMArgs
+                   IdentifierIDField,         // CASFileSystemRootID
+                   IdentifierIDField,         // clangIncludeTreeRoot
+                   IdentifierIDField          // moduleCacheKey
                    >;
 } // namespace graph_block
 

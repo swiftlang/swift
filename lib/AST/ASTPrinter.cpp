@@ -178,7 +178,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       PrintOptions::FunctionRepresentationMode::Full;
   result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
-  result.PrintExplicitAny = true;
   result.DesugarExistentialConstraint = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
@@ -411,7 +410,7 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
 }
 
 void ASTPrinter::callPrintDeclPre(const Decl *D,
-                                  Optional<BracketOptions> Bracket) {
+                                  llvm::Optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && isa<ExtensionDecl>(D))
@@ -3204,11 +3203,22 @@ static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureVariadicGenerics(Decl *decl) {
+static bool usesFeatureTupleConformances(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureTupleConformances(Decl *decl) {
+static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
+  auto &attrs = decl->getAttrs();
+  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
+    if (isa<UsedAttr>(attr))
+      return true;
+    if (isa<SectionAttr>(attr))
+      return true;
+    return false;
+  });
+}
+
+static bool usesFeatureInitAccessors(Decl *decl) {
   return false;
 }
 
@@ -3294,6 +3304,12 @@ static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
+  if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl))
+    return nomDecl->isResilient() && usesFeatureMoveOnly(decl);
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
@@ -3322,6 +3338,10 @@ static bool usesFeatureParserASTGen(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureASTGenTypes(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinMacros(Decl *decl) {
   return false;
 }
@@ -3345,12 +3365,21 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Expression);
 }
 
+static bool usesFeatureLexicalLifetimes(Decl *decl) {
+  return decl->getAttrs().hasAttribute<EagerMoveAttr>()
+         || decl->getAttrs().hasAttribute<NoEagerMoveAttr>()
+         || decl->getAttrs().hasAttribute<LexicalLifetimesAttr>();
+}
+
 static void
-suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.SuppressingFreestandingExpression = true;
+suppressingFeatureLexicalLifetimes(PrintOptions &options,
+                                   llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_EagerMove);
+  options.ExcludeAttrList.push_back(DAK_NoEagerMove);
+  options.ExcludeAttrList.push_back(DAK_LexicalLifetimes);
   action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 static void
@@ -4314,6 +4343,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
+  case AccessorKind::Init:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4328,6 +4358,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
+    break;
   }
 
   // handle effects specifiers before the body
@@ -4791,16 +4822,14 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
       }
   );
 
-  {
+  if (decl->resultType.getTypeRepr() ||
+      !decl->getResultInterfaceType()->isVoid()) {
     Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
     SWIFT_DEFER {
       Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
     };
 
-    if (decl->parameterList)
-      Printer << " -> ";
-    else
-      Printer << ": ";
+    Printer << " -> ";
 
     TypeLoc resultTypeLoc(
         decl->resultType.getTypeRepr(), decl->getResultInterfaceType());
@@ -4992,8 +5021,13 @@ void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   visit(expr->getSubExpr());
 }
 
-void PrintAST::visitMoveExpr(MoveExpr *expr) {
-  Printer << "move ";
+void PrintAST::visitConsumeExpr(ConsumeExpr *expr) {
+  Printer << "consume ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitCopyExpr(CopyExpr *expr) {
+  Printer << "copy ";
   visit(expr->getSubExpr());
 }
 
@@ -5200,7 +5234,6 @@ void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
 
 void PrintAST::visitMaterializePackExpr(MaterializePackExpr *expr) {
   visit(expr->getFromExpr());
-  Printer << ".element";
 }
 
 void PrintAST::visitPackElementExpr(PackElementExpr *expr) {
@@ -5416,8 +5449,8 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   visit(stmt->getSubExpr());
 }
 
-void PrintAST::visitForgetStmt(ForgetStmt *stmt) {
-  Printer << "_forget" << " ";
+void PrintAST::visitDiscardStmt(DiscardStmt *stmt) {
+  Printer << "discard" << " ";
   visit(stmt->getSubExpr());
 }
 
@@ -5654,7 +5687,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
+  llvm::Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> flatArgs) {
@@ -5708,16 +5741,15 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
           return opaque->getDecl()->hasExplicitGenericParams();
         case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
           return opaque->getDecl()->hasExplicitGenericParams() ||
-              isSimpleUnderPrintOptions(opaque->getExistentialType());
+                 isSimpleUnderPrintOptions(opaque->getExistentialType()
+                                               ->castTo<ExistentialType>()
+                                               ->getConstraintType());
         }
         llvm_unreachable("bad opaque-return-type printing mode");
       }
     } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
-      if (!Options.PrintExplicitAny || !existential->shouldPrintWithAny())
+      if (!existential->shouldPrintWithAny())
         return isSimpleUnderPrintOptions(existential->getConstraintType());
-    } else if (auto existential = dyn_cast<ExistentialMetatypeType>(T.getPointer())) {
-      if (!Options.PrintExplicitAny)
-        return isSimpleUnderPrintOptions(existential->getInstanceType());
     } else if (auto param = dyn_cast<GenericTypeParamType>(T.getPointer())) {
       if (param->isParameterPack())
         return false;
@@ -6030,7 +6062,8 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    Printer << "Pack{";
+    if (Options.PrintExplicitPackTypes)
+      Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
@@ -6039,7 +6072,9 @@ public:
       Type EltType = Fields[i];
       visit(EltType);
     }
-    Printer << "}";
+
+    if (Options.PrintExplicitPackTypes)
+      Printer << "}";
   }
 
   void visitSILPackType(SILPackType *T) {
@@ -6058,8 +6093,25 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
+    SmallVector<Type, 2> rootParameterPacks;
+    T->getPatternType()->getTypeParameterPacks(rootParameterPacks);
+
+    if (rootParameterPacks.empty() &&
+        (T->getCountType()->isParameterPack() ||
+         T->getCountType()->is<PackArchetypeType>())) {
+      Printer << "/* shape: ";
+      visit(T->getCountType());
+      Printer << " */ ";
+    }
+
     Printer << "repeat ";
+
     visit(T->getPatternType());
+  }
+
+  void visitPackElementType(PackElementType *T) {
+    Printer << "/* level: " << T->getLevel() << " */ ";
+    visit(T->getPackType());
   }
 
   void visitTupleType(TupleType *T) {
@@ -6189,7 +6241,7 @@ public:
     }
 
     Type instanceType = T->getInstanceType();
-    if (Options.PrintExplicitAny && T->is<ExistentialMetatypeType>()) {
+    if (T->is<ExistentialMetatypeType>()) {
       Printer << "any ";
 
       // FIXME: We need to replace nested existential metatypes so that
@@ -6201,27 +6253,23 @@ public:
 
         return type;
       }));
-    } else if (T->is<MetatypeType>() && instanceType->is<ExistentialType>()) {
-      // The 'any' keyword is needed to distinguish between existential
-      // metatypes and singleton metatypes. However, 'any' usually isn't
-      // printed for Any and AnyObject, because it's unnecessary to write
-      // 'any' with these specific constraints. Force printing with 'any'
-      // for the existential instance type in this case.
-      instanceType->getAs<ExistentialType>()->forcePrintWithAny([&](Type ty) {
-        printWithParensIfNotSimple(ty);
-      });
     } else {
-      printWithParensIfNotSimple(instanceType);
+      assert(T->is<MetatypeType>());
+      if (instanceType->is<ExistentialType>()) {
+        // The 'any' keyword is needed to distinguish between existential
+        // metatypes and singleton metatypes. However, 'any' usually isn't
+        // printed for Any and AnyObject, because it's unnecessary to write
+        // 'any' with these specific constraints. Force printing with 'any'
+        // for the existential instance type in this case.
+        instanceType->getAs<ExistentialType>()->forcePrintWithAny([&](Type ty) {
+          printWithParensIfNotSimple(ty);
+        });
+      } else {
+        printWithParensIfNotSimple(instanceType);
+      }
     }
 
-    // We spell normal metatypes of existential types as .Protocol.
-    if (isa<MetatypeType>(T) &&
-        T->getInstanceType()->isAnyExistentialType() &&
-        !Options.PrintExplicitAny) {
-      Printer << ".Protocol";
-    } else {
-      Printer << ".Type";
-    }
+    Printer << ".Type";
   }
 
   void visitModuleType(ModuleType *T) {
@@ -6632,7 +6680,7 @@ public:
     // substituted types in terms of a generic signature declared on the decl,
     // which would make this logic more uniform.
     TypePrinter *sub = this;
-    Optional<TypePrinter> subBuffer;
+    llvm::Optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
     if (auto substitutions = T->getPatternSubstitutions()) {
       subOptions.GenericSig = nullptr;
@@ -6848,7 +6896,7 @@ public:
   }
 
   void visitExistentialType(ExistentialType *T) {
-    if (Options.PrintExplicitAny && T->shouldPrintWithAny())
+    if (T->shouldPrintWithAny())
       Printer << "any ";
 
     // FIXME: The desugared type is used here only to support

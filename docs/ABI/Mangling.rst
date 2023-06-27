@@ -301,6 +301,8 @@ are always non-polymorphic ``<impl-function-type>`` types.
   VALUE-WITNESS-KIND ::= 'ug'           // getEnumTag
   VALUE-WITNESS-KIND ::= 'up'           // destructiveProjectEnumData
   VALUE-WITNESS-KIND ::= 'ui'           // destructiveInjectEnumTag
+  VALUE-WITNESS-KIND ::= 'et'           // getEnumTagSinglePayload
+  VALUE-WITNESS-KIND ::= 'st'           // storeEnumTagSinglePayload
 
 ``<VALUE-WITNESS-KIND>`` differentiates the kinds of value
 witness functions for a type.
@@ -397,7 +399,7 @@ Entities
   macro-discriminator-list ::= macro-discriminator-list? file-discriminator? macro-expansion-operator INDEX
 
   macro-expansion-operator ::= decl-name identifier 'fMa' // attached accessor macro
-  macro-expansion-operator ::= decl-name identifier 'fMA' // attached member-attribute macro
+  macro-expansion-operator ::= decl-name identifier 'fMr' // attached member-attribute macro
   macro-expansion-operator ::= identifier 'fMf' // freestanding macro
   macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
   macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
@@ -672,6 +674,8 @@ Types
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
   type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
+  
+  type ::= pack-type 'Qe' INDEX              // pack element type
   
   type ::= pattern-type count-type 'Qp'      // pack expansion type
   type ::= pack-element-list 'QP'            // pack type

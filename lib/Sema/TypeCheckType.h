@@ -335,7 +335,7 @@ public:
   }
 
   /// Whether pack expansion types are supported in this context.
-  bool isPackExpansionSupported(DeclContext *dc) const {
+  bool isPackExpansionSupported() const {
     switch (context) {
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
@@ -343,12 +343,7 @@ public:
     case Context::TupleElement:
     case Context::GenericArgument:
       return true;
-
-    // Local variable packs are supported, but property packs
-    // are not.
     case Context::PatternBindingDecl:
-      return !dc->isTypeContext();
-
     case Context::None:
     case Context::ProtocolGenericArgument:
     case Context::Inherited:
@@ -470,7 +465,7 @@ public:
   /// Strip the contextual options from the given type resolution options.
   inline TypeResolutionOptions withoutContext(bool preserveSIL = false) const {
     auto copy = *this;
-    copy.setContext(None);
+    copy.setContext(llvm::None);
     // FIXME: Move SILType to TypeResolverContext.
     if (!preserveSIL) copy -= TypeResolutionFlags::SILType;
     return copy;

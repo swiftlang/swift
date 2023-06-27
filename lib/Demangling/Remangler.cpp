@@ -2091,6 +2091,10 @@ ManglingError Remangler::mangleInitializer(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleInitAccessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "i", depth + 1);
+}
+
 ManglingError
 Remangler::manglePropertyWrapperBackingInitializer(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
@@ -2303,6 +2307,18 @@ ManglingError Remangler::mangleSILPackIndirect(Node *node, unsigned depth) {
 ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Qp";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePackElement(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  Buffer << "Qe";
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePackElementLevel(Node *node, unsigned depth) {
+  mangleIndex(node->getIndex());
   return ManglingError::Success;
 }
 
@@ -2918,7 +2934,7 @@ ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMA";
+  Buffer << "fMr";
   return mangleChildNode(node, 3, depth + 1);
 }
 
@@ -3823,6 +3839,8 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
+
+      DEMANGLER_ASSERT(node->hasChildren(), node);
       NodePointer parentOrModule = node->getChild(0);
       if (isSpecialized(parentOrModule)) {
         auto unspec = getUnspecialized(parentOrModule, Factory);
@@ -3843,8 +3861,10 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias: {
+      DEMANGLER_ASSERT(node->hasChildren(), node);
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
+      DEMANGLER_ASSERT(unboundType->hasChildren(), unboundType);
       NodePointer nominalType = unboundType->getChild(0);
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
@@ -3852,12 +3872,14 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     }
 
     case Node::Kind::ConstrainedExistential: {
+      DEMANGLER_ASSERT(node->hasChildren(), node);
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
       return unboundType;
     }
 
     case Node::Kind::BoundGenericFunction: {
+      DEMANGLER_ASSERT(node->hasChildren(), node);
       NodePointer unboundFunction = node->getChild(0);
       DEMANGLER_ASSERT(unboundFunction->getKind() == Node::Kind::Function ||
                            unboundFunction->getKind() ==
@@ -3869,6 +3891,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     }
 
     case Node::Kind::Extension: {
+      DEMANGLER_ASSERT(node->getNumChildren() >= 2, node);
       NodePointer parent = node->getChild(1);
       if (!isSpecialized(parent))
         return node;

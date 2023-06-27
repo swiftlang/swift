@@ -580,11 +580,29 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
                           SmallVectorImpl<CleanupHandle> &cleanups) {
   // Recursively decompose tuple abstraction patterns.
   if (origResultType.isTuple()) {
-    auto resultTupleType = cast<TupleType>(resultType);
-    auto tupleInit = new TupleInitialization(resultTupleType);
-    tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
+    // Normally, we build a compound initialization for the tuple.  But
+    // the initialization we build should match the substituted type,
+    // so if the tuple in the abstraction pattern vanishes under variadic
+    // substitution, we actually just want to return the initializer
+    // for the surviving component.
+    TupleInitialization *tupleInit = nullptr;
+    SmallVector<InitializationPtr, 1> singletonEltInit;
 
-    origResultType.forEachTupleElement(resultTupleType,
+    bool vanishes =
+      origResultType.getVanishingTupleElementPatternType().hasValue();
+    if (!vanishes) {
+      auto resultTupleType = cast<TupleType>(resultType);
+      tupleInit = new TupleInitialization(resultTupleType);
+      tupleInit->SubInitializations.reserve(
+        cast<TupleType>(resultType)->getNumElements());
+    }
+
+    // The list of element initializers to build into.
+    auto &eltInits = (vanishes
+        ? static_cast<SmallVectorImpl<InitializationPtr> &>(singletonEltInit)
+        : tupleInit->SubInitializations);
+
+    origResultType.forEachTupleElement(resultType,
                                        [&](TupleElementGenerator &elt) {
       if (!elt.isOrigPackExpansion()) {
         auto eltInit = prepareIndirectResultInit(SGF, loc, fnTypeForResults,
@@ -594,7 +612,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
                                                  directResults,
                                                  indirectResultAddrs,
                                                  cleanups);
-        tupleInit->SubInitializations.push_back(std::move(eltInit));
+        eltInits.push_back(std::move(eltInit));
       } else {
         assert(allResults[0].isPack());
         assert(SGF.silConv.isSILIndirect(allResults[0]));
@@ -604,11 +622,17 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
         indirectResultAddrs = indirectResultAddrs.slice(1);
 
         preparePackResultInit(SGF, loc, elt.getOrigType(), elt.getSubstTypes(),
-                              packAddr,
-                              cleanups, tupleInit->SubInitializations);
+                              packAddr, cleanups, eltInits);
       }
     });
 
+    if (vanishes) {
+      assert(singletonEltInit.size() == 1);
+      return std::move(singletonEltInit.front());
+    }
+
+    assert(tupleInit);
+    assert(eltInits.size() == cast<TupleType>(resultType)->getNumElements());
     return InitializationPtr(tupleInit);
   }
 
@@ -751,8 +775,8 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 
-void StmtEmitter::visitForgetStmt(ForgetStmt *S) {
-  // A 'forget' simply triggers the memberwise, consuming destruction of 'self'.
+void StmtEmitter::visitDiscardStmt(DiscardStmt *S) {
+  // A 'discard' simply triggers the memberwise, consuming destruction of 'self'.
   ManagedValue selfValue = SGF.emitRValueAsSingleValue(S->getSubExpr());
   CleanupLocation loc(S);
 
@@ -760,13 +784,42 @@ void StmtEmitter::visitForgetStmt(ForgetStmt *S) {
   // we somehow got to SILGen when errors were emitted!
   auto *fn = S->getInnermostMethodContext();
   if (!fn)
-    llvm_unreachable("internal compiler error with forget statement");
+    llvm_unreachable("internal compiler error with discard statement");
 
   auto *nominal = fn->getDeclContext()->getSelfNominalTypeDecl();
   assert(nominal);
 
-  SGF.emitMoveOnlyMemberDestruction(selfValue.forward(SGF), nominal, loc,
-                                    nullptr);
+  // Check if the nominal's contents are trivial. This is a temporary
+  // restriction until we get discard implemented the way we want.
+  for (auto *varDecl : nominal->getStoredProperties()) {
+    assert(varDecl->hasStorage());
+    auto varType = varDecl->getType();
+    auto &varTypeLowering = SGF.getTypeLowering(varType);
+    if (!varTypeLowering.isTrivial()) {
+      diagnose(getASTContext(),
+               S->getStartLoc(),
+               diag::discard_nontrivial_storage,
+               nominal->getDeclaredInterfaceType());
+
+      // emit a note pointing out the problematic storage type
+      if (auto varLoc = varDecl->getLoc()) {
+        diagnose(getASTContext(),
+                 varLoc,
+                 diag::discard_nontrivial_storage_note,
+                 varType);
+      } else {
+        diagnose(getASTContext(),
+                 nominal->getLoc(),
+                 diag::discard_nontrivial_implicit_storage_note,
+                 nominal->getDeclaredInterfaceType(),
+                 varType);
+      }
+
+      break; // only one diagnostic is needed per discard
+    }
+  }
+
+  SGF.emitMoveOnlyMemberDestruction(selfValue.forward(SGF), nominal, loc);
 }
 
 void StmtEmitter::visitYieldStmt(YieldStmt *S) {

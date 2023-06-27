@@ -267,6 +267,29 @@ public:
     });
   }
 
+  bool isBuiltinInteger() const {
+    return is<BuiltinIntegerType>();
+  }
+
+  bool isBuiltinFixedWidthInteger(unsigned width) const {
+    BuiltinIntegerType *bi = getAs<BuiltinIntegerType>();
+    return bi && bi->isFixedWidth(width);
+  }
+
+  bool isBuiltinFloat() const {
+    return is<BuiltinFloatType>();
+  }
+
+  bool isBuiltinVector() const {
+    return is<BuiltinVectorType>();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  SILType getBuiltinVectorElementType() const {
+    auto vector = castTo<BuiltinVectorType>();
+    return getPrimitiveObjectType(vector.getElementType());
+  }
+
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   SWIFT_IMPORT_UNSAFE
@@ -323,6 +346,8 @@ public:
     return !isAddressOnly(F);
   }
 
+  bool isLoadable(const SILFunction *f) const { return isLoadable(*f); }
+
   /// True if either:
   /// 1) The type, or the referenced type of an address type, is loadable.
   /// 2) The SIL Module conventions uses lowered addresses
@@ -348,6 +373,16 @@ public:
   /// An efficient implementation of `!isTrivial() && isOrContainsRawPointer()`.
   bool isNonTrivialOrContainsRawPointer(const SILFunction *f) const;
 
+  /// Whether the type contains a generic parameter declared as a parameter
+  /// pack.
+  bool hasParameterPack() const { return getASTType()->hasParameterPack(); }
+
+  /// Whether the type contains a concrete pack.
+  bool hasConcretePack() const { return getASTType()->hasConcretePack(); }
+
+  /// Whether the type contains some flavor of pack.
+  bool hasPack() const { return getASTType()->hasPack(); }
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
@@ -358,6 +393,8 @@ public:
   bool isReferenceCounted(SILModule &M) const;
 
   bool isReferenceCounted(SILFunction *f) const;
+
+  bool isUnownedStorageType() const { return is<UnownedStorageType>(); }
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
@@ -414,6 +451,10 @@ public:
     return getASTType()->hasOpenedExistential();
   }
 
+  TypeTraitResult canBeClass() const {
+    return getASTType()->canBeClass();
+  }
+
   /// Returns true if the referenced type is expressed in terms of one
   /// or more local archetypes.
   bool hasLocalArchetype() const {
@@ -467,6 +508,13 @@ public:
   bool isFunctionTypeWithContext() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
       return fTy->getExtInfo().hasContext();
+    }
+    return false;
+  }
+
+  bool isNoEscapeFunction() const {
+    if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
+      return fTy->isNoEscape();
     }
     return false;
   }
@@ -617,10 +665,10 @@ public:
 
   /// Return the reference ownership of this type if it is a reference storage
   /// type. Otherwise, return None.
-  Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
+  llvm::Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
     auto type = getASTType()->getAs<ReferenceStorageType>();
     if (!type)
-      return None;
+      return llvm::None;
     return type->getOwnership();
   }
 
@@ -650,12 +698,12 @@ public:
   SILType subst(Lowering::TypeConverter &tc, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                bool shouldSubstituteOpaqueArchetypes = false) const;
+                SubstOptions options = llvm::None) const;
 
   SILType subst(SILModule &M, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                bool shouldSubstituteOpaqueArchetypes = false) const;
+                SubstOptions options = llvm::None) const;
 
   SILType subst(Lowering::TypeConverter &tc,
                 InFlightSubstitution &IFS,
@@ -699,6 +747,10 @@ public:
   /// for a move only wrapped type.
   bool isPureMoveOnly() const;
 
+  /// Return true if this is a value type (struct/enum) that requires
+  /// deinitialization beyond destruction of its members.
+  bool isValueTypeWithDeinit() const;
+
   /// Returns true if and only if this type is a first class move only
   /// type. NOTE: Returns false if the type is a move only wrapped type.
   bool isMoveOnlyNominalType() const;
@@ -711,8 +763,8 @@ public:
     return getRawASTType()->is<SILMoveOnlyWrappedType>();
   }
 
-  /// If this is already a move only wrapped type, return *this. Otherwise, wrap
-  /// the copyable type in the mov eonly wrapper.
+  /// If this is already a moveonlywrapped type, return *this. Otherwise, wrap
+  /// the copyable type in the moveonlywrapper.
   SILType addingMoveOnlyWrapper() const {
     if (isMoveOnlyWrapped())
       return *this;
@@ -738,6 +790,20 @@ public:
     }
     return *this;
   }
+
+  /// If this is a box type containing a moveonlywrapped type, return a new box
+  /// with the moveonlywrapped type unwrapped.
+  ///
+  /// DISCUSSION: This is separate from addingMoveOnlyWrapper since this API
+  /// requires a SILFunction * and is specialized.
+  SILType addingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+
+  /// If this is a box type containing a copyable type, return a new box type
+  /// with the copyable type wrapped in a moveonly wrapped type.
+  ///
+  /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
+  /// requires a SILFunction * and is specialized.
+  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
@@ -787,6 +853,12 @@ public:
 
   bool isBoxedNonCopyableType(const SILFunction &fn) const {
     return isBoxedNonCopyableType(&fn);
+  }
+
+  bool isBoxedMoveOnlyWrappedType(const SILFunction *fn) const {
+    if (!this->is<SILBoxType>())
+      return false;
+    return getSILBoxFieldType(fn).isMoveOnlyWrapped();
   }
 
   SILType getInstanceTypeOfMetatype(SILFunction *function) const;

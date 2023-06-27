@@ -16,6 +16,43 @@ extension Value {
   var nonDebugUses: LazyFilterSequence<UseList> {
     uses.lazy.filter { !($0.instruction is DebugValueInst) }
   }
+
+  /// Walks over all fields of an aggregate and checks if a reference count
+  /// operation for this value is required. This differs from a simple `Type.isTrivial`
+  /// check, because it treats a value_to_bridge_object instruction as "trivial".
+  /// It can also handle non-trivial enums with trivial cases.
+  func isTrivial(_ context: some Context) -> Bool {
+    if self is Undef {
+      return true
+    }
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      if v.type.isTrivial(in: parentFunction) {
+        continue
+      }
+      if v.type.isValueTypeWithDeinit {
+        return false
+      }
+      switch v {
+      case is ValueToBridgeObjectInst:
+        break
+      case is StructInst, is TupleInst:
+        let inst = (v as! SingleValueInstruction)
+        worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
+      case let en as EnumInst:
+        if let payload = en.payload,
+           !(payload is Undef) {
+          worklist.pushIfNotVisited(payload)
+        }
+      default:
+        return false
+      }
+    }
+    return true
+  }
 }
 
 extension Builder {
@@ -78,7 +115,7 @@ extension Value {
   }
 }
 
-private extension Instruction {
+extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
       return false
@@ -253,3 +290,16 @@ private struct EscapesToValueVisitor : EscapeVisitor {
   var followTrivialTypes: Bool { true }
   var followLoads: Bool { false }
 }
+
+extension Function {
+  var globalOfGlobalInitFunction: GlobalVariable? {
+    if isGlobalInitFunction,
+       let ret = returnInstruction,
+       let atp = ret.returnedValue as? AddressToPointerInst,
+       let ga = atp.address as? GlobalAddrInst {
+      return ga.global
+    }
+    return nil
+  }
+}
+

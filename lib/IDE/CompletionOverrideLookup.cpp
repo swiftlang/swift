@@ -493,8 +493,8 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   std::string declStringWithoutFunc;
   {
     llvm::raw_string_ostream out(declStringWithoutFunc);
-    printResultBuilderBuildFunction(builder, componentType, function, None,
-                                    out);
+    printResultBuilderBuildFunction(builder, componentType, function,
+                                    llvm::None, out);
   }
   Builder.addTextChunk(declStringWithoutFunc);
   Builder.addBraceStmtWithCursor();
@@ -541,7 +541,7 @@ void CompletionOverrideLookup::getOverrideCompletions(SourceLoc Loc) {
   if (CurrTy && !CurrTy->is<ErrorType>()) {
     // Look for overridable static members too.
     Type Meta = MetatypeType::get(CurrTy);
-    lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
+    lookupVisibleMemberDecls(*this, Meta, introducerLoc, CurrDeclContext,
                              /*includeInstanceMembers=*/true,
                              /*includeDerivedRequirements*/ true,
                              /*includeProtocolExtensionMembers*/ false);

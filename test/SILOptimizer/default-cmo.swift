@@ -7,12 +7,10 @@
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t -I%S/Inputs/cross-module %s -emit-sil | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 
 import Module
 import ModuleTBD
-
-// CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int = {
-// CHECK:        %0 = function_ref @$s6Module16incrementByThreeyS2iF
 
 // CHECK-LABEL: sil_global public_external @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
 
@@ -20,6 +18,11 @@ public func callPublicFunctionPointer(_ x: Int) -> Int {
   return Module.ModuleStruct.publicFunctionPointer(x)
 }
 
+// CHECK-LABEL: sil @$s4Main25callPublicFunctionPointeryS2iF :
+// CHECK:         global_addr
+// CHECK:         load
+// CHECK:         apply
+// CHECK:       } // end sil function '$s4Main25callPublicFunctionPointeryS2iF'
 public func callPrivateFunctionPointer(_ x: Int) -> Int {
   return Module.ModuleStruct.privateFunctionPointer(x)
 }
@@ -77,9 +80,8 @@ public func getSubmoduleKlassMember() -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main26getSubmoduleKlassMemberTBDSiyF
-// CHECK:         [[F:%[0-9]+]] = function_ref @$s9ModuleTBD20submoduleKlassMemberSiyF
-// CHECK:         [[I:%[0-9]+]] = apply [[F]]
-// CHECK:         return [[I]]
+// CHECK-NOT:     function_ref 
+// CHECK-NOT:     apply 
 // CHECK:       } // end sil function '$s4Main26getSubmoduleKlassMemberTBDSiyF'
 public func getSubmoduleKlassMemberTBD() -> Int {
   return ModuleTBD.submoduleKlassMember()

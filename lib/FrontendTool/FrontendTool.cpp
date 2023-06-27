@@ -51,6 +51,9 @@
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
+#include "swift/Frontend/CachedDiagnostics.h"
+#include "swift/Frontend/CachingUtils.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -369,12 +372,13 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
-    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash,
+                                             /*cached=*/false);
     return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
-      opts.InputsAndOutputs.getSingleOutputFilename());
+      opts.InputsAndOutputs.getSingleOutputFilename(), /*cached=*/false);
 }
 
 static bool precompileClangModule(const CompilerInstance &Instance) {
@@ -722,10 +726,12 @@ static bool emitConstValuesForWholeModuleIfNeeded(
     return true;
   auto ConstValues = gatherConstValuesForModule(Protocols,
                                                 Instance.getMainModule());
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
-  writeAsJSONToFile(ConstValues, OS);
-  return false;
+
+  return withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                        ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
+                          writeAsJSONToFile(ConstValues, OS);
+                          return false;
+                        });
 }
 
 static void emitConstValuesForAllPrimaryInputsIfNeeded(
@@ -751,9 +757,11 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
       continue;
 
     auto ConstValues = gatherConstValuesForPrimary(Protocols, SF);
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
-    writeAsJSONToFile(ConstValues, OS);
+    withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                   ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
+                     writeAsJSONToFile(ConstValues, OS);
+                     return false;
+                   });
   }
 }
 
@@ -768,9 +776,12 @@ static bool writeModuleSemanticInfoIfNeeded(CompilerInstance &Instance) {
   auto ModuleSemanticPath = frontendOpts.InputsAndOutputs
     .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
     .ModuleSemanticInfoOutputPath;
-  llvm::raw_fd_ostream OS(ModuleSemanticPath, EC, llvm::sys::fs::OF_None);
-  OS << "{}\n";
-  return false;
+
+  return withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                        ModuleSemanticPath, [&](llvm::raw_ostream &OS) {
+                          OS << "{}\n";
+                          return false;
+                        });
 }
 
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
@@ -795,7 +806,8 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
+  return writeTBD(Instance.getMainModule(), TBDPath,
+                  Instance.getOutputBackend(), tbdOpts);
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -912,17 +924,14 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
       opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
-    std::string BridgingHeaderPathForPrint;
-    if (!opts.ImplicitObjCHeaderPath.empty()) {
+    std::string BridgingHeaderPathForPrint = Instance.getBridgingHeaderPath();
+    if (!BridgingHeaderPathForPrint.empty()) {
       if (opts.BridgingHeaderDirForPrint.has_value()) {
         // User specified preferred directory for including, use that dir.
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
-          llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
+          llvm::sys::path::filename(BridgingHeaderPathForPrint));
         BridgingHeaderPathForPrint = (std::string)Buffer;
-      } else {
-        // By default, include the given bridging header path directly.
-        BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
       }
     }
     hadAnyError |= printAsClangHeaderIfNeeded(
@@ -1380,6 +1389,37 @@ static bool performAction(CompilerInstance &Instance,
   return Instance.getASTContext().hadError();
 }
 
+/// Try replay the compiler result from cache.
+///
+/// Return true if all the outputs are fetched from cache. Otherwise, return
+/// false and will not replay any output.
+static bool tryReplayCompilerResults(CompilerInstance &Instance) {
+  if (!Instance.supportCaching() ||
+      Instance.getInvocation().getFrontendOptions().CacheSkipReplay)
+    return false;
+
+  assert(Instance.getCompilerBaseKey() &&
+         "Instance is not setup correctly for replay");
+
+  auto *CDP = Instance.getCachingDiagnosticsProcessor();
+  assert(CDP && "CachingDiagnosticsProcessor needs to be setup for replay");
+
+  // Don't capture diagnostics from replay.
+  CDP->endDiagnosticCapture();
+
+  bool replayed = replayCachedCompilerOutputs(
+      Instance.getObjectStore(), Instance.getActionCache(),
+      *Instance.getCompilerBaseKey(), Instance.getDiags(),
+      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
+      Instance.getInvocation().getFrontendOptions().EnableCachingRemarks);
+
+  // If we didn't replay successfully, re-start capture.
+  if (!replayed)
+    CDP->startDiagnosticCapture();
+
+  return replayed;
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -1390,6 +1430,9 @@ static bool performCompile(CompilerInstance &Instance,
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  if (tryReplayCompilerResults(Instance))
+    return false;
 
   // To compile LLVM IR, just pass it off unmodified.
   if (opts.InputsAndOutputs.shouldTreatAsLLVM())
@@ -1640,7 +1683,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   const ASTContext &Context = Instance.getASTContext();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  llvm::Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
@@ -2075,6 +2118,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto finishDiagProcessing = [&](int retValue, bool verifierEnabled) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
     PDC.setSuppressOutput(false);
+    if (auto *CDP = Instance->getCachingDiagnosticsProcessor()) {
+      // Don't cache if build failed.
+      if (retValue)
+        CDP->endDiagnosticCapture();
+    }
     bool diagnosticsError = Instance->getDiags().finishProcessing();
     // If the verifier is enabled and did not encounter any verification errors,
     // return 0 even if the compile failed. This behavior isn't ideal, but large
@@ -2132,14 +2180,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      std::make_unique<Optional<PrettyStackTraceFileContents>[]>(
-        configurationFileBuffers.size());
+      std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
+          configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              Optional<PrettyStackTraceFileContents> &trace) {
-    trace.emplace(*buffer);
-  });
+              llvm::Optional<PrettyStackTraceFileContents> &trace) {
+             trace.emplace(*buffer);
+           });
 
   // Setting DWARF Version depend on platform
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();

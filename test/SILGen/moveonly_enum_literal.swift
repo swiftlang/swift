@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s
 
 // This test makes sure that we properly setup enums when we construct moveonly
 // enums from literals.
@@ -15,7 +16,8 @@ var value: Bool { false }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21moveonly_enum_literal4testyyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[VALUE:%.*]] = enum $MoveOnlyIntPair, #MoveOnlyIntPair.lhs!enumelt,
 // CHECK: store [[VALUE]] to [init] [[PROJECT]]
 //

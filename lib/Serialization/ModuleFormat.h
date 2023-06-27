@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 781; // compound introduced names
+const uint16_t SWIFTMODULE_VERSION_MINOR = 793; // PluginSearchOption
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -109,16 +109,16 @@ public:
     return rawValue != 0;
   }
 
-  Optional<DeclID> getAsDeclID() const {
+  llvm::Optional<DeclID> getAsDeclID() const {
     if (rawValue > 0)
       return DeclID(rawValue);
-    return None;
+    return llvm::None;
   }
 
-  Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
+  llvm::Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
     if (rawValue < 0)
       return LocalDeclContextID(-rawValue);
-    return None;
+    return llvm::None;
   }
 
   static DeclContextID getFromOpaqueValue(uint32_t opaqueValue) {
@@ -330,6 +330,7 @@ enum AccessorKind : uint8_t {
   MutableAddress,
   Read,
   Modify,
+  Init,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -650,6 +651,16 @@ enum class MacroIntroducedDeclNameKind : uint8_t {
 };
 using MacroIntroducedDeclNameKindField = BCFixed<4>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class PluginSearchOptionKind : uint8_t {
+  PluginPath,
+  ExternalPluginPath,
+  LoadPluginLibrary,
+  LoadPluginExecutable,
+};
+using PluginSearchOptionKindField = BCFixed<3>;
+
 // Encodes a VersionTuple:
 //
 //  Major
@@ -883,6 +894,8 @@ namespace options_block {
     IS_CONCURRENCY_CHECKED,
     MODULE_PACKAGE_NAME,
     MODULE_EXPORT_AS_NAME,
+    PLUGIN_SEARCH_OPTION,
+    HAS_CXX_INTEROPERABILITY_ENABLED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -893,6 +906,12 @@ namespace options_block {
   using XCCLayout = BCRecordLayout<
     XCC,
     BCBlob // -Xcc flag, as string
+  >;
+
+  using PluginSearchOptionLayout = BCRecordLayout<
+    PLUGIN_SEARCH_OPTION,
+    PluginSearchOptionKindField, // kind
+    BCBlob                       // option value string
   >;
 
   using IsSIBLayout = BCRecordLayout<
@@ -950,6 +969,10 @@ namespace options_block {
   using ModuleExportAsNameLayout = BCRecordLayout<
     MODULE_EXPORT_AS_NAME,
     BCBlob
+  >;
+
+  using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
+    HAS_CXX_INTEROPERABILITY_ENABLED
   >;
 }
 
@@ -1339,6 +1362,12 @@ namespace decls_block {
     PACK_EXPANSION_TYPE,
     TypeIDField, // pattern type
     TypeIDField  // count type
+  );
+
+  TYPE_LAYOUT(PackElementTypeLayout,
+    PACK_ELEMENT_TYPE,
+    TypeIDField,  // pack type
+    BCFixed<32>   // level
   );
 
   TYPE_LAYOUT(PackTypeLayout,
@@ -2007,6 +2036,12 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
+  using SectionDeclAttrLayout = BCRecordLayout<
+    Section_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // _section
+  >;
+
   using CDeclDeclAttrLayout = BCRecordLayout<
     CDecl_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -2189,6 +2224,16 @@ namespace decls_block {
       BCVBR<4>, // # of type erased parameters
       BCArray<IdentifierIDField> // target function pieces, spi groups, type erased params
       >;
+
+  using InitializesDeclAttrLayout = BCRecordLayout<
+      Initializes_DECL_ATTR,
+      BCArray<IdentifierIDField> // initialized properties
+  >;
+
+  using AccessesDeclAttrLayout = BCRecordLayout<
+      Accesses_DECL_ATTR,
+      BCArray<IdentifierIDField> // initialized properties
+  >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,

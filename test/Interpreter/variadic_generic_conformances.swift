@@ -1,16 +1,13 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 
 // REQUIRES: executable_test
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 
-var tuples = TestSuite("VariadicGenericConformances")
+var conformances = TestSuite("VariadicGenericConformances")
 
 protocol TypeMaker {
   func makeType() -> Any.Type
@@ -32,7 +29,7 @@ struct ElementTupleMaker<each T: Sequence> : TypeMaker {
   }
 }
 
-tuples.test("makeTuple1") {
+conformances.test("makeTuple1") {
   expectEqual("()", _typeName(makeTypeIndirectly(TupleMaker< >())))
 
   // FIXME: This should unwrap the one-element tuple!
@@ -41,7 +38,7 @@ tuples.test("makeTuple1") {
   expectEqual("(Swift.Int, Swift.Bool)", _typeName(makeTypeIndirectly(TupleMaker<Int, Bool>())))
 }
 
-tuples.test("makeTuple2") {
+conformances.test("makeTuple2") {
   expectEqual("()", _typeName(makeTypeIndirectly(ElementTupleMaker< >())))
 
   // FIXME: This should unwrap the one-element tuple!
@@ -91,7 +88,7 @@ func testPackRequirements2<T: HasPackRequirements, each U: Q>(_ t: T, _ u: repea
   return t.doStuff2(repeat each u)
 }
 
-tuples.test("packRequirements") {
+conformances.test("packRequirements") {
   expectEqual(([1], ["hi"], [false]), testPackRequirements1(ConformsPackRequirements(), 1, "hi", false))
   expectEqual(([1], ["hi"], [false]), testPackRequirements2(ConformsPackRequirements(), 1, "hi", false))
 }

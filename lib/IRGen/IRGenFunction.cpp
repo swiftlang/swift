@@ -42,7 +42,7 @@ static llvm::cl::opt<bool> EnableTrapDebugInfo(
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
-                             Optional<SILLocation> DbgLoc)
+                             llvm::Optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
       OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
@@ -67,6 +67,8 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+
+  // All dynamically allocated metadata should have been cleaned up.
 }
 
 OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
@@ -74,6 +76,11 @@ OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
     return OptMode;
 
   return IGM.getOptions().OptMode;
+}
+
+bool IRGenFunction::canStackPromotePackMetadata() const {
+  return IGM.getSILModule().getOptions().EnablePackMetadataStackPromotion &&
+         !packMetadataStackPromotionDisabled;
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {

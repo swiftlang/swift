@@ -101,7 +101,7 @@ namespace {
     // added before the class fields, and the tail elements themselves
     // come after. We don't make a ClassLayout in this case, only a
     // StructLayout.
-    Optional<ArrayRef<SILType>> TailTypes;
+    llvm::Optional<ArrayRef<SILType>> TailTypes;
 
     // Normally, Swift only emits static metadata for a class if it has no
     // generic ancestry and no fields with resilient value types, which
@@ -135,10 +135,9 @@ namespace {
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
                        ReferenceCounting refcounting,
                        bool completelyFragileLayout,
-                       Optional<ArrayRef<SILType>> tailTypes = None)
-      : StructLayoutBuilder(IGM),
-        TailTypes(tailTypes),
-        CompletelyFragileLayout(completelyFragileLayout) {
+                       llvm::Optional<ArrayRef<SILType>> tailTypes = llvm::None)
+        : StructLayoutBuilder(IGM), TailTypes(tailTypes),
+          CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.
       switch (refcounting) {
       case ReferenceCounting::Native:
@@ -672,7 +671,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   case FieldAccess::ConstantDirect: {
     Address baseAddr(base, classLayout.getType(), classLayout.getAlignment());
     auto element = fieldInfo.second;
-    Address memberAddr = element.project(IGF, baseAddr, None);
+    Address memberAddr = element.project(IGF, baseAddr, llvm::None);
     // We may need to bitcast the address if the field is of a generic type.
     if (memberAddr.getElementType() != fieldTI.getStorageType())
       memberAddr = IGF.Builder.CreateElementBitCast(memberAddr,
@@ -1112,7 +1111,7 @@ namespace {
       }
       return nullptr;
     }
-    Optional<CanType> getSpecializedGenericType() const {
+    llvm::Optional<CanType> getSpecializedGenericType() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
         return llvm::None;
@@ -1125,14 +1124,14 @@ namespace {
       return pair.second;
     }
 
-    Optional<StringRef> getObjCImplCategoryName() const {
+    llvm::Optional<StringRef> getObjCImplCategoryName() const {
       if (!TheExtension || !TheExtension->isObjCImplementation())
-        return None;
+        return llvm::None;
       if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
         assert(!ident->empty());
         return ident->str();
       }
-      return None;
+      return llvm::None;
     }
     bool isBuildingClass() const {
       return TheEntity.isa<ClassUnion>() && !TheExtension;
@@ -1228,7 +1227,7 @@ namespace {
         const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
-      visitConformances(getClass()->getImplementationContext());
+      visitConformances(getClass());
 
       if (getClass()->isRootDefaultActor()) {
         Ivars.push_back(Field::DefaultActorStorage);
@@ -1249,7 +1248,7 @@ namespace {
           FieldLayout(nullptr) {
       buildCategoryName(CategoryName);
 
-      visitConformances(theExtension->getImplementationContext());
+      visitConformances(theExtension);
 
       for (Decl *member : TheExtension->getImplementationContext()->getMembers())
         visit(member);
@@ -1295,6 +1294,15 @@ namespace {
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
     void visitConformances(const IterableDeclContext *idc) {
+      auto dc = idc->getAsGenericContext();
+      if (dc->getImplementedObjCContext() != dc) {
+        // We want to use the conformance list imported from the ObjC header.
+        auto importedIDC = cast<IterableDeclContext>(
+                                 dc->getImplementedObjCContext()->getAsDecl());
+        visitConformances(importedIDC);
+        return;
+      }
+
       llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : idc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit)) {
@@ -1337,7 +1345,8 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      Optional<CanType> specializedGenericType = getSpecializedGenericType();
+      llvm::Optional<CanType> specializedGenericType =
+          getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, getClass());
@@ -1578,7 +1587,7 @@ namespace {
       //     const uint8_t *IvarLayout;
       //     ClassMetadata *NonMetaClass;
       // };
-      Optional<CanType> specializedGenericType;
+      llvm::Optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
         b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),
@@ -1822,6 +1831,9 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
+      if (Lowering::shouldSkipLowering(method))
+        return;
+
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
         return emitObjCMethodDescriptor(IGM, descriptors, method);

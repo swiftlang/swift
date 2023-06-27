@@ -20,6 +20,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 
@@ -30,22 +32,45 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
 
   // TODO: Improve this list.
   static const std::vector<std::string> removeArgAndNext = {
-      "-o", "-supplementary-output-file-map", "-serialize-diagnostics-path",
-      "-num-threads", "-cas-path"};
+      "-o",
+      "-output-filelist",
+      "-supplementary-output-file-map",
+      "-index-unit-output-path",
+      "-index-unit-output-path-filelist",
+      "-serialize-diagnostics-path",
+      "-num-threads",
+      "-cas-path"};
 
   // Don't count the `-frontend` in the first location since only frontend
   // invocation can have a cache key.
   if (Args.size() > 1 && StringRef(Args.front()) == "-frontend")
     Args = Args.drop_front();
 
-  bool SkipNext = false;
-  for (StringRef Arg : Args) {
-    if (SkipNext) {
-      SkipNext = false;
+  for (unsigned I = 0, IE =Args.size(); I < IE; ++I) {
+    StringRef Arg = Args[I];
+    if (llvm::is_contained(removeArgAndNext, Arg)) {
+      ++I;
       continue;
     }
-    if (llvm::is_contained(removeArgAndNext, Arg)) {
-      SkipNext = true;
+    // FIXME: Use a heuristic to remove all the flags that affect output paths.
+    // Those should not affect compile cache key.
+    if (Arg.startswith("-emit-")) {
+      if (Arg.endswith("-path"))
+        ++I;
+      continue;
+    }
+    // Handle -file-list option. Need to drop the option but adds the file
+    // content instead.
+    // FIXME: will be nice if the same list of files gets the same key no matter
+    // going through command-line or filelist.
+    if (Arg == "-filelist" || Arg == "-primary-filelist") {
+      auto FileList = llvm::MemoryBuffer::getFile(Args[++I]);
+      if (!FileList)
+        return llvm::errorCodeToError(FileList.getError());
+      CommandLine.append(Arg);
+      CommandLine.push_back(0);
+      CommandLine.append((*FileList)->getBuffer());
+      CommandLine.push_back(0);
       continue;
     }
     CommandLine.append(Arg);
@@ -53,13 +78,14 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
   }
 
   llvm::cas::HierarchicalTreeBuilder Builder;
-  auto CMD = CAS.storeFromString(None, CommandLine);
+  auto CMD = CAS.storeFromString(llvm::None, CommandLine);
   if (!CMD)
     return CMD.takeError();
   Builder.push(*CMD, llvm::cas::TreeEntry::Regular, "command-line");
 
   // FIXME: The version is maybe insufficient...
-  auto Version = CAS.storeFromString(None, version::getSwiftFullVersion());
+  auto Version =
+      CAS.storeFromString(llvm::None, version::getSwiftFullVersion());
   if (!Version)
     return Version.takeError();
   Builder.push(*Version, llvm::cas::TreeEntry::Regular, "version");

@@ -143,6 +143,11 @@ protected:
                                      const llvm::opt::ArgList &inputArgs,
                                      llvm::opt::ArgStringList &arguments) const;
 
+  virtual void addPlatformSpecificPluginFrontendArgs(
+      const OutputInfo &OI,
+      const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const;
   virtual InvocationInfo constructInvocation(const CompileJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -243,7 +248,7 @@ protected:
   /// Gets the response file path and command line argument for an invocation
   /// if the tool supports response files and if the command line length would
   /// exceed system limits.
-  Optional<Job::ResponseFileInfo>
+  llvm::Optional<Job::ResponseFileInfo>
   getResponseFileInfo(const Compilation &C, const char *executablePath,
                       const InvocationInfo &invocationInfo,
                       const JobContext &context) const;

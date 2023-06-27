@@ -125,9 +125,6 @@ public:
   /// Controls whether cross module optimization is enabled.
   CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
 
-  /// Enables experimental performance annotations.
-  bool EnablePerformanceAnnotations = false;
-
   /// Enables the emission of stack protectors in functions.
   bool EnableStackProtection = true;
 
@@ -175,6 +172,12 @@ public:
 
   /// Require linear OSSA lifetimes after SILGen
   bool OSSACompleteLifetimes = false;
+
+  /// Enable pack metadata stack "promotion".
+  ///
+  /// More accurately, enable skipping mandatory heapification of pack metadata
+  /// when possible.
+  bool EnablePackMetadataStackPromotion = true;
 
   // The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;

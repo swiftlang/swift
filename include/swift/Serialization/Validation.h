@@ -19,6 +19,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+class Triple;
+}
+
 namespace swift {
 
 class ModuleFile;
@@ -106,6 +110,10 @@ struct ValidationInfo {
 /// \sa validateSerializedAST()
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
+
+  SmallVector<std::pair<PluginSearchOption::Kind, StringRef>, 2>
+      PluginSearchOptions;
+
   std::string SDKPath;
   StringRef ModuleABIName;
   StringRef ModulePackageName;
@@ -121,6 +129,7 @@ class ExtendedValidationInfo {
     unsigned IsBuiltFromInterface : 1;
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
+    unsigned HasCxxInteroperability : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -136,6 +145,15 @@ public:
   }
   void addExtraClangImporterOption(StringRef option) {
     ExtraClangImporterOpts.push_back(option);
+  }
+
+  ArrayRef<std::pair<PluginSearchOption::Kind, StringRef>>
+  getPluginSearchOptions() const {
+    return PluginSearchOptions;
+  }
+  void addPluginSearchOption(
+      const std::pair<PluginSearchOption::Kind, StringRef> &opt) {
+    PluginSearchOptions.push_back(opt);
   }
 
   bool isSIB() const { return Bits.IsSIB; }
@@ -193,6 +211,10 @@ public:
   }
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
+  }
+  bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
+  void setHasCxxInteroperability(bool val) {
+    Bits.HasCxxInteroperability = val;
   }
 };
 
@@ -267,6 +289,11 @@ void diagnoseSerializedASTLoadFailure(
 void diagnoseSerializedASTLoadFailureTransitive(
     ASTContext &Ctx, SourceLoc diagLoc, const serialization::Status status,
     ModuleFile *loadedModuleFile, Identifier ModuleName, bool forTestable);
+
+/// Determine whether two triples are considered to be compatible for module
+/// serialization purposes.
+bool areCompatible(const llvm::Triple &moduleTarget,
+                   const llvm::Triple &ctxTarget);
 
 } // end namespace serialization
 } // end namespace swift

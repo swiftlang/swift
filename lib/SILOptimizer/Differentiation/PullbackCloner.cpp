@@ -226,7 +226,7 @@ private:
     return getPullback().mapTypeIntoContext(remappedSILType);
   }
 
-  Optional<TangentSpace> getTangentSpace(CanType type) {
+  llvm::Optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
     type =
         getWitness()->getDerivativeGenericSignature().getReducedType(
@@ -652,8 +652,7 @@ private:
   /// Helper for `getAdjointBuffer`.
   AllocStackInst *createFunctionLocalAllocation(
       SILType type, SILLocation loc, bool zeroInitialize = false,
-      Optional<SILDebugVariable> varInfo = None)
-  {
+      llvm::Optional<SILDebugVariable> varInfo = llvm::None) {
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
     // allocations exist yet.
@@ -1890,25 +1889,16 @@ bool PullbackCloner::Implementation::run() {
   // ignored.
   // The original blocks in traversal order for pullback generation.
   SmallVector<SILBasicBlock *, 8> originalBlocks;
-  // The set of visited original blocks.
-  SmallDenseSet<SILBasicBlock *, 8> visitedBlocks;
+  // The workqueue used for bookkeeping during the breadth-first traversal.
+  BasicBlockWorkqueue workqueue = {originalExitBlock};
 
   // Perform BFS from the original exit block.
   {
-    std::deque<SILBasicBlock *> worklist = {};
-    worklist.push_back(originalExitBlock);
-    visitedBlocks.insert(originalExitBlock);
-    while (!worklist.empty()) {
-      auto *BB = worklist.front();
-      worklist.pop_front();
-
+    while (auto *BB = workqueue.pop()) {
       originalBlocks.push_back(BB);
 
       for (auto *nextBB : BB->getPredecessorBlocks()) {
-        if (!visitedBlocks.count(nextBB)) {
-          worklist.push_back(nextBB);
-          visitedBlocks.insert(nextBB);
-        }
+        workqueue.pushIfNotVisited(nextBB);
       }
     }
   }
@@ -2004,7 +1994,7 @@ bool PullbackCloner::Implementation::run() {
     //   pullback original block, passing adjoint values of active values.
     for (auto *succBB : origBB->getSuccessorBlocks()) {
       // Skip generating pullback block for original unreachable blocks.
-      if (!visitedBlocks.count(succBB))
+      if (!workqueue.isVisited(succBB))
         continue;
       auto *pullbackTrampolineBB = pullback.createBasicBlockBefore(pullbackBB);
       pullbackTrampolineBBMap.insert({{origBB, succBB}, pullbackTrampolineBB});
@@ -2623,7 +2613,7 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // Branch to pullback successor blocks.
   assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
   builder.createSwitchEnum(pbLoc, predEnumVal, /*DefaultBB*/ nullptr,
-                           pullbackSuccessorCases, None, ProfileCounter(),
+                           pullbackSuccessorCases, llvm::None, ProfileCounter(),
                            OwnershipKind::Owned);
 }
 

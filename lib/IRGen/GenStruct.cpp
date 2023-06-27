@@ -234,11 +234,11 @@ namespace {
       return fieldInfo.getStructIndex();
     }
 
-    Optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
-                                               VarDecl *field) const {
+    llvm::Optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
+                                                     VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
-        return None;
+        return llvm::None;
       return fieldInfo.getStructIndex();
     }
 
@@ -416,7 +416,8 @@ namespace {
       //   return fields[0];
       // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -436,10 +437,10 @@ namespace {
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+      return llvm::None;
     }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+      return llvm::None;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -533,9 +534,11 @@ namespace {
       destroy(IGF, src, T, isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return llvm::None;
+    }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+      return llvm::None;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -610,7 +613,7 @@ namespace {
           /*callee=*/ParameterConvention::Direct_Unowned,
           /*params*/ {ptrParam},
           /*yields*/ {}, /*results*/ {result},
-          /*error*/ None,
+          /*error*/ llvm::None,
           /*pattern subs*/ SubstitutionMap(),
           /*invocation subs*/ SubstitutionMap(), IGF.IGM.Context);
     }
@@ -720,11 +723,8 @@ namespace {
       }
       bool canThrow = false;
       if (IGF.IGM.isForeignExceptionHandlingEnabled()) {
-        if (auto *fpt =
-                destructor->getType()->getAs<clang::FunctionProtoType>()) {
-          if (!fpt->isNothrow())
-            canThrow = true;
-        }
+        if (!IGF.IGM.isCxxNoThrow(destructor, /*defaultNoThrow=*/true))
+          canThrow = true;
       }
       if (canThrow) {
         IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
@@ -765,7 +765,8 @@ namespace {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -852,9 +853,11 @@ namespace {
                                                          isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return llvm::None;
+    }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+      return llvm::None;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -921,7 +924,8 @@ namespace {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -930,10 +934,10 @@ namespace {
       LoadableStructTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+      return llvm::None;
     }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+      return llvm::None;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -999,14 +1003,15 @@ namespace {
       //   return fields[0];
       // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+      return llvm::None;
     }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+      return llvm::None;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -1090,7 +1095,8 @@ namespace {
       //   return fields[0];
       // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     // We have an indirect schema.
@@ -1550,9 +1556,9 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getFieldAccessStrategy, baseType, field);
 }
 
-Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                      SILType baseType,
-                                                      VarDecl *field) {
+llvm::Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                            SILType baseType,
+                                                            VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
 }
 

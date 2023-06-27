@@ -202,6 +202,9 @@ CUSTOM_LOCATOR_PATH_ELT(PackElement)
 /// The shape of a parameter pack.
 SIMPLE_LOCATOR_PATH_ELT(PackShape)
 
+/// The type of an "opened" pack expansion
+CUSTOM_LOCATOR_PATH_ELT(PackExpansionType)
+
 /// The pattern  of a pack expansion.
 SIMPLE_LOCATOR_PATH_ELT(PackExpansionPattern)
 
@@ -221,6 +224,10 @@ CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
 
 /// Performing a pattern patch.
 CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
+
+/// The constraint that models the allowed implicit casts for
+/// an EnumElementPattern.
+SIMPLE_LOCATOR_PATH_ELT(EnumPatternImplicitCastMatch)
 
 /// Points to a particular attribute associated with one of
 /// the arguments e.g. `inout` or its type e.g. `@escaping`.

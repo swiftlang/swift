@@ -197,7 +197,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -267,7 +267,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      defaultItem, SourceLoc(), SourceLoc(),
                                      body,
-                                     /*case body var decls*/ None));
+                                     /*case body var decls*/ llvm::None));
   }
 
   // switch (a, b) { <case statements> }
@@ -417,16 +417,12 @@ deriveEquatable_eq(
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableTy = equatableProto->getDeclaredInterfaceType();
-    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
-    eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                  SourceRange(),
-                                                  equatableTyExpr,
-                                                  equalsDeclName,
-                                                  DeclNameLoc()));
+    eqDecl->getAttrs().add(ImplementsAttr::create(parentDC,
+                                                  equatableProto,
+                                                  equalsDeclName));
   }
 
   if (!C.getEqualIntDecl()) {
@@ -732,7 +728,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     }
 
     auto hasBoundDecls = !payloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       auto copy = C.Allocate<VarDecl *>(payloadVars.size());
       for (unsigned i : indices(payloadVars)) {
@@ -890,6 +886,10 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setSynthesized();
+  hashValueDecl->setImplicit();
+  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+  hashValueDecl->copyFormalAccessFrom(derived.Nominal,
+                                      /*sourceIsParentContext*/ true);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -908,12 +908,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
-  hashValueDecl->setImplicit();
-  hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
-  hashValueDecl->copyFormalAccessFrom(derived.Nominal,
-                                      /*sourceIsParentContext*/ true);
 
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&

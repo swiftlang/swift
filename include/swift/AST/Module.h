@@ -31,6 +31,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -522,7 +523,8 @@ private:
 
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
-  Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
+  llvm::Optional<std::pair<ModuleDecl *, Identifier>>
+      declaringModuleAndBystander;
 
   /// If this module is an underscored cross import overlay, gets the underlying
   /// module that declared it (which may itself be a cross-import overlay),
@@ -652,6 +654,14 @@ public:
   }
   void setHasHermeticSealAtLink(bool enabled = true) {
     Bits.ModuleDecl.HasHermeticSealAtLink = enabled;
+  }
+
+  /// Returns true if this module was built with C++ interoperability enabled.
+  bool hasCxxInteroperability() const {
+    return Bits.ModuleDecl.HasCxxInteroperability;
+  }
+  void setHasCxxInteroperability(bool enabled = true) {
+    Bits.ModuleDecl.HasCxxInteroperability = enabled;
   }
 
   /// \returns true if this module is a system module; note that the StdLib is
@@ -1043,7 +1053,7 @@ public:
   ///
   /// \returns true if there was a problem adding this file.
   bool registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
-                              Optional<ArtificialMainKind> kind);
+                              llvm::Optional<ArtificialMainKind> kind);
 
   /// \returns true if this module has a main entry point.
   bool hasEntryPoint() const {

@@ -410,7 +410,7 @@ ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
 
 struct SyntacticElementContext
     : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
-                                SingleValueStmtExpr *> {
+                                SingleValueStmtExpr *, ExprPattern *> {
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
@@ -441,6 +441,10 @@ struct SyntacticElementContext
     return context;
   }
 
+  static SyntacticElementContext forExprPattern(ExprPattern *EP) {
+    return SyntacticElementContext{EP};
+  }
+
   DeclContext *getAsDeclContext() const {
     if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
       return fn;
@@ -448,6 +452,8 @@ struct SyntacticElementContext
       return closure;
     } else if (auto *SVE = dyn_cast<SingleValueStmtExpr *>()) {
       return SVE->getDeclContext();
+    } else if (auto *EP = dyn_cast<ExprPattern *>()) {
+      return EP->getDeclContext();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -466,13 +472,13 @@ struct SyntacticElementContext
     return this->dyn_cast<AbstractFunctionDecl *>();
   }
 
-  Optional<AnyFunctionRef> getAsAnyFunctionRef() const {
+  llvm::Optional<AnyFunctionRef> getAsAnyFunctionRef() const {
     if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
       return {fn};
     } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
       return {closure};
     } else {
-      return None;
+      return llvm::None;
     }
   }
 
@@ -519,7 +525,32 @@ public:
                                       ConstraintLocator *locator)
       : cs(cs), context(context), locator(locator) {}
 
-  void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
+  void visitExprPattern(ExprPattern *EP) {
+    auto target = SyntacticElementTarget::forExprPattern(EP);
+
+    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true,
+                          /*leaveClosureBodyUnchecked=*/false)) {
+      hadError = true;
+      return;
+    }
+    cs.setType(EP->getMatchVar(), cs.getType(EP));
+
+    if (cs.generateConstraints(target)) {
+      hadError = true;
+      return;
+    }
+    cs.setTargetFor(EP, target);
+    cs.setExprPatternFor(EP->getSubExpr(), EP);
+  }
+
+  void visitPattern(Pattern *pattern, ContextualTypeInfo contextInfo) {
+    if (context.is<ExprPattern *>()) {
+      // This is for an ExprPattern conjunction, go ahead and generate
+      // constraints for the match expression.
+      visitExprPattern(cast<ExprPattern>(pattern));
+      return;
+    }
+
     auto parentElement =
         locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
 
@@ -535,7 +566,7 @@ public:
       }
 
       if (isa<CaseStmt>(stmt)) {
-        visitCaseItemPattern(pattern, context);
+        visitCaseItemPattern(pattern, contextInfo);
         return;
       }
     }
@@ -626,8 +657,11 @@ private:
 
     // Convert the contextual type to the pattern, which establishes the
     // bindings.
-    cs.addConstraint(ConstraintKind::Conversion, context.getType(), patternType,
-                     locator);
+    auto *loc = cs.getConstraintLocator(
+        locator, {LocatorPathElt::PatternMatch(pattern),
+                  LocatorPathElt::ContextualType(context.purpose)});
+    cs.addConstraint(ConstraintKind::Equal, context.getType(), patternType,
+                     loc);
 
     // For any pattern variable that has a parent variable (i.e., another
     // pattern variable with the same name in the same case), require that
@@ -677,7 +711,7 @@ private:
     }
   }
 
-  Optional<SyntacticElementTarget>
+  llvm::Optional<SyntacticElementTarget>
   getTargetForPattern(PatternBindingDecl *patternBinding, unsigned index,
                       Type patternType) {
     auto hasPropertyWrapper = [&](Pattern *pattern) -> bool {
@@ -710,7 +744,7 @@ private:
       if (ConstraintSystem::preCheckTarget(
               target, /*replaceInvalidRefsWithErrors=*/true,
               /*LeaveCLosureBodyUnchecked=*/false))
-        return None;
+        return llvm::None;
 
       return target;
     }
@@ -896,8 +930,8 @@ private:
         locator);
   }
 
-  void visitForgetStmt(ForgetStmt *forgetStmt) {
-    auto *fn = forgetStmt->getInnermostMethodContext();
+  void visitDiscardStmt(DiscardStmt *discardStmt) {
+    auto *fn = discardStmt->getInnermostMethodContext();
     if (!fn) {
       hadError = true;
       return;
@@ -910,7 +944,7 @@ private:
       return;
     }
 
-    auto *selfExpr = forgetStmt->getSubExpr();
+    auto *selfExpr = discardStmt->getSubExpr();
 
     createConjunction(
         cs,
@@ -918,7 +952,7 @@ private:
             selfExpr,
             cs.getConstraintLocator(
                 locator, LocatorPathElt::SyntacticElement(selfExpr)),
-            {nominalType, CTP_ForgetStmt})},
+            {nominalType, CTP_DiscardStmt})},
         locator);
   }
 
@@ -1158,7 +1192,7 @@ private:
         auto contextualFixedTy = cs.getFixedTypeRecursive(
             contextInfo->getType(), /*wantRValue*/ true);
         if (contextualFixedTy->isTypeVariableOrMember())
-          contextInfo = None;
+          contextInfo = llvm::None;
       }
 
       elements.push_back(makeElement(
@@ -1438,6 +1472,24 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   return generator.hadError;
 }
 
+void ConstraintSystem::generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
+                                           ConstraintLocatorBuilder locator) {
+  // Form a conjunction of ExprPattern elements, isolated from the rest of the
+  // pattern.
+  SmallVector<ElementInfo> elements;
+  SmallVector<TypeVariableType *, 2> referencedTypeVars;
+  for (auto *EP : exprPatterns) {
+    auto ty = getType(EP)->castTo<TypeVariableType>();
+    referencedTypeVars.push_back(ty);
+
+    ContextualTypeInfo context(ty, CTP_ExprPattern);
+    elements.push_back(makeElement(EP, getConstraintLocator(EP), context));
+  }
+  auto *loc = getConstraintLocator(locator);
+  createConjunction(*this, elements, loc, /*isIsolated*/ true,
+                    referencedTypeVars);
+}
+
 bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
   if (!closure->hasSingleExpressionBody()) {
     auto *DC = closure->getParent();
@@ -1481,13 +1533,15 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto anchor = locator.getAnchor();
 
-  Optional<SyntacticElementContext> context;
+  llvm::Optional<SyntacticElementContext> context;
   if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
     context = SyntacticElementContext::forClosure(closure);
   } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
     context = SyntacticElementContext::forFunction(fn);
   } else if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor)) {
     context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
+  } else if (auto *EP = getAsPattern<ExprPattern>(anchor)) {
+    context = SyntacticElementContext::forExprPattern(EP);
   } else {
     return SolutionKind::Error;
   }
@@ -1759,17 +1813,17 @@ private:
     return throwStmt;
   }
 
-  ASTNode visitForgetStmt(ForgetStmt *forgetStmt) {
+  ASTNode visitDiscardStmt(DiscardStmt *discardStmt) {
     auto &cs = solution.getConstraintSystem();
 
-    // Rewrite the `forget` expression.
-    auto target = *cs.getTargetFor(forgetStmt->getSubExpr());
+    // Rewrite the `discard` expression.
+    auto target = *cs.getTargetFor(discardStmt->getSubExpr());
     if (auto result = rewriteTarget(target))
-      forgetStmt->setSubExpr(result->getAsExpr());
+      discardStmt->setSubExpr(result->getAsExpr());
     else
       hadError = true;
 
-    return forgetStmt;
+    return discardStmt;
   }
 
   ASTNode visitForEachStmt(ForEachStmt *forEachStmt) {
@@ -2027,7 +2081,7 @@ private:
       mode = convertToResult;
     }
 
-    Optional<SyntacticElementTarget> resultTarget;
+    llvm::Optional<SyntacticElementTarget> resultTarget;
     if (auto target = cs.getTargetFor(returnStmt)) {
       resultTarget = *target;
     } else {
@@ -2571,8 +2625,10 @@ void ConjunctionElement::findReferencedVariables(
   }
 
   if (element.is<Decl *>() || element.is<StmtConditionElement *>() ||
-      element.is<Expr *>() || element.isStmt(StmtKind::Return))
+      element.is<Expr *>() || element.isPattern(PatternKind::Expr) ||
+      element.isStmt(StmtKind::Return)) {
     element.walk(refFinder);
+  }
 }
 
 Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {

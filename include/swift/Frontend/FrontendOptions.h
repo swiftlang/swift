@@ -21,6 +21,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
+#include "clang/CAS/CASOptions.h"
 
 #include <string>
 #include <vector>
@@ -51,7 +52,7 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// The map of aliases and underlying names of imported or referenced modules.
+  /// The map of aliases and real names of imported or referenced modules.
   llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
@@ -122,14 +123,23 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
-  /// Use CAS.
-  bool EnableCAS = false;
+  /// Enable compiler caching.
+  bool EnableCaching = false;
 
-  /// The CAS Path.
-  std::string CASPath;
+  /// Enable compiler caching remarks.
+  bool EnableCachingRemarks = false;
+
+  /// Skip replaying outputs from cache.
+  bool CacheSkipReplay = false;
+
+  /// CASOptions
+  clang::CASOptions CASOpts;
 
   /// CASFS Root.
-  std::string CASFSRootID;
+  std::vector<std::string> CASFSRootIDs;
+
+  /// Clang Include Trees.
+  std::vector<std::string> ClangIncludeTrees;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
@@ -207,7 +217,7 @@ public:
   /// When true, emitted module files will always contain options for the
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
-  Optional<bool> SerializeOptionsForDebugging;
+  llvm::Optional<bool> SerializeOptionsForDebugging;
 
   /// When true the debug prefix map entries will be applied to debugging
   /// options before serialization. These can be reconstructed at debug time by
@@ -296,7 +306,7 @@ public:
   /// Specifies the collection mode for the intermodule dependency tracker.
   /// Note that if set, the dependency tracker will be enabled even if no
   /// output path is configured.
-  Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
+  llvm::Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
   /// Should we emit the cType when printing @convention(c) or no?
   bool PrintFullConvention = false;
@@ -322,8 +332,8 @@ public:
   /// By default, we include ImplicitObjCHeaderPath directly.
   llvm::Optional<std::string> BridgingHeaderDirForPrint;
 
-  /// Disable implicitly built Swift modules because they are explicitly
-  /// built and given to the compiler invocation.
+  /// Disable implicitly-built Swift modules because they are explicitly
+  /// built and provided to the compiler invocation.
   bool DisableImplicitModules = false;
 
   /// Disable building Swift modules from textual interfaces. This should be

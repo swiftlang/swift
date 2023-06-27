@@ -106,8 +106,16 @@ static bool hasStoredProperties(NominalTypeDecl *decl,
                 || (decl != implDecl))));
 }
 
-static void computeLoweredStoredProperties(NominalTypeDecl *decl,
-                                           IterableDeclContext *implDecl) {
+namespace {
+  enum class LoweredPropertiesReason {
+    Stored,
+    Memberwise
+  };
+}
+
+static void computeLoweredProperties(NominalTypeDecl *decl,
+                                     IterableDeclContext *implDecl,
+                                     LoweredPropertiesReason reason) {
   // Expand synthesized member macros.
   auto &ctx = decl->getASTContext();
   (void)evaluateOrDefault(ctx.evaluator,
@@ -127,14 +135,19 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
     if (!var || var->isStatic())
       continue;
 
-    if (var->getAttrs().hasAttribute<LazyAttr>())
-      (void) var->getLazyStorageProperty();
+    if (reason == LoweredPropertiesReason::Stored) {
+      if (var->getAttrs().hasAttribute<LazyAttr>())
+        (void) var->getLazyStorageProperty();
 
-    if (var->hasAttachedPropertyWrapper()) {
-      (void) var->getPropertyWrapperAuxiliaryVariables();
-      (void) var->getPropertyWrapperInitializerInfo();
+      if (var->hasAttachedPropertyWrapper()) {
+        (void) var->getPropertyWrapperAuxiliaryVariables();
+        (void) var->getPropertyWrapperInitializerInfo();
+      }
     }
   }
+
+  if (reason != LoweredPropertiesReason::Stored)
+    return;
 
   // If this is an actor, check conformance to the Actor protocol to
   // ensure that the actor storage will get created (if needed).
@@ -162,6 +175,11 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
       }
     }
   }
+}
+
+static void computeLoweredStoredProperties(NominalTypeDecl *decl,
+                                           IterableDeclContext *implDecl) {
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Stored);
 }
 
 /// Enumerate both the stored properties and missing members,
@@ -283,39 +301,99 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
-/// Check whether the pattern may have storage.
-///
-/// This query is careful not to trigger accessor macro expansion, which
-/// creates a cycle. It conservatively assumes that all accessor macros
-/// produce computed properties, which is... incorrect.
-///
-/// The query also avoids triggering a `StorageImplInfoRequest` for patterns
-/// involved in a ProtocolDecl, because we know they can never contain storage.
-/// For background, vars of noncopyable type have their OpaqueReadOwnership
-/// determined by the type of the var decl, but that type hasn't always been
-/// determined when this query is made.
-static bool mayHaveStorage(Pattern *pattern) {
-  // Check whether there are any accessor macros, or it's a protocol member.
-  bool hasAccessorMacros = false;
-  bool inProtocolDecl = false;
-  pattern->forEachVariable([&](VarDecl *VD) {
-    if (isa<ProtocolDecl>(VD->getDeclContext()))
-      inProtocolDecl = true;
+bool HasInitAccessorRequest::evaluate(Evaluator &evaluator,
+                                      AbstractStorageDecl *decl) const {
+  auto *var = dyn_cast<VarDecl>(decl);
+  if (!var)
+    return false;
 
-    VD->forEachAttachedMacro(MacroRole::Accessor,
-      [&](CustomAttr *customAttr, MacroDecl *macro) {
-        hasAccessorMacros = true;
+  if (var->getAccessor(AccessorKind::Init))
+    return true;
+
+  // Look to see whether it is possible that there is an init accessor.
+  bool hasInitAccessor = false;
+  namelookup::forEachPotentialAttachedMacro(
+      var, MacroRole::Accessor,
+      [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+        if (accessorMacroIntroducesInitAccessor(macro, attr))
+          hasInitAccessor = true;
       });
-  });
 
-  if (hasAccessorMacros)
+  // There is no chance for an init accessor, so we're done.
+  if (!hasInitAccessor)
     return false;
 
-  // protocol members can never contain storage; avoid triggering request.
-  if (inProtocolDecl)
-    return false;
+  // We might get an init accessor by expanding accessor macros; do so now.
+  (void)evaluateOrDefault(
+       var->getASTContext().evaluator, ExpandAccessorMacros{var}, { });
 
-  return pattern->hasStorage();
+  return var->getAccessor(AccessorKind::Init);
+}
+
+ArrayRef<VarDecl *>
+InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
+                                        NominalTypeDecl *decl) const {
+  SmallVector<VarDecl *, 4> results;
+  for (auto var : decl->getMemberwiseInitProperties()) {
+    if (var->hasInitAccessor())
+      results.push_back(var);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+ArrayRef<VarDecl *>
+MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
+                                        NominalTypeDecl *decl) const {
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
+    return ArrayRef<VarDecl *>();
+
+  // Make sure we expand what we need to to get all of the properties.
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+
+  SmallVector<VarDecl *, 4> results;
+  SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
+
+  auto maybeAddProperty = [&](VarDecl *var) {
+    // We only care about properties that are memberwise initialized.
+    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+      return;
+
+    // Add this property.
+    results.push_back(var);
+
+    // If this property has an init accessor, it subsumes all of the stored properties
+    // that the accessor initializes. Mark those stored properties as being subsumed; we'll
+    // get back to them later.
+    if (auto initAccessor = var->getAccessor(AccessorKind::Init)) {
+      if (auto initAttr = initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
+        for (auto subsumed : initAttr->getPropertyDecls(initAccessor))
+          subsumedViaInitAccessor.insert(subsumed);
+      }
+    }
+  };
+
+  for (auto *member : decl->getCurrentMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      maybeAddProperty(var);
+
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
+        maybeAddProperty(auxVar);
+    });
+  }
+
+  // If any properties were subsumed via init accessors, drop them from the list.
+  if (!subsumedViaInitAccessor.empty()) {
+    results.erase(std::remove_if(results.begin(), results.end(), [&](VarDecl *var) {
+                    return subsumedViaInitAccessor.contains(var);
+                  }),
+                  results.end());
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
@@ -418,7 +496,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      mayHaveStorage(pattern)) {
+      pattern->hasStorage()) {
     if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
@@ -439,6 +517,13 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
                                              options)) {
       binding->setInvalid();
       return &pbe;
+    }
+
+    // Local variable packs are not allowed.
+    if (binding->getDeclContext()->isLocalContext() &&
+        binding->getInit(entryNumber)->getType()->is<PackExpansionType>()) {
+      binding->diagnose(diag::expansion_not_allowed,
+                        binding->getInit(entryNumber)->getType());
     }
 
     // A pattern binding at top level is not allowed to pick up another decl's
@@ -616,17 +701,6 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
-/*
- // An accessor that uses borrowed ownership cannot have effects, as the
-   // coroutine accessor doesn't support `async` or `throws`
-   if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-     if (accessor->hasThrows() || accessor->hasAsync())
-       if (accessor->)
-       if (accessor->getResultInterfaceType()->isPureMoveOnly())
-         accessor->diagnose(diag::moveonly_effectful_getter);
-   }
- */
-
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
@@ -640,7 +714,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     if (auto *getter = storage->getEffectfulGetAccessor()) {
       switch (kind) {
       case DiagKind::NoncopyableType:
-        getter->diagnose(diag::moveonly_effectful_getter,
+        getter->diagnose(diag::noncopyable_effectful_getter,
                          getter->getDescriptiveKind());
         break;
       case DiagKind::BorrowedAttr:
@@ -786,23 +860,23 @@ namespace  {
 }
 
 /// Determine whether the given property should be accessed via the enclosing-self access pattern.
-static Optional<EnclosingSelfPropertyWrapperAccess>
+static llvm::Optional<EnclosingSelfPropertyWrapperAccess>
 getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   // The enclosing-self pattern only applies to instance properties of
   // classes.
   if (!property->isInstanceMember())
-    return None;
+    return llvm::None;
   auto classDecl = property->getDeclContext()->getSelfClassDecl();
   if (!classDecl)
-    return None;
+    return llvm::None;
 
   // The pattern currently only works with the outermost property wrapper.
   Type outermostWrapperType = property->getPropertyWrapperBackingPropertyType();
   if (!outermostWrapperType)
-    return None;
+    return llvm::None;
   NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
   if (!wrapperTypeDecl)
-    return None;
+    return llvm::None;
 
   // Look for a generic subscript that fits the general form we need.
   auto wrapperInfo = wrapperTypeDecl->getPropertyWrapperTypeInfo();
@@ -810,7 +884,7 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
       forProjected ? wrapperInfo.enclosingInstanceProjectedSubscript
                    : wrapperInfo.enclosingInstanceWrappedSubscript;
   if (!subscript)
-    return None;
+    return llvm::None;
 
   EnclosingSelfPropertyWrapperAccess result;
   result.subscript = subscript;
@@ -824,13 +898,11 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-static Optional<PropertyWrapperLValueness>
+static llvm::Optional<PropertyWrapperLValueness>
 getPropertyWrapperLValueness(VarDecl *var) {
   auto &ctx = var->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator,
-      PropertyWrapperLValuenessRequest{var},
-      None);
+  return evaluateOrDefault(ctx.evaluator, PropertyWrapperLValuenessRequest{var},
+                           llvm::None);
 }
 
 /// Build a reference to the storage of a declaration. Returns nullptr if there
@@ -856,7 +928,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isLValue = isUsedForSetAccess;
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
-  Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
+  llvm::Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
   // Contains the underlying wrappedValue declaration in a property wrapper
   // along with whether or not the reference to this field needs to be an lvalue
   llvm::SmallVector<std::pair<VarDecl *, bool>, 1> underlyingVars;
@@ -1387,7 +1459,7 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 /// underlying storage.
 static std::pair<BraceStmt *, bool>
 synthesizeTrivialGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->hasStorage());
+  assert(getter->getStorage()->getImplInfo().hasStorage());
   return synthesizeTrivialGetterBody(getter, TargetImpl::Storage, ctx);
 }
 
@@ -2069,6 +2141,9 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     break;
+
+  case AccessorKind::Init:
+    llvm_unreachable("init accessor not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }
@@ -2324,6 +2399,12 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   AvailabilityInference::applyInferredAvailableAttrs(accessor,
                                                      asAvailableAs, ctx);
 
+  // A modify coroutine should have the same SPI visibility as the setter.
+  if (kind == AccessorKind::Modify) {
+    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
+      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
+  }
+
   finishImplicitAccessor(accessor, ctx);
 
   return accessor;
@@ -2573,6 +2654,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Init:
     break;
 
   case AccessorKind::WillSet:
@@ -2699,10 +2781,10 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
-                          NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NL_QualifiedDefault, declsFound);
     } else if (dc->isModuleScopeContext()) {
       dc->lookupQualified(dc->getParentModule(), projectionName,
-                          NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NL_QualifiedDefault, declsFound);
     } else {
       llvm_unreachable("Property wrappers don't work in local contexts");
     }
@@ -2812,9 +2894,8 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
     : PropertyWrapperMutability::Nonmutating;
 }
 
-Optional<PropertyWrapperMutability>
-PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
-                                           VarDecl *var) const {
+llvm::Optional<PropertyWrapperMutability>
+PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *originalVar = var;
   unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
   bool isProjectedValue = false;
@@ -2822,7 +2903,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
     originalVar = var->getOriginalWrappedProperty(
         PropertyWrapperSynthesizedPropertyKind::Projection);
     if (!originalVar)
-      return None;
+      return llvm::None;
 
     numWrappers = originalVar->getAttachedPropertyWrappers().size();
     isProjectedValue = true;
@@ -2835,9 +2916,9 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
       varSourceFile && varSourceFile->Kind != SourceFileKind::Interface;
 
   if (var->getParsedAccessor(AccessorKind::Get) && isVarNotInInterfaceFile)
-    return None;
+    return llvm::None;
   if (var->getParsedAccessor(AccessorKind::Set) && isVarNotInInterfaceFile)
-    return None;
+    return llvm::None;
 
   // Figure out which member we're looking through.
   auto varMember = isProjectedValue
@@ -2847,8 +2928,8 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   // Start with the traits from the outermost wrapper.
   auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
   if (firstWrapper.*varMember == nullptr)
-    return None;
-  
+    return llvm::None;
+
   PropertyWrapperMutability result;
   
   result.Getter = getGetterMutatingness(firstWrapper.*varMember);
@@ -2864,8 +2945,8 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
     assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
-      return None;
-    
+      return llvm::None;
+
     PropertyWrapperMutability nextResult;
     nextResult.Getter =
                     result.composeWith(getGetterMutatingness(wrapper.valueVar));
@@ -2878,7 +2959,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i]),
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i-1]));
 
-      return None;
+      return llvm::None;
     }
     nextResult.Setter =
               result.composeWith(getSetterMutatingness(wrapper.valueVar,
@@ -2890,9 +2971,8 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   return result;
 }
 
-Optional<PropertyWrapperLValueness>
-PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
-                                           VarDecl *var) const {
+llvm::Optional<PropertyWrapperLValueness>
+PropertyWrapperLValuenessRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *VD = var;
   unsigned numWrappers = var->getAttachedPropertyWrappers().size();
   bool isProjectedValue = false;
@@ -2904,7 +2984,7 @@ PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
   }
 
   if (!VD)
-    return None;
+    return llvm::None;
 
   auto varMember = isProjectedValue
       ? &PropertyWrapperTypeInfo::projectedValueVar
@@ -3319,21 +3399,12 @@ static void finishNSManagedImplInfo(VarDecl *var,
   }
 }
 
-static Expr *getParentExecutableInitializer(VarDecl *var) {
-  if (auto *PBD = var->getParentPatternBinding()) {
-    const auto i = PBD->getPatternEntryIndexForVarDecl(var);
-    return PBD->getExecutableInit(i);
-  }
-
-  return nullptr;
-}
-
 static void finishStorageImplInfo(AbstractStorageDecl *storage,
                                   StorageImplInfo &info) {
   auto dc = storage->getDeclContext();
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (!info.hasStorage()) {
+    if (!info.hasStorage() && !var->hasInitAccessor()) {
       if (auto *init = var->getParentExecutableInitializer()) {
         auto &Diags = var->getASTContext().Diags;
         Diags.diagnose(init->getLoc(), diag::getset_init)
@@ -3425,6 +3496,73 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
   return StorageImplInfo(ReadImplKind::Stored, writeImpl, readWriteImpl);
 }
 
+bool HasStorageRequest::evaluate(Evaluator &evaluator,
+                                 AbstractStorageDecl *storage) const {
+  // Parameters are always stored.
+  if (isa<ParamDecl>(storage))
+    return true;
+
+  // Only variables can be stored.
+  auto *var = dyn_cast<VarDecl>(storage);
+  if (!var)
+    return false;
+
+  // @_hasStorage implies that it... has storage.
+  if (var->getAttrs().hasAttribute<HasStorageAttr>())
+    return true;
+
+  // Protocol requirements never have storage.
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
+    return false;
+
+  // lazy declarations do not have storage.
+  if (storage->getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
+  // @NSManaged attributes don't have storage
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+    return false;
+
+  // Any accessors that read or write imply that there is no storage.
+  if (storage->getParsedAccessor(AccessorKind::Get) ||
+      storage->getParsedAccessor(AccessorKind::Read) ||
+      storage->getParsedAccessor(AccessorKind::Address) ||
+      storage->getParsedAccessor(AccessorKind::Set) ||
+      storage->getParsedAccessor(AccessorKind::Modify) ||
+      storage->getParsedAccessor(AccessorKind::MutableAddress))
+    return false;
+
+  // willSet or didSet in an overriding property imply that there is no storage.
+  if ((storage->getParsedAccessor(AccessorKind::WillSet) ||
+       storage->getParsedAccessor(AccessorKind::DidSet)) &&
+      storage->getAttrs().hasAttribute<OverrideAttr>())
+    return false;
+
+  // The presence of a property wrapper implies that there is no storage.
+  if (var->hasAttachedPropertyWrapper())
+    return false;
+
+  // Look for any accessor macros that might make this property computed.
+  bool hasStorage = true;
+  namelookup::forEachPotentialAttachedMacro(
+      var, MacroRole::Accessor,
+      [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+        // Will this macro introduce observers?
+        bool foundObserver = accessorMacroOnlyIntroducesObservers(macro, attr);
+
+        // If it's not (just) introducing observers, it's making the property
+        // computed.
+        if (!foundObserver)
+          hasStorage = false;
+
+        // If it will introduce observers, and there is an "override",
+        // the property doesn't have storage.
+        if (foundObserver && storage->getAttrs().hasAttribute<OverrideAttr>())
+          hasStorage = false;
+      });
+  return hasStorage;
+}
+
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
@@ -3491,6 +3629,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
+  bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
 
   auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
@@ -3504,7 +3643,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // If there's a writing accessor of any sort, there must also be a
   // reading accessor.
-  } else if (hasSetter || hasModify || hasMutableAddress) {
+  } else if (hasInit || hasSetter || hasModify || hasMutableAddress) {
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be
@@ -3583,6 +3722,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
   finishStorageImplInfo(storage, info);
 
+  assert(info.hasStorage() == storage->hasStorage() ||
+         storage->getASTContext().Diags.hadAnyError());
   return info;
 }
 

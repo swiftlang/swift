@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -236,5 +237,96 @@ struct Buffer {
   func callBind() -> UnsafeMutableBufferPointer<Int> {
     return bind(of: Int.self)
   }
+}
+
+@_noLocks
+func testBitShift(_ x: Int) -> Int {
+    return x << 1
+}
+
+@_noLocks
+func testUintIntConversion() -> Int {
+    let u: UInt32 = 5
+    return Int(u)
+}
+
+struct OptSet: OptionSet {
+    let rawValue: Int
+
+    public static var a: OptSet { return OptSet(rawValue: 1) }
+    public static var b: OptSet { return OptSet(rawValue: 2) }
+    public static var c: OptSet { return OptSet(rawValue: 4) }
+    public static var d: OptSet { return OptSet(rawValue: 8) }
+}
+
+@_noLocks
+func testOptionSet(_ options: OptSet) -> Bool {
+    return options.contains(.b)
+}
+
+let globalA = 0xff
+let globalB = UInt32(globalA)
+
+@_noLocks
+func testGlobalsWithConversion() -> UInt32 {
+    return globalB
+}
+
+public struct X: Collection {
+    public func index(after i: Int) -> Int {
+        return i + 1
+    }
+    public subscript(position: Int) -> Int {
+        get {
+            return 0
+        }
+    }
+    public var startIndex: Int = 0
+    public var endIndex: Int = 1
+    public typealias Index = Int
+}
+
+extension Collection where Element: Comparable {
+    public func testSorted() -> Int {
+        return testSorted(by: <)
+    }
+    public func testSorted(by areInIncreasingOrder: (Element, Element) -> Bool) -> Int {
+        let x = 0
+        _ = areInIncreasingOrder(self.first!, self.first!)
+        return x
+    }
+}
+@_noLocks
+public func testCollectionSort(a: X) -> Int {
+    _ = a.testSorted()
+    return 0
+}
+
+public struct Y {
+  var a, b, c: Int
+}
+
+extension Y {
+  func with2(_ body: () -> ()) {
+    body()
+  }
+  
+  func with1(_ body: (Int) -> (Int)) -> Int {
+    with2 {
+      _ = body(48)
+    }
+    return 777
+  }
+  
+  func Xsort() -> Int {
+    with1 { i in
+      i
+    }
+  }
+}
+
+@_noLocks
+public func testClosurePassing(a: inout Y) -> Int {
+    return a.Xsort()
 }
 

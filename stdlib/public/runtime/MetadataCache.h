@@ -22,8 +22,9 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 
+#include <atomic>
 #include <condition_variable>
-#include <thread>
+#include <optional>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -297,9 +298,10 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
+  std::optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
     EntryType *entry = Storage.find(key);
-    if (!entry) return None;
+    if (!entry)
+      return std::nullopt;
     return entry->await(Storage.getConcurrency(),
                         std::forward<ArgTys>(args)...);
   }
@@ -381,8 +383,8 @@ public:
   }
 
   template <class... ArgTys>
-  llvm::Optional<Status> beginAllocation(WaitQueue::Worker &worker,
-                                         ArgTys &&... args) {
+  std::optional<Status> beginAllocation(WaitQueue::Worker &worker,
+                                        ArgTys &&...args) {
 
     // Delegate to the implementation class.
     ValueType origValue =
@@ -463,7 +465,9 @@ struct GenericSignatureLayout {
       }
     }
 
+#ifndef NDEBUG
     assert(packIdx == NumPacks);
+#endif
   }
 
   size_t sizeInWords() const {
@@ -1124,9 +1128,9 @@ public:
 
   /// Perform the allocation operation.
   template <class... Args>
-  llvm::Optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
-                                         MetadataRequest request,
-                                         Args &&... args) {
+  std::optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
+                                        MetadataRequest request,
+                                        Args &&...args) {
     // Returning a non-None value here will preempt initialization, so we
     // should only do it if we're reached PrivateMetadataState::Complete.
 
@@ -1148,7 +1152,7 @@ public:
 
       // Otherwise, go directly to the initialization phase.
       assert(worker.isWorkerThread());
-      return None;
+      return std::nullopt;
     }
 
     assert(worker.isWorkerThread());
@@ -1192,7 +1196,7 @@ public:
       verifyMangledNameRoundtrip(value);
 #endif
 
-    return None;
+    return std::nullopt;
   }
 
   template <class... Args>
@@ -1581,6 +1585,8 @@ public:
   bool matchesKey(const MetadataCacheKey &key) const {
     return key == getKey();
   }
+
+  friend struct StaticAssertGenericMetadataCacheEntryValueOffset;
 };
 
 template <class EntryType, uint16_t Tag>

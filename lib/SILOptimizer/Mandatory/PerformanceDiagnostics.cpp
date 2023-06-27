@@ -217,6 +217,10 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = tfi->getOperand();
     } else if (auto *cp = dyn_cast<CopyValueInst>(closure)) {
       closure = cp->getOperand();
+    } else if (auto *bb = dyn_cast<BeginBorrowInst>(closure)) {
+      closure = bb->getOperand();
+    } else if (auto *cv = dyn_cast<ConvertFunctionInst>(closure)) {
+      closure = cv->getOperand();
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
       // We can assume that a function closure argument is already checked at
       // the call site.
@@ -335,7 +339,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
     case SILInstructionKind::MetatypeInst:
       if (metatypeUsesAreNotRelevant(cast<MetatypeInst>(inst)))
-        break;
+        return false;
       LLVM_FALLTHROUGH;
     default:
       // We didn't recognize the instruction, so try to give an error message
@@ -476,6 +480,14 @@ private:
     SILModule *module = getModule();
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
+
+    // Check that @_section is only on constant globals
+    for (SILGlobalVariable &g : module->getSILGlobals()) {
+      if (!g.getStaticInitializerValue() && g.getSectionAttr())
+        module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::section_attr_on_non_const_global);
+    }
+
     bool annotatedFunctionsFound = false;
 
     for (SILFunction &function : *module) {
@@ -485,13 +497,6 @@ private:
         // Don't rerun diagnostics on deserialized functions.
         if (function.wasDeserializedCanonical())
           continue;
-
-        if (!module->getOptions().EnablePerformanceAnnotations) {
-          module->getASTContext().Diags.diagnose(
-            function.getLocation().getSourceLoc(),
-            diag::performance_annotations_not_enabled);
-          return;
-        }
 
         diagnoser.visitFunction(&function, function.getPerfConstraints());
       }

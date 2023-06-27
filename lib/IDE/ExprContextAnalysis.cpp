@@ -174,7 +174,7 @@ public:
   Expr *visitCallExpr(CallExpr *E) {
     auto *args = E->getArgs()->getOriginalArgs();
 
-    Optional<unsigned> newTrailingClosureIdx;
+    llvm::Optional<unsigned> newTrailingClosureIdx;
     SmallVector<Argument, 4> newArgs;
     for (auto idx : indices(*args)) {
       // Update the trailing closure index if we have one.
@@ -191,7 +191,7 @@ public:
 
     // If we ended up removing the last trailing closure, drop the index.
     if (newTrailingClosureIdx && *newTrailingClosureIdx == newArgs.size())
-      newTrailingClosureIdx = None;
+      newTrailingClosureIdx = llvm::None;
 
     Removed = true;
 
@@ -372,7 +372,7 @@ public:
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Type baseTy, DeclNameRef name,
+    DeclContext &DC, Type baseTy, DeclNameRef name, SourceLoc loc,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto baseInstanceTy = baseTy->getMetatypeInstanceType();
   if (!baseInstanceTy->mayHaveMembers())
@@ -395,7 +395,7 @@ static void collectPossibleCalleesByQualifiedLookup(
 
   SmallVector<ValueDecl *, 2> decls;
   if (!DC.lookupQualified(baseInstanceTy,
-                          name.withoutArgumentLabels(),
+                          name.withoutArgumentLabels(), loc,
                           NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
@@ -522,7 +522,9 @@ static void collectPossibleCalleesByQualifiedLookup(
     }
   }
 
-  collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
+  collectPossibleCalleesByQualifiedLookup(DC, baseTy, name,
+                                          baseExpr->getLoc(),
+                                          candidates);
 
   // Add virtual 'subscript<Value>(keyPath: KeyPath<Root, Value>) -> Value'.
   if (name.getBaseName() == DeclBaseName::createSubscript() &&
@@ -553,6 +555,7 @@ static bool collectPossibleCalleesForUnresolvedMember(
       return;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
                                             unresolvedMemberExpr->getName(),
+                                            unresolvedMemberExpr->getLoc(),
                                             candidates);
   };
 
@@ -715,7 +718,7 @@ static bool getPositionInTuple(DeclContext &DC, TupleExpr *TE, Expr *CCExpr,
 ///
 /// \returns the position index number on success, \c None if \p CCExpr is not
 /// a part of \p Args.
-static Optional<unsigned>
+static llvm::Optional<unsigned>
 getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
                     ArrayRef<AnyFunctionType::Param> Params, bool Lenient) {
   auto &SM = DC.getASTContext().SourceMgr;
@@ -785,7 +788,7 @@ getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
       } else {
         // If there is no matching argument label. These arguments can't be
         // applied to the params.
-        return None;
+        return llvm::None;
       }
     }
   }
@@ -793,7 +796,7 @@ getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
     // We didn't search until the end, so we found a position in Params. Success
     return PosInParams;
   } else {
-    return None;
+    return llvm::None;
   }
 }
 
@@ -884,12 +887,12 @@ class ExprContextAnalyzer {
       }
       SmallPtrSet<CanType, 4> seenTypes;
       llvm::SmallSet<std::pair<Identifier, CanType>, 4> seenArgs;
-      llvm::SmallVector<Optional<unsigned>, 2> posInParams;
+      llvm::SmallVector<llvm::Optional<unsigned>, 2> posInParams;
       {
         bool found = false;
         auto *originalArgs = Args->getOriginalArgs();
         for (auto &typeAndDecl : Candidates) {
-          Optional<unsigned> pos = getPositionInParams(
+          llvm::Optional<unsigned> pos = getPositionInParams(
               *DC, originalArgs, ParsedExpr, typeAndDecl.Type->getParams(),
               /*lenient=*/false);
           posInParams.push_back(pos);

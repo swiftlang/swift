@@ -96,10 +96,10 @@ private:
   SILBasicBlock StaticInitializerBlock;
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
-                    IsSerialized_t IsSerialized,
-                    StringRef mangledName, SILType loweredType,
-                    Optional<SILLocation> loc, VarDecl *decl);
-  
+                    IsSerialized_t IsSerialized, StringRef mangledName,
+                    SILType loweredType, llvm::Optional<SILLocation> loc,
+                    VarDecl *decl);
+
 public:
   static void registerBridgedMetatype(SwiftMetatype metatype) {
     registeredMetatype = metatype;
@@ -108,7 +108,7 @@ public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    IsSerialized_t IsSerialized,
                                    StringRef MangledName, SILType LoweredType,
-                                   Optional<SILLocation> Loc = None,
+                                   llvm::Optional<SILLocation> Loc = llvm::None,
                                    VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();
@@ -181,16 +181,6 @@ public:
   const_iterator begin() const { return StaticInitializerBlock.begin(); }
   const_iterator end() const { return StaticInitializerBlock.end(); }
 
-  /// Returns true if \p I is a valid instruction to be contained in the
-  /// static initializer.
-  static bool isValidStaticInitializerInst(const SILInstruction *I,
-                                           SILModule &M);
-
-  /// Returns the usub_with_overflow builtin if \p TE extracts the result of
-  /// such a subtraction, which is required to have an integer_literal as right
-  /// operand.
-  static BuiltinInst *getOffsetSubtract(const TupleExtractInst *TE, SILModule &M);
-
   void dropAllReferences() {
     StaticInitializerBlock.dropAllReferences();
   }
@@ -198,6 +188,21 @@ public:
   void clear() {
     dropAllReferences();
     StaticInitializerBlock.eraseAllInstructions(Module);
+  }
+
+  /// Returns true if this global variable has `@_used` attribute.
+  bool markedAsUsed() const {
+    auto *V = getDecl();
+    return V && V->getAttrs().hasAttribute<UsedAttr>();
+  }
+
+  /// Returns a SectionAttr if this global variable has `@_section` attribute.
+  SectionAttr *getSectionAttr() const {
+    auto *V = getDecl();
+    if (!V)
+      return nullptr;
+
+    return V->getAttrs().getAttribute<SectionAttr>();
   }
 
   /// Return whether this variable corresponds to a Clang node.
@@ -290,10 +295,8 @@ SILFunction *findInitializer(SILFunction *AddrF, BuiltinInst *&CallToOnce);
 ///
 /// Given a global initializer, InitFunc, return the GlobalVariable that it
 /// statically initializes or return nullptr if it isn't an obvious static
-/// initializer. If a global variable is returned, InitVal is initialized to the
-/// the instruction producing the global's initial value.
-SILGlobalVariable *getVariableOfStaticInitializer(
-  SILFunction *InitFunc, SingleValueInstruction *&InitVal);
+/// initializer.
+SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *InitFunc);
 
 } // namespace swift
 

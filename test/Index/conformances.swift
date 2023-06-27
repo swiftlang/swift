@@ -98,9 +98,7 @@ class CompositionTypeViaAlias: CompositionTypeAlias { // CHECK: [[@LINE]]:7 | cl
 
 typealias NestedCompositionTypeAlias = CompositionTypeAlias & P2 // CHECK: [[@LINE]]:11 | type-alias/Swift | NestedCompositionTypeAlias | [[NestedCompositionTypeAlias_USR:.*]] | Def
   // CHECK: [[@LINE-1]]:40 | type-alias/Swift | CompositionTypeAlias | [[CompositionTypeAlias_USR]] | Ref | rel: 0
-  // CHECK: [[@LINE-2]]:40 | class/Swift | BaseMultiConf | [[BaseMultiConf_USR]] | Ref,Impl | rel: 1
-  // CHECK: [[@LINE-3]]:40 | protocol/Swift | P1 | [[P1_USR]] | Ref,Impl | rel: 1
-  // CHECK: [[@LINE-4]]:63 | protocol/Swift | P2 | [[P2_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-2]]:63 | protocol/Swift | P2 | [[P2_USR]] | Ref | rel: 0
 
 class CompositionViaNestedAlias: NestedCompositionTypeAlias { // CHECK: [[@LINE]]:7 | class/Swift | CompositionViaNestedAlias | [[CompositionViaNestedAlias_USR:.*]] | Def
   // CHECK: [[@LINE-1]]:34 | type-alias/Swift | NestedCompositionTypeAlias | [[NestedCompositionTypeAlias_USR]] | Ref | rel: 0
@@ -115,10 +113,12 @@ typealias ProtocolsOnly = P1 & P2 // CHECK: [[@LINE]]:11 | type-alias/Swift | Pr
   // CHECK: [[@LINE-2]]:32 | protocol/Swift | P2 | [[P2_USR]] | Ref | rel: 0
 
 class NoInherited {} // CHECK: [[@LINE]]:7 | class/Swift | NoInherited | [[NoInherited_USR:.*]] | Def
-extension NoInherited: ProtocolsOnly {} // CHECK: [[@LINE]]:11 | class/Swift | NoInherited | [[NoInherited_USR:.*]] | Ref
+extension NoInherited: ProtocolsOnly { // CHECK: [[@LINE]]:11 | class/Swift | NoInherited | [[NoInherited_USR:.*]] | Ref
   // CHECK: [[@LINE-1]]:24 | type-alias/Swift | ProtocolsOnly | [[ProtocolsOnly_USR]] | Ref | rel: 0
-  // CHECK: [[@LINE-2]]:24 | protocol/Swift | P1 | [[P1_USR]] | Ref,Impl | rel: 1
-  // CHECK: [[@LINE-3]]:24 | protocol/Swift | P2 | [[P2_USR]] | Ref,Impl | rel: 1
+  // CHECK: [[@LINE-2]]:24 | protocol/Swift | P1 | [[P1_USR]] | Ref,Impl,RelBase | rel: 1
+  // CHECK: [[@LINE-3]]:24 | protocol/Swift | P2 | [[P2_USR]] | Ref,Impl,RelBase | rel: 1
+  func foo() {}
+}
 
 struct WithCodable: Codable {} // CHECK: [[@LINE]]:21 | type-alias/Swift | Codable | [[Codable_USR:.*]] | Ref | rel: 0
 

@@ -73,32 +73,24 @@ public class Instruction : CustomStringConvertible, Hashable {
     return mayTrap || mayWriteToMemory
   }
 
-  final public var mayReadFromMemory: Bool {
+  final public var memoryEffects: SideEffects.Memory {
     switch bridged.getMemBehavior() {
-      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
+    case .None:
+      return SideEffects.Memory()
+    case .MayRead:
+      return SideEffects.Memory(read: true)
+    case .MayWrite:
+      return SideEffects.Memory(write: true)
+    case .MayReadWrite, .MayHaveSideEffects:
+      return SideEffects.Memory(read: true, write: true)
+    default:
+      fatalError("invalid memory behavior")
     }
   }
 
-  final public var mayWriteToMemory: Bool {
-    switch bridged.getMemBehavior() {
-      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
-    }
-  }
-
-  final public var mayReadOrWriteMemory: Bool {
-    switch bridged.getMemBehavior() {
-      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
-    }
-  }
+  final public var mayReadFromMemory: Bool { memoryEffects.read }
+  final public var mayWriteToMemory: Bool { memoryEffects.write }
+  final public var mayReadOrWriteMemory: Bool { memoryEffects.read || memoryEffects.write }
 
   public final var mayRelease: Bool {
     return bridged.mayRelease()
@@ -149,7 +141,17 @@ extension BridgedInstruction {
 }
 
 extension OptionalBridgedInstruction {
-  var instruction: Instruction? { obj.getAs(Instruction.self) }
+  public var instruction: Instruction? { obj.getAs(Instruction.self) }
+
+  public static var none: OptionalBridgedInstruction {
+    OptionalBridgedInstruction()
+  }
+}
+
+extension Optional where Wrapped == Instruction {
+  public var bridged: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(self?.bridged.obj)
+  }
 }
 
 public class SingleValueInstruction : Instruction, Value {
@@ -195,7 +197,7 @@ public class MultipleValueInstruction : Instruction {
 }
 
 /// Instructions, which have a single operand.
-public protocol UnaryInstruction : AnyObject {
+public protocol UnaryInstruction : Instruction {
   var operands: OperandArray { get }
   var operand: Operand { get }
 }
@@ -226,11 +228,23 @@ extension StoringInstruction {
 
 final public class StoreInst : Instruction, StoringInstruction {
   // must match with enum class StoreOwnershipQualifier
-  public enum StoreOwnership: Int {
+  public enum Ownership: Int {
     case unqualified = 0, initialize = 1, assign = 2, trivial = 3
+
+    public init(for type: Type, in function: Function, initialize: Bool) {
+      if function.hasOwnership {
+        if type.isTrivial(in: function) {
+          self = .trivial
+        } else {
+          self = initialize ? .initialize : .assign
+        }
+      } else {
+        self = .unqualified
+      }
+    }
   }
-  public var destinationOwnership: StoreOwnership {
-    StoreOwnership(rawValue: bridged.StoreInst_getStoreOwnership())!
+  public var destinationOwnership: Ownership {
+    Ownership(rawValue: bridged.StoreInst_getStoreOwnership())!
   }
 }
 
@@ -244,10 +258,10 @@ final public class CopyAddrInst : Instruction {
   public var destination: Value { return destinationOperand.value }
   
   public var isTakeOfSrc: Bool {
-    bridged.CopyAddrInst_isTakeOfSrc() != 0
+    bridged.CopyAddrInst_isTakeOfSrc()
   }
   public var isInitializationOfDest: Bool {
-    bridged.CopyAddrInst_isInitializationOfDest() != 0
+    bridged.CopyAddrInst_isInitializationOfDest()
   }
 }
 
@@ -258,16 +272,6 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 }
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
-
-final public class DeallocStackInst : Instruction, UnaryInstruction {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
-
-final public class DeallocStackRefInst : Instruction, UnaryInstruction {
-  public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
-}
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
 }
@@ -294,8 +298,6 @@ final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
 final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 
-final public class DeallocRefInst : Instruction, UnaryInstruction {}
-
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
 }
@@ -304,14 +306,24 @@ final public class StrongRetainInst : RefCountingInst {
   public var instance: Value { operand.value }
 }
 
+final public class UnownedRetainInst : RefCountingInst {
+  public var instance: Value { operand.value }
+}
+
 final public class RetainValueInst : RefCountingInst {
+  public var value: Value { return operand.value }
 }
 
 final public class StrongReleaseInst : RefCountingInst {
   public var instance: Value { operand.value }
 }
 
+final public class UnownedReleaseInst : RefCountingInst {
+  public var instance: Value { operand.value }
+}
+
 final public class ReleaseValueInst : RefCountingInst {
+  public var value: Value { return operand.value }
 }
 
 final public class DestroyValueInst : Instruction, UnaryInstruction {
@@ -323,10 +335,37 @@ final public class DestroyAddrInst : Instruction, UnaryInstruction {
 }
 
 final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstruction {
+  public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.InjectEnumAddrInst_caseIndex() }
 }
 
 final public class UnimplementedRefCountingInst : RefCountingInst {}
+
+//===----------------------------------------------------------------------===//
+//                      no-value deallocation instructions
+//===----------------------------------------------------------------------===//
+
+public protocol Deallocation : Instruction { }
+
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
+  public var allocstack: AllocStackInst {
+    return operand.value as! AllocStackInst
+  }
+}
+
+final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
+  public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
+}
+
+final public class DeallocRefInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocPartialRefInst : Instruction, Deallocation {}
+
+final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, Deallocation {}
 
 //===----------------------------------------------------------------------===//
 //                           single-value instructions
@@ -341,11 +380,11 @@ final public class LoadInst : SingleValueInstruction, UnaryInstruction {
   public var address: Value { operand.value }
 
   // must match with enum class LoadOwnershipQualifier
-  public enum LoadOwnership: Int {
+  public enum Ownership: Int {
     case unqualified = 0, take = 1, copy = 2, trivial = 3
   }
-  public var ownership: LoadOwnership {
-    LoadOwnership(rawValue: bridged.LoadInst_getLoadOwnership())!
+  public var ownership: Ownership {
+    Ownership(rawValue: bridged.LoadInst_getLoadOwnership())!
   }
 }
 
@@ -359,6 +398,14 @@ final public class BuiltinInst : SingleValueInstruction {
   public var id: ID {
     return bridged.BuiltinInst_getID()
   }
+
+  public var intrinsicID: BridgedInstruction.IntrinsicID {
+    return bridged.BuiltinInst_getIntrinsicID()
+  }
+
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged.BuiltinInst_getSubstitutionMap())
+  }
 }
 
 final public class UpcastInst : SingleValueInstruction, UnaryInstruction {
@@ -368,6 +415,14 @@ final public class UpcastInst : SingleValueInstruction, UnaryInstruction {
 final public
 class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {
   public var fromInstance: Value { operand.value }
+}
+
+final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
+  public var fromAddress: Value { operand.value }
+}
+
+final public class UncheckedTrivialBitCastInst : SingleValueInstruction, UnaryInstruction {
+  public var fromValue: Value { operand.value }
 }
 
 final public
@@ -470,12 +525,38 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 
 final public class GlobalValueInst : GlobalAccessInst {}
 
+final public class AllocGlobalInst : Instruction {
+  public var global: GlobalVariable {
+    bridged.AllocGlobalInst_getGlobal().globalVar
+  }
+}
+
 final public class IntegerLiteralInst : SingleValueInstruction {
   public var value: llvm.APInt { bridged.IntegerLiteralInst_getValue() }
 }
 
+final public class FloatLiteralInst : SingleValueInstruction {
+  public var value: llvm.APFloat { bridged.FloatLiteralInst_getValue() }
+}
+
 final public class StringLiteralInst : SingleValueInstruction {
-  public var string: String { bridged.StringLiteralInst_getValue().string }
+  public enum Encoding {
+    case Bytes
+    case UTF8
+    /// UTF-8 encoding of an Objective-C selector.
+    case ObjCSelector
+  }
+
+  public var value: StringRef { StringRef(bridged: bridged.StringLiteralInst_getValue()) }
+
+  public var encoding: Encoding {
+    switch bridged.StringLiteralInst_getEncoding() {
+    case 0: return .Bytes
+    case 1: return .UTF8
+    case 2: return .ObjCSelector
+    default: fatalError("invalid encoding in StringLiteralInst")
+    }
+  }
 }
 
 final public class TupleInst : SingleValueInstruction {
@@ -536,7 +617,7 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
   public var instance: Value { operand.value }
   public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
-  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() != 0 }
+  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -582,7 +663,9 @@ final public
 class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
+class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {
+  public var value: Value { return operand.value }
+}
 
 final public
 class MarkDependenceInst : SingleValueInstruction {
@@ -607,6 +690,8 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
+
+  public var address: Value { operand.value }
 }
 
 // An instruction that is always paired with a scope ending instruction
@@ -657,6 +742,7 @@ final public class StrongCopyUnmanagedValueInst : SingleValueInstruction, UnaryI
 
 final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
+  public var doKeepUnique: Bool { bridged.EndCOWMutationInst_doKeepUnique() }
 }
 
 final public
@@ -664,7 +750,7 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
-  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() != 0 }
+  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
 
   public func calleeArgIndex(callerArgIndex: Int) -> Int {
     bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() + callerArgIndex
@@ -712,6 +798,17 @@ final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruct
 final public
 class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class ObjectInst : SingleValueInstruction {
+  public var baseOperands: OperandArray {
+    operands[0..<bridged.ObjectInst_getNumBaseElements()]
+  }
+
+  public var tailOperands: OperandArray {
+    let ops = operands
+    return ops[bridged.ObjectInst_getNumBaseElements()..<ops.endIndex]
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
 //===----------------------------------------------------------------------===//
@@ -719,13 +816,23 @@ class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation {
+  public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
-  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() != 0 }
+  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
 
   final public var canAllocOnStack: Bool {
-    bridged.AllocRefInstBase_canAllocOnStack() != 0
+    bridged.AllocRefInstBase_canAllocOnStack()
+  }
+
+  final public var tailAllocatedCounts: OperandArray {
+    let numTailTypes = bridged.AllocRefInstBase_getNumTailTypes()
+    return operands[0..<numTailTypes]
+  }
+
+  final public var tailAllocatedTypes: TypeArray {
+    TypeArray(bridged: bridged.AllocRefInstBase_getTailAllocatedTypes())
   }
 }
 
@@ -733,6 +840,9 @@ final public class AllocRefInst : AllocRefInstBase {
 }
 
 final public class AllocRefDynamicInst : AllocRefInstBase {
+  public var isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType: Bool {
+    bridged.AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType()
+  }
 }
 
 final public class AllocBoxInst : SingleValueInstruction, Allocation {
@@ -894,6 +1004,9 @@ final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
 final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
+  public var source: Value { operand.value }
+  public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
+  public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
 }
 
 final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {

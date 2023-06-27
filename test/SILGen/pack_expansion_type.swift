@@ -1,7 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
-
-// Experimental features require an asserts compiler
-// REQUIRES: asserts
+// RUN: %target-swift-emit-silgen %s -disable-availability-checking | %FileCheck %s
 
 // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type16variadicFunction1t1ux_q_txQp_txxQp_q_xQptRvzRv_q_Rhzr0_lF : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (@pack_guaranteed Pack{repeat each T}, @pack_guaranteed Pack{repeat each U}) -> @pack_out Pack{repeat (each T, each U)} {
 // CHECK: bb0(%0 : $*Pack{repeat (each T, each U)}, %1 : $*Pack{repeat each T}, %2 : $*Pack{repeat each U}):
@@ -49,3 +46,7 @@ func variadicMetatypes<each T>(_: repeat each T) {
 // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type18sameExpansionTwice2us05more_G02vsyxxQp_xxQpq_q_QptRvzRv_r0_lF : $@convention(thin) <each U, each V> (@pack_guaranteed Pack{repeat each U}, @pack_guaranteed Pack{repeat each U}, @pack_guaranteed Pack{repeat each V}) -> () {
 public func sameExpansionTwice<each U, each V>(us: repeat each U, more_us: repeat each U, vs: repeat each V) {}
 
+// SILVerifier bug
+public func nonPackAndPackParameterInExpansion<each T, U, V>(t: repeat each T, u: U, v: V) -> (repeat (each T, U, V)) {
+  return (repeat (each t, u, v))
+}

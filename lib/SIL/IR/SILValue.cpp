@@ -106,13 +106,13 @@ SILInstruction *ValueBase::getNextInstruction() {
   return nullptr;
 }
 
-Optional<ValueBase::DefiningInstructionResult>
+llvm::Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return DefiningInstructionResult{inst, 0};
   if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
     return DefiningInstructionResult{result->getParent(), result->getIndex()};
-  return None;
+  return llvm::None;
 }
 
 bool SILPhiArgument::isLexical() const {
@@ -152,6 +152,25 @@ bool ValueBase::isLexical() const {
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
   return false;
+}
+
+bool ValueBase::isGuaranteedForwarding() const {
+  if (getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+  // NOTE: canOpcodeForwardInnerGuaranteedValues returns true for transformation
+  // terminator results.
+  if (canOpcodeForwardInnerGuaranteedValues(this) ||
+      isa<SILFunctionArgument>(this)) {
+    return true;
+  }
+  // If not a phi, return false
+  auto *phi = dyn_cast<SILPhiArgument>(this);
+  if (!phi || !phi->isPhi()) {
+    return false;
+  }
+
+  return phi->isGuaranteedForwarding();
 }
 
 bool ValueBase::hasDebugTrace() const {
@@ -290,12 +309,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 ValueOwnershipKind::ValueOwnershipKind(StringRef S)
     : value(OwnershipKind::Any) {
-  auto Result = llvm::StringSwitch<Optional<OwnershipKind::innerty>>(S)
+  auto Result = llvm::StringSwitch<llvm::Optional<OwnershipKind::innerty>>(S)
                     .Case("unowned", OwnershipKind::Unowned)
                     .Case("owned", OwnershipKind::Owned)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
-                    .Default(None);
+                    .Default(llvm::None);
   if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
   value = Result.value();

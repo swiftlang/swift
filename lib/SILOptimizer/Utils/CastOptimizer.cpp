@@ -474,7 +474,7 @@ static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
   return false;
 }
 
-static Optional<std::pair<SILFunction *, SubstitutionMap>>
+static llvm::Optional<std::pair<SILFunction *, SubstitutionMap>>
 findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
                      SILDynamicCastInst dynamicCast) {
   CanType sourceFormalType = dynamicCast.getSourceFormalType();
@@ -492,7 +492,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   ModuleDecl *modDecl =
       mod.getASTContext().getLoadedModule(mod.getASTContext().Id_Foundation);
   if (!modDecl)
-    return None;
+    return llvm::None;
   SmallVector<ValueDecl *, 2> results;
   modDecl->lookupMember(results,
                         sourceFormalType.getNominalOrBoundGenericNominal(),
@@ -506,7 +506,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     resultsRef = results;
   }
   if (resultsRef.size() != 1)
-    return None;
+    return llvm::None;
 
   auto *resultDecl = results.front();
   auto memberDeclRef = SILDeclRef(resultDecl);
@@ -519,16 +519,16 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
-    return None;
+    return llvm::None;
 
   if (dynamicCast.getFunction()->isSerialized() &&
       !bridgedFunc->hasValidLinkageForFragileRef())
-    return None;
+    return llvm::None;
 
   if (bridgedFunc->getLoweredFunctionType()
           ->getSingleResult()
           .isFormalIndirect())
-    return None;
+    return llvm::None;
   return std::make_pair(bridgedFunc, subMap);
 }
 
@@ -1631,7 +1631,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
 
 /// Simplify conversions between thick and objc metatypes.
 SILValue CastOptimizer::optimizeMetatypeConversion(
-    ConversionInst *mci, MetatypeRepresentation representation) {
+    ConversionOperation mci, MetatypeRepresentation representation) {
   SILValue op = mci->getOperand(0);
   // Instruction has a proper target type already.
   SILType ty = mci->getType();
@@ -1646,14 +1646,14 @@ SILValue CastOptimizer::optimizeMetatypeConversion(
   auto replaceCast = [&](SILValue newValue) -> SILValue {
     assert(ty.getAs<AnyMetatypeType>()->getRepresentation() ==
            newValue->getType().getAs<AnyMetatypeType>()->getRepresentation());
-    replaceValueUsesAction(mci, newValue);
-    eraseInstAction(mci);
+    replaceValueUsesAction(*mci, newValue);
+    eraseInstAction(*mci);
     return newValue;
   };
 
   if (auto *mi = dyn_cast<MetatypeInst>(op)) {
     return replaceCast(
-        SILBuilderWithScope(mci, builderContext).createMetatype(loc, ty));
+        SILBuilderWithScope(*mci, builderContext).createMetatype(loc, ty));
   }
 
   // For metatype instructions that require an operand, generate the new

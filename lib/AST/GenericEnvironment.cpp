@@ -320,8 +320,8 @@ void GenericEnvironment::addMapping(GenericParamKey key,
   getContextTypes()[index] = contextType;
 }
 
-Optional<Type> GenericEnvironment::getMappingIfPresent(
-                                                    GenericParamKey key) const {
+llvm::Optional<Type>
+GenericEnvironment::getMappingIfPresent(GenericParamKey key) const {
   // Find the index into the parallel arrays of generic parameters and
   // context types.
   auto genericParams = getGenericParams();
@@ -331,7 +331,7 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
   if (auto type = getContextTypes()[index])
     return type;
 
-  return None;
+  return llvm::None;
 }
 
 namespace {
@@ -432,7 +432,8 @@ Type TypeBase::mapTypeOutOfContext() {
   assert(!hasTypeParameter() && "already have an interface type");
   return Type(this).subst(MapTypeOutOfContext(),
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes);
+    SubstFlags::AllowLoweredTypes |
+    SubstFlags::PreservePackExpansionLevel);
 }
 
 class GenericEnvironment::NestedTypeStorage
@@ -634,10 +635,10 @@ Type GenericEnvironment::mapTypeIntoContext(
   assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
          "already have a contextual type");
 
-  type = maybeApplyOuterContextSubstitutions(type);
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
-                           SubstFlags::AllowLoweredTypes);
+                           SubstFlags::AllowLoweredTypes |
+                           SubstFlags::PreservePackExpansionLevel);
   assert((!result->hasTypeParameter() || result->hasError() ||
           getKind() == Kind::Opaque) &&
          "not fully substituted");
@@ -671,7 +672,7 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
   FindElementArchetypeForOpenedPackParam
     findElementArchetype(this, getOpenedPackParams());
 
-  return type.transformRec([&](TypeBase *ty) -> Optional<Type> {
+  return type.transformRec([&](TypeBase *ty) -> llvm::Optional<Type> {
     // We're only directly substituting pack archetypes.
     auto archetype = ty->getAs<PackArchetypeType>();
     if (!archetype) {
@@ -680,7 +681,7 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
         return Type(ty);
 
       // Recurse into any other type.
-      return None;
+      return llvm::None;
     }
 
     auto rootArchetype = cast<PackArchetypeType>(archetype->getRoot());
@@ -721,7 +722,7 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   // Map the interface type to the element type by stripping
   // away the isParameterPack bit before mapping type parameters
   // to archetypes.
-  return type.transformRec([&](TypeBase *ty) -> Optional<Type> {
+  return type.transformRec([&](TypeBase *ty) -> llvm::Optional<Type> {
     // We're only directly substituting pack parameters.
     if (!ty->isTypeParameter()) {
       // Don't recurse into nested pack expansions; just map it into
@@ -730,7 +731,7 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
         return mapTypeIntoContext(ty);
 
       // Recurse into any other type.
-      return None;
+      return llvm::None;
     }
 
     // Just do normal mapping for types that are not rooted in
@@ -787,16 +788,19 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   // Map element archetypes to the pack archetypes by converting
   // element types to interface types and adding the isParameterPack
   // bit. Then, map type parameters to archetypes.
-  return type.subst([&](SubstitutableType *type) {
-    auto *genericParam = type->getAs<GenericTypeParamType>();
-    if (!genericParam)
-      return Type();
+  return type.subst(
+      [&](SubstitutableType *type) {
+        auto *genericParam = type->getAs<GenericTypeParamType>();
+        if (!genericParam)
+          return Type();
 
-    if (auto *packParam = packParamForElement[{genericParam}])
-      return substitutions(packParam);
+        if (auto *packParam = packParamForElement[{genericParam}])
+          return substitutions(packParam);
 
-    return substitutions(genericParam);
-  }, LookUpConformanceInSignature(sig.getPointer()));
+        return substitutions(genericParam);
+      },
+      LookUpConformanceInSignature(sig.getPointer()),
+      SubstFlags::PreservePackExpansionLevel);
 }
 
 namespace {

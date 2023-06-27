@@ -103,11 +103,10 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 }
 
 namespace {
-  enum class SearchPathKind : uint8_t {
-    Import = 1 << 0,
-    Framework = 1 << 1,
-    CompilerPlugin = 1 << 2
-  };
+enum class SearchPathKind : uint8_t {
+  Import = 1 << 0,
+  Framework = 1 << 1,
+};
 } // end anonymous namespace
 
 using AssociativityCacheType =
@@ -403,6 +402,9 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
       NextMacroDiscriminator;
 
+  /// Local and closure discriminators per context.
+  llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -416,6 +418,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::FoldingSet<PackType> PackTypes;
     llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
+    llvm::FoldingSet<PackElementType> PackElementTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -430,6 +433,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, InOutType*> InOutTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
+    llvm::DenseMap<void *, PlaceholderType *> PlaceholderTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
     llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
@@ -558,7 +562,7 @@ struct ASTContext::Implementation {
 
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
 
-  Optional<ClangTypeConverter> Converter;
+  llvm::Optional<ClangTypeConverter> Converter;
 
   /// The IRGen specific SIL transforms that have been registered.
   SILTransformCtors IRGenSILPasses;
@@ -689,8 +693,6 @@ ASTContext::ASTContext(
     getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
   for (const auto &framepath : SearchPathOpts.getFrameworkSearchPaths())
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
-  for (StringRef path : SearchPathOpts.getCompilerPluginLibraryPaths())
-    getImpl().SearchPathsSet[path] |= SearchPathKind::CompilerPlugin;
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
@@ -1067,8 +1069,8 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
       /* Note: lookupQualified() will search both the Swift overlay \
        * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
-      M->lookupQualified(M, DeclNameRef(getIdentifier(#NAME)), NL_OnlyTypes, \
-                         decls); \
+      M->lookupQualified(M, DeclNameRef(getIdentifier(#NAME)), SourceLoc(), \
+                         NL_OnlyTypes, decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) \
@@ -1136,6 +1138,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
     M = getLoadedModule(Id_Cxx);
@@ -1331,7 +1334,8 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                 {Id_regexString, Id_version});
   SmallVector<ValueDecl *, 1> results;
   spModule->lookupQualified(getRegexType(), DeclNameRef(name),
-                            NL_IncludeUsableFromInline, results);
+                            SourceLoc(), NL_IncludeUsableFromInline,
+                            results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
   auto subs = regexType->getMemberSubstitutionMap(spModule, foundDecl);
@@ -1391,6 +1395,9 @@ FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
 FuncDecl *
 ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
     auto *func = dyn_cast<FuncDecl>(result);
     if (func &&
@@ -1404,6 +1411,9 @@ ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
 
 AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{nominal},
@@ -1412,6 +1422,9 @@ AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncode
 
 AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{nominal},
@@ -1420,6 +1433,9 @@ AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEnco
 
 AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{nominal},
@@ -1428,6 +1444,9 @@ AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncod
 
 AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDecoder(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{nominal},
@@ -1436,6 +1455,9 @@ AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDe
 
 AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResultHandler(
     NominalTypeDecl *nominal) const {
+  if (!nominal)
+    return nullptr;
+
   return evaluateOrDefault(
       nominal->getASTContext().evaluator,
       GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{nominal},
@@ -1811,9 +1833,8 @@ bool ASTContext::hadError() const {
 
 /// Retrieve the arena from which we should allocate storage for a type.
 static AllocationArena getArena(RecursiveTypeProperties properties) {
-  bool hasTypeVariable = properties.hasTypeVariable();
-  return hasTypeVariable ? AllocationArena::ConstraintSolver
-                         : AllocationArena::Permanent;
+  return properties.isSolverAllocated() ? AllocationArena::ConstraintSolver
+                                        : AllocationArena::Permanent;
 }
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
@@ -1917,7 +1938,7 @@ static void findPath_dfs(ModuleDependencyID X,
   auto node = optionalNode.value();
   assert(optionalNode.has_value() && "Expected cache value for dependency.");
   for (const auto &dep : node->getModuleImports()) {
-    Optional<ModuleDependencyKind> lookupKind = None;
+    llvm::Optional<ModuleDependencyKind> lookupKind = llvm::None;
     // Underlying Clang module needs an explicit lookup to avoid confusing it
     // with the parent Swift module.
     if ((dep == X.first && node->isSwiftModule()) || node->isClangModule())
@@ -2002,12 +2023,10 @@ static void diagnoseScannerFailure(StringRef moduleName,
   }
 }
 
-Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
+llvm::Optional<const ModuleDependencyInfo *> ASTContext::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &delegate,
-    bool optionalDependencyLookup,
-    bool isTestableImport,
-    llvm::Optional<ModuleDependencyID> dependencyOf) {
+    InterfaceSubContextDelegate &delegate, bool optionalDependencyLookup,
+    bool isTestableImport, llvm::Optional<ModuleDependencyID> dependencyOf) {
   // Retrieve the dependencies for this module.
   // Check whether we've cached this result.
   if (auto found =
@@ -2036,10 +2055,10 @@ Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
   if (!optionalDependencyLookup)
     diagnoseScannerFailure(moduleName, Diags, cache,
                            dependencyOf);
-  return None;
+  return llvm::None;
 }
 
-Optional<const ModuleDependencyInfo*>
+llvm::Optional<const ModuleDependencyInfo *>
 ASTContext::getSwiftModuleDependencies(StringRef moduleName,
                                        ModuleDependenciesCache &cache,
                                        InterfaceSubContextDelegate &delegate) {
@@ -2064,10 +2083,10 @@ ASTContext::getSwiftModuleDependencies(StringRef moduleName,
                                                           delegate))
       return dependencies;
   }
-  return None;
+  return llvm::None;
 }
 
-Optional<const ModuleDependencyInfo*>
+llvm::Optional<const ModuleDependencyInfo *>
 ASTContext::getClangModuleDependencies(StringRef moduleName,
                                        ModuleDependenciesCache &cache,
                                        InterfaceSubContextDelegate &delegate) {
@@ -2083,7 +2102,7 @@ ASTContext::getClangModuleDependencies(StringRef moduleName,
                                                           delegate))
       return dependencies;
   }
-  return None;
+  return llvm::None;
 }
 
 namespace {
@@ -2184,6 +2203,18 @@ unsigned ASTContext::getNextMacroDiscriminator(
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
+/// Get the next discriminator within the given declaration context.
+unsigned ASTContext::getNextDiscriminator(const DeclContext *dc) {
+  return getImpl().NextDiscriminator[dc];
+}
+
+/// Set the maximum assigned discriminator within the given declaration context.
+void ASTContext::setMaxAssignedDiscriminator(
+    const DeclContext *dc, unsigned discriminator) {
+  assert(discriminator >= getImpl().NextDiscriminator[dc]);
+  getImpl().NextDiscriminator[dc] = discriminator;
+}
+
 void ASTContext::verifyAllLoadedModules() const {
 #ifndef NDEBUG
   FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
@@ -2273,11 +2304,11 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
   return getRewriteContext().isRecursivelyConstructingRequirementMachine(proto);
 }
 
-Optional<llvm::TinyPtrVector<ValueDecl *>>
+llvm::Optional<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (!decl->LazySemanticInfo.hasOverriddenComputed)
-    return None;
+    return llvm::None;
 
   // If there are no overridden declarations (the common case), return.
   llvm::TinyPtrVector<ValueDecl *> overridden;
@@ -2590,11 +2621,11 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
-Optional<ExternalSourceLocs *>
+llvm::Optional<ExternalSourceLocs *>
 ASTContext::getExternalSourceLocs(const Decl *D) {
   auto Known = getImpl().ExternalSourceLocs.find(D);
   if (Known == getImpl().ExternalSourceLocs.end())
-    return None;
+    return llvm::None;
 
   return Known->second;
 }
@@ -2971,13 +3002,14 @@ void AbstractFunctionDecl::setForeignErrorConvention(
   conventionsMap.insert({this, conv});
 }
 
-Optional<ForeignErrorConvention>
+llvm::Optional<ForeignErrorConvention>
 AbstractFunctionDecl::getForeignErrorConvention() const {
   if (!hasThrows())
-    return None;
+    return llvm::None;
   auto &conventionsMap = getASTContext().getImpl().ForeignErrorConventions;
   auto it = conventionsMap.find(this);
-  if (it == conventionsMap.end()) return None;
+  if (it == conventionsMap.end())
+    return llvm::None;
   return it->second;
 }
 
@@ -2989,21 +3021,23 @@ void AbstractFunctionDecl::setForeignAsyncConvention(
   conventionsMap.insert({this, conv});
 }
 
-Optional<ForeignAsyncConvention>
+llvm::Optional<ForeignAsyncConvention>
 AbstractFunctionDecl::getForeignAsyncConvention() const {
   if (!hasAsync())
-    return None;
+    return llvm::None;
   auto &conventionsMap = getASTContext().getImpl().ForeignAsyncConventions;
   auto it = conventionsMap.find(this);
-  if (it == conventionsMap.end()) return None;
+  if (it == conventionsMap.end())
+    return llvm::None;
   return it->second;
 }
 
-Optional<KnownFoundationEntity> swift::getKnownFoundationEntity(StringRef name){
-  return llvm::StringSwitch<Optional<KnownFoundationEntity>>(name)
+llvm::Optional<KnownFoundationEntity>
+swift::getKnownFoundationEntity(StringRef name) {
+  return llvm::StringSwitch<llvm::Optional<KnownFoundationEntity>>(name)
 #define FOUNDATION_ENTITY(Name) .Case(#Name, KnownFoundationEntity::Name)
 #include "swift/AST/KnownFoundationEntities.def"
-    .Default(None);
+      .Default(llvm::None);
 }
 
 StringRef swift::getSwiftName(KnownFoundationEntity kind) {
@@ -3117,15 +3151,43 @@ Type ErrorType::get(Type originalType) {
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
   RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
-  if (originalProperties.hasTypeVariable())
-    properties |= RecursiveTypeProperties::HasTypeVariable;
+
+  // We need to preserve the solver allocated bit, to ensure any wrapping
+  // types are solver allocated too.
+  if (originalProperties.isSolverAllocated())
+    properties |= RecursiveTypeProperties::SolverAllocated;
+
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
 Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
-  return new (ctx, AllocationArena::Permanent)
-      PlaceholderType(ctx, originator, RecursiveTypeProperties::HasPlaceholder);
+
+  auto originatorProps = [&]() -> RecursiveTypeProperties {
+    if (auto *tv = originator.dyn_cast<TypeVariableType *>())
+      return tv->getRecursiveProperties();
+
+    if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
+      return depTy->getRecursiveProperties();
+
+    return RecursiveTypeProperties();
+  }();
+  auto arena = getArena(originatorProps);
+
+  auto &cache = ctx.getImpl().getArena(arena).PlaceholderTypes;
+  auto &entry = cache[originator.getOpaqueValue()];
+  if (entry)
+    return entry;
+
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasPlaceholder;
+
+  // We need to preserve the solver allocated bit, to ensure any wrapping
+  // types are solver allocated too.
+  if (originatorProps.isSolverAllocated())
+    properties |= RecursiveTypeProperties::SolverAllocated;
+
+  entry = new (ctx, arena) PlaceholderType(ctx, originator, properties);
+  return entry;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -3289,6 +3351,47 @@ PackType *PackType::getEmpty(const ASTContext &C) {
   return cast<PackType>(CanType(C.TheEmptyPackType));
 }
 
+PackElementType::PackElementType(Type packType, unsigned level,
+                                 RecursiveTypeProperties properties,
+                                 const ASTContext *canCtx)
+  : TypeBase(TypeKind::PackElement, canCtx, properties),
+    packType(packType), level(level) {
+  assert(packType->isParameterPack() ||
+         packType->is<PackArchetypeType>() ||
+         packType->is<TypeVariableType>());
+  assert(level > 0);
+}
+
+PackElementType *PackElementType::get(Type packType, unsigned level) {
+  auto properties = packType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  auto &context = packType->getASTContext();
+  llvm::FoldingSetNodeID id;
+  PackElementType::Profile(id, packType, level);
+
+  void *insertPos;
+  if (PackElementType *elementType =
+        context.getImpl().getArena(arena)
+          .PackElementTypes.FindNodeOrInsertPos(id, insertPos))
+    return elementType;
+
+  const ASTContext *canCtx = packType->isCanonical()
+      ? &context : nullptr;
+  PackElementType *elementType =
+      new (context, arena) PackElementType(packType, level, properties,
+                                           canCtx);
+  context.getImpl().getArena(arena).PackElementTypes.InsertNode(elementType,
+                                                                insertPos);
+  return elementType;
+}
+
+void PackElementType::Profile(llvm::FoldingSetNodeID &ID,
+                              Type packType, unsigned level) {
+  ID.AddPointer(packType.getPointer());
+  ID.AddInteger(level);
+}
+
 CanPackType CanPackType::get(const ASTContext &C, ArrayRef<CanType> elements) {
   SmallVector<Type, 8> ncElements(elements.begin(), elements.end());
   return CanPackType(PackType::get(C, ncElements));
@@ -3311,7 +3414,7 @@ CanPackType CanPackType::get(const ASTContext &C,
 }
 
 PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
-  RecursiveTypeProperties properties;
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasConcretePack;
   bool isCanonical = true;
   for (Type eltTy : elements) {
     assert(!eltTy->is<PackType>() &&
@@ -3351,7 +3454,7 @@ void PackType::Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements) {
 
 CanSILPackType SILPackType::get(const ASTContext &C, ExtInfo info,
                                 ArrayRef<CanType> elements) {
-  RecursiveTypeProperties properties;
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasConcretePack;
   for (CanType eltTy : elements) {
     assert(!isa<SILPackType>(eltTy) &&
            "Cannot have pack directly inside another pack");
@@ -3803,7 +3906,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
 AnyMetatypeType::AnyMetatypeType(TypeKind kind, const ASTContext *C,
                                  RecursiveTypeProperties properties,
                                  Type instanceType,
-                                 Optional<MetatypeRepresentation> repr)
+                                 llvm::Optional<MetatypeRepresentation> repr)
     : TypeBase(kind, C, properties), InstanceType(instanceType) {
   if (repr) {
     Bits.AnyMetatypeType.Representation = static_cast<char>(*repr) + 1;
@@ -3812,7 +3915,8 @@ AnyMetatypeType::AnyMetatypeType(TypeKind kind, const ASTContext *C,
   }
 }
 
-MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
+MetatypeType *MetatypeType::get(Type T,
+                                llvm::Optional<MetatypeRepresentation> Repr,
                                 const ASTContext &Ctx) {
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -3835,12 +3939,12 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
 
 MetatypeType::MetatypeType(Type T, const ASTContext *C,
                            RecursiveTypeProperties properties,
-                           Optional<MetatypeRepresentation> repr)
-  : AnyMetatypeType(TypeKind::Metatype, C, properties, T, repr) {
-}
+                           llvm::Optional<MetatypeRepresentation> repr)
+    : AnyMetatypeType(TypeKind::Metatype, C, properties, T, repr) {}
 
 ExistentialMetatypeType *
-ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
+ExistentialMetatypeType::get(Type T,
+                             llvm::Optional<MetatypeRepresentation> repr,
                              const ASTContext &ctx) {
   // If we're creating an existential metatype from an
   // existential type, wrap the constraint type direcly.
@@ -3866,11 +3970,10 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
              T, T->isCanonical() ? &ctx : nullptr, properties, repr);
 }
 
-ExistentialMetatypeType::ExistentialMetatypeType(Type T,
-                                                 const ASTContext *C,
-                                       RecursiveTypeProperties properties,
-                                       Optional<MetatypeRepresentation> repr)
-  : AnyMetatypeType(TypeKind::ExistentialMetatype, C, properties, T, repr) {
+ExistentialMetatypeType::ExistentialMetatypeType(
+    Type T, const ASTContext *C, RecursiveTypeProperties properties,
+    llvm::Optional<MetatypeRepresentation> repr)
+    : AnyMetatypeType(TypeKind::ExistentialMetatype, C, properties, T, repr) {
   if (repr) {
     assert(*repr != MetatypeRepresentation::Thin &&
            "creating a thin existential metatype?");
@@ -3943,7 +4046,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 15,
+  static_assert(RecursiveTypeProperties::BitWidth == 17,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4076,7 +4179,7 @@ static void profileParams(llvm::FoldingSetNodeID &ID,
 
 void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
                            ArrayRef<AnyFunctionType::Param> params, Type result,
-                           Optional<ExtInfo> info) {
+                           llvm::Optional<ExtInfo> info) {
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
   if (info.has_value()) {
@@ -4088,7 +4191,7 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, Optional<ExtInfo> info) {
+                                Type result, llvm::Optional<ExtInfo> info) {
   Type globalActor;
   if (info.has_value())
     globalActor = info->getGlobalActor();
@@ -4150,7 +4253,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
-                           Optional<ExtInfo> info, const ASTContext *ctx,
+                           llvm::Optional<ExtInfo> info, const ASTContext *ctx,
                            RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::Function, ctx, output, properties,
                       params.size(), info) {
@@ -4168,7 +4271,7 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature sig,
                                   ArrayRef<AnyFunctionType::Param> params,
-                                  Type result, Optional<ExtInfo> info) {
+                                  Type result, llvm::Optional<ExtInfo> info) {
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
@@ -4183,7 +4286,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              Optional<ExtInfo> info) {
+                                              llvm::Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
 
   // We do not allow type variables in GenericFunctionTypes. Note that if this
@@ -4241,14 +4344,12 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
 }
 
 GenericFunctionType::GenericFunctionType(
-                       GenericSignature sig,
-                       ArrayRef<AnyFunctionType::Param> params,
-                       Type result,
-                       Optional<ExtInfo> info,
-                       const ASTContext *ctx,
-                       RecursiveTypeProperties properties)
-  : AnyFunctionType(TypeKind::GenericFunction, ctx, result,
-                    properties, params.size(), info), Signature(sig) {
+    GenericSignature sig, ArrayRef<AnyFunctionType::Param> params, Type result,
+    llvm::Optional<ExtInfo> info, const ASTContext *ctx,
+    RecursiveTypeProperties properties)
+    : AnyFunctionType(TypeKind::GenericFunction, ctx, result, properties,
+                      params.size(), info),
+      Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   if (info) {
@@ -4286,17 +4387,11 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
 }
 
 void SILFunctionType::Profile(
-    llvm::FoldingSetNodeID &id,
-    GenericSignature genericParams,
-    ExtInfo info,
-    SILCoroutineKind coroutineKind,
-    ParameterConvention calleeConvention,
-    ArrayRef<SILParameterInfo> params,
-    ArrayRef<SILYieldInfo> yields,
-    ArrayRef<SILResultInfo> results,
-    Optional<SILResultInfo> errorResult,
-    ProtocolConformanceRef conformance,
-    SubstitutionMap patternSubs,
+    llvm::FoldingSetNodeID &id, GenericSignature genericParams, ExtInfo info,
+    SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
+    ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
+    ArrayRef<SILResultInfo> results, llvm::Optional<SILResultInfo> errorResult,
+    ProtocolConformanceRef conformance, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs) {
   id.AddPointer(genericParams.getPointer());
   auto infoKey = info.getFuncAttrKey();
@@ -4325,17 +4420,11 @@ void SILFunctionType::Profile(
 }
 
 SILFunctionType::SILFunctionType(
-    GenericSignature genericSig,
-    ExtInfo ext,
-    SILCoroutineKind coroutineKind,
-    ParameterConvention calleeConvention,
-    ArrayRef<SILParameterInfo> params,
-    ArrayRef<SILYieldInfo> yields,
-    ArrayRef<SILResultInfo> normalResults,
-    Optional<SILResultInfo> errorResult,
-    SubstitutionMap patternSubs,
-    SubstitutionMap invocationSubs,
-    const ASTContext &ctx,
+    GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
+    ParameterConvention calleeConvention, ArrayRef<SILParameterInfo> params,
+    ArrayRef<SILYieldInfo> yields, ArrayRef<SILResultInfo> normalResults,
+    llvm::Optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
+    SubstitutionMap invocationSubs, const ASTContext &ctx,
     RecursiveTypeProperties properties,
     ProtocolConformanceRef witnessMethodConformance)
     : TypeBase(TypeKind::SILFunction, &ctx, properties),
@@ -4541,16 +4630,11 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
 }
 
 CanSILFunctionType SILFunctionType::get(
-    GenericSignature genericSig,
-    ExtInfo ext, SILCoroutineKind coroutineKind,
-    ParameterConvention callee,
-    ArrayRef<SILParameterInfo> params,
-    ArrayRef<SILYieldInfo> yields,
-    ArrayRef<SILResultInfo> normalResults,
-    Optional<SILResultInfo> errorResult,
-    SubstitutionMap patternSubs,
-    SubstitutionMap invocationSubs,
-    const ASTContext &ctx,
+    GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
+    ParameterConvention callee, ArrayRef<SILParameterInfo> params,
+    ArrayRef<SILYieldInfo> yields, ArrayRef<SILResultInfo> normalResults,
+    llvm::Optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
+    SubstitutionMap invocationSubs, const ASTContext &ctx,
     ProtocolConformanceRef witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
@@ -4604,7 +4688,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 15,
+  static_assert(RecursiveTypeProperties::BitWidth == 17,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -4870,7 +4954,7 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
 
 CanTypeWrapper<OpenedArchetypeType>
 OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
-                         Optional<UUID> knownID) {
+                         llvm::Optional<UUID> knownID) {
   assert(existential->isExistentialType());
   auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
       parentSig, existential->getASTContext());
@@ -4880,7 +4964,7 @@ OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
 CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 Type interfaceType,
                                                 GenericSignature parentSig,
-                                                Optional<UUID> knownID) {
+                                                llvm::Optional<UUID> knownID) {
   assert(!interfaceType->hasArchetype() && "must be interface type");
 
   if (!knownID)
@@ -5403,7 +5487,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   if (wasNotFoundInCache ||
       (known->second.getKind() == ForeignRepresentableKind::None &&
        known->second.getGeneration() < CurrentGeneration)) {
-    Optional<ForeignRepresentationInfo> result;
+    llvm::Optional<ForeignRepresentationInfo> result;
 
     // Look for a conformance to _ObjectiveCBridgeable (other than Optional's--
     // we don't want to allow exposing APIs with double-optional types like
@@ -5614,10 +5698,8 @@ ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
   return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
 }
 
-const clang::Type *
-ASTContext::getCanonicalClangFunctionType(
-    ArrayRef<SILParameterInfo> params,
-    Optional<SILResultInfo> result,
+const clang::Type *ASTContext::getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params, llvm::Optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
   auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
@@ -5795,7 +5877,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   }
 
   auto eraseParameterPackRec = [&](Type type) -> Type {
-    return type.transformRec([&](Type t) -> Optional<Type> {
+    return type.transformRec([&](Type t) -> llvm::Optional<Type> {
       if (auto *paramType = t->getAs<GenericTypeParamType>()) {
         if (packElementParams.find(paramType) != packElementParams.end()) {
           return Type(packElementParams[paramType]);
@@ -5803,7 +5885,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
 
         return t;
       }
-      return None;
+      return llvm::None;
     });
   };
 
@@ -6093,7 +6175,7 @@ void ASTContext::setSideCachedPropertyWrapperBackingPropertyType(
 }
 
 VarDecl *VarDecl::getOriginalWrappedProperty(
-    Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
+    llvm::Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 
@@ -6241,29 +6323,9 @@ void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {
   getImpl().Plugins = std::move(loader);
 }
 
-PluginLoader &ASTContext::getPluginLoader() { return *getImpl().Plugins; }
-
-Optional<std::string>
-ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
-  return getImpl().Plugins->lookupLibraryPluginByModuleName(moduleName);
-}
-
-Optional<StringRef>
-ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
-  return getImpl().Plugins->lookupExecutablePluginByModuleName(moduleName);
-}
-
-Optional<std::pair<std::string, std::string>>
-ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
-  return getImpl().Plugins->lookupExternalLibraryPluginByModuleName(moduleName);
-}
-
-LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
-  return getImpl().Plugins->loadLibraryPlugin(path);
-}
-
-LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
-  return getImpl().Plugins->loadExecutablePlugin(path);
+PluginLoader &ASTContext::getPluginLoader() {
+  assert(getImpl().Plugins && "PluginLoader must be setup before using");
+  return *getImpl().Plugins;
 }
 
 Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {

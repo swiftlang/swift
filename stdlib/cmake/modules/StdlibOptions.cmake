@@ -135,7 +135,15 @@ option(SWIFT_STDLIB_BUILD_PRIVATE
        TRUE)
 
 option(SWIFT_STDLIB_HAS_DLADDR
-       "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
+       "Build stdlib assuming the runtime environment provides the dladdr API."
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_DLSYM
+       "Build stdlib assuming the runtime environment provides the dlsym API."
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_FILESYSTEM
+       "Build stdlib assuming the runtime environment has a filesystem."
        TRUE)
 
 option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
@@ -221,10 +229,17 @@ set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     option only affects the standard library and runtime, not tools.")
 
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_TRACING_default TRUE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING_default TRUE)
 else()
+  set(SWIFT_STDLIB_TRACING_default FALSE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING_default FALSE)
 endif()
+
+option(SWIFT_STDLIB_TRACING
+  "Enable tracing in the runtime; assumes the presence of os_log(3)
+   and the os_signpost(3) API."
+  "${SWIFT_STDLIB_TRACING_default}")
 
 option(SWIFT_STDLIB_CONCURRENCY_TRACING
   "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
@@ -239,3 +254,16 @@ set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
   "If set, provides a fixed path to the swift-backtrace binary.  This
    will disable dynamic determination of the path and will also disable
    the setting in SWIFT_BACKTRACE.")
+
+# Use dispatch as the system scheduler by default.
+# For convenience, we set this to false when concurrency is disabled.
+set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
+if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
+endif()
+
+if(SWIFT_CONCURRENCY_USES_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
+    message(SEND_ERROR "Concurrency requires libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+  endif()
+endif()

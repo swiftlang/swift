@@ -233,19 +233,19 @@ public:
 
 private:
   Kind Knd;
-  Optional<RequirementFailureInfo> ReqFailureInfo;
+  llvm::Optional<RequirementFailureInfo> ReqFailureInfo;
 
-  CheckGenericArgumentsResult(Kind Knd,
-                              Optional<RequirementFailureInfo> ReqFailureInfo)
+  CheckGenericArgumentsResult(
+      Kind Knd, llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
       : Knd(Knd), ReqFailureInfo(ReqFailureInfo) {}
 
 public:
   static CheckGenericArgumentsResult createSuccess() {
-    return CheckGenericArgumentsResult(Success, None);
+    return CheckGenericArgumentsResult(Success, llvm::None);
   }
 
   static CheckGenericArgumentsResult createSubstitutionFailure() {
-    return CheckGenericArgumentsResult(SubstitutionFailure, None);
+    return CheckGenericArgumentsResult(SubstitutionFailure, llvm::None);
   }
 
   static CheckGenericArgumentsResult createRequirementFailure(
@@ -459,7 +459,7 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 /// e.g., because of a \c return statement. Otherwise, returns either the
 /// fully type-checked body of the function (on success) or a \c nullptr
 /// value if an error occurred while type checking the transformed body.
-Optional<BraceStmt *> applyResultBuilderBodyTransform(
+llvm::Optional<BraceStmt *> applyResultBuilderBodyTransform(
     FuncDecl *func, Type builderType,
     bool ClosuresInResultBuilderDontParticipateInInference = false);
 
@@ -533,7 +533,11 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 CheckGenericArgumentsResult::Kind
 checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
                       TypeSubstitutionFn substitutions,
-                      SubstOptions options = None);
+                      SubstOptions options = llvm::None);
+
+/// Check the given requirements without applying substitutions.
+CheckGenericArgumentsResult::Kind
+checkGenericArguments(ArrayRef<Requirement> requirements);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
@@ -610,11 +614,11 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
                          constraints::ContextualTypeInfo contextualInfo = {},
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 
-Optional<constraints::SyntacticElementTarget>
+llvm::Optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
                     TypeCheckExprOptions options = TypeCheckExprOptions());
 
-Optional<constraints::SyntacticElementTarget>
+llvm::Optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
                 TypeCheckExprOptions options = TypeCheckExprOptions());
 
@@ -648,8 +652,8 @@ bool typeCheckForCodeCompletion(
 /// Check the key-path expression.
 ///
 /// Returns the type of the last component of the key-path.
-Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                    bool requireResultType = false);
+llvm::Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
+                                          bool requireResultType = false);
 
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
@@ -729,15 +733,26 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
 
+/// Attempt to simplify an ExprPattern into a BoolPattern or
+/// OptionalSomePattern. Returns \c nullptr if the pattern could not be
+/// simplified.
+NullablePtr<Pattern> trySimplifyExprPattern(ExprPattern *EP, Type patternTy);
+
 /// Coerce a pattern to the given type.
 ///
 /// \param pattern The contextual pattern.
 /// \param type the type to coerce the pattern to.
 /// \param options Options that control the coercion.
+/// \param tryRewritePattern A function that attempts to externally rewrite
+/// the given pattern. This is used by the constraint system to take over
+/// rewriting for ExprPatterns.
 ///
 /// \returns the coerced pattern, or nullptr if the coercion failed.
-Pattern *coercePatternToType(ContextualPattern pattern, Type type,
-                             TypeResolutionOptions options);
+Pattern *coercePatternToType(
+    ContextualPattern pattern, Type type, TypeResolutionOptions options,
+    llvm::function_ref<llvm::Optional<Pattern *>(Pattern *, Type)>
+        tryRewritePattern = [](Pattern *, Type) { return llvm::None; });
+
 bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
@@ -899,6 +914,7 @@ LookupResult lookupUnqualifiedType(
 /// \returns The result of name lookup.
 LookupResult
 lookupMember(DeclContext *dc, Type type, DeclNameRef name,
+             SourceLoc loc = SourceLoc(),
              NameLookupOptions options = defaultMemberLookupOptions);
 
 /// Look up a member type within the given type.
@@ -914,6 +930,7 @@ lookupMember(DeclContext *dc, Type type, DeclNameRef name,
 /// \returns The result of name lookup.
 LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
+                 SourceLoc loc = SourceLoc(),
                  NameLookupOptions options = defaultMemberTypeLookupOptions);
 
 /// Given an expression that's known to be an infix operator,
@@ -923,10 +940,6 @@ lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
-
-SmallVector<MacroDecl *, 1>
-lookupMacros(DeclContext *dc, DeclNameRef macroName, SourceLoc loc,
-             MacroRoles contexts);
 
 enum class UnsupportedMemberTypeAccessKind : uint8_t {
   None,
@@ -1063,13 +1076,13 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
-Optional<Diag<>>
+llvm::Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is unavailable or None if this
 /// is allowed.
-Optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+llvm::Optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
 /// Same as \c checkDeclarationAvailability but doesn't give a reason for
 /// unavailability.
@@ -1081,14 +1094,14 @@ bool isDeclarationUnavailable(
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
-Optional<UnavailabilityReason>
+llvm::Optional<UnavailabilityReason>
 checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
 
 /// Checks whether a conformance should be considered unavailable when
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
-Optional<UnavailabilityReason>
+llvm::Optional<UnavailabilityReason>
 checkConformanceAvailability(const RootProtocolConformance *Conf,
                              const ExtensionDecl *Ext,
                              const ExportContext &Where);
@@ -1117,15 +1130,21 @@ void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
                                      const UnavailabilityReason &reason);
 
 void
-diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
-                                          const DeclContext *ReferenceDC,
-                                          const UnavailabilityReason &Reason);
+diagnosePotentialUnavailability(SourceRange ReferenceRange,
+                                Diag<StringRef, llvm::VersionTuple> Diag,
+                                const DeclContext *ReferenceDC,
+                                const UnavailabilityReason &Reason);
 
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 
 /// Type check a single 'distributed func' declaration.
 void checkDistributedFunc(FuncDecl *func);
+
+bool checkAvailability(SourceRange ReferenceRange,
+                       AvailabilityContext Availability,
+                       Diag<StringRef, llvm::VersionTuple> Diag,
+                       const DeclContext *ReferenceDC);
 
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
                                   const DeclContext *ReferenceDC);
@@ -1193,10 +1212,10 @@ bool getDefaultGenericArgumentsString(
         [](const GenericTypeParamDecl *) { return Type(); });
 
 /// Attempt to omit needless words from the name of the given declaration.
-Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+llvm::Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
 /// Attempt to omit needless words from the name of the given declaration.
-Optional<Identifier> omitNeedlessWords(VarDecl *var);
+llvm::Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
 /// Calculate edit distance between declaration names.
 unsigned getCallEditDistance(DeclNameRef writtenName, DeclName correctedName,
@@ -1281,14 +1300,14 @@ void applyAccessNote(ValueDecl *VD);
 /// module of `dc`. If `tangentVectorEqualsSelf` is true, returns true iff
 /// the given type additionally satisfies `Self == Self.TangentVector`.
 bool isDifferentiable(Type type, bool tangentVectorEqualsSelf, DeclContext *dc,
-                      Optional<TypeResolutionStage> stage);
+                      llvm::Optional<TypeResolutionStage> stage);
 
 /// Emits diagnostics if the given function type's parameter/result types are
 /// not compatible with the ext info. Returns whether an error was diagnosed.
 bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
-                                 Optional<FunctionTypeRepr *>repr,
+                                 llvm::Optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
-                                 Optional<TypeResolutionStage> stage);
+                                 llvm::Optional<TypeResolutionStage> stage);
 
 /// Walk the parallel structure of a type with user-provided placeholders and
 /// an inferred type produced by the type checker. Where placeholders can be
@@ -1359,7 +1378,7 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// \c backingStorageType directly and the maximum is the number of attached property wrappers
 /// (which will produce the original property type). If not specified, defaults to the maximum.
 Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
-                             Optional<unsigned> limit = None);
+                             llvm::Optional<unsigned> limit = llvm::None);
 
 /// Compute the projected value type for the given property that has attached
 /// property wrappers when the backing storage is known to have the given type.
@@ -1495,7 +1514,7 @@ diagnoseAttrWithRemovalFixIt(const Decl *D, const DeclAttribute *attr,
 
   auto &Diags = D->getASTContext().Diags;
 
-  Optional<InFlightDiagnostic> diag;
+  llvm::Optional<InFlightDiagnostic> diag;
   if (!attr || !attr->getLocation().isValid())
     diag.emplace(Diags.diagnose(D, std::forward<ArgTypes>(Args)...));
   else

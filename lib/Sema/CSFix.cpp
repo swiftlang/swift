@@ -38,10 +38,10 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
-Optional<ScoreKind> ConstraintFix::impact() const {
+llvm::Optional<ScoreKind> ConstraintFix::impact() const {
   switch (fixBehavior) {
   case FixBehavior::AlwaysWarning:
-    return None;
+    return llvm::None;
 
   case FixBehavior::Error:
     return SK_Fix;
@@ -50,7 +50,7 @@ Optional<ScoreKind> ConstraintFix::impact() const {
     return SK_DisfavoredOverload;
 
   case FixBehavior::Suppress:
-    return None;
+    return llvm::None;
   }
 }
 
@@ -249,10 +249,9 @@ bool MarkGlobalActorFunction::diagnose(const Solution &solution,
 }
 
 /// The fix behavior to apply to a concurrency-related diagnostic.
-static Optional<FixBehavior>
-getConcurrencyFixBehavior(
-    ConstraintSystem &cs, ConstraintKind constraintKind,
-    ConstraintLocatorBuilder locator, bool forSendable) {
+static llvm::Optional<FixBehavior>
+getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
+                          ConstraintLocatorBuilder locator, bool forSendable) {
   // We can only handle the downgrade for conversions.
   switch (constraintKind) {
   case ConstraintKind::Conversion:
@@ -262,7 +261,7 @@ getConcurrencyFixBehavior(
 
   default:
     if (!cs.shouldAttemptFixes())
-      return None;
+      return llvm::None;
 
     return FixBehavior::Error;
   }
@@ -553,7 +552,7 @@ AllowWrappedValueMismatch *AllowWrappedValueMismatch::create(ConstraintSystem &c
 ///
 /// \returns A tuple containing the contextual type purpose, the source type,
 /// and the contextual type.
-static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
+static llvm::Optional<std::tuple<ContextualTypePurpose, Type, Type>>
 getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
   if (auto contextualTypeElt =
           locator->findLast<LocatorPathElt::ContextualType>()) {
@@ -593,7 +592,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
                            solution.getType(assignExpr->getSrc()),
                            solution.getType(assignExpr->getDest())->getRValueType());
   }
-  return None;
+  return llvm::None;
 }
 
 bool AllowTupleTypeMismatch::coalesceAndDiagnose(
@@ -639,7 +638,7 @@ bool AllowTupleTypeMismatch::diagnose(const Solution &solution,
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator,
-                               Optional<unsigned> index) {
+                               llvm::Optional<unsigned> index) {
   return new (cs.getAllocator())
       AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
 }
@@ -1368,19 +1367,24 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
   return failure.diagnose(asNote);
 }
 
-MustBeCopyable::MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator)
+MustBeCopyable::MustBeCopyable(ConstraintSystem &cs,
+                               Type noncopyableTy,
+                               NoncopyableMatchFailure failure,
+                               ConstraintLocator *locator)
     : ConstraintFix(cs, FixKind::MustBeCopyable, locator, FixBehavior::Error),
-      noncopyableTy(noncopyableTy) {}
+      noncopyableTy(noncopyableTy), failure(failure) {}
 
 bool MustBeCopyable::diagnose(const Solution &solution, bool asNote) const {
-  NotCopyableFailure failure(solution, noncopyableTy, getLocator());
-  return failure.diagnose(asNote);
+  NotCopyableFailure failDiag(solution, noncopyableTy, failure, getLocator());
+  return failDiag.diagnose(asNote);
 }
 
 MustBeCopyable* MustBeCopyable::create(ConstraintSystem &cs,
                                               Type noncopyableTy,
+                                              NoncopyableMatchFailure failure,
                                               ConstraintLocator *locator) {
-  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy, locator);
+  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy,
+                                                failure, locator);
 }
 
 bool MustBeCopyable::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
@@ -1934,18 +1938,10 @@ bool AllowNonClassTypeToConvertToAnyObject::diagnose(const Solution &solution,
                                                      bool asNote) const {
   auto *locator = getLocator();
 
-  if (locator->isForContextualType()) {
-    ContextualFailure failure(solution, getFromType(), getToType(), locator);
-    return failure.diagnose(asNote);
-  }
+  NonClassTypeToAnyObjectConversionFailure failure(solution, getFromType(),
+                                                   getToType(), locator);
 
-  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
-                                    locator);
-    return failure.diagnose(asNote);
-  }
-
-  return false;
+  return failure.diagnose(asNote);
 }
 
 AllowNonClassTypeToConvertToAnyObject *
@@ -2088,6 +2084,19 @@ IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
 }
 
+bool IgnoreInvalidPatternInExpr::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  InvalidPatternInExprFailure failure(solution, P, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreInvalidPatternInExpr *
+IgnoreInvalidPatternInExpr::create(ConstraintSystem &cs, Pattern *pattern,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidPatternInExpr(cs, pattern, locator);
+}
+
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
   MissingContextualTypeForNil failure(solution, getLocator());
@@ -2139,9 +2148,10 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
 
 bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
                                           bool asNote) const {
-  // Not being able to infer the type of a pattern should already have been
-  // diagnosed on the pattern's initializer or as a structural issue of the AST.
-  return true;
+  // An unresolved AnyPatternDecl means there was some issue in the match
+  // that means we couldn't infer the pattern. We don't have a diagnostic to
+  // emit here, the failure should be diagnosed by the fix for expression.
+  return false;
 }
 
 IgnoreUnresolvedPatternVar *
@@ -2426,6 +2436,20 @@ bool AllowTupleLabelMismatch::diagnose(const Solution &solution,
   return warning.diagnose(asNote);
 }
 
+AllowAssociatedValueMismatch *
+AllowAssociatedValueMismatch::create(ConstraintSystem &cs, Type fromType,
+                                     Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowAssociatedValueMismatch(cs, fromType, toType, locator);
+}
+
+bool AllowAssociatedValueMismatch::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  AssociatedValueMismatchFailure failure(solution, getFromType(), getToType(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
 bool AllowSwiftToCPointerConversion::diagnose(const Solution &solution,
                                               bool asNote) const {
   SwiftToCPointerConversionInInvalidContext failure(solution, getLocator());
@@ -2462,10 +2486,11 @@ bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
 
 bool AddExplicitExistentialCoercion::isRequired(
     ConstraintSystem &cs, Type resultTy,
-    llvm::function_ref<Optional<Type>(TypeVariableType *)> findExistentialType,
+    llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
+        findExistentialType,
     ConstraintLocatorBuilder locator) {
   using ExistentialTypeFinder =
-      llvm::function_ref<Optional<Type>(TypeVariableType *)>;
+      llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>;
 
   struct CoercionChecker : public TypeWalker {
     bool RequiresCoercion = false;
@@ -2503,6 +2528,12 @@ bool AddExplicitExistentialCoercion::isRequired(
         // associated with its associated types, the call needs a coercion.
         if (erasedMemberTy->isExistentialType() &&
             hasConstrainedAssociatedTypes(member, *existentialType)) {
+          RequiresCoercion = true;
+          return Action::Stop;
+        }
+
+        if (erasedMemberTy->isExistentialType() &&
+             erasedMemberTy->hasTypeParameter()) {
           RequiresCoercion = true;
           return Action::Stop;
         }
@@ -2677,14 +2708,14 @@ bool AddExplicitExistentialCoercion::isRequired(
     ConstraintLocatorBuilder locator) {
   return isRequired(
       cs, resultTy,
-      [&](TypeVariableType *typeVar) -> Optional<Type> {
+      [&](TypeVariableType *typeVar) -> llvm::Optional<Type> {
         auto opened =
             llvm::find_if(openedExistentials, [&typeVar](const auto &entry) {
               return typeVar == entry.first;
             });
 
         if (opened == openedExistentials.end())
-          return None;
+          return llvm::None;
 
         return opened->second->getExistentialType();
       },
@@ -2741,4 +2772,60 @@ AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
                                  Type toType, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowGlobalActorMismatch(cs, fromType, toType, locator);
+}
+
+bool DestructureTupleToMatchPackExpansionParameter::diagnose(
+    const Solution &solution, bool asNote) const {
+  DestructureTupleToUseWithPackExpansionParameter failure(solution, ParamShape,
+                                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+DestructureTupleToMatchPackExpansionParameter *
+DestructureTupleToMatchPackExpansionParameter::create(
+    ConstraintSystem &cs, PackType *paramShapeTy, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DestructureTupleToMatchPackExpansionParameter(cs, paramShapeTy, locator);
+}
+
+bool AllowValueExpansionWithoutPackReferences::diagnose(
+    const Solution &solution, bool asNote) const {
+  ValuePackExpansionWithoutPackReferences failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowValueExpansionWithoutPackReferences *
+AllowValueExpansionWithoutPackReferences::create(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowValueExpansionWithoutPackReferences(cs, locator);
+}
+
+bool IgnoreMissingEachKeyword::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  MissingEachForValuePackReference failure(solution, ValuePackType,
+                                           getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreMissingEachKeyword *
+IgnoreMissingEachKeyword::create(ConstraintSystem &cs, Type valuePackTy,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreMissingEachKeyword(cs, valuePackTy, locator);
+}
+
+bool AllowInvalidMemberReferenceInInitAccessor::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidMemberReferenceWithinInitAccessor failure(solution, MemberName,
+                                                   getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidMemberReferenceInInitAccessor *
+AllowInvalidMemberReferenceInInitAccessor::create(ConstraintSystem &cs,
+                                                  DeclNameRef memberName,
+                                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidMemberReferenceInInitAccessor(cs, memberName, locator);
 }

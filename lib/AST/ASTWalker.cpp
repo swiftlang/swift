@@ -455,21 +455,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
     }
-    // Visit auxiliary decls, which may be decls from macro expansions.
+
     bool alreadyFailed = false;
     if (shouldWalkExpansion) {
-      MED->visitAuxiliaryDecls([&](Decl *decl) {
+      MED->forEachExpandedNode([&](ASTNode expandedNode) {
         if (alreadyFailed) return;
-        alreadyFailed = inherited::visit(decl);
-      });
-      MED->forEachExpandedExprOrStmt([&](ASTNode expandedNode) {
-        if (alreadyFailed) return;
+
         if (auto *expr = expandedNode.dyn_cast<Expr *>()) {
-          if (!doIt(expr))
-            alreadyFailed = true;
+          alreadyFailed = doIt(expr) == nullptr;
         } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
-          if (!doIt(stmt))
-            alreadyFailed = true;
+          alreadyFailed = doIt(stmt) == nullptr;
+        } else {
+          auto decl = expandedNode.get<Decl *>();
+          if (!isa<VarDecl>(decl))
+            alreadyFailed = doIt(decl);
         }
       });
     }
@@ -690,6 +689,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
+
+  Expr *visitCopyExpr(CopyExpr *E) {
+    if (Expr *subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+    return nullptr;
+  }
+
+  Expr *visitConsumeExpr(ConsumeExpr *E) {
+    if (Expr *subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitTupleExpr(TupleExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (E->getElement(i)) {
@@ -1482,7 +1498,7 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        D->isInMacroExpansionInContext())
+        D->isInMacroExpansionInContext() && !Walker.Parent.isNull())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -1655,10 +1671,10 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
-Stmt *Traversal::visitForgetStmt(ForgetStmt *FS) {
-  if (Expr *E = doIt(FS->getSubExpr())) {
-    FS->setSubExpr(E);
-    return FS;
+Stmt *Traversal::visitDiscardStmt(DiscardStmt *DS) {
+  if (Expr *E = doIt(DS->getSubExpr())) {
+    DS->setSubExpr(E);
+    return DS;
   }
   return nullptr;
 }
@@ -2163,6 +2179,10 @@ bool Traversal::visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
+  return false;
+}
+
+bool Traversal::visitSelfTypeRepr(SelfTypeRepr *T) {
   return false;
 }
 

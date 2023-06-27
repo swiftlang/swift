@@ -57,45 +57,13 @@ bool canOpcodeForwardInnerGuaranteedValues(SILValue value);
 /// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardInnerGuaranteedValues(Operand *use);
 
+bool computeIsScoped(SILArgument *arg);
+
+bool computeIsReborrow(SILArgument *arg);
+
 // This is the use-def equivalent of use->getOperandOwnership() ==
 // OperandOwnership::GuaranteedForwarding.
-inline bool isGuaranteedForwarding(SILValue value) {
-  if (value->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    return false;
-  }
-  // NOTE: canOpcodeForwardInnerGuaranteedValues returns true for transformation
-  // terminator results.
-  if (canOpcodeForwardInnerGuaranteedValues(value) ||
-      isa<SILFunctionArgument>(value)) {
-    return true;
-  }
-  // If not a phi, return false
-  auto *phi = dyn_cast<SILPhiArgument>(value);
-  if (!phi || !phi->isPhi()) {
-    return false;
-  }
-  // For a phi, if we find GuaranteedForwarding phi operand on any incoming
-  // path, we return true. Additional verification is added to ensure
-  // GuaranteedForwarding phi operands are found on zero or all paths in the
-  // OwnershipVerifier.
-  bool isGuaranteedForwardingPhi = false;
-  phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *op) -> bool {
-    auto opValue = op->get();
-    assert(opValue->getOwnershipKind().isCompatibleWith(
-        OwnershipKind::Guaranteed));
-    if (canOpcodeForwardInnerGuaranteedValues(opValue) ||
-        isa<SILFunctionArgument>(opValue)) {
-      isGuaranteedForwardingPhi = true;
-      return false;
-    }
-    auto *phi = dyn_cast<SILPhiArgument>(opValue);
-    if (!phi || !phi->isPhi()) {
-      return false;
-    }
-    return true;
-  });
-  return isGuaranteedForwardingPhi;
-}
+bool computeIsGuaranteedForwarding(SILValue value);
 
 /// Is the opcode that produces \p value capable of forwarding owned values?
 ///
@@ -122,13 +90,13 @@ inline bool isForwardingConsume(SILValue value) {
 //                        Ownership Def-Use Utilities
 //===----------------------------------------------------------------------===//
 
-bool hasPointerEscape(BorrowedValue value);
+bool findPointerEscape(BorrowedValue value);
 
 /// Whether the specified OSSA-lifetime introducer has a pointer escape.
 ///
 /// precondition: \p value introduces an OSSA-lifetime, either a BorrowedValue
 /// can be constructed from it or it's an owned value
-bool hasPointerEscape(SILValue value);
+bool findPointerEscape(SILValue value);
 
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
 /// requirement. Return true if no PointerEscape use was found.
@@ -251,7 +219,7 @@ public:
   }
 
   bool preservesOwnership() const {
-    auto &mixin = *OwnershipForwardingMixin::get(use->getUser());
+    auto &mixin = *ForwardingInstruction::get(use->getUser());
     return mixin.preservesOwnership();
   }
 
@@ -523,7 +491,7 @@ public:
                        })) {
         return Kind::Invalid;
       }
-      if (isGuaranteedForwarding(value)) {
+      if (cast<SILArgument>(value)->isGuaranteedForwarding()) {
         return Kind::Invalid;
       }
       return Kind::Phi;

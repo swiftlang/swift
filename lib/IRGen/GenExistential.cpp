@@ -510,15 +510,16 @@ namespace {
       asDerived().emitValueRelease(IGF, value, IGF.getDefaultAtomicity());
     }
 
-    void packIntoEnumPayload(IRGenFunction &IGF,
+    void packIntoEnumPayload(IRGenModule &IGM,
+                             IRBuilder &builder,
                              EnumPayload &payload,
                              Explosion &src,
                              unsigned offset) const override {
-      payload.insertValue(IGF, src.claimNext(), offset);
-      auto wordSize = IGF.IGM.getPointerSize().getValueInBits();
+      payload.insertValue(IGM, builder, src.claimNext(), offset);
+      auto wordSize = IGM.getPointerSize().getValueInBits();
       for (unsigned i = 0; i < getNumStoredProtocols(); ++i) {
         offset += wordSize;
-        payload.insertValue(IGF, src.claimNext(), offset);
+        payload.insertValue(IGM, builder, src.claimNext(), offset);
       }
     }
 
@@ -798,6 +799,7 @@ namespace {
   class Name##ClassExistentialTypeInfo final \
     : public ScalarExistentialTypeInfoBase<Name##ClassExistentialTypeInfo, \
                                            LoadableTypeInfo> { \
+  bool IsOptional; \
   public: \
     Name##ClassExistentialTypeInfo( \
         ArrayRef<const ProtocolDecl *> storedProtocols, \
@@ -807,7 +809,8 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsTriviallyDestroyable,\
-                                      IsCopyable, IsFixedSize) {} \
+                                      IsCopyable, IsFixedSize), \
+        IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
                           SILType T, \
@@ -823,6 +826,25 @@ namespace {
         return IGM.getNativeObjectTypeInfo(); \
       else \
         return IGM.getUnknownObjectTypeInfo(); \
+    } \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
+      return getValueTypeInfoForExtraInhabitants(IGM) \
+                  .getFixedExtraInhabitantCount(IGM) - IsOptional; \
+    } \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
+                                       unsigned bits, \
+                                       unsigned index) const override { \
+      /* Note that we pass down the original bit-width. */ \
+      return getValueTypeInfoForExtraInhabitants(IGM) \
+                  .getFixedExtraInhabitantValue(IGM, bits, \
+                                                index + IsOptional); \
+    } \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, \
+                                         Address src, SILType T, \
+                                         bool isOutlined) const override { \
+      return PointerInfo::forHeapObject(IGF.IGM) \
+        .withNullable(IsNullable_t(IsOptional)) \
+        .getExtraInhabitantIndex(IGF, src); \
     } \
     /* FIXME -- Use REF_STORAGE_HELPER and make */ \
     /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */ \
@@ -1066,7 +1088,8 @@ class ClassExistentialTypeInfo final
           ScalarKind::TriviallyDestroyable));
     }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, T, getBestKnownAlignment().getValue());
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+        alignedGroup, T, getBestKnownAlignment().getValue(), *this);
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them

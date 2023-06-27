@@ -25,16 +25,6 @@ AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) && {
   // When we exit, set the result to be invalidated so we can't use this again.
   SWIFT_DEFER { didInvalidate = true; };
 
-  // If the projectedAddress is dead, it is itself a leaf use. Since we don't
-  // have an operand for it, simply bail. Dead projectedAddress is unexpected.
-  //
-  // TODO: store_borrow is currently an InteriorPointer with no uses, so we end
-  // up bailing. It should be in a dependence scope instead. It's not clear why
-  // it produces an address at all.
-  if (projectedAddress->use_empty()) {
-    return AddressUseKind::PointerEscape;
-  }
-
   StackList<Operand *> worklist(projectedAddress->getFunction());
   SmallPtrSet<Operand *, 32> visitedOperands;
 
@@ -125,7 +115,8 @@ AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) && {
         isa<AssignInst>(user) || isa<LoadUnownedInst>(user) ||
         isa<StoreUnownedInst>(user) || isa<EndApplyInst>(user) ||
         isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
-        isa<AssignByWrapperInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
+        isa<AssignByWrapperInst>(user) || isa<AssignOrInitInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
         isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
@@ -159,7 +150,9 @@ AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) && {
         isa<UncheckedAddrCastInst>(user) || isa<MarkMustCheckInst>(user) ||
         isa<MarkUninitializedInst>(user) || isa<DropDeinitInst>(user) ||
         isa<ProjectBlockStorageInst>(user) || isa<UpcastInst>(user) ||
-        isa<TuplePackElementAddrInst>(user)) {
+        isa<TuplePackElementAddrInst>(user) ||
+        isa<CopyableToMoveOnlyWrapperAddrInst>(user) ||
+        isa<MoveOnlyWrapperToCopyableAddrInst>(user)) {
       transitiveResultUses(op);
       continue;
     }

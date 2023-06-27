@@ -597,13 +597,19 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
           return new (Context)
-              TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
+              TypeExpr(new (Context) SelfTypeRepr(SelfType, Loc));
         }
       }
 
       TypoCorrectionResults corrections(Name, nameLoc);
-      TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                                         lookupOptions, corrections);
+
+      // FIXME: Don't perform typo correction inside macro arguments, because it
+      // will invoke synthesizing declarations in this scope, which will attempt to
+      // expand this macro which leads to circular reference errors.
+      if (!namelookup::isInMacroArgument(DC->getParentSourceFile(), UDRE->getLoc())) {
+        TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
+                                           lookupOptions, corrections);
+      }
 
       if (auto typo = corrections.claimUniqueCorrection()) {
         auto diag = Context.Diags.diagnose(
@@ -1066,8 +1072,24 @@ namespace {
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TypeChecker::checkForForbiddenPrefix(
             getASTContext(), unresolved->getName().getBaseName());
-        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC,
-                                                            UseErrorExprs));
+        auto *refExpr =
+            TypeChecker::resolveDeclRefExpr(unresolved, DC, UseErrorExprs);
+
+        // Check whether this is standalone `self` in init accessor, which
+        // is invalid.
+        if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
+          if (accessor->isInitAccessor() && isa<DeclRefExpr>(refExpr)) {
+            auto *DRE = cast<DeclRefExpr>(refExpr);
+            if (accessor->getImplicitSelfDecl() == DRE->getDecl() &&
+                !isa_and_nonnull<UnresolvedDotExpr>(Parent.getAsExpr())) {
+              Ctx.Diags.diagnose(unresolved->getLoc(),
+                                 diag::invalid_use_of_self_in_init_accessor);
+              refExpr = new (Ctx) ErrorExpr(unresolved->getSourceRange());
+            }
+          }
+        }
+
+        return finish(true, refExpr);
       }
 
       // Let's try to figure out if `InOutExpr` is out of place early
@@ -1395,7 +1417,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // See if the type has a member type with this name.
       auto Result = TypeChecker::lookupMemberType(
           DC, TD->getDeclaredInterfaceType(), Name,
-          defaultMemberLookupOptions);
+          UDE->getLoc(), defaultMemberLookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1488,6 +1510,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (BaseTy->mayHaveMembers()) {
     // See if there is a member type with this name.
     auto Result = TypeChecker::lookupMemberType(DC, BaseTy, Name,
+                                                UDE->getLoc(),
                                                 defaultMemberLookupOptions);
 
     // If there is no nested type with this name, we have a lookup of
@@ -1609,7 +1632,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
         if (callee->getName().getBaseName() ==
             Context.Id_appendInterpolation) {
 
-          Optional<Argument> newArg;
+          llvm::Optional<Argument> newArg;
           if (args->size() > 1) {
             auto *secondArg = args->get(1).getExpr();
             Context.Diags
@@ -1666,7 +1689,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
 
             auto *newArgList =
                 ArgumentList::create(Context, lParen, {*newArg}, rParen,
-                                     /*trailingClosureIdx*/ None,
+                                     /*trailingClosureIdx*/ llvm::None,
                                      /*implicit*/ false);
             E = CallExpr::create(Context, newCallee, newArgList,
                                  /*implicit=*/false);

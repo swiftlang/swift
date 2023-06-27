@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
@@ -63,6 +64,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "Cygwin",
   "Haiku",
   "WASI",
+  "none",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationArches[] = {
@@ -394,42 +396,17 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     return { UnsupportedOS, UnsupportedArch };
 
   // Set the "_endian" platform condition.
-  switch (Target.getArch()) {
-  default: llvm_unreachable("undefined architecture endianness");
-  case llvm::Triple::ArchType::arm:
-  case llvm::Triple::ArchType::thumb:
-  case llvm::Triple::ArchType::aarch64:
-  case llvm::Triple::ArchType::aarch64_32:
-  case llvm::Triple::ArchType::ppc64le:
-  case llvm::Triple::ArchType::wasm32:
-  case llvm::Triple::ArchType::x86:
-  case llvm::Triple::ArchType::x86_64:
-  case llvm::Triple::ArchType::riscv64:
+  if (Target.isLittleEndian()) {
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
-  case llvm::Triple::ArchType::ppc64:
-  case llvm::Triple::ArchType::systemz:
+  } else {
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
-    break;
   }
 
   // Set the "_pointerBitWidth" platform condition.
-  switch (Target.getArch()) {
-  default: llvm_unreachable("undefined architecture pointer bit width");
-  case llvm::Triple::ArchType::arm:
-  case llvm::Triple::ArchType::thumb:
-  case llvm::Triple::ArchType::aarch64_32:
-  case llvm::Triple::ArchType::x86:
-  case llvm::Triple::ArchType::wasm32:
+  if (Target.isArch32Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
-    break;
-  case llvm::Triple::ArchType::aarch64:
-  case llvm::Triple::ArchType::ppc64:
-  case llvm::Triple::ArchType::ppc64le:
-  case llvm::Triple::ArchType::x86_64:
-  case llvm::Triple::ArchType::systemz:
+  } else if (Target.isArch64Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
-    break;
   }
 
   // Set the "runtime" platform condition.
@@ -485,7 +462,7 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
   case Feature::FeatureName: return true;
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)            \
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
   case Feature::FeatureName: return AvailableInProd;
 #include "swift/Basic/Features.def"
   }
@@ -493,21 +470,21 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
 }
 
 llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<Optional<Feature>>(name)
+  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-                   .Default(None);
+      .Default(llvm::None);
 }
 
 llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<Optional<Feature>>(name)
+  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                  \
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-                   .Default(None);
+      .Default(llvm::None);
 }
 
 llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
@@ -516,8 +493,20 @@ llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
-  default: return None;
+  default:
+    return llvm::None;
   }
+}
+
+bool swift::includeInModuleInterface(Feature feature) {
+  switch (feature) {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+  case Feature::FeatureName: return true;
+#define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
+  case Feature::FeatureName: return false;
+#include "swift/Basic/Features.def"
+  }
+  llvm_unreachable("covered switch");
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {

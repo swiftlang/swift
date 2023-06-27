@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature VariadicGenerics
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 func tuplify<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)
@@ -38,8 +36,9 @@ func coerceExpansion<each T>(_ value: repeat each T) {
 
 func localValuePack<each T>(_ t: repeat each T) -> (repeat each T, repeat each T) {
   let local = repeat each t
+  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
   let localAnnotated: repeat each T = repeat each t
-  // expected-error@-1{{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
   return (repeat each local, repeat each localAnnotated)
 }
@@ -50,7 +49,14 @@ protocol P {
   var value: A { get }
 
   func f(_ self: Self) -> Self
+
+  func makeA() -> A
 }
+
+extension P {
+  func makeA() -> [Self] { return [self] }
+}
+
 
 func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
   let _: (repeat (each T.A, U)) = (repeat ((each t).value, u))
@@ -59,18 +65,16 @@ func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
 func sameElement<each T, U>(t: repeat each T, u: U) where repeat each T: P, repeat each T == U {
 // expected-error@-1{{same-element requirements are not yet supported}}
 
-  // FIXME: Opened element archetypes in diagnostics
   let _: (repeat each T) = (repeat (each t).f(u))
-  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'τ_1_0'}}
+  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'each T'}}
 }
 
 func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     where repeat each C: Collection, repeat (each C).Element == U {
     // expected-error@-1{{same-element requirements are not yet supported}}
 
-  // FIXME: Opened element archetypes in diagnostics
   _ = (repeat (each c).forEach(function))
-  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(τ_1_0.Element) throws -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(each C.Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
@@ -83,9 +87,9 @@ func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
 }
 
 func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
-  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
-  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
-  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
+  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
+  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
+  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
 }
 
 func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
@@ -96,28 +100,28 @@ func returnEachPackReference<each T>(_ t: repeat each T) -> each T { // expected
   fatalError()
 }
 
-// expected-error@+1 {{pack type 'T' must be referenced with 'each'}}{{63-63=each }}
+// expected-error@+1 {{type pack 'T' must be referenced with 'each'}}{{63-63=each }}
 func returnRepeatTuple<each T>(_ t: repeat each T) -> (repeat T) {
   fatalError()
 }
 
 // expected-error@+2 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-// expected-error@+1 {{pack type 'T' must be referenced with 'each'}}{{55-55=each }}
+// expected-error@+1 {{type pack 'T' must be referenced with 'each'}}{{55-55=each }}
 func parameterAsPackTypeWithoutExpansion<each T>(_ t: T) {
 }
 
 // expected-error@+2 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-// expected-error@+1 {{pack type 'T' must be referenced with 'each'}}{{57-57=each }}
+// expected-error@+1 {{type pack 'T' must be referenced with 'each'}}{{57-57=each }}
 func returnPackReference<each T>(_ t: repeat each T) -> T {
   fatalError()
 }
 
 func packTypeParameterOutsidePackExpansionType<each T>(_ t: T,
   // expected-error@-1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-  // expected-error@-2 {{pack type 'T' must be referenced with 'each'}}{{61-61=each }}
+  // expected-error@-2 {{type pack 'T' must be referenced with 'each'}}{{61-61=each }}
                                                        _ a: Array<T>) {
   // expected-error@-1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-  // expected-error@-2 {{pack type 'T' must be referenced with 'each'}}{{67-67=each }}
+  // expected-error@-2 {{type pack 'T' must be referenced with 'each'}}{{67-67=each }}
 }
 
 func expansionOfNonPackType<T>(_ t: repeat each T) {}
@@ -126,14 +130,18 @@ func expansionOfNonPackType<T>(_ t: repeat each T) {}
 
 func tupleExpansion<each T, each U>(
   _ tuple1: (repeat each T),
-  _ tuple2: (repeat each U)
+  _ tuple2: (repeat each U),
+  _ tuple3: inout (repeat each T)
 ) {
-  _ = forward(repeat each tuple1.element)
+  _ = forward(repeat each tuple1)
 
-  _ = zip(repeat each tuple1.element, with: repeat each tuple1.element)
+  _ = zip(repeat each tuple1, with: repeat each tuple1)
+  _ = zip(repeat each tuple1, with: repeat each tuple1.element) // legacy syntax
 
-  _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each U' and 'each T' have the same shape}}
+  _ = zip(repeat each tuple1, with: repeat each tuple2)
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'repeat each T' and 'repeat each U' have the same shape}}
+
+  _ = forward(repeat each tuple3)
 }
 
 protocol Generatable {
@@ -240,10 +248,10 @@ func test_pack_expansion_materialization_from_lvalue_base() {
 
     init() {
       self.data = (repeat Data<each T>())
-      _ = (repeat each data.element) // Ok
+      _ = (repeat each data) // Ok
 
       var tmp = (repeat Data<each T>()) // expected-warning {{never mutated}}
-      _ = (repeat each tmp.element) // Ok
+      _ = (repeat each tmp) // Ok
 
       // TODO: Add subscript test-case when syntax is supported.
     }
@@ -271,10 +279,9 @@ func packOutsideExpansion<each T>(_ t: repeat each T) {
 
   let tuple = (repeat each t)
 
-  _ = tuple.element
-  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
+  _ = tuple
 
-  _ = each tuple.element
+  _ = each tuple
   // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 }
 
@@ -327,13 +334,23 @@ func test_pack_expansions_with_closures() {
     takesVariadicFunction { y in fn(x, y) } // Ok
     takesVariadicFunction { y, z in fn(y, z) } // Ok
   }
+
+  // rdar://108977234 - invalid error non-pack type instead of missing `Hashable` conformance
+  func testEscapingCapture<each T>(_ t: repeat each T) -> () -> [AnyHashable] {
+    return {
+      var result = [AnyHashable]()
+      repeat result.append(each t) // expected-error {{argument type 'each T' does not conform to expected type 'Hashable'}}
+      return result
+    }
+  }
 }
 
 // rdar://107151854 - crash on invalid due to specialized pack expansion
-func test_pack_expansion_specialization() {
+func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
-    init(_: repeat each T) {} // expected-note 2 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {} // expected-note 2 {{'init(vals:)' declared here}}
+    init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
+    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
@@ -341,11 +358,28 @@ func test_pack_expansion_specialization() {
   _ = Data<Int, String>(42, "") // Ok
   _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
   _ = Data<Int, String>((42, ""))
-  // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{38-39=}} {{48-49=}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
-  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
+  _ = Data<Int, String, Float>(tuple)
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, tuple)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}} {{39-40=}} {{49-50=}}
+
+  struct Ambiguity<each T> {
+    func test(_: repeat each T) -> Int { 42 }
+    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+    func test(_: repeat each T) -> String { "" }
+    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  }
+
+  _ = Ambiguity<Int, String, Float>().test(tuple) // expected-error {{no exact matches in call to instance method 'test'}}
 }
 
 // rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
@@ -396,4 +430,177 @@ do {
   _ = Defaulted(t: "a", 0, 1.0) // Ok
   _ = Defaulted(t: "b", 0) // Ok
   _ = Defaulted(t: "c", 1.0, u: "d", 0) // Ok
+}
+
+// rdar://108064941 - unused result diagnostic is unaware of Void packs
+func test_no_unused_result_warning(arr: inout [Any]) {
+  func test1<each T>(_ value: (repeat each T)) {
+    repeat arr.append(each value.element) // no warning
+  }
+
+  func test2<each T>(_ value: repeat each T) {
+    ((repeat arr.append(each value))) // no warning
+  }
+}
+
+func test_partually_flattened_expansions() {
+  struct S<each T> {
+    init() {}
+
+    func fn<each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {
+      return (repeat (each t, each u))
+    }
+  }
+
+  _ = S().fn(t: 1, "hi", u: false, 1.0) // Ok
+  _ = S<Int, String>().fn(t: 1, "hi", u: false, 1.0) // Ok
+}
+
+// rdar://109160060 - tuple with pack expansions is not convertible to Any
+do {
+  func test1<each T>(_: repeat (each T).Type) -> (repeat each T) {}
+  print(test1(Int.self, String.self))
+
+  func test2<each T>(_ s: [Any], t: repeat (each T).Type) -> (repeat each T) {
+    var iter = s.makeIterator()
+    return (repeat (iter.next()! as! (each T)))
+  }
+
+  print(test2([]))
+  print(test2([1], t: Int.self))
+  print(test2([1, "hi"], t: Int.self, String.self))
+  print(test2([1, "hi", false], t: Int.self, String.self, Bool.self))
+
+  func test3<each T>(v: Any) -> (Int, repeat each T) {
+    return v // expected-error {{cannot convert return expression of type 'Any' to return type '(Int, repeat each T)'}}
+  }
+}
+
+// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without a type annotation`
+do {
+  func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+    return (repeat (each value).makeA()) // Ok
+  }
+
+  func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+    return (repeat each value.makeA())
+    // expected-error@-1 {{value pack 'each T' must be referenced with 'each'}} {{25-25=(each }} {{30-30=)}}
+  }
+}
+
+// rdar://107835215 - failed to produce a diagnostic for invalid pack expansion expression
+do {
+  func test1(x: Int) {
+    repeat x
+    // expected-error@-1:5 {{value pack expansion must contain at least one pack reference}}
+  }
+
+  func test2<T: Numeric>(_ x: T) {
+    repeat print(x * 2)
+    // expected-error@-1:5 {{value pack expansion must contain at least one pack reference}}
+  }
+
+  struct S<T> {
+    init(_: T) {}
+  }
+
+  func test<each T>(x: repeat each T, y: Int) {
+    func f<each A, each B>(_: repeat each A, y: repeat each B) {}
+    f(repeat each x, y: repeat [S(y)])
+    // expected-error@-1:25 {{value pack expansion must contain at least one pack reference}}
+  }
+}
+
+// missing 'each' keyword before value pack references
+do {
+  func overloaded<each U>(_: String, _: repeat each U) -> Int { 42 }
+  func overloaded<each T>(_: Int, _ b: repeat each T) -> (repeat each T) {
+    fatalError()
+  }
+
+  func test<each T>(v: repeat each T) {
+    _ = (repeat overloaded(42, v)) // expected-error {{value pack 'each T' must be referenced with 'each'}} {{32-32=each }}
+    _ = (repeat overloaded(42, each v)) // Ok
+  }
+}
+
+// rdar://108904190 - top-level 'repeat' not allowed in single-expression closures
+func test_pack_expansion_to_void_conv_for_closure_result<each T>(x: repeat each T) {
+  let _: () -> Void = { repeat print(each x) } // Ok
+  let _: () -> Void = { (repeat print(each x)) } // Ok
+  let _: (Int) -> Void = { repeat ($0, print(each x)) } // expected-warning {{expression of type '/* shape: each T */ repeat (Int, ())' is unused}}
+  let _: (Int, String) -> Void = { ($0, repeat ($1, print(each x))) } // expected-warning {{expression of type '(Int, /* shape: each T */ repeat (String, ()))' is unused}}
+}
+
+// rdar://109539394 - crash on passing multiple variadic lists to singly variadic callee
+do {
+  func test1<each T>(_: repeat each T) {}
+  func test2<each T>(_: repeat each T) where repeat each T: RawRepresentable {} // expected-note {{where 'each T' = 'each T2'}}
+
+  func caller<each T1, each T2>(t1: repeat each T1, t2: repeat each T2) {
+    test1(repeat each t1, repeat each t2) // Ok
+    test2(repeat each t2, repeat each t1) // expected-error {{local function 'test2' requires that 'each T2' conform to 'RawRepresentable'}}
+  }
+}
+
+do {
+  func overloaded<each T>(_ a: Int, _ b: repeat each T) -> (repeat each T) {
+    return (repeat each b)
+  }
+
+  func overloaded() {}
+
+  func test<each T>(_ a: repeat each T) {
+    _ = (repeat overloaded(1, each a))
+  }
+}
+
+func configure<T, each Element>(
+  _ item: T,
+  with configuration: repeat (ReferenceWritableKeyPath<T, each Element>, each Element)
+) -> T {
+  repeat item[keyPath: (each configuration).0] = (each configuration).1
+  return item
+}
+
+// rdar://110819621 - generic parameter is bound before pack expansion type which result in inference failures
+func test_that_expansions_are_bound_early() {
+  struct Data {
+    let prop: Int?
+  }
+
+  struct Value<each T> {
+    init(_ body: (repeat each T) -> Bool) {}
+  }
+
+  func compute<Root, Value>(
+    root: Root,
+    keyPath: KeyPath<Root, Value>,
+    other: Value) -> Bool { true }
+
+  func test_keypath(v: Int) {
+    let _: Value<Data> = Value({
+        compute(
+          root: $0,
+          keyPath: \.prop,
+          other: v
+        )
+      }) // Ok
+
+    let _: Value = Value<Data>({
+        compute(
+          root: $0,
+          keyPath: \.prop,
+          other: v
+        )
+      }) // Ok
+  }
+
+  func equal<Value>(_: Value, _: Value) -> Bool {}
+
+  func test_equality(i: Int) {
+    let _: Value<Data> = Value({
+        equal($0.prop, i) // Ok
+      })
+  }
 }

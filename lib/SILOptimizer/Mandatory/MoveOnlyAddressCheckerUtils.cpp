@@ -225,6 +225,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -278,6 +279,12 @@
 
 using namespace swift;
 using namespace swift::siloptimizer;
+
+llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
+    "move-only-address-checker-disable-lifetime-extension",
+    llvm::cl::init(false),
+    llvm::cl::desc("Disable the lifetime extension of non-consumed fields of "
+                   "move-only values."));
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Memory Utilities
@@ -382,7 +389,25 @@ static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
   }
 }
 
-static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
+static void insertDebugValueBefore(SILInstruction *insertPt,
+                                   DebugVarCarryingInst debugVar,
+                                   llvm::function_ref<SILValue ()> operand) {
+  if (!debugVar) {
+    return;
+  }
+  auto varInfo = debugVar.getVarInfo();
+  if (!varInfo) {
+    return;
+  }
+  SILBuilderWithScope debugInfoBuilder(insertPt);
+  debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
+  debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand(),
+                                    *varInfo, false, true);
+}
+
+static void convertMemoryReinitToInitForm(SILInstruction *memInst,
+                                          DebugVarCarryingInst debugVar) {
+  SILValue dest;
   switch (memInst->getKind()) {
   default:
     llvm_unreachable("unsupported?!");
@@ -390,14 +415,21 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
   case SILInstructionKind::CopyAddrInst: {
     auto *cai = cast<CopyAddrInst>(memInst);
     cai->setIsInitializationOfDest(IsInitialization_t::IsInitialization);
-    return;
+    dest = cai->getDest();
+    break;
   }
   case SILInstructionKind::StoreInst: {
     auto *si = cast<StoreInst>(memInst);
     si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
-    return;
+    dest = si->getDest();
+    break;
   }
   }
+  
+  // Insert a new debug_value instruction after the reinitialization, so that
+  // the debugger knows that the variable is in a usable form again.
+  insertDebugValueBefore(memInst->getNextInstruction(), debugVar,
+                       [&]{ return debugVar.getOperandForDebugValueClone(); });
 }
 
 static bool memInstMustConsume(Operand *memOper) {
@@ -405,6 +437,7 @@ static bool memInstMustConsume(Operand *memOper) {
 
   SILInstruction *memInst = memOper->getUser();
 
+  // FIXME: drop_deinit must be handled here!
   switch (memInst->getKind()) {
   default:
     return false;
@@ -415,7 +448,7 @@ static bool memInstMustConsume(Operand *memOper) {
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
   case SILInstructionKind::ExplicitCopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
+    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
@@ -433,7 +466,7 @@ static bool memInstMustConsume(Operand *memOper) {
       return false;
     ApplySite applySite(pai);
     auto convention = applySite.getArgumentConvention(*memOper);
-    return convention.isInoutConvention();
+    return !convention.isInoutConvention();
   }
   case SILInstructionKind::DestroyAddrInst:
     return true;
@@ -492,6 +525,14 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
   return false;
 }
 
+static bool isCopyableValue(SILValue value) {
+  if (value->getType().isMoveOnly())
+    return false;
+  if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(value))
+    return false;
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                   MARK: Find Candidate Mark Must Checks
 //===----------------------------------------------------------------------===//
@@ -522,12 +563,20 @@ namespace {
 struct UseState {
   MarkMustCheckInst *address;
 
+  llvm::Optional<unsigned> cachedNumSubelements;
+
+  /// The blocks that consume fields of the value.
+  ///
+  /// A map from blocks to a bit vector recording which fields were destroyed
+  /// in each.
+  llvm::SmallMapVector<SILBasicBlock *, SmallBitVector, 8> consumingBlocks;
+
   /// A map from destroy_addr to the part of the type that it destroys.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> destroys;
 
   /// A map from a liveness requiring use to the part of the type that it
   /// requires liveness for.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> livenessUses;
+  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> livenessUses;
 
   /// A map from a load [copy] or load [take] that we determined must be
   /// converted to a load_borrow to the part of the type tree that it needs to
@@ -579,6 +628,9 @@ struct UseState {
   /// [assign] that are reinits that we will convert to inits and true reinits.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> reinitInsts;
 
+  /// The set of drop_deinits of this mark_must_check
+  SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
+
   /// A "inout terminator use" is an implicit liveness use of the entire value
   /// placed on a terminator. We use this both so we add liveness for the
   /// terminator user and so that we can use the set to quickly identify later
@@ -593,6 +645,34 @@ struct UseState {
 
   SILFunction *getFunction() const { return address->getFunction(); }
 
+  /// The number of fields in the exploded type.
+  unsigned getNumSubelements() {
+    if (!cachedNumSubelements) {
+      cachedNumSubelements = TypeSubElementCount(address);
+    }
+    return *cachedNumSubelements;
+  }
+
+  SmallBitVector &getOrCreateLivenessUse(SILInstruction *inst) {
+    auto iter = livenessUses.find(inst);
+    if (iter == livenessUses.end()) {
+      iter = livenessUses.insert({inst, SmallBitVector(getNumSubelements())})
+                 .first;
+    }
+    return iter->second;
+  }
+
+  void recordLivenessUse(SILInstruction *inst, SmallBitVector const &bits) {
+    getOrCreateLivenessUse(inst) |= bits;
+  }
+
+  void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    auto &bits = getOrCreateLivenessUse(inst);
+    for (auto element : range.getRange()) {
+      bits.set(element);
+    }
+  }
+
   /// Returns true if this is a terminator instruction that although it doesn't
   /// use our inout argument directly is used by the pass to ensure that we
   /// reinit said argument if we consumed it in the body of the function.
@@ -600,8 +680,35 @@ struct UseState {
     return inoutTermUsers.count(inst);
   }
 
+  /// Returns true if the given instruction is within the same block as a reinit
+  /// and precedes a reinit instruction in that block.
+  bool precedesReinitInSameBlock(SILInstruction *inst) const {
+    SILBasicBlock *block = inst->getParent();
+    SmallSetVector<SILInstruction *, 8> sameBlockReinits;
+
+    // First, search for all reinits that are within the same block.
+    for (auto &reinit : reinitInsts) {
+      if (reinit.first->getParent() != block)
+        continue;
+      sameBlockReinits.insert(reinit.first);
+    }
+
+    if (sameBlockReinits.empty())
+      return false;
+
+    // Walk down from the given instruction to see if we encounter a reinit.
+    for (auto ii = std::next(inst->getIterator()); ii != block->end(); ++ii) {
+      if (sameBlockReinits.contains(&*ii))
+        return true;
+    }
+
+    return false;
+  }
+
   void clear() {
     address = nullptr;
+    cachedNumSubelements = llvm::None;
+    consumingBlocks.clear();
     destroys.clear();
     livenessUses.clear();
     borrows.clear();
@@ -609,6 +716,7 @@ struct UseState {
     takeInsts.clear();
     initInsts.clear();
     reinitInsts.clear();
+    dropDeinitInsts.clear();
     inoutTermUsers.clear();
     debugValue = nullptr;
   }
@@ -643,6 +751,10 @@ struct UseState {
     for (auto pair : reinitInsts) {
       llvm::dbgs() << *pair.first;
     }
+    llvm::dbgs() << "DropDeinits:\n";
+    for (auto *inst : dropDeinitInsts) {
+      llvm::dbgs() << *inst;
+    }
     llvm::dbgs() << "InOut Term Users:\n";
     for (auto *inst : inoutTermUsers) {
       llvm::dbgs() << *inst;
@@ -651,6 +763,16 @@ struct UseState {
     if (debugValue) {
       llvm::dbgs() << *debugValue;
     }
+  }
+
+  void recordConsumingBlock(SILBasicBlock *block, TypeTreeLeafTypeRange range) {
+    auto iter = consumingBlocks.find(block);
+    if (iter == consumingBlocks.end()) {
+      iter =
+          consumingBlocks.insert({block, SmallBitVector(getNumSubelements())})
+              .first;
+    }
+    range.setBits(iter->second);
   }
 
   void
@@ -702,7 +824,7 @@ struct UseState {
     {
       auto iter = livenessUses.find(inst);
       if (iter != livenessUses.end()) {
-        if (span.setIntersection(iter->second))
+        if (span.intersects(iter->second))
           return true;
       }
     }
@@ -752,8 +874,98 @@ struct UseState {
 
 } // namespace
 
+//===----------------------------------------------------------------------===//
+//                       MARK: Partial Apply Utilities
+//===----------------------------------------------------------------------===//
+
+static bool findNonEscapingPartialApplyUses(PartialApplyInst *pai,
+                                            TypeTreeLeafTypeRange leafRange,
+                                            UseState &useState) {
+  StackList<Operand *> worklist(pai->getFunction());
+  for (auto *use : pai->getUses())
+    worklist.push_back(use);
+
+  LLVM_DEBUG(llvm::dbgs() << "Searching for partial apply uses!\n");
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+
+    if (use->isTypeDependent())
+      continue;
+
+    auto *user = use->getUser();
+
+    // These instructions do not cause us to escape.
+    if (isIncidentalUse(user) || isa<DestroyValueInst>(user))
+      continue;
+
+    // Look through these instructions.
+    if (isa<BeginBorrowInst>(user) || isa<CopyValueInst>(user) ||
+        isa<MoveValueInst>(user) ||
+        // If we capture this partial_apply in another partial_apply, then we
+        // know that said partial_apply must not have escaped the value since
+        // otherwise we could not have an inout_aliasable argument or be
+        // on_stack. Process it recursively so that we treat uses of that
+        // partial_apply and applies of that partial_apply as uses of our
+        // partial_apply.
+        //
+        // We have this separately from the other look through sections so that
+        // we can make it clearer what we are doing here.
+        isa<PartialApplyInst>(user) ||
+        // Likewise with convert_function. Any valid function conversion that
+        // doesn't prevent stack promotion of the closure must retain the
+        // invariants on its transitive uses.
+        isa<ConvertFunctionInst>(user)) {
+      for (auto *use : cast<SingleValueInstruction>(user)->getUses())
+        worklist.push_back(use);
+      continue;
+    }
+
+    // If we have a mark_dependence and are the value, look through the
+    // mark_dependence.
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      if (mdi->getValue() == use->get()) {
+        for (auto *use : mdi->getUses())
+          worklist.push_back(use);
+        continue;
+      }
+    }
+
+    if (auto apply = FullApplySite::isa(user)) {
+      // If we apply the function or pass the function off to an apply, then we
+      // need to treat the function application as a liveness use of the
+      // variable since if the partial_apply is invoked within the function
+      // application, we may access the captured variable.
+      useState.recordLivenessUse(user, leafRange);
+      if (apply.beginsCoroutineEvaluation()) {
+        // If we have a coroutine, we need to treat the abort_apply and
+        // end_apply as liveness uses since once we execute one of those
+        // instructions, we have returned control to the coroutine which means
+        // that we could then access the captured variable again.
+        auto *bai = cast<BeginApplyInst>(user);
+        SmallVector<EndApplyInst *, 4> endApplies;
+        SmallVector<AbortApplyInst *, 4> abortApplies;
+        bai->getCoroutineEndPoints(endApplies, abortApplies);
+        for (auto *eai : endApplies)
+          useState.recordLivenessUse(eai, leafRange);
+        for (auto *aai : abortApplies)
+          useState.recordLivenessUse(aai, leafRange);
+      }
+      continue;
+    }
+
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "Found instruction we did not understand... returning false!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Instruction: " << *user);
+    return false;
+  }
+
+  return true;
+}
+
 void UseState::initializeLiveness(
     FieldSensitiveMultiDefPrunedLiveRange &liveness) {
+  assert(liveness.getNumSubElements() == getNumSubelements());
   // We begin by initializing all of our init uses.
   for (auto initInstAndValue : initInsts) {
     LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
@@ -774,30 +986,36 @@ void UseState::initializeLiveness(
   // Then check if our markedValue is from an argument that is in,
   // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
   // the initialization point.
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(address->getOperand())) {
-    switch (fArg->getArgumentConvention()) {
-    case swift::SILArgumentConvention::Indirect_In:
-    case swift::SILArgumentConvention::Indirect_In_Guaranteed:
-    case swift::SILArgumentConvention::Indirect_Inout:
-    case swift::SILArgumentConvention::Indirect_InoutAliasable:
-      // We need to add our address to the initInst array to make sure that
-      // later invariants that we assert upon remain true.
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found in/in_guaranteed/inout/inout_aliasable argument as "
-                    "an init... adding mark_must_check as init!\n");
-      initInsts.insert({address, liveness.getTopLevelSpan()});
-      liveness.initializeDef(address, liveness.getTopLevelSpan());
-      break;
-    case swift::SILArgumentConvention::Indirect_Out:
-      llvm_unreachable("Should never have out addresses here");
-    case swift::SILArgumentConvention::Direct_Owned:
-    case swift::SILArgumentConvention::Direct_Unowned:
-    case swift::SILArgumentConvention::Direct_Guaranteed:
-    case swift::SILArgumentConvention::Pack_Inout:
-    case swift::SILArgumentConvention::Pack_Guaranteed:
-    case swift::SILArgumentConvention::Pack_Owned:
-    case swift::SILArgumentConvention::Pack_Out:
-      llvm_unreachable("Working with addresses");
+  {
+    SILValue operand = address->getOperand();
+    if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
+      operand = c->getOperand();
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
+      switch (fArg->getArgumentConvention()) {
+      case swift::SILArgumentConvention::Indirect_In:
+      case swift::SILArgumentConvention::Indirect_In_Guaranteed:
+      case swift::SILArgumentConvention::Indirect_Inout:
+      case swift::SILArgumentConvention::Indirect_InoutAliasable:
+        // We need to add our address to the initInst array to make sure that
+        // later invariants that we assert upon remain true.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Found in/in_guaranteed/inout/inout_aliasable argument as "
+               "an init... adding mark_must_check as init!\n");
+        initInsts.insert({address, liveness.getTopLevelSpan()});
+        liveness.initializeDef(address, liveness.getTopLevelSpan());
+        break;
+      case swift::SILArgumentConvention::Indirect_Out:
+        llvm_unreachable("Should never have out addresses here");
+      case swift::SILArgumentConvention::Direct_Owned:
+      case swift::SILArgumentConvention::Direct_Unowned:
+      case swift::SILArgumentConvention::Direct_Guaranteed:
+      case swift::SILArgumentConvention::Pack_Inout:
+      case swift::SILArgumentConvention::Pack_Guaranteed:
+      case swift::SILArgumentConvention::Pack_Owned:
+      case swift::SILArgumentConvention::Pack_Out:
+        llvm_unreachable("Working with addresses");
+      }
     }
   }
 
@@ -857,6 +1075,8 @@ void UseState::initializeLiveness(
   // Now at this point, we have defined all of our defs so we can start adding
   // uses to the liveness.
   for (auto reinitInstAndValue : reinitInsts) {
+    recordConsumingBlock(reinitInstAndValue.first->getParent(),
+                         reinitInstAndValue.second);
     if (!isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
       liveness.updateForUse(reinitInstAndValue.first, reinitInstAndValue.second,
                             false /*lifetime ending*/);
@@ -871,6 +1091,8 @@ void UseState::initializeLiveness(
   for (auto takeInstAndValue : takeInsts) {
     liveness.updateForUse(takeInstAndValue.first, takeInstAndValue.second,
                           true /*lifetime ending*/);
+    recordConsumingBlock(takeInstAndValue.first->getParent(),
+                         takeInstAndValue.second);
     LLVM_DEBUG(llvm::dbgs()
                    << "Added liveness for take: " << *takeInstAndValue.first;
                liveness.print(llvm::dbgs()));
@@ -878,9 +1100,16 @@ void UseState::initializeLiveness(
   for (auto copyInstAndValue : copyInsts) {
     liveness.updateForUse(copyInstAndValue.first, copyInstAndValue.second,
                           true /*lifetime ending*/);
+    recordConsumingBlock(copyInstAndValue.first->getParent(),
+                         copyInstAndValue.second);
     LLVM_DEBUG(llvm::dbgs()
                    << "Added liveness for copy: " << *copyInstAndValue.first;
                liveness.print(llvm::dbgs()));
+  }
+
+  for (auto destroyInstAndValue : destroys) {
+    recordConsumingBlock(destroyInstAndValue.first->getParent(),
+                         destroyInstAndValue.second);
   }
 
   // Do the same for our borrow and liveness insts.
@@ -991,9 +1220,8 @@ namespace {
 
 struct ConsumeInfo {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
-  llvm::MapVector<
-      SILBasicBlock *,
-      SmallVector<std::pair<SILInstruction *, TypeTreeLeafTypeRange>, 1>>
+  llvm::MapVector<SILBasicBlock *,
+                  SmallVector<std::pair<SILInstruction *, SmallBitVector>, 1>>
       finalBlockConsumes;
 
   bool isFrozen = false;
@@ -1008,8 +1236,7 @@ public:
         if (!inst)
           continue;
         os << "Inst: " << *inst;
-        os << "Range: ";
-        instRangePairVector.second.dump();
+        os << "Range: " << instRangePairVector.second;
         os << '\n';
       }
     }
@@ -1032,13 +1259,15 @@ public:
     return foundAny;
   }
 
-  void recordFinalConsume(SILInstruction *inst, TypeTreeLeafTypeRange span) {
+  void recordFinalConsume(SILInstruction *inst, SmallBitVector const &bits) {
     assert(!isFrozen);
-    auto iter = finalBlockConsumes.insert({inst->getParent(), {{inst, span}}});
-    if (iter.second)
-      return;
+    auto *block = inst->getParent();
+    auto iter = finalBlockConsumes.find(block);
+    if (iter == finalBlockConsumes.end()) {
+      iter = finalBlockConsumes.insert({block, {}}).first;
+    }
     LLVM_DEBUG(llvm::dbgs() << "Recorded Final Consume: " << *inst);
-    iter.first->second.emplace_back(inst, span);
+    iter->second.emplace_back(inst, bits);
   }
 
   void finishRecordingFinalConsumes() {
@@ -1046,8 +1275,8 @@ public:
     for (auto &pair : finalBlockConsumes) {
       llvm::stable_sort(
           pair.second,
-          [](const std::pair<SILInstruction *, TypeTreeLeafTypeRange> &lhs,
-             const std::pair<SILInstruction *, TypeTreeLeafTypeRange> &rhs) {
+          [](const std::pair<SILInstruction *, SmallBitVector> &lhs,
+             const std::pair<SILInstruction *, SmallBitVector> &rhs) {
             return lhs.first < rhs.first;
           });
     }
@@ -1063,7 +1292,7 @@ public:
   // operands.
   //
   // Can only be used once frozen.
-  bool claimConsume(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+  bool claimConsume(SILInstruction *inst, SmallBitVector const &bits) {
     assert(isFrozen);
 
     bool claimedConsume = false;
@@ -1071,7 +1300,7 @@ public:
     auto &iter = finalBlockConsumes[inst->getParent()];
     for (unsigned i : indices(iter)) {
       auto &instRangePair = iter[i];
-      if (instRangePair.first == inst && instRangePair.second == range) {
+      if (instRangePair.first == inst && instRangePair.second == bits) {
         instRangePair.first = nullptr;
         claimedConsume = true;
         LLVM_DEBUG(llvm::dbgs() << "Claimed consume: " << *inst);
@@ -1151,10 +1380,55 @@ struct MoveOnlyAddressCheckerPImpl {
                                 FieldSensitiveMultiDefPrunedLiveRange &liveness,
                                 FieldSensitivePrunedLivenessBoundary &boundary);
 
-  void rewriteUses(FieldSensitiveMultiDefPrunedLiveRange &liveness,
+  void rewriteUses(MarkMustCheckInst *markedValue,
+                   FieldSensitiveMultiDefPrunedLiveRange &liveness,
                    const FieldSensitivePrunedLivenessBoundary &boundary);
 
+  /// Identifies and diagnoses reinitializations that are reachable from a
+  /// discard statement.
+  void checkForReinitAfterDiscard();
+
   void handleSingleBlockDestroy(SILInstruction *destroy, bool isReinit);
+};
+
+class ExtendUnconsumedLiveness {
+  UseState addressUseState;
+  FieldSensitiveMultiDefPrunedLiveRange &liveness;
+  FieldSensitivePrunedLivenessBoundary &boundary;
+
+  enum class DestroyKind {
+    Destroy,
+    Take,
+    Reinit,
+  };
+  using DestroysCollection =
+      llvm::SmallMapVector<SILInstruction *, DestroyKind, 8>;
+  using ConsumingBlocksCollection = SmallPtrSetVector<SILBasicBlock *, 8>;
+
+public:
+  ExtendUnconsumedLiveness(UseState addressUseState,
+                           FieldSensitiveMultiDefPrunedLiveRange &liveness,
+                           FieldSensitivePrunedLivenessBoundary &boundary)
+      : addressUseState(addressUseState), liveness(liveness),
+        boundary(boundary) {}
+
+  void run();
+
+  void runOnField(unsigned element, DestroysCollection &destroys,
+                  ConsumingBlocksCollection &consumingBlocks);
+
+private:
+  bool hasDefAfter(SILInstruction *inst, unsigned element);
+  bool isLiveAtBegin(SILBasicBlock *block, unsigned element, bool isLiveAtEnd,
+                     DestroysCollection const &destroys);
+
+  bool
+  shouldAddDestroyToLiveness(SILInstruction *destroy, unsigned element,
+                             BasicBlockSet const &consumedAtExitBlocks,
+                             BasicBlockSetVector const &consumedAtEntryBlocks);
+
+  void addPreviousInstructionToLiveness(SILInstruction *inst, unsigned element,
+                                        bool lifetimeEnding);
 };
 
 } // namespace
@@ -1165,15 +1439,49 @@ struct MoveOnlyAddressCheckerPImpl {
 
 namespace {
 
+struct CopiedLoadBorrowEliminationState {
+  SILFunction *fn;
+  StackList<LoadBorrowInst *> targets;
+
+  CopiedLoadBorrowEliminationState(SILFunction *fn) : fn(fn), targets(fn) {}
+
+  void process() {
+    if (targets.empty())
+      return;
+
+    while (!targets.empty()) {
+      auto *lbi = targets.pop_back_val();
+      SILBuilderWithScope builder(lbi);
+      SILValue li = builder.emitLoadValueOperation(
+          lbi->getLoc(), lbi->getOperand(), LoadOwnershipQualifier::Copy);
+      SILValue borrow = builder.createBeginBorrow(lbi->getLoc(), li);
+
+      for (auto *ebi : lbi->getEndBorrows()) {
+        auto *next = ebi->getNextInstruction();
+        SILBuilderWithScope builder(next);
+        auto loc = RegularLocation::getAutoGeneratedLocation();
+        builder.emitDestroyValueOperation(loc, li);
+      }
+
+      lbi->replaceAllUsesWith(borrow);
+      lbi->eraseFromParent();
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump Start! ";
+               fn->print(llvm::dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump End!\n");
+  }
+};
+
 /// An early transform that we run to convert any load_borrow that are copied
 /// directly or that have any subelement that is copied to a load [copy]. This
 /// lets the rest of the optimization handle these as appropriate.
 struct CopiedLoadBorrowEliminationVisitor final
     : public TransitiveAddressWalker {
-  SILFunction *fn;
-  StackList<LoadBorrowInst *> targets;
+  CopiedLoadBorrowEliminationState &state;
 
-  CopiedLoadBorrowEliminationVisitor(SILFunction *fn) : fn(fn), targets(fn) {}
+  CopiedLoadBorrowEliminationVisitor(CopiedLoadBorrowEliminationState &state)
+      : state(state) {}
 
   bool visitUse(Operand *op) override {
     LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim visiting ";
@@ -1207,7 +1515,7 @@ struct CopiedLoadBorrowEliminationVisitor final
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
         if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
-          if (cvi->getOperand()->getType().isMoveOnly()) {
+          if (!isCopyableValue(cvi->getOperand())) {
             shouldConvertToLoadCopy = true;
             break;
           }
@@ -1259,35 +1567,8 @@ struct CopiedLoadBorrowEliminationVisitor final
     if (!shouldConvertToLoadCopy)
       return true;
 
-    targets.push_back(lbi);
+    state.targets.push_back(lbi);
     return true;
-  }
-
-  void process() {
-    if (targets.empty())
-      return;
-
-    while (!targets.empty()) {
-      auto *lbi = targets.pop_back_val();
-      SILBuilderWithScope builder(lbi);
-      SILValue li = builder.emitLoadValueOperation(
-          lbi->getLoc(), lbi->getOperand(), LoadOwnershipQualifier::Copy);
-      SILValue borrow = builder.createBeginBorrow(lbi->getLoc(), li);
-
-      for (auto *ebi : lbi->getEndBorrows()) {
-        auto *next = ebi->getNextInstruction();
-        SILBuilderWithScope builder(next);
-        auto loc = RegularLocation::getAutoGeneratedLocation();
-        builder.emitDestroyValueOperation(loc, li);
-      }
-
-      lbi->replaceAllUsesWith(borrow);
-      lbi->eraseFromParent();
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump Start! ";
-               fn->print(llvm::dbgs()));
-    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump End!\n");
   }
 };
 
@@ -1311,6 +1592,12 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
   auto targetType = use->get()->getType();
   auto iterType = rootAddress->getType();
   TypeOffsetSizePair iterPair(iterType, fn);
+
+  // If our rootAddress is moveonlywrapped, then we know that it must be
+  // copyable under the hood meanign that we copy its fields rather than
+  // destructure the fields.
+  if (iterType.isMoveOnlyWrapped())
+    return;
 
   while (iterType != targetType) {
     // If we have a nominal type as our parent type, see if it has a
@@ -1354,7 +1641,6 @@ struct GatherUsesVisitor final : public TransitiveAddressWalker {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkMustCheckInst *markedValue;
-  bool emittedEarlyDiagnostic = false;
   DiagnosticEmitter &diagnosticEmitter;
 
   // Pruned liveness used to validate that load [take]/load [copy] can be
@@ -1511,25 +1797,39 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
-    if (markedValue->getCheckKind() ==
-        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found mark must check [nocopy] error: " << *user);
-      diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
-      emittedEarlyDiagnostic = true;
-      return true;
-    }
-
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
+
+    // If we have a non-move only type, just treat this as a liveness use.
+    if (isCopyableValue(copyAddr->getSrc())) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found copy of copyable type. Treating as liveness use! "
+                 << *user);
+      useState.recordLivenessUse(user, *leafRange);
+      return true;
+    }
+
+    if (markedValue->getCheckKind() ==
+        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
+      if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found mark must check [nocopy] use of escaping box: " << *user);
+        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
+            markedValue);
+        return true;
+      }
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found mark must check [nocopy] error: " << *user);
+      diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
+      return true;
+    }
 
     // TODO: Add borrow checking here like below.
 
     // TODO: Add destructure deinit checking here once address only checking is
     // completely brought up.
-
-    // TODO: Add check here that we don't error on trivial/copyable types.
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -1554,11 +1854,11 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // trivial load. If it is, then we just treat this as a liveness requiring
     // use.
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial ||
-        !li->getType().isMoveOnly()) {
+        isCopyableValue(li)) {
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
       if (!leafRange)
         return false;
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
 
@@ -1578,7 +1878,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                  .didEmitCheckerDoesntUnderstandDiagnostic());
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to perform borrow to destructure transform!\n");
-      emittedEarlyDiagnostic = true;
       return false;
     }
 
@@ -1586,7 +1885,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // mark that we emitted an early diagnostic and return true.
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
@@ -1607,13 +1905,18 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
     // Canonicalize the lifetime of the load [take], load [copy].
     LLVM_DEBUG(llvm::dbgs() << "Running copy propagation!\n");
     moveChecker.changed |= moveChecker.canonicalizer.canonicalize();
+
+    // Export the drop_deinit's discovered by the ObjectChecker into the
+    // AddressChecker to preserve it for later use. We need to do this since
+    // the ObjectChecker's state gets cleared after running on this LoadInst.
+    for (auto *dropDeinit : moveChecker.canonicalizer.getDropDeinitUses())
+      moveChecker.addressUseState.dropDeinitInsts.insert(dropDeinit);
 
     // If we are asked to perform no_consume_or_assign checking or
     // assignable_but_not_consumable checking, if we found any consumes of our
@@ -1625,14 +1928,18 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                    << "Found mark must check [nocopy] error: " << *user);
         auto *fArg = dyn_cast<SILFunctionArgument>(
             stripAccessMarkers(markedValue->getOperand()));
-        if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
-          moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
-              markedValue, fArg);
+        // If we have a closure captured that we specialized, we should have a
+        // no consume or assign and should emit a normal guaranteed diagnostic.
+        if (fArg && fArg->isClosureCapture() &&
+            fArg->getArgumentConvention().isInoutConvention()) {
+          assert(checkKind == MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
         } else {
+          // Otherwise, we need to emit an escaping closure error.
           moveChecker.diagnosticEmitter
               .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
         }
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1646,7 +1953,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
       if (checkForExclusivityHazards(li)) {
         LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1660,7 +1966,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                                  "since they will become end_borrows.\n");
       for (auto *consumeUse : li->getConsumingUses()) {
         auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-        useState.livenessUses.insert({dvi, *leafRange});
+        useState.recordLivenessUse(dvi, *leafRange);
       }
 
       return true;
@@ -1679,7 +1985,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       // succeeded.
       // Otherwise, emit the diagnostic.
       moveChecker.diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
-      emittedEarlyDiagnostic = true;
       LLVM_DEBUG(llvm::dbgs() << "Emitted early object level diagnostic.\n");
       return true;
     }
@@ -1688,7 +1993,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
       if (checkForExclusivityHazards(li)) {
         LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1701,7 +2005,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                                  "since they will become end_borrows.\n");
       for (auto *consumeUse : li->getConsumingUses()) {
         auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-        useState.livenessUses.insert({dvi, *leafRange});
+        useState.recordLivenessUse(dvi, *leafRange);
       }
     } else {
       // If we had a load [copy], store this into the copy list. These are the
@@ -1721,9 +2025,41 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Now that we have handled or loadTakeOrCopy, we need to now track our
   // additional pure takes.
   if (::memInstMustConsume(op)) {
+    // If we don't have a consumeable and assignable check kind, then we can't
+    // consume. Emit an error.
+    //
+    // NOTE: Since SILGen eagerly loads loadable types from memory, this
+    // generally will only handle address only types.
+    if (markedValue->getCheckKind() !=
+        MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+      auto *fArg = dyn_cast<SILFunctionArgument>(
+          stripAccessMarkers(markedValue->getOperand()));
+      if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+        moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(markedValue,
+                                                                   fArg);
+      } else {
+        moveChecker.diagnosticEmitter
+            .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+      }
+      return true;
+    }
+
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
+
+    // Now check if we have a destructure through deinit. If we do, emit an
+    // error.
+    unsigned numDiagnostics =
+        moveChecker.diagnosticEmitter.getDiagnosticCount();
+    checkForDestructureThroughDeinit(markedValue, op, *leafRange,
+                                     diagnosticEmitter);
+    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Emitting destructure through deinit error!\n");
+      return true;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
     useState.takeInsts.insert({user, *leafRange});
     return true;
@@ -1736,7 +2072,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (!leafRange)
         return false;
 
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
 
@@ -1761,14 +2097,28 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (!leafRange)
         return false;
 
-      useState.livenessUses.insert({user, *leafRange});
+      useState.recordLivenessUse(user, *leafRange);
       return true;
     }
   }
 
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
-    if (pas->isOnStack()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply!\n");
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(
+            stripAccessMarkers(markedValue->getOperand()))) {
+      // If we are processing an inout convention and we emitted an error on the
+      // partial_apply, we shouldn't process this mark_must_check, but squelch
+      // the compiler doesn't understand error.
+      if (fArg->getArgumentConvention().isInoutConvention() &&
+          pas->getCalleeFunction()->hasSemanticsAttr(
+              semantics::NO_MOVEONLY_DIAGNOSTICS)) {
+        diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
+        return false;
+      }
+    }
+
+    if (pas->isOnStack() ||
+        ApplySite(pas).getArgumentConvention(*op).isInoutConvention()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
       // On-stack partial applications and their final consumes are always a
       // liveness use of their captures.
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
@@ -1777,15 +2127,35 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         return false;
       }
 
-      useState.livenessUses.insert({user, *leafRange});
-      for (auto *use : pas->getConsumingUses()) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Adding consuming use of partial apply as liveness use: "
-                   << *use->getUser());
-        useState.livenessUses.insert({use->getUser(), *leafRange});
+      // Attempt to find calls of the non-escaping partial apply and places
+      // where the partial apply is passed to a function. We treat those as
+      // liveness uses. If we find a use we don't understand, we return false
+      // here.
+      if (!findNonEscapingPartialApplyUses(pas, *leafRange, useState)) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Failed to understand use of a non-escaping partial apply?!\n");
+        return false;
       }
+
       return true;
     }
+  }
+
+  if (auto *explicitCopy = dyn_cast<ExplicitCopyAddrInst>(op->getUser())) {
+    assert(op->getOperandNumber() == ExplicitCopyAddrInst::Src &&
+           "Dest should have been handled earlier");
+    assert(!explicitCopy->isTakeOfSrc() &&
+           "If we had a take of src, this should have already been identified "
+           "as a must consume");
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
+      return false;
+    }
+
+    useState.recordLivenessUse(user, *leafRange);
+    return true;
   }
 
   // If we don't fit into any of those categories, just track as a liveness
@@ -1803,7 +2173,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     llvm_unreachable("standard failure");
   }
 #endif
-  useState.livenessUses.insert({user, *leafRange});
+  useState.recordLivenessUse(user, *leafRange);
 
   return true;
 }
@@ -1816,7 +2186,7 @@ namespace {
 
 using InstLeafTypePair = std::pair<SILInstruction *, TypeTreeLeafTypeRange>;
 using InstOptionalLeafTypePair =
-    std::pair<SILInstruction *, Optional<TypeTreeLeafTypeRange>>;
+    std::pair<SILInstruction *, llvm::Optional<TypeTreeLeafTypeRange>>;
 
 /// Post process the found liveness and emit errors if needed. TODO: Better
 /// name.
@@ -1929,9 +2299,9 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
         // array and emit an error on those instead since it would be a better
         // error than using end_borrow here.
         {
-          auto pair = liveness.isInterestingUser(&*ii);
-          if (pair.first == FieldSensitivePrunedLiveness::NonLifetimeEndingUse &&
-              pair.second->contains(errorSpan)) {
+          if (liveness.isInterestingUserOfKind(
+                  &*ii, FieldSensitivePrunedLiveness::NonLifetimeEndingUse,
+                  errorSpan)) {
             diagnosticEmitter.emitAddressDiagnostic(
                 addressUseState.address, &*ii, errorUser, false /*is consuming*/,
                 addressUseState.isInOutTermUser(&*ii));
@@ -2107,7 +2477,7 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
     // claim that destroy instead of inserting another destroy_addr.
     if (auto *dai = dyn_cast<DestroyAddrInst>(nextInstruction)) {
       if (dai->getOperand() == baseAddress) {
-        consumes.recordFinalConsume(dai, TypeTreeLeafTypeRange(0, bv.size()));
+        consumes.recordFinalConsume(dai, bv);
         return;
       }
     }
@@ -2117,7 +2487,7 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
     auto loc =
         RegularLocation::getAutoGeneratedLocation(nextInstruction->getLoc());
     auto *dai = builder.createDestroyAddr(loc, baseAddress);
-    consumes.recordFinalConsume(dai, TypeTreeLeafTypeRange(0, bv.size()));
+    consumes.recordFinalConsume(dai, bv);
     addressUseState.destroys.insert({dai, TypeTreeLeafTypeRange(0, bv.size())});
     return;
   }
@@ -2135,7 +2505,9 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
     if (pair.first->getType().isTrivial(*nextInstruction->getFunction()))
       continue;
     auto *dai = builder.createDestroyAddr(loc, pair.first);
-    consumes.recordFinalConsume(dai, pair.second);
+    SmallBitVector consumedBits(bv.size());
+    pair.second.setBits(consumedBits);
+    consumes.recordFinalConsume(dai, consumedBits);
     addressUseState.destroys.insert({dai, pair.second});
   }
 }
@@ -2171,21 +2543,14 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   // referring to the same debug variable as the original definition, we have to
   // use the same debug scope and location as the original debug var.
   auto insertUndefDebugValue = [&debugVar](SILInstruction *insertPt) {
-    if (!debugVar) {
-      return;
-    }
-    auto varInfo = debugVar.getVarInfo();
-    if (!varInfo) {
-      return;
-    }
-    SILBuilderWithScope debugInfoBuilder(insertPt);
-    debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
-    debugInfoBuilder.createDebugValue(
-        debugVar->getLoc(),
-        SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
-                      insertPt->getModule()),
-        *varInfo, false, true);
+    insertDebugValueBefore(insertPt, debugVar, [&]{
+      return SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
+                           insertPt->getModule());
+    });
   };
+
+  // Control flow merge blocks used as insertion points.
+  llvm::DenseMap<SILBasicBlock *, SmallBitVector> mergeBlocks;
 
   for (auto &pair : boundary.getLastUsers()) {
     auto *inst = pair.first;
@@ -2193,52 +2558,77 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 
     LLVM_DEBUG(llvm::dbgs() << "        User: " << *inst);
 
-    auto interestingUse = liveness.isInterestingUser(inst);
-    switch (interestingUse.first) {
-    case IsInterestingUser::LifetimeEndingUse: {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "        Lifetime ending use! Recording final consume!\n");
-      // If we have a consuming use, when we stop at the consuming use we want
-      // the value to still be around. We only want the value to be invalidated
-      // once the consume operation has occured. Thus we always place the
-      // debug_value undef strictly after the consuming operation.
-      if (auto *ti = dyn_cast<TermInst>(inst)) {
-        for (auto *succBlock : ti->getSuccessorBlocks()) {
-          insertUndefDebugValue(&succBlock->front());
-        }
-      } else {
-        insertUndefDebugValue(inst->getNextInstruction());
-      }
-      consumes.recordFinalConsume(inst, *interestingUse.second);
-      continue;
+    auto interestingUser = liveness.getInterestingUser(inst);
+    SmallVector<std::pair<TypeTreeLeafTypeRange, IsInterestingUser>, 4> ranges;
+    if (interestingUser) {
+      interestingUser->getContiguousRanges(ranges);
     }
-    case IsInterestingUser::NonLifetimeEndingUse:
-    case IsInterestingUser::NonUser:
-      LLVM_DEBUG(llvm::dbgs() << "        NoneUser or NonLifetimeEndingUse! "
-                                 "inserting destroy before instruction!\n");
-      // If we are dealing with an inout parameter, we will have modeled our
-      // last use by treating a return inst as a last use. Since it doesn't have
-      // any successors, this results in us not inserting any destroy_addr.
-      if (isa<TermInst>(inst)) {
-        auto *block = inst->getParent();
-        for (auto *succBlock : block->getSuccessorBlocks()) {
-          auto *insertPt = &*succBlock->begin();
-          insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                         liveness.getRootValue(), bv, consumes);
-          // We insert the debug_value undef /after/ the last use since we want
-          // the value to be around when we stop at the last use instruction.
-          insertUndefDebugValue(insertPt);
+
+    for (auto rangePair : ranges) {
+      SmallBitVector bits(bv.size());
+      rangePair.first.setBits(bits);
+      switch (rangePair.second) {
+      case IsInterestingUser::LifetimeEndingUse: {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "        Lifetime ending use! Recording final consume!\n");
+        // If we have a consuming use, when we stop at the consuming use we want
+        // the value to still be around. We only want the value to be
+        // invalidated once the consume operation has occured. Thus we always
+        // place the debug_value undef strictly after the consuming operation.
+        if (auto *ti = dyn_cast<TermInst>(inst)) {
+          for (auto *succBlock : ti->getSuccessorBlocks()) {
+            insertUndefDebugValue(&succBlock->front());
+          }
+        } else {
+          insertUndefDebugValue(inst->getNextInstruction());
         }
+        consumes.recordFinalConsume(inst, bits);
         continue;
       }
+      case IsInterestingUser::NonUser:
+        break;
+      case IsInterestingUser::NonLifetimeEndingUse:
+        LLVM_DEBUG(llvm::dbgs() << "        NonLifetimeEndingUse! "
+                                   "inserting destroy before instruction!\n");
+        // If we are dealing with an inout parameter, we will have modeled our
+        // last use by treating a return inst as a last use. Since it doesn't
+        // have any successors, this results in us not inserting any
+        // destroy_addr.
+        if (isa<TermInst>(inst)) {
+          auto *block = inst->getParent();
+          for (auto *succBlock : block->getSuccessorBlocks()) {
+            auto iter = mergeBlocks.find(succBlock);
+            if (iter == mergeBlocks.end())
+              iter = mergeBlocks.insert({succBlock, bits}).first;
+            else {
+              SmallBitVector &alreadySetBits = iter->second;
+              bool hadCommon = alreadySetBits.anyCommon(bits);
+              alreadySetBits &= bits;
+              if (hadCommon)
+                continue;
+            }
 
-      auto *insertPt = inst->getNextInstruction();
-      insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                     liveness.getRootValue(), bv, consumes);
-      // We insert the debug_value undef /after/ the last use since we want
-      // the value to be around when we stop at the last use instruction.
-      insertUndefDebugValue(insertPt);
-      continue;
+            auto *insertPt = &*succBlock->begin();
+            insertDestroyBeforeInstruction(addressUseState, insertPt,
+                                           liveness.getRootValue(), bits,
+                                           consumes);
+            // We insert the debug_value undef /after/ the last use since we
+            // want the value to be around when we stop at the last use
+            // instruction.
+            insertUndefDebugValue(insertPt);
+          }
+          continue;
+        }
+
+        auto *insertPt = inst->getNextInstruction();
+        insertDestroyBeforeInstruction(addressUseState, insertPt,
+                                       liveness.getRootValue(), bits, consumes);
+        // We insert the debug_value undef /after/ the last use since we want
+        // the value to be around when we stop at the last use instruction.
+        insertUndefDebugValue(insertPt);
+        continue;
+      }
     }
   }
 
@@ -2290,36 +2680,81 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 }
 
 void MoveOnlyAddressCheckerPImpl::rewriteUses(
+    MarkMustCheckInst *markedValue,
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     const FieldSensitivePrunedLivenessBoundary &boundary) {
   LLVM_DEBUG(llvm::dbgs() << "MoveOnlyAddressChecker Rewrite Uses!\n");
-  // First remove all destroy_addr that have not been claimed.
+
+  /// Whether the marked value appeared in a discard statement.
+  const bool isDiscardingContext = !addressUseState.dropDeinitInsts.empty();
+
+  // Process destroys
   for (auto destroyPair : addressUseState.destroys) {
-    if (!consumes.claimConsume(destroyPair.first, destroyPair.second)) {
+    /// Is this destroy instruction a final consuming use?
+    SmallBitVector bits(liveness.getNumSubElements());
+    destroyPair.second.setBits(bits);
+    bool isFinalConsume = consumes.claimConsume(destroyPair.first, bits);
+
+    // Remove destroys that are not the final consuming use.
+    if (!isFinalConsume) {
       destroyPair.first->eraseFromParent();
+      continue;
+    }
+
+    // Otherwise, if we're in a discarding context, flag this final destroy_addr
+    // as a point where we're missing an explicit `consume self`. The reasoning
+    // here is that if a destroy of self is the final consuming use,
+    // then these are the points where we implicitly destroy self to clean-up
+    // that self var before exiting the scope. An explicit 'consume self'
+    // that is thrown away is a consume of this mark_must_check'd var and not a
+    // destroy of it, according to the use classifier.
+    if (isDiscardingContext) {
+
+      // Since the boundary computations treat a newly-added destroy prior to
+      // a reinit within that same block as a "final consuming use", exclude
+      // such destroys-before-reinit. We are only interested in the final
+      // destroy of a var, not intermediate destroys of the var.
+      if (addressUseState.precedesReinitInSameBlock(destroyPair.first))
+        continue;
+
+      auto *dropDeinit = addressUseState.dropDeinitInsts.front();
+      diagnosticEmitter.emitMissingConsumeInDiscardingContext(destroyPair.first,
+                                                              dropDeinit);
     }
   }
+
+  auto debugVar = DebugVarCarryingInst::getFromValue(
+    stripAccessMarkers(markedValue->getOperand()));
 
   // Then convert all claimed reinits to inits.
   for (auto reinitPair : addressUseState.reinitInsts) {
     if (!isReinitToInitConvertibleInst(reinitPair.first))
       continue;
-    if (!consumes.claimConsume(reinitPair.first, reinitPair.second))
-      convertMemoryReinitToInitForm(reinitPair.first);
+    SmallBitVector bits(liveness.getNumSubElements());
+    reinitPair.second.setBits(bits);
+    if (!consumes.claimConsume(reinitPair.first, bits))
+      convertMemoryReinitToInitForm(reinitPair.first, debugVar);
   }
 
   // Check all takes.
   for (auto takeInst : addressUseState.takeInsts) {
-    bool claimedConsume =
-        consumes.claimConsume(takeInst.first, takeInst.second);
+    SmallBitVector bits(liveness.getNumSubElements());
+    takeInst.second.setBits(bits);
+    bool claimedConsume = consumes.claimConsume(takeInst.first, bits);
     (void)claimedConsume;
-    assert(claimedConsume && "Should claim all copies?!");
+    if (!claimedConsume) {
+      llvm::errs()
+          << "Found consume that was not recorded as a 'claimed consume'!\n";
+      llvm::errs() << "Unrecorded consume: " << *takeInst.first;
+      llvm_unreachable("Standard compiler abort?!");
+    }
   }
 
   // Then rewrite all copy insts to be takes and claim them.
   for (auto copyInst : addressUseState.copyInsts) {
-    bool claimedConsume =
-        consumes.claimConsume(copyInst.first, copyInst.second);
+    SmallBitVector bits(liveness.getNumSubElements());
+    copyInst.second.setBits(bits);
+    bool claimedConsume = consumes.claimConsume(copyInst.first, bits);
     if (!claimedConsume) {
       llvm::errs()
           << "Found consume that was not recorded as a 'claimed consume'!\n";
@@ -2355,29 +2790,27 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
   // scope, we would have emitted the scope expansion error during diagnostics.
   for (auto pair : addressUseState.borrows) {
     if (auto *li = dyn_cast<LoadInst>(pair.first)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-        // If we had a load [copy], borrow then we know that all of its destroys
-        // must have been destroy_value. So we can just gather up those
-        // destroy_value and use then to create a new load_borrow scope.
-        SILBuilderWithScope builder(li);
-        auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
-        // We use this auxillary list to avoid iterator invalidation of
-        // li->getConsumingUse();
-        StackList<DestroyValueInst *> toDelete(lbi->getFunction());
-        for (auto *consumeUse : li->getConsumingUses()) {
-          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-          SILBuilderWithScope destroyBuilder(dvi);
-          destroyBuilder.createEndBorrow(dvi->getLoc(), lbi);
-          toDelete.push_back(dvi);
-          changed = true;
-        }
-        while (!toDelete.empty())
-          toDelete.pop_back_val()->eraseFromParent();
-
-        li->replaceAllUsesWith(lbi);
-        li->eraseFromParent();
-        continue;
+      // If we had a load -> load_borrow then we know that all of its destroys
+      // must have been destroy_value. So we can just gather up those
+      // destroy_value and use then to create a new load_borrow scope.
+      SILBuilderWithScope builder(li);
+      auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
+      // We use this auxillary list to avoid iterator invalidation of
+      // li->getConsumingUse();
+      StackList<DestroyValueInst *> toDelete(lbi->getFunction());
+      for (auto *consumeUse : li->getConsumingUses()) {
+        auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+        SILBuilderWithScope destroyBuilder(dvi);
+        destroyBuilder.createEndBorrow(dvi->getLoc(), lbi);
+        toDelete.push_back(dvi);
+        changed = true;
       }
+      while (!toDelete.empty())
+        toDelete.pop_back_val()->eraseFromParent();
+
+      li->replaceAllUsesWith(lbi);
+      li->eraseFromParent();
+      continue;
     }
 
     llvm::dbgs() << "Borrow: " << *pair.first;
@@ -2393,6 +2826,348 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
 #endif
 }
 
+void MoveOnlyAddressCheckerPImpl::checkForReinitAfterDiscard() {
+  auto const &dropDeinits = addressUseState.dropDeinitInsts;
+  auto const &reinits = addressUseState.reinitInsts;
+
+  if (dropDeinits.empty() || reinits.empty())
+    return;
+
+  using BasicBlockMap = llvm::DenseMap<SILBasicBlock *,
+                                       llvm::SmallPtrSet<SILInstruction *, 2>>;
+  BasicBlockMap blocksWithReinit;
+  for (auto const &info : reinits) {
+    auto *reinit = info.first;
+    blocksWithReinit[reinit->getParent()].insert(reinit);
+  }
+
+  // Starting from each drop_deinit instruction, can we reach a reinit of self?
+  for (auto *dropInst : dropDeinits) {
+    auto *dropBB = dropInst->getParent();
+
+    // First, if the block containing this drop_deinit also contains a reinit,
+    // check if that reinit happens after this drop_deinit.
+    auto result = blocksWithReinit.find(dropBB);
+    if (result != blocksWithReinit.end()) {
+      auto &blockReinits = result->second;
+      for (auto ii = std::next(dropInst->getIterator()); ii != dropBB->end();
+           ++ii) {
+        SILInstruction *current = &*ii;
+        if (blockReinits.contains(current)) {
+          // Then the drop_deinit can reach a reinit immediately after it in the
+          // same block.
+          diagnosticEmitter.emitReinitAfterDiscardError(current, dropInst);
+          return;
+        }
+      }
+    }
+
+    BasicBlockWorklist worklist(fn);
+
+    // Seed the search with the successors of the drop_init block, so that if we
+    // visit the drop_deinit block again, we'll know the reinits _before_ the
+    // drop_deinit are reachable via some back-edge / cycle.
+    for (auto *succ : dropBB->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succ);
+
+    // Determine reachability across blocks.
+    while (auto *bb = worklist.pop()) {
+      // Set-up next iteration.
+      for (auto *succ : bb->getSuccessorBlocks())
+        worklist.pushIfNotVisited(succ);
+
+      auto result = blocksWithReinit.find(bb);
+      if (result == blocksWithReinit.end())
+        continue;
+
+      // We found a reachable reinit! Identify the earliest reinit in this block
+      // for diagnosis.
+      auto &blockReinits = result->second;
+      SILInstruction *firstBadReinit = nullptr;
+      for (auto &inst : *bb) {
+        if (blockReinits.contains(&inst)) {
+          firstBadReinit = &inst;
+          break;
+        }
+      }
+
+      if (!firstBadReinit)
+        llvm_unreachable("bug");
+
+      diagnosticEmitter.emitReinitAfterDiscardError(firstBadReinit, dropInst);
+      return;
+    }
+  }
+}
+
+void ExtendUnconsumedLiveness::run() {
+  ConsumingBlocksCollection consumingBlocks;
+  DestroysCollection destroys;
+  for (unsigned element = 0, count = liveness.getNumSubElements();
+       element < count; ++element) {
+
+    for (auto pair : addressUseState.consumingBlocks) {
+      if (pair.second.test(element)) {
+        consumingBlocks.insert(pair.first);
+      }
+    }
+
+    for (auto pair : addressUseState.destroys) {
+      if (pair.second.contains(element)) {
+        destroys[pair.first] = DestroyKind::Destroy;
+      }
+    }
+    for (auto pair : addressUseState.takeInsts) {
+      if (pair.second.contains(element)) {
+        destroys[pair.first] = DestroyKind::Take;
+      }
+    }
+    for (auto pair : addressUseState.reinitInsts) {
+      if (pair.second.contains(element)) {
+        destroys[pair.first] = DestroyKind::Reinit;
+      }
+    }
+
+    runOnField(element, destroys, consumingBlocks);
+
+    consumingBlocks.clear();
+    destroys.clear();
+  }
+}
+
+/// Extend liveness of each field as far as possible within the original live
+/// range as far as possible without incurring any copies.
+///
+/// The strategy has two parts.
+///
+/// (1) The global analysis:
+/// - Collect the blocks in which the field was live before canonicalization.
+///   These are the "original" live blocks (originalLiveBlocks).
+///   [Color these blocks green.]
+/// - From within that collection, collect the blocks which contain a _final_
+///   consuming, non-destroy use, and their iterative successors.
+///   These are the "consumed" blocks (consumedAtExitBlocks).
+///   [Color these blocks red.]
+/// - Extend liveness down to the boundary between originalLiveBlocks and
+///   consumedAtExitBlocks blocks.
+///   [Extend liveness down to the boundary between green blocks and red.]
+/// - In particular, in regions of originalLiveBlocks which have no boundary
+///   with consumedAtExitBlocks, liveness should be extended to its original
+///   extent.
+///   [Extend liveness down to the boundary between green blocks and uncolored.]
+///
+/// (2) The local analysis:
+/// - For in-block lifetimes, extend liveness forward from non-consuming uses
+///   and dead defs to the original destroy.
+void ExtendUnconsumedLiveness::runOnField(
+    unsigned element, DestroysCollection &destroys,
+    ConsumingBlocksCollection &consumingBlocks) {
+  SILValue currentDef = addressUseState.address;
+
+  // First, collect the blocks that were _originally_ live.  We can't use
+  // liveness here because it doesn't include blocks that occur before a
+  // destroy_addr.
+  BasicBlockSet originalLiveBlocks(currentDef->getFunction());
+  {
+    // Some of the work here was already done by initializeLiveness.
+    // Specifically, it already discovered all blocks containing (transitive)
+    // uses and blocks that appear between them and the def.
+    //
+    // Seed the set with what it already discovered.
+    for (auto *discoveredBlock : liveness.getDiscoveredBlocks())
+      originalLiveBlocks.insert(discoveredBlock);
+
+    // Start the walk from the consuming blocks (which includes destroys as well
+    // as the other consuming uses).
+    BasicBlockWorklist worklist(currentDef->getFunction());
+    for (auto *consumingBlock : consumingBlocks) {
+      if (!originalLiveBlocks.insert(consumingBlock)
+          // Don't walk into the predecessors of blocks which kill liveness.
+          && !isLiveAtBegin(consumingBlock, element, /*isLiveAtEnd=*/true, destroys)) {
+        continue;
+      }
+      for (auto *predecessor : consumingBlock->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predecessor);
+      }
+    }
+
+    // Walk backwards from consuming blocks.
+    while (auto *block = worklist.pop()) {
+      if (!originalLiveBlocks.insert(block)) {
+        continue;
+      }
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predecessor);
+      }
+    }
+  }
+
+  // Second, collect the blocks which occur after a consuming use.
+  BasicBlockSet consumedAtExitBlocks(currentDef->getFunction());
+  BasicBlockSetVector consumedAtEntryBlocks(currentDef->getFunction());
+  {
+    // Start the forward walk from blocks which contain non-destroy consumes not
+    // followed by defs.
+    //
+    // Because they contain a consume not followed by a def, these are
+    // consumed-at-exit.
+    BasicBlockWorklist worklist(currentDef->getFunction());
+    for (auto iterator : boundary.getLastUsers()) {
+      if (!iterator.second.test(element))
+        continue;
+      auto *instruction = iterator.first;
+      // Skip over destroys on the boundary.
+      auto iter = destroys.find(instruction);
+      if (iter != destroys.end() && iter->second != DestroyKind::Take) {
+        continue;
+      }
+      // Skip over non-consuming users.
+      auto interestingUser = liveness.isInterestingUser(instruction, element);
+      assert(interestingUser !=
+             FieldSensitivePrunedLiveness::IsInterestingUser::NonUser);
+      if (interestingUser !=
+          FieldSensitivePrunedLiveness::IsInterestingUser::LifetimeEndingUse) {
+        continue;
+      }
+      // A consume with a subsequent def doesn't cause the block to be
+      // consumed-at-exit.
+      if (hasDefAfter(instruction, element))
+        continue;
+      worklist.push(instruction->getParent());
+    }
+    while (auto *block = worklist.pop()) {
+      consumedAtExitBlocks.insert(block);
+      for (auto *successor : block->getSuccessorBlocks()) {
+        if (!originalLiveBlocks.contains(successor))
+          continue;
+        worklist.pushIfNotVisited(successor);
+        consumedAtEntryBlocks.insert(successor);
+      }
+    }
+  }
+
+  // Third, find the blocks on the boundary between the originally-live blocks
+  // and the originally-live-but-consumed blocks.  Extend liveness "to the end"
+  // of these blocks.
+  for (auto *block : consumedAtEntryBlocks) {
+    for (auto *predecessor : block->getPredecessorBlocks()) {
+      if (consumedAtExitBlocks.contains(predecessor))
+        continue;
+      // Add "the instruction(s) before the terminator" of the predecessor to
+      // liveness.
+      addPreviousInstructionToLiveness(predecessor->getTerminator(), element,
+                                       /*lifetimeEnding*/ false);
+    }
+  }
+
+  // Finally, preserve the destroys which weren't in the consumed region in
+  // place: hoisting such destroys would not avoid copies.
+  for (auto pair : destroys) {
+    auto *destroy = pair.first;
+    if (!shouldAddDestroyToLiveness(destroy, element, consumedAtExitBlocks,
+                                    consumedAtEntryBlocks))
+      continue;
+    addPreviousInstructionToLiveness(destroy, element,
+                                     /*lifetimeEnding*/ false);
+  }
+}
+
+bool ExtendUnconsumedLiveness::shouldAddDestroyToLiveness(
+    SILInstruction *destroy, unsigned element,
+    BasicBlockSet const &consumedAtExitBlocks,
+    BasicBlockSetVector const &consumedAtEntryBlocks) {
+  auto *block = destroy->getParent();
+  bool followedByDef = hasDefAfter(destroy, element);
+  if (!followedByDef) {
+    // This destroy is the last write to the field in the block.
+    //
+    // If the block is consumed-at-exit, then there is some other consuming use
+    // before this destroy.  Liveness can't be extended.
+    return !consumedAtExitBlocks.contains(block);
+  }
+  for (auto *inst = destroy->getPreviousInstruction(); inst;
+       inst = inst->getPreviousInstruction()) {
+    if (liveness.isDef(inst, element)) {
+      // Found the corresponding def with no intervening users.  Liveness
+      // can be extended to the destroy.
+      return true;
+    }
+    auto interestingUser = liveness.isInterestingUser(inst, element);
+    switch (interestingUser) {
+    case FieldSensitivePrunedLiveness::IsInterestingUser::NonUser:
+      break;
+    case FieldSensitivePrunedLiveness::IsInterestingUser::NonLifetimeEndingUse:
+      // The first use seen is non-consuming.  Liveness can be extended to the
+      // destroy.
+      return true;
+      break;
+    case FieldSensitivePrunedLiveness::IsInterestingUser::LifetimeEndingUse:
+      // Found a consuming use.  Liveness can't be extended to the destroy
+      // (without creating a copy and triggering a diagnostic).
+      return false;
+      break;
+    }
+  }
+  // Found no uses or defs between the destroy and the top of the block.  If the
+  // block was not consumed at entry, liveness can be extended to the destroy.
+  return !consumedAtEntryBlocks.contains(block);
+}
+
+/// Compute the block's effect on liveness and apply it to \p isLiveAtEnd.
+bool ExtendUnconsumedLiveness::isLiveAtBegin(SILBasicBlock *block,
+                                             unsigned element, bool isLiveAtEnd,
+                                             DestroysCollection const &destroys) {
+  enum class Effect {
+    None, // 0
+    Kill, // 1
+    Gen,  // 2
+  };
+  auto effect = Effect::None;
+  for (auto &instruction : llvm::reverse(*block)) {
+    // An instruction can be both a destroy and a def.  If it is, its
+    // behavior is first to destroy and then to init.  So when walking
+    // backwards, its last action is to destroy, so its effect is that of any
+    // destroy.
+    if (destroys.find(&instruction) != destroys.end()) {
+      effect = Effect::Gen;
+    } else if (liveness.isDef(&instruction, element)) {
+      effect = Effect::Kill;
+    }
+  }
+  switch (effect) {
+  case Effect::None:
+    return isLiveAtEnd;
+  case Effect::Kill:
+    return false;
+  case Effect::Gen:
+    return true;
+  }
+}
+
+bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,
+                                           unsigned element) {
+  // NOTE: Start iteration at \p start, not its sequel, because
+  //       it might be both a consuming use and a def.
+  for (auto *inst = start; inst; inst = inst->getNextInstruction()) {
+    if (liveness.isDef(inst, element))
+      return true;
+  }
+  return false;
+}
+
+void ExtendUnconsumedLiveness::addPreviousInstructionToLiveness(
+    SILInstruction *inst, unsigned element, bool lifetimeEnding) {
+  auto range = TypeTreeLeafTypeRange(element, element + 1);
+  if (auto *previous = inst->getPreviousInstruction()) {
+    liveness.updateForUse(previous, range, lifetimeEnding);
+  } else {
+    for (auto *predecessor : inst->getParent()->getPredecessorBlocks()) {
+      liveness.updateForUse(predecessor->getTerminator(), range,
+                            lifetimeEnding);
+    }
+  }
+}
+
 bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     MarkMustCheckInst *markedAddress) {
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
@@ -2402,18 +3177,19 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // [copy] + begin_borrow for further processing. This just eliminates a case
   // that the checker doesn't need to know about.
   {
-    CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(fn);
+    CopiedLoadBorrowEliminationState state(markedAddress->getFunction());
+    CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
     if (AddressUseKind::Unknown ==
         std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
                               << *markedAddress);
       return false;
     }
-    copiedLoadBorrowEliminator.process();
+    state.process();
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this
-  // to categorize the uses of this address into their ownership behavior (e.x.:
+  // to categorize the uses of this address into their ownership behavior (e.g.:
   // init, reinit, take, destroy, etc.).
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
                             diagnosticEmitter);
@@ -2423,7 +3199,6 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
     return false;
   }
-  addressUseState.initializeInOutTermUsers();
 
   // If we found a load [copy] or copy_addr that requires multiple copies or an
   // exclusivity error, then we emitted an early error. Bail now and allow the
@@ -2438,9 +3213,14 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   if (diagCount != diagnosticEmitter.getDiagnosticCount())
     return true;
 
-  // Then check if we emitted an error. If we did not, return true.
-  if (diagCount != diagnosticEmitter.getDiagnosticCount())
-    return true;
+  // Now that we know that we have run our visitor and did not emit any errors
+  // and successfully visited everything, see if have any
+  // assignable_but_not_consumable of address only types that are consumed.
+  //
+  // DISCUSSION: For non address only types, this is not an issue since we
+  // eagerly load
+
+  addressUseState.initializeInOutTermUsers();
 
   //===---
   // Liveness Checking
@@ -2483,8 +3263,15 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
+  if (!DisableMoveOnlyAddressCheckerLifetimeExtension) {
+    ExtendUnconsumedLiveness extension(addressUseState, liveness, boundary);
+    extension.run();
+  }
+  boundary.clear();
+  liveness.computeBoundary(boundary);
   insertDestroysOnBoundary(markedAddress, liveness, boundary);
-  rewriteUses(liveness, boundary);
+  checkForReinitAfterDiscard();
+  rewriteUses(markedAddress, liveness, boundary);
 
   return true;
 }
@@ -2504,9 +3291,19 @@ bool MoveOnlyAddressChecker::check(
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // Perform our address check.
+    unsigned diagnosticEmittedByEarlierPassCount =
+      diagnosticEmitter.getDiagnosticEmittedByEarlierPassCount();
     if (!pimpl.performSingleCheck(markedValue)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Failed to perform single check! Emitting error!\n");
+      if (diagnosticEmittedByEarlierPassCount !=
+          diagnosticEmitter.getDiagnosticEmittedByEarlierPassCount()) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Failed to perform single check but found earlier emitted "
+               "error. Not emitting checker doesn't understand diagnostic!\n");
+        continue;
+      }
+      LLVM_DEBUG(llvm::dbgs() << "Failed to perform single check! Emitting "
+                                 "compiler doesn't understand diagnostic!\n");
       // If we fail the address check in some way, set the diagnose!
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
     }

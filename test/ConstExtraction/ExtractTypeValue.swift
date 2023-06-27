@@ -16,7 +16,8 @@ struct TypeValuePropertyStruct : MyProto {
 }
 
 // CHECK:             "label": "birdTypes",
-// CHECK-NEXT:        "type": "Swift.Array<ExtractTypeValue.Bird.Type>",
+// CHECK-NEXT:        "type": "Swift.Array<any ExtractTypeValue.Bird.Type>",
+// CHECK-NEXT:        "mangledTypeName": "Say16ExtractTypeValue4Bird_pXpG",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}ExtractTypeValue.swift",

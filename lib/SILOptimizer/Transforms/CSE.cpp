@@ -457,22 +457,6 @@ public:
     return visitSelectEnumInstBase(X);
   }
 
-  hash_code visitSelectValueInst(SelectValueInst *X) {
-    auto hash = llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getAllOperands()[0]),
-        X->getType(), X->hasDefault());
-
-    for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
-      hash = llvm::hash_combine(hash, X->getCase(i).first,
-                                X->getCase(i).second);
-    }
-
-    if (X->hasDefault())
-      hash = llvm::hash_combine(hash, X->getDefaultResult());
-
-    return hash;
-  }
-
   hash_code visitWitnessMethodInst(WitnessMethodInst *X) {
     if (X->getFunction()->hasOwnership()) {
       auto TransformedOpValues =
@@ -1187,11 +1171,17 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return false;
   }
   if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
-    // Although the onFastPath builtin has no side-effects we don't want to
-    // (re-)move it.
-    if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
+    switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::OnFastPath:
+      // Although the onFastPath builtin has no side-effects we don't want to
+      // (re-)move it.
       return false;
-    return !BI->mayReadOrWriteMemory();
+    case BuiltinValueKind::Once:
+    case BuiltinValueKind::OnceWithContext:
+      return true;
+    default:
+      return !BI->mayReadOrWriteMemory();
+    }
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
     return !EMI->getOperand()->getType().isAddress();
@@ -1235,7 +1225,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:

@@ -1079,7 +1079,7 @@ ManglingError Remangler::mangleAccessorAttachedMacroExpansion(
 
 ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
     Node *node, unsigned depth) {
-  Buffer << "fMA";
+  Buffer << "fMr";
   RETURN_IF_ERROR(mangleIndex(node, depth + 1));
   return mangleChildNodes(node, depth + 1);
 }
@@ -1242,6 +1242,11 @@ ManglingError Remangler::mangleWillSet(Node *node, EntityContext &ctx,
 ManglingError Remangler::mangleDidSet(Node *node, EntityContext &ctx,
                                       unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "W", ctx, depth + 1);
+}
+
+ManglingError Remangler::mangleInitAccessor(Node *node, EntityContext &ctx,
+                                            unsigned depth) {
+  return mangleAccessor(node->getFirstChild(), "i", ctx, depth + 1);
 }
 
 ManglingError Remangler::mangleOwningMutableAddressor(Node *node,
@@ -1927,6 +1932,14 @@ ManglingError Remangler::mangleSILPackIndirect(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::manglePackElement(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::manglePackElementLevel(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 

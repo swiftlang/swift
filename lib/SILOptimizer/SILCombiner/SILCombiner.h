@@ -234,8 +234,6 @@ public:
   SILInstruction *visitSILInstruction(SILInstruction *I) { return nullptr; }
 
   /// Instruction visitors.
-  SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
-  SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
@@ -251,7 +249,6 @@ public:
   // NOTE: The load optimized in this method is a load [trivial].
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
-  SILInstruction *visitLoadInst(LoadInst *LI);
   SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
@@ -381,11 +378,11 @@ public:
 
 private:
   // Build concrete existential information using findInitExistential.
-  Optional<ConcreteOpenedExistentialInfo>
+  llvm::Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
 
   // Build concrete existential information using SoleConformingType.
-  Optional<ConcreteOpenedExistentialInfo>
+  llvm::Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfoFromSoleConformingType(Operand &ArgOperand);
 
   // Common utility function to build concrete existential information for all

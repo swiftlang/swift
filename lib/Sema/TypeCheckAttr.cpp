@@ -253,6 +253,8 @@ public:
 
   void visitCDeclAttr(CDeclAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
+  void visitUsedAttr(UsedAttr *attr);
+  void visitSectionAttr(SectionAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -292,6 +294,8 @@ public:
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
+  void visitInitializesAttr(InitializesAttr *attr);
+  void visitAccessesAttr(AccessesAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
 
@@ -790,23 +794,23 @@ void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
                           attr->getAttrName());
 }
 
-static Optional<Diag<bool,Type>>
+static llvm::Optional<Diag<bool, Type>>
 isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
   if (type->isObjCExistentialType() || type->isAny())
-    return None; // @objc existential types are okay
+    return llvm::None; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
 
   if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     if (classDecl->isObjC())
-      return None; // @objc class types are okay.
+      return llvm::None; // @objc class types are okay.
     return diag::iboutlet_nonobjc_class;
   }
 
   if (type->isString()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
-    return None;
+    return llvm::None;
   }
 
   if (type->isArray()) {
@@ -830,7 +834,6 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
   // No other types are permitted.
   return diag::iboutlet_nonobject_type;
 }
-
 
 void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
@@ -1297,7 +1300,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   auto behavior = behaviorLimitForObjCReason(reason, Ctx);
 
   // Only certain decls can be ObjC.
-  Optional<Diag<>> error;
+  llvm::Optional<Diag<>> error;
   if (isa<ClassDecl>(D) ||
       isa<ProtocolDecl>(D)) {
     /* ok */
@@ -1947,7 +1950,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  Optional<AvailabilityContext> EnclosingAnnotatedRange;
+  llvm::Optional<AvailabilityContext> EnclosingAnnotatedRange;
   AvailabilityContext AttrRange =
       AvailabilityInference::availableRange(attr, Ctx);
 
@@ -1989,7 +1992,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     }
   }
 
-  Optional<Diag<>> MaybeNotAllowed =
+  llvm::Optional<Diag<>> MaybeNotAllowed =
       TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
   if (MaybeNotAllowed.has_value()) {
     AvailabilityContext DeploymentRange
@@ -2034,50 +2037,9 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
 
   // Verify that the declaration is exposable.
   auto repr = cxx_translation::getDeclRepresentation(VD);
-  if (repr.isUnsupported()) {
-    using namespace cxx_translation;
-    switch (*repr.error) {
-    case UnrepresentableObjC:
-      diagnose(attr->getLocation(), diag::expose_unsupported_objc_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableAsync:
-      diagnose(attr->getLocation(), diag::expose_unsupported_async_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableIsolatedInActor:
-      diagnose(attr->getLocation(),
-               diag::expose_unsupported_actor_isolated_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableRequiresClientEmission:
-      diagnose(attr->getLocation(),
-               diag::expose_unsupported_client_emission_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableGeneric:
-      diagnose(attr->getLocation(), diag::expose_generic_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableGenericRequirements:
-      diagnose(attr->getLocation(), diag::expose_generic_requirement_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableThrows:
-      diagnose(attr->getLocation(), diag::expose_throwing_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableIndirectEnum:
-      diagnose(attr->getLocation(), diag::expose_indirect_enum_cxx, VD);
-      break;
-    case UnrepresentableEnumCaseType:
-      diagnose(attr->getLocation(), diag::expose_enum_case_type_to_cxx, VD);
-      break;
-    case UnrepresentableEnumCaseTuple:
-      diagnose(attr->getLocation(), diag::expose_enum_case_tuple_to_cxx, VD);
-      break;
-    }
-  }
+  if (repr.isUnsupported())
+    diagnose(attr->getLocation(),
+             cxx_translation::diagnoseRepresenationError(*repr.error, VD));
 
   // Verify that the name mentioned in the expose
   // attribute matches the supported name pattern.
@@ -2086,6 +2048,32 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
                attr->Name);
   }
+}
+
+void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
+    return;
+  }
+  
+  // Only top-level func/var decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    diagnose(attr->getLocation(), diag::used_not_at_top_level);
+}
+
+void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
+    return;
+  }
+
+  // Only top-level func/var decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    diagnose(attr->getLocation(), diag::section_not_at_top_level);
+
+  // The name must not be empty.
+  if (attr->Name.empty())
+    diagnose(attr->getLocation(), diag::section_empty_name);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
@@ -2339,7 +2327,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
-                               SF, NL_QualifiedDefault);
+                               SF, attr->getLocation(),
+                               NL_QualifiedDefault);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -2621,7 +2610,8 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   }
 
   auto where = ExportContext::forDeclSignature(D);
-  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, None);
+  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
+                           llvm::None);
 
   if (mainFunction->hasAsync() &&
       context.LangOpts.isConcurrencyModelTaskToThread() &&
@@ -2709,7 +2699,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     // The constructor must be declared within the class itself.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C
-    if (!isa<ClassDecl>(ctor->getDeclContext()) &&
+    if (!isa<ClassDecl>(ctor->getDeclContext()->getImplementedObjCContext()) &&
         !isObjCClassExtensionInOverlay(ctor->getDeclContext())) {
       diagnose(ctor, diag::required_initializer_in_extension, parentTy)
         .highlight(attr->getLocation());
@@ -3058,7 +3048,8 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
     options |= NL_IncludeUsableFromInline;
 
   if (typeCtx)
-    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName, options,
+    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
+                                     attr->getLocation(), options,
                                      results);
 }
 
@@ -3355,14 +3346,13 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::resolveContextualType(
-        typeEraserRepr, PD, None,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
+    return TypeResolution::resolveContextualType(typeEraserRepr, PD, llvm::None,
+                                                 // Unbound generics and
+                                                 // placeholders are not allowed
+                                                 // within this attribute.
+                                                 /*unboundTyOpener*/ nullptr,
+                                                 /*placeholderHandler*/ nullptr,
+                                                 /*packElementOpener*/ nullptr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -3561,61 +3551,86 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
   (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
 }
 
+void AttributeChecker::visitInitializesAttr(InitializesAttr *attr) {
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::init_accessor_initializes_attribute_on_other_declaration);
+    return;
+  }
+
+  (void)attr->getPropertyDecls(accessor);
+}
+
+void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::init_accessor_accesses_attribute_on_other_declaration);
+    return;
+  }
+
+  // Check whether there are any intersections between initializes(...) and
+  // accesses(...) attributes.
+
+  llvm::Optional<ArrayRef<VarDecl *>> initializedProperties;
+  if (auto *initAttr = D->getAttrs().getAttribute<InitializesAttr>()) {
+    initializedProperties.emplace(initAttr->getPropertyDecls(accessor));
+  }
+
+  if (initializedProperties) {
+    for (auto *property : attr->getPropertyDecls(accessor)) {
+      if (llvm::is_contained(*initializedProperties, property)) {
+        diagnose(attr->getLocation(),
+                 diag::init_accessor_property_both_init_and_accessed,
+                 property->getName());
+      }
+    }
+  }
+}
+
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   DeclContext *DC = D->getDeclContext();
 
-  Type T = attr->getProtocolType();
-  if (!T && attr->getProtocolTypeRepr()) {
-    auto context = TypeResolverContext::GenericRequirement;
-    T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
-                                              TypeResolutionOptions(context),
-                                              /*unboundTyOpener*/ nullptr,
-                                              /*placeholderHandler*/ nullptr,
-                                              /*packElementOpener*/ nullptr);
-  }
+  ProtocolDecl *PD = attr->getProtocol(DC);
 
-  // Definite error-types were already diagnosed in resolveType.
-  if (T->hasError())
-    return;
-  attr->setProtocolType(T);
-
-  // Check that we got a ProtocolType.
-  if (auto PT = T->getAs<ProtocolType>()) {
-    ProtocolDecl *PD = PT->getDecl();
-
-    // Check that the ProtocolType has the specified member.
-    LookupResult R =
-        TypeChecker::lookupMember(PD->getDeclContext(), PT,
-                                  DeclNameRef(attr->getMemberName()));
-    if (!R) {
-      diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_lacks_member,
-               PD->getName(), attr->getMemberName())
-        .highlight(attr->getMemberNameLoc().getSourceRange());
-    }
-
-    // Check that the decl we're decorating is a member of a type that actually
-    // conforms to the specified protocol.
-    NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
-    if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
-      if (!OtherPD->inheritsFrom(PD)) {
-        diagnose(attr->getLocation(),
-                 diag::implements_attr_protocol_not_conformed_to,
-                 NTD->getName(), PD->getName())
-          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
-      }
-    } else {
-      SmallVector<ProtocolConformance *, 2> conformances;
-      if (!NTD->lookupConformance(PD, conformances)) {
-        diagnose(attr->getLocation(),
-                 diag::implements_attr_protocol_not_conformed_to,
-                 NTD->getName(), PD->getName())
-          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
-      }
-    }
-  } else {
+  if (!PD) {
     diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
       .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    return;
+  }
+
+  // Check that the ProtocolType has the specified member.
+  LookupResult R =
+      TypeChecker::lookupMember(PD->getDeclContext(),
+                                PD->getDeclaredInterfaceType(),
+                                DeclNameRef(attr->getMemberName()));
+  if (!R) {
+    diagnose(attr->getLocation(),
+             diag::implements_attr_protocol_lacks_member,
+             PD->getName(), attr->getMemberName())
+      .highlight(attr->getMemberNameLoc().getSourceRange());
+    return;
+  }
+
+  // Check that the decl we're decorating is a member of a type that actually
+  // conforms to the specified protocol.
+  NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
+  if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
+    if (!OtherPD->inheritsFrom(PD)) {
+      diagnose(attr->getLocation(),
+               diag::implements_attr_protocol_not_conformed_to,
+               NTD->getName(), PD->getName())
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    }
+  } else {
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!NTD->lookupConformance(PD, conformances)) {
+      diagnose(attr->getLocation(),
+               diag::implements_attr_protocol_not_conformed_to,
+               NTD->getName(), PD->getName())
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    }
   }
 }
 
@@ -4043,11 +4058,12 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
       auto builderType = nominal->getDeclaredType();
       nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
-                               NL_QualifiedDefault,
+                               attr->getLocation(), NL_QualifiedDefault,
                                buildPartialBlockFirstMatches);
       nominal->lookupQualified(
           builderType, DeclNameRef(buildPartialBlockAccumulated),
-          NL_QualifiedDefault, buildPartialBlockAccumulatedMatches);
+          attr->getLocation(), NL_QualifiedDefault,
+          buildPartialBlockAccumulatedMatches);
 
       hasAccessibleBuildPartialBlockFirst = llvm::any_of(
           buildPartialBlockFirstMatches, isBuildMethodAsAccessibleAsType);
@@ -4332,6 +4348,14 @@ void AttributeChecker::checkBackDeployedAttrs(
       }
     }
 
+    if (VD->getOpaqueResultTypeDecl()) {
+      diagnoseAndRemoveAttr(Attr,
+                            diag::backdeployed_opaque_result_not_supported,
+                            Attr, D->getDescriptiveKind())
+          .warnInSwiftInterface(D->getDeclContext());
+      continue;
+    }
+
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
 
@@ -4490,7 +4514,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
-Optional<Diag<>>
+llvm::Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
@@ -4500,7 +4524,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
-      return None;
+      return llvm::None;
 
     // Do not permit potential availability of script-mode global variables;
     // their initializer expression is not lazily evaluated, so this would
@@ -4529,15 +4553,15 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     }
   }
 
-  return None;
+  return llvm::None;
 }
 
-Optional<Diag<>>
+llvm::Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
-      return parent->getSemanticUnavailableAttr() != None;
+      return parent->getSemanticUnavailableAttr() != llvm::None;
     }
     return false;
   };
@@ -4545,17 +4569,17 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   // A destructor is always called if declared.
   if (auto *DD = dyn_cast<DestructorDecl>(D)) {
     if (parentIsUnavailable(D))
-      return None;
+      return llvm::None;
 
     return diag::availability_deinit_no_unavailable;
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
-      return None;
+      return llvm::None;
 
     if (parentIsUnavailable(D))
-      return None;
+      return llvm::None;
 
     // Do not permit unavailable script-mode global variables; their initializer
     // expression is not lazily evaluated, so this would not be safe.
@@ -4568,7 +4592,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
       return diag::availability_stored_property_no_unavailable;
   }
 
-  return None;
+  return llvm::None;
 }
 
 static bool shouldBlockImplicitDynamic(Decl *D) {
@@ -4927,6 +4951,8 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
     return DescriptiveDeclKind::Addressor;
   case AccessorKind::MutableAddress:
     return DescriptiveDeclKind::MutableAddressor;
+  case AccessorKind::Init:
+    return DescriptiveDeclKind::InitAccessor;
   }
 }
 
@@ -4967,8 +4993,9 @@ enum class AbstractFunctionDeclLookupErrorKind {
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
-    const llvm::function_ref<Optional<AbstractFunctionDeclLookupErrorKind>(
-        AbstractFunctionDecl *)> &isValidCandidate,
+    const llvm::function_ref<
+        llvm::Optional<AbstractFunctionDeclLookupErrorKind>(
+            AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
   assert(lookupContext);
   auto &ctx = lookupContext->getASTContext();
@@ -5856,7 +5883,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   };
 
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
-      -> Optional<AbstractFunctionDeclLookupErrorKind> {
+      -> llvm::Optional<AbstractFunctionDeclLookupErrorKind> {
     // Error if the original candidate is a protocol requirement. Derivative
     // registration does not yet support protocol requirements.
     // TODO(TF-982): Allow default derivative implementations for protocol
@@ -5872,13 +5899,13 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
             cast<AnyFunctionType>(originalFnType->getCanonicalType()),
             originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
-    return None;
+    return llvm::None;
   };
 
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     const auto options =
-        TypeResolutionOptions(None) | TypeResolutionFlags::AllowModule;
+        TypeResolutionOptions(llvm::None) | TypeResolutionFlags::AllowModule;
     baseType = TypeResolution::resolveContextualType(
         baseTypeRepr, derivative->getDeclContext(), options,
         /*unboundTyOpener*/ nullptr,
@@ -6465,19 +6492,19 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   }
 
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
-      -> Optional<AbstractFunctionDeclLookupErrorKind> {
+      -> llvm::Optional<AbstractFunctionDeclLookupErrorKind> {
     // Error if the original candidate does not have the expected type.
     if (!checkFunctionSignature(
             cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
             originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
-    return None;
+    return llvm::None;
   };
 
   Type baseType;
   if (attr->getBaseTypeRepr()) {
     baseType = TypeResolution::resolveContextualType(
-        attr->getBaseTypeRepr(), transpose->getDeclContext(), None,
+        attr->getBaseTypeRepr(), transpose->getDeclContext(), llvm::None,
         /*unboundTyOpener*/ nullptr,
         /*placeholderHandler*/ nullptr,
         /*packElementOpener*/ nullptr);
@@ -7133,7 +7160,7 @@ public:
   void visitCustomAttr(CustomAttr *attr) {
     // Check whether this custom attribute is the global actor attribute.
     auto globalActorAttr = evaluateOrDefault(
-        ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
+        ctx.evaluator, GlobalActorAttributeRequest{closure}, llvm::None);
 
     if (globalActorAttr && globalActorAttr->first == attr) {
       // if there is an `isolated` parameter, then this global-actor attribute
@@ -7251,7 +7278,8 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
                                      nameRef.withoutArgumentLabels(),
-                                     NL_OnlyTypes, lookupResults);
+                                     attr->getLocation(), NL_OnlyTypes,
+                                     lookupResults);
     if (lookupResults.size() == 1)
       return lookupResults[0];
     return nullptr;
@@ -7314,7 +7342,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   // completion handler has been removed).
   if (!renamedDecl && !asyncResults.empty()) {
     for (AbstractFunctionDecl *candidate : asyncResults) {
-      Optional<unsigned> completionHandler =
+      llvm::Optional<unsigned> completionHandler =
           attachedFunc->findPotentialCompletionHandlerParam(candidate);
       if (!completionHandler)
         continue;
@@ -7536,4 +7564,66 @@ void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
           }
         });
   }
+}
+
+ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
+    Evaluator &evaluator, DeclAttribute *attr, AccessorDecl *attachedTo,
+    ArrayRef<Identifier> referencedVars) const {
+  auto &ctx = attachedTo->getASTContext();
+
+  auto *storage = attachedTo->getStorage();
+
+  auto typeDC = storage->getDeclContext()->getSelfNominalTypeDecl();
+  if (!typeDC)
+    return ctx.AllocateCopy(ArrayRef<VarDecl *>());
+
+  SmallVector<VarDecl *> results;
+
+  bool failed = false;
+  for (auto name : referencedVars) {
+    auto propertyResults = typeDC->lookupDirect(DeclName(name));
+    switch (propertyResults.size()) {
+    case 0: {
+      ctx.Diags.diagnose(attr->getLocation(), diag::cannot_find_type_in_scope,
+                         DeclNameRef(name));
+      failed = true;
+      break;
+    }
+
+    case 1: {
+      auto *member = propertyResults.front();
+
+      // Only stored properties are supported.
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        if (var->getImplInfo().hasStorage()) {
+          results.push_back(var);
+          break;
+        }
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::init_accessor_can_refer_only_to_properties,
+                         member->getDescriptiveKind(), member->createNameRef());
+      failed = true;
+      break;
+    }
+
+    default:
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::ambiguous_member_overload_set,
+                         DeclNameRef(name));
+
+      for (auto *choice : propertyResults) {
+        ctx.Diags.diagnose(choice, diag::decl_declared_here, choice->getName());
+      }
+
+      failed = true;
+      break;
+    }
+  }
+
+  if (failed)
+    return ctx.AllocateCopy(ArrayRef<VarDecl *>());
+
+  return ctx.AllocateCopy(results);
 }

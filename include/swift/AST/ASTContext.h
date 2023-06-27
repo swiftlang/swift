@@ -168,7 +168,7 @@ enum class KnownFoundationEntity {
 
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
-Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+llvm::Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
 /// Retrieve the Swift name for the given Foundation entity, where
 /// "NS" prefix stripping will apply under omit-needless-words.
@@ -342,12 +342,8 @@ public:
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
 
-  /// The next auto-closure discriminator.  This needs to be preserved
-  /// across invocations of both the parser and the type-checker.
-  unsigned NextAutoClosureDiscriminator = 0;
-
   /// Cached mapping from types to their associated tangent spaces.
-  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+  llvm::DenseMap<Type, llvm::Optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// A cache of derivative function types per configuration.
   llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
@@ -807,9 +803,9 @@ public:
   ///
   /// SIL analog of \c ASTContext::getClangFunctionType .
   const clang::Type *
-  getCanonicalClangFunctionType(
-    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
-    SILFunctionType::Representation trueRep);
+  getCanonicalClangFunctionType(ArrayRef<SILParameterInfo> params,
+                                llvm::Optional<SILResultInfo> result,
+                                SILFunctionType::Representation trueRep);
 
   /// Instantiates "Impl.Converter" if needed, then translate Swift generic
   /// substitutions to equivalent C++ types using \p templateParams and \p
@@ -929,6 +925,10 @@ public:
   /// needed to place array buffers into constant data sections.
   AvailabilityContext getImmortalRefCountSymbolsAvailability();
 
+  /// Get the runtime availability of runtime functions for
+  /// variadic generic types.
+  AvailabilityContext getVariadicGenericTypeAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -970,6 +970,9 @@ public:
   /// Swift compiler for future versions of the target platform.
   AvailabilityContext getSwiftFutureAvailability();
 
+  /// Returns `true` if versioned availability annotations are supported for the
+  /// target triple.
+  bool supportsVersionedAvailability() const;
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -1028,25 +1031,24 @@ public:
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
-  Optional<const ModuleDependencyInfo*> getModuleDependencies(
-      StringRef moduleName,
-      ModuleDependenciesCache &cache,
+  llvm::Optional<const ModuleDependencyInfo *> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool optionalDependencyLookup = false,
-      bool isTestableImport = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
+      bool optionalDependencyLookup = false, bool isTestableImport = false,
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>>
+          dependencyOf = llvm::None);
 
   /// Retrieve the module dependencies for the Clang module with the given name.
-  Optional<const ModuleDependencyInfo*> getClangModuleDependencies(
-      StringRef moduleName,
-      ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate);
+  llvm::Optional<const ModuleDependencyInfo *>
+  getClangModuleDependencies(StringRef moduleName,
+                             ModuleDependenciesCache &cache,
+                             InterfaceSubContextDelegate &delegate);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<const ModuleDependencyInfo*> getSwiftModuleDependencies(
-      StringRef moduleName,
-      ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate);
+  llvm::Optional<const ModuleDependencyInfo *>
+  getSwiftModuleDependencies(StringRef moduleName,
+                             ModuleDependenciesCache &cache,
+                             InterfaceSubContextDelegate &delegate);
 
   /// Compute the extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
@@ -1113,6 +1115,13 @@ public:
   /// name and context.
   unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context,
                                      DeclBaseName baseName);
+
+  /// Get the next discriminator within the given declaration context.
+  unsigned getNextDiscriminator(const DeclContext *dc);
+
+  /// Set the maximum assigned discriminator within the given declaration context.
+  void setMaxAssignedDiscriminator(
+      const DeclContext *dc, unsigned discriminator);
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///
@@ -1494,39 +1503,6 @@ public:
   /// Get the plugin loader.
   PluginLoader &getPluginLoader();
 
-  /// Lookup a library plugin that can handle \p moduleName and return the path
-  /// to it.
-  /// The path is valid within the VFS, use `FS.getRealPath()` for the
-  /// underlying path.
-  Optional<std::string> lookupLibraryPluginByModuleName(Identifier moduleName);
-
-  /// Load the specified dylib plugin path resolving the path with the
-  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
-  /// returns a nullptr.
-  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
-  /// instance is simply returned.
-  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
-
-  /// Lookup an executable plugin that is declared to handle \p moduleName
-  /// module by '-load-plugin-executable'.
-  /// The path is valid within the VFS, use `FS.getRealPath()` for the
-  /// underlying path.
-  Optional<StringRef> lookupExecutablePluginByModuleName(Identifier moduleName);
-
-  /// Look for dynamic libraries in paths from `-external-plugin-path` and
-  /// return a pair of `(library path, plugin server executable)` if found.
-  /// These paths are valid within the VFS, use `FS.getRealPath()` for their
-  /// underlying path.
-  Optional<std::pair<std::string, std::string>>
-  lookupExternalLibraryPluginByModuleName(Identifier moduleName);
-
-  /// Launch the specified executable plugin path resolving the path with the
-  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
-  /// returns a nullptr.
-  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
-  /// instance is simply returned.
-  LoadedExecutablePlugin *loadExecutablePlugin(StringRef path);
-
   /// Get the output backend. The output backend needs to be initialized via
   /// constructor or `setOutputBackend`.
   llvm::vfs::OutputBackend &getOutputBackend() const {
@@ -1542,7 +1518,7 @@ public:
 private:
   friend Decl;
 
-  Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  llvm::Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
   void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
 
   friend TypeBase;

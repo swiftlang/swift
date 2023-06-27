@@ -422,6 +422,18 @@ getProtocolRefsList(llvm::Constant *protocol) {
   if (objCProtocolList->isNullValue()) {
     return std::make_pair(0, nullptr);
   }
+
+  if (!protocol->getContext().supportsTypedPointers()) {
+    auto protocolRefsVar = cast<llvm::GlobalVariable>(objCProtocolList);
+    auto sizeListPair =
+        cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
+    auto size =
+        cast<llvm::ConstantInt>(sizeListPair->getOperand(0))->getZExtValue();
+    auto protocolRefsList =
+        cast<llvm::ConstantArray>(sizeListPair->getOperand(1));
+    return std::make_pair(size, protocolRefsList);
+  }
+
   auto bitcast = cast<llvm::ConstantExpr>(objCProtocolList);
   assert(bitcast->getOpcode() == llvm::Instruction::BitCast);
   auto protocolRefsVar = cast<llvm::GlobalVariable>(bitcast->getOperand(0));
@@ -926,7 +938,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *context = params.takeLast();
   Address dataAddr = layout.emitCastTo(subIGF, context);
   auto &fieldLayout = layout.getElement(0);
-  Address selfAddr = fieldLayout.project(subIGF, dataAddr, None);
+  Address selfAddr = fieldLayout.project(subIGF, dataAddr, llvm::None);
   Explosion selfParams;
   if (retainsSelf)
     cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
@@ -998,7 +1010,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     assert(nativeParam.empty());
 
     // Pass along the value.
-    ti.reexplode(subIGF, nonNativeParam, translatedParams);
+    ti.reexplode(nonNativeParam, translatedParams);
   }
 
   // Prepare the call to the underlying method.
@@ -1066,7 +1078,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure",
                                              Descriptor);
   // FIXME: non-fixed offsets
-  NonFixedOffsets offsets = None;
+  NonFixedOffsets offsets = llvm::None;
   Address dataAddr = layout.emitCastTo(IGF, data);
   auto &fieldLayout = layout.getElement(0);
   auto &fieldType = layout.getElementTypes()[0];

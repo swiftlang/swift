@@ -122,7 +122,7 @@ if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern wi
 
 
 switch n {
-case Foo.A: // expected-error{{enum case 'A' is not a member of type 'Voluntary<Int>'}}
+case Foo.A: // expected-error{{pattern of type 'Foo' cannot match 'Voluntary<Int>'}}
   ()
 case Voluntary<Int>.Naught,
      Voluntary<Int>.Naught(), // expected-error {{pattern with associated values does not match enum case 'Naught'}}
@@ -307,6 +307,7 @@ do {
   while case let _ as [Derived] = arr {}
   // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
 
+  // https://github.com/apple/swift/issues/61850
   for case _ as [Derived] in [arr] {}
 
   if case is [Derived] = arr {}
@@ -363,3 +364,51 @@ let (responseObject: Int?) = op1
 // expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
 // expected-error @-3 {{cannot convert value of type 'Int?' to specified type '(responseObject: _)'}}
+
+enum E<T> {
+  case e(T)
+}
+
+// rdar://108738034 - Make sure we don't treat 'E' as a binding, but can treat
+// 'y' as a binding
+func testNonBinding1(_ x: E<Int>) -> Int {
+  if case let E<Int>.e(y) = x { y } else { 0 }
+}
+
+func testNonBinding2(_ e: E<Int>) -> Int {
+  switch e {
+  case let E<Int>.e(y):
+    y
+  }
+}
+
+// In this case, 'y' should be an identifier, but 'z' is a binding.
+func testNonBinding3(_ x: (Int, Int), y: [Int]) -> Int {
+  if case let (y[0], z) = x { z } else { 0 }
+}
+
+func testNonBinding4(_ x: (Int, Int), y: [Int]) -> Int {
+  switch x {
+  case let (y[0], z):
+    z
+  default:
+    0
+  }
+}
+
+func testNonBinding5(_ x: Int, y: [Int]) {
+  // We treat 'z' here as a binding, which is invalid.
+  if case let y[z] = x {} // expected-error {{pattern variable binding cannot appear in an expression}}
+}
+
+func testNonBinding6(y: [Int], z: Int) -> Int {
+  switch 0 {
+  // We treat 'z' here as a binding, which is invalid.
+  case let y[z]: // expected-error {{pattern variable binding cannot appear in an expression}}
+    z
+  case y[z]: // This is fine
+    0
+  default:
+    0
+  }
+}

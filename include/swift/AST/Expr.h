@@ -25,11 +25,14 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
 
@@ -138,6 +141,7 @@ class alignas(8) Expr : public ASTAllocated<Expr> {
   void operator=(const Expr&) = delete;
 
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Expr, bitmax(NumExprKindBits,8)+1,
@@ -370,6 +374,7 @@ protected:
   );
 
   } Bits;
+  // clang-format on
 
 private:
   /// Ty - This is the type of the expression.
@@ -1198,9 +1203,9 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  Optional<ActorIsolation> isImplicitlyAsync() const {
+  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.DeclRefExpr.IsImplicitlyAsync)
-      return None;
+      return llvm::None;
 
     return implicitActorHopTarget;
   }
@@ -1581,9 +1586,9 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  Optional<ActorIsolation> isImplicitlyAsync() const {
+  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.LookupExpr.IsImplicitlyAsync)
-      return None;
+      return llvm::None;
 
     return implicitActorHopTarget;
   }
@@ -2050,31 +2055,61 @@ public:
   }
 };
 
-/// MoveExpr - A 'move' surrounding an lvalue expression marking the lvalue as
-/// needing to be moved.
-///
-/// getSemanticsProvidingExpr() looks through this because it doesn't
-/// provide the value and only very specific clients care where the
-/// 'move' was written.
-class MoveExpr final : public IdentityExpr {
-  SourceLoc MoveLoc;
+/// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
+/// lvalue as needing to be moved.
+class ConsumeExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc ConsumeLoc;
 
 public:
-  MoveExpr(SourceLoc moveLoc, Expr *sub, Type type = Type(),
-           bool implicit = false)
-      : IdentityExpr(ExprKind::Move, sub, type, implicit), MoveLoc(moveLoc) {}
+  ConsumeExpr(SourceLoc consumeLoc, Expr *sub, Type type = Type(),
+              bool implicit = false)
+      : Expr(ExprKind::Consume, implicit, type), SubExpr(sub),
+        ConsumeLoc(consumeLoc) {}
 
-  static MoveExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc, Expr *sub,
-                                  Type type = Type()) {
-    return new (ctx) MoveExpr(moveLoc, sub, type, /*implicit=*/true);
+  static ConsumeExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc,
+                                     Expr *sub, Type type = Type()) {
+    return new (ctx) ConsumeExpr(moveLoc, sub, type, /*implicit=*/true);
   }
 
-  SourceLoc getLoc() const { return MoveLoc; }
+  SourceLoc getLoc() const { return ConsumeLoc; }
 
-  SourceLoc getStartLoc() const { return MoveLoc; }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return getLoc(); }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
-  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Consume;
+  }
+};
+
+/// CopyExpr - A 'copy' surrounding an lvalue expression marking the lvalue as
+/// needing a semantic copy. Used to force a copy of a no implicit copy type.
+class CopyExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc CopyLoc;
+
+public:
+  CopyExpr(SourceLoc copyLoc, Expr *sub, Type type = Type(),
+           bool implicit = false)
+      : Expr(ExprKind::Copy, implicit, type), SubExpr(sub), CopyLoc(copyLoc) {}
+
+  static CopyExpr *createImplicit(ASTContext &ctx, SourceLoc copyLoc, Expr *sub,
+                                  Type type = Type()) {
+    return new (ctx) CopyExpr(copyLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return CopyLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return CopyLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Copy; }
 };
 
 /// BorrowExpr - A 'borrow' surrounding an lvalue/accessor expression at an
@@ -3627,8 +3662,6 @@ public:
     PatternExpr = patternExpr;
   }
 
-  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
-
   GenericEnvironment *getGenericEnvironment() {
     return Environment;
   }
@@ -3651,7 +3684,7 @@ public:
 };
 
 /// An expression to materialize a pack from a tuple containing a pack
-/// expansion, spelled \c tuple.element.
+/// expansion.
 ///
 /// These nodes are created by CSApply and should only appear in a
 /// type-checked AST in the context of a \c PackExpansionExpr .
@@ -3659,7 +3692,7 @@ class MaterializePackExpr final : public Expr {
   /// The expression from which to materialize a pack.
   Expr *FromExpr;
 
-  /// The source location of \c .element
+  /// The source location of (deprecated) \c .element
   SourceLoc ElementLoc;
 
   MaterializePackExpr(Expr *fromExpr, SourceLoc elementLoc,
@@ -3683,7 +3716,7 @@ public:
   }
 
   SourceLoc getEndLoc() const {
-    return ElementLoc;
+    return ElementLoc.isValid() ? ElementLoc : FromExpr->getEndLoc();
   }
 
   static bool classof(const Expr *E) {
@@ -4673,9 +4706,9 @@ public:
   ///
   /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
-  Optional<ActorIsolation> isImplicitlyAsync() const {
+  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
-      return None;
+      return llvm::None;
 
     return implicitActorHopTarget;
   }
@@ -5951,7 +5984,7 @@ public:
   /// If the provided expression appears as an argument to a subscript component
   /// of the key path, returns the index of that component. Otherwise, returns
   /// \c None.
-  Optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
+  llvm::Optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
 
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
@@ -6186,10 +6219,10 @@ public:
 
 /// An invocation of a macro expansion, spelled with `#` for freestanding
 /// macros or `@` for attached macros.
-class MacroExpansionExpr final : public Expr {
+class MacroExpansionExpr final : public Expr,
+                                 public FreestandingMacroExpansion {
 private:
   DeclContext *DC;
-  MacroExpansionInfo *info;
   Expr *Rewritten;
   MacroRoles Roles;
   MacroExpansionDecl *SubstituteDecl;
@@ -6198,47 +6231,31 @@ public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
   explicit MacroExpansionExpr(DeclContext *dc, MacroExpansionInfo *info,
-                              MacroRoles roles,
-                              bool isImplicit = false,
+                              MacroRoles roles, bool isImplicit = false,
                               Type ty = Type())
       : Expr(ExprKind::MacroExpansion, isImplicit, ty),
-        DC(dc), info(info), Rewritten(nullptr), Roles(roles),
-        SubstituteDecl(nullptr) {
+        FreestandingMacroExpansion(FreestandingMacroKind::Expr, info), DC(dc),
+        Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
     Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
   }
 
-  explicit MacroExpansionExpr(DeclContext *dc,
-                              SourceLoc sigilLoc, DeclNameRef macroName,
-                              DeclNameLoc macroNameLoc,
-                              SourceLoc leftAngleLoc,
-                              ArrayRef<TypeRepr *> genericArgs,
-                              SourceLoc rightAngleLoc,
-                              ArgumentList *argList,
-                              MacroRoles roles,
-                              bool isImplicit = false,
-                              Type ty = Type());
-
-  DeclNameRef getMacroName() const { return info->MacroName; }
-  DeclNameLoc getMacroNameLoc() const { return info->MacroNameLoc; }
+  static MacroExpansionExpr *
+  create(DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
+         DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+         ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
+         ArgumentList *argList, MacroRoles roles, bool isImplicit = false,
+         Type ty = Type());
 
   Expr *getRewritten() const { return Rewritten; }
   void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
 
-  ArrayRef<TypeRepr *> getGenericArgs() const { return info->GenericArgs; }
-
-  SourceRange getGenericArgsRange() const {
-    return SourceRange(info->LeftAngleLoc, info->RightAngleLoc);
+  ArgumentList *getArgs() const {
+    return FreestandingMacroExpansion::getArgs();
   }
-
-  ArgumentList *getArgs() const { return info->ArgList; }
-  void setArgs(ArgumentList *newArgs) { info->ArgList = newArgs; }
 
   MacroRoles getMacroRoles() const { return Roles; }
 
-  SourceLoc getLoc() const { return info->SigilLoc; }
-
-  ConcreteDeclRef getMacroRef() const { return info->macroRef; }
-  void setMacroRef(ConcreteDeclRef ref) { info->macroRef = ref; }
+  SourceLoc getLoc() const { return getPoundLoc(); }
 
   DeclContext *getDeclContext() const { return DC; }
   void setDeclContext(DeclContext *dc) { DC = dc; }
@@ -6261,15 +6278,18 @@ public:
     Bits.MacroExpansionExpr.Discriminator = discriminator;
   }
 
-  MacroExpansionInfo *getExpansionInfo() const { return info; }
-
-  SourceRange getSourceRange() const;
+  SourceRange getSourceRange() const {
+    return getExpansionInfo()->getSourceRange();
+  }
 
   MacroExpansionDecl *createSubstituteDecl();
   MacroExpansionDecl *getSubstituteDecl() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MacroExpansion;
+  }
+  static bool classof(const FreestandingMacroExpansion *expansion) {
+    return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Expr;
   }
 };
 

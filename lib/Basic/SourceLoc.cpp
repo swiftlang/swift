@@ -204,11 +204,11 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
   return nullptr;
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   auto It = BufIdentIDMap.find(BufIdentifier);
   if (It == BufIdentIDMap.end())
-    return None;
+    return llvm::None;
   return It->second;
 }
 
@@ -220,7 +220,7 @@ SourceManager::~SourceManager() {
 
 /// Dump the contents of the given memory buffer to a file, returning the
 /// name of that file (when successful) and \c None otherwise.
-static Optional<std::string>
+static llvm::Optional<std::string>
 dumpBufferToFile(const llvm::MemoryBuffer *buffer,
                  const SourceManager &sourceMgr,
                  CharSourceRange originalSourceRange) {
@@ -229,7 +229,7 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
   llvm::sys::path::system_temp_directory(true, outputFileName);
   llvm::sys::path::append(outputFileName, "swift-generated-sources");
   if (llvm::sys::fs::create_directory(outputFileName))
-    return None;
+    return llvm::None;
 
   // Finalize the name of the resulting file. This is unique based on name
   // mangling.
@@ -267,7 +267,7 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
       }
     });
   if (ec)
-    return None;
+    return llvm::None;
 
   return outputFileName.str().str();
 }
@@ -356,7 +356,7 @@ StringRef SourceManager::getEntireTextForBuffer(unsigned BufferID) const {
 }
 
 StringRef SourceManager::extractText(CharSourceRange Range,
-                                     Optional<unsigned> BufferID) const {
+                                     llvm::Optional<unsigned> BufferID) const {
   assert(Range.isValid() && "range should be valid");
 
   if (!BufferID)
@@ -394,16 +394,19 @@ void SourceManager::setGeneratedSourceInfo(
   }
 }
 
-Optional<GeneratedSourceInfo> SourceManager::getGeneratedSourceInfo(
-    unsigned bufferID
-) const {
+bool SourceManager::hasGeneratedSourceInfo(unsigned bufferID) {
+  return GeneratedSourceInfos.count(bufferID);
+}
+
+llvm::Optional<GeneratedSourceInfo>
+SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   auto known = GeneratedSourceInfos.find(bufferID);
   if (known == GeneratedSourceInfos.end())
-    return None;
+    return llvm::None;
   return known->second;
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());
   // Search the buffers back-to front, so later alias buffers are
@@ -417,7 +420,7 @@ SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
         less_equal(Loc.Value.getPointer(), Buf->getBufferEnd()))
       return i;
   }
-  return None;
+  return llvm::None;
 }
 
 unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
@@ -537,14 +540,14 @@ SourceManager::getLineLength(unsigned BufferId, unsigned Line) const {
   if (BegOffset && EndOffset) {
      return EndOffset.value() - BegOffset.value();
   }
-  return None;
+  return llvm::None;
 }
 
 llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
                                                            unsigned Line,
                                                            unsigned Col) const {
   if (Line == 0) {
-    return None;
+    return llvm::None;
   }
   const bool LineEnd = (Col == ~0u);
   if (LineEnd)
@@ -554,7 +557,7 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
                  ->getLLVMSourceMgr()
                  .FindLocForLineAndColumn(BufferId, Line, Col);
   if (!loc.isValid())
-    return None;
+    return llvm::None;
 
   auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
   const char *Ptr = loc.getPointer();

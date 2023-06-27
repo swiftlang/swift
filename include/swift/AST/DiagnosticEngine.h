@@ -143,7 +143,7 @@ namespace swift {
       StringRef StringVal;
       DeclNameRef IdentifierVal;
       ObjCSelector ObjCSelectorVal;
-      ValueDecl *TheValueDecl;
+      const ValueDecl *TheValueDecl;
       Type TypeVal;
       TypeRepr *TyR;
       FullyQualified<Type> FullyQualifiedTypeVal;
@@ -194,7 +194,7 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
     }
 
-    DiagnosticArgument(ValueDecl *VD)
+    DiagnosticArgument(const ValueDecl *VD)
       : Kind(DiagnosticArgumentKind::ValueDecl), TheValueDecl(VD) {
     }
 
@@ -305,7 +305,7 @@ namespace swift {
       return ObjCSelectorVal;
     }
 
-    ValueDecl *getAsValueDecl() const {
+    const ValueDecl *getAsValueDecl() const {
       assert(Kind == DiagnosticArgumentKind::ValueDecl);
       return TheValueDecl;
     }
@@ -564,6 +564,15 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
 
+    /// Limit the diagnostic behavior to warning if the context is a
+    /// swiftinterface.
+    ///
+    /// This is useful for diagnostics for restrictions that may be lifted by a
+    /// future version of the compiler. In such cases, it may be helpful to
+    /// avoid failing to build a module from its interface if the interface was
+    /// emitted using a compiler that no longer has the restriction.
+    InFlightDiagnostic &warnInSwiftInterface(const DeclContext *context);
+
     /// Conditionally limit the diagnostic behavior to warning until
     /// the specified version.  If the condition is false, no limit is
     /// imposed, meaning (presumably) it is treated as an error.
@@ -819,7 +828,7 @@ namespace swift {
     DiagnosticState state;
 
     /// The currently active diagnostic, if there is one.
-    Optional<Diagnostic> ActiveDiagnostic;
+    llvm::Optional<Diagnostic> ActiveDiagnostic;
 
     /// Diagnostics wrapped by ActiveDiagnostic, if any.
     SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
@@ -1161,7 +1170,7 @@ namespace swift {
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
-    Optional<DiagnosticInfo>
+    llvm::Optional<DiagnosticInfo>
     diagnosticInfoForDiagnostic(const Diagnostic &diagnostic);
 
     /// Send \c diag to all diagnostic consumers.
@@ -1169,8 +1178,7 @@ namespace swift {
 
     /// Retrieve the set of child notes that describe how the generated
     /// source buffer was derived, e.g., a macro expansion backtrace.
-    std::vector<Diagnostic> getGeneratedSourceBufferNotes(
-        SourceLoc loc, Optional<unsigned> &lastBufferID);
+    std::vector<Diagnostic> getGeneratedSourceBufferNotes(SourceLoc loc);
 
     /// Handle a new diagnostic, which will either be emitted, or added to an
     /// active transaction.
@@ -1447,6 +1455,22 @@ namespace swift {
         clear();
       }
       QueueEngine.TransactionCount--;
+    }
+  };
+
+  /// A RAII object that adds and removes a diagnostic consumer from an engine.
+  class DiagnosticConsumerRAII final {
+    DiagnosticEngine &Diags;
+    DiagnosticConsumer &Consumer;
+
+  public:
+    DiagnosticConsumerRAII(DiagnosticEngine &diags,
+                           DiagnosticConsumer &consumer)
+        : Diags(diags), Consumer(consumer) {
+      Diags.addConsumer(Consumer);
+    }
+    ~DiagnosticConsumerRAII() {
+      Diags.removeConsumer(Consumer);
     }
   };
 

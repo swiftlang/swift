@@ -94,7 +94,9 @@ static bool findOverlayFilesInDirectory(ASTContext &ctx, StringRef path,
     callback(file);
   }
 
-  if (error && error != std::errc::no_such_file_or_directory) {
+  // A CAS file list returns operation not permitted on directory iterations.
+  if (error && error != std::errc::no_such_file_or_directory &&
+      error != std::errc::operation_not_permitted) {
     ctx.Diags.diagnose(diagLoc, diag::cannot_list_swiftcrossimport_dir,
                        moduleName, error.message(), path);
   }
@@ -178,7 +180,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
                                                      StringRef moduleName) const {
   using namespace llvm::sys;
   using namespace file_types;
-  Optional<std::string> modulePath;
+  llvm::Optional<std::string> modulePath;
   // A map from secondary module name to a vector of overlay names.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
 

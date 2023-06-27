@@ -276,9 +276,30 @@ struct InternalGeneric<T> {
     let y: Int
 }
 
+public enum SinglePayloadSimpleClassEnum {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(SimpleClass)
+}
+
+public struct ContainsSinglePayloadSimpleClassEnum {
+    public let x: SinglePayloadSimpleClassEnum
+    public let y: AnyObject
+
+    public init(x: SinglePayloadSimpleClassEnum, y: AnyObject) {
+        self.x = x
+        self.y = y
+    }
+}
+
 public enum SinglePayloadEnum<T> {
     case empty
-    case nonEmpty(T?)
+    case nonEmpty(Int, T?)
 }
 
 public struct SinglePayloadEnumWrapper<T> {
@@ -296,6 +317,7 @@ public enum MultiPayloadEnum {
     case b(Int, String)
     case c(Bool)
     case d
+    case e(SimpleClass)
 }
 
 public struct MultiPayloadEnumWrapper {
@@ -306,6 +328,47 @@ public struct MultiPayloadEnumWrapper {
         self.x = x
         self.y = y
     }
+}
+
+public struct MixedEnumWrapper {
+    let x: SinglePayloadSimpleClassEnum
+    let y: MultiPayloadEnum
+
+    public init(x: SinglePayloadSimpleClassEnum, y: MultiPayloadEnum) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public struct MixedEnumWrapperWrapperGeneric<T> {
+    let x: MixedEnumWrapper
+    let y: T
+
+    public init(x: MixedEnumWrapper, y: T) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public struct SinglePayloadEnumExtraTagBytesWrapper {
+    let x: SinglePayloadEnumExtraTagBytes
+    let y: SimpleClass
+
+    public init(x: SinglePayloadEnumExtraTagBytes, y: SimpleClass) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public enum SinglePayloadEnumExtraTagBytes {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(WeakNativeWrapper)
 }
 
 public struct ComplexNesting<A, B, C, D> {
@@ -377,6 +440,21 @@ public struct InternalEnumWrapper {
   public init(x: AnyObject) {
     self.x = .a(23, x)
   }
+}
+
+public enum SingletonEnum<T> {
+    case only(T, Int)
+}
+
+public enum SinglePayloadEnumManyXI {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(Builtin.Int63, SimpleClass)
 }
 
 public struct PrespecializedStruct<T> {

@@ -39,10 +39,9 @@
 using namespace swift;
 using namespace Lowering;
 
-
-Optional<SILVTable::Entry>
-SILGenModule::emitVTableMethod(ClassDecl *theClass,
-                               SILDeclRef derived, SILDeclRef base) {
+llvm::Optional<SILVTable::Entry>
+SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
+                               SILDeclRef base) {
   assert(base.kind == derived.kind);
 
   auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
@@ -73,7 +72,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     // domain, don't emit the vtable entry.
     if (derivedClass->isResilient(M.getSwiftModule(),
                                   ResilienceExpansion::Maximal)) {
-      return None;
+      return llvm::None;
     }
   }
 
@@ -764,7 +763,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // But this is expensive, so we only do it for coroutine lowering.
   // When they're part of the AST function type, we can remove this
   // parameter completely.
-  Optional<SubstitutionMap> witnessSubsForTypeLowering;
+  llvm::Optional<SubstitutionMap> witnessSubsForTypeLowering;
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
@@ -907,9 +906,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                       requirement.getDecl());
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
-                          requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true,
-                          None);
+                          requirement, reqtSubs, requirement, witnessSubs,
+                          isFree, /*isSelfConformance*/ true, llvm::None);
 
   SGM.emitLazyConformancesForFunction(f);
 
@@ -1069,6 +1067,21 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }
 
+void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
+  auto *dd = nom->getValueTypeDestructor();
+  if (!dd)
+    return;
+
+  SILDeclRef constant(dd, SILDeclRef::Kind::Deallocator);
+  SILFunction *f = getFunction(constant, NotForDefinition);
+  auto serialized = IsSerialized_t::IsNotSerialized;
+  bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;
+  // We only serialize the deinit if the type is public and not resilient.
+  if (nomIsPublic && !nom->isResilient())
+    serialized = IsSerialized;
+  SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
+}
+
 namespace {
 
 /// An ASTVisitor for generating SIL from method declarations
@@ -1086,11 +1099,6 @@ public:
     SGM.emitLazyConformancesForType(theType);
 
     forEachMemberToLower(theType, [&](Decl *member) {
-      // FIXME: Conformance macros can generate extension decls. These
-      // are visited as top-level decls; skip them here.
-      if (isa<ExtensionDecl>(member))
-        return;
-
       visit(member);
     });
 
@@ -1098,6 +1106,13 @@ public:
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
       SILGenVTable genVTable(SGM, theClass);
       genVTable.emitVTable();
+    }
+
+    // If this is a nominal type that is move only, emit a deinit table for it.
+    if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
+      if (nom->isMoveOnly()) {
+        SGM.emitNonCopyableTypeDeinitTable(nom);
+      }
     }
 
     // Build a default witness table if this is a protocol that needs one.

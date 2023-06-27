@@ -46,7 +46,7 @@ struct EntityInfo {
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
-  Optional<UIdent> EffectiveAccess;
+  llvm::Optional<UIdent> EffectiveAccess;
 
   EntityInfo() = default;
 };
@@ -87,7 +87,7 @@ struct CodeCompletionInfo {
   StringRef AssocUSRs;
   UIdent SemanticContext;
   UIdent TypeRelation;
-  Optional<uint8_t> ModuleImportDepth;
+  llvm::Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
   bool IsSystem;
   unsigned NumBytesToErase;
@@ -117,8 +117,8 @@ struct CodeCompletionInfo {
     IndexRange parameterRange;
   };
 
-  Optional<DescriptionStructure> descriptionStructure;
-  Optional<ArrayRef<ParameterStructure>> parametersStructure;
+  llvm::Optional<DescriptionStructure> descriptionStructure;
+  llvm::Optional<ArrayRef<ParameterStructure>> parametersStructure;
 };
 
 struct ExpressionType {
@@ -215,11 +215,101 @@ enum class DiagnosticCategory {
   NoUsage
 };
 
+struct RawCharSourceRange {
+  unsigned Offset;
+  unsigned Length;
+};
+
+enum class MacroRole : uint8_t {
+  // This should align with 'swift::MacroRole'.
+  Expression = 0x01,
+  Declaration = 0x02,
+  Accessor = 0x04,
+  MemberAttribute = 0x08,
+  Member = 0x10,
+  Peer = 0x20,
+  Conformance = 0x40,
+  CodeItem = 0x80,
+};
+using MacroRoles = swift::OptionSet<MacroRole>;
+
+struct MacroExpansionInfo {
+  // See swift::ExternalMacroReference.
+  struct ExternalMacroReference {
+    std::string moduleName;
+    std::string typeName;
+
+    ExternalMacroReference(StringRef moduleName, StringRef typeName)
+        : moduleName(moduleName), typeName(typeName){};
+  };
+  // See swift::ExpandedMacroDefinition.
+  struct ExpandedMacroDefinition {
+    // 'Replacement.range' references some part of code in 'expansionText'.
+    // 'expansionText' will be replaced by the 'parameterIndex'-th argument of
+    // the macro.
+    struct Replacement {
+      RawCharSourceRange range;
+      unsigned parameterIndex;
+      Replacement(RawCharSourceRange range, unsigned parameterIndex)
+          : range(range), parameterIndex(parameterIndex) {}
+    };
+    std::string expansionText;
+    std::vector<Replacement> replacements;
+
+    ExpandedMacroDefinition(StringRef expansionText)
+        : expansionText(expansionText), replacements(){};
+  };
+
+  // Offset of the macro expansion syntax (i.e. attribute or #<macro name>) from
+  // the start of the source file.
+  unsigned offset;
+
+  // Macro roles.
+  MacroRoles roles;
+
+  // Tagged union of macro definition.
+  std::variant<ExternalMacroReference, ExpandedMacroDefinition> macroDefinition;
+
+  MacroExpansionInfo(unsigned offset, MacroRoles roles,
+                     ExternalMacroReference macroRef)
+      : offset(offset), roles(roles), macroDefinition(macroRef) {}
+  MacroExpansionInfo(unsigned offset, MacroRoles roles,
+                     ExpandedMacroDefinition definition)
+      : offset(offset), roles(roles), macroDefinition(definition) {}
+};
+
+/// Stores information about a given buffer, including its name and, if
+/// generated, its source text and original location.
+struct BufferInfo {
+  struct OriginalLocation {
+    std::shared_ptr<const BufferInfo> OrigBufferInfo;
+    unsigned OrigBufferID;
+    RawCharSourceRange Range;
+
+    OriginalLocation(std::shared_ptr<const BufferInfo> OrigBufferInfo,
+                     unsigned OrigBufferID, RawCharSourceRange Range)
+        : OrigBufferInfo(std::move(OrigBufferInfo)), OrigBufferID(OrigBufferID),
+          Range(Range) {}
+  };
+
+  std::string BufferName;
+  llvm::Optional<std::string> Contents;
+  llvm::Optional<OriginalLocation> OrigLocation;
+
+  BufferInfo(std::string BufferName, llvm::Optional<std::string> Contents,
+             llvm::Optional<OriginalLocation> OrigLocation)
+      : BufferName(std::move(BufferName)), Contents(std::move(Contents)),
+        OrigLocation(std::move(OrigLocation)) {}
+};
+using BufferInfoSharedPtr = std::shared_ptr<const BufferInfo>;
+
 struct DiagnosticEntryInfoBase {
   struct Fixit {
-    unsigned Offset;
-    unsigned Length;
+    RawCharSourceRange Range;
     std::string Text;
+
+    Fixit(RawCharSourceRange Range, std::string Text)
+        : Range(Range), Text(std::move(Text)) {}
   };
 
   std::string ID;
@@ -227,9 +317,9 @@ struct DiagnosticEntryInfoBase {
   unsigned Offset = 0;
   unsigned Line = 0;
   unsigned Column = 0;
-  std::string Filename;
+  BufferInfoSharedPtr FileInfo;
   SmallVector<DiagnosticCategory, 1> Categories;
-  SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
+  SmallVector<RawCharSourceRange, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
   SmallVector<std::string, 1> EducationalNotePaths;
 };
@@ -293,9 +383,8 @@ public:
 
   virtual bool diagnosticsEnabled() = 0;
 
-  virtual void setDiagnosticStage(UIdent DiagStage) = 0;
-  virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
-                                UIdent DiagStage) = 0;
+  virtual void handleDiagnostics(ArrayRef<DiagnosticEntryInfo> DiagInfos,
+                                 UIdent DiagStage) = 0;
 
   virtual void handleSourceText(StringRef Text) = 0;
 
@@ -754,7 +843,7 @@ struct RenameRangeDetail {
   unsigned EndLine;
   unsigned EndColumn;
   UIdent Kind;
-  Optional<unsigned> ArgIndex;
+  llvm::Optional<unsigned> ArgIndex;
 };
 
 struct CategorizedRenameRanges {
@@ -810,7 +899,7 @@ public:
 
   virtual bool finishSourceEntity(UIdent Kind) = 0;
 
-  virtual bool handleDiagnostic(const DiagnosticEntryInfo &Info) = 0;
+  virtual bool handleDiagnostics(ArrayRef<DiagnosticEntryInfo> Diags) = 0;
 };
 
 struct TypeContextInfoItem {
@@ -901,16 +990,15 @@ public:
                             OptionsDictionary *options,
                             CodeCompletionConsumer &Consumer,
                             ArrayRef<const char *> Args,
-                            Optional<VFSOptions> vfsOptions,
+                            llvm::Optional<VFSOptions> vfsOptions,
                             SourceKitCancellationToken CancellationToken) = 0;
 
-  virtual void
-  codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
-                   unsigned offset, OptionsDictionary *options,
-                   ArrayRef<FilterRule> filterRules,
-                   GroupedCodeCompletionConsumer &consumer,
-                   ArrayRef<const char *> args, Optional<VFSOptions> vfsOptions,
-                   SourceKitCancellationToken CancellationToken) = 0;
+  virtual void codeCompleteOpen(
+      StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
+      OptionsDictionary *options, ArrayRef<FilterRule> filterRules,
+      GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
+      llvm::Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;
@@ -929,17 +1017,16 @@ public:
   virtual void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
-  virtual void
-  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) = 0;
+  virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                          EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                          llvm::Optional<VFSOptions> vfsOptions) = 0;
 
-  virtual void editorOpenInterface(EditorConsumer &Consumer,
-                                   StringRef Name,
+  virtual void editorOpenInterface(EditorConsumer &Consumer, StringRef Name,
                                    StringRef ModuleName,
-                                   Optional<StringRef> Group,
+                                   llvm::Optional<StringRef> Group,
                                    ArrayRef<const char *> Args,
                                    bool SynthesizedExtensions,
-                                   Optional<StringRef> InterestedUSR) = 0;
+                                   llvm::Optional<StringRef> InterestedUSR) = 0;
 
   virtual void editorOpenTypeInterface(EditorConsumer &Consumer,
                                        ArrayRef<const char *> Args,
@@ -985,19 +1072,20 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       unsigned Length, bool Actionables, bool SymbolGraph,
       bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      Optional<VFSOptions> vfsOptions,
+      llvm::Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void
   getDiagnostics(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
-                 Optional<VFSOptions> VfsOptions,
+                 llvm::Optional<VFSOptions> VfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) = 0;
 
   virtual void
-  getNameInfo(StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
+  getNameInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
+              unsigned Offset, NameTranslatingInfo &Input,
               ArrayRef<const char *> Args,
               SourceKitCancellationToken CancellationToken,
               std::function<void(const RequestResult<NameTranslatingInfo> &)>
@@ -1012,7 +1100,7 @@ public:
   virtual void getCursorInfoFromUSR(
       StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
       bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      Optional<VFSOptions> vfsOptions,
+      llvm::Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
@@ -1074,8 +1162,8 @@ public:
   /// the entire document are collected.
   virtual void collectVariableTypes(
       StringRef PrimaryFilePath, StringRef InputBufferName,
-      ArrayRef<const char *> Args, Optional<unsigned> Offset,
-      Optional<unsigned> Length, bool FullyQualified,
+      ArrayRef<const char *> Args, llvm::Optional<unsigned> Offset,
+      llvm::Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;
@@ -1088,18 +1176,24 @@ public:
   virtual void getExpressionContextInfo(
       llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
-      TypeContextInfoConsumer &Consumer, Optional<VFSOptions> vfsOptions) = 0;
+      TypeContextInfoConsumer &Consumer,
+      llvm::Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getConformingMethodList(
       llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
       ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedTypes,
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
-      Optional<VFSOptions> vfsOptions) = 0;
+      llvm::Optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
+                                        ArrayRef<const char *> args,
+                                        ArrayRef<MacroExpansionInfo> expansions,
+                                        CategorizedEditsReceiver receiver) = 0;
 
   virtual void
   performCompile(StringRef Name, ArrayRef<const char *> Args,
-                 Optional<VFSOptions> vfsOptions,
+                 llvm::Optional<VFSOptions> vfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<CompilationResult> &)>
                      Receiver) = 0;

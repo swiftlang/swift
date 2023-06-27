@@ -194,6 +194,16 @@ inline Operand *getSingleDebugUse(SILValue value) {
   return *ii;
 }
 
+/// If \p value has any debug user(s), return the operand associated with some
+/// use. Otherwise, returns nullptr.
+inline Operand *getAnyDebugUse(SILValue value) {
+  auto range = getDebugUses(value);
+  auto ii = range.begin(), ie = range.end();
+  if (ii == ie)
+    return nullptr;
+  return *ii;
+}
+
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.
@@ -427,7 +437,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
 
   Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
 
-  Optional<SILDebugVariable> getVarInfo() const {
+  llvm::Optional<SILDebugVariable> getVarInfo() const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
@@ -533,29 +543,6 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     return inst.getName();
   }
 };
-
-inline DebugVarCarryingInst DebugVarCarryingInst::getFromValue(SILValue value) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
-    if (auto result = VarDeclCarryingInst(svi)) {
-      switch (result.getKind()) {
-      case VarDeclCarryingInst::Kind::Invalid:
-        llvm_unreachable("ShouldKind have never seen this");
-      case VarDeclCarryingInst::Kind::DebugValue:
-      case VarDeclCarryingInst::Kind::AllocStack:
-      case VarDeclCarryingInst::Kind::AllocBox:
-        return DebugVarCarryingInst(svi);
-      case VarDeclCarryingInst::Kind::GlobalAddr:
-      case VarDeclCarryingInst::Kind::RefElementAddr:
-        return DebugVarCarryingInst();
-      }
-    }
-  }
-
-  if (auto *use = getSingleDebugUse(value))
-    return DebugVarCarryingInst(use->getUser());
-
-  return DebugVarCarryingInst();
-}
 
 static_assert(sizeof(DebugVarCarryingInst) == sizeof(VarDeclCarryingInst) &&
                   alignof(DebugVarCarryingInst) == alignof(VarDeclCarryingInst),

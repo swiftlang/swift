@@ -1804,8 +1804,8 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitForgetStmt(ForgetStmt *S) {
-    printCommon(S, "forget_stmt") << '\n';
+  void visitDiscardStmt(DiscardStmt *S) {
+    printCommon(S, "discard_stmt") << '\n';
     printRec(S->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2128,6 +2128,17 @@ public:
     PrintWithColorRAII(OS, ExprModifierColor)
       << " number_of_decls=" << E->getDecls().size()
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
+    if (!E->isForOperator()) {
+      PrintWithColorRAII(OS, ExprModifierColor) << " decls=[\n";
+      interleave(
+          E->getDecls(),
+          [&](ValueDecl *D) {
+            OS.indent(Indent + 2);
+            D->dumpRef(PrintWithColorRAII(OS, DeclModifierColor).getOS());
+          },
+          [&] { PrintWithColorRAII(OS, DeclModifierColor) << ",\n"; });
+      PrintWithColorRAII(OS, ExprModifierColor) << "]";
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -2194,8 +2205,14 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitMoveExpr(MoveExpr *E) {
-    printCommon(E, "move_expr");
+  void visitConsumeExpr(ConsumeExpr *E) {
+    printCommon(E, "consume_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitCopyExpr(CopyExpr *E) {
+    printCommon(E, "copy_expr");
     OS << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3335,6 +3352,22 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitSelfTypeRepr(SelfTypeRepr *T) {
+    printCommon("type_self");
+    auto Ty = T->getType();
+    if (Ty) {
+      auto &srcMgr =  Ty->getASTContext().SourceMgr;
+      if (T->getLoc().isValid()) {
+        OS << " location=@";
+        T->getLoc().print(OS, srcMgr);
+      } else {
+        OS << " location=<<invalid>>";
+      }
+    }
+    OS << " type="; Ty.dump(OS);
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
     printCommon("sil_box");
     Indent += 2;
@@ -3864,6 +3897,13 @@ namespace {
       printCommon(label, "pack_expansion_type");
       printRec("pattern", T->getPatternType());
       printRec("count", T->getCountType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitPackElementType(PackElementType *T, StringRef label) {
+      printCommon(label, "element_type");
+      printField("level", T->getLevel());
+      printRec("pack", T->getPackType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

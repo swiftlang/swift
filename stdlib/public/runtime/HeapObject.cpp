@@ -35,7 +35,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <new>
-#include <thread>
 #if SWIFT_OBJC_INTEROP
 # include <objc/NSObject.h>
 # include <objc/runtime.h>
@@ -815,11 +814,19 @@ void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
   size_t retainCount = swift_retainCount(object);
-  if (SWIFT_UNLIKELY(retainCount > 1))
+  if (SWIFT_UNLIKELY(retainCount > 1)) {
+    auto descriptor = object->metadata->getTypeContextDescriptor();
+
     swift::fatalError(0,
-                      "Object %p deallocated with retain count %zd, reference "
-                      "may have escaped from deinit.\n",
-                      object, retainCount);
+                      "Object %p of class %s deallocated with non-zero retain "
+                      "count %zd. This object's deinit, or something called "
+                      "from it, may have created a strong reference to self "
+                      "which outlived deinit, resulting in a dangling "
+                      "reference.\n",
+                      object,
+                      descriptor ? descriptor->Name.get() : "<unknown>",
+                      retainCount);
+  }
 
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
@@ -849,6 +856,17 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   // Destroy ivars
   auto *classMetadata = _swift_getClassOfAllocated(object)->getClassObject();
   assert(classMetadata && "Not a class?");
+
+#if SWIFT_OBJC_INTEROP
+  // If the object's class is already pure ObjC class, just release it and move
+  // on. There are no ivar destroyers. This avoids attempting to mutate
+  // placeholder objects statically created in read-only memory.
+  if (classMetadata->isPureObjC()) {
+    objc_release((id)object);
+    return;
+  }
+#endif
+
   while (classMetadata != metadata) {
 #if SWIFT_OBJC_INTEROP
     // If we have hit a pure Objective-C class, we won't see another ivar

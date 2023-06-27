@@ -94,13 +94,11 @@ SILGenModule::~SILGenModule() {
   M.verifyIncompleteOSSA();
 }
 
-static SILDeclRef
-getBridgingFn(Optional<SILDeclRef> &cacheSlot,
-              SILGenModule &SGM,
-              Identifier moduleName,
-              StringRef functionName,
-              std::initializer_list<Type> inputTypes,
-              Type outputType) {
+static SILDeclRef getBridgingFn(llvm::Optional<SILDeclRef> &cacheSlot,
+                                SILGenModule &SGM, Identifier moduleName,
+                                StringRef functionName,
+                                std::initializer_list<Type> inputTypes,
+                                Type outputType) {
   if (!cacheSlot) {
     ASTContext &ctx = SGM.M.getASTContext();
     ModuleDecl *mod = ctx.getLoadedModule(moduleName);
@@ -366,12 +364,13 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
 }
 
 static FuncDecl *lookupIntrinsic(ModuleDecl &module,
-                                 Optional<FuncDecl *> &cache, Identifier name) {
+                                 llvm::Optional<FuncDecl *> &cache,
+                                 Identifier name) {
   if (cache)
     return *cache;
 
   SmallVector<ValueDecl *, 1> decls;
-  module.lookupQualified(&module, DeclNameRef(name),
+  module.lookupQualified(&module, DeclNameRef(name), SourceLoc(),
                          NL_QualifiedDefault | NL_IncludeUsableFromInline,
                          decls);
   if (decls.size() != 1) {
@@ -384,7 +383,7 @@ static FuncDecl *lookupIntrinsic(ModuleDecl &module,
 }
 
 static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            Optional<FuncDecl *> &cache,
+                                            llvm::Optional<FuncDecl *> &cache,
                                             StringRef name) {
   auto *module = C.getLoadedModule(C.Id_Concurrency);
   if (!module) {
@@ -602,17 +601,10 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto env = sig.getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
-  fn = builder.createFunction(SILLinkage::PublicExternal,
-                              functionName,
-                              functionTy,
-                              env,
-                              /*location*/ None,
-                              IsNotBare,
-                              IsNotTransparent,
-                              IsNotSerialized,
-                              IsNotDynamic,
-                              IsNotDistributed,
-                              IsNotRuntimeAccessible);
+  fn = builder.createFunction(
+      SILLinkage::PublicExternal, functionName, functionTy, env,
+      /*location*/ llvm::None, IsNotBare, IsNotTransparent, IsNotSerialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
   return fn;
 }
@@ -875,6 +867,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       break;
     }
 
+    if (constant.isInitAccessor()) {
+      auto *accessor = cast<AccessorDecl>(constant.getDecl());
+      preEmitFunction(constant, f, accessor);
+      PrettyStackTraceSILFunction X("silgen init accessor", f);
+      f->createProfiler(constant);
+      SILGenFunction(*this, *f, accessor).emitInitAccessor(accessor);
+      postEmitFunction(constant, f);
+      break;
+    }
+
     auto *fd = cast<FuncDecl>(constant.getDecl());
 
     preEmitFunction(constant, f, fd);
@@ -1079,11 +1081,6 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f, dd).emitDeallocatingDestructor(dd);
-
-    // If we have a move only type, create the table for this type.
-    if (nom->isMoveOnly())
-      SILMoveOnlyDeinit::create(f->getModule(), nom, IsNotSerialized, f);
-
     postEmitFunction(constant, f);
     return;
   }
@@ -1504,7 +1501,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
   if (!cd->requiresStoredPropertyInits())
     return false;
 
-  for (Decl *member : cd->getImplementationContext()->getMembers()) {
+  for (Decl *member : cd->getImplementationContext()->getAllMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
@@ -1517,7 +1514,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
 }
 
 bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
-  for (Decl *member : cd->getImplementationContext()->getMembers()) {
+  for (Decl *member : cd->getImplementationContext()->getAllMembers()) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
@@ -1934,7 +1931,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   bool needsGenericContext = true;
   
   if (canStorageUseTrivialDescriptor(*this, decl)) {
-    (void)SILProperty::create(M, /*serialized*/ false, decl, None);
+    (void)SILProperty::create(M, /*serialized*/ false, decl, llvm::None);
     return;
   }
   
@@ -2004,7 +2001,7 @@ namespace {
 class SourceFileScope {
   SILGenModule &sgm;
   SILDeclRef EntryRef;
-  Optional<Scope> scope;
+  llvm::Optional<Scope> scope;
   bool isAsyncTopLevel = false;
 public:
   SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm) {
@@ -2038,7 +2035,7 @@ public:
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
       auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
 
-      sgm.TopLevelSGF->prepareEpilog(None, true, moduleCleanupLoc);
+      sgm.TopLevelSGF->prepareEpilog(llvm::None, true, moduleCleanupLoc);
 
       auto prologueLoc = RegularLocation::getModuleLocation();
       prologueLoc.markAsPrologue();
@@ -2196,10 +2193,6 @@ public:
     for (auto *D : sf->getTopLevelDecls()) {
       // Emit auxiliary decls.
       D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-        // Skip extensions decls; they are visited below.
-        if (isa<ExtensionDecl>(auxiliaryDecl))
-          return;
-
         FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                         "SILgen-decl", auxiliaryDecl);
         SGM.visit(auxiliaryDecl);
@@ -2357,7 +2350,7 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options,
-                                                    None, irgenOptions);
+                                                    llvm::None, irgenOptions);
   return llvm::cantFail(
       mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
 }
@@ -2366,6 +2359,7 @@ std::unique_ptr<SILModule>
 swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
-  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options, None, irgenOptions);
+  auto desc =
+      ASTLoweringDescriptor::forFile(sf, tc, options, llvm::None, irgenOptions);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }

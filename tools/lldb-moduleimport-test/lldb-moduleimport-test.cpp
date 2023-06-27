@@ -89,6 +89,25 @@ static bool validateModule(
       llvm::outs() << ", system=" << (searchPath.IsSystem ? "true" : "false")
                    << "\n";
     }
+    llvm::outs() << "- Plugin Search Options:\n";
+    for (auto opt : extendedInfo.getPluginSearchOptions()) {
+      StringRef optStr;
+      switch (opt.first) {
+      case swift::PluginSearchOption::Kind::PluginPath:
+        optStr = "-plugin-path";
+        break;
+      case swift::PluginSearchOption::Kind::ExternalPluginPath:
+        optStr = "-external-plugin-path";
+        break;
+      case swift::PluginSearchOption::Kind::LoadPluginLibrary:
+        optStr = "-load-plugin-library";
+        break;
+      case swift::PluginSearchOption::Kind::LoadPluginExecutable:
+        optStr = "-load-plugin-executable";
+        break;
+      }
+      llvm::outs() << "    " << optStr << " " << opt.second << "\n";
+    }
   }
 
   return true;
@@ -230,6 +249,9 @@ int main(int argc, char **argv) {
   opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
                     cat(Visible));
 
+  opt<std::string> Filter("filter", desc("triple for filtering modules"),
+                          cat(Visible));
+
   opt<std::string> ModuleCachePath(
       "module-cache-path", desc("Clang module cache path"), cat(Visible));
 
@@ -342,9 +364,11 @@ int main(int argc, char **argv) {
     ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
   }
 
+  llvm::Triple filter(Filter);
   for (auto &Module : Modules)
     if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
-                         StringRef(Module.first, Module.second), modules)) {
+                         StringRef(Module.first, Module.second), filter,
+                         modules)) {
       llvm::errs() << "error: Failed to parse AST section!\n";
       return 1;
     }

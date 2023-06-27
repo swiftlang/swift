@@ -107,6 +107,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   GlobalActor.swift
   MainActor.swift
   PartialAsyncTask.swift
+  Setup.cpp
   SourceCompatibilityShims.swift
   Task.cpp
   Task.swift
@@ -119,7 +120,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.cpp
   TaskLocal.swift
   TaskSleep.swift
-  ThreadSanitizer.cpp
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStreamBuffer.swift
@@ -149,7 +149,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
-    -enable-experimental-feature MoveOnly
     -diagnostic-style swift
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   ${swift_concurrency_options}

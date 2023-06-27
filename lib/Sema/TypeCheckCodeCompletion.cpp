@@ -574,15 +574,12 @@ bool TypeChecker::typeCheckForCodeCompletion(
       return false;
   }
 
-  auto node = target.getAsASTNode();
-  if (!node)
-    return false;
-
-  if (auto *expr = getAsExpr(node)) {
-    node = expr->walk(SanitizeExpr(Context));
+  if (getAsExpr(target.getAsASTNode())) {
+    SanitizeExpr sanitizer(Context);
+    target = *target.walk(sanitizer);
   }
 
-  CompletionContextFinder contextAnalyzer(node, DC);
+  CompletionContextFinder contextAnalyzer(target, DC);
 
   // If there was no completion expr (e.g. if the code completion location was
   // among tokens that were skipped over during parser error recovery) bail.
@@ -674,16 +671,15 @@ bool TypeChecker::typeCheckForCodeCompletion(
   return true;
 }
 
-static Optional<Type> getTypeOfCompletionContextExpr(
-                        DeclContext *DC,
-                        CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr,
-                        ConcreteDeclRef &referencedDecl) {
+static llvm::Optional<Type>
+getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
+                               Expr *&parsedExpr,
+                               ConcreteDeclRef &referencedDecl) {
   if (constraints::ConstraintSystem::preCheckExpression(
           parsedExpr, DC,
           /*replaceInvalidRefsWithErrors=*/true,
           /*leaveClosureBodiesUnchecked=*/true))
-    return None;
+    return llvm::None;
 
   switch (kind) {
   case CompletionTypeCheckKind::Normal:
@@ -708,7 +704,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
       }
     }
 
-    return None;
+    return llvm::None;
   }
 
   Type originalType = parsedExpr->getType();
@@ -726,17 +722,14 @@ static Optional<Type> getTypeOfCompletionContextExpr(
     return parsedExpr->getType();
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
-Optional<Type> swift::getTypeOfCompletionContextExpr(
-                        ASTContext &Ctx,
-                        DeclContext *DC,
-                        CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr,
-                        ConcreteDeclRef &referencedDecl) {
+llvm::Optional<Type> swift::getTypeOfCompletionContextExpr(
+    ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
+    Expr *&parsedExpr, ConcreteDeclRef &referencedDecl) {
   DiagnosticSuppression suppression(Ctx.Diags);
 
   // Try to solve for the actual type of the expression.
@@ -770,6 +763,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
 
 LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
-  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
+  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), SourceLoc(),
+                                   llvm::None);
 }
 

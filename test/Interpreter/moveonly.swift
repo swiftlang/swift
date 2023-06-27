@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
 
 // REQUIRES: executable_test
 
@@ -45,7 +46,7 @@ Tests.test("global destroyed once") {
   do {
     global = FD()
   }
-  expectEqual(0, LifetimeTracked.instances)    
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 @_moveOnly
@@ -104,3 +105,31 @@ Tests.test("empty struct") {
     let _ = consume e
   }
 }
+
+protocol P {
+   var name: String { get }
+}
+
+Tests.test("AddressOnly") {
+    class Klass : P {
+        var name: String { "myName" }
+    }
+
+    @_moveOnly
+    struct S<T : P> {
+        var t: T
+    }
+
+    let e = S(t: Klass())
+    expectEqual(e.t.name, "myName")
+
+    func testGeneric<T : P>(_ x: borrowing S<T>) {
+        expectEqual(x.t.name, "myName")
+    }
+    testGeneric(e)
+
+    if e.t.name.count == 5 {
+        let _ = consume e
+    }
+}
+

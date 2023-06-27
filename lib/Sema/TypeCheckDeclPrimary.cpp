@@ -168,7 +168,7 @@ static void checkInheritanceClause(
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
-  Optional<std::pair<unsigned, SourceRange>> inheritedAnyObject;
+  llvm::Optional<std::pair<unsigned, SourceRange>> inheritedAnyObject;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -277,7 +277,7 @@ static void checkInheritanceClause(
     }
 
     // If this is an enum inheritance clause, check for a raw type.
-    if (isa<EnumDecl>(decl)) {
+    if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
       // Check if we already had a raw type.
       if (superclassTy) {
         if (superclassTy->isEqual(inheritedTy)) {
@@ -293,6 +293,18 @@ static void checkInheritanceClause(
         }
         continue;
       }
+
+      // Noncopyable types cannot have a raw type until there is support for
+      // generics, since the raw type here is only useful if we'll generate
+      // a conformance to RawRepresentable, which is currently disabled.
+      if (enumDecl->isMoveOnly()) {
+        // TODO: getRemovalRange is not yet aware of ~Copyable entries so it
+        // will accidentally delete commas or colons that are needed.
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::enum_raw_type_nonconforming_and_noncopyable,
+                       enumDecl->getDeclaredInterfaceType(), inheritedTy)
+             .highlight(inherited.getSourceRange());
+      }
       
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
@@ -303,11 +315,9 @@ static void checkInheritanceClause(
           .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
-
-        // Fall through to record the raw type.
       }
 
-      // Record the raw type.
+      // Save the raw type locally.
       superclassTy = inheritedTy;
       superclassRange = inherited.getSourceRange();
       continue;
@@ -471,14 +481,29 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   if (!genericParams)
     return;
 
+  auto *decl = ownerCtx->getAsDecl();
+  bool hasPack = false;
+
   for (auto gp : *genericParams) {
     // Diagnose generic types with a parameter packs if VariadicGenerics
     // is not enabled.
-    auto *decl = ownerCtx->getAsDecl();
-    auto &ctx = decl->getASTContext();
-    if (gp->isParameterPack() && isa<GenericTypeDecl>(decl) &&
-        !ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-      decl->diagnose(diag::experimental_type_with_parameter_pack);
+    if (gp->isParameterPack()) {
+      // Variadic nominal types require runtime support.
+      if (isa<NominalTypeDecl>(decl)) {
+        TypeChecker::checkAvailability(
+            gp->getSourceRange(),
+            ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
+            diag::availability_variadic_type_only_version_newer,
+            ownerCtx);
+      }
+
+      // Variadic nominal and type alias types can only have a single
+      // parameter pack.
+      if (hasPack && isa<GenericTypeDecl>(decl)) {
+        gp->diagnose(diag::more_than_one_pack_in_type);
+      }
+
+      hasPack = true;
     }
 
     TypeChecker::checkDeclAttributes(gp);
@@ -793,8 +818,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
 
       if (isAcceptableVersionBasedChange) {
         class AvailabilityRange {
-          Optional<llvm::VersionTuple> introduced;
-          Optional<llvm::VersionTuple> obsoleted;
+          llvm::Optional<llvm::VersionTuple> introduced;
+          llvm::Optional<llvm::VersionTuple> obsoleted;
 
         public:
           static AvailabilityRange from(const ValueDecl *VD) {
@@ -963,13 +988,13 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   return std::make_tuple<>();
 }
 
-static Optional<unsigned>
-getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+static llvm::Optional<unsigned> getParamIndex(const ParameterList *paramList,
+                                              const ParamDecl *decl) {
   ArrayRef<ParamDecl *> params = paramList->getArray();
   for (unsigned i = 0; i < params.size(); ++i) {
     if (params[i] == decl) return i;
   }
-  return None;
+  return llvm::None;
 }
 
 static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
@@ -998,7 +1023,7 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   }
 
   // The corresponding parameter should have a default value.
-  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
+  llvm::Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
   assert(idx && "containing decl does not contain param?");
   ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
   if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
@@ -1242,19 +1267,19 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
-static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
-                                                           Pattern *pattern) {
+static llvm::Optional<std::string>
+buildDefaultInitializerString(DeclContext *dc, Pattern *pattern) {
   switch (pattern->getKind()) {
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #define PATTERN(Id, Parent)
 #include "swift/AST/PatternNodes.def"
-    return None;
+    return llvm::None;
   case PatternKind::Any:
-    return None;
+    return llvm::None;
 
   case PatternKind::Named: {
     if (!pattern->hasType())
-      return None;
+      return llvm::None;
 
     // Special-case the various types we might see here.
     auto type = pattern->getType();
@@ -1279,7 +1304,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
     if (type->getOptionalObjectType())
       return std::string("nil");
 
-    return None;
+    return llvm::None;
   }
 
   case PatternKind::Paren: {
@@ -1288,7 +1313,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
       return "(" + *sub + ")";
     }
 
-    return None;
+    return llvm::None;
   }
 
   case PatternKind::Tuple: {
@@ -1304,7 +1329,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
 
         result += *sub;
       } else {
-        return None;
+        return llvm::None;
       }
     }
     result += ")";
@@ -1397,6 +1422,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
           { C, DeclBaseName::createConstructor(), { C.Id_from } });
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
+                                    classDecl->getLoc(),
                                     NameLookupFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
@@ -1485,8 +1511,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       }
 
       auto varLoc = vars[0]->getLoc();
-      
-      Optional<InFlightDiagnostic> diag;
+
+      llvm::Optional<InFlightDiagnostic> diag;
       switch (vars.size()) {
       case 1:
         diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_1,
@@ -1611,9 +1637,9 @@ static void diagnoseChangesByAccessNote(
 
 template <typename Attr>
 static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
-                            Optional<bool> expected,
+                            llvm::Optional<bool> expected,
                             SmallVectorImpl<DeclAttribute *> &removedAttrs,
-                            llvm::function_ref<Attr*()> willCreate) {
+                            llvm::function_ref<Attr *()> willCreate) {
   if (!expected) return;
 
   auto attr = VD->getAttrs().getAttribute<Attr>();
@@ -1834,7 +1860,7 @@ public:
     if (!isa<ClassDecl>(decl->getDeclContext())) {
       decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
         this->visit(auxiliaryDecl);
-      });
+      }, /*visitFreestandingExpanded=*/false);
     }
 
     if (auto *Stats = getASTContext().Stats)
@@ -2002,6 +2028,17 @@ public:
     llvm_unreachable("should always be type-checked already");
   }
 
+  /// Determine the number of bits set.
+  static unsigned numBitsSet(uint64_t value) {
+    unsigned count = 0;
+    for (uint64_t i : range(0, 63)) {
+      if (value & (uint64_t(1) << i))
+        ++count;
+    }
+
+    return count;
+  }
+
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
     checkAccessControl(MD);
@@ -2032,7 +2069,7 @@ public:
       ExternalMacroDefinitionRequest request{
         &Ctx, external.moduleName, external.macroTypeName
       };
-      auto externalDef = evaluateOrDefault(Ctx.evaluator, request, None);
+      auto externalDef = evaluateOrDefault(Ctx.evaluator, request, llvm::None);
       if (!externalDef) {
         MD->diagnose(
             diag::external_macro_not_found,
@@ -2045,13 +2082,46 @@ public:
       break;
     }
     }
+
+    // If the macro has a result type, it must have the freestanding
+    // expression role. Other roles cannot have result types.
+    if (auto resultTypeRepr = MD->getResultTypeRepr()) {
+      if (!MD->getMacroRoles().contains(MacroRole::Expression)) {
+        auto resultType = MD->getResultInterfaceType(); {
+          auto diag = Ctx.Diags.diagnose(
+              MD->arrowLoc, diag::macro_result_type_cannot_be_used, resultType);
+          diag.highlight(resultTypeRepr->getSourceRange());
+
+          // In a .swiftinterface file, downgrade this diagnostic to a warning.
+          // This allows the compiler to process existing .swiftinterface
+          // files that contain this issue.
+          if (resultType->isVoid()) {
+            if (auto sourceFile = MD->getParentSourceFile())
+              if (sourceFile->Kind == SourceFileKind::Interface)
+                diag.limitBehavior(DiagnosticBehavior::Warning);
+          }
+        }
+
+        Ctx.Diags.diagnose(MD->arrowLoc, diag::macro_make_freestanding_expression)
+          .fixItInsert(MD->getAttributeInsertionLoc(false),
+                       "@freestanding(expression)\n");
+        Ctx.Diags.diagnose(MD->arrowLoc, diag::macro_remove_result_type)
+          .fixItRemove(SourceRange(MD->arrowLoc, resultTypeRepr->getEndLoc()));
+      }
+    }
+
+    // A macro can only have a single freestanding macro role.
+    MacroRoles freestandingRolesInhabited =
+        MD->getMacroRoles() & getFreestandingMacroRoles();
+    if (numBitsSet(freestandingRolesInhabited.toRaw()) > 1) {
+      MD->diagnose(diag::macro_multiple_freestanding_roles);
+    }
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-    // Decls in expansion already visited as auxiliary decls.
-    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+    MED->forEachExpandedNode([&](ASTNode node) {
       TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
     });
   }
@@ -2229,7 +2299,7 @@ public:
         if (PBD->isInitialized(i)) {
           // Add the attribute that preserves the "has an initializer" value
           // across module generation, as required for TBDGen.
-          if (var->hasStorage() &&
+          if (var->supportsInitialization() &&
               !var->getAttrs().hasAttribute<HasInitialValueAttr>()) {
             var->getAttrs().add(new (Ctx)
                                     HasInitialValueAttr(/*IsImplicit=*/true));
@@ -2545,6 +2615,17 @@ public:
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
 
+    // Temporary restriction until we figure out pattern matching and
+    // enum case construction with packs.
+    if (auto genericSig = ED->getGenericSignature()) {
+      for (auto paramTy : genericSig.getGenericParams()) {
+        if (paramTy->isParameterPack()) {
+          ED->diagnose(diag::enum_with_pack);
+          break;
+        }
+      }
+    }
+
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
@@ -2586,7 +2667,7 @@ public:
     //
 
     if (ED->isObjC() && ED->isMoveOnly()) {
-      ED->diagnose(diag::moveonly_objc_enum_banned);
+      ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
@@ -2600,15 +2681,22 @@ public:
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
-    if (ED->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+    if (ED->isMoveOnly()) {
       if (ED->isIndirect())
-        ED->diagnose(diag::moveonly_enums_do_not_support_indirect,
+        ED->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
       for (auto *elt : ED->getAllElements()) {
         if (elt->isIndirect()) {
-          elt->diagnose(diag::moveonly_enums_do_not_support_indirect,
+          elt->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                         ED->getBaseIdentifier());
         }
+      }
+
+      if (!ED->getASTContext().LangOpts.hasFeature(
+              Feature::MoveOnlyResilientTypes) &&
+          ED->isResilient()) {
+        ED->diagnose(diag::noncopyable_types_cannot_be_resilient,
+                     ED->getDescriptiveKind(), ED->getBaseIdentifier());
       }
     }
   }
@@ -2650,6 +2738,13 @@ public:
     diagnoseCopyableTypeContainingMoveOnlyType(SD);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
+
+    if (!SD->getASTContext().LangOpts.hasFeature(
+            Feature::MoveOnlyResilientTypes) &&
+        SD->isResilient() && SD->isMoveOnly()) {
+      SD->diagnose(diag::noncopyable_types_cannot_be_resilient,
+                   SD->getDescriptiveKind(), SD->getBaseIdentifier());
+    }
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2754,10 +2849,14 @@ public:
   /// check to see if a move-only type can ever conform to the given type.
   /// \returns true iff a diagnostic was emitted because it was not compatible
   static bool diagnoseIncompatibleWithMoveOnlyType(SourceLoc loc,
-                                                 NominalTypeDecl *moveonlyType,
-                                                 Type type) {
+                                                   NominalTypeDecl *moveonlyType,
+                                                   Type type) {
     assert(type && "got an empty type?");
     assert(moveonlyType->isMoveOnly());
+
+    // no need to emit a diagnostic if the type itself is already problematic.
+    if (type->hasError())
+      return false;
 
     auto canType = type->getCanonicalType();
     if (auto prot = canType->getAs<ProtocolType>()) {
@@ -2770,7 +2869,7 @@ public:
 
     auto &ctx = moveonlyType->getASTContext();
     ctx.Diags.diagnose(loc,
-                       diag::moveonly_cannot_conform_to_type,
+                       diag::noncopyable_cannot_conform_to_type,
                        moveonlyType->getDescriptiveKind(),
                        moveonlyType->getBaseName(),
                        type);
@@ -2820,6 +2919,18 @@ public:
       else if (superclass->isActor())
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
+
+      // Enforce a temporary restriction on inheriting from a superclass
+      // type with a pack, until we figure out the semantics of method
+      // overrides in these situations.
+      if (auto genericSig = superclass->getGenericSignature()) {
+        for (auto paramTy : genericSig.getGenericParams()) {
+          if (paramTy->isParameterPack()) {
+            CD->diagnose(diag::superclass_with_pack);
+            break;
+          }
+        }
+      }
     }
 
     if (CD->isDistributedActor()) {
@@ -3242,8 +3353,8 @@ public:
     // FIXME: This needs to be moved to its own request if we want to
     // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      Optional<ForeignAsyncConvention> asyncConvention;
-      Optional<ForeignErrorConvention> errorConvention;
+      llvm::Optional<ForeignAsyncConvention> asyncConvention;
+      llvm::Optional<ForeignErrorConvention> errorConvention;
       ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
       if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
@@ -3607,7 +3718,7 @@ public:
     if (CD->isFailable()) {
       if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (nom->isMoveOnly()) {
-          CD->diagnose(diag::moveonly_failable_init);
+          CD->diagnose(diag::noncopyable_failable_init);
         }
       }
     }
@@ -3671,7 +3782,7 @@ void TypeChecker::typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked) {
 
 void TypeChecker::checkParameterList(ParameterList *params,
                                      DeclContext *owner) {
-  Optional<ParamDecl*> firstIsolatedParam;
+  llvm::Optional<ParamDecl *> firstIsolatedParam;
   bool diagnosedDuplicateIsolatedParam = false;
   for (auto param: *params) {
     checkDeclAttributes(param);
@@ -3787,18 +3898,17 @@ void TypeChecker::checkParameterList(ParameterList *params,
   }
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
 
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(
-      ctx.evaluator, ResolveMacroRequest{MED, MED},
-      ConcreteDeclRef());
+  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
+                                 ConcreteDeclRef());
   if (!macro)
-    return None;
+    return llvm::None;
   MED->setMacroRef(macro);
 
   auto roles = cast<MacroDecl>(macro.getDecl())->getMacroRoles();
@@ -3807,7 +3917,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   // So there's no thing to be done here.
   if (!roles.contains(MacroRole::Declaration) &&
       !roles.contains(MacroRole::CodeItem))
-    return None;
+    return llvm::None;
 
   // For now, restrict global freestanding macros in script mode.
   if (dc->isModuleScopeContext() &&

@@ -181,13 +181,13 @@ protected:
     SHARED_TEMPLATE_FIELD(typename, SwitchEnumInstBase, bool hasDefault);
     SHARED_TEMPLATE_FIELD(SILInstructionKind, LoadReferenceInstBase, bool isTake);
     SHARED_TEMPLATE_FIELD(SILInstructionKind, StoreReferenceInstBase, bool isInitializationOfDest);
-    SHARED_FIELD(SILArgument, uint8_t valueOwnershipKind);
     SHARED_FIELD(MultipleValueInstructionResult, uint8_t valueOwnershipKind);
     SHARED_FIELD(UncheckedOwnershipConversionInst, uint8_t valueOwnershipKind);
     SHARED_FIELD(StoreInst, uint8_t ownershipQualifier);
     SHARED_FIELD(LoadInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignByWrapperInst, uint8_t mode);
+    SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
     SHARED_FIELD(SelectEnumInstBase, bool hasDefault);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);
@@ -203,6 +203,11 @@ protected:
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
 
+    SHARED_FIELD(SILArgument, uint8_t
+                 valueOwnershipKind : NumVOKindBits,
+                 reborrow : 1,
+                 pointerEscape : 1);
+
     SHARED_FIELD(DebugValueInst, uint8_t
                  poisonRefs : 1,
                  usesMoveableValueDebugInfo : 1,
@@ -217,12 +222,17 @@ protected:
     SHARED_FIELD(AllocBoxInst, uint8_t
                  dynamicLifetime : 1,
                  reflection : 1,
-                 usesMoveableValueDebugInfo : 1);
+                 usesMoveableValueDebugInfo : 1,
+                 pointerEscape : 1);
 
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
       onStack : 1,
       numTailTypes: NumAllocRefTailTypesBits);
+
+    SHARED_FIELD(BeginBorrowInst, uint8_t
+                 lexical : 1,
+                 pointerEscape : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
@@ -246,6 +256,11 @@ protected:
       enforcement : NumSILAccessEnforcementBits,
       aborting : 1,
       fromBuiltin : 1);
+
+    SHARED_FIELD(MoveValueInst, uint8_t
+                 allowDiagnostics : 1,
+                 lexical : 1,
+                 pointerEscape : 1);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;

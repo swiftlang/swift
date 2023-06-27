@@ -304,15 +304,6 @@ def I : JoinedOrSeparate<["-"], "I">,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
-def plugin_path : Separate<["-"], "plugin-path">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
-  HelpText<"Add directory to the plugin search path">;
-
-def external_plugin_path : Separate<["-"], "external-plugin-path">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
-  HelpText<"Add directory to the plugin search path with a plugin server executable">,
-  MetaVarName<"<path>#<plugin-server-path>">;
-
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
@@ -393,7 +384,10 @@ def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
 
 def remark_loading_module : Flag<["-"], "Rmodule-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit a remark and file path of each loaded module">;
+  HelpText<"Emit remarks about loaded module">;
+def remark_module_recovery : Flag<["-"], "Rmodule-recovery">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about contextual inconsistencies in loaded modules">;
 
 def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -520,8 +514,8 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
 
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
-  MetaVarName<"<alias_name=underlying_name>">,
-  HelpText<"If a source file imports or references module <alias_name>, the <underlying_name> is used for the contents of the file">;
+  MetaVarName<"<alias_name=real_name>">,
+  HelpText<"If a source file imports or references module <alias_name>, the <real_name> is used for the contents of the file">;
 
 def module_link_name : Separate<["-"], "module-link-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -630,7 +624,7 @@ def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmo
   HelpText<"Augment emitted Objective-C header with textual imports for every included modular import">;
 
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
-  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
@@ -709,8 +703,7 @@ def enable_experimental_cxx_interop :
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Enables C++ interoperability; requires compatbility version to be "
-  "specified.">;
+  HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
@@ -935,7 +928,7 @@ def disableCrossModuleOptimization : Flag<["-"], "disable-cmo">,
 
 def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
-  HelpText<"Enable experimental performance annotations">;
+  HelpText<"Deprecated, has no effect">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
@@ -1285,6 +1278,10 @@ def clang_target : Separate<["-"], "clang-target">,
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
+def explain_module_dependency : Separate<["-"], "explain-module-dependency">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Emit remark/notes describing why compilaiton may depend on a module with a given name.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
@@ -1815,33 +1812,54 @@ def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
   MetaVarName<"<path>">,
   HelpText<"Specify a directory where the clang importer and clang linker can find headers and libraries">;
 
+def cache_compile_job:  Flag<["-"], "cache-compile-job">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Enable compiler caching">;
+
+def cache_remarks:  Flag<["-"], "cache-remarks">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Show remarks for compiler caching">;
+
+def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Skip loading the compilation result from cache">;
+
 def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;
 
-def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-for-testing">,
-  Flags<[FrontendOption, HelpHidden, NoDriverOption]>,
-  HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
+def cas_plugin_path: Separate<["-"], "cas-plugin-path">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Path to CAS Plugin">, MetaVarName<"<path>">;
+
+def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
+
 
 // END ONLY SUPPORTED IN NEW DRIVER
 
-def enable_cas: Flag<["-"], "enable-cas">,
-  Flags<[FrontendOption, NoDriverOption]>,
-  HelpText<"Enable CAS for swift-frontend">;
 
-def cas_fs: Separate<["-"], "cas-fs">,
-  Flags<[FrontendOption, NoDriverOption]>,
-  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
+def plugin_search_Group : OptionGroup<"<plugin search options>">;
+
+def plugin_path : Separate<["-"], "plugin-path">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Add directory to the plugin search path">;
+
+def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Add directory to the plugin search path with a plugin server executable">,
+  MetaVarName<"<path>#<plugin-server-path>">;
 
 def load_plugin_library:
-  Separate<["-"], "load-plugin-library">,
+  Separate<["-"], "load-plugin-library">, Group<plugin_search_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to a dynamic library containing compiler plugins such as "
            "macros">,
   MetaVarName<"<path>">;
 
 def load_plugin_executable:
-  Separate<["-"], "load-plugin-executable">,
+  Separate<["-"], "load-plugin-executable">, Group<plugin_search_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to an executable compiler plugins and providing module names "
            "such as macros">,

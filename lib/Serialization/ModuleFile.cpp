@@ -91,6 +91,16 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
   return ctxTarget.isOSVersionLT(moduleTarget);
 }
 
+namespace swift {
+namespace serialization {
+bool areCompatible(const llvm::Triple &moduleTarget,
+                   const llvm::Triple &ctxTarget) {
+  return areCompatibleArchitectures(moduleTarget, ctxTarget) &&
+         areCompatibleOSs(moduleTarget, ctxTarget);
+}
+} // namespace serialization
+} // namespace swift
+
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
     : Core(core) {
   assert(!core->hasError());
@@ -249,8 +259,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   ASTContext &ctx = getContext();
 
   llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
-  if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
-      !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
+  if (!areCompatible(moduleTarget, ctx.LangOpts.Target)) {
     status = Status::TargetIncompatible;
     if (!recoverFromIncompatibility)
       return error(status);
@@ -277,9 +286,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   if (res != Status::Valid) return res;
 
   if (Core->Bits.HasEntryPoint) {
-    FileContext->getParentModule()->registerEntryPointFile(FileContext,
-                                                           SourceLoc(),
-                                                           None);
+    FileContext->getParentModule()->registerEntryPointFile(
+        FileContext, SourceLoc(), llvm::None);
   }
 
   return status;
@@ -329,7 +337,7 @@ void ModuleFile::lookupValue(DeclName name,
         if (!declOrError) {
           if (!getContext().LangOpts.EnableDeserializationRecovery)
             fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
+          diagnoseAndConsumeError(declOrError.takeError());
           continue;
         }
         auto VD = cast<ValueDecl>(declOrError.get());
@@ -348,7 +356,7 @@ void ModuleFile::lookupValue(DeclName name,
         if (!declOrError) {
           if (!getContext().LangOpts.EnableDeserializationRecovery)
             fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
+          diagnoseAndConsumeError(declOrError.takeError());
           continue;
         }
         auto VD = cast<ValueDecl>(declOrError.get());
@@ -551,8 +559,9 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
-              NL_QualifiedDefault, Decls);
-          Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
+              SourceLoc(), NL_QualifiedDefault, Decls);
+          llvm::Optional<ImportKind> FoundKind =
+              ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.has_value() &&
                  "deserialized imports should not be ambiguous");
           Kind = *FoundKind;
@@ -590,7 +599,7 @@ void ModuleFile::lookupVisibleDecls(ImportPath::Access accessPath,
     if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
-      llvm::consumeError(declOrError.takeError());
+      diagnoseAndConsumeError(declOrError.takeError());
       return;
     }
     consumer.foundDecl(cast<ValueDecl>(declOrError.get()),
@@ -639,7 +648,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
       if (!declOrError) {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(declOrError.takeError());
-        llvm::consumeError(declOrError.takeError());
+        diagnoseAndConsumeError(declOrError.takeError());
       }
     }
   } else {
@@ -652,7 +661,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
       if (!declOrError) {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(declOrError.takeError());
-        llvm::consumeError(declOrError.takeError());
+        diagnoseAndConsumeError(declOrError.takeError());
       }
     }
   }
@@ -709,7 +718,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     if (!derivativeGenSigOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(derivativeGenSigOrError.takeError());
-      llvm::consumeError(derivativeGenSigOrError.takeError());
+      diagnoseAndConsumeError(derivativeGenSigOrError.takeError());
     }
     auto derivativeGenSig = derivativeGenSigOrError.get();
     // NOTE(TF-1038): Result indices are currently unsupported in derivative
@@ -720,7 +729,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   }
 }
 
-Optional<Fingerprint>
+llvm::Optional<Fingerprint>
 ModuleFile::loadFingerprint(const IterableDeclContext *IDC) const {
   PrettyStackTraceDecl trace("loading fingerprints for", IDC->getDecl());
 
@@ -728,12 +737,12 @@ ModuleFile::loadFingerprint(const IterableDeclContext *IDC) const {
   assert(IDC->getDeclID() != 0);
 
   if (!Core->DeclFingerprints) {
-    return None;
+    return llvm::None;
   }
 
   auto it = Core->DeclFingerprints->find(IDC->getDeclID());
   if (it == Core->DeclFingerprints->end()) {
-    return None;
+    return llvm::None;
   }
   return *it;
 }
@@ -883,7 +892,7 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
         if (!decl) {
           if (!getContext().LangOpts.EnableDeserializationRecovery)
             fatal(decl.takeError());
-          llvm::consumeError(decl.takeError());
+          diagnoseAndConsumeError(decl.takeError());
           continue;
         }
 
@@ -906,7 +915,7 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
         if (!decl) {
           if (!getContext().LangOpts.EnableDeserializationRecovery)
             fatal(decl.takeError());
-          llvm::consumeError(decl.takeError());
+          diagnoseAndConsumeError(decl.takeError());
           continue;
         }
 
@@ -1042,7 +1051,7 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results, bool recursiv
   getTopLevelDecls(results);
 }
 
-Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
+llvm::Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -1053,14 +1062,14 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
          "Decl is from a different serialized file");
 
   if (!Core->DeclCommentTable)
-    return None;
+    return llvm::None;
   if (D->isImplicit())
-    return None;
+    return llvm::None;
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   llvm::raw_svector_ostream OS(USRBuffer);
   if (ide::printDeclUSR(D, OS))
-    return None;
+    return llvm::None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
 }
@@ -1150,7 +1159,7 @@ static void readRawLoc(ExternalSourceLocs::RawLoc &Loc, const char *&Data,
   Loc.Directive.Name = readLocString(Data, StringData);
 }
 
-Optional<ExternalSourceLocs::RawLocs>
+llvm::Optional<ExternalSourceLocs::RawLocs>
 ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
   assert(D);
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -1161,22 +1170,22 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
          "Decl is from a different serialized file");
 
   if (!Core->DeclUSRsTable)
-    return None;
+    return llvm::None;
   // Future compilers may not provide BasicDeclLocsData anymore.
   if (Core->BasicDeclLocsData.empty())
-    return None;
+    return llvm::None;
   if (D->isImplicit())
-    return None;
+    return llvm::None;
 
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   llvm::raw_svector_ostream OS(USRBuffer);
   if (ide::printDeclUSR(D, OS))
-    return None;
+    return llvm::None;
 
   auto It = Core->DeclUSRsTable->find(OS.str());
   if (It == Core->DeclUSRsTable->end())
-    return None;
+    return llvm::None;
 
   auto UsrId = *It;
   uint32_t RecordSize =
@@ -1215,31 +1224,31 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
 
 const static StringRef Separator = "/";
 
-Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
+llvm::Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
   if (!Core->GroupNamesMap)
-    return None;
+    return llvm::None;
   const auto &GroupNamesMap = *Core->GroupNamesMap;
   auto it = GroupNamesMap.find(Id);
   if (it == GroupNamesMap.end())
-    return None;
+    return llvm::None;
   StringRef Original = it->second;
   if (Original.empty())
-    return None;
+    return llvm::None;
   auto SepPos = Original.find_last_of(Separator);
   assert(SepPos != StringRef::npos && "Cannot find Separator.");
   return StringRef(Original.data(), SepPos);
 }
 
-Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
+llvm::Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
   if (!Core->GroupNamesMap)
-    return None;
+    return llvm::None;
   const auto &GroupNamesMap = *Core->GroupNamesMap;
   auto it = GroupNamesMap.find(Id);
   if (it == GroupNamesMap.end())
-    return None;
+    return llvm::None;
   StringRef Original = it->second;
   if (Original.empty())
-    return None;
+    return llvm::None;
   auto SepPos = Original.find_last_of(Separator);
   assert(SepPos != StringRef::npos && "Cannot find Separator.");
   auto Start = Original.data() + SepPos + 1;
@@ -1247,29 +1256,28 @@ Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
   return StringRef(Start, Len);
 }
 
-Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
+llvm::Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
   if (!Triple.has_value()) {
-    return None;
+    return llvm::None;
   }
   return getGroupNameById(Triple.value().Group);
 }
 
-
-Optional<StringRef>
+llvm::Optional<StringRef>
 ModuleFile::getSourceFileNameForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
   if (!Triple.has_value()) {
-    return None;
+    return llvm::None;
   }
   return getSourceFileNameById(Triple.value().Group);
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 ModuleFile::getSourceOrderForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
   if (!Triple.has_value()) {
-    return None;
+    return llvm::None;
   }
   return Triple.value().SourceOrder;
 }
@@ -1292,10 +1300,10 @@ void ModuleFile::collectAllGroups(SmallVectorImpl<StringRef> &Names) const {
   }
 }
 
-Optional<CommentInfo>
+llvm::Optional<CommentInfo>
 ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (!Core->DeclCommentTable)
-    return None;
+    return llvm::None;
 
   // Use the comment cache to preserve the memory that the array of
   // `SingleRawComment`s, inside `CommentInfo`, points to, and generally avoid
@@ -1304,25 +1312,24 @@ ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (it != CommentsCache.end()) {
     const auto &cachePtr = it->second;
     if (!cachePtr)
-      return None;
+      return llvm::None;
     return cachePtr->Info;
   }
 
   auto I = Core->DeclCommentTable->find(USR);
   if (I == Core->DeclCommentTable->end())
-    return None;
+    return llvm::None;
 
   auto &cachePtr = CommentsCache[USR];
   cachePtr = *I;
   return cachePtr->Info;
 }
 
-Optional<StringRef>
-ModuleFile::getGroupNameByUSR(StringRef USR) const {
+llvm::Optional<StringRef> ModuleFile::getGroupNameByUSR(StringRef USR) const {
   if (auto Comment = getCommentForDeclByUSR(USR)) {
     return getGroupNameById(Comment.value().Group);
   }
-  return None;
+  return llvm::None;
 }
 
 Identifier ModuleFile::getDiscriminatorForPrivateDecl(const Decl *D) {

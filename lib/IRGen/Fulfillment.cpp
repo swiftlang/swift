@@ -54,6 +54,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::InOut:
   case TypeKind::DynamicSelf:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
   case TypeKind::BuiltinTuple:
     llvm_unreachable("these types do not have metadata");
 
@@ -179,9 +180,9 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   return false;
 }
 
-static CanType getSingletonPackExpansionParameter(CanPackType packType,
-                    const FulfillmentMap::InterestingKeysCallback &keys,
-                    Optional<unsigned> &packExpansionComponent) {
+static CanType getSingletonPackExpansionParameter(
+    CanPackType packType, const FulfillmentMap::InterestingKeysCallback &keys,
+    llvm::Optional<unsigned> &packExpansionComponent) {
   if (auto expansion = packType.unwrapSingletonPackExpansion()) {
     if (keys.isInterestingPackExpansion(expansion)) {
       packExpansionComponent = 0;
@@ -203,7 +204,7 @@ bool FulfillmentMap::searchTypeMetadataPack(IRGenModule &IGM,
   // expansion over one.
   // TODO: we can also fulfill pack expansions if we can slice away
   // constant-sized prefixes and suffixes.
-  Optional<unsigned> packExpansionComponent;
+  llvm::Optional<unsigned> packExpansionComponent;
   if (auto parameter = getSingletonPackExpansionParameter(packType, keys,
                                                     packExpansionComponent)) {
     MetadataPath singletonPath = path;
@@ -227,8 +228,22 @@ bool FulfillmentMap::searchConformance(
 
   SILWitnessTable::enumerateWitnessTableConditionalConformances(
       conformance, [&](unsigned index, CanType type, ProtocolDecl *protocol) {
+        llvm::Optional<unsigned> packExpansionComponent;
+
+        if (auto packType = dyn_cast<PackType>(type)) {
+          auto param =
+              getSingletonPackExpansionParameter(packType, interestingKeys,
+                                                 packExpansionComponent);
+          if (!param)
+            return /*finished?*/ false;
+          type = param;
+        }
+
         MetadataPath conditionalPath = path;
         conditionalPath.addConditionalConformanceComponent(index);
+        if (packExpansionComponent)
+          conditionalPath.addPackExpansionPatternComponent(*packExpansionComponent);
+
         hadFulfillment |=
             searchWitnessTable(IGM, type, protocol, sourceIndex,
                                std::move(conditionalPath), interestingKeys);
@@ -361,7 +376,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
     }
     case GenericRequirement::Kind::WitnessTablePack:
     case GenericRequirement::Kind::WitnessTable: {
-      Optional<unsigned> packExpansionComponent;
+      llvm::Optional<unsigned> packExpansionComponent;
       if (requirement.getKind() == GenericRequirement::Kind::WitnessTable) {
         // Ignore it unless the type itself is interesting.
         if (!keys.isInterestingType(arg))

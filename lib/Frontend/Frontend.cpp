@@ -209,6 +209,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
 
+  serializationOpts.PluginSearchOptions =
+      getSearchPathOptions().PluginSearchOpts;
+
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
 
@@ -400,35 +403,18 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 
 bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getFrontendOptions();
-  if (!Opts.EnableCAS)
+  if (!Opts.EnableCaching)
     return false;
 
-  auto MaybeCache = llvm::cas::createOnDiskUnifiedCASDatabases(Opts.CASPath);
-  if (!MaybeCache) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_create_cas, Opts.CASPath,
-                         toString(MaybeCache.takeError()));
+  auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
+  if (!MaybeDB) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         toString(MaybeDB.takeError()));
     return true;
   }
-  CAS = std::move(MaybeCache->first);
-  ResultCache = std::move(MaybeCache->second);
+  std::tie(CAS, ResultCache) = *MaybeDB;
 
   // create baseline key.
-  llvm::Optional<llvm::cas::ObjectRef> FSRef;
-  if (!Opts.CASFSRootID.empty()) {
-    auto CASFSID = CAS->parseID(Opts.CASFSRootID);
-    if (!CASFSID) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
-                           toString(CASFSID.takeError()));
-      return true;
-    }
-    FSRef = CAS->getReference(*CASFSID);
-    if (!FSRef) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
-                           "-cas-fs value does not exist in CAS");
-      return true;
-    }
-  }
-
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
@@ -465,6 +451,15 @@ void CompilerInstance::setupOutputBackend() {
     OutputBackend =
         llvm::vfs::makeMirroringOutputBackend(OutputBackend, HashBackend);
   }
+}
+
+void CompilerInstance::setupCachingDiagnosticsProcessorIfNeeded() {
+  if (!supportCaching())
+    return;
+
+  // Only setup if using CAS.
+  CDP = std::make_unique<CachingDiagnosticsProcessor>(*this);
+  CDP->startDiagnosticCapture();
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
@@ -507,6 +502,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
+  // Setup caching diagnostics processor. It should be setup after all other
+  // DiagConsumers are added.
+  setupCachingDiagnosticsProcessorIfNeeded();
+
   // If we expect an implicit stdlib import, load in the standard library. If we
   // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
   // trigger a bunch of other errors due to the stdlib being missing, or at
@@ -521,24 +520,38 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  if (Invocation.getFrontendOptions().EnableCAS &&
-      !Invocation.getFrontendOptions().CASFSRootID.empty()) {
+  if (Invocation.getFrontendOptions().EnableCaching &&
+      (!Invocation.getFrontendOptions().CASFSRootIDs.empty() ||
+       !Invocation.getFrontendOptions().ClangIncludeTrees.empty())) {
     // Set up CASFS as BaseFS.
-    auto RootID = CAS->parseID(Invocation.getFrontendOptions().CASFSRootID);
-    if (!RootID) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
-                           Invocation.getFrontendOptions().CASFSRootID,
-                           toString(RootID.takeError()));
-      return true;
-    }
-    auto FS = llvm::cas::createCASFileSystem(*CAS, *RootID);
+    const auto &Opts = getInvocation().getFrontendOptions();
+    auto FS =
+        createCASFileSystem(*CAS, Opts.CASFSRootIDs, Opts.ClangIncludeTrees);
     if (!FS) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
-                           Invocation.getFrontendOptions().CASFSRootID,
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                            toString(FS.takeError()));
       return true;
     }
     SourceMgr.setFileSystem(std::move(*FS));
+  }
+
+  // If we have a bridging header cache key, try load it now and overlay it.
+  if (!Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey.empty() &&
+      Invocation.getFrontendOptions().EnableCaching) {
+    auto loadedBridgingBuffer = loadCachedCompileResultFromCacheKey(
+        getObjectStore(), getActionCache(), Diagnostics,
+        Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey,
+        Invocation.getClangImporterOptions().BridgingHeader);
+    if (loadedBridgingBuffer) {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> PCHFS =
+          new llvm::vfs::InMemoryFileSystem();
+      PCHFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
+                     std::move(loadedBridgingBuffer));
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
+          new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
+      OverlayVFS->pushOverlay(PCHFS);
+      SourceMgr.setFileSystem(std::move(OverlayVFS));
+    }
   }
 
   auto ExpectedOverlay =
@@ -662,17 +675,24 @@ bool CompilerInstance::setUpModuleLoaders() {
   // If using `-explicit-swift-module-map-file`, create the explicit loader
   // before creating `ClangImporter` because the entries in the map influence
   // the Clang flags. The loader is added to the context below.
-  std::unique_ptr<ExplicitSwiftModuleLoader> ESML = nullptr;
+  std::unique_ptr<SerializedModuleLoaderBase> ESML = nullptr;
   bool ExplicitModuleBuild =
       Invocation.getFrontendOptions().DisableImplicitModules;
   if (ExplicitModuleBuild ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
-    ESML = ExplicitSwiftModuleLoader::create(
-        *Context, getDependencyTracker(), MLM,
-        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
-        Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
-        IgnoreSourceInfoFile);
+    if (Invocation.getFrontendOptions().EnableCaching)
+      ESML = ExplicitCASModuleLoader::create(
+          *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
+          MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
+          IgnoreSourceInfoFile);
+    else
+      ESML = ExplicitSwiftModuleLoader::create(
+          *Context, getDependencyTracker(), MLM,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
+          IgnoreSourceInfoFile);
   }
 
   // Wire up the Clang importer. If the user has specified an SDK, use it.
@@ -759,8 +779,8 @@ bool CompilerInstance::setUpPluginLoader() {
   return false;
 }
 
-Optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
-  Optional<unsigned> ideInspectionTargetBufferID;
+llvm::Optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
+  llvm::Optional<unsigned> ideInspectionTargetBufferID;
   auto ideInspectionTarget = Invocation.getIDEInspectionTarget();
   if (ideInspectionTarget.first) {
     auto memBuf = ideInspectionTarget.first;
@@ -779,10 +799,36 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
   return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .endswith(file_types::getExtension(file_types::TY_PCH));
+}
+
+std::string CompilerInstance::getBridgingHeaderPath() const {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+  if (!isPCHFilenameExtension(opts.ImplicitObjCHeaderPath))
+    return opts.ImplicitObjCHeaderPath;
+
+  auto clangImporter =
+      static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+
+  // No clang importer created. Report error?
+  if (!clangImporter)
+    return std::string();
+
+  return clangImporter->getOriginalSourceFile(opts.ImplicitObjCHeaderPath);
+}
+
 bool CompilerInstance::setUpInputs() {
+  // There is no input file when building PCM using ClangIncludeTree.
+  if (Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::EmitPCM &&
+      Invocation.getClangImporterOptions().UseClangIncludeTree)
+    return false;
+
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
-  const Optional<unsigned> ideInspectionTargetBufferID =
+  const llvm::Optional<unsigned> ideInspectionTargetBufferID =
       setUpIDEInspectionTargetBuffer();
 
   const auto &Inputs =
@@ -793,7 +839,7 @@ bool CompilerInstance::setUpInputs() {
   bool hasFailed = false;
   for (const InputFile &input : Inputs) {
     bool failed = false;
-    Optional<unsigned> bufferID =
+    llvm::Optional<unsigned> bufferID =
         getRecordedBufferID(input, shouldRecover, failed);
     hasFailed |= failed;
 
@@ -815,11 +861,11 @@ bool CompilerInstance::setUpInputs() {
   return false;
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 CompilerInstance::getRecordedBufferID(const InputFile &input,
                                       const bool shouldRecover, bool &failed) {
   if (!input.getBuffer()) {
-    if (Optional<unsigned> existingBufferID =
+    if (llvm::Optional<unsigned> existingBufferID =
             SourceMgr.getIDForBufferIdentifier(input.getFileName())) {
       return existingBufferID;
     }
@@ -835,14 +881,14 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
 
   if (!buffers.has_value()) {
     failed = true;
-    return None;
+    return llvm::None;
   }
 
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
   if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
     PartialModules.push_back(std::move(*buffers));
-    return None;
+    return llvm::None;
   }
   assert(buffers->ModuleDocBuffer.get() == nullptr);
   assert(buffers->ModuleSourceInfoBuffer.get() == nullptr);
@@ -853,8 +899,8 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
   return bufferID;
 }
 
-Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
-    const InputFile &input) {
+llvm::Optional<ModuleBuffers>
+CompilerInstance::getInputBuffersIfPresent(const InputFile &input) {
   if (auto b = input.getBuffer()) {
     return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
                                                               b->getBufferIdentifier()));
@@ -873,7 +919,7 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                          input.getFileName(),
                          inputFileOrErr.getError().message());
-    return None;
+    return llvm::None;
   }
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
     return ModuleBuffers(std::move(*inputFileOrErr));
@@ -885,7 +931,7 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
                        sourceinfo.has_value() ? std::move(sourceinfo.value()) : nullptr);
 }
 
-Optional<std::unique_ptr<llvm::MemoryBuffer>>
+llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleSourceInfo(const InputFile &input) {
   llvm::SmallString<128> pathWithoutProjectDir(input.getFileName());
   llvm::sys::path::replace_extension(pathWithoutProjectDir,
@@ -901,10 +947,10 @@ CompilerInstance::openModuleSourceInfo(const InputFile &input) {
   if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
                                                             pathWithoutProjectDir))
     return std::move(*sourceInfoFileOrErr);
-  return None;
+  return llvm::None;
 }
 
-Optional<std::unique_ptr<llvm::MemoryBuffer>>
+llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleDoc(const InputFile &input) {
   llvm::SmallString<128> moduleDocFilePath(input.getFileName());
   llvm::sys::path::replace_extension(
@@ -922,7 +968,7 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                        moduleDocFilePath,
                        moduleDocFileOrErr.getError().message());
-  return None;
+  return llvm::None;
 }
 
 /// Enable Swift concurrency on a per-target basis
@@ -1060,7 +1106,7 @@ bool CompilerInstance::canImportCxxShim() const {
 }
 
 bool CompilerInstance::supportCaching() const {
-  if (!Invocation.getFrontendOptions().EnableCAS)
+  if (!Invocation.getFrontendOptions().EnableCaching)
     return false;
 
   return FrontendOptions::supportCompilationCaching(
@@ -1137,7 +1183,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
-    pushImport(CXX_SHIM_NAME);
+    pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
@@ -1145,7 +1191,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   return imports;
 }
 
-static Optional<SourceFileKind>
+static llvm::Optional<SourceFileKind>
 tryMatchInputModeToSourceFileKind(FrontendOptions::ParseInputMode mode) {
   switch (mode) {
   case FrontendOptions::ParseInputMode::SwiftLibrary:
@@ -1179,7 +1225,7 @@ CompilerInstance::computeMainSourceFileForModule(ModuleDecl *mod) const {
                llvm::sys::path::filename(input.getFileName()) == "main.swift";
       });
 
-  Optional<unsigned> MainBufferID = None;
+  llvm::Optional<unsigned> MainBufferID = llvm::None;
   if (MainInputIter != Inputs.end()) {
     MainBufferID =
         getSourceMgr().getIDForBufferIdentifier(MainInputIter->getFileName());
@@ -1205,7 +1251,7 @@ bool CompilerInstance::createFilesForMainModule(
     ModuleDecl *mod, SmallVectorImpl<FileUnit *> &files) const {
   // Try to pull out the main source file, if any. This ensures that it
   // is at the start of the list of files.
-  Optional<unsigned> MainBufferID = None;
+  llvm::Optional<unsigned> MainBufferID = llvm::None;
   if (SourceFile *mainSourceFile = computeMainSourceFileForModule(mod)) {
     MainBufferID = mainSourceFile->getBufferID();
     files.push_back(mainSourceFile);
@@ -1260,6 +1306,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
+    if (Invocation.getLangOptions().EnableCXXInterop &&
+        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
+      MainModule->setHasCxxInteroperability();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
@@ -1454,6 +1503,9 @@ void CompilerInstance::finishTypeChecking() {
 
 SourceFile::ParsingOptions
 CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
+  using ActionType = FrontendOptions::ActionType;
+  using ParsingFlags = SourceFile::ParsingFlags;
+
   const auto &frontendOpts = Invocation.getFrontendOptions();
   const auto action = frontendOpts.RequestedAction;
 
@@ -1462,34 +1514,37 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     // Generally in a parse-only invocation, we want to disable #if evaluation.
     // However, there are a couple of modes where we need to know which clauses
     // are active.
-    if (action != FrontendOptions::ActionType::EmitImportedModules &&
-        action != FrontendOptions::ActionType::ScanDependencies) {
-      opts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+    if (action != ActionType::EmitImportedModules &&
+        action != ActionType::ScanDependencies) {
+      opts |= ParsingFlags::DisablePoundIfEvaluation;
     }
 
     // If we need to dump the parse tree, disable delayed bodies as we want to
     // show everything.
-    if (action == FrontendOptions::ActionType::DumpParse)
-      opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+    if (action == ActionType::DumpParse)
+      opts |= ParsingFlags::DisableDelayedBodies;
   }
 
-  auto typeOpts = getASTContext().TypeCheckerOpts;
-  if (forPrimary || isWholeModuleCompilation()) {
+  const auto &typeOpts = getASTContext().TypeCheckerOpts;
+  const auto isEffectivelyPrimary = forPrimary || isWholeModuleCompilation();
+  if (isEffectivelyPrimary) {
     // Disable delayed body parsing for primaries and in WMO, unless
     // forcefully skipping function bodies
     if (typeOpts.SkipFunctionBodies == FunctionBodySkipping::None)
-      opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+      opts |= ParsingFlags::DisableDelayedBodies;
   } else {
     // Suppress parse warnings for non-primaries, as they'll get parsed multiple
     // times.
-    opts |= SourceFile::ParsingFlags::SuppressWarnings;
+    opts |= ParsingFlags::SuppressWarnings;
   }
 
-  // Dependency scanning does not require an AST, so disable Swift Parser
-  // ASTGen parsing completely.
-  if (frontendOpts.RequestedAction ==
-      FrontendOptions::ActionType::ScanDependencies)
-    opts |= SourceFile::ParsingFlags::DisableSwiftParserASTGen;
+  // Turn off round-trip checking for secondary files, and for dependency
+  // scanning and IDE inspection.
+  if (!isEffectivelyPrimary || SourceMgr.hasIDEInspectionTargetBuffer() ||
+      frontendOpts.RequestedAction == ActionType::ScanDependencies) {
+    opts -= ParsingFlags::RoundTrip;
+    opts -= ParsingFlags::ValidateNewParserDiagnostics;
+  }
 
   // Enable interface hash computation for primaries or emit-module-separately,
   // but not in WMO, as it's only currently needed for incremental mode.
@@ -1497,14 +1552,14 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
       typeOpts.SkipFunctionBodies ==
           FunctionBodySkipping::NonInlinableWithoutTypes ||
       frontendOpts.ReuseFrontendForMultipleCompilations) {
-    opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
+    opts |= ParsingFlags::EnableInterfaceHash;
   }
   return opts;
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    ModuleDecl *mod, SourceFileKind fileKind,
-    Optional<unsigned> bufferID, bool isMainBuffer) const {
+    ModuleDecl *mod, SourceFileKind fileKind, llvm::Optional<unsigned> bufferID,
+    bool isMainBuffer) const {
   auto isPrimary = bufferID && isPrimaryInput(*bufferID);
   auto opts = getSourceFileParsingOptions(isPrimary);
 

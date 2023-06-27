@@ -1,12 +1,14 @@
-// RUN: %swift-frontend -swift-version 4 -target arm64e-apple-ios12.0 -primary-file %s -emit-ir -module-name A | %FileCheck %s --check-prefix=CHECK
-// RUN: %swift-frontend -swift-version 4 -target arm64e-apple-ios12.0 %s -primary-file %S/Inputs/ptrauth-global-2.swift -emit-ir -module-name A | %FileCheck %s --check-prefix=CHECK2
+// RUN: %swift-frontend %use_no_opaque_pointers -swift-version 4 -target arm64e-apple-ios12.0 -primary-file %s -emit-ir -module-name A | %FileCheck %s --check-prefix=CHECK
+// RUN: %swift-frontend %use_no_opaque_pointers -swift-version 4 -target arm64e-apple-ios12.0 %s -primary-file %S/Inputs/ptrauth-global-2.swift -emit-ir -module-name A | %FileCheck %s --check-prefix=CHECK2
+// RUN: %swift-frontend -swift-version 4 -target arm64e-apple-ios12.0 -primary-file %s -emit-ir -module-name A
+// RUN: %swift-frontend -swift-version 4 -target arm64e-apple-ios12.0 %s -primary-file %S/Inputs/ptrauth-global-2.swift -emit-ir -module-name A
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
 // Make sure that the key at the definition of the global matches call sites.
 
-// CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZ" = global %swift.function { {{.*}} @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth"
+// CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZ" = constant %swift.function { {{.*}} @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth"
 // CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth" = {{.*}} @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_" {{.*}} i64 58141 }, section "llvm.ptrauth"
 
 

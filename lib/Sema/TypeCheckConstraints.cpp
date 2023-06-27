@@ -69,6 +69,8 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
     bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
   if (canBindToPack())
     bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToPack);
+  if (isPackExpansion())
+    bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
   if (!bindingOptions.empty()) {
     OS << " [allows bindings to: ";
     interleave(bindingOptions, OS,
@@ -93,10 +95,10 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
-Optional<ExprKind>
+llvm::Optional<ExprKind>
 TypeVariableType::Implementation::getAtomicLiteralKind() const {
   if (!locator || !locator->directlyAt<LiteralExpr>())
-    return None;
+    return llvm::None;
 
   auto kind = getAsExpr(locator->getAnchor())->getKind();
   switch (kind) {
@@ -107,7 +109,7 @@ TypeVariableType::Implementation::getAtomicLiteralKind() const {
   case ExprKind::NilLiteral:
     return kind;
   default:
-    return None;
+    return llvm::None;
   }
 }
 
@@ -398,7 +400,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 /// FIXME: In order to remote this function both \c FrontendStatsTracer
 /// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
 // instead of each individual syntactic element types.
-Optional<SyntacticElementTarget>
+llvm::Optional<SyntacticElementTarget>
 TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
                                  TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
@@ -410,7 +412,7 @@ TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
   return typeCheckTarget(target, options);
 }
 
-Optional<SyntacticElementTarget>
+llvm::Optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                              TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
@@ -423,7 +425,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (ConstraintSystem::preCheckTarget(
           target, /*replaceInvalidRefsWithErrors=*/true,
           options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
-    return None;
+    return llvm::None;
   }
 
   // Check whether given target has a code completion token which requires
@@ -433,7 +435,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                                  [&](const constraints::Solution &S) {
                                    Context.CompletionCallback->sawSolution(S);
                                  }))
-    return None;
+    return llvm::None;
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -469,7 +471,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable)
-    return None;
+    return llvm::None;
 
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
@@ -480,7 +482,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   auto resultTarget = cs.applySolution(solution, target);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return None;
+    return llvm::None;
   }
 
   // Unless the client has disabled them, perform syntactic checks on the
@@ -656,7 +658,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       cs.openGenericRequirement(DC->getParent(), index, requirement,
                                 /*skipSelfProtocolConstraint=*/false, locator,
                                 [&](Type type) -> Type {
-                                  return cs.openType(type, genericParameters);
+                                  return cs.openType(type, genericParameters,
+                                                     locator);
                                 });
     };
 
@@ -1588,6 +1591,16 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }
   }
 
+  if (!OpenedPackExpansionTypes.empty()) {
+    out.indent(indent) << "Opened pack expansion types:\n";
+    for (const auto &expansion : OpenedPackExpansionTypes) {
+      out.indent(indent + 2);
+      out << expansion.first->getString(PO);
+      out << " opens to " << expansion.second->getString(PO);
+      out << "\n";
+    }
+  }
+
   if (!DefaultedConstraints.empty()) {
     out.indent(indent) << "Defaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
@@ -1629,12 +1642,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   }
 
   // Since move-only types currently cannot conform to protocols, nor be a class
-  // type, the subtyping hierarchy is a bit bizarre as of now:
+  // type, the subtyping hierarchy looks a bit like this:
   //
-  //              noncopyable
-  //           structs and enums
-  //                   |
-  //       +--------- Any
+  //                  ~Copyable
+  //                    /  \
+  //                   /    \
+  //       +--------- Any    noncopyable structs/enums
   //       |           |
   //   AnyObject    protocol
   //       |       existentials
@@ -1646,7 +1659,9 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   //
   // Thus, right now, a move-only type is only a subtype of itself.
-  if (fromType->isPureMoveOnly() || toType->isPureMoveOnly())
+  // We also want to prevent conversions of a move-only type's metatype.
+  if (fromType->getMetatypeInstanceType()->isPureMoveOnly()
+      || toType->getMetatypeInstanceType()->isPureMoveOnly())
     return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.

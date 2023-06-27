@@ -666,6 +666,37 @@ void swift_initStructMetadataWithLayoutString(StructMetadata *self,
                                               const uint8_t *fieldTags,
                                               uint32_t *fieldOffsets);
 
+enum LayoutStringFlags : uint64_t {
+  Empty = 0,
+  // TODO: Track other useful information tha can be used to optimize layout
+  //       strings, like different reference kinds contained in the string
+  //       number of ref counting operations (maybe up to 4), so we can
+  //       use witness functions optimized for these cases.
+  HasRelativePointers = (1ULL << 63),
+};
+
+inline bool operator&(LayoutStringFlags a, LayoutStringFlags b) {
+  return (uint64_t(a) & uint64_t(b)) != 0;
+}
+inline LayoutStringFlags operator|(LayoutStringFlags a, LayoutStringFlags b) {
+  return LayoutStringFlags(uint64_t(a) | uint64_t(b));
+}
+inline LayoutStringFlags &operator|=(LayoutStringFlags &a, LayoutStringFlags b) {
+  return a = (a | b);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+size_t _swift_refCountBytesForMetatype(const Metadata *type);
+
+struct LayoutStringWriter;
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
+                                         LayoutStringFlags &flags,
+                                         const Metadata *fieldType,
+                                         size_t &fullOffset,
+                                         size_t &previousFieldOffset);
+
 /// Allocate the metadata for a class and copy fields from the given pattern.
 /// The final size of the metadata is calculated at runtime from the metadata
 /// bounds in the class descriptor.
@@ -991,6 +1022,21 @@ void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
 
 SWIFT_RUNTIME_EXPORT
 void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+/// A struct containing pointers to all of the type descriptors in the
+/// Concurrency runtime which have standard manglings.
+struct ConcurrencyStandardTypeDescriptors {
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
+  const ContextDescriptor * __ptrauth_swift_type_descriptor TYPENAME;
+#include "swift/Demangling/StandardTypesMangling.def"
+};
+
+/// Register the type descriptors with standard manglings from the Concurrency
+/// runtime. The passed-in struct must be immortal.
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_registerConcurrencyStandardTypeDescriptors(
+    const ConcurrencyStandardTypeDescriptors *descriptors);
 
 #pragma clang diagnostic pop
 

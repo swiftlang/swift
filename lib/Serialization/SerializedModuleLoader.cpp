@@ -50,7 +50,7 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
 
   // An arm64 module can import an arm64e module.
-  Optional<llvm::Triple> normalizedAltTarget;
+  llvm::Optional<llvm::Triple> normalizedAltTarget;
   if ((normalizedTarget.getArch() == llvm::Triple::ArchType::aarch64) &&
       (normalizedTarget.getSubArch() !=
        llvm::Triple::SubArchType::AArch64SubArch_arm64e)) {
@@ -86,10 +86,10 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
 
 /// Apply \p body for each module search path in \p Ctx until \p body returns
 /// non-None value. Returns the return value from \p body, or \c None.
-Optional<bool> forEachModuleSearchPath(
+llvm::Optional<bool> forEachModuleSearchPath(
     const ASTContext &Ctx,
-    llvm::function_ref<Optional<bool>(StringRef, ModuleSearchPathKind,
-                                      bool isSystem)>
+    llvm::function_ref<llvm::Optional<bool>(StringRef, ModuleSearchPathKind,
+                                            bool isSystem)>
         callback) {
   for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =
@@ -118,7 +118,7 @@ Optional<bool> forEachModuleSearchPath(
       return result;
   }
 
-  return None;
+  return llvm::None;
 }
 } // end unnamed namespace
 
@@ -203,10 +203,9 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
         auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
         names.push_back(Ctx.getIdentifier(name));
       });
-      return None;
+      return llvm::None;
     }
-    case ModuleSearchPathKind::RuntimeLibrary:
-    case ModuleSearchPathKind::CompilerPlugin: {
+    case ModuleSearchPathKind::RuntimeLibrary: {
       // Look for:
       // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
       // (Other OS)  $PATH/{name}.{extension}
@@ -231,7 +230,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
         auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
         names.push_back(Ctx.getIdentifier(name));
       });
-      return None;
+      return llvm::None;
     }
     case ModuleSearchPathKind::Framework:
     case ModuleSearchPathKind::DarwinImplicitFramework: {
@@ -253,7 +252,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
 
         names.push_back(Ctx.getIdentifier(name));
       });
-      return None;
+      return llvm::None;
     }
     }
     llvm_unreachable("covered switch");
@@ -392,8 +391,8 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-llvm::ErrorOr<llvm::StringSet<>>
-SerializedModuleLoaderBase::getModuleImportsOfModule(
+llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
+SerializedModuleLoaderBase::getImportsOfModule(
     Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
     bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
     StringRef packageName, llvm::vfs::FileSystem *fileSystem,
@@ -403,6 +402,7 @@ SerializedModuleLoaderBase::getModuleImportsOfModule(
     return moduleBuf.getError();
 
   llvm::StringSet<> importedModuleNames;
+  llvm::StringSet<> importedHeaders;
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
@@ -410,9 +410,10 @@ SerializedModuleLoaderBase::getModuleImportsOfModule(
       isRequiredOSSAModules, SDKName, recoverer, loadedModuleFile);
 
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
-    // FIXME: Record header dependency?
-    if (dependency.isHeader())
+    if (dependency.isHeader()) {
+      importedHeaders.insert(dependency.RawPath);
       continue;
+    }
 
     ModuleLoadingBehavior dependencyTransitiveBehavior =
         loadedModuleFile->getTransitiveLoadingBehavior(
@@ -433,16 +434,13 @@ SerializedModuleLoaderBase::getModuleImportsOfModule(
     importedModuleNames.insert(moduleName);
   }
 
-  return importedModuleNames;
+  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames, importedHeaders};
 }
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
-  // Map the set of dependencies over to the "module dependencies".
-  auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-      modulePath.str(), moduleDocPath, sourceInfoPath, isFramework);
   // Some transitive dependencies of binary modules are not required to be
   // imported during normal builds.
   // TODO: This is worth revisiting for debugger purposes where
@@ -451,18 +449,37 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   //       optional.
   ModuleLoadingBehavior transitiveLoadingBehavior =
       ModuleLoadingBehavior::Required;
-  auto importedModuleNames = getModuleImportsOfModule(
+  auto binaryModuleImports = getImportsOfModule(
       modulePath, transitiveLoadingBehavior, isFramework,
       isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
-  if (!importedModuleNames)
-    return importedModuleNames.getError();
+  if (!binaryModuleImports)
+    return binaryModuleImports.getError();
 
-  llvm::StringSet<> addedModuleNames;
-  for (const auto &importedModuleName : *importedModuleNames)
-    dependencies.addModuleImport(importedModuleName.getKey(),
-                                 &addedModuleNames);
+  auto importedModuleSet = binaryModuleImports.get().moduleImports;
+  std::vector<std::string> importedModuleNames;
+  importedModuleNames.reserve(importedModuleSet.size());
+  llvm::transform(importedModuleSet.keys(),
+                  std::back_inserter(importedModuleNames),
+                  [](llvm::StringRef N) {
+                     return N.str();
+                  });
+
+  auto importedHeaderSet = binaryModuleImports.get().headerImports;
+  std::vector<std::string> importedHeaders;
+  importedHeaders.reserve(importedHeaderSet.size());
+  llvm::transform(importedHeaderSet.keys(),
+                  std::back_inserter(importedHeaders),
+                  [](llvm::StringRef N) {
+                     return N.str();
+                  });
+
+  // Map the set of dependencies over to the "module dependencies".
+  auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
+       modulePath.str(), moduleDocPath, sourceInfoPath,
+       importedModuleNames, importedHeaders, isFramework,
+       /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }
@@ -611,7 +628,7 @@ bool SerializedModuleLoaderBase::findModule(
   /// was diagnosed, or None if neither one happened and the search should
   /// continue.
   auto findTargetSpecificModuleFiles = [&](bool IsFramework) -> SearchResult {
-    Optional<SerializedModuleBaseName> firstAbsoluteBaseName;
+    llvm::Optional<SerializedModuleBaseName> firstAbsoluteBaseName;
 
     for (const auto &targetSpecificBaseName : targetSpecificBaseNames) {
       SerializedModuleBaseName
@@ -660,8 +677,7 @@ bool SerializedModuleLoaderBase::findModule(
 
     switch (searchPath->getKind()) {
     case ModuleSearchPathKind::Import:
-    case ModuleSearchPathKind::RuntimeLibrary:
-    case ModuleSearchPathKind::CompilerPlugin: {
+    case ModuleSearchPathKind::RuntimeLibrary: {
       isFramework = false;
 
       // On Apple platforms, we can assume that the runtime libraries use
@@ -766,8 +782,8 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
 }
 
 LoadedFile *SerializedModuleLoaderBase::loadAST(
-    ModuleDecl &M, Optional<SourceLoc> diagLoc, StringRef moduleInterfacePath,
-    StringRef moduleInterfaceSourcePath,
+    ModuleDecl &M, llvm::Optional<SourceLoc> diagLoc,
+    StringRef moduleInterfacePath, StringRef moduleInterfaceSourcePath,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
@@ -824,6 +840,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
+    if (loadedModuleFile->hasCxxInteroperability())
+      M.setHasCxxInteroperability();
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
@@ -894,6 +912,19 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
     Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
                        diag::need_hermetic_seal_to_import_module, M.getName());
+  }
+
+  // Non-resilient modules built with C++ interoperability enabled
+  // are typically incompatible with clients that do not enable
+  // C++ interoperability.
+  if (M.hasCxxInteroperability() &&
+      M.getResilienceStrategy() != ResilienceStrategy::Resilient &&
+      !Ctx.LangOpts.EnableCXXInterop &&
+      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule) {
+    auto loc = diagLoc.value_or(SourceLoc());
+    Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
+                       M.getName());
+    Ctx.Diags.diagnose(loc, diag::enable_cxx_interop_docs);
   }
 
   return fileUnit;
@@ -1594,7 +1625,7 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
-Optional<Fingerprint>
+llvm::Optional<Fingerprint>
 SerializedASTFile::loadFingerprint(const IterableDeclContext *IDC) const {
   return File.loadFingerprint(IDC);
 }
@@ -1616,7 +1647,7 @@ void SerializedASTFile::lookupImportedSPIGroups(
   }
 }
 
-Optional<CommentInfo>
+llvm::Optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
@@ -1625,23 +1656,22 @@ bool SerializedASTFile::hasLoadedSwiftDoc() const {
   return File.hasLoadedSwiftDoc();
 }
 
-Optional<ExternalSourceLocs::RawLocs>
+llvm::Optional<ExternalSourceLocs::RawLocs>
 SerializedASTFile::getExternalRawLocsForDecl(const Decl *D) const {
   return File.getExternalRawLocsForDecl(D);
 }
 
-Optional<StringRef>
+llvm::Optional<StringRef>
 SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
   return File.getGroupNameForDecl(D);
 }
 
-
-Optional<StringRef>
+llvm::Optional<StringRef>
 SerializedASTFile::getSourceFileNameForDecl(const Decl *D) const {
   return File.getSourceFileNameForDecl(D);
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
   return File.getSourceOrderForDecl(D);
 }
@@ -1651,7 +1681,7 @@ void SerializedASTFile::collectAllGroups(
   File.collectAllGroups(Names);
 }
 
-Optional<StringRef>
+llvm::Optional<StringRef>
 SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
   return File.getGroupNameByUSR(USR);
 }

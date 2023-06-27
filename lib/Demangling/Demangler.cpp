@@ -2068,7 +2068,7 @@ NodePointer Demangler::demangleImplParamConvention(Node::Kind ConvKind) {
     case 'y': attr = "@unowned"; break;
     case 'v': attr = "@pack_owned"; break;
     case 'p': attr = "@pack_guaranteed"; break;
-    case 'm': attr = "@pack_guaranteed"; break;
+    case 'm': attr = "@pack_inout"; break;
     default:
       pushBack();
       return nullptr;
@@ -2510,6 +2510,17 @@ NodePointer Demangler::demangleArchetype() {
     NodePointer PackExpansionTy = createType(
           createWithChildren(Node::Kind::PackExpansion, PatternTy, CountTy));
     return PackExpansionTy;
+  }
+  case 'e': {
+    NodePointer PackTy = popTypeAndGetChild();
+    int level = demangleIndex();
+    if (level < 0)
+      return NULL;
+
+    NodePointer PackElementTy = createType(
+          createWithChildren(Node::Kind::PackElement, PackTy,
+              createNode(Node::Kind::PackElementLevel, level)));
+    return PackElementTy;
   }
   case 'P':
     return popPack();
@@ -3693,6 +3704,7 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
+    case 'i': Kind = Node::Kind::InitAccessor; break;
     case 'a':
       switch (nextChar()) {
         case 'O': Kind = Node::Kind::OwningMutableAddressor; break;
@@ -4070,7 +4082,7 @@ NodePointer Demangler::demangleMacroExpansion() {
     isFreestanding = false;
     break;
 
-  case 'A':
+  case 'r':
     kind = Node::Kind::MemberAttributeAttachedMacroExpansion;
     isAttached = true;
     isFreestanding = false;

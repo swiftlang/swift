@@ -211,6 +211,24 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
   return nullptr;
 }
 
+AccessorDecl *DeclContext::getInnermostPropertyAccessorContext() {
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDecl()) {
+      auto accessor = dyn_cast<AccessorDecl>(decl);
+      // If we found a non-accessor decl, we're done.
+      if (accessor == nullptr)
+        return nullptr;
+
+      auto *storage = accessor->getStorage();
+      if (isa<VarDecl>(storage) && storage->getDeclContext()->isTypeContext())
+        return accessor;
+    }
+  } while ((dc = dc->getParent()));
+
+  return nullptr;
+}
+
 bool DeclContext::isTypeContext() const {
   if (auto decl = getAsDecl())
     return isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl);
@@ -902,6 +920,10 @@ DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {
 }
 
 DeclRange IterableDeclContext::getMembers() const {
+  return getCurrentMembers();
+}
+
+DeclRange IterableDeclContext::getCurrentMembers() const {
   loadAllMembers();
 
   return getCurrentMembersWithoutLoading();
@@ -1040,7 +1062,10 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       return;
 
     // Synthesized member macros can add new members in a macro expansion buffer.
-    auto *memberSourceFile = member->getInnermostDeclContext()->getParentSourceFile();
+    SourceFile *memberSourceFile = member->getLoc()
+        ? member->getModuleContext()
+                ->getSourceFileContainingLocation(member->getLoc())
+        : member->getInnermostDeclContext()->getParentSourceFile();
     if (memberSourceFile->getFulfilledMacroRole() == MacroRole::Member ||
         memberSourceFile->getFulfilledMacroRole() == MacroRole::Peer)
       return;
@@ -1196,10 +1221,10 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
-Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
+llvm::Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   auto fileUnit = dyn_cast<FileUnit>(getAsGenericContext()->getModuleScopeContext());
   if (!fileUnit)
-    return None;
+    return llvm::None;
 
   if (isa<SourceFile>(fileUnit)) {
     auto mutableThis = const_cast<IterableDeclContext *>(this);
@@ -1210,7 +1235,7 @@ Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   }
 
   if (getDecl()->isImplicit())
-    return None;
+    return llvm::None;
 
   return fileUnit->loadFingerprint(this);
 }

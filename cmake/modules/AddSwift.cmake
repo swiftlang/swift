@@ -259,6 +259,10 @@ function(_add_host_variant_c_compile_flags target)
       # (see revision d913eefcc93f8c80d6d1a6de4ea898a2838d8b6f)
       # This is required to build with VS2017 15.8+
       _ENABLE_EXTENDED_ALIGNED_STORAGE=1>)
+    if(SWIFT_HOST_VARIANT_ARCH MATCHES "ARM64|aarch64")
+      target_compile_options(${target} PRIVATE
+        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-D_STD_ATOMIC_USE_ARM64_LDAR_STLR=0>)
+    endif()
 
     # msvcprt's std::function requires RTTI, but we do not want RTTI data.
     # Emulate /GR-.
@@ -576,7 +580,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
     # Make sure we can find the early SwiftSyntax libraries.
     target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
 
-    # For the "end step" of bootstrapping configurations on Darwin, need to be
+    # For the "end step" of bootstrapping configurations, we need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
       if (NOT "${bootstrapping}" STREQUAL "1")
@@ -590,6 +594,13 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
           get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
           target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
+        else()
+          get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+          get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+          set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+          target_link_directories(${target} PRIVATE ${host_lib_dir})
+
+          set(swift_runtime_rpath "${host_lib_dir}")
         endif()
       endif()
     endif()
@@ -926,10 +937,17 @@ function(add_swift_host_tool executable)
       endif()
     endif()
 
-    set_property(
-      TARGET ${executable}
-      APPEND PROPERTY INSTALL_RPATH
-        "@executable_path/../${extra_relative_rpath}lib/swift/host")
+    if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+      set_property(
+        TARGET ${executable}
+        APPEND PROPERTY INSTALL_RPATH
+          "@executable_path/../${extra_relative_rpath}lib/swift/host")
+    else()
+      set_property(
+        TARGET ${executable}
+        APPEND PROPERTY INSTALL_RPATH
+          "$ORIGIN/../${extra_relative_rpath}lib/swift/host")
+    endif()
   endif()
 
   if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)

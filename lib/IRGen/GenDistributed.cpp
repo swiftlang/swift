@@ -134,6 +134,9 @@ class DistributedAccessor {
   /// The list of all arguments that were allocated on the stack.
   SmallVector<StackAddress, 4> AllocatedArguments;
 
+  /// The list of all the arguments that were loaded.
+  SmallVector<std::pair<Address, /*type=*/llvm::Value *>, 4> LoadedArguments;
+
 public:
   DistributedAccessor(IRGenFunction &IGF, SILFunction *target,
                       CanSILFunctionType accessorTy);
@@ -498,6 +501,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
         resultValue.getAddress(), IGM.getStorageType(paramTy));
 
     cast<LoadableTypeInfo>(paramInfo).loadAsTake(IGF, eltPtr, arguments);
+    LoadedArguments.push_back(std::make_pair(eltPtr, argumentType));
     break;
   }
 
@@ -505,6 +509,8 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
     // Copy the value out at +1.
     cast<LoadableTypeInfo>(paramInfo).loadAsCopy(IGF, resultValue.getAddress(),
                                                  arguments);
+    LoadedArguments.push_back(
+        std::make_pair(resultValue.getAddress(), argumentType));
     break;
   }
   }
@@ -575,6 +581,15 @@ void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
 }
 
 void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
+  // Destroy loaded arguments.
+  // This MUST be done before deallocating, as otherwise we'd try to
+  // swift_release freed memory, which will be a no-op, however that also would
+  // mean we never drop retain counts to 0 and miss to run deinitializers of
+  // classes!
+  llvm::for_each(LoadedArguments, [&](const auto &argInfo) {
+    emitDestroyCall(IGF, argInfo.second, argInfo.first);
+  });
+
   // Deallocate all of the copied arguments. Since allocations happened
   // on stack they have to be deallocated in reverse order.
   {

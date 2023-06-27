@@ -183,7 +183,7 @@ void AvailableValues::dump() const { print(llvm::dbgs(), nullptr); }
 struct borrowtodestructure::Implementation {
   BorrowToDestructureTransform &interface;
 
-  Optional<AvailableValueStore> blockToAvailableValues;
+  llvm::Optional<AvailableValueStore> blockToAvailableValues;
 
   /// The liveness that we use for all borrows or for individual switch_enum
   /// arguments.
@@ -317,9 +317,10 @@ bool Implementation::gatherUses(SILValue value) {
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-      blocksToUses.insert(
-          nextUse->getParentBlock(),
-          {nextUse, {*leafRange, false /*is lifetime ending*/}});
+      blocksToUses.insert(nextUse->getParentBlock(),
+                          {nextUse,
+                           {liveness.getNumSubElements(), *leafRange,
+                            false /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
@@ -344,7 +345,9 @@ bool Implementation::gatherUses(SILValue value) {
       LLVM_DEBUG(llvm::dbgs() << "        Found lifetime ending use!\n");
       destructureNeedingUses.push_back(nextUse);
       blocksToUses.insert(nextUse->getParentBlock(),
-                          {nextUse, {*leafRange, true /*is lifetime ending*/}});
+                          {nextUse,
+                           {liveness.getNumSubElements(), *leafRange,
+                            true /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             true /*is lifetime ending*/);
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
@@ -381,9 +384,10 @@ bool Implementation::gatherUses(SILValue value) {
       // Otherwise, treat it as a normal use.
       LLVM_DEBUG(llvm::dbgs() << "        Treating non-begin_borrow borrow as "
                                  "a non lifetime ending use!\n");
-      blocksToUses.insert(
-          nextUse->getParentBlock(),
-          {nextUse, {*leafRange, false /*is lifetime ending*/}});
+      blocksToUses.insert(nextUse->getParentBlock(),
+                          {nextUse,
+                           {liveness.getNumSubElements(), *leafRange,
+                            false /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
@@ -413,7 +417,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
     // First loop through our uses and handle any consuming twice errors. We
     // also setup usedBits to check for non-consuming uses that may overlap.
     Operand *badOperand = nullptr;
-    Optional<TypeTreeLeafTypeRange> badRange;
+    llvm::Optional<TypeTreeLeafTypeRange> badRange;
     for (auto *use : instRangePair.second) {
       if (!use->isConsuming())
         continue;
@@ -547,7 +551,7 @@ void Implementation::checkDestructureUsesOnBoundary() const {
 
 #ifndef NDEBUG
 static void dumpSmallestTypeAvailable(
-    SmallVectorImpl<Optional<std::pair<TypeOffsetSizePair, SILType>>>
+    SmallVectorImpl<llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>>
         &smallestTypeAvailable) {
   LLVM_DEBUG(llvm::dbgs() << "            Dumping smallest type available!\n");
   for (auto pair : llvm::enumerate(smallestTypeAvailable)) {
@@ -641,11 +645,11 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
         : targetBlockRPO(*pofi->getRPONumber(block)), pe(block->pred_end()),
           pofi(pofi) {}
 
-    Optional<SILBasicBlock *> operator()(SILBasicBlock *predBlock) const {
+    llvm::Optional<SILBasicBlock *> operator()(SILBasicBlock *predBlock) const {
       // If our predecessor block has a larger RPO number than our target block,
       // then their edge must be a backedge.
       if (targetBlockRPO < *pofi->getRPONumber(predBlock))
-        return None;
+        return llvm::None;
       return predBlock;
     }
   };
@@ -677,7 +681,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
   LLVM_DEBUG(llvm::dbgs() << "        Computing smallest type available for "
                              "available values for block bb"
                           << block->getDebugID() << '\n');
-  SmallVector<Optional<std::pair<TypeOffsetSizePair, SILType>>, 8>
+  SmallVector<llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>, 8>
       smallestTypeAvailable;
   {
     auto pi = predsSkippingBackEdges.begin();
@@ -704,7 +708,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
               {{TypeOffsetSizePair(predAvailableValues[i], getRootValue()),
                 predAvailableValues[i]->getType()}});
         else
-          smallestTypeAvailable.emplace_back(None);
+          smallestTypeAvailable.emplace_back(llvm::None);
       }
       LLVM_DEBUG(llvm::dbgs() << "        Finished computing initial smallest "
                                  "type available for block bb"
@@ -726,7 +730,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
           continue;
 
         if (!predAvailableValues[i]) {
-          smallestTypeAvailable[i] = None;
+          smallestTypeAvailable[i] = llvm::None;
           continue;
         }
 
@@ -989,13 +993,13 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
     if (auto operandList = blocksToUses.find(block)) {
       // If we do, gather up the bits that we need.
       for (auto operand : *operandList) {
-        auto &subEltSpan = operand.second.subEltSpan;
+        auto &liveBits = operand.second.liveBits;
         LLVM_DEBUG(llvm::dbgs() << "    Found need operand "
                                 << operand.first->getOperandNumber()
-                                << " of inst: " << *operand.first->getUser()
-                                << "    Needs bits: " << subEltSpan << '\n');
-        bitsNeededInBlock.set(subEltSpan.startEltOffset,
-                              subEltSpan.endEltOffset);
+                                << " of inst: " << *operand.first->getUser());
+        for (auto bit : liveBits.set_bits()) {
+          bitsNeededInBlock.set(bit);
+        }
         seenOperands.insert(operand.first);
       }
     }

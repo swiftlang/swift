@@ -34,6 +34,7 @@
 #include "TupleMetadataVisitor.h"
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/Optional.h"
 
 using namespace swift;
@@ -43,10 +44,10 @@ namespace {
 
 template <class Impl, template <class> class Base>
 class LayoutScanner : public Base<Impl> {
-  Optional<Size> AddressPoint;
+  llvm::Optional<Size> AddressPoint;
 
 protected:
-  Optional<Size> DynamicOffsetBase;
+  llvm::Optional<Size> DynamicOffsetBase;
 
   template <class... As>
   LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}

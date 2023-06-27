@@ -412,9 +412,8 @@ bool SILModule::loadFunction(SILFunction *F, LinkingMode LinkMode) {
   return true;
 }
 
-SILFunction *SILModule::loadFunction(StringRef name,
-                                     LinkingMode LinkMode,
-                                     Optional<SILLinkage> linkage) {
+SILFunction *SILModule::loadFunction(StringRef name, LinkingMode LinkMode,
+                                     llvm::Optional<SILLinkage> linkage) {
   SILFunction *func = lookUpFunction(name);
   if (!func)
     func = getSILLoader()->lookupSILFunction(name, linkage);
@@ -905,10 +904,9 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   prespecializedFunctionDeclsImported = true;
 }
 
-SILProperty *SILProperty::create(SILModule &M,
-                                 bool Serialized,
-                                 AbstractStorageDecl *Decl,
-                                 Optional<KeyPathPatternComponent> Component) {
+SILProperty *
+SILProperty::create(SILModule &M, bool Serialized, AbstractStorageDecl *Decl,
+                    llvm::Optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);
   return prop;
@@ -956,12 +954,29 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   return theClass->getObjectModel() == ReferenceCounting::ObjC;
 }
 
-bool Lowering::shouldSkipLowering(Decl *D) {
+static bool isUnconditionallyUnavailable(const Decl *D) {
+  if (auto unavailableAttrAndDecl = D->getSemanticUnavailableAttr())
+    return unavailableAttrAndDecl->first->isUnconditionallyUnavailable();
+
+  return false;
+}
+
+bool Lowering::shouldSkipLowering(const Decl *D) {
   if (D->getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
       UnavailableDeclOptimization::Complete)
     return false;
 
   // Unavailable declarations should be skipped if
   // -unavailable-decl-optimization=complete is specified.
-  return D->getSemanticUnavailableAttr() != None;
+  return isUnconditionallyUnavailable(D);
+}
+
+bool Lowering::shouldLowerToUnavailableCodeStub(const Decl *D) {
+  if (D->getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+      UnavailableDeclOptimization::Stub)
+    return false;
+
+  // Unavailable declarations should trap at runtime if
+  // -unavailable-decl-optimization=stub is specified.
+  return isUnconditionallyUnavailable(D);
 }

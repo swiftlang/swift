@@ -96,7 +96,8 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   /// worklist.
   void drainVisitedSinceLastMutationIntoWorklist() {
     while (!visitedSinceLastMutation.empty()) {
-      Optional<SILValue> nextValue = visitedSinceLastMutation.pop_back_val();
+      llvm::Optional<SILValue> nextValue =
+          visitedSinceLastMutation.pop_back_val();
       if (!nextValue.has_value()) {
         continue;
       }
@@ -124,7 +125,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   bool visitSILInstruction(SILInstruction *i) {
     assert((isa<OwnershipForwardingTermInst>(i) ||
-            !OwnershipForwardingMixin::isa(i)) &&
+            !ForwardingInstruction::isa(i)) &&
            "Should have forwarding visitor for all ownership forwarding "
            "non-term instructions");
     return false;
@@ -134,7 +135,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool visitValueBase(ValueBase *v) {
     auto *inst = v->getDefiningInstruction();
     (void)inst;
-    assert((!inst || !OwnershipForwardingMixin::isa(inst)) &&
+    assert((!inst || !ForwardingInstruction::isa(inst)) &&
            "Should have forwarding visitor for all ownership forwarding "
            "instructions");
     return false;
@@ -183,7 +184,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(UncheckedEnumData)
   FORWARDING_INST(MarkUninitialized)
   FORWARDING_INST(SelectEnum)
-  FORWARDING_INST(SelectValue)
   FORWARDING_INST(DestructureStruct)
   FORWARDING_INST(DestructureTuple)
   FORWARDING_INST(TupleExtract)

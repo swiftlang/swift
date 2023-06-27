@@ -68,6 +68,8 @@ public:
 
   ArrayRef<ProtocolConformanceRef> getPatternConformances() const;
 
+  bool isInvalid() const;
+
   bool isCanonical() const;
 
   PackConformance *getCanonicalConformance() const;
@@ -80,13 +82,13 @@ public:
   /// The ProtocolConformanceRef either stores a pack conformance, or
   /// it is invalid in the case of substitution failure.
   ProtocolConformanceRef subst(SubstitutionMap subMap,
-                               SubstOptions options=None) const;
+                               SubstOptions options = llvm::None) const;
 
   /// The ProtocolConformanceRef either stores a pack conformance, or
   /// it is invalid in the case of substitution failure.
   ProtocolConformanceRef subst(TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
-                               SubstOptions options=None) const;
+                               SubstOptions options = llvm::None) const;
 
   /// Apply an in-flight substitution to the conformances in this
   /// protocol conformance ref.
@@ -103,4 +105,4 @@ void simple_display(llvm::raw_ostream &out, PackConformance *conformance);
 
 } // end namespace swift
 
-#endif  // SWIFT_AST_PACKCONFORMANCE_H
+#endif // SWIFT_AST_PACKCONFORMANCE_H

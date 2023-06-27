@@ -78,6 +78,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     assert(selfIdx >= 0)
     return selfIdx
   }
+
+  public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
   
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { bridged.getSILResultType().type }
@@ -121,6 +123,22 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// True if the callee function is annotated with @_semantics("programtermination_point").
   /// This means that the function terminates the program.
   public var isProgramTerminationPoint: Bool { hasSemanticsAttribute("programtermination_point") }
+
+  public var isTransparent: Bool { bridged.isTransparent() }
+
+  public var isAsync: Bool { bridged.isAsync() }
+
+  /// True if this is a `[global_init]` function.
+  ///
+  /// Such a function is typically a global addressor which calls the global's
+  /// initializer (`[global_init_once_fn]`) via a `builtin "once"`.
+  public var isGlobalInitFunction: Bool { bridged.isGlobalInitFunction() }
+
+  /// True if this is a `[global_init_once_fn]` function.
+  ///
+  /// Such a function allocates a global and stores the global's init value.
+  /// It's called from a `[global_init]` function via a `builtin "once"`.
+  public var isGlobalInitOnceFunction: Bool { bridged.isGlobalInitOnceFunction() }
 
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
@@ -174,6 +192,40 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       default: return .none
     }
   }
+
+  public enum PerformanceConstraints {
+    case none
+    case noAllocations
+    case noLocks
+  }
+
+  public var performanceConstraints: PerformanceConstraints {
+    switch bridged.getPerformanceConstraints() {
+      case .None: return .none
+      case .NoAllocation: return .noAllocations
+      case .NoLocks: return .noLocks
+      default: fatalError("unknown performance constraint")
+    }
+  }
+
+  public enum InlineStrategy {
+    case automatic
+    case never
+    case always
+  }
+
+  public var inlineStrategy: InlineStrategy {
+    switch bridged.getInlineStrategy() {
+      case .InlineDefault: return .automatic
+      case .NoInline: return .never
+      case .AlwaysInline: return .always
+      default:
+        fatalError()
+    }
+  }
+
+  public var isSerialized: Bool { bridged.isSerialized() }
+  public var hasValidLinkageForFragileRef: Bool { bridged.hasValidLinkageForFragileRef() }
 
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized

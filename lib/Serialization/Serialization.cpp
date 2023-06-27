@@ -843,7 +843,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
   BLOCK_RECORD(options_block, MODULE_ABI_NAME);
   BLOCK_RECORD(options_block, IS_CONCURRENCY_CHECKED);
+  BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
   BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
+  BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
+  BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1085,6 +1088,12 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         IsConcurrencyChecked.emit(ScratchRecord);
       }
 
+      if (M->hasCxxInteroperability()) {
+        options_block::HasCxxInteroperabilityEnabledLayout
+            CxxInteroperabilityEnabled(Out);
+        CxxInteroperabilityEnabled.emit(ScratchRecord);
+      }
+
       if (options.SerializeOptionsForDebugging) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
@@ -1123,6 +1132,47 @@ void Serializer::writeHeader(const SerializationOptions &options) {
             continue;
           }
           XCC.emit(ScratchRecord, arg);
+        }
+
+        // Macro plugins
+        options_block::PluginSearchOptionLayout PluginSearchOpt(Out);
+        for (auto &elem : options.PluginSearchOptions) {
+          switch (elem.getKind()) {
+          case PluginSearchOption::Kind::PluginPath: {
+            auto &opt = elem.get<PluginSearchOption::PluginPath>();
+            PluginSearchOpt.emit(ScratchRecord,
+                                 uint8_t(PluginSearchOptionKind::PluginPath),
+                                 opt.SearchPath);
+            continue;
+          }
+          case PluginSearchOption::Kind::ExternalPluginPath: {
+            auto &opt = elem.get<PluginSearchOption::ExternalPluginPath>();
+            PluginSearchOpt.emit(
+                ScratchRecord,
+                uint8_t(PluginSearchOptionKind::ExternalPluginPath),
+                opt.SearchPath + "#" + opt.ServerPath);
+            continue;
+          }
+          case PluginSearchOption::Kind::LoadPluginLibrary: {
+            auto &opt = elem.get<PluginSearchOption::LoadPluginLibrary>();
+            PluginSearchOpt.emit(
+                ScratchRecord,
+                uint8_t(PluginSearchOptionKind::LoadPluginLibrary),
+                opt.LibraryPath);
+            continue;
+          }
+          case PluginSearchOption::Kind::LoadPluginExecutable: {
+            auto &opt = elem.get<PluginSearchOption::LoadPluginExecutable>();
+            std::string optStr = opt.ExecutablePath + "#";
+            llvm::interleave(
+                opt.ModuleNames, [&](auto &name) { optStr += name; },
+                [&]() { optStr += ","; });
+            PluginSearchOpt.emit(
+                ScratchRecord,
+                uint8_t(PluginSearchOptionKind::LoadPluginExecutable), optStr);
+            continue;
+          }
+          }
         }
       }
     }
@@ -2648,7 +2698,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       SmallVector<IdentifierID, 4> spis;
       for (auto spi : theAttr->getSPIGroups()) {
-        assert(!spi.empty() && "Empty SPI name");
+        // SPI group name in source code can be '_', a specifier that allows
+        // implicit import of the SPI. It gets converted to to an empty identifier
+        // during parsing to match the existing AST node representation. An empty
+        // identifier is printed as '_' at serialization.
         spis.push_back(S.addDeclBaseNameRef(spi));
       }
 
@@ -2874,6 +2927,34 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_Initializes: {
+      auto abbrCode = S.DeclTypeAbbrCodes[InitializesDeclAttrLayout::Code];
+      auto attr = cast<InitializesAttr>(DA);
+
+      SmallVector<IdentifierID, 4> properties;
+      for (auto identifier : attr->getProperties()) {
+        properties.push_back(S.addDeclBaseNameRef(identifier));
+      }
+
+      InitializesDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, properties);
+      return;
+    }
+
+    case DAK_Accesses: {
+      auto abbrCode = S.DeclTypeAbbrCodes[AccessesDeclAttrLayout::Code];
+      auto attr = cast<InitializesAttr>(DA);
+
+      SmallVector<IdentifierID, 4> properties;
+      for (auto identifier : attr->getProperties()) {
+        properties.push_back(S.addDeclBaseNameRef(identifier));
+      }
+
+      AccessesDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, properties);
+      return;
+    }
+
     case DAK_DynamicReplacement: {
       auto abbrCode =
           S.DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
@@ -3015,6 +3096,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[ExposeDeclAttrLayout::Code];
       ExposeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(), theAttr->Name);
+      return;
+    }
+
+    case DAK_Section: {
+      auto *theAttr = cast<SectionAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
+      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           theAttr->isImplicit(),
+                                           theAttr->Name);
       return;
     }
 
@@ -4632,7 +4722,7 @@ public:
     uint8_t hasExpandedDefinition = 0;
     IdentifierID externalModuleNameID = 0;
     IdentifierID externalMacroTypeNameID = 0;
-    Optional<ExpandedMacroDefinition> expandedDef;
+    llvm::Optional<ExpandedMacroDefinition> expandedDef;
     auto def = macro->getDefinition();
     switch (def.kind) {
       case MacroDefinition::Kind::Invalid:
@@ -5037,6 +5127,14 @@ public:
     PackExpansionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                         S.addTypeRef(expansionTy->getPatternType()),
                                         S.addTypeRef(expansionTy->getCountType()));
+  }
+
+  void visitPackElementType(const PackElementType *elementType) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PackElementTypeLayout::Code];
+    PackElementTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(elementType->getPackType()),
+                                      elementType->getLevel());
   }
 
   void visitPackType(const PackType *packTy) {
@@ -5596,6 +5694,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
+  registerDeclTypeAbbr<SILMoveOnlyWrappedTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();
@@ -5606,6 +5705,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
   registerDeclTypeAbbr<PackExpansionTypeLayout>();
+  registerDeclTypeAbbr<PackElementTypeLayout>();
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
 
@@ -6190,7 +6290,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
-  Optional<DeclID> entryPointClassID;
+  llvm::Optional<DeclID> entryPointClassID;
   SmallVector<DeclID, 16> orderedTopLevelDecls;
 
   ArrayRef<const FileUnit *> files;
@@ -6201,7 +6301,12 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       Scratch.push_back(synthesizedFile);
     files = llvm::makeArrayRef(Scratch);
   } else {
-    files = M->getFiles();
+    for (auto file : M->getFiles()) {
+      Scratch.push_back(file);
+      if (auto *synthesizedFile = file->getSynthesizedFile())
+        Scratch.push_back(synthesizedFile);
+    }
+    files = llvm::makeArrayRef(Scratch);
   }
   for (auto nextFile : files) {
     if (nextFile->hasEntryPoint())

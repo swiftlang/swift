@@ -1,13 +1,17 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h
 // REQUIRES: objc_interop
 
-@_objcImplementation extension ObjCClass {
+protocol EmptySwiftProto {}
+
+@_objcImplementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
   // expected-note@-1 {{previously implemented by extension here}}
   // expected-error@-2 {{extension for main class interface should provide implementation for instance method 'method(fromHeader4:)'}}
   // expected-error@-3 {{extension for main class interface should provide implementation for property 'propertyFromHeader9'}}
   // FIXME: give better diagnostic expected-error@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'}}
   // FIXME: give better diagnostic expected-error@-5 {{extension for main class interface should provide implementation for property 'propertyFromHeader7'}}
   // FIXME: give better diagnostic expected-error@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'}}
+  // expected-error@-7 {{'@_objcImplementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
+  // expected-error@-8 {{'@_objcImplementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
@@ -38,6 +42,13 @@
     // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
   }
 
+  var methodFromHeader5: CInt
+  // expected-error@-1 {{property 'methodFromHeader5' does not match the instance method declared by the header}}
+
+  func method(fromHeader6: Double) {
+    // expected-error@-1 {{instance method 'method(fromHeader6:)' of type '(Double) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+  }
+
   var propertyFromHeader1: CInt
   // OK, provides an implementation with a stored property
 
@@ -57,15 +68,23 @@
   }
 
   @objc let propertyFromHeader5: CInt
-  // FIXME: bad, needs to be settable
+  // expected-error@-1 {{property 'propertyFromHeader5' should be settable to match the settable property declared by the header}}
 
   @objc var propertyFromHeader6: CInt {
-    // FIXME: bad, needs a setter
+    // expected-error@-1 {{property 'propertyFromHeader6' should be settable to match the settable property declared by the header}}
     get { return 1 }
   }
 
   final var propertyFromHeader8: CInt
   // FIXME: Should complain about final not fulfilling the @objc requirement
+
+  func propertyFromHeader10() -> CInt {
+    // expected-error@-1 {{instance method 'propertyFromHeader10()' does not match the property declared by the header}}
+    return 1
+  }
+
+  var propertyFromHeader11: Float
+  // expected-error@-1 {{property 'propertyFromHeader11' of type 'Float' does not match type 'Int32' declared by the header}}
 
   var readonlyPropertyFromHeader1: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable
@@ -130,12 +149,31 @@
     // OK
   }
 
+  @objc(initFromProtocol1:)
+  required public init?(fromProtocol1: CInt) {
+    // OK
+  }
+
+  @objc(initFromProtocol2:)
+  public init?(fromProtocol2: CInt) {
+    // expected-error@-1 {{initializer 'init(fromProtocol2:)' should be 'required' to match initializer declared by the header}} {{3-3=required }}
+  }
+
+  @objc(initNotFromProtocol:)
+  required public init?(notFromProtocol: CInt) {
+    // expected-error@-1 {{initializer 'init(notFromProtocol:)' should not be 'required' to match initializer declared by the header}} {{3-12=}}
+  }
+
   class func classMethod1(_: CInt) {
     // OK
   }
 
   func classMethod2(_: CInt) {
     // expected-error@-1 {{instance method 'classMethod2' does not match class method declared in header}} {{3-3=class }}
+  }
+
+  class func classMethod3(_: Float) {
+    // expected-error@-1 {{class method 'classMethod3' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
   }
 
   func instanceMethod1(_: CInt) {
@@ -289,6 +327,43 @@
 
   public func doSomethingFunAndAsynchronous(completionHandler: @escaping (Any?, Error?) -> Void) {
   }
+
+  @available(SwiftStdlib 5.1, *)
+  @objc(doSomethingOverloadedWithCompletionHandler:)
+  public func doSomethingOverloaded() async {}
+
+  @available(*, noasync)
+  @objc(doSomethingOverloaded)
+  public func doSomethingOverloaded() {}
+}
+
+@_objcImplementation(Conformance) extension ObjCClass {
+  // expected-error@-1 {{extension for category 'Conformance' should provide implementation for instance method 'requiredMethod2()'}}
+  // no-error concerning 'optionalMethod2()'
+
+  func requiredMethod1() {}
+
+  func optionalMethod1() {}
+}
+
+@_objcImplementation(TypeMatchOptionality) extension ObjCClass {
+  func nullableResultAndArg(_: Any?) -> Any? { fatalError() } // no-error
+  func nonnullResultAndArg(_: Any) -> Any { fatalError() } // no-error
+  func nullUnspecifiedResultAndArg(_: Any!) -> Any! { fatalError() } // no-error
+
+  func nonnullResult1() -> Any { fatalError() } // no-error
+  func nonnullResult2() -> Any? { fatalError() } // expected-error {{instance method 'nonnullResult2()' of type '() -> Any?' does not match type '() -> Any' declared by the header}}
+  func nonnullResult3() -> Any! { fatalError() } // no-error (special case)
+
+  func nonnullArgument1(_: Any) {} // no-error
+  func nonnullArgument2(_: Any?) {} // expected-error {{instance method 'nonnullArgument2' of type '(Any?) -> ()' does not match type '(Any) -> Void' declared by the header}}
+  func nonnullArgument3(_: Any!) {} // no-error (special case)
+
+  func nullableResult() -> Any { fatalError() } // expected-error {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
+  func nullableArgument(_: Any) {} // expected-error {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
+
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be implicitly @objc because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be implicitly @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @_objcImplementation extension ObjCClass {}

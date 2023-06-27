@@ -111,3 +111,32 @@ struct OldStorage {
 // The deprecation warning below comes from the deprecation attribute
 // introduced by @wrapStoredProperties on OldStorage.
 _ = OldStorage(x: 5).x   // expected-warning{{'x' is deprecated: hands off my data}}
+
+@wrapStoredProperties(#"available(*, deprecated, message: "hands off my data")"#)
+class C2: P {
+  var x: Int = 0
+  var y: Int = 0
+
+  var squareOfLength: Int {
+    return x*x + y*y // expected-warning 4{{hands off my data}}
+  }
+
+  var blah: Int { squareOfLength }
+}
+
+@attached(member, names: named(expandedMember))
+macro AddMember() = #externalMacro(module: "MacroDefinition", type: "SingleMemberMacro")
+
+@AddMember
+@wrapAllProperties
+struct TestExpansionOrder {
+  var originalMember: Int = 10
+}
+
+var expansionOrder = TestExpansionOrder()
+
+// CHECK-NOT: setting 27
+expansionOrder.expandedMember = 27
+
+// CHECK: setting 28
+expansionOrder.originalMember = 28

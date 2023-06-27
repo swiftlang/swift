@@ -181,7 +181,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   computeDumpScopeMapLocations();
 
-  Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+  llvm::Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
   // None here means error, not just "no inputs". Propagate unconditionally.
@@ -351,11 +351,24 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
 
-  Opts.EnableCAS = Args.hasArg(OPT_enable_cas);
-  Opts.CASPath =
+  Opts.EnableCaching = Args.hasArg(OPT_cache_compile_job);
+  Opts.EnableCachingRemarks = Args.hasArg(OPT_cache_remarks);
+  Opts.CacheSkipReplay = Args.hasArg(OPT_cache_disable_replay);
+  Opts.CASOpts.CASPath =
       Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
-  Opts.CASFSRootID = Args.getLastArgValue(OPT_cas_fs);
-  if (Opts.EnableCAS && Opts.CASFSRootID.empty() &&
+  Opts.CASOpts.PluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
+  for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
+    StringRef Name, Value;
+    std::tie(Name, Value) = Opt.split('=');
+    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
+                                            std::string(Value));
+  }
+
+  Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
+  Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
+
+  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
+      Opts.ClangIncludeTrees.empty() &&
       FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
     if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
         Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
@@ -653,9 +666,9 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     // selected".
     return false;
   }
-  Optional<std::vector<std::string>> outputFilenames =
+  llvm::Optional<std::vector<std::string>> outputFilenames =
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
-        Args, Diags, options::OPT_o, options::OPT_output_filelist);
+          Args, Diags, options::OPT_o, options::OPT_output_filelist);
 
   std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&
@@ -831,7 +844,7 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     
     for (auto item: args) {
       auto str = StringRef(item);
-      // splits to an alias and the underlying name
+      // splits to an alias and its real name
       auto pair = str.split('=');
       auto lhs = pair.first;
       auto rhs = pair.second;
@@ -844,13 +857,13 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
         return false;
       }
       
-      // First, add the underlying name as a key to prevent it from being
+      // First, add the real name as a key to prevent it from being
       // used as an alias
       if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
         return false;
       }
-      // Next, add the alias as a key and the underlying name as a value to the map
+      // Next, add the alias as a key and the real name as a value to the map
       auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
       if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);

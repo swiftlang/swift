@@ -156,8 +156,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
-  // Convert last destroy_value to deinits.
-  P.addMoveOnlyDeinitInsertion();
   // Lower move only wrapped trivial types.
   P.addTrivialMoveOnlyTypeEliminator();
   // Check no uses after consume operator of a value in an address.
@@ -213,8 +211,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   }
 
   P.addOptimizeHopToExecutor();
-  P.addMandatoryGenericSpecializer();
 
+  // These diagnostic passes must run before OnoneSimplification because
+  // they rely on completely unoptimized SIL.
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
@@ -226,9 +225,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDiagnoseLifetimeIssues();
   }
 
-  P.addGlobalOpt();
-  P.addPerformanceDiagnostics();
-  
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 
@@ -236,6 +232,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // until we can audit the later part of the pipeline. Eventually, this should
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
+
+  P.addMandatoryPerformanceOptimizations();
+  P.addOnoneSimplification();
+  P.addInitializeStaticGlobals();
+  P.addPerformanceDiagnostics();
 }
 
 SILPassPipelinePlan
@@ -480,17 +481,13 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
-    // Does not inline functions with defined semantics.
-    P.addEarlyInliner();
+    // Does not inline functions with defined semantics or effects.
+    P.addEarlyPerfInliner();
     break;
   case OptimizationLevelKind::MidLevel:
-    // Does inline semantics-functions (except "availability"), but not
-    // global-init functions.
-    P.addPerfInliner();
-    break;
   case OptimizationLevelKind::LowLevel:
     // Inlines everything
-    P.addLateInliner();
+    P.addPerfInliner();
     break;
   }
 
@@ -626,10 +623,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // is linked in from the stdlib.
   P.addTempRValueOpt();
 
-  // Needed to serialize static initializers of globals for cross-module
-  // optimization.
-  P.addGlobalOpt();
-
   // Add the outliner pass (Osize).
   P.addOutliner();
 }
@@ -673,7 +666,6 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
   P.addComputeSideEffects();
   P.addStackPromotion();
 
-  P.addGlobalOpt();
   P.addLetPropertiesOpt();
 }
 
@@ -698,25 +690,26 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionAndGlobalElimination();
+  P.addReadOnlyGlobalVariablesPass();
   P.addTargetConstantFolding();
   P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
-  // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
+  // These few passes are needed to cleanup between loop unrolling and InitializeStaticGlobals.
   // This is needed to fully optimize static small String constants.
   P.addSimplifyCFG();
   P.addSILCombine();
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
-  
+  P.addSimplification();
+
+  P.addInitializeStaticGlobals();
+
   // ComputeEffects should be done at the end of a function-pipeline. The next
-  // pass (GlobalOpt) is a module pass, so this is the end of a function-pipeline.
+  // pass (LetPropertiesOpt) is a module pass, so this is the end of a function-pipeline.
   P.addComputeEscapeEffects();
   P.addComputeSideEffects();
 
-  // Hoist globals out of loops.
-  // Global-init functions should not be inlined GlobalOpt is done.
-  P.addGlobalOpt();
   P.addLetPropertiesOpt();
 
   // Propagate constants into closures and convert to static dispatch.  This
@@ -759,9 +752,16 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
+  // The NamedReturnValueOptimization shouldn't be done before serialization.
+  // For details see the comment for `namedReturnValueOptimization`.
+  P.addNamedReturnValueOptimization();
+
   P.addDeadObjectElimination();
   P.addObjectOutliner();
   P.addDeadStoreElimination();
+
+  // dead-store-elimination can expose opportunities for dead object elimination.
+  P.addDeadObjectElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
   P.addFunctionSignatureOpts();
@@ -883,6 +883,16 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // boundaries as required by the ABI.
   P.addLoadableByAddress();
 
+  if (Options.EnablePackMetadataStackPromotion) {
+    // Insert marker instructions indicating where on-stack pack metadata
+    // deallocation must occur.
+    //
+    // No code motion may occur after this pass: alloc_pack_metadata must
+    // directly precede the instruction on behalf of which metadata will
+    // actually be emitted (e.g. apply).
+    P.addPackMetadataMarkerInserter();
+  }
+
   return P;
 }
 
@@ -983,7 +993,6 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // in the editor.
   P.startPipeline("Non-Diagnostic Mandatory Optimizations");
   P.addForEachLoopUnroll();
-  P.addOnoneSimplification();
 
   // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
   // be no need to run another analysis of copies at -Onone.

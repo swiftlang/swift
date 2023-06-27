@@ -28,6 +28,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -157,10 +158,12 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i) {
 struct SILValuePrinterInfo {
   ID ValueID;
   SILType Type;
-  Optional<ValueOwnershipKind> OwnershipKind;
+  llvm::Optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
   LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
   bool IsCapture = false;
+  bool IsReborrow = false;
+  bool IsEscaping = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -170,15 +173,22 @@ struct SILValuePrinterInfo {
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime, bool IsCapture)
+                      LifetimeAnnotation Lifetime, bool IsCapture,
+                      bool IsReborrow, bool IsEscaping)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
         IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
-        IsCapture(IsCapture) {}
+        IsCapture(IsCapture), IsReborrow(IsReborrow), IsEscaping(IsEscaping) {}
   SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime, bool IsCapture)
+                      LifetimeAnnotation Lifetime, bool IsCapture,
+                      bool IsReborrow, bool IsEscaping)
       : ValueID(ValueID), Type(Type), OwnershipKind(),
         IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
-        IsCapture(IsCapture) {}
+        IsCapture(IsCapture), IsReborrow(IsReborrow), IsEscaping(IsEscaping) {}
+  SILValuePrinterInfo(ID ValueID, SILType Type,
+                      ValueOwnershipKind OwnershipKind, bool IsReborrow,
+                      bool IsEscaping)
+      : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
+        IsReborrow(IsReborrow), IsEscaping(IsEscaping) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -331,6 +341,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
       break;
     case AccessorKind::Modify:
       OS << "!modify";
+      break;
+    case AccessorKind::Init:
+      OS << "!init";
       break;
     }
     break;
@@ -671,6 +684,10 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     }
     if (i.IsCapture)
       *this << "@closureCapture ";
+    if (i.IsReborrow)
+      *this << "@reborrow ";
+    if (i.IsEscaping)
+      *this << "@pointer_escape ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
@@ -704,9 +721,12 @@ public:
     return {Ctx.getID(V), V ? V->getType() : SILType()};
   }
   SILValuePrinterInfo getIDAndType(SILFunctionArgument *arg) {
-    return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy(),
-            arg->getLifetimeAnnotation(), arg->isClosureCapture()};
+    return {Ctx.getID(arg),          arg->getType(),
+            arg->isNoImplicitCopy(), arg->getLifetimeAnnotation(),
+            arg->isClosureCapture(), arg->isReborrow(),
+            arg->hasPointerEscape()};
   }
+
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
@@ -716,7 +736,13 @@ public:
             arg->getOwnershipKind(),
             arg->isNoImplicitCopy(),
             arg->getLifetimeAnnotation(),
-            arg->isClosureCapture()};
+            arg->isClosureCapture(),
+            arg->isReborrow(),
+            arg->hasPointerEscape()};
+  }
+  SILValuePrinterInfo getIDAndTypeAndOwnership(SILArgument *arg) {
+    return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
+            arg->isReborrow(), arg->hasPointerEscape()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -829,6 +855,12 @@ public:
     *this << ')';
   }
 
+#ifndef NDEBUG
+  void printID(const SILBasicBlock *BB) {
+    *this << Ctx.getID(BB) << "\n";
+  }
+#endif
+
   void print(const SILBasicBlock *BB) {
     // Output uses for BB arguments. These are put into place as comments before
     // the block header.
@@ -868,7 +900,7 @@ public:
     *this << '\n';
 
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
-    Optional<SILLocation> PrevLoc;
+    llvm::Optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
       if (SILPrintSourceInfo) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
@@ -1351,7 +1383,7 @@ public:
     }
   }
 
-  void printDebugVar(Optional<SILDebugVariable> Var,
+  void printDebugVar(llvm::Optional<SILDebugVariable> Var,
                      const SourceManager *SM = nullptr) {
     if (!Var)
       return;
@@ -1402,6 +1434,9 @@ public:
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }
+  void visitAllocPackMetadataInst(AllocPackMetadataInst *APMI) {
+    *this << APMI->getType().getObjectType();
+  }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
@@ -1433,6 +1468,10 @@ public:
     
     if (ABI->emitReflectionMetadata()) {
       *this << "[reflection] ";
+    }
+
+    if (ABI->hasPointerEscape()) {
+      *this << "[pointer_escape] ";
     }
 
     if (ABI->getUsesMoveableValueDebugInfo() &&
@@ -1651,11 +1690,14 @@ public:
     *this << getIDAndType(LBI->getOperand());
   }
 
-  void visitBeginBorrowInst(BeginBorrowInst *LBI) {
-    if (LBI->isLexical()) {
+  void visitBeginBorrowInst(BeginBorrowInst *BBI) {
+    if (BBI->isLexical()) {
       *this << "[lexical] ";
     }
-    *this << getIDAndType(LBI->getOperand());
+    if (BBI->hasPointerEscape()) {
+      *this << "[pointer_escape] ";
+    }
+    *this << getIDAndType(BBI->getOperand());
   }
 
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
@@ -1690,8 +1732,7 @@ public:
     }
   }
 
-  void printForwardingOwnershipKind(OwnershipForwardingMixin *inst,
-                                    SILValue op) {
+  void printForwardingOwnershipKind(ForwardingInstruction *inst, SILValue op) {
     if (!op)
       return;
 
@@ -1736,8 +1777,33 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
+
     *this << getIDAndType(AI->getDest())
           << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
+  }
+
+  void visitAssignOrInitInst(AssignOrInitInst *AI) {
+    switch (AI->getMode()) {
+    case AssignOrInitInst::Unknown:
+      break;
+    case AssignOrInitInst::Init:
+      *this << "[init] ";
+      break;
+    case AssignOrInitInst::Set:
+      *this << "[set] ";
+      break;
+    }
+
+    // Print all of the properties that have been previously initialized.
+    for (unsigned i = 0, n = AI->getNumInitializedProperties(); i != n; ++i) {
+      if (AI->isPropertyAlreadyInitialized(i)) {
+        *this << "[assign=" << i << "] ";
+      }
+    }
+
+    *this << getIDAndType(AI->getSrc());
+    *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
   }
 
@@ -1755,6 +1821,9 @@ public:
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
     case MarkUninitializedInst::DelegatingSelfAllocated:
       *this << "[delegatingselfallocated] ";
+      break;
+    case MarkUninitializedInst::Out:
+      *this << "[out] ";
       break;
     }
     *this << getIDAndType(MU->getOperand());
@@ -1869,9 +1938,9 @@ public:
       *this << " !false_count(" << CI->getFalseBBCount().getValue() << ")";
   }
 
-  void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
+  void printUncheckedConversionInst(ConversionOperation CI, SILValue operand) {
     *this << getIDAndType(operand) << " to " << CI->getType();
-    if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(CI)) {
+    if (auto *ofci = dyn_cast<OwnershipForwardingSingleValueInstruction>(*CI)) {
       printForwardingOwnershipKind(ofci, ofci->getOperand(0));
     }
   }
@@ -1895,11 +1964,11 @@ public:
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitUpcastInst(UpcastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
     *this << (CI->needsStackProtection() ? "[stack_protection] " : "");
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to ";
@@ -1912,7 +1981,7 @@ public:
     *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *CI) {
     *this << ' ' << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
@@ -1920,64 +1989,64 @@ public:
           << getIDAndType(CI->getDest());
   }
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitUncheckedValueCastInst(UncheckedValueCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
 
-#define LOADABLE_REF_STORAGE(Name, ...) \
-  void visitRefTo##Name##Inst(RefTo##Name##Inst *CI) { \
-    printUncheckedConversionInst(CI, CI->getOperand()); \
-  } \
-  void visit##Name##ToRefInst(Name##ToRefInst *CI) { \
-    printUncheckedConversionInst(CI, CI->getOperand()); \
+#define LOADABLE_REF_STORAGE(Name, ...)                                        \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *CI) {                         \
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());   \
+  }                                                                            \
+  void visit##Name##ToRefInst(Name##ToRefInst *CI) {                           \
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());   \
   }
 #include "swift/AST/ReferenceStorage.def"
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitObjCExistentialMetatypeToObjectInst(
                                       ObjCExistentialMetatypeToObjectInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitObjCProtocolInst(ObjCProtocolInst *CI) {
     *this << "#" << CI->getProtocol()->getName() << " : " << CI->getType();
   }
   
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
-    *this << getIDAndType(I->getConverted()) << ", "
+    *this << getIDAndType(I->getOperand(0)) << ", "
           << getIDAndType(I->getBitsOperand());
-    printForwardingOwnershipKind(I, I->getConverted());
+    printForwardingOwnershipKind(I, I->getOperand(0));
   }
-  
+
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *I) {
-    printUncheckedConversionInst(I, I->getOperand());
+    printUncheckedConversionInst(ConversionOperation(I), I->getOperand());
     printForwardingOwnershipKind(I, I->getOperand());
   }
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *I) {
-    printUncheckedConversionInst(I, I->getOperand());
+    printUncheckedConversionInst(ConversionOperation(I), I->getOperand());
   }
 
   void visitCopyValueInst(CopyValueInst *I) {
@@ -1993,6 +2062,8 @@ public:
       *this << "[allows_diagnostics] ";
     if (I->isLexical())
       *this << "[lexical] ";
+    if (I->hasPointerEscape())
+      *this << "[pointer_escape] ";
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2422,6 +2493,9 @@ public:
   void visitDeallocPackInst(DeallocPackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
+  void visitDeallocPackMetadataInst(DeallocPackMetadataInst *DPMI) {
+    *this << getIDAndType(DPMI->getOperand());
+  }
   void visitDeallocStackRefInst(DeallocStackRefInst *ESRL) {
     *this << getIDAndType(ESRL->getOperand());
   }
@@ -2452,6 +2526,18 @@ public:
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getOperand());
+  }
+  void visitMoveOnlyWrapperToCopyableAddrInst(
+      MoveOnlyWrapperToCopyableAddrInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
+  }
+  void
+  visitMoveOnlyWrapperToCopyableBoxInst(MoveOnlyWrapperToCopyableBoxInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
+  }
+  void visitCopyableToMoveOnlyWrapperAddrInst(
+      CopyableToMoveOnlyWrapperAddrInst *BAI) {
+    *this << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
@@ -2632,21 +2718,6 @@ public:
     printSelectEnumInst(SEI);
   }
 
-  void visitSelectValueInst(SelectValueInst *SVI) {
-    *this << getIDAndType(SVI->getOperand());
-
-    for (unsigned i = 0, e = SVI->getNumCases(); i < e; ++i) {
-      SILValue casevalue;
-      SILValue result;
-      std::tie(casevalue, result) = SVI->getCase(i);
-      *this << ", case " << Ctx.getID(casevalue) << ": " << Ctx.getID(result);
-    }
-    if (SVI->hasDefault())
-      *this << ", default " << Ctx.getID(SVI->getDefaultResult());
-
-    *this << " : " << SVI->getType();
-  }
-  
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     *this << getIDAndType(DMBI->getOperand()) << ", " << DMBI->getMember()
           << ", " << Ctx.getID(DMBI->getHasMethodBB()) << ", "
@@ -3021,6 +3092,21 @@ void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
+#ifndef NDEBUG
+void SILBasicBlock::dumpID() const {
+  printID(llvm::errs());
+}
+
+void SILBasicBlock::printID(llvm::raw_ostream &OS) const {
+  SILPrintContext Ctx(OS);
+  printID(Ctx);
+}
+
+void SILBasicBlock::printID(SILPrintContext &Ctx) const {
+  SILPrinter(Ctx).printID(this);
+}
+#endif
+
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {
   SILPrintContext Ctx(llvm::errs(), Verbose);
@@ -3132,6 +3218,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (forceEnableLexicalLifetimes()) {
     OS << "[lexical_lifetimes] ";
   }
+  if (!useStackForPackMetadata()) {
+    OS << "[no_onstack_pack_metadata] ";
+  }
 
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
@@ -3213,6 +3302,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   for (auto *Attr : getSpecializeAttrs()) {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
+
+  if (markedAsUsed())
+    OS << "[used] ";
+
+  if (!section().empty())
+    OS << "[section \"" << section() << "\"] ";
 
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
@@ -4287,7 +4382,6 @@ PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
   result.PrintInSILBody = true;
   result.PreferTypeRepr = false;
   result.PrintIfConfig = false;
-  result.PrintExplicitAny = true;
   result.OpaqueReturnTypePrinting =
      OpaqueReturnTypePrintingMode::StableReference;
   if (ctx && ctx->printFullConvention())

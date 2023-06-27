@@ -13,6 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 #define SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PathRemapper.h"
 #include "llvm/Support/VersionTuple.h"
@@ -43,6 +44,7 @@ namespace swift {
     StringRef ModuleLinkName;
     StringRef ModuleInterface;
     std::vector<std::string> ExtraClangOptions;
+    std::vector<swift::PluginSearchOption> PluginSearchOptions;
 
     /// Path prefixes that should be rewritten in debug info.
     PathRemapper DebuggingOptionsPrefixMap;

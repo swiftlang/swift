@@ -28,6 +28,8 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/Sema/Sema.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
@@ -146,9 +148,10 @@ Alignment IRGenModule::getAsyncContextAlignment() const {
   return Alignment(MaximumAlignment);
 }
 
-Optional<Size>
+llvm::Optional<Size>
 FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
-  if (!isSpecial()) return None;
+  if (!isSpecial())
+    return llvm::None;
 
   auto headerSize = getAsyncContextHeaderSize(IGM);
   headerSize = headerSize.roundUpToAlignment(IGM.getPointerAlignment());
@@ -321,7 +324,7 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::Block:
-    return llvm::CallingConv::C;
+    return IGM.getOptions().PlatformCCallingConvention;
 
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -578,7 +581,7 @@ namespace {
   class YieldSchema {
     SILType YieldTy;
     const TypeInfo &YieldTI;
-    Optional<NativeConventionSchema> NativeSchema;
+    llvm::Optional<NativeConventionSchema> NativeSchema;
     bool IsIndirect;
   public:
     YieldSchema(IRGenModule &IGM, SILFunctionConventions fnConv,
@@ -2462,7 +2465,7 @@ class AsyncCallEmission final : public CallEmission {
   llvm::Value *currentResumeFn = nullptr;
   llvm::Value *thickContext = nullptr;
   Size staticContextSize = Size(0);
-  Optional<AsyncContextLayout> asyncContextLayout;
+  llvm::Optional<AsyncContextLayout> asyncContextLayout;
 
   AsyncContextLayout getAsyncContextLayout() {
     if (!asyncContextLayout) {
@@ -3860,7 +3863,7 @@ bool irgen::addNativeArgument(IRGenFunction &IGF,
     // Pass the argument explosion directly, mapping into the native swift
     // calling convention.
     Explosion nonNativeParam;
-    ti.reexplode(IGF, in, nonNativeParam);
+    ti.reexplode(in, nonNativeParam);
     Explosion nativeParam = nativeSchema.mapIntoNative(
         IGF.IGM, IGF, nonNativeParam, paramType, isOutlined);
     nativeParam.transferInto(out, nativeParam.size());
@@ -4289,7 +4292,7 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
                      + unsigned(!indirectComponents.empty()))));
 
   // Fill in the indirect buffer if necessary.
-  Optional<Address> indirectBuffer;
+  llvm::Optional<Address> indirectBuffer;
   Size indirectBufferSize;
   if (!indirectComponents.empty()) {
     auto bufferStructTy = coroInfo.indirectResultsType;
@@ -4553,6 +4556,23 @@ bool IRGenModule::isForeignExceptionHandlingEnabled() const {
       Context.getClangModuleLoader()->getClangASTContext().getLangOpts();
   return Context.LangOpts.EnableCXXInterop && clangLangOpts.Exceptions &&
          !clangLangOpts.IgnoreExceptions;
+}
+
+bool IRGenModule::isCxxNoThrow(clang::FunctionDecl *fd, bool defaultNoThrow) {
+  auto *fpt = fd->getType()->getAs<clang::FunctionProtoType>();
+  if (!fpt)
+    return defaultNoThrow;
+  if (fpt->getExceptionSpecType() ==
+      clang::ExceptionSpecificationType::EST_Unevaluated) {
+    // Clang might not have evaluated the exception spec for
+    // a constructor, so force the evaluation of it.
+    auto &clangSema = Context.getClangModuleLoader()->getClangSema();
+    clangSema.EvaluateImplicitExceptionSpec(fd->getLocation(), fd);
+    fpt = fd->getType()->getAs<clang::FunctionProtoType>();
+    if (!fpt)
+      return defaultNoThrow;
+  }
+  return fpt->isNothrow();
 }
 
 /// Emit the epilogue for the function.
@@ -5145,7 +5165,8 @@ Callee irgen::getSwiftFunctionPointerCallee(
     PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
   auto fn = isClosure ? FunctionPointer::createSignedClosure(calleeInfo.OrigFnType, fnPtr, authInfo, sig) :
-    FunctionPointer::createSigned(calleeInfo.OrigFnType, fnPtr, authInfo, sig);
+    FunctionPointer::createSigned(calleeInfo.OrigFnType, fnPtr, authInfo, sig,
+                                  true);
   if (castOpaqueToRefcountedContext) {
     assert(dataPtr && dataPtr->getType() == IGF.IGM.OpaquePtrTy &&
            "Expecting trivial closure context");
@@ -5275,7 +5296,7 @@ FunctionPointer FunctionPointer::getAsFunction(IRGenFunction &IGF) const {
 void irgen::emitAsyncReturn(
     IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
     CanSILFunctionType fnType,
-    Optional<ArrayRef<llvm::Value *>> nativeResultArgs) {
+    llvm::Optional<ArrayRef<llvm::Value *>> nativeResultArgs) {
   auto contextAddr = asyncLayout.emitCastTo(IGF, IGF.getAsyncContext());
   auto returnToCallerLayout = asyncLayout.getResumeParentLayout();
   auto returnToCallerAddr =
@@ -5342,7 +5363,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   auto &IGM = IGF.IGM;
 
   // Map the explosion to the native result type.
-  Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
+  llvm::Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
   SmallVector<llvm::Value *, 16> nativeResultsStorage;
   SILFunctionConventions conv(fnType, IGF.getSILModule());
   auto &nativeSchema =
@@ -5450,7 +5471,7 @@ void irgen::forwardAsyncCallResult(IRGenFunction &IGF,
   Explosion resultExplosion;
   Explosion errorExplosion;
   auto hasError = fnType->hasErrorResult();
-  Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
+  llvm::Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
   SmallVector<llvm::Value *, 16> nativeResultsStorage;
 
   if (suspendResultTy->getNumElements() == numAsyncContextParams) {

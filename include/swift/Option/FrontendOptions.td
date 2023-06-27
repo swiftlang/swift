@@ -588,6 +588,10 @@ def disable_deserialization_safety :
   Flag<["-"], "disable-deserialization-safety">,
   HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
 
+def force_workaround_broken_modules :
+  Flag<["-"], "experimental-force-workaround-broken-modules">,
+  HelpText<"Attempt unsafe recovery for imported modules with broken modularization">;
+
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
@@ -861,6 +865,11 @@ def cxx_interop_getters_setters_as_properties :
   HelpText<"Import getters and setters as computed properties in Swift">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_disable_requirement_at_import :
+  Flag<["-"], "disable-cxx-interop-requirement-at-import">,
+  HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
@@ -1023,6 +1032,16 @@ def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
 
 def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
   HelpText<"Enable layout string based value witnesses">;
+
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_pack_metadata_stack_promotion :
+    Joined<["-"], "enable-pack-metadata-stack-promotion=">,
+    HelpText<"Whether to skip heapifying stack metadata packs when possible.">,
+    MetaVarName<"true|false">;
+  def enable_pack_metadata_stack_promotion_noArg :
+    Flag<["-"], "enable-pack-metadata-stack-promotion">,
+    HelpText<"Skip heapifying stack metadata packs when possible.">;
+}
 
 def disable_layout_string_value_witnesses : Flag<["-"], "disable-layout-string-value-witnesses">,
   HelpText<"Disable layout string based value witnesses">;
@@ -1198,6 +1217,23 @@ def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;
 
+// CAS/Caching related options.
+def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-for-testing">,
+  HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
+
+def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
+  HelpText<"Cache Key for bridging header pch">;
+
+def clang_include_tree: Flag<["-"], "clang-include-tree">,
+  HelpText<"Use clang include tree">;
+
+def cas_fs: Separate<["-"], "cas-fs">,
+  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
+
+def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
+  HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
+
+
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
@@ -1205,4 +1241,12 @@ def experimental_spi_only_imports :
 def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;
+
+def platform_c_calling_convention :
+    Separate<["-"], "experimental-platform-c-calling-convention">,
+    HelpText<"Which calling convention is used to perform non-swift calls. "
+             "Defaults to llvm's standard C calling convention.">;
+def platform_c_calling_convention_EQ :
+    Joined<["-"], "experimental-platform-c-calling-convention=">,
+    Alias<platform_c_calling_convention>;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

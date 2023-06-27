@@ -310,6 +310,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
+                      AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
@@ -368,53 +370,52 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     SINGLE_VALUE_INST_RANGE(MethodInst, ClassMethodInst, WitnessMethodInst)
 
   // Conversions
-  ABSTRACT_SINGLE_VALUE_INST(ConversionInst, SingleValueInstruction)
     SINGLE_VALUE_INST(UpcastInst, upcast,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedAddrCastInst, unchecked_addr_cast,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedTrivialBitCastInst, unchecked_trivial_bit_cast,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedBitwiseCastInst, unchecked_bitwise_cast,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedValueCastInst, unchecked_value_cast,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToRawPointerInst, ref_to_raw_pointer,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
 #define LOADABLE_REF_STORAGE(Name, name, ...) \
     SINGLE_VALUE_INST(RefTo##Name##Inst, ref_to_##name, \
-                      ConversionInst, None, DoesNotRelease) \
+                      SingleValueInstruction, None, DoesNotRelease) \
     SINGLE_VALUE_INST(Name##ToRefInst, name##_to_ref, \
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
     SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ThickToObjCMetatypeInst, thick_to_objc_metatype,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCToThickMetatypeInst, objc_to_thick_metatype,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCMetatypeToObjectInst, objc_metatype_to_object,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
-                      ConversionInst, None, DoesNotRelease)
+                      SingleValueInstruction, None, DoesNotRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
     // retain X
@@ -427,8 +428,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     // scalar cast that doesn't affect the value's representation, its
     // side effect can then be modeled as None.
     DYNAMICCAST_SINGLE_VALUE_INST(UnconditionalCheckedCastInst, unconditional_checked_cast,
-                      ConversionInst, MayRead, DoesNotRelease)
-    SINGLE_VALUE_INST_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
+                      SingleValueInstruction, MayRead, DoesNotRelease)
 
   SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -461,8 +461,15 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // effects relative to other OSSA values like copy_value.
   SINGLE_VALUE_INST(MoveValueInst, move_value, SingleValueInstruction, None,
                     DoesNotRelease)
-  SINGLE_VALUE_INST(DropDeinitInst, drop_deinit, SingleValueInstruction, None,
-                    DoesNotRelease)
+  // A drop_deinit has no user-level side effects. It does, however, change the
+  // information about the owenership of its operand, and therefore cannot be
+  // arbitrarily deleted. It effectively wraps the type of the operand so that
+  // the resulting value is an equivalent type without a user-defined deinit.
+  //
+  // TODO: Add an OwnershipEffect type of side effect for instructions like
+  // drop_deinit to indicate their ownership effects.
+  SINGLE_VALUE_INST(DropDeinitInst, drop_deinit, SingleValueInstruction,
+                    MayHaveSideEffects, DoesNotRelease)
   // A canary value inserted by a SIL generating frontend to signal to the move
   // checker to check a specific value.  Valid only in Raw SIL. The relevant
   // checkers should remove the mark_must_check instruction after successfully
@@ -481,11 +488,25 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // and owned for assignment/owned function arguments.
   SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperValueInst, copyable_to_moveonlywrapper,
                     SingleValueInstruction, None, DoesNotRelease)
-  // Convert a $@moveOnly T to $T. Ownership is fixed at construction by
+  // Convert a $@moveOnly T object to $T. Ownership is fixed at construction by
   // frontend to express specific semantics: guaranteed for function arguments
   // and owned for assignment/return values.
-  SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableValueInst, moveonlywrapper_to_copyable,
-                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableValueInst,
+                    moveonlywrapper_to_copyable, SingleValueInstruction, None,
+                    DoesNotRelease)
+  // Convert a ${ @moveOnly T } to $T. This is a forwarding instruction that
+  // acts similarly to an object cast, unlike MoveOnlyWrapperToCopyableValue.
+  SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableBoxInst,
+                    moveonlywrapper_to_copyable_box, SingleValueInstruction, None,
+                    DoesNotRelease)
+  // Convert a $*@moveOnly T to $*T. Acts just as a cast.
+  SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableAddrInst,
+                    moveonlywrapper_to_copyable_addr, SingleValueInstruction,
+                    None, DoesNotRelease)
+  // Convert a $*T to $*@moveOnly T. Acts just as a cast.
+  SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperAddrInst,
+                    copyable_to_moveonlywrapper_addr, SingleValueInstruction,
+                    None, DoesNotRelease)
   // A move_addr is a Raw SIL only instruction that is equivalent to a copy_addr
   // [init]. It is lowered during the diagnostic passes to a copy_addr [init] if
   // the move checker found uses that prevented us from converting this to a
@@ -586,8 +607,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(SelectEnumAddrInst, select_enum_addr,
                     SingleValueInstruction, MayRead, DoesNotRelease)
-  SINGLE_VALUE_INST(SelectValueInst, select_value,
-                    SingleValueInstruction, None, DoesNotRelease)
 
   // Protocol and Protocol Composition Types
   SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,
@@ -720,6 +739,8 @@ ABSTRACT_INST(DeallocationInst, SILInstruction)
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocPackInst, dealloc_pack,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocPackMetadataInst, dealloc_pack_metadata,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocStackRefInst, dealloc_stack_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocRefInst, dealloc_ref,
@@ -773,7 +794,7 @@ NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
 NON_VALUE_INST(HopToExecutorInst, hop_to_executor,
-               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+               SILInstruction, MayHaveSideEffects, MayRelease)
 
 NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
@@ -794,6 +815,8 @@ NON_VALUE_INST(StoreInst, store,
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
+               SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(AssignOrInitInst, assign_or_init,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)

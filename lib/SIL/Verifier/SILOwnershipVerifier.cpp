@@ -82,7 +82,7 @@ namespace swift {
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
   /// The result of performing the check.
-  Optional<bool> result;
+  llvm::Optional<bool> result;
 
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
@@ -564,7 +564,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
   // have lifetime ending uses, since our lifetime is guaranteed by our
   // operand, so there is nothing further to do. So just return true.
   if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    if (isGuaranteedForwarding(value)) {
+    if (value->isGuaranteedForwarding()) {
       return true;
     }
   }
@@ -720,7 +720,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // Check if we are an instruction that forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
-  if (isGuaranteedForwarding(value)) {
+  if (value->isGuaranteedForwarding()) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
       return false;
@@ -781,7 +781,7 @@ void SILInstruction::verifyOperandOwnership(
     return;
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
-  Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
+  llvm::Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
   if (IsSILOwnershipVerifierTestingEnabled) {
     errorBuilder.emplace(*getFunction(),
                          BehaviorKind::PrintMessageAndReturnFalse);
@@ -934,7 +934,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   unsigned errorCounter = 0;
-  Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
+  llvm::Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
   if (IsSILOwnershipVerifierTestingEnabled) {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndReturnFalse,
                          &errorCounter);

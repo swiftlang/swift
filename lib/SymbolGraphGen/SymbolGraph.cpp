@@ -31,9 +31,9 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
-                         Optional<ModuleDecl *> ExtendedModule,
+                         llvm::Optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         Optional<llvm::VersionTuple> ModuleVersion,
+                         llvm::Optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
     : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
       ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {
@@ -718,7 +718,10 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
     // Symbols from exported-imported modules should only be included if they
     // were originally public.
-    if (Walker.isFromExportedImportedModule(D) &&
+    // We force compiler-equality here to ensure that the presence of an underlying
+    // Clang module does not prevent internal Swift symbols from being emitted when
+    // MinimumAccessLevel is set to `internal` or below.
+    if (Walker.isFromExportedImportedModule(D, /*countUnderlyingClangModule*/false) &&
         VD->getFormalAccess() < AccessLevel::Public) {
       return true;
     }

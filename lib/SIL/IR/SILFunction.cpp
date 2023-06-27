@@ -92,20 +92,16 @@ void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
                           SpecializeAttrSet.end());
 }
 
-SILFunction *
-SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
-                    CanSILFunctionType loweredType,
-                    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
-                    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-                    IsSerialized_t isSerialized, ProfileCounter entryCount,
-                    IsDynamicallyReplaceable_t isDynamic,
-                    IsDistributed_t isDistributed,
-                    IsRuntimeAccessible_t isRuntimeAccessible,
-                    IsExactSelfClass_t isExactSelfClass,
-                    IsThunk_t isThunk,
-                    SubclassScope classSubclassScope, Inline_t inlineStrategy,
-                    EffectsKind E, SILFunction *insertBefore,
-                    const SILDebugScope *debugScope) {
+SILFunction *SILFunction::create(
+    SILModule &M, SILLinkage linkage, StringRef name,
+    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+    llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    IsTransparent_t isTrans, IsSerialized_t isSerialized,
+    ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
+    IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
+    IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk,
+    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
+    SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
@@ -204,12 +200,14 @@ void SILFunction::init(
   this->InlineStrategy = inlineStrategy;
   this->Linkage = unsigned(Linkage);
   this->HasCReferences = false;
+  this->MarkedAsUsed = false;
   this->IsAlwaysWeakImported = false;
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
   this->IsRuntimeAccessible = isRuntimeAccessible;
   this->ForceEnableLexicalLifetimes = DoNotForceEnableLexicalLifetimes;
+  this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -280,11 +278,13 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->ObjCReplacementFor = ObjCReplacementFor;
   newSnapshot->SemanticsAttrSet = SemanticsAttrSet;
   newSnapshot->SpecializeAttrSet = SpecializeAttrSet;
+  newSnapshot->Section = Section;
   newSnapshot->Availability = Availability;
   newSnapshot->specialPurpose = specialPurpose;
   newSnapshot->perfConstraints = perfConstraints;
   newSnapshot->GlobalInitFlag = GlobalInitFlag;
   newSnapshot->HasCReferences = HasCReferences;
+  newSnapshot->MarkedAsUsed = MarkedAsUsed;
   newSnapshot->IsAlwaysWeakImported = IsAlwaysWeakImported;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
@@ -448,7 +448,8 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(genericSig.getPointer()),
-                    genericSig);
+                    genericSig,
+                    SubstFlags::PreservePackExpansionLevel);
 }
 
 bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
@@ -856,6 +857,9 @@ SILFunction::isPossiblyUsedExternally() const {
     return true;
 
   if (isRuntimeAccessible())
+    return true;
+
+  if (markedAsUsed())
     return true;
 
   // Declaration marked as `@_alwaysEmitIntoClient` that

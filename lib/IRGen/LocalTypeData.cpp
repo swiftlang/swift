@@ -19,6 +19,7 @@
 #include "Fulfillment.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
+#include "GenPack.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -220,7 +221,7 @@ LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
   auto &chain = it->second;
 
   CacheEntry *best = nullptr;
-  Optional<OperationCost> bestCost;
+  llvm::Optional<OperationCost> bestCost;
 
   CacheEntry *next = chain.Root;
   while (next) {
@@ -350,6 +351,9 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
 
   llvm::Value *data = value.getMetadata();
 
+  if (key.Type->is<PackArchetypeType>())
+    data = maskMetadataPackPointer(IGF, data);
+
   // At -O0, create an alloca to keep the type alive. Not for async functions
   // though; see the comment in IRGenFunctionSIL::emitShadowCopyIfNeeded().
   if (!IGF.IGM.IRGen.Opts.shouldOptimize() && !IGF.isAsync()) {
@@ -469,18 +473,24 @@ void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
   SILWitnessTable::enumerateWitnessTableConditionalConformances(
       conformance,
       [&](unsigned index, CanType type, ProtocolDecl *proto) {
-        auto archetype = getTypeInContext(type);
-        if (isa<ArchetypeType>(archetype)) {
+        if (auto packType = dyn_cast<PackType>(type)) {
+          if (auto expansion = packType.unwrapSingletonPackExpansion())
+            type = expansion.getPatternType();
+        }
+
+        type = getTypeInContext(type);
+
+        if (isa<ArchetypeType>(type)) {
           WitnessIndex wIndex(privateWitnessTableIndexToTableOffset(index),
                               /*prefix*/ false);
 
           auto table = loadConditionalConformance(*this ,selfTable,
                                                   wIndex.forProtocolWitnessTable());
           table = Builder.CreateBitCast(table, IGM.WitnessTablePtrTy);
-          setProtocolWitnessTableName(IGM, table, archetype, proto);
+          setProtocolWitnessTableName(IGM, table, type, proto);
 
           setUnscopedLocalTypeData(
-              archetype,
+              type,
               LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
               table);
         }
@@ -538,7 +548,7 @@ void LocalTypeDataCache::
 addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
                            llvm::function_ref<AbstractSource()> createSource) {
   // Add the source lazily.
-  Optional<unsigned> sourceIndex;
+  llvm::Optional<unsigned> sourceIndex;
   auto getSourceIndex = [&]() -> unsigned {
     if (!sourceIndex) {
       AbstractSources.emplace_back(createSource());
@@ -594,7 +604,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
     // Check whether there's already an entry that's at least as good as the
     // fulfillment.
-    Optional<OperationCost> fulfillmentCost;
+    llvm::Optional<OperationCost> fulfillmentCost;
     auto getFulfillmentCost = [&]() -> OperationCost {
       if (!fulfillmentCost)
         fulfillmentCost = fulfillment.second.Path.cost();

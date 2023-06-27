@@ -158,6 +158,7 @@ private:
   NO_PRESERVABLE_STRUCTURE(Module)
   NO_PRESERVABLE_STRUCTURE(Pack)
   NO_PRESERVABLE_STRUCTURE(PackExpansion)
+  NO_PRESERVABLE_STRUCTURE(PackElement)
 #undef NO_PRESERVABLE_STRUCTURE
 
   // These types simply shouldn't appear in types that we generalize at all.
@@ -230,13 +231,14 @@ private:
   /// Generalize the given type by preserving its top-level structure
   /// but generalizing its component types.
   Type generalizeComponentTypes(CanType type) {
-    return type.transformRec([&](TypeBase *componentType) -> Optional<Type> {
-      // Ignore the top level.
-      if (componentType == type.getPointer())
-        return None;
+    return type.transformRec(
+        [&](TypeBase *componentType) -> llvm::Optional<Type> {
+          // Ignore the top level.
+          if (componentType == type.getPointer())
+            return llvm::None;
 
-      return generalizeComponentType(CanType(componentType));
-    });
+          return generalizeComponentType(CanType(componentType));
+        });
   }
 
   Type generalizeComponentType(CanType origArg) {

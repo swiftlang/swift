@@ -300,6 +300,23 @@ replaceDestroy(DestroyAddrInst *dai, SILValue newValue, SILBuilderContext &ctx,
   prepareForDeletion(dai, instructionsToDelete);
 }
 
+/// Whether the specified debug_value's operand names the address at the
+/// indicated alloc_stack.
+///
+/// If it's a guaranteed alloc_stack (i.e. a store_borrow location), that
+/// includes the values produced by any store_borrows whose destinations are the
+/// alloc_stack since those values amount to aliases for the alloc_stack's
+/// storage.
+static bool isDebugValueOfAllocStack(DebugValueInst *dvi, AllocStackInst *asi) {
+  auto value = dvi->getOperand();
+  if (value == asi)
+    return true;
+  auto *sbi = dyn_cast<StoreBorrowInst>(value);
+  if (!sbi)
+    return false;
+  return sbi->getDest() == asi;
+}
+
 /// Promote a DebugValue w/ address value to a DebugValue of non-address value.
 static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
                                   SILBuilderContext &ctx,
@@ -938,7 +955,7 @@ public:
 
 private:
   /// Promote AllocStacks into SSA.
-  void promoteAllocationToPhi();
+  void promoteAllocationToPhi(BlockSetVector &livePhiBlocks);
 
   /// Replace the dummy nodes with new block arguments.
   void addBlockArguments(BlockSetVector &phiBlocks);
@@ -973,8 +990,8 @@ private:
 
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB.
-  Optional<LiveValues> getLiveOutValues(BlockSetVector &phiBlocks,
-                                        SILBasicBlock *startBlock);
+  llvm::Optional<LiveValues> getLiveOutValues(BlockSetVector &phiBlocks,
+                                              SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB or undef if there are none.
@@ -982,8 +999,8 @@ private:
                                        SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing into block.
-  Optional<LiveValues> getLiveInValues(BlockSetVector &phiBlocks,
-                                       SILBasicBlock *block);
+  llvm::Optional<LiveValues> getLiveInValues(BlockSetVector &phiBlocks,
+                                             SILBasicBlock *block);
 
   /// Get the values for this AllocStack variable that are flowing into block or
   /// undef if there are none.
@@ -1017,7 +1034,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
   // - Some + !isStorageValid: a value was encountered but is no longer stored--
   //                           it has been destroy_addr'd, etc
   // - Some + isStorageValid: a value was encountered and is currently stored
-  Optional<StorageStateTracking<LiveValues>> runningVals;
+  llvm::Optional<StorageStateTracking<LiveValues>> runningVals;
   // The most recent StoreInst or StoreBorrowInst that encountered while
   // iterating over the block.  The final value will be returned to the caller
   // which will use it to determine the live-out value of the block.
@@ -1191,7 +1208,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
     // if we have a valid value to use at this point. Otherwise we'll
     // promote this when we deal with hooking up phis.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
-      if (dvi->getOperand() == asi && runningVals)
+      if (isDebugValueOfAllocStack(dvi, asi) && runningVals)
         promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
                               ctx, deleter);
       continue;
@@ -1248,7 +1265,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSetVector &phiBlocks) {
   }
 }
 
-Optional<LiveValues>
+llvm::Optional<LiveValues>
 StackAllocationPromoter::getLiveOutValues(BlockSetVector &phiBlocks,
                                           SILBasicBlock *startBlock) {
   LLVM_DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
@@ -1294,7 +1311,7 @@ StackAllocationPromoter::getEffectiveLiveOutValues(BlockSetVector &phiBlocks,
   return LiveValues::forOwned(undef, undef);
 }
 
-Optional<LiveValues>
+llvm::Optional<LiveValues>
 StackAllocationPromoter::getLiveInValues(BlockSetVector &phiBlocks,
                                          SILBasicBlock *block) {
   // First, check if there is a Phi value in the current block. We know that
@@ -1685,7 +1702,8 @@ void StackAllocationPromoter::pruneAllocStackUsage() {
   LLVM_DEBUG(llvm::dbgs() << "*** Finished pruning : " << *asi);
 }
 
-void StackAllocationPromoter::promoteAllocationToPhi() {
+void StackAllocationPromoter::promoteAllocationToPhi(
+    BlockSetVector &livePhiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *asi);
 
   // A list of blocks that will require new Phi values.
@@ -1781,10 +1799,6 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   // Replace the dummy values with new block arguments.
   addBlockArguments(phiBlocks);
 
-  // The blocks which still have new phis after fixBranchesAndUses runs.  These
-  // are not necessarily the same as phiBlocks because fixBranchesAndUses
-  // removes superfluous proactive phis.
-  BlockSetVector livePhiBlocks(asi->getFunction());
   // Hook up the Phi nodes, loads, and debug_value_addr with incoming values.
   fixBranchesAndUses(phiBlocks, livePhiBlocks);
 
@@ -1801,8 +1815,13 @@ void StackAllocationPromoter::run() {
   // per block and the last store is recorded.
   pruneAllocStackUsage();
 
+  // The blocks which still have new phis after fixBranchesAndUses runs.  These
+  // are not necessarily the same as phiBlocks because fixBranchesAndUses
+  // removes superfluous proactive phis.
+  BlockSetVector livePhiBlocks(asi->getFunction());
+
   // Replace AllocStacks with Phi-nodes.
-  promoteAllocationToPhi();
+  promoteAllocationToPhi(livePhiBlocks);
 
   // Make sure that all of the allocations were promoted into registers.
   assert(isWriteOnlyAllocation(asi) && "Non-write uses left behind");
@@ -1814,14 +1833,18 @@ void StackAllocationPromoter::run() {
   // Use the lifetime completion utility to complete such lifetimes.
   // First, collect the stored values to complete.
   if (asi->getType().isOrHasEnum()) {
+    for (auto *block : livePhiBlocks) {
+      SILPhiArgument *argument = cast<SILPhiArgument>(
+          block->getArgument(block->getNumArguments() - 1));
+      assert(argument->isPhi());
+      valuesToComplete.push_back(argument);
+    }
     for (auto it : initializationPoints) {
       auto *si = it.second;
       auto stored = si->getOperand(CopyLikeInstruction::Src);
       valuesToComplete.push_back(stored);
-      if (lexicalLifetimeEnsured(asi)) {
-        if (auto lexical = getLexicalValueForStore(si, asi)) {
-          valuesToComplete.push_back(lexical);
-        }
+      if (auto lexical = getLexicalValueForStore(si, asi)) {
+        valuesToComplete.push_back(lexical);
       }
     }
   }
@@ -1854,7 +1877,7 @@ class MemoryToRegisters {
   /// DomTreeLevelMap is a DenseMap implying that if we initialize it, we always
   /// will initialize a heap object with 64 objects. Thus by using an optional,
   /// computing this lazily, we only do this if we actually need to do so.
-  Optional<DomTreeLevelMap> domTreeLevels;
+  llvm::Optional<DomTreeLevelMap> domTreeLevels;
 
   /// The function that we are optimizing.
   SILFunction &f;
@@ -1923,7 +1946,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   SILBasicBlock *parentBlock = asi->getParent();
   // The default value of the AllocStack is NULL because we don't have
   // uninitialized variables in Swift.
-  Optional<StorageStateTracking<LiveValues>> runningVals;
+  llvm::Optional<StorageStateTracking<LiveValues>> runningVals;
 
   // For all instructions in the block.
   for (auto bbi = parentBlock->begin(), bbe = parentBlock->end(); bbi != bbe;) {
@@ -2028,7 +2051,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // Replace debug_value w/ address value with debug_value of
     // the promoted value.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
-      if (dvi->getOperand() == asi) {
+      if (isDebugValueOfAllocStack(dvi, asi)) {
         if (runningVals) {
           promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
                                 ctx, deleter);

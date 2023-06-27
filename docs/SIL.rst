@@ -2805,7 +2805,7 @@ canonical SIL that the value was never copied and thus is a "move only value"
 even though the actual underlying wrapped type is copyable. As an example of
 this, consider the following Swift::
 
-  func doSomething(@_noImplicitCopy _ x: Klass) -> () { // expected-error {{'x' has guaranteed ownership but was consumed}}
+  func doSomething(@_noImplicitCopy _ x: Klass) -> () { // expected-error {{'x' is borrowed and cannot be consumed}}
     x.doSomething()
     let x2 = x // expected-note {{consuming use}}
     x2.doSomething()
@@ -3475,8 +3475,6 @@ A value ``%1`` is said to be *value-dependent* on a value ``%0`` if:
   with ``tuple_extract``, ``struct_extract``, ``unchecked_enum_data``,
   ``select_enum``, or ``select_enum_addr``.
 
-- ``%1`` is the result of ``select_value`` and ``%0`` is one of the cases.
-
 - ``%1`` is a basic block parameter and ``%0`` is the corresponding
   argument from a branch to that block.
 
@@ -3797,7 +3795,21 @@ address of the allocated memory.
 
 ``alloc_pack`` is a stack allocation instruction.  See the section above
 on stack discipline.  The corresponding stack deallocation instruction is
-``dealloc_stack``.
+``dealloc_pack``.
+
+alloc_pack_metadata
+```````````````````
+
+::
+
+  sil-instruction ::= 'alloc_pack_metadata' $()
+
+Inserted as the last SIL lowering pass of IRGen, indicates that the next instruction
+may have on-stack pack metadata allocated on its behalf.
+
+Notionally, ``alloc_pack_metadata`` is a stack allocation instruction.  See the
+section above on stack discipline.  The corresponding stack deallocation
+instruction is ``dealloc_pack_metadata``.
 
 alloc_ref
 `````````
@@ -4054,6 +4066,23 @@ prior to being deallocated.
 
 ``dealloc_pack`` is a stack deallocation instruction.  See the section
 on Stack Discipline above.  The operand must be an ``alloc_pack``
+instruction.
+
+dealloc_pack_metadata
+`````````````````````
+
+::
+
+  sil-instruction ::= 'dealloc_pack_metadata' sil-operand
+
+  dealloc_pack_metadata $0 : $*()
+
+Inserted as the last SIL lowering pass of IRGen, indicates that the on-stack
+pack metadata emitted on behalf of its operand (actually on behalf of the
+instruction after its operand) must be cleaned up here.
+
+``dealloc_pack_metadata`` is a stack deallocation instruction.  See the section
+on Stack Discipline above.  The operand must be an ``alloc_pack_metadata``
 instruction.
 
 dealloc_box
@@ -7918,45 +7947,6 @@ block. If there is a ``default`` basic block, control is transferred to it if
 the value does not match any of the ``case`` values. It is undefined behavior
 if the value does not match any cases and no ``default`` branch is provided.
 
-select_value
-````````````
-::
-
-  sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
-                      (',' 'default' sil-value)?
-                      ':' sil-type
-  sil-select-value-case ::= 'case' sil-value ':' sil-value
-
-
-  %n = select_value %0 : $U, \
-    case %c1: %r1,           \
-    case %c2: %r2, /* ... */ \
-    default %r3 : $T
-
-  // $U must be a builtin type. Only integers types are supported currently.
-  // c1, c2, etc must be of type $U
-  // %r1, %r2, %r3, etc. must have type $T
-  // %n has type $T
-
-Selects one of the "case" or "default" operands based on the case of a
-value. This is equivalent to a trivial `switch_value`_ branch sequence::
-
-  entry:
-    switch_value %0 : $U,            \
-      case %c1: bb1,           \
-      case %c2: bb2, /* ... */ \
-      default bb_default
-  bb1:
-    br cont(%r1 : $T) // value for %c1
-  bb2:
-    br cont(%r2 : $T) // value for %c2
-  bb_default:
-    br cont(%r3 : $T) // value for default
-  cont(%n : $T):
-    // use argument %n
-
-but turns the control flow dependency into a data flow dependency.
-
 switch_enum
 ```````````
 ::
@@ -8428,6 +8418,33 @@ need for the guaranteed form in the future.
   checking. Importantly, this instruction also is where in the case of an
   @moveOnly trivial type, we convert from the non-trivial representation to the
   trivial representation.
+
+copyable_to_moveonlywrapper_addr
+````````````````````````````````
+::
+
+  sil-instruction ::= 'copyable_to_moveonlywrapper_addr'
+
+`copyable_to_moveonlywrapper_addr`_ takes in a '*T' and maps it to a move only
+wrapped '*@moveOnly T'. This is semantically used by a code generator
+initializing a new moveOnly binding from a copyable value. It semantically acts
+as an address cast. If one thinks of '@moveOnly' as a monad, this is how one
+injects a copyable value into the move only space.
+
+moveonlywrapper_to_copyable_addr
+````````````````````````````````
+::
+
+  sil-instruction ::= 'moveonlywrapper_to_copyable_addr'
+
+`moveonlywrapper_to_copyable_addr`_ takes in a '*@moveOnly T' and produces a new
+'*T' value. This instruction acts like an address cast that projects out the
+underlying T from an @moveOnly T.
+
+NOTE: From the perspective of the address checker, a trivial `load`_ with a
+`moveonlywrapper_to_copyable_addr`_ operand is considered to be a use of a
+noncopyable type.
+
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

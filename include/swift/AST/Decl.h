@@ -26,6 +26,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -46,6 +47,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <map>
 #include <type_traits>
 
 namespace swift {
@@ -183,6 +185,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DistributedMethod,
   Getter,
   Setter,
+  InitAccessor,
   Addressor,
   MutableAddressor,
   ReadAccessor,
@@ -223,6 +226,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
 /// Diagnostic printing of \c ReferenceOwnership.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
+
+enum class SelfAccessKind : uint8_t {
+  NonMutating,
+  Mutating,
+  LegacyConsuming,
+  Consuming,
+  Borrowing,
+  LastSelfAccessKind = Borrowing,
+};
+enum : unsigned {
+  NumSelfAccessKindBits =
+      countBitsUsed(static_cast<unsigned>(SelfAccessKind::LastSelfAccessKind))
+};
+static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
+                  (NumSelfAccessKindBits << 1),
+              "Self Access Kind is too small to fit in SelfAccess kind bits. "
+              "Please expand ");
+
+/// Diagnostic printing of \c SelfAccessKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 
 /// Encapsulation of the overload signature of a given declaration,
 /// which is used to determine uniqueness of a declaration within a
@@ -315,6 +338,10 @@ enum class ArtificialMainKind : uint8_t {
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl : public ASTAllocated<Decl> {
 protected:
+  // clang-format off
+  //
+  // We format these different than clang-format wishes us to... so turn if off
+  // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
@@ -456,7 +483,8 @@ protected:
     DistributedThunk: 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl,
+                        1+1+2+1+1+NumSelfAccessKindBits+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -473,7 +501,7 @@ protected:
     SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
-    SelfAccess : 2,
+    SelfAccess : NumSelfAccessKindBits,
 
     /// Whether this is a top-level function which should be treated
     /// as if it were in local context for the purposes of capture
@@ -631,7 +659,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -681,7 +709,10 @@ protected:
 
     /// If the map from @objc provided name to top level swift::Decl in this
     /// module is populated
-    ObjCNameLookupCachePopulated : 1
+    ObjCNameLookupCachePopulated : 1,
+
+    /// Whether this module has been built with C++ interoperability enabled.
+    HasCxxInteroperability : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -735,6 +766,8 @@ protected:
   );
 
   } Bits;
+  // Turn back on clang-format now that we have defined our inline bitfields.
+  // clang-format on
 
   // Storage for the declaration attributes.
   DeclAttributes Attrs;
@@ -883,7 +916,13 @@ public:
   ///
   /// Auxiliary declarations can be property wrapper backing variables,
   /// backing variables for 'lazy' vars, or peer macro expansions.
-  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const;
+  ///
+  /// When \p visitFreestandingExpanded is true (the default), this will also
+  /// visit the declarations produced by a freestanding macro expansion.
+  void visitAuxiliaryDecls(
+      AuxiliaryDeclCallback callback,
+      bool visitFreestandingExpanded = true
+  ) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
@@ -907,11 +946,12 @@ public:
   /// Returns the introduced OS version in the given platform kind specified
   /// by @available attribute.
   /// This function won't consider the parent context to get the information.
-  Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
+  llvm::Optional<llvm::VersionTuple>
+  getIntroducedOSVersion(PlatformKind Kind) const;
 
   /// Returns the OS version in which the decl became ABI as specified by the
   /// `@backDeployed` attribute.
-  Optional<llvm::VersionTuple>
+  llvm::Optional<llvm::VersionTuple>
   getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
 
   /// Returns true if the decl has an active `@backDeployed` attribute for the
@@ -1018,11 +1058,11 @@ public:
   /// \returns the unparsed comment attached to this declaration.
   RawComment getRawComment() const;
 
-  Optional<StringRef> getGroupName() const;
+  llvm::Optional<StringRef> getGroupName() const;
 
-  Optional<StringRef> getSourceFileName() const;
+  llvm::Optional<StringRef> getSourceFileName() const;
 
-  Optional<unsigned> getSourceOrder() const;
+  llvm::Optional<unsigned> getSourceOrder() const;
 
   /// \returns The brief comment attached to this declaration, or the brief
   /// comment attached to the comment providing decl.
@@ -1076,9 +1116,9 @@ public:
   /// \seeAlso ExtensionDecl::isObjCInterface()
   Decl *getObjCImplementationDecl() const;
 
-  Optional<Decl *> getCachedObjCImplementationDecl() const {
+  llvm::Optional<Decl *> getCachedObjCImplementationDecl() const {
     if (CachedObjCImplementationDecl == this)
-      return None;
+      return llvm::None;
     return CachedObjCImplementationDecl;
   }
 
@@ -1156,7 +1196,7 @@ public:
   /// This is the "raw" global actor attribute as written directly on the
   /// declaration, along with the nominal type declaration to which it refers,
   /// without any inference rules applied.
-  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
   getGlobalActorAttr() const;
 
   /// If an alternative module name is specified for this decl, e.g. using
@@ -1179,7 +1219,7 @@ public:
   /// This attribute may come from an enclosing decl since availability is
   /// inherited. The second member of the returned pair is the decl that owns
   /// the attribute.
-  Optional<std::pair<const AvailableAttr *, const Decl *>>
+  llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticAvailableRangeAttr() const;
 
   /// Retrieve the @available attribute that makes this declaration unavailable,
@@ -1191,7 +1231,7 @@ public:
   ///
   /// Note that this notion of unavailability is broader than that which is
   /// checked by \c AvailableAttr::isUnavailable.
-  Optional<std::pair<const AvailableAttr *, const Decl *>>
+  llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr() const;
 
   // List the SPI groups declared with @_spi or inherited by this decl.
@@ -1370,7 +1410,8 @@ public:
   ///
   /// If the list is non-homogeneous, or if there is more than one decl that
   /// cannot be overloaded, returns None.
-  static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
+  static llvm::Optional<ImportKind>
+  findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ImportKind getImportKind() const {
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
@@ -1656,7 +1697,7 @@ public:
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid. Do not call unless
   /// \c isObjCImplementation() returns \c true.
-  Optional<Identifier> getCategoryNameForObjCImplementation() const;
+  llvm::Optional<Identifier> getCategoryNameForObjCImplementation() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -1811,7 +1852,7 @@ public:
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
       : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
-        InitContextAndFlags({InitContext, None}) {}
+        InitContextAndFlags({InitContext, llvm::None}) {}
 
 private:
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
@@ -2557,8 +2598,8 @@ public:
   /// entities (classes, protocols, properties), this operation will
   /// return a zero-parameter selector with the appropriate name in its
   /// first slot.
-  Optional<ObjCSelector> getObjCRuntimeName(
-                                    bool skipIsObjCResolution = false) const;
+  llvm::Optional<ObjCSelector>
+  getObjCRuntimeName(bool skipIsObjCResolution = false) const;
 
   /// Determine whether the given declaration can infer @objc, or the
   /// Objective-C name, if used to satisfy the given requirement.
@@ -3046,7 +3087,7 @@ private:
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
   /// signature of the original declaration.
-  Optional<SubstitutionMap> UniqueUnderlyingType;
+  llvm::Optional<SubstitutionMap> UniqueUnderlyingType;
 
   /// A set of substitutions which are used based on the availability
   /// checks performed at runtime. This set of only populated if there
@@ -3054,8 +3095,8 @@ private:
   ///
   /// It always contains one or more conditionally available substitutions
   /// followed by a universally available type used as a fallback.
-  Optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
-      ConditionallyAvailableTypes = None;
+  llvm::Optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
+      ConditionallyAvailableTypes = llvm::None;
 
   mutable Identifier OpaqueReturnTypeIdentifier;
 
@@ -3099,8 +3140,7 @@ public:
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
-  Optional<unsigned> getAnonymousOpaqueParamOrdinal(
-      TypeRepr *repr) const;
+  llvm::Optional<unsigned> getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -3133,10 +3173,10 @@ public:
 
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
-  Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
+  llvm::Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
     return UniqueUnderlyingType;
   }
-  
+
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
@@ -3863,7 +3903,7 @@ public:
   /// protocols to which the nominal type conforms. Furthermore, the resulting
   /// set of declarations has not been filtered for visibility, nor have
   /// overridden declarations been removed.
-  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name,
+  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name, SourceLoc loc = SourceLoc(),
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
@@ -3879,8 +3919,13 @@ public:
   /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
   ConstructorDecl *getDistributedRemoteCallArgumentInitFunction() const;
 
-  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  /// Get the move-only `enqueue(ExecutorJob)` protocol requirement function on the `Executor` protocol.
   AbstractFunctionDecl *getExecutorOwnedEnqueueFunction() const;
+  /// This method should be deprecated and removed
+  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorLegacyOwnedEnqueueFunction() const;
+  /// Get the move-only `enqueue(UnownedJob)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorLegacyUnownedEnqueueFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -3939,13 +3984,27 @@ public:
   bool isOptionalDecl() const;
 
   /// Is this a key path type?
-  Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
+  llvm::Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
   /// Retrieve information about this type as a property wrapper.
   PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
   /// Return a collection of the stored member variables of this type.
   ArrayRef<VarDecl *> getStoredProperties() const;
+
+  /// Return a collection of all properties with init accessors in
+  /// this type.
+  ArrayRef<VarDecl *> getInitAccessorProperties() const;
+
+  /// Return a collection of all properties that will be part of the memberwise
+  ///  initializer.
+  ArrayRef<VarDecl *> getMemberwiseInitProperties() const;
+  
+  /// Establish a mapping between properties that could be iniitalized
+  /// via other properties by means of init accessors. This mapping is
+  /// one-to-many because we allow intersecting `initializes(...)`.
+  void collectPropertiesInitializableByInitAccessors(
+      std::multimap<VarDecl *, VarDecl *> &result) const;
 
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
@@ -4391,25 +4450,26 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
-  Optional<bool> getCachedInheritsSuperclassInitializers() const {
+  llvm::Optional<bool> getCachedInheritsSuperclassInitializers() const {
     if (Bits.ClassDecl.ComputedInheritsSuperclassInits)
       return Bits.ClassDecl.InheritsSuperclassInits;
 
-    return None;
+    return llvm::None;
   }
 
-  Optional<bool> getCachedHasMissingDesignatedInitializers() const {
+  llvm::Optional<bool> getCachedHasMissingDesignatedInitializers() const {
     if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
       // Force loading all the members, which will add this attribute if any of
       // members are determined to be missing while loading.
       auto mutableThis = const_cast<ClassDecl *>(this);
-      (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
+      (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
+                                      getStartLoc());
     }
 
     if (Bits.ClassDecl.ComputedHasMissingDesignatedInitializers)
       return Bits.ClassDecl.HasMissingDesignatedInitializers;
 
-    return None;
+    return llvm::None;
   }
 
   void setHasMissingDesignatedInitializers(bool value) {
@@ -4741,15 +4801,15 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  Optional<RequirementSignature> RequirementSig;
+  llvm::Optional<RequirementSignature> RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
-  Optional<bool> getCachedRequiresClass() const {
+  llvm::Optional<bool> getCachedRequiresClass() const {
     if (Bits.ProtocolDecl.RequiresClassValid)
       return Bits.ProtocolDecl.RequiresClass;
 
-    return None;
+    return llvm::None;
   }
 
   /// Caches the result of \c requiresClass
@@ -4760,11 +4820,11 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// Returns the cached result of \c existentialConformsToSelf or \c None if it
   /// hasn't yet been computed.
-  Optional<bool> getCachedExistentialConformsToSelf() const {
+  llvm::Optional<bool> getCachedExistentialConformsToSelf() const {
     if (Bits.ProtocolDecl.ExistentialConformsToSelfValid)
       return Bits.ProtocolDecl.ExistentialConformsToSelf;
 
-    return None;
+    return llvm::None;
   }
 
   /// Caches the result of \c existentialConformsToSelf
@@ -4775,11 +4835,11 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// Returns the cached result of \c hasSelfOrAssociatedTypeRequirements or
   /// \c None if it hasn't yet been computed.
-  Optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
+  llvm::Optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
     if (Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirementsValid)
       return Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements;
 
-    return None;
+    return llvm::None;
   }
 
   /// Caches the result of \c hasSelfOrAssociatedTypeRequirements
@@ -4949,17 +5009,18 @@ private:
 public:
   /// If this is known to be a compiler-known protocol, returns the kind.
   /// Otherwise returns None.
-  Optional<KnownProtocolKind> getKnownProtocolKind() const {
+  llvm::Optional<KnownProtocolKind> getKnownProtocolKind() const {
     if (Bits.ProtocolDecl.KnownProtocol == 0)
       computeKnownProtocolKind();
 
     if (Bits.ProtocolDecl.KnownProtocol == 1)
-      return None;
-    
+      return llvm::None;
+
     return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
 
-  Optional<KnownDerivableProtocolKind> getKnownDerivableProtocolKind() const;
+  llvm::Optional<KnownDerivableProtocolKind>
+  getKnownDerivableProtocolKind() const;
 
   /// Check whether this protocol is of a specific, known protocol kind.
   bool isSpecificProtocol(KnownProtocolKind kind) const {
@@ -5242,10 +5303,10 @@ public:
 
   /// Overwrite the registered implementation-info.  This should be
   /// used carefully.
-  void setImplInfo(StorageImplInfo implInfo) {
-    LazySemanticInfo.ImplInfoComputed = 1;
-    ImplInfo = implInfo;
-  }
+  void setImplInfo(StorageImplInfo implInfo);
+
+  /// Cache the implementation-info, for use by the request-evaluator.
+  void cacheImplInfo(StorageImplInfo implInfo);
 
   ReadImplKind getReadImpl() const {
     return getImplInfo().getReadImpl();
@@ -5260,8 +5321,16 @@ public:
 
   /// Return true if this is a VarDecl that has storage associated with
   /// it.
-  bool hasStorage() const {
-    return getImplInfo().hasStorage();
+  bool hasStorage() const;
+
+  /// Return true if this is a VarDecl that has init accessor associated
+  /// with it.
+  bool hasInitAccessor() const;
+
+  /// Return true if this is a property that either has storage
+  /// or init accessor associated with it.
+  bool supportsInitialization() const {
+    return hasStorage() || hasInitAccessor();
   }
 
   /// Return true if this storage has the basic accessors/capability
@@ -5917,13 +5986,13 @@ public:
 
   /// Retrieve information about the mutability of the composed
   /// property wrappers.
-  Optional<PropertyWrapperMutability>
-      getPropertyWrapperMutability() const;
+  llvm::Optional<PropertyWrapperMutability>
+  getPropertyWrapperMutability() const;
 
   /// Returns whether this property is the backing storage property or a storage
   /// wrapper for wrapper instance's projectedValue. If this property is
   /// neither, then it returns `None`.
-  Optional<PropertyWrapperSynthesizedPropertyKind>
+  llvm::Optional<PropertyWrapperSynthesizedPropertyKind>
   getPropertyWrapperSynthesizedPropertyKind() const;
 
   /// Retrieve the backing storage property for a property that has an
@@ -5986,7 +6055,8 @@ public:
   /// \param kind If not \c None, only returns the original property when
   /// \c this property is the specified synthesized property.
   VarDecl *getOriginalWrappedProperty(
-      Optional<PropertyWrapperSynthesizedPropertyKind> kind = None) const;
+      llvm::Optional<PropertyWrapperSynthesizedPropertyKind> kind =
+          llvm::None) const;
 
   /// Set the property that wraps to this property as it's backing
   /// property.
@@ -6086,7 +6156,7 @@ class ParamDecl : public VarDecl {
 
   /// Retrieve the cached initializer context for the parameter's default
   /// argument without triggering a request.
-  Optional<Initializer *> getCachedDefaultArgumentInitContext() const;
+  llvm::Optional<Initializer *> getCachedDefaultArgumentInitContext() const;
 
   enum class Flags : uint8_t {
     /// Whether or not this parameter is vargs.
@@ -6333,11 +6403,11 @@ public:
 
   using Specifier = ParamSpecifier;
 
-  Optional<Specifier> getCachedSpecifier() const {
+  llvm::Optional<Specifier> getCachedSpecifier() const {
     if (Bits.ParamDecl.OwnershipSpecifier != 0)
       return Specifier(Bits.ParamDecl.OwnershipSpecifier - 1);
 
-    return None;
+    return llvm::None;
   }
 
   /// Return the raw specifier value for this parameter.
@@ -6611,21 +6681,21 @@ class BodyAndFingerprint {
   Fingerprint Fp;
 
 public:
-  BodyAndFingerprint(BraceStmt *body, Optional<Fingerprint> fp)
+  BodyAndFingerprint(BraceStmt *body, llvm::Optional<Fingerprint> fp)
       : BodyAndHasFp(body, fp.has_value()),
         Fp(fp.has_value() ? *fp : Fingerprint::ZERO()) {}
-  BodyAndFingerprint() : BodyAndFingerprint(nullptr, None) {}
+  BodyAndFingerprint() : BodyAndFingerprint(nullptr, llvm::None) {}
 
   BraceStmt *getBody() const { return BodyAndHasFp.getPointer(); }
 
-  Optional<Fingerprint> getFingerprint() const {
+  llvm::Optional<Fingerprint> getFingerprint() const {
     if (BodyAndHasFp.getInt())
       return Fp;
     else
-      return None;
+      return llvm::None;
   }
 
-  void setFingerprint(Optional<Fingerprint> fp) {
+  void setFingerprint(llvm::Optional<Fingerprint> fp) {
     if (fp.has_value()) {
       Fp = *fp;
       BodyAndHasFp.setInt(true);
@@ -6944,7 +7014,8 @@ public:
   void setBodyToBeReparsed(SourceRange bodyRange);
 
   /// Provide the parsed body for the function.
-  void setBodyParsed(BraceStmt *S, Optional<Fingerprint> fp = None) {
+  void setBodyParsed(BraceStmt *S,
+                     llvm::Optional<Fingerprint> fp = llvm::None) {
     setBody(S, BodyKind::Parsed);
     BodyAndFP.setFingerprint(fp);
   }
@@ -7088,11 +7159,12 @@ public:
   /// Retrieve the fingerprint of the body. Note that this is not affected by
   /// the body of the local functions or the members of the local types in this
   /// function.
-  Optional<Fingerprint> getBodyFingerprint() const;
+  llvm::Optional<Fingerprint> getBodyFingerprint() const;
 
   /// Retrieve the fingerprint of the body including the local type members and
   /// the local function bodies.
-  Optional<Fingerprint> getBodyFingerprintIncludingLocalTypeMembers() const;
+  llvm::Optional<Fingerprint>
+  getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
   ///
@@ -7165,14 +7237,14 @@ public:
 
   /// Get information about the foreign error convention used by this
   /// declaration, given that it is @objc and 'throws'.
-  Optional<ForeignErrorConvention> getForeignErrorConvention() const;
+  llvm::Optional<ForeignErrorConvention> getForeignErrorConvention() const;
 
   /// If this is a foreign C function imported as a method, get the index of
   /// the foreign parameter imported as `self`. If the function is imported
   /// as a static method, `-1` is returned to represent the `self` parameter
   /// being dropped altogether. `None` is returned for a normal function
   /// or method.
-  Optional<int> getForeignFunctionAsMethodSelfParameterIndex() const;
+  llvm::Optional<int> getForeignFunctionAsMethodSelfParameterIndex() const;
 
   /// Set information about the foreign async convention used by this
   /// declaration.
@@ -7180,7 +7252,7 @@ public:
 
   /// Get information about the foreign async convention used by this
   /// declaration, given that it is @objc and 'async'.
-  Optional<ForeignAsyncConvention> getForeignAsyncConvention() const;
+  llvm::Optional<ForeignAsyncConvention> getForeignAsyncConvention() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
@@ -7217,7 +7289,7 @@ public:
   /// Returns the last index of the parameter that looks like a completion
   /// handler if \p asyncAlternative is not set (with the same conditions on
   /// its type as above).
-  Optional<unsigned> findPotentialCompletionHandlerParam(
+  llvm::Optional<unsigned> findPotentialCompletionHandlerParam(
       const AbstractFunctionDecl *asyncAlternative = nullptr) const;
 
   using DeclContext::operator new;
@@ -7227,17 +7299,6 @@ public:
 
 class OperatorDecl;
 
-enum class SelfAccessKind : uint8_t {
-  NonMutating,
-  Mutating,
-  LegacyConsuming,
-  Consuming,
-  Borrowing,
-};
-
-/// Diagnostic printing of \c SelfAccessKind.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
-  
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
@@ -7291,18 +7352,18 @@ private:
                               DeclContext *Parent,
                               ClangNode ClangN);
 
-  Optional<SelfAccessKind> getCachedSelfAccessKind() const {
+  llvm::Optional<SelfAccessKind> getCachedSelfAccessKind() const {
     if (Bits.FuncDecl.SelfAccessComputed)
       return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
 
-    return None;
+    return llvm::None;
   }
 
-  Optional<bool> getCachedIsStatic() const {
+  llvm::Optional<bool> getCachedIsStatic() const {
     if (Bits.FuncDecl.IsStaticComputed)
       return Bits.FuncDecl.IsStatic;
 
-    return None;
+    return llvm::None;
   }
 
 public:
@@ -7482,10 +7543,10 @@ class AccessorDecl final : public FuncDecl {
              SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
              DeclContext *parent, ClangNode clangNode);
 
-  Optional<bool> getCachedIsTransparent() const {
+  llvm::Optional<bool> getCachedIsTransparent() const {
     if (Bits.AccessorDecl.IsTransparentComputed)
       return Bits.AccessorDecl.IsTransparent;
-    return None;
+    return llvm::None;
   }
 
   friend class IsAccessorTransparentRequest;
@@ -7539,6 +7600,10 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  bool isInitAccessor() const {
+    return (getAccessorKind() == AccessorKind::Init);
   }
 
   /// \returns true if this is non-mutating due to applying a 'mutating'
@@ -8557,12 +8622,15 @@ public:
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 
+  /// Set the definition of this macro
+  void setDefinition(MacroDefinition definition);
+
   /// Retrieve the parameter list of this macro.
   ParameterList *getParameterList() const { return parameterList; }
 
   /// Retrieve the builtin macro kind for this macro, or \c None if it is a
   /// user-defined macro with no special semantics.
-  Optional<BuiltinMacroKind> getBuiltinKind() const;
+  llvm::Optional<BuiltinMacroKind> getBuiltinKind() const;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
@@ -8579,69 +8647,29 @@ public:
   using Decl::getASTContext;
 };
 
-/// Information about a macro expansion that is common between macro
-/// expansion declarations and expressions.
-///
-/// Instances of these types will be shared among paired macro expansion
-/// declaration/expression nodes.
-struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
-  SourceLoc SigilLoc;
-  DeclNameRef MacroName;
-  DeclNameLoc MacroNameLoc;
-  SourceLoc LeftAngleLoc, RightAngleLoc;
-  ArrayRef<TypeRepr *> GenericArgs;
-  ArgumentList *ArgList;
-
-  /// The referenced macro.
-  ConcreteDeclRef macroRef;
-
-  MacroExpansionInfo(SourceLoc sigilLoc,
-                     DeclNameRef macroName,
-                     DeclNameLoc macroNameLoc,
-                     SourceLoc leftAngleLoc, SourceLoc rightAngleLoc,
-                     ArrayRef<TypeRepr *> genericArgs,
-                     ArgumentList *argList)
-    : SigilLoc(sigilLoc), MacroName(macroName), MacroNameLoc(macroNameLoc),
-      LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-      GenericArgs(genericArgs), ArgList(argList) { }
-};
-
-class MacroExpansionDecl : public Decl {
-  MacroExpansionInfo *info;
+class MacroExpansionDecl : public Decl, public FreestandingMacroExpansion {
 
 public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
   MacroExpansionDecl(DeclContext *dc, MacroExpansionInfo *info);
 
-  MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
-                     DeclNameLoc macroLoc,
-                     SourceLoc leftAngleLoc,
-                     ArrayRef<TypeRepr *> genericArgs,
-                     SourceLoc rightAngleLoc,
-                     ArgumentList *args);
+  static MacroExpansionDecl *create(DeclContext *dc, SourceLoc poundLoc,
+                                    DeclNameRef macro, DeclNameLoc macroLoc,
+                                    SourceLoc leftAngleLoc,
+                                    ArrayRef<TypeRepr *> genericArgs,
+                                    SourceLoc rightAngleLoc,
+                                    ArgumentList *args);
 
-  ArrayRef<TypeRepr *> getGenericArgs() const {
-    return info->GenericArgs;
+  DeclContext *getDeclContext() const { return Decl::getDeclContext(); }
+
+  SourceRange getSourceRange() const {
+    return getExpansionInfo()->getSourceRange();
   }
+  SourceLoc getLocFromSource() const { return getExpansionInfo()->SigilLoc; }
 
-  SourceRange getGenericArgsRange() const {
-    return SourceRange(info->LeftAngleLoc, info->RightAngleLoc);
-  }
-
-  SourceRange getSourceRange() const;
-  SourceLoc getLocFromSource() const { return info->SigilLoc; }
-  SourceLoc getPoundLoc() const { return info->SigilLoc; }
-  DeclNameLoc getMacroNameLoc() const { return info->MacroNameLoc; }
-  DeclNameRef getMacroName() const { return info->MacroName; }
-  ArgumentList *getArgs() const { return info->ArgList; }
-  void setArgs(ArgumentList *args) { info->ArgList = args; }
-  using ExprOrStmtExpansionCallback = llvm::function_ref<void(ASTNode)>;
-  void forEachExpandedExprOrStmt(ExprOrStmtExpansionCallback) const;
-  ConcreteDeclRef getMacroRef() const { return info->macroRef; }
-  void setMacroRef(ConcreteDeclRef ref) { info->macroRef = ref; }
-
-  MacroExpansionInfo *getExpansionInfo() const { return info; }
+  /// Enumerate the nodes produced by expanding this macro expansion.
+  void forEachExpandedNode(llvm::function_ref<void(ASTNode)> callback) const;
 
   /// Returns a discriminator which determines this macro expansion's index
   /// in the sequence of macro expansions within the current function.
@@ -8664,6 +8692,9 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;
   }
+  static bool classof(const FreestandingMacroExpansion *expansion) {
+    return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
+  }
 };
 
 /// Find references to the given generic parameter in the type signature of the
@@ -8671,11 +8702,11 @@ public:
 ///
 /// \param skipParamIndex If the value is a function or subscript declaration,
 /// specifies the index of the parameter that shall be skipped.
-GenericParameterReferenceInfo findGenericParameterReferences(
-    const ValueDecl *value,
-    CanGenericSignature sig, GenericTypeParamType *genericParam,
-    bool treatNonResultCovarianceAsInvariant,
-    Optional<unsigned> skipParamIndex);
+GenericParameterReferenceInfo
+findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
+                               GenericTypeParamType *genericParam,
+                               bool treatNonResultCovarianceAsInvariant,
+                               llvm::Optional<unsigned> skipParamIndex);
 
 inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
                                             const DeclRefExpr *base) const {
@@ -8870,6 +8901,10 @@ const ParamDecl *getParameterAt(ConcreteDeclRef declRef, unsigned index);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
+
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
+const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);

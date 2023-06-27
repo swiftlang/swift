@@ -58,14 +58,12 @@ struct CheckerLivenessInfo {
   SmallSetVector<Operand *, 8> consumingUse;
   SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
-  DiagnosticPrunedLiveness liveness;
+  BitfieldRef<DiagnosticPrunedLiveness> liveness;
 
-  CheckerLivenessInfo(SILFunction *fn)
-      : nonLifetimeEndingUsesInLiveOut(),
-        liveness(fn, nullptr, &nonLifetimeEndingUsesInLiveOut) {}
+  CheckerLivenessInfo() : nonLifetimeEndingUsesInLiveOut() {}
 
   void initDef(SILValue def) {
-    liveness.initializeDef(def);
+    liveness->initializeDef(def);
     defUseWorklist.insert(def);
   }
 
@@ -78,7 +76,6 @@ struct CheckerLivenessInfo {
 
   void clear() {
     defUseWorklist.clear();
-    liveness.invalidate();
     consumingUse.clear();
     interiorPointerTransitiveUses.clear();
     nonLifetimeEndingUsesInLiveOut.clear();
@@ -121,16 +118,16 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::ForwardingConsume:
         consumingUse.insert(use);
-        liveness.updateForUse(user, /*lifetimeEnding*/ true);
+        liveness->updateForUse(user, /*lifetimeEnding*/ true);
         break;
       case OperandOwnership::DestroyingConsume:
         // destroy_value does not force pruned liveness (but store etc. does).
         if (!isa<DestroyValueInst>(user)) {
-          liveness.updateForUse(user, /*lifetimeEnding*/ true);
+          liveness->updateForUse(user, /*lifetimeEnding*/ true);
         }
         consumingUse.insert(use);
         break;
@@ -147,12 +144,12 @@ bool CheckerLivenessInfo::compute() {
           // of the new variable as a use. Thus we only include the begin_borrow
           // itself as the use.
           if (bbi->isLexical()) {
-            liveness.updateForUse(bbi, false /*lifetime ending*/);
+            liveness->updateForUse(bbi, false /*lifetime ending*/);
           } else {
             // Otherwise, try to update liveness for a borrowing operand
             // use. This will make it so that we add the end_borrows of the
             // liveness use. If we have a reborrow here, we will bail.
-            if (liveness.updateForBorrowingOperand(use) !=
+            if (liveness->updateForBorrowingOperand(use) !=
                 InnerBorrowKind::Contained) {
               return false;
             }
@@ -163,7 +160,7 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::GuaranteedForwarding:
         // A forwarding borrow is validated as part of its parent borrow. So
         // just mark it as extending liveness and look through it.
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        liveness->updateForUse(user, /*lifetimeEnding*/ false);
         ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
           if (SILArgument::isTerminatorResult(result)) {
             return true;
@@ -187,7 +184,8 @@ bool CheckerLivenessInfo::compute() {
           (void)addrUseKind;
           while (!interiorPointerTransitiveUses.empty()) {
             auto *addrUse = interiorPointerTransitiveUses.pop_back_val();
-            liveness.updateForUse(addrUse->getUser(), /*lifetimeEnding*/ false);
+            liveness->updateForUse(addrUse->getUser(),
+                                   /*lifetimeEnding*/ false);
           }
         }
         break;
@@ -220,8 +218,7 @@ struct ConsumeOperatorCopyableValuesChecker {
   SILLoopInfo *loopInfoToUpdate;
 
   ConsumeOperatorCopyableValuesChecker(SILFunction *fn)
-      : fn(fn), livenessInfo(fn), dominanceToUpdate(nullptr),
-        loopInfoToUpdate(nullptr) {}
+      : fn(fn), dominanceToUpdate(nullptr), loopInfoToUpdate(nullptr) {}
 
   void setDominanceToUpdate(DominanceInfo *newDFI) {
     dominanceToUpdate = newDFI;
@@ -251,10 +248,10 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
 
   // First we emit the main error and then the note on where the move was.
   diagnose(astContext, getSourceLocFromValue(borrowedValue),
-           diag::sil_movekillscopyablevalue_value_consumed_more_than_once,
+           diag::sil_movechecking_value_used_after_consume,
            borrowedValueName);
   diagnose(astContext, mvi->getLoc().getSourceLoc(),
-           diag::sil_movekillscopyablevalue_move_here);
+           diag::sil_movechecking_consuming_use_here);
 
   // Then we do a bit of work to figure out where /all/ of the later uses than
   // mvi are so we can emit notes to the user telling them this is a problem
@@ -262,7 +259,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
   // going to be emitting a diagnostic and thus later parts of the compiler are
   // not going to run. First we look for uses in the same block as our move.
   auto *mviBlock = mvi->getParent();
-  auto mviBlockLiveness = livenessInfo.liveness.getBlockLiveness(mviBlock);
+  auto mviBlockLiveness = livenessInfo.liveness->getBlockLiveness(mviBlock);
   switch (mviBlockLiveness) {
   case PrunedLiveBlocks::Dead:
     llvm_unreachable("We should never see this");
@@ -278,14 +275,14 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
     // implementation choice.
     for (SILInstruction &inst :
          make_range(std::next(mvi->getIterator()), mviBlock->end())) {
-      switch (livenessInfo.liveness.isInterestingUser(&inst)) {
+      switch (livenessInfo.liveness->isInterestingUser(&inst)) {
       case PrunedLiveness::NonUser:
         break;
       case PrunedLiveness::NonLifetimeEndingUse:
       case PrunedLiveness::LifetimeEndingUse:
         LLVM_DEBUG(llvm::dbgs() << "Emitting note for in block use: " << inst);
         diagnose(astContext, inst.getLoc().getSourceLoc(),
-                 diag::sil_movekillscopyablevalue_use_here);
+                 diag::sil_movechecking_nonconsuming_use_here);
         break;
       }
     }
@@ -334,9 +331,9 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
     // adding successors since we do not need to look further than the pruned
     // liveness boundary for uses.
     if (PrunedLiveBlocks::LiveOut !=
-        livenessInfo.liveness.getBlockLiveness(block)) {
+        livenessInfo.liveness->getBlockLiveness(block)) {
       for (SILInstruction &inst : *block) {
-        switch (livenessInfo.liveness.isInterestingUser(&inst)) {
+        switch (livenessInfo.liveness->isInterestingUser(&inst)) {
         case PrunedLiveness::NonUser:
           break;
         case PrunedLiveness::NonLifetimeEndingUse:
@@ -344,7 +341,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
           LLVM_DEBUG(llvm::dbgs()
                      << "(3) Emitting diagnostic for user: " << inst);
           diagnose(astContext, inst.getLoc().getSourceLoc(),
-                   diag::sil_movekillscopyablevalue_use_here);
+                   diag::sil_movechecking_nonconsuming_use_here);
           break;
         }
       }
@@ -370,7 +367,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
         LLVM_DEBUG(llvm::dbgs()
                    << "(1) Emitting diagnostic for user: " << inst);
         diagnose(astContext, inst.getLoc().getSourceLoc(),
-                 diag::sil_movekillscopyablevalue_use_here);
+                 diag::sil_movechecking_nonconsuming_use_here);
         continue;
       }
 
@@ -381,7 +378,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
           // carry dataflow violation.
           if (mvi == &inst) {
             diagnose(astContext, inst.getLoc().getSourceLoc(),
-                     diag::sil_movekillscopyablevalue_value_consumed_in_loop);
+                     diag::sil_movechecking_consumed_in_loop_here);
             continue;
           }
           // We ignore consuming uses that are destroy_value since in our model
@@ -392,7 +389,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
           LLVM_DEBUG(llvm::dbgs()
                      << "(2) Emitting diagnostic for user: " << inst);
           diagnose(astContext, inst.getLoc().getSourceLoc(),
-                   diag::sil_movekillscopyablevalue_use_here);
+                   diag::sil_movechecking_nonconsuming_use_here);
         }
       }
     }
@@ -442,6 +439,10 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   // TODO: We should add llvm.dbg.addr support for fastisel and also teach
   // CodeGen how to handle llvm.dbg.addr better.
   while (!valuesToProcess.empty()) {
+    BitfieldRef<DiagnosticPrunedLiveness>::StackState livenessBitfieldContainer(
+        livenessInfo.liveness, fn, nullptr,
+        &livenessInfo.nonLifetimeEndingUsesInLiveOut);
+
     auto lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *lexicalValue);
@@ -473,7 +474,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         mvi->setAllowsDiagnostics(false);
 
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
-        if (livenessInfo.liveness.isWithinBoundary(mvi)) {
+        if (livenessInfo.liveness->isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
