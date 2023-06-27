@@ -217,7 +217,7 @@ public:
   /// When true, emitted module files will always contain options for the
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
-  Optional<bool> SerializeOptionsForDebugging;
+  llvm::Optional<bool> SerializeOptionsForDebugging;
 
   /// When true the debug prefix map entries will be applied to debugging
   /// options before serialization. These can be reconstructed at debug time by
@@ -306,7 +306,7 @@ public:
   /// Specifies the collection mode for the intermodule dependency tracker.
   /// Note that if set, the dependency tracker will be enabled even if no
   /// output path is configured.
-  Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
+  llvm::Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
   /// Should we emit the cType when printing @convention(c) or no?
   bool PrintFullConvention = false;

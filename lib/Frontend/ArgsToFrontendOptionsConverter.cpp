@@ -181,7 +181,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   computeDumpScopeMapLocations();
 
-  Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+  llvm::Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
   // None here means error, not just "no inputs". Propagate unconditionally.
@@ -666,9 +666,9 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     // selected".
     return false;
   }
-  Optional<std::vector<std::string>> outputFilenames =
+  llvm::Optional<std::vector<std::string>> outputFilenames =
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
-        Args, Diags, options::OPT_o, options::OPT_output_filelist);
+          Args, Diags, options::OPT_o, options::OPT_output_filelist);
 
   std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&

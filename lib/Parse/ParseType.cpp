@@ -491,8 +491,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     MutableArrayRef<TypeRepr *> patternSubsTypes;
     if (isInSILMode()) {
       auto parseSubstitutions =
-          [&](MutableArrayRef<TypeRepr*> &subs) -> Optional<bool> {
-        if (!consumeIf(tok::kw_for)) return None;
+          [&](MutableArrayRef<TypeRepr *> &subs) -> llvm::Optional<bool> {
+        if (!consumeIf(tok::kw_for))
+          return llvm::None;
 
         if (!startsWithLess(Tok)) {
           diagnose(Tok, diag::sil_function_subst_expected_l_angle);

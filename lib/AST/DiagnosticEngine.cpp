@@ -1104,11 +1104,11 @@ static AccessLevel getBufferAccessLevel(const Decl *decl) {
   return level;
 }
 
-Optional<DiagnosticInfo>
+llvm::Optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic);
   if (behavior == DiagnosticBehavior::Ignore)
-    return None;
+    return llvm::None;
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
@@ -1158,7 +1158,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           // FIXME: Horrible, horrible hackaround. We're not getting a
           // DeclContext everywhere we should.
           if (!dc) {
-            return None;
+            return llvm::None;
           }
 
           while (!dc->isModuleContext()) {

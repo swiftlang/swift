@@ -166,11 +166,11 @@ public:
 }  // end namespace
 
 static Type replaceTypeParametersWithErrorTypes(Type type) {
-  return type.transformRec([](Type t) -> Optional<Type> {
-      if (t->isTypeParameter())
-        return ErrorType::get(t->getASTContext());
-      return None;
-    });
+  return type.transformRec([](Type t) -> llvm::Optional<Type> {
+    if (t->isTypeParameter())
+      return ErrorType::get(t->getASTContext());
+    return llvm::None;
+  });
 }
 
 void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {

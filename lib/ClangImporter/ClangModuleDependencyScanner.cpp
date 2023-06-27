@@ -79,8 +79,7 @@ static void addSearchPathInvocationArguments(
 
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
-    ASTContext &ctx,
-    Optional<StringRef> sourceFileName = None) {
+    ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
   std::vector<std::string> commandLineArgs =
       ClangImporter::getClangArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
@@ -380,7 +379,7 @@ void ClangImporter::recordBridgingHeaderOptions(
 // Clang does have a concept working directory which may be specified on this
 // Clang invocation with '-working-directory'. If so, it is crucial that we
 // use this directory as an argument to the Clang scanner invocation below.
-static Optional<std::string>
+static llvm::Optional<std::string>
 computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
                              const ASTContext &ctx) {
   std::string workingDir;
@@ -393,16 +392,18 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
     if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          "Missing '-working-directory' argument");
-      return None;
+      return llvm::None;
     }
     workingDir = *(clangWorkingDirPos - 1);
   }
   return workingDir;
 }
 
-Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
-    StringRef moduleName, ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &delegate, bool isTestableImport) {
+llvm::Optional<const ModuleDependencyInfo *>
+ClangImporter::getModuleDependencies(StringRef moduleName,
+                                     ModuleDependenciesCache &cache,
+                                     InterfaceSubContextDelegate &delegate,
+                                     bool isTestableImport) {
   auto &ctx = Impl.SwiftContext;
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
@@ -411,7 +412,7 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
   if (!optionalWorkingDir) {
     ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                        "Missing '-working-directory' argument");
-    return None;
+    return llvm::None;
   }
   std::string workingDir = *optionalWorkingDir;
 
@@ -435,7 +436,7 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
                       "' not found") == std::string::npos)
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          errorStr);
-    return None;
+    return llvm::None;
   }
 
   // Record module dependencies for each module we found.

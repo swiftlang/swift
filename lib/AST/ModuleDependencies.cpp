@@ -164,7 +164,7 @@ void ModuleDependencyInfo::addModuleImport(
   }
 }
 
-Optional<std::string> ModuleDependencyInfo::getBridgingHeader() const {
+llvm::Optional<std::string> ModuleDependencyInfo::getBridgingHeader() const {
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
     auto swiftInterfaceStorage =
@@ -181,7 +181,7 @@ Optional<std::string> ModuleDependencyInfo::getBridgingHeader() const {
   }
 }
 
-Optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
+llvm::Optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
   std::string Root;
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
@@ -202,15 +202,15 @@ Optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
     break;
   }
   default:
-    return None;
+    return llvm::None;
   }
   if (Root.empty())
-    return None;
+    return llvm::None;
 
   return Root;
 }
 
-Optional<std::string> ModuleDependencyInfo::getClangIncludeTree() const {
+llvm::Optional<std::string> ModuleDependencyInfo::getClangIncludeTree() const {
   std::string Root;
   switch (getKind()) {
   case swift::ModuleDependencyKind::Clang: {
@@ -219,15 +219,15 @@ Optional<std::string> ModuleDependencyInfo::getClangIncludeTree() const {
     break;
   }
   default:
-    return None;
+    return llvm::None;
   }
   if (Root.empty())
-    return None;
+    return llvm::None;
 
   return Root;
 }
 
-Optional<std::string>
+llvm::Optional<std::string>
 ModuleDependencyInfo::getBridgingHeaderIncludeTree() const {
   std::string Root;
   switch (getKind()) {
@@ -246,10 +246,10 @@ ModuleDependencyInfo::getBridgingHeaderIncludeTree() const {
     break;
   }
   default:
-    return None;
+    return llvm::None;
   }
   if (Root.empty())
-    return None;
+    return llvm::None;
 
   return Root;
 }
@@ -537,8 +537,9 @@ void SwiftDependencyScanningService::configureForContextHash(StringRef scanningC
   }
 }
 
-Optional<const ModuleDependencyInfo*> SwiftDependencyScanningService::findDependency(
-    StringRef moduleName, Optional<ModuleDependencyKind> kind,
+llvm::Optional<const ModuleDependencyInfo *>
+SwiftDependencyScanningService::findDependency(
+    StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind,
     StringRef scanningContextHash) const {
   if (!kind) {
     for (auto kind = ModuleDependencyKind::FirstKind;
@@ -547,7 +548,7 @@ Optional<const ModuleDependencyInfo*> SwiftDependencyScanningService::findDepend
       if (dep.has_value())
         return dep.value();
     }
-    return None;
+    return llvm::None;
   }
 
   assert(kind.has_value() && "Expected dependencies kind for lookup.");
@@ -556,11 +557,11 @@ Optional<const ModuleDependencyInfo*> SwiftDependencyScanningService::findDepend
   if (known != map.end())
     return &(known->second);
 
-  return None;
+  return llvm::None;
 }
 
 bool SwiftDependencyScanningService::hasDependency(
-    StringRef moduleName, Optional<ModuleDependencyKind> kind,
+    StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind,
     StringRef scanContextHash) const {
   return findDependency(moduleName, kind, scanContextHash).has_value();
 }
@@ -616,8 +617,9 @@ ModuleDependenciesCache::ModuleDependenciesCache(
   }
 }
 
-Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependency(
-    StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
+llvm::Optional<const ModuleDependencyInfo *>
+ModuleDependenciesCache::findDependency(
+    StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind) const {
   auto optionalDep = globalScanningService.findDependency(moduleName, kind,
                                                           scannerContextHash);
   // During a scan, only produce the cached source module info for the current
@@ -627,7 +629,7 @@ Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependency(
     if (dep->getAsSwiftSourceModule() &&
         moduleName != mainScanModuleName &&
         moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {
-      return None;
+      return llvm::None;
     }
   }
 
@@ -635,7 +637,7 @@ Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependency(
 }
 
 bool ModuleDependenciesCache::hasDependency(
-    StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
+    StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind) const {
   return findDependency(moduleName, kind).has_value();
 }
 

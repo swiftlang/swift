@@ -88,7 +88,7 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
   for (auto It = SN->begin(); It != SN->end(); ++It) {
     auto *MN = cast<MappingNode>(&*It);
     BatchScanInput entry;
-    Optional<std::set<int8_t>> Platforms;
+    llvm::Optional<std::set<int8_t>> Platforms;
     for (auto &Pair : *MN) {
       auto Key = getScalaNodeText(Pair.getKey());
       auto *Value = Pair.getValue();
@@ -116,7 +116,7 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
   return false;
 }
 
-static Optional<std::vector<BatchScanInput>>
+static llvm::Optional<std::vector<BatchScanInput>>
 parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
                         llvm::StringSaver &saver) {
   assert(!batchInputPath.empty());
@@ -129,7 +129,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   if (!FileBufOrErr) {
     ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_missing,
                        batchInputPath);
-    return None;
+    return llvm::None;
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
 
@@ -145,7 +145,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
     if (parseBatchInputEntries(ctx, saver, N, result)) {
       ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_corrupted,
                          batchInputPath);
-      return None;
+      return llvm::None;
     }
   }
   return result;
@@ -1628,7 +1628,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
 
 static ModuleDependencyInfo identifyMainModuleDependencies(
     CompilerInstance &instance,
-    Optional<SwiftDependencyTracker> tracker = None) {
+    llvm::Optional<SwiftDependencyTracker> tracker = llvm::None) {
   ModuleDecl *mainModule = instance.getMainModule();
   // Main module file name.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
@@ -2089,7 +2089,7 @@ swift::dependencies::performBatchModuleScan(
             FEOpts.SerializeModuleInterfaceDependencyHashes,
             FEOpts.shouldTrackSystemDependencies(),
             RequireOSSAModules_t(instance.getSILOptions()));
-        Optional<const ModuleDependencyInfo*> rootDeps;
+        llvm::Optional<const ModuleDependencyInfo *> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's
@@ -2157,7 +2157,7 @@ swift::dependencies::performBatchModulePrescan(
             FEOpts.SerializeModuleInterfaceDependencyHashes,
             FEOpts.shouldTrackSystemDependencies(),
             RequireOSSAModules_t(instance.getSILOptions()));
-        Optional<const ModuleDependencyInfo*> rootDeps;
+        llvm::Optional<const ModuleDependencyInfo *> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's
