@@ -837,6 +837,7 @@ public class AllocRefInstBase : SingleValueInstruction, Allocation {
 }
 
 final public class AllocRefInst : AllocRefInstBase {
+  public var isBare: Bool { bridged.AllocRefInst_isBare() }
 }
 
 final public class AllocRefDynamicInst : AllocRefInstBase {

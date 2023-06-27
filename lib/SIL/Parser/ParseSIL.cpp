@@ -5031,6 +5031,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AllocRefDynamicInst: {
     bool IsObjC = false;
     bool OnStack = false;
+    bool isBare = false;
     SmallVector<SILType, 2> ElementTypes;
     SmallVector<SILValue, 2> ElementCounts;
     while (P.consumeIf(tok::l_square)) {
@@ -5041,6 +5042,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         IsObjC = true;
       } else if (Optional == "stack") {
         OnStack = true;
+      } else if (Optional == "bare" && Opcode == SILInstructionKind::AllocRefInst) {
+        isBare = true;
       } else if (Optional == "tail_elems") {
         SILType ElemTy;
         if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
@@ -5082,7 +5085,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                           OnStack,
                                           ElementTypes, ElementCounts);
     } else {
-      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack,
+      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack, isBare,
                                    ElementTypes, ElementCounts);
     }
     break;

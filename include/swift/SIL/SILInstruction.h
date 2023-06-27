@@ -2206,12 +2206,20 @@ protected:
   AllocRefInstBase(SILInstructionKind Kind,
                    SILDebugLocation DebugLoc,
                    SILType ObjectType,
-                   bool objc, bool canBeOnStack,
+                   bool objc, bool canBeOnStack, bool isBare,
                    ArrayRef<SILType> ElementTypes);
 
   SILType *getTypeStorage();
   const SILType *getTypeStorage() const {
     return const_cast<AllocRefInstBase*>(this)->getTypeStorage();
+  }
+
+  bool isBare() const {
+    return sharedUInt8().AllocRefInstBase.isBare;
+  }
+
+  void setBare(bool isBare = true) {
+    sharedUInt8().AllocRefInstBase.isBare = isBare;
   }
 
 public:
@@ -2285,11 +2293,11 @@ class AllocRefInst final
 
   AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
                SILType ObjectType,
-               bool objc, bool canBeOnStack,
+               bool objc, bool canBeOnStack, bool isBare,
                ArrayRef<SILType> ElementTypes,
                ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
-                        objc, canBeOnStack, ElementTypes) {
+                        objc, canBeOnStack, isBare, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size());
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
@@ -2297,11 +2305,19 @@ class AllocRefInst final
 
   static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
                               SILType ObjectType,
-                              bool objc, bool canBeOnStack,
+                              bool objc, bool canBeOnStack, bool isBare,
                               ArrayRef<SILType> ElementTypes,
                               ArrayRef<SILValue> ElementCountOperands);
 
 public:
+  bool isBare() const {
+    return AllocRefInstBase::isBare();
+  }
+
+  void setBare(bool isBare = true) {
+    AllocRefInstBase::setBare(isBare);
+  }
+
   ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands().slice(getNumTailTypes());
   }
@@ -2332,7 +2348,7 @@ class AllocRefDynamicInst final
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
-                                            canBeOnStack, ElementTypes) {
+                                            canBeOnStack, /*isBare=*/ false, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size() + 1);
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());

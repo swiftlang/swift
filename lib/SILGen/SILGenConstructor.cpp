@@ -957,7 +957,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // allocated is the type of the class that defines the designated
     // initializer.
     F.setIsExactSelfClass(IsExactSelfClass);
-    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
+    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false, false,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
   args.push_back(selfValue);

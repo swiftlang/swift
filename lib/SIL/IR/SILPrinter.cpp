@@ -1452,6 +1452,8 @@ public:
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
+    if (ARI->isBare())
+      *this << "[bare] ";
     printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }

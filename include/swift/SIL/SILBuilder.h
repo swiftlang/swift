@@ -446,14 +446,14 @@ public:
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool objc, bool canAllocOnStack,
+                               bool objc, bool canAllocOnStack, bool isBare,
                                ArrayRef<SILType> ElementTypes,
                                ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
     return insert(AllocRefInst::create(getSILDebugLocation(Loc), getFunction(),
-                                       ObjectType, objc, canAllocOnStack,
+                                       ObjectType, objc, canAllocOnStack, isBare,
                                        ElementTypes, ElementCountOperands));
   }
 

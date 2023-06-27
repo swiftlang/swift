@@ -760,6 +760,14 @@ struct BridgedInstruction {
     getAs<swift::AllocRefInstBase>()->setStackAllocatable();
   }
 
+  bool AllocRefInst_isBare() const {
+    return getAs<swift::AllocRefInst>()->isBare();
+  }
+
+  void AllocRefInst_setIsBare() const {
+    getAs<swift::AllocRefInst>()->setBare(true);
+  }
+
   inline void TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const;
 
   SwiftInt KeyPathInst_getNumComponents() const {

@@ -922,7 +922,7 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
                                       getOpType(Inst->getType()),
-                                      Inst->isObjC(), Inst->canAllocOnStack(),
+                                      Inst->isObjC(), Inst->canAllocOnStack(), Inst->isBare(),
                                       ElemTypes, CountArgs);
   recordClonedInstruction(Inst, NewInst);
 }

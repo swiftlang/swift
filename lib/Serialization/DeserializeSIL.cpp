@@ -1702,7 +1702,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                                  TailTypes, Counts);
     } else {
       assert(i == NumVals);
-      ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,
+      bool isBare = (bool)((Flags >> 2) & 1);
+      ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack, isBare,
                                           TailTypes, Counts);
     }
     break;

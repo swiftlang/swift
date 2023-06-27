@@ -228,6 +228,7 @@ protected:
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
       onStack : 1,
+      isBare : 1,   // Only used in AllocRefInst
       numTailTypes: NumAllocRefTailTypesBits);
 
     SHARED_FIELD(BeginBorrowInst, uint8_t

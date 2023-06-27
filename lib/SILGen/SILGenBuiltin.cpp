@@ -1080,7 +1080,7 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,
     assert(InstanceType == RefType.getASTType() &&
            "substituted type does not match operand metatype");
     (void) InstanceType;
-    return SGF.B.createAllocRef(loc, RefType, false, false,
+    return SGF.B.createAllocRef(loc, RefType, false,
                                 ElemTypes, Counts);
   } else {
     return SGF.B.createAllocRefDynamic(loc, Metatype, RefType, false,
