@@ -180,9 +180,9 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   return false;
 }
 
-static CanType getSingletonPackExpansionParameter(CanPackType packType,
-                    const FulfillmentMap::InterestingKeysCallback &keys,
-                    llvm::Optional<unsigned> &packExpansionComponent) {
+static CanType getSingletonPackExpansionParameter(
+    CanPackType packType, const FulfillmentMap::InterestingKeysCallback &keys,
+    llvm::Optional<unsigned> &packExpansionComponent) {
   if (auto expansion = packType.unwrapSingletonPackExpansion()) {
     if (keys.isInterestingPackExpansion(expansion)) {
       packExpansionComponent = 0;

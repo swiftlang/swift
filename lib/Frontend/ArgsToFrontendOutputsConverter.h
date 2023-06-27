@@ -100,7 +100,7 @@ public:
 
 private:
   llvm::Optional<std::string> computeOutputFile(StringRef outputArg,
-                                          const InputFile &input) const;
+                                                const InputFile &input) const;
 
   /// \return the correct output filename when none was specified.
   ///
@@ -108,7 +108,8 @@ private:
   /// without the driver,
   /// because the driver will always pass -o with an appropriate filename
   /// if output is required for the requested action.
-  llvm::Optional<std::string> deriveOutputFileFromInput(const InputFile &input) const;
+  llvm::Optional<std::string>
+  deriveOutputFileFromInput(const InputFile &input) const;
 
   /// \return the correct output filename when a directory was specified.
   ///
@@ -137,7 +138,8 @@ public:
       const llvm::opt::ArgList &args, DiagnosticEngine &diags,
       const FrontendInputsAndOutputs &inputsAndOutputs,
       ArrayRef<std::string> outputFiles, StringRef moduleName);
-  llvm::Optional<std::vector<SupplementaryOutputPaths>> computeOutputPaths() const;
+  llvm::Optional<std::vector<SupplementaryOutputPaths>>
+  computeOutputPaths() const;
 
 private:
   /// \Return a set of supplementary output paths for each input that might

@@ -59,7 +59,8 @@ enum class AutomaticEnumValueKind {
   Integer,
 };
 
-llvm::Optional<AutomaticEnumValueKind> computeAutomaticEnumValueKind(EnumDecl *ED);
+llvm::Optional<AutomaticEnumValueKind>
+computeAutomaticEnumValueKind(EnumDecl *ED);
 
 void validatePrecedenceGroup(PrecedenceGroupDecl *PGD);
 

@@ -81,8 +81,9 @@ enum class EnforceExclusivityMode {
 
 namespace llvm {
 
-inline raw_ostream &operator<<(raw_ostream &os,
-                               const llvm::Optional<CopyPropagationOption> option) {
+inline raw_ostream &
+operator<<(raw_ostream &os,
+           const llvm::Optional<CopyPropagationOption> option) {
   if (option) {
     switch (*option) {
     case CopyPropagationOption::Off:
@@ -482,8 +483,9 @@ struct SILOptOptions {
                          llvm::cl::desc("Ignore [always_inline] attribute."),
                          llvm::cl::init(false));
   using CPStateOpt =
-    llvm::cl::opt<llvm::Optional<CopyPropagationOption>, /*ExternalStorage*/ false,
-                     llvm::cl::parser<llvm::Optional<CopyPropagationOption>>>;
+      llvm::cl::opt<llvm::Optional<CopyPropagationOption>,
+                    /*ExternalStorage*/ false,
+                    llvm::cl::parser<llvm::Optional<CopyPropagationOption>>>;
   CPStateOpt
   CopyPropagationState = CPStateOpt(
         "enable-copy-propagation",
@@ -525,7 +527,8 @@ namespace {
 using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
 } // end anonymous namespace
 
-static llvm::Optional<ASTVerifierOverrideKind> getASTOverrideKind(const SILOptOptions &options) {
+static llvm::Optional<ASTVerifierOverrideKind>
+getASTOverrideKind(const SILOptOptions &options) {
   assert(!(options.EnableASTVerifier && options.DisableASTVerifier) &&
          "Can only set one of EnableASTVerifier/DisableASTVerifier?!");
   if (options.EnableASTVerifier)

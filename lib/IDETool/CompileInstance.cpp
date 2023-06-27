@@ -218,9 +218,9 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
   auto FS = SM.getFileSystem();
 
   if (shouldCheckDependencies()) {
-    if (areAnyDependentFilesInvalidated(*CI, *FS, /*excludeBufferID=*/llvm::None,
-                                        DependencyCheckedTimestamp,
-                                        InMemoryDependencyHash)) {
+    if (areAnyDependentFilesInvalidated(
+            *CI, *FS, /*excludeBufferID=*/llvm::None,
+            DependencyCheckedTimestamp, InMemoryDependencyHash)) {
       return true;
     }
     DependencyCheckedTimestamp = std::chrono::system_clock::now();

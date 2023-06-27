@@ -339,7 +339,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   SmallString<128> SharedResourceDirPath;
   getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
   llvm::Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
-  
+
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
     auto value = context.Args.getLastArgValue(
                                     options::OPT_runtime_compatibility_version);

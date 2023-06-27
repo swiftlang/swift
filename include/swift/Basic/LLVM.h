@@ -58,7 +58,8 @@ namespace llvm {
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
 #endif
-  template<typename T> class TinyPtrVector;
+  template <typename T>
+  class TinyPtrVector;
   template <typename ...PTs> class PointerUnion;
   template <typename IteratorT> class iterator_range;
   class SmallBitVector;

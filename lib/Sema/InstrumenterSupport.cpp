@@ -142,4 +142,3 @@ Expr *InstrumenterBase::buildIDArgumentExpr(llvm::Optional<DeclNameRef> name,
   return new (Context) UnresolvedDeclRefExpr(*name, DeclRefKind::Ordinary,
                                              DeclNameLoc(SR.End));
 }
-

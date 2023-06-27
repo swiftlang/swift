@@ -1553,11 +1553,14 @@ public:
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       auto astType = boxedInterfaceType.getASTType();
-      astType = astType.transformRec([](Type t) -> llvm::Optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
-        return llvm::None;
-      })->getCanonicalType();
+      astType =
+          astType
+              .transformRec([](Type t) -> llvm::Optional<Type> {
+                if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+                  return openedExistential->getInterfaceType();
+                return llvm::None;
+              })
+              ->getCanonicalType();
       boxedInterfaceType = SILType::getPrimitiveType(
           astType, boxedInterfaceType.getCategory());
     }

@@ -125,9 +125,9 @@ public:
   /// Create a witness for the given requirement.
   ///
   /// Deserialized witnesses do not have a witness thunk signature.
-  static Witness forDeserialized(ValueDecl *decl,
-                                 SubstitutionMap substitutions,
-                                 llvm::Optional<ActorIsolation> enterIsolation) {
+  static Witness
+  forDeserialized(ValueDecl *decl, SubstitutionMap substitutions,
+                  llvm::Optional<ActorIsolation> enterIsolation) {
     // TODO: It's probably a good idea to have a separate 'deserialized' bit.
     return Witness(
         decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature(),
@@ -151,8 +151,7 @@ public:
   ///
   /// \param enterIsolation The actor isolation that the witness thunk will
   /// need to hop to before calling the witness.
-  Witness(ValueDecl *decl,
-          SubstitutionMap substitutions,
+  Witness(ValueDecl *decl, SubstitutionMap substitutions,
           GenericSignature witnessThunkSig,
           SubstitutionMap reqToWitnessThunkSigSubs,
           GenericSignature derivativeGenSig,

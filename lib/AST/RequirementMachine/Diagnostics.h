@@ -57,7 +57,8 @@ struct RequirementError {
 
 private:
   RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
-    : kind(kind), requirement(requirement), conflictingRequirement(llvm::None), loc(loc) {}
+      : kind(kind), requirement(requirement),
+        conflictingRequirement(llvm::None), loc(loc) {}
 
   RequirementError(Kind kind, Requirement requirement,
                    Requirement conflict,

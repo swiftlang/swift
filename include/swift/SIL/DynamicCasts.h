@@ -133,7 +133,8 @@ struct SILDynamicCastKind {
   SILDynamicCastKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<SILDynamicCastKind> fromNodeKind(SILInstructionKind kind) {
+  static llvm::Optional<SILDynamicCastKind>
+  fromNodeKind(SILInstructionKind kind) {
     if (auto innerTyOpt = SILDynamicCastKind::fromNodeKindHelper(kind))
       return SILDynamicCastKind(*innerTyOpt);
     return llvm::None;

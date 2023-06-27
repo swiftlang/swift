@@ -235,9 +235,9 @@ public:
     return ClangRepresentation::unsupported;
   }
 
-  ClangRepresentation visitTupleType(TupleType *TT,
-                                     llvm::Optional<OptionalTypeKind> optionalKind,
-                                     bool isInOutParam) {
+  ClangRepresentation
+  visitTupleType(TupleType *TT, llvm::Optional<OptionalTypeKind> optionalKind,
+                 bool isInOutParam) {
     if (TT->getNumElements() > 0)
       // FIXME: Handle non-void type.
       return ClangRepresentation::unsupported;
@@ -259,16 +259,17 @@ public:
     return visitSugarType(aliasTy, optionalKind, isInOutParam);
   }
 
-  ClangRepresentation visitSugarType(SugarType *sugarTy,
-                                     llvm::Optional<OptionalTypeKind> optionalKind,
-                                     bool isInOutParam) {
+  ClangRepresentation
+  visitSugarType(SugarType *sugarTy,
+                 llvm::Optional<OptionalTypeKind> optionalKind,
+                 bool isInOutParam) {
     return visitPart(sugarTy->getSinglyDesugaredType(), optionalKind,
                      isInOutParam);
   }
 
-  ClangRepresentation visitClassType(ClassType *CT,
-                                     llvm::Optional<OptionalTypeKind> optionalKind,
-                                     bool isInOutParam) {
+  ClangRepresentation
+  visitClassType(ClassType *CT, llvm::Optional<OptionalTypeKind> optionalKind,
+                 bool isInOutParam) {
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
       ClangSyntaxPrinter(os).printClangTypeReference(cd->getClangDecl());
@@ -302,16 +303,16 @@ public:
     return ClangRepresentation::representable;
   }
 
-  ClangRepresentation visitEnumType(EnumType *ET,
-                                    llvm::Optional<OptionalTypeKind> optionalKind,
-                                    bool isInOutParam) {
+  ClangRepresentation
+  visitEnumType(EnumType *ET, llvm::Optional<OptionalTypeKind> optionalKind,
+                bool isInOutParam) {
     return visitValueType(ET, ET->getNominalOrBoundGenericNominal(),
                           optionalKind, isInOutParam);
   }
 
-  ClangRepresentation visitStructType(StructType *ST,
-                                      llvm::Optional<OptionalTypeKind> optionalKind,
-                                      bool isInOutParam) {
+  ClangRepresentation
+  visitStructType(StructType *ST, llvm::Optional<OptionalTypeKind> optionalKind,
+                  bool isInOutParam) {
     return visitValueType(ST, ST->getNominalOrBoundGenericNominal(),
                           optionalKind, isInOutParam);
   }
@@ -333,11 +334,10 @@ public:
     return result;
   }
 
-  ClangRepresentation visitValueType(TypeBase *type,
-                                     const NominalTypeDecl *decl,
-                                     llvm::Optional<OptionalTypeKind> optionalKind,
-                                     bool isInOutParam,
-                                     ArrayRef<Type> genericArgs = {}) {
+  ClangRepresentation
+  visitValueType(TypeBase *type, const NominalTypeDecl *decl,
+                 llvm::Optional<OptionalTypeKind> optionalKind,
+                 bool isInOutParam, ArrayRef<Type> genericArgs = {}) {
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
 
     // Handle known type names.
@@ -475,9 +475,10 @@ public:
     return visitPart(ds->getSelfType(), optionalKind, isInOutParam);
   }
 
-  ClangRepresentation visitMetatypeType(MetatypeType *mt,
-                                        llvm::Optional<OptionalTypeKind> optionalKind,
-                                        bool isInOutParam) {
+  ClangRepresentation
+  visitMetatypeType(MetatypeType *mt,
+                    llvm::Optional<OptionalTypeKind> optionalKind,
+                    bool isInOutParam) {
     if (typeUseKind == FunctionSignatureTypeUse::TypeReference)
       return visitPart(mt->getInstanceType(), optionalKind, isInOutParam);
     return ClangRepresentation::unsupported;
@@ -1234,8 +1235,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
               os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
               interopContext, delegate, moduleContext, declPrinter,
               FunctionSignatureTypeUse::TypeReference);
-          auto result = typePrinter.visit(metadataSrcParam.getType(), llvm::None,
-                                          /*isInOut=*/false);
+          auto result =
+              typePrinter.visit(metadataSrcParam.getType(), llvm::None,
+                                /*isInOut=*/false);
           assert(!result.isUnsupported());
           os << ">::getTypeMetadata()";
         },
@@ -1262,13 +1264,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       if (classDecl->hasClangNode()) {
         assert(!isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
         os << "return ";
-        printCallToCFunc(/*additionalParam=*/ llvm::None);
+        printCallToCFunc(/*additionalParam=*/llvm::None);
         os << ";\n";
         return;
       }
       ClangClassTypePrinter::printClassTypeReturnScaffold(
           os, classDecl, moduleContext,
-          [&]() { printCallToCFunc(/*additionalParam=*/ llvm::None); });
+          [&]() { printCallToCFunc(/*additionalParam=*/llvm::None); });
       return;
     }
     if (auto *decl = resultTy->getNominalOrBoundGenericNominal()) {
@@ -1311,7 +1313,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     ClangSyntaxPrinter(os).printIdentifier(
         cast<clang::NamedDecl>(classDecl->getClangDecl())->getName());
     os << " *)(__bridge void *)";
-    printCallToCFunc(/*additionalParam=*/ llvm::None);
+    printCallToCFunc(/*additionalParam=*/llvm::None);
     os << ";\n";
     return;
   }
@@ -1325,7 +1327,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   // If the function can't throw just return its value result.
   else if (!hasThrows)
     os << "  return ";
-  printCallToCFunc(/*additionalParam=*/ llvm::None);
+  printCallToCFunc(/*additionalParam=*/llvm::None);
   os << ";\n";
 
   // Create the condition and the statement to throw an exception.

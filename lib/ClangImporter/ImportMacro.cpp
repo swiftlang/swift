@@ -52,8 +52,8 @@ static bool isInSystemModule(DeclContext *D) {
   return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
-static llvm::Optional<StringRef> getTokenSpelling(ClangImporter::Implementation &impl,
-                                            const clang::Token &tok) {
+static llvm::Optional<StringRef>
+getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   bool tokenInvalid = false;
   llvm::SmallString<32> spellingBuffer;
   StringRef tokenSpelling = impl.getClangPreprocessor().getSpelling(
@@ -271,8 +271,8 @@ static bool isSignToken(const clang::Token &tok) {
          tok.is(clang::tok::tilde);
 }
 
-static llvm::Optional<clang::QualType> builtinTypeForToken(const clang::Token &tok,
-    const clang::ASTContext &context) {
+static llvm::Optional<clang::QualType>
+builtinTypeForToken(const clang::Token &tok, const clang::ASTContext &context) {
   switch (tok.getKind()) {
   case clang::tok::kw_short:
     return clang::QualType(context.ShortTy);
@@ -310,10 +310,9 @@ static llvm::Optional<clang::QualType> builtinTypeForToken(const clang::Token &t
 }
 
 static llvm::Optional<std::pair<llvm::APSInt, Type>>
-  getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
-                                  const clang::MacroInfo *macro,
-                                  DeclContext *DC,
-                                  const clang::Token &token) {
+getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
+                                const clang::MacroInfo *macro, DeclContext *DC,
+                                const clang::Token &token) {
 
   // Integer literal.
   if (token.is(clang::tok::numeric_constant)) {

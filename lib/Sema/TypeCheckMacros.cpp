@@ -1272,9 +1272,9 @@ bool swift::accessorMacroIntroducesInitAccessor(
   return false;
 }
 
-llvm::Optional<unsigned> swift::expandAccessors(
-    AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
-) {
+llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
+                                                CustomAttr *attr,
+                                                MacroDecl *macro) {
   // Evaluate the macro.
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, storage, attr,
@@ -1375,8 +1375,8 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   return macroSourceFile->getBufferID();
 }
 
-llvm::Optional<unsigned>
-swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
+llvm::Optional<unsigned> swift::expandMembers(CustomAttr *attr,
+                                              MacroDecl *macro, Decl *decl) {
   // Evaluate the macro.
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
@@ -1403,8 +1403,8 @@ swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   return macroSourceFile->getBufferID();
 }
 
-llvm::Optional<unsigned>
-swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
+llvm::Optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
+                                            Decl *decl) {
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
                               /*passParentContext=*/false, MacroRole::Peer);
@@ -1428,9 +1428,9 @@ ExpandConformanceMacros::evaluate(Evaluator &evaluator,
   return nominal->getASTContext().AllocateCopy(bufferIDs);
 }
 
-llvm::Optional<unsigned>
-swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
-                          NominalTypeDecl *nominal) {
+llvm::Optional<unsigned> swift::expandConformances(CustomAttr *attr,
+                                                   MacroDecl *macro,
+                                                   NominalTypeDecl *nominal) {
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
                                                  MacroRole::Conformance);

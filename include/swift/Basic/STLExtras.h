@@ -17,8 +17,8 @@
 #ifndef SWIFT_BASIC_STLEXTRAS_H
 #define SWIFT_BASIC_STLEXTRAS_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include <algorithm>

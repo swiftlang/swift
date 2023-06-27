@@ -111,7 +111,7 @@ static llvm::Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
   return llvm::StringSwitch<llvm::Optional<uint8_t>>(Platform)
 #define LD_PLATFORM(Name, Id) .Case(#Name, Id)
 #include "ldPlatformKinds.def"
-    .Default(llvm::None);
+      .Default(llvm::None);
 }
 
 StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
@@ -269,7 +269,7 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
 /// Find the most relevant introducing version of the decl stack we have visited
 /// so far.
 static llvm::Optional<llvm::VersionTuple>
-getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
+getInnermostIntroVersion(ArrayRef<Decl *> DeclStack, PlatformKind Platform) {
   for (auto It = DeclStack.rbegin(); It != DeclStack.rend(); ++ It) {
     if (auto Result = (*It)->getIntroducedOSVersion(Platform))
       return Result;

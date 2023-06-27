@@ -32,13 +32,13 @@ using namespace swift;
 namespace {
 
 /// Get PlatformConditionKind from platform condition name.
-static
-llvm::Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
+static llvm::Optional<PlatformConditionKind>
+getPlatformConditionKind(StringRef Name) {
   return llvm::StringSwitch<llvm::Optional<PlatformConditionKind>>(Name)
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
     .Case(IDENTIFIER, PlatformConditionKind::LABEL)
 #include "swift/AST/PlatformConditionKinds.def"
-    .Default(llvm::None);
+      .Default(llvm::None);
 }
 
 /// Get platform condition name from PlatformConditionKind.
@@ -58,7 +58,8 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
-static bool isValidPrefixUnaryOperator(llvm::Optional<StringRef> UnaryOperator) {
+static bool
+isValidPrefixUnaryOperator(llvm::Optional<StringRef> UnaryOperator) {
   return UnaryOperator != llvm::None &&
          (UnaryOperator.value() == ">=" || UnaryOperator.value() == "<");
 }
@@ -327,7 +328,8 @@ public:
         *KindName == "_compiler_version") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
       llvm::Optional<StringRef> PrefixName =
-          PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : llvm::None;
+          PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator)
+              : llvm::None;
       if (!isValidPrefixUnaryOperator(PrefixName)) {
         D.diagnose(
             Arg->getLoc(), diag::unsupported_platform_condition_argument,
@@ -792,7 +794,8 @@ Result Parser::parseIfConfigRaw(
       SourceMgr.getIDEInspectionTargetBufferID() == L->getBufferID() &&
       SourceMgr.isBeforeInBuffer(Tok.getLoc(),
                                  SourceMgr.getIDEInspectionTargetLoc())) {
-    llvm::SaveAndRestore<llvm::Optional<StableHasher>> H(CurrentTokenHash, llvm::None);
+    llvm::SaveAndRestore<llvm::Optional<StableHasher>> H(CurrentTokenHash,
+                                                         llvm::None);
     BacktrackingScope backtrack(*this);
     do {
       auto startLoc = Tok.getLoc();

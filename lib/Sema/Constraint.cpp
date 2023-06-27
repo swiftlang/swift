@@ -1114,7 +1114,8 @@ llvm::Optional<TrailingClosureMatching>
 Constraint::getTrailingClosureMatching() const {
   assert(Kind == ConstraintKind::ApplicableFunction);
   switch (trailingClosureMatching) {
-  case 0: return llvm::None;
+  case 0:
+    return llvm::None;
   case 1: return TrailingClosureMatching::Forward;
   case 2: return TrailingClosureMatching::Backward;
   }

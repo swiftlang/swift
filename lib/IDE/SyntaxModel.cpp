@@ -351,7 +351,7 @@ class ModelASTWalker : public ASTWalker {
   static const std::regex &getURLRegex(StringRef Protocol);
 
   llvm::Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
-                                      SourceLoc OrigLoc);
+                                            SourceLoc OrigLoc);
   llvm::DenseSet<ASTNode> NodesVisitedBefore;
   /// When non-zero, we should avoid passing tokens as syntax nodes since a parent of several tokens
   /// is considered as one, e.g. object literal expression.
@@ -1699,8 +1699,8 @@ public:
 } // end anonymous namespace
 
 llvm::Optional<SyntaxNode> ModelASTWalker::parseFieldNode(StringRef Text,
-                                                    StringRef OrigText,
-                                                    SourceLoc OrigLoc) {
+                                                          StringRef OrigText,
+                                                          SourceLoc OrigLoc) {
   llvm::Optional<SyntaxNode> Node;
   DocFieldParser parser(Text);
   if (auto ident = parser.parseFieldName()) {

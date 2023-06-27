@@ -19,8 +19,7 @@
 namespace swift {
 
 void emitDistributedActorSystemWitnessCall(
-    SILBuilder &B, SILLocation loc, DeclName methodName,
-    SILValue base,
+    SILBuilder &B, SILLocation loc, DeclName methodName, SILValue base,
     // types to be passed through to SubstitutionMap:
     SILType actorType,
     // call arguments, except the base which will be passed last

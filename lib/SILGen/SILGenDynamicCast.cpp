@@ -490,9 +490,9 @@ RValue Lowering::emitConditionalCheckedCast(
       },
       // The failure path.
       [&](llvm::Optional<ManagedValue> Value) {
-        // We always are performing a take here, so Value should be llvm::None since
-        // the
-        // object should have been destroyed immediately in the fail block.
+        // We always are performing a take here, so Value should be llvm::None
+        // since the object should have been destroyed immediately in the fail
+        // block.
         assert(!Value.has_value() && "Expected a take_always consumption kind");
         auto noneDecl = SGF.getASTContext().getOptionalNoneDecl();
 

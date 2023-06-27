@@ -339,10 +339,10 @@ void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
 #endif
 }
 
-void
-Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
-                                 llvm::Optional<DiagnosticTransaction> &transaction,
-                                 bool suppressDiagnostics) {
+void Parser::parseSourceFileViaASTGen(
+    SmallVectorImpl<ASTNode> &items,
+    llvm::Optional<DiagnosticTransaction> &transaction,
+    bool suppressDiagnostics) {
 #if SWIFT_SWIFT_PARSER
   const auto &langOpts = Context.LangOpts;
 
@@ -791,10 +791,12 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 }
 
 bool Parser::parseSpecializeAttributeArguments(
-    swift::tok ClosingBrace, bool &DiscardAttribute, llvm::Optional<bool> &Exported,
+    swift::tok ClosingBrace, bool &DiscardAttribute,
+    llvm::Optional<bool> &Exported,
     llvm::Optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, AvailabilityContext *SILAvailability, SmallVectorImpl<Identifier> &spiGroups,
+    DeclNameRef &targetFunction, AvailabilityContext *SILAvailability,
+    SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     size_t &typeErasedParamsCount,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
@@ -2087,8 +2089,9 @@ static bool isKnownDocumentationAttributeArgument(StringRef ArgumentName) {
     .Default(false);
 }
 
-bool Parser::parseDocumentationAttributeArgument(llvm::Optional<StringRef> &Metadata,
-                                                 llvm::Optional<AccessLevel> &Visibility) {
+bool Parser::parseDocumentationAttributeArgument(
+    llvm::Optional<StringRef> &Metadata,
+    llvm::Optional<AccessLevel> &Visibility) {
   if (Tok.isNot(tok::identifier)) {
     diagnose(Tok.getLoc(), diag::documentation_attr_expected_argument);
     return false;
@@ -2114,14 +2117,14 @@ bool Parser::parseDocumentationAttributeArgument(llvm::Optional<StringRef> &Meta
     }
     auto ArgumentValue = Tok.getText();
     llvm::Optional<AccessLevel> ParsedVisibility =
-      llvm::StringSwitch<llvm::Optional<AccessLevel>>(ArgumentValue)
-        .Case("open", AccessLevel::Open)
-        .Case("public", AccessLevel::Public)
-        .Case("package", AccessLevel::Package)
-        .Case("internal", AccessLevel::Internal)
-        .Case("private", AccessLevel::Private)
-        .Case("fileprivate", AccessLevel::FilePrivate)
-        .Default(llvm::None);
+        llvm::StringSwitch<llvm::Optional<AccessLevel>>(ArgumentValue)
+            .Case("open", AccessLevel::Open)
+            .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
+            .Case("internal", AccessLevel::Internal)
+            .Case("private", AccessLevel::Private)
+            .Case("fileprivate", AccessLevel::FilePrivate)
+            .Default(llvm::None);
 
     if (!ParsedVisibility) {
       diagnose(Tok.getLoc(), diag::documentation_attr_unknown_access_level, ArgumentValue);
@@ -2200,13 +2203,14 @@ Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
 static llvm::Optional<MacroIntroducedDeclNameKind>
 getMacroIntroducedDeclNameKind(Identifier name) {
-  return llvm::StringSwitch<llvm::Optional<MacroIntroducedDeclNameKind>>(name.str())
-    .Case("named", MacroIntroducedDeclNameKind::Named)
-    .Case("overloaded", MacroIntroducedDeclNameKind::Overloaded)
-    .Case("prefixed", MacroIntroducedDeclNameKind::Prefixed)
-    .Case("suffixed", MacroIntroducedDeclNameKind::Suffixed)
-    .Case("arbitrary", MacroIntroducedDeclNameKind::Arbitrary)
-    .Default(llvm::None);
+  return llvm::StringSwitch<llvm::Optional<MacroIntroducedDeclNameKind>>(
+             name.str())
+      .Case("named", MacroIntroducedDeclNameKind::Named)
+      .Case("overloaded", MacroIntroducedDeclNameKind::Overloaded)
+      .Case("prefixed", MacroIntroducedDeclNameKind::Prefixed)
+      .Case("suffixed", MacroIntroducedDeclNameKind::Suffixed)
+      .Case("arbitrary", MacroIntroducedDeclNameKind::Arbitrary)
+      .Default(llvm::None);
 }
 
 /// Determine the macro role based on its name.
@@ -2460,11 +2464,9 @@ Parser::parseMacroRoleAttribute(
 ///
 /// \returns \c None if an error was diagnosed; \c Identifier() if the argument list was permissibly
 ///          omitted; the identifier written by the user otherwise.
-static llvm::Optional<Identifier>
-parseSingleAttrOptionImpl(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
-                          StringRef AttrName, DeclAttrKind DK,
-                          bool allowOmitted,
-                          Diagnostic nonIdentifierDiagnostic) {
+static llvm::Optional<Identifier> parseSingleAttrOptionImpl(
+    Parser &P, SourceLoc Loc, SourceRange &AttrRange, StringRef AttrName,
+    DeclAttrKind DK, bool allowOmitted, Diagnostic nonIdentifierDiagnostic) {
   SWIFT_DEFER {
     AttrRange = SourceRange(Loc, P.PreviousLoc);
   };
@@ -2529,7 +2531,7 @@ parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc,
 ///
 /// \returns \c None if an error was diagnosed; the value corresponding to the identifier written by the
 ///          user otherwise.
-template<typename R>
+template <typename R>
 static llvm::Optional<R>
 parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
                       StringRef AttrName, DeclAttrKind DK,
@@ -3462,8 +3464,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
 
-      llvm::Optional<StringRef> value = getStringLiteralIfNotInterpolated(
-          Tok.getLoc(), flag);
+      llvm::Optional<StringRef> value =
+          getStringLiteralIfNotInterpolated(Tok.getLoc(), flag);
       if (!value)
         return makeParserSuccess();
       Token stringTok = Tok;
@@ -3742,19 +3744,18 @@ ParserStatus Parser::parseDeclAttribute(
   if (DK == DAK_Rethrows) { DK = DAK_AtRethrows; }
   if (DK == DAK_Reasync) { DK = DAK_AtReasync; }
 
-  auto checkInvalidAttrName = [&](StringRef invalidName,
-                                  StringRef correctName,
-                                  DeclAttrKind kind,
-                                  llvm::Optional<Diag<StringRef, StringRef>> diag = llvm::None) {
-    if (DK == DAK_Count && Tok.getText() == invalidName) {
-      DK = kind;
+  auto checkInvalidAttrName =
+      [&](StringRef invalidName, StringRef correctName, DeclAttrKind kind,
+          llvm::Optional<Diag<StringRef, StringRef>> diag = llvm::None) {
+        if (DK == DAK_Count && Tok.getText() == invalidName) {
+          DK = kind;
 
-      if (diag) {
-        diagnose(Tok, *diag, invalidName, correctName)
-            .fixItReplace(Tok.getLoc(), correctName);
-      }
-    }
-  };
+          if (diag) {
+            diagnose(Tok, *diag, invalidName, correctName)
+                .fixItReplace(Tok.getLoc(), correctName);
+          }
+        }
+      };
 
   // Check if attr is availability, and suggest available instead
   checkInvalidAttrName("availability", "available", DAK_Available, diag::attr_renamed);
@@ -4100,18 +4101,18 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
   // Determine which attribute it is, and diagnose it if unknown.
   TypeAttrKind attr = TypeAttributes::getAttrKindFromString(Tok.getText());
 
-  auto checkInvalidAttrName = [&](
-      StringRef invalidName, StringRef correctName, TypeAttrKind kind,
-      llvm::Optional<Diag<StringRef, StringRef>> diag = llvm::None) {
-    if (attr == TAK_Count && Tok.getText() == invalidName) {
-      attr = kind;
+  auto checkInvalidAttrName =
+      [&](StringRef invalidName, StringRef correctName, TypeAttrKind kind,
+          llvm::Optional<Diag<StringRef, StringRef>> diag = llvm::None) {
+        if (attr == TAK_Count && Tok.getText() == invalidName) {
+          attr = kind;
 
-      if (diag) {
-        diagnose(Tok, *diag, invalidName, correctName)
-            .fixItReplace(Tok.getLoc(), correctName);
-      }
-    }
-  };
+          if (diag) {
+            diagnose(Tok, *diag, invalidName, correctName)
+                .fixItReplace(Tok.getLoc(), correctName);
+          }
+        }
+      };
 
   // Historical name for @Sendable.
   checkInvalidAttrName(
@@ -6131,14 +6132,15 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
     LBLoc = RBLoc = PreviousLoc;
 
     // Cache the empty result to prevent delayed parsing.
-    Context.evaluator.cacheOutput(
-        ParseMembersRequest{IDC}, FingerprintAndMembers{llvm::None, {}});
+    Context.evaluator.cacheOutput(ParseMembersRequest{IDC},
+                                  FingerprintAndMembers{llvm::None, {}});
     return true;
   }
 
   // Record '{' '}' to the current hash, nothing else.
   recordTokenHash("}");
-  llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(CurrentTokenHash, llvm::None);
+  llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(CurrentTokenHash,
+                                                       llvm::None);
 
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
@@ -8333,8 +8335,8 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
     }
   }
 
-  llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(CurrentTokenHash,
-                                                 StableHasher::defaultHasher());
+  llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(
+      CurrentTokenHash, StableHasher::defaultHasher());
 
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
   // Since we know 'Tok.is(tok::l_brace)', the body can't be null.
@@ -8404,7 +8406,8 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   recordTokenHash("{");
   recordTokenHash("}");
 
-  llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(CurrentTokenHash, llvm::None);
+  llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(CurrentTokenHash,
+                                                       llvm::None);
 
   // If we can delay parsing this body, or this is the first pass of code
   // completion, skip until the end. If we encounter a code completion token
@@ -9811,12 +9814,12 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
         return abortBody();
       }
 
-      auto parsedAssociativity
-        = llvm::StringSwitch<llvm::Optional<Associativity>>(Tok.getText())
-          .Case("none", Associativity::None)
-          .Case("left", Associativity::Left)
-          .Case("right", Associativity::Right)
-          .Default(llvm::None);
+      auto parsedAssociativity =
+          llvm::StringSwitch<llvm::Optional<Associativity>>(Tok.getText())
+              .Case("none", Associativity::None)
+              .Case("left", Associativity::Left)
+              .Case("right", Associativity::Right)
+              .Default(llvm::None);
 
       if (!parsedAssociativity) {
         diagnose(Tok, diag::expected_precedencegroup_associativity);

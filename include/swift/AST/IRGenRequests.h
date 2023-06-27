@@ -189,14 +189,13 @@ public:
                            outModuleHash};
   }
 
-  static IRGenDescriptor
-  forWholeModule(ModuleDecl *M, const IRGenOptions &Opts,
-                 const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
-                 Lowering::TypeConverter &Conv,
-                 std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
-                 const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = llvm::None,
-                 ArrayRef<std::string> parallelOutputFilenames = {},
-                 llvm::GlobalVariable **outModuleHash = nullptr) {
+  static IRGenDescriptor forWholeModule(
+      ModuleDecl *M, const IRGenOptions &Opts, const TBDGenOptions &TBDOpts,
+      const SILOptions &SILOpts, Lowering::TypeConverter &Conv,
+      std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
+      const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = llvm::None,
+      ArrayRef<std::string> parallelOutputFilenames = {},
+      llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{M,
                            symsToEmit,
                            Opts,

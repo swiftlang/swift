@@ -44,7 +44,7 @@ namespace {
 struct InferredAvailability {
   PlatformAgnosticAvailabilityKind PlatformAgnostic
     = PlatformAgnosticAvailabilityKind::None;
-  
+
   llvm::Optional<llvm::VersionTuple> Introduced;
   llvm::Optional<llvm::VersionTuple> Deprecated;
   llvm::Optional<llvm::VersionTuple> Obsoleted;
@@ -255,9 +255,11 @@ SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
   return llvm::None;
 }
 
-llvm::Optional<AvailableAttrDeclPair> Decl::getSemanticAvailableRangeAttr() const {
+llvm::Optional<AvailableAttrDeclPair>
+Decl::getSemanticAvailableRangeAttr() const {
   auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, SemanticAvailableRangeAttrRequest{this}, llvm::None);
+  return evaluateOrDefault(eval, SemanticAvailableRangeAttrRequest{this},
+                           llvm::None);
 }
 
 llvm::Optional<AvailabilityContext>
@@ -290,7 +292,8 @@ SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator,
 
 llvm::Optional<AvailableAttrDeclPair> Decl::getSemanticUnavailableAttr() const {
   auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, SemanticUnavailableAttrRequest{this}, llvm::None);
+  return evaluateOrDefault(eval, SemanticUnavailableAttrRequest{this},
+                           llvm::None);
 }
 
 bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(

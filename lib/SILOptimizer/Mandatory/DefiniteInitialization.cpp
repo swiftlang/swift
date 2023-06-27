@@ -100,7 +100,8 @@ enum class DIKind : uint8_t { No, Yes, Partial };
 } // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
-static llvm::Optional<DIKind> mergeKinds(llvm::Optional<DIKind> OK1, llvm::Optional<DIKind> OK2) {
+static llvm::Optional<DIKind> mergeKinds(llvm::Optional<DIKind> OK1,
+                                         llvm::Optional<DIKind> OK2) {
   // If OK1 is unset, ignore it.
   if (!OK1.has_value())
     return OK2;
@@ -125,7 +126,6 @@ static llvm::Optional<DIKind> mergeKinds(llvm::Optional<DIKind> OK1, llvm::Optio
   // Otherwise, we're still consistently Yes or No.
   return K1;
 }
-
 
 namespace {
   /// AvailabilitySet - This class stores an array of lattice values for tuple
@@ -172,7 +172,7 @@ namespace {
       case DIKind::Partial: Data[Elt*2] = true,  Data[Elt*2+1] = false; break;
       }
     }
-    
+
     void set(unsigned Elt, llvm::Optional<DIKind> K) {
       if (!K.has_value())
         Data[Elt*2] = true, Data[Elt*2+1] = true;
@@ -526,7 +526,8 @@ namespace {
     void putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList);
     void computePredsLiveOut(SILBasicBlock *BB);
     void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
-    void getOutSelfInitialized(SILBasicBlock *BB, llvm::Optional<DIKind> &Result);
+    void getOutSelfInitialized(SILBasicBlock *BB,
+                               llvm::Optional<DIKind> &Result);
 
     bool shouldEmitError(const SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
@@ -3405,8 +3406,8 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
   LLVM_DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
 }
 
-void LifetimeChecker::
-getOutSelfInitialized(SILBasicBlock *BB, llvm::Optional<DIKind> &Result) {
+void LifetimeChecker::getOutSelfInitialized(SILBasicBlock *BB,
+                                            llvm::Optional<DIKind> &Result) {
   computePredsLiveOut(BB);
 
   for (auto *Pred : BB->getPredecessorBlocks())

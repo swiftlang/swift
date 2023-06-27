@@ -470,8 +470,8 @@ namespace {
     // Returns None if the AST does not contain enough information to recover
     // substitutions; this is different from an Optional(SubstitutionMap()),
     // indicating a valid call to a non-generic operator.
-    llvm::Optional<SubstitutionMap>
-    getOperatorSubstitutions(ValueDecl *witness, Type refType) {
+    llvm::Optional<SubstitutionMap> getOperatorSubstitutions(ValueDecl *witness,
+                                                             Type refType) {
       // We have to recover substitutions in this hacky way because
       // the AST does not retain enough information to devirtualize
       // calls like this.
@@ -2950,8 +2950,9 @@ namespace {
             DeclNameLoc(expr->getLoc()), SourceLoc(), {}, SourceLoc(), nullptr,
             MacroRole::Expression, /*isImplicit=*/true, expandedType);
         expansion->setMacroRef(macroRef);
-        (void)evaluateOrDefault(
-            ctx.evaluator, ExpandMacroExpansionExprRequest{expansion}, llvm::None);
+        (void)evaluateOrDefault(ctx.evaluator,
+                                ExpandMacroExpansionExprRequest{expansion},
+                                llvm::None);
         if (expansion->getRewritten()) {
           cs.cacheExprTypes(expansion);
           return expansion;
@@ -6613,7 +6614,8 @@ bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
       return true;
     }
 
-    if (llvm::Optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
+    if (llvm::Optional<Type> elementType =
+            ConstraintSystem::isSetType(toType)) {
       peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
       return true;
     }
@@ -9127,7 +9129,8 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
 /// \returns the resulting initialization expression.
 static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
     Solution &solution, SyntacticElementTarget target,
-    llvm::function_ref<llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+    llvm::function_ref<
+        llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
         rewriteTarget) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
@@ -9704,7 +9707,7 @@ ConstraintSystem::applySolution(Solution &solution,
   // If any of them failed to type check, bail.
   if (hadError)
     return llvm::None;
-  
+
   if (isDebugMode()) {
     // If we had partially type-checked expressions, lets print
     // fully type-checked target after processDelayed is done.
@@ -9799,7 +9802,8 @@ SolutionResult SolutionResult::forAmbiguous(
   return result;
 }
 
-SolutionResult SolutionResult::forTooComplex(llvm::Optional<SourceRange> affected) {
+SolutionResult
+SolutionResult::forTooComplex(llvm::Optional<SourceRange> affected) {
   SolutionResult result(Kind::TooComplex);
   result.TooComplexAt = affected;
   return result;

@@ -916,9 +916,10 @@ public:
   void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
   /// Parse the source file via the Swift Parser using the ASTGen library.
-  void parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
-                                llvm::Optional<DiagnosticTransaction> &transaction,
-                                bool suppressDiagnostics = false);
+  void
+  parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
+                           llvm::Optional<DiagnosticTransaction> &transaction,
+                           bool suppressDiagnostics = false);
 
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
@@ -1060,7 +1061,8 @@ public:
 
   /// Parse the arguments inside the @_specialize attribute
   bool parseSpecializeAttributeArguments(
-      swift::tok ClosingBrace, bool &DiscardAttribute, llvm::Optional<bool> &Exported,
+      swift::tok ClosingBrace, bool &DiscardAttribute,
+      llvm::Optional<bool> &Exported,
       llvm::Optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
       AvailabilityContext *SILAvailability,
@@ -1112,8 +1114,9 @@ public:
                                                               SourceLoc Loc);
 
   /// Parse a single argument from a @_documentation attribute.
-  bool parseDocumentationAttributeArgument(llvm::Optional<StringRef> &Metadata,
-                                           llvm::Optional<AccessLevel> &Visibility);
+  bool
+  parseDocumentationAttributeArgument(llvm::Optional<StringRef> &Metadata,
+                                      llvm::Optional<AccessLevel> &Visibility);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.
@@ -1898,7 +1901,8 @@ public:
                                          bool isExprBasic);
   ParserResult<Expr> parseExprMacroExpansion(bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprCollectionElement(llvm::Optional<bool> &isDictionary);
+  ParserResult<Expr>
+  parseExprCollectionElement(llvm::Optional<bool> &isDictionary);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(llvm::Optional<StmtKind> ParentKind);
 

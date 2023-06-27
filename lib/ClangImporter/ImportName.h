@@ -485,17 +485,15 @@ private:
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  llvm::Optional<ForeignAsyncConvention::Info>
-  considerAsyncImport(const clang::ObjCMethodDecl *clangDecl,
-                      StringRef baseName,
-                      SmallVectorImpl<StringRef> &paramNames,
-                      ArrayRef<const clang::ParmVarDecl *> params,
-                      bool isInitializer,
-                      llvm::Optional<unsigned> explicitCompletionHandlerParamIndex,
-                      CustomAsyncName customName,
-                      llvm::Optional<unsigned> completionHandlerFlagParamIndex,
-                      bool completionHandlerFlagIsZeroOnError,
-                      llvm::Optional<ForeignErrorConvention::Info> errorInfo);
+  llvm::Optional<ForeignAsyncConvention::Info> considerAsyncImport(
+      const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
+      SmallVectorImpl<StringRef> &paramNames,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
+      llvm::Optional<unsigned> explicitCompletionHandlerParamIndex,
+      CustomAsyncName customName,
+      llvm::Optional<unsigned> completionHandlerFlagParamIndex,
+      bool completionHandlerFlagIsZeroOnError,
+      llvm::Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

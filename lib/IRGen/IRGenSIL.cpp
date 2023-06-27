@@ -997,12 +997,11 @@ public:
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
-  llvm::Value *emitShadowCopyIfNeeded(llvm::Value *Storage,
-                                      llvm::Type *StorageType,
-                                      const SILDebugScope *Scope,
-                                      SILDebugVariable VarInfo,
-                                      bool IsAnonymous, bool WasMoved,
-                                      llvm::Optional<Alignment> Align = llvm::None) {
+  llvm::Value *
+  emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
+                         const SILDebugScope *Scope, SILDebugVariable VarInfo,
+                         bool IsAnonymous, bool WasMoved,
+                         llvm::Optional<Alignment> Align = llvm::None) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -4015,9 +4014,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
         auto errorType =
             cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
         nativeResultsStorage.push_back(llvm::ConstantPointerNull::get(errorType));
-        return emitAsyncReturn(
-            IGF, asyncLayout, fnType,
-            llvm::Optional<llvm::ArrayRef<llvm::Value *>>(nativeResultsStorage));
+        return emitAsyncReturn(IGF, asyncLayout, fnType,
+                               llvm::Optional<llvm::ArrayRef<llvm::Value *>>(
+                                   nativeResultsStorage));
       }
 
       return emitAsyncReturn(IGF, asyncLayout, fnType, llvm::None);

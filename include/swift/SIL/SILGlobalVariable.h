@@ -96,10 +96,10 @@ private:
   SILBasicBlock StaticInitializerBlock;
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
-                    IsSerialized_t IsSerialized,
-                    StringRef mangledName, SILType loweredType,
-                    llvm::Optional<SILLocation> loc, VarDecl *decl);
-  
+                    IsSerialized_t IsSerialized, StringRef mangledName,
+                    SILType loweredType, llvm::Optional<SILLocation> loc,
+                    VarDecl *decl);
+
 public:
   static void registerBridgedMetatype(SwiftMetatype metatype) {
     registeredMetatype = metatype;

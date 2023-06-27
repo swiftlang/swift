@@ -786,10 +786,10 @@ public:
 };
 
 /// Request information about the mutability of composed property wrappers.
-class PropertyWrapperMutabilityRequest :
-    public SimpleRequest<PropertyWrapperMutabilityRequest,
-                         llvm::Optional<PropertyWrapperMutability> (VarDecl *),
-                         RequestFlags::Cached> {
+class PropertyWrapperMutabilityRequest
+    : public SimpleRequest<PropertyWrapperMutabilityRequest,
+                           llvm::Optional<PropertyWrapperMutability>(VarDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -797,8 +797,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Optional<PropertyWrapperMutability>
-  evaluate(Evaluator &evaluator, VarDecl *var) const;
+  llvm::Optional<PropertyWrapperMutability> evaluate(Evaluator &evaluator,
+                                                     VarDecl *var) const;
 
 public:
   // Caching
@@ -806,10 +806,10 @@ public:
 };
 
 /// Request information about the l-valueness of composed property wrappers.
-class PropertyWrapperLValuenessRequest :
-    public SimpleRequest<PropertyWrapperLValuenessRequest,
-                         llvm::Optional<PropertyWrapperLValueness> (VarDecl *),
-                         RequestFlags::Cached> {
+class PropertyWrapperLValuenessRequest
+    : public SimpleRequest<PropertyWrapperLValuenessRequest,
+                           llvm::Optional<PropertyWrapperLValueness>(VarDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -817,8 +817,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Optional<PropertyWrapperLValueness>
-  evaluate(Evaluator &evaluator, VarDecl *var) const;
+  llvm::Optional<PropertyWrapperLValueness> evaluate(Evaluator &evaluator,
+                                                     VarDecl *var) const;
 
 public:
   // Caching
@@ -1372,12 +1372,11 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 ///
 /// This is the "raw" global actor attribute as written directly on the
 /// declaration, with any inference rules applied.
-class GlobalActorAttributeRequest :
-    public SimpleRequest<
-        GlobalActorAttributeRequest,
-        llvm::Optional<CustomAttrNominalPair>(
-            llvm::PointerUnion<Decl *, ClosureExpr *>),
-        RequestFlags::Cached> {
+class GlobalActorAttributeRequest
+    : public SimpleRequest<GlobalActorAttributeRequest,
+                           llvm::Optional<CustomAttrNominalPair>(
+                               llvm::PointerUnion<Decl *, ClosureExpr *>),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1386,8 +1385,8 @@ private:
 
   // Evaluation.
   llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-  evaluate(
-      Evaluator &evaluator, llvm::PointerUnion<Decl *, ClosureExpr *>) const;
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<Decl *, ClosureExpr *>) const;
 
 public:
   // Caching
@@ -3721,7 +3720,7 @@ private:
   friend SimpleRequest;
 
   llvm::Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
-                                           const Decl *decl) const;
+                                                 const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3738,7 +3737,7 @@ private:
   friend SimpleRequest;
 
   llvm::Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
-                                           const Decl *decl) const;
+                                                 const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3981,8 +3980,8 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<unsigned>
-  evaluate(Evaluator &evaluator, MacroExpansionDecl *med) const;
+  llvm::Optional<unsigned> evaluate(Evaluator &evaluator,
+                                    MacroExpansionDecl *med) const;
 
 public:
   bool isCached() const { return true; }
@@ -4001,8 +4000,8 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<unsigned>
-  evaluate(Evaluator &evaluator, MacroExpansionExpr *mee) const;
+  llvm::Optional<unsigned> evaluate(Evaluator &evaluator,
+                                    MacroExpansionExpr *mee) const;
 
 public:
   bool isCached() const { return true; }

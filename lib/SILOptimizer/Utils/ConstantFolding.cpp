@@ -561,8 +561,7 @@ static SILValue specializePolymorphicBuiltin(BuiltinInst *bi,
 ///
 /// The list of operations we constant fold might not be complete. Start with
 /// folding the operations used by the standard library.
-static SILValue constantFoldBinary(BuiltinInst *BI,
-                                   BuiltinValueKind ID,
+static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
                                    llvm::Optional<bool> &ResultsInError) {
   switch (ID) {
   default:
@@ -837,7 +836,6 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
   // The call to the builtin should be replaced with the constant value.
   return constructResultWithOverflowTuple(BI, Result, false);
-
 }
 
 /// A utility function that extracts the literal text corresponding
@@ -862,7 +860,8 @@ static bool tryExtractLiteralText(FloatLiteralInst *flitInst,
 }
 
 static SILValue foldFPToIntConversion(BuiltinInst *BI,
-      const BuiltinInfo &Builtin, llvm::Optional<bool> &ResultsInError) {
+                                      const BuiltinInfo &Builtin,
+                                      llvm::Optional<bool> &ResultsInError) {
 
   assert(Builtin.ID == BuiltinValueKind::FPToSI ||
          Builtin.ID == BuiltinValueKind::FPToUI);
@@ -1316,7 +1315,8 @@ case BuiltinValueKind::id:
 /// as results of User. If we could only simplify /some/ of an instruction's
 /// results, we still return true, but signal that we couldn't simplify by
 /// placing SILValue() in that position instead.
-static bool constantFoldInstruction(Operand *Op, llvm::Optional<bool> &ResultsInError,
+static bool constantFoldInstruction(Operand *Op,
+                                    llvm::Optional<bool> &ResultsInError,
                                     SmallVectorImpl<SILValue> &Results) {
   auto *User = Op->getUser();
 

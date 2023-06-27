@@ -240,8 +240,9 @@ struct RuntimeVersionCheck {
 /// be available, returns true. If it will sometimes be available, adds
 /// information about the runtime check needed to ensure it is available to
 /// \c versionCheck and returns true.
-static bool checkAvailability(const EnumElementDecl* elt, ASTContext &C,
-    llvm::Optional<RuntimeVersionCheck> &versionCheck) {
+static bool
+checkAvailability(const EnumElementDecl *elt, ASTContext &C,
+                  llvm::Optional<RuntimeVersionCheck> &versionCheck) {
   auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
 
   // Is it always available?

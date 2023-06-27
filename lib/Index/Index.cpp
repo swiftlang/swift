@@ -1010,7 +1010,8 @@ private:
   bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
   bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
-                              IndexSymbol &Info, llvm::Optional<AccessKind> AccKind);
+                              IndexSymbol &Info,
+                              llvm::Optional<AccessKind> AccKind);
 
   bool indexComment(const Decl *D);
 
@@ -1839,9 +1840,9 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
   return false;
 }
 
-bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
-                                                 SourceLoc Loc, IndexSymbol &Info,
-                                                 llvm::Optional<AccessKind> AccKind) {
+bool IndexSwiftASTWalker::initVarRefIndexSymbols(
+    Expr *CurrentE, ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
+    llvm::Optional<AccessKind> AccKind) {
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 

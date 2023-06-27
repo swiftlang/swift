@@ -37,11 +37,9 @@ using namespace Lowering;
 ///
 /// Because these are builtin operations, we can make some structural
 /// assumptions about the expression used to call them.
-static llvm::Optional<SmallVector<Expr*, 2>>
-decomposeArguments(SILGenFunction &SGF,
-                   SILLocation loc,
-                   PreparedArguments &&args,
-                   unsigned expectedCount) {
+static llvm::Optional<SmallVector<Expr *, 2>>
+decomposeArguments(SILGenFunction &SGF, SILLocation loc,
+                   PreparedArguments &&args, unsigned expectedCount) {
   SmallVector<Expr*, 2> result;
   auto sources = std::move(args).getSources();
 
@@ -1795,7 +1793,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (function.kind != SILDeclRef::Kind::Func)
     return llvm::None;
   if (!function.hasDecl())
-    return llvm::None;  
+    return llvm::None;
   ValueDecl *decl = function.getDecl();
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return llvm::None;

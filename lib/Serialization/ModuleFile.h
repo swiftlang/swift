@@ -924,7 +924,8 @@ public:
   llvm::Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateDecl(const Decl *D);
-  llvm::Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+  llvm::Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
   void collectSerializedSearchPath(

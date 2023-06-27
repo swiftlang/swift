@@ -133,7 +133,8 @@ void SwiftLangSupport::performCompile(
     std::function<void(const RequestResult<CompilationResult> &)> Receiver) {
 
   std::string error;
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
+  auto fileSystem =
+      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
   if (!fileSystem) {
     Receiver(RequestResult<CompilationResult>::fromError(error));
     return;

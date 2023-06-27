@@ -64,19 +64,20 @@ namespace mocking_fine_grained_dependency_graphs {
 /// <provides> is the dependent declaration if known. If not known, the
 /// use will be the entire file.
 
-void simulateLoad(ModuleDepGraph &g, const driver::Job *cmd,
-                  const DependencyDescriptions &dependencyDescriptions,
-                  llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
-                  const bool hadCompilationError = false);
+void simulateLoad(
+    ModuleDepGraph &g, const driver::Job *cmd,
+    const DependencyDescriptions &dependencyDescriptions,
+    llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
+    const bool hadCompilationError = false);
 
 /// Same as \ref simulateLoad, but returns the specifically changed nodes or
 /// None if the load failed.
 
-ModuleDepGraph::Changes
-getChangesForSimulatedLoad(ModuleDepGraph &g, const driver::Job *cmd,
-                           const DependencyDescriptions &dependencyDescriptions,
-                           llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
-                           const bool hadCompilationError = false);
+ModuleDepGraph::Changes getChangesForSimulatedLoad(
+    ModuleDepGraph &g, const driver::Job *cmd,
+    const DependencyDescriptions &dependencyDescriptions,
+    llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
+    const bool hadCompilationError = false);
 
 /// Simulates the driver reloading a swiftdeps file after a job has run.
 /// Returns the jobs that must now be run, possibly redundantly including \p
@@ -97,7 +98,8 @@ printJobsForDebugging(const std::vector<const driver::Job *> &jobs);
 } // namespace fine_grained_dependencies
 
 /// Aborts if unconvertible, returns \c None for an empty string.
-inline llvm::Optional<Fingerprint> mockFingerprintFromString(llvm::StringRef value) {
+inline llvm::Optional<Fingerprint>
+mockFingerprintFromString(llvm::StringRef value) {
   auto contents = value.str();
   const auto n = value.size();
   if (n == 0 || n > Fingerprint::DIGEST_LENGTH)

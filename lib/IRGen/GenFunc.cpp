@@ -316,10 +316,12 @@ namespace {
     static bool isFirstElementTrivial() {
       return true;
     }
-    void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *fn,
-                                llvm::Optional<Atomicity> atomicity = llvm::None) const {}
-    void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *fn,
-                                 llvm::Optional<Atomicity> atomicity = llvm::None) const {}
+    void emitRetainFirstElement(
+        IRGenFunction &IGF, llvm::Value *fn,
+        llvm::Optional<Atomicity> atomicity = llvm::None) const {}
+    void emitReleaseFirstElement(
+        IRGenFunction &IGF, llvm::Value *fn,
+        llvm::Optional<Atomicity> atomicity = llvm::None) const {}
     void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *fn,
                                 Address fnAddr) const {
       IGF.Builder.CreateStore(fn, fnAddr);
@@ -337,15 +339,17 @@ namespace {
     bool isSecondElementTrivial() const {
       return isTriviallyDestroyable(ResilienceExpansion::Maximal);
     }
-    void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *data,
-                                 llvm::Optional<Atomicity> atomicity = llvm::None) const {
+    void emitRetainSecondElement(
+        IRGenFunction &IGF, llvm::Value *data,
+        llvm::Optional<Atomicity> atomicity = llvm::None) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRetain(data, *atomicity);
       }
     }
-    void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *data,
-                                  llvm::Optional<Atomicity> atomicity = llvm::None) const {
+    void emitReleaseSecondElement(
+        IRGenFunction &IGF, llvm::Value *data,
+        llvm::Optional<Atomicity> atomicity = llvm::None) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRelease(data, *atomicity);
@@ -1199,8 +1203,7 @@ public:
       : PartialApplicationForwarderEmission(
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
             substType, outType, subs, layout, conventions),
-        layout(getAsyncContextLayout(
-            subIGF.IGM, origType, substType, subs)),
+        layout(getAsyncContextLayout(subIGF.IGM, origType, substType, subs)),
         currentArgumentIndex(outType->getNumParameters()) {}
 
   void begin() override { super::begin(); }
@@ -1356,16 +1359,12 @@ getPartialApplicationForwarderEmission(
 /// If 'layout' is null, there is a single captured value of
 /// Swift-refcountable type that is being used directly as the
 /// context object.
-static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
-                                   const llvm::Optional<FunctionPointer> &staticFnPtr,
-                                   bool calleeHasContext,
-                                   const Signature &origSig,
-                                   CanSILFunctionType origType,
-                                   CanSILFunctionType substType,
-                                   CanSILFunctionType outType,
-                                   SubstitutionMap subs,
-                                   HeapLayout const *layout,
-                                   ArrayRef<ParameterConvention> conventions) {
+static llvm::Value *emitPartialApplicationForwarder(
+    IRGenModule &IGM, const llvm::Optional<FunctionPointer> &staticFnPtr,
+    bool calleeHasContext, const Signature &origSig,
+    CanSILFunctionType origType, CanSILFunctionType substType,
+    CanSILFunctionType outType, SubstitutionMap subs, HeapLayout const *layout,
+    ArrayRef<ParameterConvention> conventions) {
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
@@ -1472,7 +1471,8 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto bindingLayout = layout->getElement(nextCapturedField++);
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
-      auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ llvm::None);
+      auto bindingsAddr =
+          bindingLayout.project(subIGF, data, /*offsets*/ llvm::None);
       layout->getBindings().restore(subIGF, bindingsAddr,
                                     MetadataState::Complete);
     }
@@ -2083,7 +2083,7 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
     out.add(ctx);
     return {};
   }
-  
+
   llvm::Optional<FunctionPointer> staticFn;
   if (fn.isConstant()) staticFn = fn;
 

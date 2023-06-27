@@ -339,11 +339,12 @@ static llvm::Optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
   return llvm::StringSwitch<llvm::Optional<StringRef>>(tripleEnvironment)
-              .Cases("unknown", "", llvm::None)
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("simulator", StringRef("simulator"))
-  //          .Case ("macabi", StringRef("macabi"))
-              .Default(tripleEnvironment);
+      .Cases("unknown", "", llvm::None)
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("simulator", StringRef("simulator"))
+      //          .Case ("macabi", StringRef("macabi"))
+      .Default(tripleEnvironment);
 }
 
 llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
@@ -398,7 +399,7 @@ llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
 llvm::Optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
-  #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
   if (Triple.isMacOSX()) {
     llvm::VersionTuple OSVersion;

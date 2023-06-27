@@ -173,8 +173,8 @@ namespace swift {
 
     llvm::Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
-    
-public:
+
+  public:
     Identifier getModuleIdentifier() const {
       return MF->getAssociatedModule()->getName();
     }
@@ -184,7 +184,8 @@ public:
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
-    bool hasSILFunction(StringRef Name, llvm::Optional<SILLinkage> Linkage = llvm::None);
+    bool hasSILFunction(StringRef Name,
+                        llvm::Optional<SILLinkage> Linkage = llvm::None);
     SILVTable *lookupVTable(StringRef MangledClassName);
     SILMoveOnlyDeinit *lookupMoveOnlyDeinit(StringRef mangledNominalTypeName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);

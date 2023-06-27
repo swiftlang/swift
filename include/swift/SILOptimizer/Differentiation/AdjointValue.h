@@ -103,24 +103,24 @@ public:
 
   using DebugInfo = AdjointValueBase::DebugInfo;
 
-  static AdjointValue createConcrete(
-      llvm::BumpPtrAllocator &allocator, SILValue value,
-      llvm::Optional<DebugInfo> debugInfo = llvm::None) {
+  static AdjointValue
+  createConcrete(llvm::BumpPtrAllocator &allocator, SILValue value,
+                 llvm::Optional<DebugInfo> debugInfo = llvm::None) {
     auto *buf = allocator.Allocate<AdjointValueBase>();
     return new (buf) AdjointValueBase(value, debugInfo);
   }
 
-  static AdjointValue createZero(
-      llvm::BumpPtrAllocator &allocator, SILType type,
-      llvm::Optional<DebugInfo> debugInfo = llvm::None) {
+  static AdjointValue
+  createZero(llvm::BumpPtrAllocator &allocator, SILType type,
+             llvm::Optional<DebugInfo> debugInfo = llvm::None) {
     auto *buf = allocator.Allocate<AdjointValueBase>();
     return new (buf) AdjointValueBase(type, debugInfo);
   }
 
-  static AdjointValue createAggregate(
-      llvm::BumpPtrAllocator &allocator, SILType type,
-      ArrayRef<AdjointValue> elements,
-      llvm::Optional<DebugInfo> debugInfo = llvm::None) {
+  static AdjointValue
+  createAggregate(llvm::BumpPtrAllocator &allocator, SILType type,
+                  ArrayRef<AdjointValue> elements,
+                  llvm::Optional<DebugInfo> debugInfo = llvm::None) {
     AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
         sizeof(AdjointValueBase) + elements.size() * sizeof(AdjointValue),
         alignof(AdjointValueBase)));

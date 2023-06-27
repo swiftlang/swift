@@ -209,11 +209,13 @@ private:
 
   // MARK: The ASTPrinter callback interface.
 
-  void printDeclPre(const Decl *D, llvm::Optional<BracketOptions> Bracket) override {
+  void printDeclPre(const Decl *D,
+                    llvm::Optional<BracketOptions> Bracket) override {
     contextStack.emplace_back(PrintContext(D));
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
-  void printDeclPost(const Decl *D, llvm::Optional<BracketOptions> Bracket) override {
+  void printDeclPost(const Decl *D,
+                     llvm::Optional<BracketOptions> Bracket) override {
     assert(contextStack.back().getDecl() == D && "unmatched printDeclPre");
     contextStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
@@ -722,8 +724,8 @@ static void addRefactorings(
   }
 }
 
-static llvm::Optional<unsigned>
-getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
+static llvm::Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD,
+                                                         SourceLoc Cursor) {
   if (Cursor.isInvalid())
     return llvm::None;
   SourceLoc Loc;
@@ -884,7 +886,8 @@ static void setLocationInfo(const ValueDecl *VD,
 
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isValid()) {
-    auto getSignatureRange = [&](const ValueDecl *VD) -> llvm::Optional<unsigned> {
+    auto getSignatureRange =
+        [&](const ValueDecl *VD) -> llvm::Optional<unsigned> {
       if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
         SourceRange R = FD->getSignatureSourceRange();
         if (R.isValid())

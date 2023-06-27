@@ -41,8 +41,8 @@
 using namespace swift;
 using namespace irgen;
 
-static llvm::Optional<Type> getPrimitiveTypeFromLLVMType(ASTContext &ctx,
-                                                   const llvm::Type *type) {
+static llvm::Optional<Type>
+getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
   if (const auto *intType = dyn_cast<llvm::IntegerType>(type)) {
     switch (intType->getBitWidth()) {
     case 1:

@@ -771,8 +771,7 @@ public:
   ///
   /// If \p linkage is provided, the deserialized function is required to have
   /// that linkage. Returns null, if this is not the case.
-  SILFunction *loadFunction(StringRef name,
-                            LinkingMode LinkMode,
+  SILFunction *loadFunction(StringRef name, LinkingMode LinkMode,
                             llvm::Optional<SILLinkage> linkage = llvm::None);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized

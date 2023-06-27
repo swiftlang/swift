@@ -233,7 +233,8 @@ public:
     // Copy in the pointers into the tail allocated memory. We do not need to do
     // any sorting/uniquing ourselves since we assume that our users perform
     // this task for us.
-    llvm::MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]), NumElts);
+    llvm::MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]),
+                                         NumElts);
     std::copy(Array.begin(), Array.end(), DataMem.begin());
 
     // Allocate the new node and insert it into the Set.
@@ -284,7 +285,8 @@ public:
     // Copy in the union of the two pointer sets into the tail allocated
     // memory. Since we know that our sorted arrays are uniqued, we can use
     // set_union to get the uniqued sorted array that we want.
-    llvm::MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]), NumElts);
+    llvm::MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]),
+                                         NumElts);
     std::set_union(S1->begin(), S1->end(), S2.begin(), S2.end(),
                    DataMem.begin());
 
@@ -333,7 +335,8 @@ public:
     // Copy in the union of the two pointer sets into the tail allocated
     // memory. Since we know that our sorted arrays are uniqued, we can use
     // set_union to get the uniqued sorted array that we want.
-    llvm::MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]), NumElts);
+    llvm::MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]),
+                                         NumElts);
     std::set_union(S1->begin(), S1->end(), S2->begin(), S2->end(),
                    DataMem.begin());
 

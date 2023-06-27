@@ -1942,8 +1942,8 @@ struct DynamicCallableMethods {
 
 /// A function that rewrites a syntactic element target in the context
 /// of solution application.
-using RewriteTargetFn =
-    std::function<llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>;
+using RewriteTargetFn = std::function<llvm::Optional<SyntacticElementTarget>(
+    SyntacticElementTarget)>;
 
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
@@ -2089,7 +2089,7 @@ private:
 
   /// Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclNameRef>, llvm::Optional<LookupResult>>
-    MemberLookups;
+      MemberLookups;
 
   /// Folding set containing all of the locators used in this
   /// constraint system.
@@ -3202,8 +3202,8 @@ public:
     (void)inserted;
   }
 
-  llvm::Optional<CaseLabelItemInfo> getCaseLabelItemInfo(
-      const CaseLabelItem *item) const {
+  llvm::Optional<CaseLabelItemInfo>
+  getCaseLabelItemInfo(const CaseLabelItem *item) const {
     auto known = caseLabelItems.find(item);
     if (known == caseLabelItems.end())
       return llvm::None;
@@ -3495,11 +3495,11 @@ public:
   ///
   /// \returns the joined type, which is generally a new type variable, unless there are
   /// fewer than 2 input types or the \c supertype parameter is specified.
-  template<typename Iterator>
-  Type addJoinConstraint(ConstraintLocator *locator,
-                         Iterator begin, Iterator end,
-                         llvm::Optional<Type> supertype,
-                         std::function<std::pair<Type, ConstraintLocator *>(Iterator)> getType) {
+  template <typename Iterator>
+  Type addJoinConstraint(
+      ConstraintLocator *locator, Iterator begin, Iterator end,
+      llvm::Optional<Type> supertype,
+      std::function<std::pair<Type, ConstraintLocator *>(Iterator)> getType) {
     if (begin == end)
       return Type();
 
@@ -4239,7 +4239,8 @@ private:
   ///
   /// \returns The constraint found along with the number of optional object
   /// constraints looked through, or \c None if no constraint was found.
-  llvm::Optional<std::pair<Constraint *, unsigned>> findConstraintThroughOptionals(
+  llvm::Optional<std::pair<Constraint *, unsigned>>
+  findConstraintThroughOptionals(
       TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
       llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate);
 
@@ -4406,7 +4407,8 @@ public:
   void generateConstraints(
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
-      ConstraintLocator *locator, llvm::Optional<unsigned> favoredIndex = llvm::None,
+      ConstraintLocator *locator,
+      llvm::Optional<unsigned> favoredIndex = llvm::None,
       bool requiresFix = false,
       llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
           getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
@@ -5135,9 +5137,10 @@ public:
   ///
   /// \returns a solution if a single unambiguous one could be found, or None if
   /// ambiguous or unsolvable.
-  llvm::Optional<Solution> solveSingle(FreeTypeVariableBinding allowFreeTypeVariables
-                                 = FreeTypeVariableBinding::Disallow,
-                                 bool allowFixes = false);
+  llvm::Optional<Solution>
+  solveSingle(FreeTypeVariableBinding allowFreeTypeVariables =
+                  FreeTypeVariableBinding::Disallow,
+              bool allowFixes = false);
 
   /// Assuming that constraints have already been generated, solve the
   /// constraint system for code completion, writing all solutions to
@@ -5202,20 +5205,19 @@ public:
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
   llvm::Optional<unsigned>
-  findBestSolution(SmallVectorImpl<Solution> &solutions,
-                   bool minimize);
+  findBestSolution(SmallVectorImpl<Solution> &solutions, bool minimize);
 
 public:
   /// Apply a given solution to the target, producing a fully
   /// type-checked target or \c None if an error occurred.
   ///
   /// \param target the target to which the solution will be applied.
-  llvm::Optional<SyntacticElementTarget> applySolution(Solution &solution,
-                                                 SyntacticElementTarget target);
+  llvm::Optional<SyntacticElementTarget>
+  applySolution(Solution &solution, SyntacticElementTarget target);
 
   /// Apply the given solution to the given statement-condition.
-  llvm::Optional<StmtCondition> applySolution(
-      Solution &solution, StmtCondition condition, DeclContext *dc);
+  llvm::Optional<StmtCondition>
+  applySolution(Solution &solution, StmtCondition condition, DeclContext *dc);
 
   /// Apply the given solution to the given function's body and, for
   /// closure expressions, the expression itself.
@@ -5227,10 +5229,11 @@ public:
   /// \param rewriteTarget Function that performs a rewrite of any targets
   /// within the context.
   ///
-  SolutionApplicationToFunctionResult applySolution(
-      Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
-      std::function<llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
-          rewriteTarget);
+  SolutionApplicationToFunctionResult
+  applySolution(Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
+                std::function<llvm::Optional<SyntacticElementTarget>(
+                    SyntacticElementTarget)>
+                    rewriteTarget);
 
   /// Apply the given solution to the given closure body.
   ///
@@ -5243,10 +5246,11 @@ public:
   /// within the context.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(
-      Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
-      std::function<llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
-          rewriteTarget);
+  bool applySolutionToBody(Solution &solution, AnyFunctionRef fn,
+                           DeclContext *&currentDC,
+                           std::function<llvm::Optional<SyntacticElementTarget>(
+                               SyntacticElementTarget)>
+                               rewriteTarget);
 
   /// Apply the given solution to the given SingleValueStmtExpr.
   ///
@@ -5260,7 +5264,8 @@ public:
   /// \returns true if solution cannot be applied.
   bool applySolutionToSingleValueStmt(
       Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
-      std::function<llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+      std::function<
+          llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
           rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
@@ -5503,7 +5508,7 @@ public:
   /// \param argInsertIdx The index in the argument list where this argument was
   /// expected.
   virtual llvm::Optional<unsigned> missingArgument(unsigned paramIdx,
-                                             unsigned argInsertIdx);
+                                                   unsigned argInsertIdx);
 
   /// Indicate that there was no label given when one was expected by parameter.
   ///
@@ -5581,7 +5586,7 @@ struct CompletionArgInfo {
 /// from the provided anchor if it's a \c CallExpr, \c SubscriptExpr, or
 /// \c ObjectLiteralExpr.
 llvm::Optional<CompletionArgInfo> getCompletionArgInfo(ASTNode anchor,
-                                                 ConstraintSystem &cs);
+                                                       ConstraintSystem &cs);
 
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).
@@ -5602,13 +5607,10 @@ llvm::Optional<CompletionArgInfo> getCompletionArgInfo(ASTNode anchor,
 ///
 /// \returns the bindings produced by performing this matching, or \c None if
 /// the match failed.
-llvm::Optional<MatchCallArgumentResult>
-matchCallArguments(
+llvm::Optional<MatchCallArgumentResult> matchCallArguments(
     SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    llvm::Optional<unsigned> unlabeledTrailingClosureIndex,
-    bool allowFixes,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
+    llvm::Optional<unsigned> unlabeledTrailingClosureIndex, bool allowFixes,
     MatchCallArgumentListener &listener,
     llvm::Optional<TrailingClosureMatching> trailingClosureMatching);
 

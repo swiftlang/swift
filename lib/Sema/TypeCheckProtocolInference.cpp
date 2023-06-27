@@ -677,12 +677,12 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     return inferred;
   }
 
-  auto setup = [&]() -> std::tuple<llvm::Optional<RequirementMatch>, Type, Type> {
+  auto setup =
+      [&]() -> std::tuple<llvm::Optional<RequirementMatch>, Type, Type> {
     fullWitnessType = removeSelfParam(witness, fullWitnessType);
-    return std::make_tuple(
-        llvm::None,
-        removeSelfParam(req, req->getInterfaceType()),
-        fullWitnessType);
+    return std::make_tuple(llvm::None,
+                           removeSelfParam(req, req->getInterfaceType()),
+                           fullWitnessType);
   };
 
   /// Visits a requirement type to match it to a potential witness for
@@ -753,8 +753,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
   // Match a requirement and witness type.
   MatchVisitor matchVisitor(conformance, inferred);
-  auto matchTypes = [&](Type reqType, Type witnessType)
-                      -> llvm::Optional<RequirementMatch> {
+  auto matchTypes = [&](Type reqType,
+                        Type witnessType) -> llvm::Optional<RequirementMatch> {
     if (!matchVisitor.match(reqType, witnessType)) {
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               fullWitnessType);
@@ -1051,7 +1051,7 @@ static void sanitizeProtocolRequirements(
                                      SmallVectorImpl<Requirement> &sanitized) {
   std::function<Type(Type)> sanitizeType;
   sanitizeType = [&](Type outerType) {
-    return outerType.transformRec([&] (TypeBase *type) -> llvm::Optional<Type> {
+    return outerType.transformRec([&](TypeBase *type) -> llvm::Optional<Type> {
       if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
         if (!depMemTy->getAssocType() ||
             depMemTy->getAssocType()->getProtocol() != proto) {

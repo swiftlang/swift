@@ -1167,7 +1167,8 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar,
 /// type variable.
 ///
 /// \returns the type to bind to, if the binding is okay.
-static llvm::Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
+static llvm::Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
+                                               Type type) {
   // If the type references the type variable, don't permit the binding.
   if (type->hasTypeVariable()) {
     SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;

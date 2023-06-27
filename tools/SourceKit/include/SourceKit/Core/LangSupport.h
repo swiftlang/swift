@@ -993,13 +993,12 @@ public:
                             llvm::Optional<VFSOptions> vfsOptions,
                             SourceKitCancellationToken CancellationToken) = 0;
 
-  virtual void
-  codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
-                   unsigned offset, OptionsDictionary *options,
-                   ArrayRef<FilterRule> filterRules,
-                   GroupedCodeCompletionConsumer &consumer,
-                   ArrayRef<const char *> args, llvm::Optional<VFSOptions> vfsOptions,
-                   SourceKitCancellationToken CancellationToken) = 0;
+  virtual void codeCompleteOpen(
+      StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
+      OptionsDictionary *options, ArrayRef<FilterRule> filterRules,
+      GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
+      llvm::Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;
@@ -1018,12 +1017,11 @@ public:
   virtual void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
-  virtual void
-  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-             ArrayRef<const char *> Args, llvm::Optional<VFSOptions> vfsOptions) = 0;
+  virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                          EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                          llvm::Optional<VFSOptions> vfsOptions) = 0;
 
-  virtual void editorOpenInterface(EditorConsumer &Consumer,
-                                   StringRef Name,
+  virtual void editorOpenInterface(EditorConsumer &Consumer, StringRef Name,
                                    StringRef ModuleName,
                                    llvm::Optional<StringRef> Group,
                                    ArrayRef<const char *> Args,
@@ -1178,7 +1176,8 @@ public:
   virtual void getExpressionContextInfo(
       llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
-      TypeContextInfoConsumer &Consumer, llvm::Optional<VFSOptions> vfsOptions) = 0;
+      TypeContextInfoConsumer &Consumer,
+      llvm::Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getConformingMethodList(
       llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,

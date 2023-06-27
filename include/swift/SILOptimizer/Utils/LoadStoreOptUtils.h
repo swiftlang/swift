@@ -66,7 +66,8 @@ public:
   LSBase() : Base(), Kind(Normal) {}
   LSBase(KeyKind Kind) : Base(), Kind(Kind) {}
   LSBase(SILValue B) : Base(B), Kind(Normal) {}
-  LSBase(SILValue B, const llvm::Optional<ProjectionPath> &P, KeyKind Kind = Normal)
+  LSBase(SILValue B, const llvm::Optional<ProjectionPath> &P,
+         KeyKind Kind = Normal)
       : Base(B), Kind(Kind), Path(P) {}
 
   /// Virtual destructor.
@@ -323,7 +324,8 @@ class LSLocation : public LSBase {
 public:
   /// Constructors.
   LSLocation() {}
-  LSLocation(SILValue B, const llvm::Optional<ProjectionPath> &P, KeyKind K = Normal)
+  LSLocation(SILValue B, const llvm::Optional<ProjectionPath> &P,
+             KeyKind K = Normal)
       : LSBase(B, P, K) {}
   LSLocation(KeyKind Kind) : LSBase(Kind) {}
   /// Use the concatenation of the 2 ProjectionPaths as the Path.
@@ -336,7 +338,8 @@ public:
   }
 
   /// Initialize a location with a new set of base, projectionpath and kind.
-  void init(SILValue B, const llvm::Optional<ProjectionPath> &P, KeyKind K= Normal) {
+  void init(SILValue B, const llvm::Optional<ProjectionPath> &P,
+            KeyKind K = Normal) {
     Base = B;
     Path = P;
     Kind = K;

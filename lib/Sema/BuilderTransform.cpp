@@ -276,7 +276,8 @@ protected:
         }
 
         return std::make_pair(
-            builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()), llvm::None);
+            builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()),
+            llvm::None);
       }
       // If `buildBlock` does not exist at this point, it could be the case that
       // `buildPartialBlock` did not have the sufficient availability for this
@@ -594,7 +595,8 @@ protected:
     return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
   }
 
-  llvm::Optional<std::pair<Expr *, CaseStmt *>> transformCase(CaseStmt *caseStmt) {
+  llvm::Optional<std::pair<Expr *, CaseStmt *>>
+  transformCase(CaseStmt *caseStmt) {
     auto *body = caseStmt->getBody();
 
     // Explicitly disallow `case` statements with empty bodies
@@ -1483,9 +1485,9 @@ swift::determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder) {
 }
 
 void swift::printResultBuilderBuildFunction(
-      NominalTypeDecl *builder, Type componentType,
-      ResultBuilderBuildFunction function,
-      llvm::Optional<std::string> stubIndent, llvm::raw_ostream &out) {
+    NominalTypeDecl *builder, Type componentType,
+    ResultBuilderBuildFunction function, llvm::Optional<std::string> stubIndent,
+    llvm::raw_ostream &out) {
   // Render the component type into a string.
   std::string componentTypeString;
   if (componentType)

@@ -278,15 +278,17 @@ public:
 
 public:
   TypeMemberDiffItem(StringRef usr, StringRef newTypeName,
-                     StringRef newPrintedName, llvm::Optional<uint8_t> selfIndex,
-                     llvm::Optional<uint8_t> removedIndex, StringRef oldTypeName,
-                     StringRef oldPrintedName) : usr(usr),
-    newTypeName(newTypeName), newPrintedName(newPrintedName),
-    selfIndex(selfIndex), removedIndex(removedIndex), oldTypeName(oldTypeName),
-    oldPrintedName(oldPrintedName), OldNameViewer(oldPrintedName),
-    NewNameViewer(newPrintedName),
-    NewTypeDot(isNewNameGlobal() ? "" : (llvm::Twine(newTypeName) + ".").str()),
-    Subkind(getSubKind()) {}
+                     StringRef newPrintedName,
+                     llvm::Optional<uint8_t> selfIndex,
+                     llvm::Optional<uint8_t> removedIndex,
+                     StringRef oldTypeName, StringRef oldPrintedName)
+      : usr(usr), newTypeName(newTypeName), newPrintedName(newPrintedName),
+        selfIndex(selfIndex), removedIndex(removedIndex),
+        oldTypeName(oldTypeName), oldPrintedName(oldPrintedName),
+        OldNameViewer(oldPrintedName), NewNameViewer(newPrintedName),
+        NewTypeDot(isNewNameGlobal() ? ""
+                                     : (llvm::Twine(newTypeName) + ".").str()),
+        Subkind(getSubKind()) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);

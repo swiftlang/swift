@@ -41,9 +41,9 @@ public:
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///
   /// Version components can be any unsigned 64-bit number.
-  static llvm::Optional<version::Version> parseVersionString(StringRef VersionString,
-                                                       SourceLoc Loc,
-                                                       DiagnosticEngine *Diags);
+  static llvm::Optional<version::Version>
+  parseVersionString(StringRef VersionString, SourceLoc Loc,
+                     DiagnosticEngine *Diags);
 };
 } // namespace swift
 

@@ -1252,7 +1252,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> LiteralExpr * {
     return EED->RawValueExpr;
   };
-  
+
   llvm::Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
     // If the element has been diagnosed up to now, skip it.

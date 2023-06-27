@@ -803,9 +803,9 @@ public:
   ///
   /// SIL analog of \c ASTContext::getClangFunctionType .
   const clang::Type *
-  getCanonicalClangFunctionType(
-    ArrayRef<SILParameterInfo> params, llvm::Optional<SILResultInfo> result,
-    SILFunctionType::Representation trueRep);
+  getCanonicalClangFunctionType(ArrayRef<SILParameterInfo> params,
+                                llvm::Optional<SILResultInfo> result,
+                                SILFunctionType::Representation trueRep);
 
   /// Instantiates "Impl.Converter" if needed, then translate Swift generic
   /// substitutions to equivalent C++ types using \p templateParams and \p
@@ -1031,25 +1031,24 @@ public:
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
-  llvm::Optional<const ModuleDependencyInfo*> getModuleDependencies(
-      StringRef moduleName,
-      ModuleDependenciesCache &cache,
+  llvm::Optional<const ModuleDependencyInfo *> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool optionalDependencyLookup = false,
-      bool isTestableImport = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = llvm::None);
+      bool optionalDependencyLookup = false, bool isTestableImport = false,
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>>
+          dependencyOf = llvm::None);
 
   /// Retrieve the module dependencies for the Clang module with the given name.
-  llvm::Optional<const ModuleDependencyInfo*> getClangModuleDependencies(
-      StringRef moduleName,
-      ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate);
+  llvm::Optional<const ModuleDependencyInfo *>
+  getClangModuleDependencies(StringRef moduleName,
+                             ModuleDependenciesCache &cache,
+                             InterfaceSubContextDelegate &delegate);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  llvm::Optional<const ModuleDependencyInfo*> getSwiftModuleDependencies(
-      StringRef moduleName,
-      ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate);
+  llvm::Optional<const ModuleDependencyInfo *>
+  getSwiftModuleDependencies(StringRef moduleName,
+                             ModuleDependenciesCache &cache,
+                             InterfaceSubContextDelegate &delegate);
 
   /// Compute the extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.

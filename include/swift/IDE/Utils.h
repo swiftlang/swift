@@ -172,7 +172,8 @@ private:
   bool IsRef = true;
   Type Ty;
   Type ContainerType;
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef = llvm::None;
+  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
+      llvm::None;
 
   bool IsKeywordArgument = false;
   /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
@@ -239,7 +240,8 @@ public:
 
   ValueDecl *typeOrValue() { return CtorTyRef ? CtorTyRef : ValueD; }
 
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> getCustomAttrRef() const {
+  llvm::Optional<std::pair<const CustomAttr *, Decl *>>
+  getCustomAttrRef() const {
     return CustomAttrRef;
   }
 
@@ -362,8 +364,8 @@ class NameMatcher: public ASTWalker {
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc);
   bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
                   ArgumentList *Args);
-  bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc, LabelRangeType RangeType,
-                  ArrayRef<CharSourceRange> LabelLocs,
+  bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
+                  LabelRangeType RangeType, ArrayRef<CharSourceRange> LabelLocs,
                   llvm::Optional<unsigned> FirstTrailingLabel);
   bool handleCustomAttrs(Decl *D);
   ArgumentList *getApplicableArgsFor(Expr* E);

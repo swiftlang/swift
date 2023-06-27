@@ -66,8 +66,8 @@ TEST(FileSpecificDiagnosticConsumer, SubconsumersFinishInOrder) {
   (void)sourceMgr.addMemBufferCopy("abcde", "A");
   (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
-  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
-      nullptr, llvm::None);
+  auto consumerA =
+      std::make_unique<ExpectationDiagnosticConsumer>(nullptr, llvm::None);
   auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), llvm::None);
 

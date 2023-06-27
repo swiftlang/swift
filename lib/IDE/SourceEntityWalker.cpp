@@ -216,8 +216,9 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
     if (auto *macro =
             dyn_cast_or_null<MacroDecl>(MD->getMacroRef().getDecl())) {
       auto macroRefType = macro->getDeclaredInterfaceType();
-      if (!passReference(macro, macroRefType, MD->getMacroNameLoc(),
-                         ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
+      if (!passReference(
+              macro, macroRefType, MD->getMacroNameLoc(),
+              ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
         return Action::Stop();
     }
   }
@@ -427,8 +428,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
           NewOpAccess = OpAccess;
       }
 
-      llvm::SaveAndRestore<llvm::Optional<AccessKind>>
-        C(this->OpAccess, NewOpAccess);
+      llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                         NewOpAccess);
 
       // Visit in source order.
       if (!MRE->getBase()->walk(*this))
@@ -523,8 +524,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We already visited the children.
     return doSkipChildren();
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
-    llvm::SaveAndRestore<llvm::Optional<AccessKind>>
-      C(this->OpAccess, AccessKind::ReadWrite);
+    llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                       AccessKind::ReadWrite);
 
     if (!IOE->getSubExpr()->walk(*this))
       return Action::Stop();
@@ -532,8 +533,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We already visited the children.
     return doSkipChildren();
   } else if (auto LE = dyn_cast<LoadExpr>(E)) {
-    llvm::SaveAndRestore<llvm::Optional<AccessKind>>
-      C(this->OpAccess, AccessKind::Read);
+    llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                       AccessKind::Read);
 
     if (!LE->getSubExpr()->walk(*this))
       return Action::Stop();
@@ -542,8 +543,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return doSkipChildren();
   } else if (auto AE = dyn_cast<AssignExpr>(E)) {
     {
-      llvm::SaveAndRestore<llvm::Optional<AccessKind>>
-        C(this->OpAccess, AccessKind::Write);
+      llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                         AccessKind::Write);
 
       if (AE->getDest() && !AE->getDest()->walk(*this))
         return Action::Stop();
@@ -644,9 +645,9 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
         auto Continue = passReference(ModD, {ident, IdT->getLoc()});
         return Action::StopIf(!Continue);
       }
-      auto Continue =
-          passReference(VD, Type(), IdT->getNameLoc(),
-                        ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None));
+      auto Continue = passReference(
+          VD, Type(), IdT->getNameLoc(),
+          ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None));
       return Action::StopIf(!Continue);
     }
   } else if (auto FT = dyn_cast<FixedTypeRepr>(T)) {
@@ -794,8 +795,9 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
   if (Decls.size() == 1) {
     // FIXME: ImportDecl should store a DeclNameLoc.
     // FIXME: Handle overloaded funcs too by passing a reference for each?
-    if (!passReference(Decls.front(), Type(), DeclNameLoc(Import->getEndLoc()),
-        ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
+    if (!passReference(
+            Decls.front(), Type(), DeclNameLoc(Import->getEndLoc()),
+            ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
       return false;
   }
 

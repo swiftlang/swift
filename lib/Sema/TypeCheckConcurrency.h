@@ -343,9 +343,9 @@ struct SendableCheckContext {
   const llvm::Optional<SendableCheck> conformanceCheck;
 
   SendableCheckContext(
-      const DeclContext * fromDC,
-      llvm::Optional<SendableCheck> conformanceCheck = llvm::None
-  ) : fromDC(fromDC), conformanceCheck(conformanceCheck) { }
+      const DeclContext *fromDC,
+      llvm::Optional<SendableCheck> conformanceCheck = llvm::None)
+      : fromDC(fromDC), conformanceCheck(conformanceCheck) {}
 
   /// Determine the default diagnostic behavior for a missing/unavailable
   /// Sendable conformance in this context.
@@ -457,8 +457,8 @@ void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c llvm::None).
 llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-checkGlobalActorAttributes(
-    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
+checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
+                           ArrayRef<CustomAttr *> attrs);
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
@@ -491,7 +491,8 @@ enum class DispatchQueueOperation {
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
-llvm::Optional<DispatchQueueOperation> isDispatchQueueOperationName(StringRef name);
+llvm::Optional<DispatchQueueOperation>
+isDispatchQueueOperationName(StringRef name);
 
 /// Check the correctness of the given Sendable conformance.
 ///
@@ -526,7 +527,8 @@ VarDecl *getReferencedParamOrCapture(
 /// \param fromDC The context where we are performing the access.
 bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC, llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+    const DeclContext *fromDC,
+    llvm::Optional<ReferencedActor> actorInstance = llvm::None);
 
 /// Check whether given variable references to a potentially
 /// isolated actor.

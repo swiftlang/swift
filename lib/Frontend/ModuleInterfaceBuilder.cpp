@@ -45,7 +45,7 @@ namespace path = llvm::sys::path;
 /// If the file dependency in \p FullDepPath is inside the \p Base directory,
 /// this returns its path relative to \p Base. Otherwise it returns None.
 static llvm::Optional<StringRef> getRelativeDepPath(StringRef DepPath,
-                                              StringRef Base) {
+                                                    StringRef Base) {
   // If Base is the root directory, or DepPath does not start with Base, bail.
   if (Base.size() <= 1 || !DepPath.startswith(Base)) {
     return llvm::None;
@@ -123,7 +123,8 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
     assert(moduleCachePath.empty() || !DepName.startswith(moduleCachePath));
 
     // Serialize the paths of dependencies in the SDK relative to it.
-    llvm::Optional<StringRef> SDKRelativePath = getRelativeDepPath(DepName, SDKPath);
+    llvm::Optional<StringRef> SDKRelativePath =
+        getRelativeDepPath(DepName, SDKPath);
     StringRef DepNameToStore = SDKRelativePath.value_or(DepName);
     bool IsSDKRelative = SDKRelativePath.has_value();
 

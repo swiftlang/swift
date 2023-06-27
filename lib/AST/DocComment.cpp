@@ -35,9 +35,9 @@ void *DocComment::operator new(size_t Bytes, swift::markup::MarkupContext &MC,
 }
 
 namespace {
-llvm::Optional<swift::markup::ParamField *> extractParamOutlineItem(
-    swift::markup::MarkupContext &MC,
-    swift::markup::MarkupASTNode *Node) {
+llvm::Optional<swift::markup::ParamField *>
+extractParamOutlineItem(swift::markup::MarkupContext &MC,
+                        swift::markup::MarkupASTNode *Node) {
 
   auto Item = dyn_cast<swift::markup::Item>(Node);
   if (!Item)
@@ -397,7 +397,7 @@ namespace {
 template <typename Result>
 class CommentProviderFinder final {
   using ResultWithDecl = std::pair<Result, const Decl *>;
-  using VisitFnTy = llvm::Optional<Result>(*)(const Decl *);
+  using VisitFnTy = llvm::Optional<Result> (*)(const Decl *);
 
   VisitFnTy VisitFn;
 

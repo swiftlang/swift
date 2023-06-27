@@ -106,7 +106,7 @@ class ConditionalValue {
   
   /// The Scope for the current branch.
   llvm::Optional<Scope> scope;
-  
+
   /// A place to hold conditional Initializations of our result.
   std::unique_ptr<Initialization> currentInitialization;
   

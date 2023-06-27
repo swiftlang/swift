@@ -21,10 +21,10 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/NullablePtr.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/ADT/Optional.h"
 #include <set>
 #include <string>
 #include <vector>

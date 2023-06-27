@@ -180,10 +180,10 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 
 /// Determine whether the given function can be represented in Objective-C,
 /// and figure out its foreign error convention (if any).
-bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                           ObjCReason Reason,
-                           llvm::Optional<ForeignAsyncConvention> &asyncConvention,
-                           llvm::Optional<ForeignErrorConvention> &errorConvention);
+bool isRepresentableInObjC(
+    const AbstractFunctionDecl *AFD, ObjCReason Reason,
+    llvm::Optional<ForeignAsyncConvention> &asyncConvention,
+    llvm::Optional<ForeignErrorConvention> &errorConvention);
 
 /// Determine whether the given variable can be represented in Objective-C.
 bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);

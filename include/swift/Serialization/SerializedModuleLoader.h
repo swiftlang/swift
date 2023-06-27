@@ -232,10 +232,10 @@ public:
 
   virtual void verifyAllModules() override;
 
-  virtual llvm::Optional<const ModuleDependencyInfo*> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate,
-      bool isTestableImport) override;
+  virtual llvm::Optional<const ModuleDependencyInfo *>
+  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
+                        InterfaceSubContextDelegate &delegate,
+                        bool isTestableImport) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -439,8 +439,8 @@ public:
 
   llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
 
-
-  llvm::Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const override;
+  llvm::Optional<StringRef>
+  getSourceFileNameForDecl(const Decl *D) const override;
 
   llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const override;
 

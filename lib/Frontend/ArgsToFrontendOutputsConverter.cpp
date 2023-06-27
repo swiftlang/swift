@@ -37,10 +37,9 @@ bool ArgsToFrontendOutputsConverter::convert(
     std::vector<std::string> &mainOutputsForIndexUnits,
     std::vector<SupplementaryOutputPaths> &supplementaryOutputs) {
 
-  llvm::Optional<OutputFilesComputer> ofc =
-      OutputFilesComputer::create(Args, Diags, InputsAndOutputs, {
-        "output", options::OPT_o, options::OPT_output_filelist, "-o"
-      });
+  llvm::Optional<OutputFilesComputer> ofc = OutputFilesComputer::create(
+      Args, Diags, InputsAndOutputs,
+      {"output", options::OPT_o, options::OPT_output_filelist, "-o"});
   if (!ofc)
     return true;
   llvm::Optional<std::vector<std::string>> mains = ofc->computeOutputFiles();
@@ -50,12 +49,11 @@ bool ArgsToFrontendOutputsConverter::convert(
   llvm::Optional<std::vector<std::string>> indexMains;
   if (Args.hasArg(options::OPT_index_unit_output_path,
                   options::OPT_index_unit_output_path_filelist)) {
-    llvm::Optional<OutputFilesComputer> iuofc =
-        OutputFilesComputer::create(Args, Diags, InputsAndOutputs, {
-          "index unit output path", options::OPT_index_unit_output_path,
-          options::OPT_index_unit_output_path_filelist,
-          "-index-unit-output-path"
-        });
+    llvm::Optional<OutputFilesComputer> iuofc = OutputFilesComputer::create(
+        Args, Diags, InputsAndOutputs,
+        {"index unit output path", options::OPT_index_unit_output_path,
+         options::OPT_index_unit_output_path_filelist,
+         "-index-unit-output-path"});
     if (!iuofc)
       return true;
     indexMains = iuofc->computeOutputFiles();
@@ -110,11 +108,9 @@ OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
   return args.getAllArgValues(singleOpt);
 }
 
-llvm::Optional<OutputFilesComputer>
-OutputFilesComputer::create(const llvm::opt::ArgList &args,
-                            DiagnosticEngine &diags,
-                            const FrontendInputsAndOutputs &inputsAndOutputs,
-                            OutputOptInfo optInfo) {
+llvm::Optional<OutputFilesComputer> OutputFilesComputer::create(
+    const llvm::opt::ArgList &args, DiagnosticEngine &diags,
+    const FrontendInputsAndOutputs &inputsAndOutputs, OutputOptInfo optInfo) {
   llvm::Optional<std::vector<std::string>> outputArguments =
       getOutputFilenamesFromCommandLineOrFilelist(args, diags, optInfo.SingleID,
                                                   optInfo.FilelistID);
@@ -183,13 +179,15 @@ OutputFilesComputer::computeOutputFiles() const {
                                   ? StringRef()
                                   : StringRef(OutputFileArguments[i++]);
 
-        llvm::Optional<std::string> outputFile = computeOutputFile(outputArg, input);
+        llvm::Optional<std::string> outputFile =
+            computeOutputFile(outputArg, input);
         if (!outputFile)
           return true;
         outputFiles.push_back(*outputFile);
         return false;
       });
-  return hadError ? llvm::None : llvm::Optional<std::vector<std::string>>(outputFiles);
+  return hadError ? llvm::None
+                  : llvm::Optional<std::vector<std::string>>(outputFiles);
 }
 
 llvm::Optional<std::string>

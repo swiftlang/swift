@@ -88,8 +88,8 @@ bool MatchCallArgumentListener::canClaimArgIgnoringNameMismatch(
 /// Otherwise, an empty optional.
 ///
 static llvm::Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
-                                                   StringRef argName,
-                                                   unsigned maxScore) {
+                                                         StringRef argName,
+                                                         unsigned maxScore) {
   using namespace camel_case;
 
   // Compute the edit distance.
@@ -224,8 +224,8 @@ static bool areConservativelyCompatibleArgumentLabels(
 
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
-                            /*allow fixes*/ false, listener,
-                            llvm::None).has_value();
+                            /*allow fixes*/ false, listener, llvm::None)
+      .has_value();
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -290,10 +290,8 @@ static bool backwardScanAcceptsTrailingClosure(
 /// \param beforeLabel If non-empty, stop examining parameters when we reach
 /// a parameter with this label.
 static bool anyParameterRequiresArgument(
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    unsigned firstParamIdx,
-    llvm::Optional<Identifier> beforeLabel) {
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
+    unsigned firstParamIdx, llvm::Optional<Identifier> beforeLabel) {
   for (unsigned paramIdx : range(firstParamIdx, params.size())) {
     // If have been asked to stop when we reach a parameter with a particular
     // label, and we see a parameter with that label, we're done: no parameter
@@ -321,10 +319,8 @@ static bool isCodeCompletionTypeVar(Type type) {
 
 static bool matchCallArgumentsImpl(
     SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
-    bool allowFixes,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
+    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex, bool allowFixes,
     TrailingClosureMatching trailingClosureMatching,
     MatchCallArgumentListener &listener,
     SmallVectorImpl<ParamBinding> &parameterBindings) {
@@ -393,9 +389,9 @@ static bool matchCallArgumentsImpl(
 
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
-  auto claimNextNamed = [&](unsigned &nextArgIdx, Identifier paramLabel,
-                            bool ignoreNameMismatch,
-                            bool forVariadic = false) -> llvm::Optional<unsigned> {
+  auto claimNextNamed =
+      [&](unsigned &nextArgIdx, Identifier paramLabel, bool ignoreNameMismatch,
+          bool forVariadic = false) -> llvm::Optional<unsigned> {
     // Skip over any claimed arguments.
     skipClaimedArgs(nextArgIdx);
 
@@ -547,13 +543,13 @@ static bool matchCallArgumentsImpl(
       // backward-match rule that skips this parameter if doing so is the only
       // way to successfully match arguments to parameters.
       if (!parameterRequiresArgument(params, paramInfo, paramIdx) &&
-          !param.getPlainType()->getASTContext().LangOpts
-              .hasFeature(Feature::ForwardTrailingClosures) &&
+          !param.getPlainType()->getASTContext().LangOpts.hasFeature(
+              Feature::ForwardTrailingClosures) &&
           anyParameterRequiresArgument(
               params, paramInfo, paramIdx + 1,
               nextArgIdx + 1 < numArgs
-                ? llvm::Optional<Identifier>(args[nextArgIdx + 1].getLabel())
-                : llvm::Optional<Identifier>(llvm::None))) {
+                  ? llvm::Optional<Identifier>(args[nextArgIdx + 1].getLabel())
+                  : llvm::Optional<Identifier>(llvm::None))) {
         haveUnfulfilledParams = true;
         return;
       }
@@ -989,8 +985,7 @@ static bool matchCallArgumentsImpl(
 /// forward and backward scanning directions to succeed.
 static bool requiresBothTrailingClosureDirections(
     ArrayRef<AnyFunctionType::Param> args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
     llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   // If there's no unlabeled trailing closure, direction doesn't matter.
   if (!unlabeledTrailingClosureArgIndex)
@@ -1033,13 +1028,10 @@ static bool requiresBothTrailingClosureDirections(
   return false;
 }
 
-llvm::Optional<MatchCallArgumentResult>
-constraints::matchCallArguments(
+llvm::Optional<MatchCallArgumentResult> constraints::matchCallArguments(
     SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
-    bool allowFixes,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
+    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex, bool allowFixes,
     MatchCallArgumentListener &listener,
     llvm::Optional<TrailingClosureMatching> trailingClosureMatching) {
 
@@ -1053,8 +1045,8 @@ constraints::matchCallArguments(
             allowFixes, scanDirection, listener, paramBindings))
       return llvm::None;
 
-    return MatchCallArgumentResult{
-        scanDirection, std::move(paramBindings), llvm::None};
+    return MatchCallArgumentResult{scanDirection, std::move(paramBindings),
+                                   llvm::None};
   };
 
   // If we know that we won't have to perform both forward and backward
@@ -1183,11 +1175,12 @@ protected:
   }
 
 public:
-  ArgumentFailureTracker(ConstraintSystem &cs, ValueDecl *callee,
-                         SmallVectorImpl<AnyFunctionType::Param> &args,
-                         ArrayRef<AnyFunctionType::Param> params,
-                         llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
-                         ConstraintLocatorBuilder locator)
+  ArgumentFailureTracker(
+      ConstraintSystem &cs, ValueDecl *callee,
+      SmallVectorImpl<AnyFunctionType::Param> &args,
+      ArrayRef<AnyFunctionType::Param> params,
+      llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
+      ConstraintLocatorBuilder locator)
       : CS(cs), Callee(callee), Arguments(args), Parameters(params),
         UnlabeledTrailingClosureArgIndex(unlabeledTrailingClosureArgIndex),
         Locator(locator) {}
@@ -1203,7 +1196,7 @@ public:
   }
 
   llvm::Optional<unsigned> missingArgument(unsigned paramIdx,
-                                     unsigned argInsertIdx) override {
+                                           unsigned argInsertIdx) override {
     if (!CS.shouldAttemptFixes())
       return llvm::None;
 
@@ -1341,18 +1334,18 @@ class CompletionArgumentTracker : public ArgumentFailureTracker {
   struct CompletionArgInfo ArgInfo;
 
 public:
-  CompletionArgumentTracker(ConstraintSystem &cs, ValueDecl *callee,
-                            SmallVectorImpl<AnyFunctionType::Param> &args,
-                            ArrayRef<AnyFunctionType::Param> params,
-                            llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
-                            ConstraintLocatorBuilder locator,
-                            struct CompletionArgInfo ArgInfo)
+  CompletionArgumentTracker(
+      ConstraintSystem &cs, ValueDecl *callee,
+      SmallVectorImpl<AnyFunctionType::Param> &args,
+      ArrayRef<AnyFunctionType::Param> params,
+      llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
+      ConstraintLocatorBuilder locator, struct CompletionArgInfo ArgInfo)
       : ArgumentFailureTracker(cs, callee, args, params,
                                unlabeledTrailingClosureArgIndex, locator),
         ArgInfo(ArgInfo) {}
 
   llvm::Optional<unsigned> missingArgument(unsigned paramIdx,
-                                     unsigned argInsertIdx) override {
+                                           unsigned argInsertIdx) override {
     // When solving for code completion, if any argument contains the
     // completion location, later arguments shouldn't be considered missing
     // (causing the solution to have a worse score) as the user just hasn't
@@ -1454,12 +1447,11 @@ namespace {
 /// variable (from the opened parameter type) the existential type that needs
 /// to be opened (from the argument type), and the adjustments that need to be
 /// applied to the existential type after it is opened.
-static llvm::Optional<
-    std::tuple<GenericTypeParamType *, TypeVariableType *, Type,
-               OpenedExistentialAdjustments>>
-shouldOpenExistentialCallArgument(
-    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy,
-    Expr *argExpr, ConstraintSystem &cs) {
+static llvm::Optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
+                                 Type, OpenedExistentialAdjustments>>
+shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
+                                  Type paramTy, Type argTy, Expr *argExpr,
+                                  ConstraintSystem &cs) {
   if (!callee)
     return llvm::None;
 
@@ -1605,14 +1597,13 @@ shouldOpenExistentialCallArgument(
 
 // Match the argument of a call to the parameter.
 static ConstraintSystem::TypeMatchResult matchCallArguments(
-    ConstraintSystem &cs, FunctionType *contextualType,
-    ArgumentList *argList,
+    ConstraintSystem &cs, FunctionType *contextualType, ArgumentList *argList,
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
     llvm::Optional<TrailingClosureMatching> trailingClosureMatching,
     SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
-      &openedExistentials) {
+        &openedExistentials) {
   assert(subKind == ConstraintKind::OperatorArgumentConversion ||
          subKind == ConstraintKind::ArgumentConversion);
   auto *loc = cs.getConstraintLocator(locator);
@@ -2038,7 +2029,6 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
   return cs.getTypeMatchSuccess();
 }
 
-
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionResultTypes(Type expectedResult, Type fnResult,
                                            TypeMatchOptions flags,
@@ -2433,7 +2423,8 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
     auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
 
     auto instantiatedPattern = pattern.transformRec([&](Type t)
-                                                        -> llvm::Optional<Type> {
+                                                        -> llvm::Optional<
+                                                            Type> {
       if (isPackExpansionType(t))
         return t;
 
@@ -8582,7 +8573,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   // Rest of the implicit conversions depend on the resolved type.
   {
     auto getPointerFor = [&ctx](PointerTypeKind ptrKind,
-                                llvm::Optional<Type> elementTy = llvm::None) -> Type {
+                                llvm::Optional<Type> elementTy =
+                                    llvm::None) -> Type {
       switch (ptrKind) {
       case PTK_UnsafePointer:
         assert(elementTy);
@@ -10197,11 +10189,10 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   return nullptr;
 }
 
-static ConstraintFix *
-fixMemberRef(ConstraintSystem &cs, Type baseTy,
-             DeclNameRef memberName, const OverloadChoice &choice,
-             ConstraintLocator *locator,
-             llvm::Optional<MemberLookupResult::UnviableReason> reason = llvm::None) {
+static ConstraintFix *fixMemberRef(
+    ConstraintSystem &cs, Type baseTy, DeclNameRef memberName,
+    const OverloadChoice &choice, ConstraintLocator *locator,
+    llvm::Optional<MemberLookupResult::UnviableReason> reason = llvm::None) {
   // Not all of the choices handled here are going
   // to refer to a declaration.
   if (auto *decl = choice.getDeclOrNull()) {
@@ -12672,12 +12663,10 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
   return implicitRef;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyApplicableFnConstraint(
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     Type type1, Type type2,
     llvm::Optional<TrailingClosureMatching> trailingClosureMatching,
-    TypeMatchOptions flags,
-    ConstraintLocatorBuilder locator) {
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
 
   // By construction, the left hand side is a type that looks like the
@@ -15027,8 +15016,8 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                  locator)) {
       return SolutionKind::Error;
     }
-    return simplifyApplicableFnConstraint(
-        first, second, llvm::None, subflags, locator);
+    return simplifyApplicableFnConstraint(first, second, llvm::None, subflags,
+                                          locator);
   }
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(first, second,
@@ -15474,18 +15463,16 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
       return simplifyFixConstraint(fix, constraint.getFirstType(),
-                                   constraint.getSecondType(), matchKind, llvm::None,
-                                   constraint.getLocator());
+                                   constraint.getSecondType(), matchKind,
+                                   llvm::None, constraint.getLocator());
     }
 
     // If there is a restriction on this constraint, apply it directly rather
     // than going through the general \c matchTypes() machinery.
     if (auto restriction = constraint.getRestriction()) {
-      return simplifyRestrictedConstraint(*restriction,
-                                          constraint.getFirstType(),
-                                          constraint.getSecondType(),
-                                          matchKind, llvm::None,
-                                          constraint.getLocator());
+      return simplifyRestrictedConstraint(
+          *restriction, constraint.getFirstType(), constraint.getSecondType(),
+          matchKind, llvm::None, constraint.getLocator());
     }
 
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
@@ -15496,53 +15483,50 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
       return simplifyFixConstraint(fix, constraint.getFirstType(),
-                                   constraint.getSecondType(), matchKind, llvm::None,
-                                   constraint.getLocator());
+                                   constraint.getSecondType(), matchKind,
+                                   llvm::None, constraint.getLocator());
     }
 
     return simplifyBridgingConstraint(constraint.getFirstType(),
-                                      constraint.getSecondType(),
-                                      llvm::None, constraint.getLocator());
+                                      constraint.getSecondType(), llvm::None,
+                                      constraint.getLocator());
 
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        constraint.getTrailingClosureMatching(), llvm::None, constraint.getLocator());
+        constraint.getTrailingClosureMatching(), llvm::None,
+        constraint.getLocator());
 
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(
-      constraint.getFirstType(), constraint.getSecondType(), llvm::None,
-      constraint.getLocator());
+        constraint.getFirstType(), constraint.getSecondType(), llvm::None,
+        constraint.getLocator());
 
   case ConstraintKind::DynamicTypeOf:
     return simplifyDynamicTypeOfConstraint(constraint.getFirstType(),
                                            constraint.getSecondType(),
-                                           llvm::None,
-                                           constraint.getLocator());
+                                           llvm::None, constraint.getLocator());
 
   case ConstraintKind::EscapableFunctionOf:
-    return simplifyEscapableFunctionOfConstraint(constraint.getFirstType(),
-                                                 constraint.getSecondType(),
-                                                 llvm::None,
-                                                 constraint.getLocator());
+    return simplifyEscapableFunctionOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), llvm::None,
+        constraint.getLocator());
 
   case ConstraintKind::OpenedExistentialOf:
-    return simplifyOpenedExistentialOfConstraint(constraint.getFirstType(),
-                                                 constraint.getSecondType(),
-                                                 llvm::None,
-                                                 constraint.getLocator());
+    return simplifyOpenedExistentialOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), llvm::None,
+        constraint.getLocator());
 
   case ConstraintKind::KeyPath:
     return simplifyKeyPathConstraint(
-      constraint.getFirstType(), constraint.getSecondType(),
-      constraint.getThirdType(), constraint.getTypeVariables(),
-      llvm::None, constraint.getLocator());
+        constraint.getFirstType(), constraint.getSecondType(),
+        constraint.getThirdType(), constraint.getTypeVariables(), llvm::None,
+        constraint.getLocator());
 
   case ConstraintKind::KeyPathApplication:
     return simplifyKeyPathApplicationConstraint(
-      constraint.getFirstType(), constraint.getSecondType(),
-      constraint.getThirdType(),
-      llvm::None, constraint.getLocator());
+        constraint.getFirstType(), constraint.getSecondType(),
+        constraint.getThirdType(), llvm::None, constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     if (auto *fix = constraint.getFix()) {
@@ -15561,34 +15545,27 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   case ConstraintKind::SubclassOf:
-    return simplifySubclassOfConstraint(
-             constraint.getFirstType(),
-             constraint.getSecondType(),
-             constraint.getLocator(),
-             /*flags*/ llvm::None);
+    return simplifySubclassOfConstraint(constraint.getFirstType(),
+                                        constraint.getSecondType(),
+                                        constraint.getLocator(),
+                                        /*flags*/ llvm::None);
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
-             constraint.getFirstType(),
-             constraint.getSecondType(),
-             constraint.getKind(),
-             constraint.getLocator(),
-             llvm::None);
+        constraint.getFirstType(), constraint.getSecondType(),
+        constraint.getKind(), constraint.getLocator(), llvm::None);
 
   case ConstraintKind::TransitivelyConformsTo:
-    return simplifyTransitivelyConformsTo(
-             constraint.getFirstType(),
-             constraint.getSecondType(),
-             constraint.getLocator(),
-             llvm::None);
+    return simplifyTransitivelyConformsTo(constraint.getFirstType(),
+                                          constraint.getSecondType(),
+                                          constraint.getLocator(), llvm::None);
 
   case ConstraintKind::CheckedCast: {
-    auto result = simplifyCheckedCastConstraint(constraint.getFirstType(),
-                                                constraint.getSecondType(),
-                                                /*flags*/ llvm::None,
-                                                constraint.getLocator());
+    auto result = simplifyCheckedCastConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
     // NOTE: simplifyCheckedCastConstraint() may return Unsolved, e.g. if the
     // subexpression's type is unresolved. Don't record the fix until we
     // successfully simplify the constraint.
@@ -15603,50 +15580,41 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 
   case ConstraintKind::OptionalObject:
-    return simplifyOptionalObjectConstraint(constraint.getFirstType(),
-                                            constraint.getSecondType(),
-                                            /*flags*/ llvm::None,
-                                            constraint.getLocator());
-      
+    return simplifyOptionalObjectConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-    return simplifyMemberConstraint(constraint.getKind(),
-                                    constraint.getFirstType(),
-                                    constraint.getMember(),
-                                    constraint.getSecondType(),
-                                    constraint.getMemberUseDC(),
-                                    constraint.getFunctionRefKind(),
-                                    /*outerAlternatives=*/{},
-                                    /*flags*/ llvm::None, constraint.getLocator());
+    return simplifyMemberConstraint(
+        constraint.getKind(), constraint.getFirstType(), constraint.getMember(),
+        constraint.getSecondType(), constraint.getMemberUseDC(),
+        constraint.getFunctionRefKind(),
+        /*outerAlternatives=*/{},
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::ValueWitness:
-    return simplifyValueWitnessConstraint(constraint.getKind(),
-                                          constraint.getFirstType(),
-                                          constraint.getRequirement(),
-                                          constraint.getSecondType(),
-                                          constraint.getMemberUseDC(),
-                                          constraint.getFunctionRefKind(),
-                                          /*flags*/ llvm::None,
-                                          constraint.getLocator());
+    return simplifyValueWitnessConstraint(
+        constraint.getKind(), constraint.getFirstType(),
+        constraint.getRequirement(), constraint.getSecondType(),
+        constraint.getMemberUseDC(), constraint.getFunctionRefKind(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::Defaultable:
-    return simplifyDefaultableConstraint(constraint.getFirstType(),
-                                         constraint.getSecondType(),
-                                         /*flags*/ llvm::None,
-                                         constraint.getLocator());
+    return simplifyDefaultableConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::FallbackType:
-    return simplifyFallbackTypeConstraint(constraint.getFirstType(),
-                                          constraint.getSecondType(),
-                                          constraint.getTypeVariables(),
-                                          /*flags*/ llvm::None,
-                                          constraint.getLocator());
+    return simplifyFallbackTypeConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        constraint.getTypeVariables(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::PropertyWrapper:
-    return simplifyPropertyWrapperConstraint(constraint.getFirstType(),
-                                             constraint.getSecondType(),
-                                             /*flags*/ llvm::None,
-                                             constraint.getLocator());
+    return simplifyPropertyWrapperConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
@@ -15655,10 +15623,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
-    return simplifyOneWayConstraint(constraint.getKind(),
-                                    constraint.getFirstType(),
-                                    constraint.getSecondType(),
-                                    /*flags*/ llvm::None, constraint.getLocator());
+    return simplifyOneWayConstraint(
+        constraint.getKind(), constraint.getFirstType(),
+        constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::UnresolvedMemberChainBase:
     return simplifyUnresolvedMemberChainBaseConstraint(
@@ -15673,23 +15641,23 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::BindTupleOfFunctionParams:
     return simplifyBindTupleOfFunctionParamsConstraint(
-        constraint.getFirstType(), constraint.getSecondType(), /*flags*/ llvm::None,
-        constraint.getLocator());
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::PackElementOf:
     return simplifyPackElementOfConstraint(
-        constraint.getFirstType(), constraint.getSecondType(), /*flags*/llvm::None,
-        constraint.getLocator());
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(
-        constraint.getFirstType(), constraint.getSecondType(), /*flags*/ llvm::None,
-        constraint.getLocator());
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::SameShape:
-    return simplifySameShapeConstraint(constraint.getFirstType(),
-                                       constraint.getSecondType(),
-                                       /*flags*/ llvm::None, constraint.getLocator());
+    return simplifySameShapeConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
 
   case ConstraintKind::ExplicitGenericArguments:
     return simplifyExplicitGenericArgumentsConstraint(

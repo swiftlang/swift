@@ -662,9 +662,9 @@ protected:
   // method.
   using GetAddrOfEntityFn = llvm::Constant* (IRGenModule &, ConstantInit);
 
-  llvm::GlobalVariable *emit(
-                        llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
-                        const char *section) {
+  llvm::GlobalVariable *
+  emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
+       const char *section) {
     layout();
 
     llvm::GlobalVariable *var;
@@ -704,8 +704,7 @@ protected:
     return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
                 section);
   }
-  llvm::GlobalVariable *emit(llvm::NoneType none,
-                             const char *section) {
+  llvm::GlobalVariable *emit(llvm::NoneType none, const char *section) {
     return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
                 section);
   }

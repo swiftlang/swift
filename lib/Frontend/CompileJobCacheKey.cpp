@@ -84,7 +84,8 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
   Builder.push(*CMD, llvm::cas::TreeEntry::Regular, "command-line");
 
   // FIXME: The version is maybe insufficient...
-  auto Version = CAS.storeFromString(llvm::None, version::getSwiftFullVersion());
+  auto Version =
+      CAS.storeFromString(llvm::None, version::getSwiftFullVersion());
   if (!Version)
     return Version.takeError();
   Builder.push(*Version, llvm::cas::TreeEntry::Regular, "version");

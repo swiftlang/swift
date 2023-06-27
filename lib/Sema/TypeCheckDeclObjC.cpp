@@ -624,10 +624,9 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
 }
 
 bool swift::isRepresentableInObjC(
-       const AbstractFunctionDecl *AFD,
-       ObjCReason Reason,
-       llvm::Optional<ForeignAsyncConvention> &asyncConvention,
-       llvm::Optional<ForeignErrorConvention> &errorConvention) {
+    const AbstractFunctionDecl *AFD, ObjCReason Reason,
+    llvm::Optional<ForeignAsyncConvention> &asyncConvention,
+    llvm::Optional<ForeignErrorConvention> &errorConvention) {
   // Clear out the async and error conventions. They will be added later if
   // needed.
   asyncConvention = llvm::None;
@@ -1361,8 +1360,8 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-static
-llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
+static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+                                                   bool allowImplicit) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
     return llvm::None;
@@ -1622,7 +1621,6 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
 static void markAsObjC(ValueDecl *D, ObjCReason reason,
                        llvm::Optional<ForeignAsyncConvention> asyncConvention,
                        llvm::Optional<ForeignErrorConvention> errorConvention);
-
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
@@ -2031,7 +2029,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     // 'alloc', or 'allocWithZone:'. Check for these cases.
     if (!method->isInstanceMember()) {
       auto isForbiddenSelector = [&](ObjCSelector sel)
-      -> llvm::Optional<Diag<unsigned, DeclName, ObjCSelector>> {
+          -> llvm::Optional<Diag<unsigned, DeclName, ObjCSelector>> {
         switch (sel.getNumArgs()) {
         case 0:
           if (sel.getSelectorPieces().front() == ctx.Id_load ||
@@ -2209,7 +2207,8 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
   return false;
 }
 
-bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
+                                   const ValueDecl *decl,
                                    llvm::Optional<ObjCSelector> nameOpt,
                                    llvm::Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {

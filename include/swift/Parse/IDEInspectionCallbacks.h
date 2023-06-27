@@ -240,10 +240,10 @@ public:
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,
-                                 llvm::Optional<unsigned> yieldIndex) {};
+                                 llvm::Optional<unsigned> yieldIndex){};
 
   virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
-                                      llvm::Optional<StmtKind> ParentKind) {};
+                                      llvm::Optional<StmtKind> ParentKind){};
 
   virtual void completeAfterPoundDirective() {};
 

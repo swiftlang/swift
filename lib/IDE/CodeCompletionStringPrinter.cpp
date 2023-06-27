@@ -47,7 +47,8 @@ CodeCompletionStringPrinter::getChunkKindForPrintNameContext(
   }
 }
 
-llvm::Optional<ChunkKind> CodeCompletionStringPrinter::getChunkKindForStructureKind(
+llvm::Optional<ChunkKind>
+CodeCompletionStringPrinter::getChunkKindForStructureKind(
     PrintStructureKind Kind) const {
   switch (Kind) {
   case PrintStructureKind::FunctionParameter:

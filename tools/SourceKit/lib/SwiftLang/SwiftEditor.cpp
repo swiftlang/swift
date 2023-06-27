@@ -75,9 +75,9 @@ void EditorDiagConsumer::getAllDiagnostics(
 
 /// Retrieve the raw range from a range, if it exists in the provided buffer.
 /// Otherwise returns \c None.
-static llvm::Optional<RawCharSourceRange> getRawRangeInBuffer(CharSourceRange range,
-                                                        unsigned bufferID,
-                                                        SourceManager &SM) {
+static llvm::Optional<RawCharSourceRange>
+getRawRangeInBuffer(CharSourceRange range, unsigned bufferID,
+                    SourceManager &SM) {
   if (!range.isValid() ||
       SM.findBufferContainingLoc(range.getStart()) != bufferID) {
     return llvm::None;
@@ -87,8 +87,10 @@ static llvm::Optional<RawCharSourceRange> getRawRangeInBuffer(CharSourceRange ra
   return {{offset, length}};
 }
 
-BufferInfoSharedPtr EditorDiagConsumer::getBufferInfo(
-    StringRef FileName, llvm::Optional<unsigned> BufferID, swift::SourceManager &SM) {
+BufferInfoSharedPtr
+EditorDiagConsumer::getBufferInfo(StringRef FileName,
+                                  llvm::Optional<unsigned> BufferID,
+                                  swift::SourceManager &SM) {
   // NOTE: Using StringRef as a key here relies on SourceMgr using const char*
   // as buffer identifiers. This is fast, but may be brittle.  We can always
   // switch over to using a StringMap. Note that the logic in
@@ -743,9 +745,9 @@ private:
   std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
-  llvm::Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
-      ImmutableTextSnapshotRef NewSnapshot,
-      ArrayRef<DiagnosticEntryInfo> ParserDiags);
+  llvm::Optional<std::vector<DiagnosticEntryInfo>>
+  getSemanticDiagnostics(ImmutableTextSnapshotRef NewSnapshot,
+                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 };
 
 class SwiftDocumentSyntaxInfo {
@@ -1226,7 +1228,8 @@ inferDefaultAccessSyntactically(const ExtensionDecl *ED) {
 /// Document structure is a purely syntactic request that shouldn't require name lookup
 /// or type-checking, so this is a best-effort computation, particularly where extensions
 /// are concerned.
-static llvm::Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
+static llvm::Optional<AccessLevel>
+inferAccessSyntactically(const ValueDecl *D) {
   assert(D);
 
   // Check if the decl has an explicit access control attribute.
@@ -2372,14 +2375,16 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 // EditorOpen
 //===----------------------------------------------------------------------===//
-void SwiftLangSupport::editorOpen(
-    StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-    ArrayRef<const char *> Args, llvm::Optional<VFSOptions> vfsOptions) {
+void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                                  EditorConsumer &Consumer,
+                                  ArrayRef<const char *> Args,
+                                  llvm::Optional<VFSOptions> vfsOptions) {
 
   std::string error;
   // Do not provide primaryFile so that opening an existing document will
   // reinitialize the filesystem instead of keeping the old one.
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
+  auto fileSystem =
+      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
   if (!fileSystem)
     return Consumer.handleRequestError(error.c_str());
 

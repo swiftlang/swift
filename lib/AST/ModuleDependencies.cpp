@@ -537,7 +537,8 @@ void SwiftDependencyScanningService::configureForContextHash(StringRef scanningC
   }
 }
 
-llvm::Optional<const ModuleDependencyInfo*> SwiftDependencyScanningService::findDependency(
+llvm::Optional<const ModuleDependencyInfo *>
+SwiftDependencyScanningService::findDependency(
     StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind,
     StringRef scanningContextHash) const {
   if (!kind) {
@@ -616,7 +617,8 @@ ModuleDependenciesCache::ModuleDependenciesCache(
   }
 }
 
-llvm::Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependency(
+llvm::Optional<const ModuleDependencyInfo *>
+ModuleDependenciesCache::findDependency(
     StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind) const {
   auto optionalDep = globalScanningService.findDependency(moduleName, kind,
                                                           scannerContextHash);

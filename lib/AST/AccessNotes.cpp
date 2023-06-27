@@ -28,7 +28,7 @@
 namespace swift {
 
 AccessNoteDeclName::AccessNoteDeclName()
-  : parentNames(), name(), accessorKind(llvm::None) { }
+    : parentNames(), name(), accessorKind(llvm::None) {}
 
 AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   auto parsedName = parseDeclName(str);

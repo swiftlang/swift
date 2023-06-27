@@ -16,8 +16,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "clang/Basic/DarwinSDKInfo.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   class Triple;

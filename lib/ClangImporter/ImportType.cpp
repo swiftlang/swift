@@ -210,16 +210,16 @@ namespace {
     llvm::Optional<unsigned> CompletionHandlerErrorParamIndex;
 
   public:
-    SwiftTypeConverter(ClangImporter::Implementation &impl,
-                       llvm::function_ref<void(Diagnostic &&)> addDiag,
-                       bool allowNSUIntegerAsInt,
-                       Bridgeability bridging,
-                       const clang::FunctionType *completionHandlerType,
-                       llvm::Optional<unsigned> completionHandlerErrorParamIndex)
-      : Impl(impl), addImportDiagnostic(addDiag),
-        AllowNSUIntegerAsInt(allowNSUIntegerAsInt), Bridging(bridging),
-        CompletionHandlerType(completionHandlerType),
-        CompletionHandlerErrorParamIndex(completionHandlerErrorParamIndex) {}
+    SwiftTypeConverter(
+        ClangImporter::Implementation &impl,
+        llvm::function_ref<void(Diagnostic &&)> addDiag,
+        bool allowNSUIntegerAsInt, Bridgeability bridging,
+        const clang::FunctionType *completionHandlerType,
+        llvm::Optional<unsigned> completionHandlerErrorParamIndex)
+        : Impl(impl), addImportDiagnostic(addDiag),
+          AllowNSUIntegerAsInt(allowNSUIntegerAsInt), Bridging(bridging),
+          CompletionHandlerType(completionHandlerType),
+          CompletionHandlerErrorParamIndex(completionHandlerErrorParamIndex) {}
 
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
@@ -1633,9 +1633,8 @@ static ImportedType adjustTypeForConcreteImport(
 ImportedType ClangImporter::Implementation::importType(
     clang::QualType type, ImportTypeKind importKind,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
-    bool allowNSUIntegerAsInt, Bridgeability bridging,
-    ImportTypeAttrs attrs, OptionalTypeKind optionality,
-    bool resugarNSErrorPointer,
+    bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
+    OptionalTypeKind optionality, bool resugarNSErrorPointer,
     llvm::Optional<unsigned> completionHandlerErrorParamIndex) {
   if (type.isNull())
     return {Type(), false};
@@ -1856,15 +1855,16 @@ private:
   Result recurse(Type ty) {
     bool anyFound = false;
 
-    Type newTy = ty.transformRec([&](TypeBase *childTy) -> llvm::Optional<Type> {
-      // We want to visit the first level of children.
-      if (childTy == ty.getPointer())
-        return llvm::None;
+    Type newTy =
+        ty.transformRec([&](TypeBase *childTy) -> llvm::Optional<Type> {
+          // We want to visit the first level of children.
+          if (childTy == ty.getPointer())
+            return llvm::None;
 
-      auto result = this->visit(childTy);
-      anyFound |= result.second;
-      return result.first;
-    });
+          auto result = this->visit(childTy);
+          anyFound |= result.second;
+          return result.first;
+        });
 
     return { newTy, anyFound };
   }
@@ -2507,12 +2507,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
-    auto swiftParamTyOpt = importParameterType(
-        param, optionalityOfParam, allowNSUIntegerAsInt,
-        /*isNSDictionarySubscriptGetter=*/false,
-        /*paramIsError=*/false,
-        /*paramIsCompletionHandler=*/false,
-        /*completionHandlerErrorParamIndex=*/llvm::None, genericParams, paramAddDiag);
+    auto swiftParamTyOpt =
+        importParameterType(param, optionalityOfParam, allowNSUIntegerAsInt,
+                            /*isNSDictionarySubscriptGetter=*/false,
+                            /*paramIsError=*/false,
+                            /*paramIsCompletionHandler=*/false,
+                            /*completionHandlerErrorParamIndex=*/llvm::None,
+                            genericParams, paramAddDiag);
     if (!swiftParamTyOpt) {
       addImportDiagnostic(param,
                           Diagnostic(diag::parameter_type_not_imported, param),
@@ -3131,10 +3132,12 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         ImportTypeKind importKind = getImportTypeKindForParam(param);
 
         // Import the original completion handler type without adjustments.
-        Type origSwiftParamTy = importType(
-            paramTy, importKind, paramAddDiag, allowNSUIntegerAsIntInParam,
-            Bridgeability::Full, ImportTypeAttrs(), optionalityOfParam,
-            /*resugarNSErrorPointer=*/!paramIsError, llvm::None).getType();
+        Type origSwiftParamTy =
+            importType(paramTy, importKind, paramAddDiag,
+                       allowNSUIntegerAsIntInParam, Bridgeability::Full,
+                       ImportTypeAttrs(), optionalityOfParam,
+                       /*resugarNSErrorPointer=*/!paramIsError, llvm::None)
+                .getType();
         completionHandlerType = mapGenericArgs(origDC, dc, origSwiftParamTy)
             ->getCanonicalType();
         continue;

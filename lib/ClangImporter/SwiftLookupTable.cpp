@@ -684,13 +684,15 @@ SwiftLookupTable::allGlobalsAsMembersInContext(StoredContext context) {
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
-SwiftLookupTable::lookupGlobalsAsMembers(SerializedSwiftName baseName,
-                                         llvm::Optional<EffectiveClangContext> searchContext) {
+SwiftLookupTable::lookupGlobalsAsMembers(
+    SerializedSwiftName baseName,
+    llvm::Optional<EffectiveClangContext> searchContext) {
   // Propagate the null search context.
   if (!searchContext)
     return lookupGlobalsAsMembersImpl(baseName, llvm::None);
 
-  llvm::Optional<StoredContext> storedContext = translateContext(*searchContext);
+  llvm::Optional<StoredContext> storedContext =
+      translateContext(*searchContext);
   if (!storedContext) return { };
 
   return lookupGlobalsAsMembersImpl(baseName, *storedContext);

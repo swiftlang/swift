@@ -225,7 +225,8 @@ private:
   /// other scope ending instructions.
   /// If a Match WITH an apply is returned, we might be able to transform this
   /// instruction, so more expensive checks are in order.
-  llvm::Optional<Match> definesMatchingInstructionSequence(SILInstruction *) const;
+  llvm::Optional<Match>
+  definesMatchingInstructionSequence(SILInstruction *) const;
 
   /// Whether the specified instruction is or might be the beginning of a
   /// sequence of "inconsequential" instructions the last of which destroys

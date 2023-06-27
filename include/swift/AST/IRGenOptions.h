@@ -467,7 +467,8 @@ public:
   
   /// Pull in runtime compatibility shim libraries by autolinking.
   llvm::Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
-  llvm::Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+  llvm::Optional<llvm::VersionTuple>
+      AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
   llvm::Optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
   bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;

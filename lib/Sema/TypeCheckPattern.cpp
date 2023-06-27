@@ -571,8 +571,8 @@ public:
       baseTE = TypeExpr::createImplicit(enumDecl->getDeclaredTypeInContext(),
                                         Context);
     } else {
-      const auto options =
-          TypeResolutionOptions(llvm::None) | TypeResolutionFlags::SilenceErrors;
+      const auto options = TypeResolutionOptions(llvm::None) |
+                           TypeResolutionFlags::SilenceErrors;
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
@@ -1458,7 +1458,7 @@ Pattern *TypeChecker::coercePatternToType(
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     llvm::Optional<CheckedCastKind> castKind;
-    
+
     EnumElementDecl *elt = EEP->getElementDecl();
     
     Type enumTy;

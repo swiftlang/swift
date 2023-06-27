@@ -46,36 +46,36 @@ llvm::Optional<unsigned> expandFreestandingMacro(MacroExpansionDecl *med);
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.
-llvm::Optional<unsigned> expandAccessors(
-    AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
-);
+llvm::Optional<unsigned> expandAccessors(AbstractStorageDecl *storage,
+                                         CustomAttr *attr, MacroDecl *macro);
 
 /// Expand the attributes for the given member declaration based
 /// on the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-llvm::Optional<unsigned>
-expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
+llvm::Optional<unsigned> expandAttributes(CustomAttr *attr, MacroDecl *macro,
+                                          Decl *member);
 
 /// Expand the synthesized members for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-llvm::Optional<unsigned>
-expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+llvm::Optional<unsigned> expandMembers(CustomAttr *attr, MacroDecl *macro,
+                                       Decl *decl);
 
 /// Expand the peer declarations for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-llvm::Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+llvm::Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro,
+                                     Decl *decl);
 
 /// Expand the conformances for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
 llvm::Optional<unsigned> expandConformances(CustomAttr *attr, MacroDecl *macro,
-                                      NominalTypeDecl *nominal);
+                                            NominalTypeDecl *nominal);
 
 /// Determine whether an accessor macro with the given attribute only
 /// introduces observers like willSet and didSet.

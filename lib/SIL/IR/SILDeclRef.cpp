@@ -219,7 +219,8 @@ ASTContext &SILDeclRef::getASTContext() const {
   return DC->getASTContext();
 }
 
-llvm::Optional<AvailabilityContext> SILDeclRef::getAvailabilityForLinkage() const {
+llvm::Optional<AvailabilityContext>
+SILDeclRef::getAvailabilityForLinkage() const {
   // Back deployment thunks and fallbacks don't have availability since they
   // are non-ABI.
   // FIXME: Generalize this check to all kinds of non-ABI functions.

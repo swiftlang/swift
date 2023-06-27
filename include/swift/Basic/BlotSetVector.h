@@ -45,7 +45,8 @@ namespace swift {
 ///
 /// (a) The `blot operation' is leaving the value in the set vector, but marking
 /// the value as being dead.
-template <typename ValueT, typename VectorT = std::vector<llvm::Optional<ValueT>>,
+template <typename ValueT,
+          typename VectorT = std::vector<llvm::Optional<ValueT>>,
           typename MapT = llvm::DenseMap<ValueT, unsigned>>
 class BlotSetVector {
   VectorT vector;

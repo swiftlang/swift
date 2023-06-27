@@ -358,7 +358,8 @@ private:
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 
-  typedef llvm::Optional<std::pair<LocationOfPreexistingNode, ModuleDepGraphNode *>>
+  typedef llvm::Optional<
+      std::pair<LocationOfPreexistingNode, ModuleDepGraphNode *>>
       PreexistingNodeIfAny;
 
   /// Find the preexisting node here that best matches the integrand.
@@ -477,7 +478,8 @@ public:
   void printPath(raw_ostream &out, const driver::Job *node) const;
 
   /// Get a printable filename, given a node's swiftDeps.
-  StringRef getProvidingFilename(const llvm::Optional<std::string> &swiftDeps) const;
+  StringRef
+  getProvidingFilename(const llvm::Optional<std::string> &swiftDeps) const;
 
   /// Print one node on the dependency path.
   static void printOneNodeOfPath(raw_ostream &out, const DependencyKey &key,

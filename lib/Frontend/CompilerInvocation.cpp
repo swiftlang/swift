@@ -323,8 +323,9 @@ static bool ParseFrontendArgs(
   return converter.convert(buffers);
 }
 
-static void diagnoseSwiftVersion(llvm::Optional<version::Version> &vers, Arg *verArg,
-                                 ArgList &Args, DiagnosticEngine &diags) {
+static void diagnoseSwiftVersion(llvm::Optional<version::Version> &vers,
+                                 Arg *verArg, ArgList &Args,
+                                 DiagnosticEngine &diags) {
   // General invalid version error
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
@@ -630,7 +631,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_unavailable_decl_optimization_EQ)) {
     auto value =
-        llvm::StringSwitch<llvm::Optional<UnavailableDeclOptimization>>(A->getValue())
+        llvm::StringSwitch<llvm::Optional<UnavailableDeclOptimization>>(
+            A->getValue())
             .Case("none", UnavailableDeclOptimization::None)
             .Case("stub", UnavailableDeclOptimization::Stub)
             .Case("complete", UnavailableDeclOptimization::Complete)
@@ -911,11 +913,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.isSwiftVersionAtLeast(6)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
-    auto value = llvm::StringSwitch<llvm::Optional<StrictConcurrency>>(A->getValue())
-      .Case("minimal", StrictConcurrency::Minimal)
-      .Case("targeted", StrictConcurrency::Targeted)
-      .Case("complete", StrictConcurrency::Complete)
-      .Default(llvm::None);
+    auto value =
+        llvm::StringSwitch<llvm::Optional<StrictConcurrency>>(A->getValue())
+            .Case("minimal", StrictConcurrency::Minimal)
+            .Case("targeted", StrictConcurrency::Targeted)
+            .Case("complete", StrictConcurrency::Complete)
+            .Default(llvm::None);
 
     if (value)
       Opts.StrictConcurrencyLevel = *value;
@@ -951,12 +954,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         generateOptimizationRemarkRegex(Diags, Args, A);
 
   if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
-    auto value = llvm::StringSwitch<llvm::Optional<AccessNoteDiagnosticBehavior>>(A->getValue())
-      .Case("none", AccessNoteDiagnosticBehavior::Ignore)
-      .Case("failures", AccessNoteDiagnosticBehavior::RemarkOnFailure)
-      .Case("all", AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess)
-      .Case("all-validate", AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess)
-      .Default(llvm::None);
+    auto value =
+        llvm::StringSwitch<llvm::Optional<AccessNoteDiagnosticBehavior>>(
+            A->getValue())
+            .Case("none", AccessNoteDiagnosticBehavior::Ignore)
+            .Case("failures", AccessNoteDiagnosticBehavior::RemarkOnFailure)
+            .Case("all", AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess)
+            .Case("all-validate",
+                  AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess)
+            .Default(llvm::None);
 
     if (value)
       Opts.AccessNoteBehavior = *value;
@@ -1098,7 +1104,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       getDefaultMinimumInliningTargetVersion(Opts.Target);
 
   // Parse OS version number arguments.
-  auto parseVersionArg = [&](OptSpecifier opt) -> llvm::Optional<llvm::VersionTuple> {
+  auto parseVersionArg =
+      [&](OptSpecifier opt) -> llvm::Optional<llvm::VersionTuple> {
     Arg *A = Args.getLastArg(opt);
     if (!A)
       return llvm::None;
@@ -1948,11 +1955,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   llvm::Optional<DestroyHoistingOption> specifiedDestroyHoistingOption;
   if (Arg *A = Args.getLastArg(OPT_enable_destroy_hoisting)) {
-    specifiedDestroyHoistingOption = 
+    specifiedDestroyHoistingOption =
         llvm::StringSwitch<llvm::Optional<DestroyHoistingOption>>(A->getValue())
-          .Case("true", DestroyHoistingOption::On)
-          .Case("false", DestroyHoistingOption::Off)
-          .Default(llvm::None);
+            .Case("true", DestroyHoistingOption::On)
+            .Case("false", DestroyHoistingOption::Off)
+            .Default(llvm::None);
   }
 
   llvm::Optional<CopyPropagationOption> specifiedCopyPropagationOption;
@@ -2469,7 +2476,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseJIT = true;
     if (const Arg *A = Args.getLastArg(OPT_dump_jit)) {
       llvm::Optional<swift::JITDebugArtifact> artifact =
-          llvm::StringSwitch<llvm::Optional<swift::JITDebugArtifact>>(A->getValue())
+          llvm::StringSwitch<llvm::Optional<swift::JITDebugArtifact>>(
+              A->getValue())
               .Case("llvm-ir", JITDebugArtifact::LLVMIR)
               .Case("object", JITDebugArtifact::Object)
               .Default(llvm::None);
@@ -2652,7 +2660,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  auto getRuntimeCompatVersion = [&] () -> llvm::Optional<llvm::VersionTuple> {
+  auto getRuntimeCompatVersion = [&]() -> llvm::Optional<llvm::VersionTuple> {
     llvm::Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {

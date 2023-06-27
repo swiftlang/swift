@@ -22,8 +22,8 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 
-#include <condition_variable>
 #include <atomic>
+#include <condition_variable>
 #include <optional>
 
 #ifndef SWIFT_DEBUG_RUNTIME
@@ -298,9 +298,10 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  std::optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
+  std::optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
     EntryType *entry = Storage.find(key);
-    if (!entry) return std::nullopt;
+    if (!entry)
+      return std::nullopt;
     return entry->await(Storage.getConcurrency(),
                         std::forward<ArgTys>(args)...);
   }
@@ -383,7 +384,7 @@ public:
 
   template <class... ArgTys>
   std::optional<Status> beginAllocation(WaitQueue::Worker &worker,
-                                         ArgTys &&... args) {
+                                        ArgTys &&...args) {
 
     // Delegate to the implementation class.
     ValueType origValue =
@@ -1128,8 +1129,8 @@ public:
   /// Perform the allocation operation.
   template <class... Args>
   std::optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
-                                         MetadataRequest request,
-                                         Args &&... args) {
+                                        MetadataRequest request,
+                                        Args &&...args) {
     // Returning a non-None value here will preempt initialization, so we
     // should only do it if we're reached PrivateMetadataState::Complete.
 

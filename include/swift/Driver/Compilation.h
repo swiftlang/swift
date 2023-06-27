@@ -430,13 +430,9 @@ public:
     return LastBuildTime;
   }
 
-  llvm::Optional<unsigned> getBatchCount() const {
-    return BatchCount;
-  }
+  llvm::Optional<unsigned> getBatchCount() const { return BatchCount; }
 
-  llvm::Optional<unsigned> getBatchSizeLimit() const {
-    return BatchSizeLimit;
-  }
+  llvm::Optional<unsigned> getBatchSizeLimit() const { return BatchSizeLimit; }
 
   /// Requests the path to a file containing all input source files. This can
   /// be shared across jobs.

@@ -293,7 +293,8 @@ StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
         changes = Changes::CFG;
       }
       if (insertDeallocs(bd.data.AliveStackLocsAtExit,
-                SuccBI.AliveStackLocsAtEntry, &InsertionBlock->front(), llvm::None)) {
+                         SuccBI.AliveStackLocsAtEntry, &InsertionBlock->front(),
+                         llvm::None)) {
         if (changes == Changes::None)
           changes = Changes::Instructions;
       }

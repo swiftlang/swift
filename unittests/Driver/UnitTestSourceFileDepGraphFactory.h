@@ -53,11 +53,12 @@ private:
   void addADefinedDecl(StringRef s, NodeKind kind);
   void addAUsedDecl(StringRef s, NodeKind kind);
 
-  llvm::Optional<std::pair<DependencyKey, DependencyKey>> parseAUsedDecl(StringRef s,
-                                                                   NodeKind);
+  llvm::Optional<std::pair<DependencyKey, DependencyKey>>
+  parseAUsedDecl(StringRef s, NodeKind);
 
   /// Parse and return an interface \c DependencyKey
-  llvm::Optional<DependencyKey> parseADefinedDecl(StringRef s, NodeKind, DeclAspect);
+  llvm::Optional<DependencyKey> parseADefinedDecl(StringRef s, NodeKind,
+                                                  DeclAspect);
 
   DependencyKey computeUseKey(StringRef s, bool isCascadingUse);
 

@@ -454,7 +454,8 @@ public:
 
   static SourceKit::UIdent getUIDForRefactoringRangeKind(swift::ide::RefactoringRangeKind Kind);
 
-  static llvm::Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
+  static llvm::Optional<UIdent>
+  getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
   static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
 
@@ -593,12 +594,11 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(
-      StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> vfsOptions) override;
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                  EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                  llvm::Optional<VFSOptions> vfsOptions) override;
 
-  void editorOpenInterface(EditorConsumer &Consumer,
-                           StringRef Name,
+  void editorOpenInterface(EditorConsumer &Consumer, StringRef Name,
                            StringRef ModuleName,
                            llvm::Optional<StringRef> Group,
                            ArrayRef<const char *> Args,

@@ -136,9 +136,8 @@ namespace {
                        ReferenceCounting refcounting,
                        bool completelyFragileLayout,
                        llvm::Optional<ArrayRef<SILType>> tailTypes = llvm::None)
-      : StructLayoutBuilder(IGM),
-        TailTypes(tailTypes),
-        CompletelyFragileLayout(completelyFragileLayout) {
+        : StructLayoutBuilder(IGM), TailTypes(tailTypes),
+          CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.
       switch (refcounting) {
       case ReferenceCounting::Native:
@@ -1346,7 +1345,8 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      llvm::Optional<CanType> specializedGenericType = getSpecializedGenericType();
+      llvm::Optional<CanType> specializedGenericType =
+          getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, getClass());

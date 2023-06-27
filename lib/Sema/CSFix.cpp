@@ -250,9 +250,8 @@ bool MarkGlobalActorFunction::diagnose(const Solution &solution,
 
 /// The fix behavior to apply to a concurrency-related diagnostic.
 static llvm::Optional<FixBehavior>
-getConcurrencyFixBehavior(
-    ConstraintSystem &cs, ConstraintKind constraintKind,
-    ConstraintLocatorBuilder locator, bool forSendable) {
+getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
+                          ConstraintLocatorBuilder locator, bool forSendable) {
   // We can only handle the downgrade for conversions.
   switch (constraintKind) {
   case ConstraintKind::Conversion:
@@ -2487,7 +2486,8 @@ bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
 
 bool AddExplicitExistentialCoercion::isRequired(
     ConstraintSystem &cs, Type resultTy,
-    llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)> findExistentialType,
+    llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
+        findExistentialType,
     ConstraintLocatorBuilder locator) {
   using ExistentialTypeFinder =
       llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>;

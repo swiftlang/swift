@@ -697,8 +697,7 @@ void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
 // RequiresOpaqueAccessorsRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool>
-RequiresOpaqueAccessorsRequest::getCachedResult() const {
+llvm::Optional<bool> RequiresOpaqueAccessorsRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
     return storage->LazySemanticInfo.RequiresOpaqueAccessors;
@@ -733,8 +732,7 @@ void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
 // IsAccessorTransparentRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool>
-IsAccessorTransparentRequest::getCachedResult() const {
+llvm::Optional<bool> IsAccessorTransparentRequest::getCachedResult() const {
   auto *accessor = std::get<0>(getStorage());
   return accessor->getCachedIsTransparent();
 }
@@ -795,7 +793,8 @@ void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
 // GenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<GenericSignature> GenericSignatureRequest::getCachedResult() const {
+llvm::Optional<GenericSignature>
+GenericSignatureRequest::getCachedResult() const {
   auto *GC = std::get<0>(getStorage());
   if (GC->GenericSigAndBit.getInt()) {
     return GC->GenericSigAndBit.getPointer();
@@ -840,8 +839,7 @@ void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
 // UnderlyingTypeRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<Type>
-UnderlyingTypeRequest::getCachedResult() const {
+llvm::Optional<Type> UnderlyingTypeRequest::getCachedResult() const {
   auto *typeAlias = std::get<0>(getStorage());
   if (auto type = typeAlias->UnderlyingTy.getType())
     return type;
@@ -879,7 +877,8 @@ bool EnumRawValuesRequest::isCached() const {
   return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
 
-llvm::Optional<evaluator::SideEffect> EnumRawValuesRequest::getCachedResult() const {
+llvm::Optional<evaluator::SideEffect>
+EnumRawValuesRequest::getCachedResult() const {
   auto *ED = std::get<0>(getStorage());
   if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
     return std::make_tuple<>();
@@ -1098,7 +1097,8 @@ void swift::simple_display(llvm::raw_ostream &out,
 // InheritsSuperclassInitializersRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
+llvm::Optional<bool>
+InheritsSuperclassInitializersRequest::getCachedResult() const {
   auto *decl = std::get<0>(getStorage());
   return decl->getCachedInheritsSuperclassInitializers();
 }
@@ -1270,7 +1270,8 @@ llvm::Optional<Type> DefaultArgumentTypeRequest::getCachedResult() const {
   if (!defaultInfo)
     return llvm::None;
 
-  return defaultInfo->ExprType ? llvm::Optional<Type>(defaultInfo->ExprType) : llvm::None;
+  return defaultInfo->ExprType ? llvm::Optional<Type>(defaultInfo->ExprType)
+                               : llvm::None;
 }
 
 void DefaultArgumentTypeRequest::cacheResult(Type type) const {
@@ -1282,7 +1283,8 @@ void DefaultArgumentTypeRequest::cacheResult(Type type) const {
 // CallerSideDefaultArgExprRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<Expr *> CallerSideDefaultArgExprRequest::getCachedResult() const {
+llvm::Optional<Expr *>
+CallerSideDefaultArgExprRequest::getCachedResult() const {
   auto *defaultExpr = std::get<0>(getStorage());
   auto storage = defaultExpr->ContextOrCallerSideExpr;
   assert(!storage.isNull());
@@ -1428,7 +1430,8 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
 // TypeCheckFunctionBodyRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
+llvm::Optional<BraceStmt *>
+TypeCheckFunctionBodyRequest::getCachedResult() const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto *afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {

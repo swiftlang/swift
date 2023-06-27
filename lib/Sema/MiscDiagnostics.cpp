@@ -6090,7 +6090,8 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-llvm::Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
+llvm::Optional<DeclName>
+TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
@@ -6138,12 +6139,11 @@ llvm::Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *af
     firstParamName = params->get(0)->getName().str();
 
   StringScratchSpace scratch;
-  if (!swift::omitNeedlessWords(baseNameStr, argNameStrs, firstParamName,
-                                getTypeNameForOmission(resultType),
-                                getTypeNameForOmission(contextType),
-                                paramTypes, returnsSelf, false,
-                                /*allPropertyNames=*/nullptr,
-                                llvm::None, llvm::None, scratch))
+  if (!swift::omitNeedlessWords(
+          baseNameStr, argNameStrs, firstParamName,
+          getTypeNameForOmission(resultType),
+          getTypeNameForOmission(contextType), paramTypes, returnsSelf, false,
+          /*allPropertyNames=*/nullptr, llvm::None, llvm::None, scratch))
     return llvm::None;
 
   /// Retrieve a replacement identifier.
@@ -6196,9 +6196,10 @@ llvm::Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getInterfaceType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
-  if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
+  if (::omitNeedlessWords(name, {}, "", typeName, contextTypeName, {},
                           /*returnsSelf=*/false, true,
-                          /*allPropertyNames=*/nullptr, llvm::None, llvm::None, scratch)) {
+                          /*allPropertyNames=*/nullptr, llvm::None, llvm::None,
+                          scratch)) {
     return Context.getIdentifier(name);
   }
 

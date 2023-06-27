@@ -12,8 +12,8 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringRef.h"
 
 #ifndef SWIFT_RQM_SYMBOL_H
 #define SWIFT_RQM_SYMBOL_H
@@ -209,8 +209,7 @@ public:
   static Symbol forLayout(LayoutConstraint layout,
                           RewriteContext &ctx);
 
-  static Symbol forSuperclass(CanType type,
-                              llvm::ArrayRef<Term> substitutions,
+  static Symbol forSuperclass(CanType type, llvm::ArrayRef<Term> substitutions,
                               RewriteContext &ctx);
 
   static Symbol forConcreteType(CanType type,
@@ -226,9 +225,8 @@ public:
 
   llvm::Optional<int> compare(Symbol other, RewriteContext &ctx) const;
 
-  Symbol withConcreteSubstitutions(
-      llvm::ArrayRef<Term> substitutions,
-      RewriteContext &ctx) const;
+  Symbol withConcreteSubstitutions(llvm::ArrayRef<Term> substitutions,
+                                   RewriteContext &ctx) const;
 
   Symbol transformConcreteSubstitutions(
       llvm::function_ref<Term(Term)> fn,

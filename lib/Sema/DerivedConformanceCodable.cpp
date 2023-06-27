@@ -52,8 +52,8 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
 ///
 /// \param paramIndex if set will be used to generate name in the form of
 ///                   '_$paramIndex' when VarDecl has no name.
-static Identifier getVarNameForCoding(VarDecl *var,
-                                      llvm::Optional<int> paramIndex = llvm::None) {
+static Identifier
+getVarNameForCoding(VarDecl *var, llvm::Optional<int> paramIndex = llvm::None) {
   auto &C = var->getASTContext();
   Identifier identifier;
   if (auto *PD = dyn_cast<ParamDecl>(var)) {
@@ -983,7 +983,8 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
       auto stmt = CaseStmt::create(
           C, CaseParentKind::Switch, SourceLoc(), labelItem, SourceLoc(),
           SourceLoc(), caseBody,
-          /*case body vardecls*/ createSubpattern ? caseBodyVarDecls : llvm::None);
+          /*case body vardecls*/
+              createSubpattern ? caseBodyVarDecls : llvm::None);
       cases.push_back(stmt);
     }
   }

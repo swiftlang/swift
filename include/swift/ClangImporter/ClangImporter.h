@@ -441,10 +441,10 @@ public:
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  llvm::Optional<const ModuleDependencyInfo*> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate,
-      bool isTestableImport = false) override;
+  llvm::Optional<const ModuleDependencyInfo *>
+  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
+                        InterfaceSubContextDelegate &delegate,
+                        bool isTestableImport = false) override;
 
   /// Add dependency information for the bridging header.
   ///

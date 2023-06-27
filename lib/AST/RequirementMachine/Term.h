@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Optional.h"
 #include "Symbol.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallVector.h"
 
 #ifndef SWIFT_RQM_TERM_H
 #define SWIFT_RQM_TERM_H
@@ -124,7 +124,7 @@ public:
     : Symbols(std::move(symbols)) {}
 
   explicit MutableTerm(llvm::ArrayRef<Symbol> symbols)
-    : Symbols(symbols.begin(), symbols.end()) {}
+      : Symbols(symbols.begin(), symbols.end()) {}
 
   explicit MutableTerm(Term term)
     : Symbols(term.begin(), term.end()) {}
@@ -145,7 +145,8 @@ public:
     Symbols.append(from, to);
   }
 
-  llvm::Optional<int> compare(const MutableTerm &other, RewriteContext &ctx) const;
+  llvm::Optional<int> compare(const MutableTerm &other,
+                              RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 

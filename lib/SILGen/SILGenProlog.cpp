@@ -768,8 +768,9 @@ private:
       // If it's a locally mutable parameter, then we need to move the argument
       // value into a local box to hold the mutated value.
       // We don't need to mark_uninitialized since we immediately initialize.
-      auto mutableBox = SGF.emitLocalVariableWithCleanup(pd,
-                                                   /*uninitialized kind*/ llvm::None);
+      auto mutableBox =
+          SGF.emitLocalVariableWithCleanup(pd,
+                                           /*uninitialized kind*/ llvm::None);
       argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
       return;
     }
@@ -1133,14 +1134,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(CaptureInfo captureInfo,
-                                ParameterList *paramList,
-                                ParamDecl *selfParam,
-                                DeclContext *DC,
-                                Type resultType,
-                                bool throws,
-                                SourceLoc throwsLoc,
-                                llvm::Optional<AbstractionPattern> origClosureType) {
+void SILGenFunction::emitProlog(
+    CaptureInfo captureInfo, ParameterList *paramList, ParamDecl *selfParam,
+    DeclContext *DC, Type resultType, bool throws, SourceLoc throwsLoc,
+    llvm::Optional<AbstractionPattern> origClosureType) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
@@ -1453,9 +1450,10 @@ SILValue SILGenFunction::emitLoadActorExecutor(SILLocation loc,
   return actorV;
 }
 
-ExecutorBreadcrumb SILGenFunction::emitHopToTargetActor(SILLocation loc,
-                                          llvm::Optional<ActorIsolation> maybeIso,
-                                          llvm::Optional<ManagedValue> maybeSelf) {
+ExecutorBreadcrumb
+SILGenFunction::emitHopToTargetActor(SILLocation loc,
+                                     llvm::Optional<ActorIsolation> maybeIso,
+                                     llvm::Optional<ManagedValue> maybeSelf) {
   if (!maybeIso)
     return ExecutorBreadcrumb();
 
@@ -1475,9 +1473,9 @@ ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
   return breadcrumb;
 }
 
-llvm::Optional<SILValue> SILGenFunction::emitExecutor(
-    SILLocation loc, ActorIsolation isolation,
-    llvm::Optional<ManagedValue> maybeSelf) {
+llvm::Optional<SILValue>
+SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
+                             llvm::Optional<ManagedValue> maybeSelf) {
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Independent:
@@ -1666,14 +1664,11 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
   (void)arg;
 }
 
-uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
-                                 ParamDecl *selfParam,
-                                 Type resultType,
-                                 DeclContext *DC,
-                                 bool throws,
-                                 SourceLoc throwsLoc,
-                                 unsigned numIgnoredTrailingParameters,
-                                 llvm::Optional<AbstractionPattern> origClosureType) {
+uint16_t SILGenFunction::emitBasicProlog(
+    ParameterList *paramList, ParamDecl *selfParam, Type resultType,
+    DeclContext *DC, bool throws, SourceLoc throwsLoc,
+    unsigned numIgnoredTrailingParameters,
+    llvm::Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getReducedType(genericSig);

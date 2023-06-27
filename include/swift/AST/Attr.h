@@ -17,31 +17,31 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/UUID.h"
-#include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/OptimizationMode.h"
-#include "swift/Basic/Version.h"
-#include "swift/Basic/Located.h"
 #include "swift/AST/ASTAllocated.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/StorageImpl.h"
-#include "llvm/ADT/iterator_range.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/Located.h"
+#include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/UUID.h"
+#include "swift/Basic/Version.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VersionTuple.h"
@@ -644,7 +644,7 @@ enum class PlatformAgnosticAvailabilityKind {
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
-#define INIT_VER_TUPLE(X)\
+#define INIT_VER_TUPLE(X)                                                      \
   X(X.empty() ? llvm::Optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
@@ -803,9 +803,8 @@ class ObjCAttr final : public DeclAttribute,
 
   /// Create an implicit @objc attribute with the given (optional) name.
   explicit ObjCAttr(llvm::Optional<ObjCSelector> name, bool implicitName)
-    : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
-      NameData(nullptr)
-  {
+      : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
+        NameData(nullptr) {
     Bits.ObjCAttr.HasTrailingLocationInfo = false;
     Bits.ObjCAttr.ImplicitName = implicitName;
     Bits.ObjCAttr.Swift3Inferred = false;
@@ -816,8 +815,9 @@ class ObjCAttr final : public DeclAttribute,
   }
 
   /// Create an @objc attribute written in the source.
-  ObjCAttr(SourceLoc atLoc, SourceRange baseRange, llvm::Optional<ObjCSelector> name,
-           SourceRange parenRange, ArrayRef<SourceLoc> nameLocs);
+  ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
+           llvm::Optional<ObjCSelector> name, SourceRange parenRange,
+           ArrayRef<SourceLoc> nameLocs);
 
   /// Determine whether this attribute has trailing location information.
   bool hasTrailingLocationInfo() const {
@@ -2347,14 +2347,15 @@ public:
 /// in symbol graphs, and/or adding arbitrary metadata to it.
 class DocumentationAttr: public DeclAttribute {
 public:
-  DocumentationAttr(SourceLoc AtLoc, SourceRange Range,
-                    StringRef Metadata, llvm::Optional<AccessLevel> Visibility,
-                    bool Implicit)
-  : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
-    Metadata(Metadata), Visibility(Visibility) {}
+  DocumentationAttr(SourceLoc AtLoc, SourceRange Range, StringRef Metadata,
+                    llvm::Optional<AccessLevel> Visibility, bool Implicit)
+      : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
+        Metadata(Metadata), Visibility(Visibility) {}
 
-  DocumentationAttr(StringRef Metadata, llvm::Optional<AccessLevel> Visibility, bool Implicit)
-  : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility, Implicit) {}
+  DocumentationAttr(StringRef Metadata, llvm::Optional<AccessLevel> Visibility,
+                    bool Implicit)
+      : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility,
+                          Implicit) {}
 
   const StringRef Metadata;
   const llvm::Optional<AccessLevel> Visibility;
@@ -2434,8 +2435,7 @@ public:
 template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   ToAttributeKind() {}
 
-  llvm::Optional<const ATTR *>
-  operator()(const DeclAttribute *Attr) const {
+  llvm::Optional<const ATTR *> operator()(const DeclAttribute *Attr) const {
     if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
       return cast<ATTR>(Attr);
     return llvm::None;

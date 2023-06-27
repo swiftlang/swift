@@ -206,13 +206,15 @@ public:
     unsigned asInt() const { return *reinterpret_cast<const unsigned *>(this); }
 
     struct ToLiveSucc {
-      llvm::Optional<SuccessorID> operator()(llvm::Optional<SuccessorID> ID) const {
+      llvm::Optional<SuccessorID>
+      operator()(llvm::Optional<SuccessorID> ID) const {
         return ID;
       }
     };
 
     struct ToLiveLocalSucc {
-      llvm::Optional<unsigned> operator()(llvm::Optional<SuccessorID> ID) const {
+      llvm::Optional<unsigned>
+      operator()(llvm::Optional<SuccessorID> ID) const {
         if (!ID)
           return llvm::None;
         if ((*ID).IsNonLocal)
@@ -222,7 +224,8 @@ public:
     };
 
     struct ToLiveNonLocalSucc {
-      llvm::Optional<unsigned> operator()(llvm::Optional<SuccessorID> ID) const {
+      llvm::Optional<unsigned>
+      operator()(llvm::Optional<SuccessorID> ID) const {
         if (!ID)
           return llvm::None;
         if (!(*ID).IsNonLocal)

@@ -795,7 +795,8 @@ private:
                              Desc.getASTFile());
   };
 
-  static llvm::Optional<ASTSourceDescriptor> getClangModule(const ModuleDecl &M) {
+  static llvm::Optional<ASTSourceDescriptor>
+  getClangModule(const ModuleDecl &M) {
     for (auto *FU : M.getFiles())
       if (auto *CMU = dyn_cast_or_null<ClangModuleUnit>(FU))
         if (auto Desc = CMU->getASTSourceDescriptor())
@@ -1393,17 +1394,17 @@ private:
 
     case TypeKind::BuiltinNativeObject: {
       unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-      auto PTy =
-          DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                     /* DWARFAddressSpace */ llvm::None, MangledName);
+      auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                            /* DWARFAddressSpace */ llvm::None,
+                                            MangledName);
       return DBuilder.createObjectPointerType(PTy);
     }
 
     case TypeKind::BuiltinBridgeObject: {
       unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-      auto PTy =
-          DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                     /* DWARFAddressSpace */ llvm::None, MangledName);
+      auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                            /* DWARFAddressSpace */ llvm::None,
+                                            MangledName);
       return DBuilder.createObjectPointerType(PTy);
     }
 
@@ -3189,7 +3190,8 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DebugType, bool IsLocalToUnit, llvm::Optional<SILLocation> Loc) {
+    DebugTypeInfo DebugType, bool IsLocalToUnit,
+    llvm::Optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
       Storage, Name, LinkageName, DebugType, IsLocalToUnit, Loc);
 }

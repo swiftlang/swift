@@ -564,7 +564,8 @@ struct FullApplySiteKind {
   FullApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<FullApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+  static llvm::Optional<FullApplySiteKind>
+  fromNodeKind(SILInstructionKind kind) {
     if (auto innerOpt = FullApplySiteKind::fromNodeKindHelper(kind))
       return FullApplySiteKind(*innerOpt);
     return llvm::None;

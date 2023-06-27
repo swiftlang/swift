@@ -1544,9 +1544,9 @@ GeneratedModule swift::performIRGeneration(
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forWholeModule(
-      M, Opts, TBDOpts, SILOpts, SILModPtr->Types,
-      std::move(SILMod), ModuleName, PSPs, /*symsToEmit*/ llvm::None,
-      parallelOutputFilenames, outModuleHash);
+      M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
+      ModuleName, PSPs, /*symsToEmit*/ llvm::None, parallelOutputFilenames,
+      outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty() &&
@@ -1570,8 +1570,8 @@ performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forFile(
-      file, Opts, TBDOpts, SILOpts, SILModPtr->Types,
-      std::move(SILMod), ModuleName, PSPs, PrivateDiscriminator,
+      file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
+      ModuleName, PSPs, PrivateDiscriminator,
       /*symsToEmit*/ llvm::None, outModuleHash);
   return llvm::cantFail(file->getASTContext().evaluator(IRGenRequest{desc}));
 }

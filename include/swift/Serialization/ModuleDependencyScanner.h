@@ -44,14 +44,15 @@ namespace swift {
       std::string moduleCachePath;
 
       llvm::Optional<SwiftDependencyTracker> dependencyTracker;
+
     public:
       llvm::Optional<ModuleDependencyInfo> dependencies;
 
-      ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                              Identifier moduleName,
-                              InterfaceSubContextDelegate &astDelegate,
-                              ScannerKind kind = MDS_plain,
-                              llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
+      ModuleDependencyScanner(
+          ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
+          InterfaceSubContextDelegate &astDelegate,
+          ScannerKind kind = MDS_plain,
+          llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
           : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                        /*IgnoreSwiftSourceInfoFile=*/true),
             kind(kind), moduleName(moduleName), astDelegate(astDelegate),
@@ -118,11 +119,11 @@ namespace swift {
       llvm::BumpPtrAllocator Allocator;
 
     public:
-      PlaceholderSwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                                    Identifier moduleName,
-                                    StringRef PlaceholderDependencyModuleMap,
-                                    InterfaceSubContextDelegate &astDelegate,
-                                    llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
+      PlaceholderSwiftModuleScanner(
+          ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
+          StringRef PlaceholderDependencyModuleMap,
+          InterfaceSubContextDelegate &astDelegate,
+          llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
           : ModuleDependencyScanner(ctx, LoadMode, moduleName, astDelegate,
                                     MDS_placeholder, tracker) {
 

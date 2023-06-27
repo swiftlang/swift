@@ -38,8 +38,8 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -2852,10 +2852,8 @@ class AnyMetatypeType : public TypeBase {
   Type InstanceType;
 protected:
   AnyMetatypeType(TypeKind kind, const ASTContext *C,
-                  RecursiveTypeProperties properties,
-                  Type instanceType,
+                  RecursiveTypeProperties properties, Type instanceType,
                   llvm::Optional<MetatypeRepresentation> repr);
-
 
 public:
   Type getInstanceType() const { return InstanceType; }
@@ -2916,8 +2914,8 @@ public:
   ///
   /// Metatype representation is a SIL-only property. Thin metatypes
   /// can be lowered away to empty types in IR.
-  static MetatypeType *get(Type T,
-                           llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
+  static MetatypeType *
+  get(Type T, llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
     return get(T, repr, T->getASTContext());
   }
 
@@ -2927,8 +2925,7 @@ public:
   }
   
 private:
-  MetatypeType(Type T, const ASTContext *C,
-               RecursiveTypeProperties properties,
+  MetatypeType(Type T, const ASTContext *C, RecursiveTypeProperties properties,
                llvm::Optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
 };
@@ -2954,18 +2951,16 @@ END_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
 /// The representation of an existential metatype cannot be thin.
 class ExistentialMetatypeType : public AnyMetatypeType {
 public:
-  static ExistentialMetatypeType *get(Type T,
-                                      llvm::Optional<MetatypeRepresentation> Repr,
-                                      const ASTContext &C);
+  static ExistentialMetatypeType *
+  get(Type T, llvm::Optional<MetatypeRepresentation> Repr, const ASTContext &C);
 
   /// Return the ExistentialMetatypeType for the specified type
   /// with the given representation.
   ///
   /// Metatype representation is a SIL-only property. Existential
   /// metatypes cannot be thin.
-  static ExistentialMetatypeType *get(Type T,
-                                      llvm::Optional<MetatypeRepresentation> repr
-                                        = llvm::None) {
+  static ExistentialMetatypeType *
+  get(Type T, llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
     return get(T, repr, T->getASTContext());
   }
 
@@ -3259,7 +3254,7 @@ public:
       return Param(getType(), Identifier(), getFlags().asParamFlags());
     }
 
-    Yield subst(SubstitutionMap subs, SubstOptions options=llvm::None) const {
+    Yield subst(SubstitutionMap subs, SubstOptions options = llvm::None) const {
       return Yield(getType().subst(subs, options), getFlags());
     }
 
@@ -3280,7 +3275,8 @@ public:
     CanType getType() const { return CanType(Yield::getType()); }
     CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
 
-    CanYield subst(SubstitutionMap subs, SubstOptions options=llvm::None) const {
+    CanYield subst(SubstitutionMap subs,
+                   SubstOptions options = llvm::None) const {
       return CanYield(getType().subst(subs, options)->getCanonicalType(),
                       getFlags());
     }
@@ -3587,8 +3583,7 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
   static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanParamArrayRef params,
-                                CanType result,
+                                CanParamArrayRef params, CanType result,
                                 llvm::Optional<ExtInfo> info = llvm::None);
 
   CanGenericSignature getOptGenericSignature() const;
@@ -3662,10 +3657,8 @@ public:
       info = getExtInfo();
     Profile(ID, getParams(), getResult(), info);
   }
-  static void Profile(llvm::FoldingSetNodeID &ID,
-                      ArrayRef<Param> params,
-                      Type result,
-                      llvm::Optional<ExtInfo> info);
+  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Param> params,
+                      Type result, llvm::Optional<ExtInfo> info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3673,15 +3666,16 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<Param> params, Type result, llvm::Optional<ExtInfo> info,
-               const ASTContext *ctx, RecursiveTypeProperties properties);
+  FunctionType(ArrayRef<Param> params, Type result,
+               llvm::Optional<ExtInfo> info, const ASTContext *ctx,
+               RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType get(CanParamArrayRef params, CanType result,
-                             llvm::Optional<ExtInfo> info = llvm::None) {
-    auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
+static CanFunctionType get(CanParamArrayRef params, CanType result,
+                           llvm::Optional<ExtInfo> info = llvm::None) {
+  auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
+  return cast<FunctionType>(fnType->getCanonicalType());
+}
 
   CanFunctionType withExtInfo(ExtInfo info) const {
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
@@ -3765,17 +3759,13 @@ class GenericFunctionType final : public AnyFunctionType,
   }
 
   /// Construct a new generic function type.
-  GenericFunctionType(GenericSignature sig,
-                      ArrayRef<Param> params,
-                      Type result,
-                      llvm::Optional<ExtInfo> info,
-                      const ASTContext *ctx,
+  GenericFunctionType(GenericSignature sig, ArrayRef<Param> params, Type result,
+                      llvm::Optional<ExtInfo> info, const ASTContext *ctx,
                       RecursiveTypeProperties properties);
 
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature sig,
-                                  ArrayRef<Param> params,
+  static GenericFunctionType *get(GenericSignature sig, ArrayRef<Param> params,
                                   Type result,
                                   llvm::Optional<ExtInfo> info = llvm::None);
 
@@ -3813,10 +3803,8 @@ public:
       info = getExtInfo();
     Profile(ID, getGenericSignature(), getParams(), getResult(), info);
   }
-  static void Profile(llvm::FoldingSetNodeID &ID,
-                      GenericSignature sig,
-                      ArrayRef<Param> params,
-                      Type result,
+  static void Profile(llvm::FoldingSetNodeID &ID, GenericSignature sig,
+                      ArrayRef<Param> params, Type result,
                       llvm::Optional<ExtInfo> info);
 
   // Implement isa/cast/dyncast/etc.
@@ -3827,16 +3815,15 @@ public:
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   /// Create a new generic function type.
-  static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanParamArrayRef params,
-                                    CanType result,
-                                    llvm::Optional<ExtInfo> info = llvm::None) {
-    // Knowing that the argument types are independently canonical is
-    // not sufficient to guarantee that the function type will be canonical.
-    auto fnType =
-        GenericFunctionType::get(sig, params.getOriginalArray(), result, info);
-    return cast<GenericFunctionType>(fnType->getCanonicalType());
-  }
+static CanGenericFunctionType get(CanGenericSignature sig,
+                                  CanParamArrayRef params, CanType result,
+                                  llvm::Optional<ExtInfo> info = llvm::None) {
+  // Knowing that the argument types are independently canonical is
+  // not sufficient to guarantee that the function type will be canonical.
+  auto fnType =
+      GenericFunctionType::get(sig, params.getOriginalArray(), result, info);
+  return cast<GenericFunctionType>(fnType->getCanonicalType());
+}
 
   CanFunctionType substGenericArgs(SubstitutionMap subs) const;
 
@@ -4574,8 +4561,7 @@ private:
                   ArrayRef<SILYieldInfo> yieldResults,
                   ArrayRef<SILResultInfo> normalResults,
                   llvm::Optional<SILResultInfo> errorResult,
-                  SubstitutionMap patternSubs,
-                  SubstitutionMap invocationSubs,
+                  SubstitutionMap patternSubs, SubstitutionMap invocationSubs,
                   const ASTContext &ctx, RecursiveTypeProperties properties,
                   ProtocolConformanceRef witnessMethodConformance);
 
@@ -5238,9 +5224,10 @@ public:
   Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,
           SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
           ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
-          ArrayRef<SILResultInfo> results, llvm::Optional<SILResultInfo> errorResult,
-          ProtocolConformanceRef conformance,
-          SubstitutionMap patternSub, SubstitutionMap invocationSubs);
+          ArrayRef<SILResultInfo> results,
+          llvm::Optional<SILResultInfo> errorResult,
+          ProtocolConformanceRef conformance, SubstitutionMap patternSub,
+          SubstitutionMap invocationSubs);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -6342,9 +6329,9 @@ public:
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
-                                                 GenericSignature parentSig,
-                                                 llvm::Optional<UUID> knownID = llvm::None);
+  static CanTypeWrapper<OpenedArchetypeType>
+  get(CanType existential, GenericSignature parentSig,
+      llvm::Optional<UUID> knownID = llvm::None);
 
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
@@ -6356,10 +6343,9 @@ public:
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
-                                                 Type interfaceType,
-                                                 GenericSignature parentSig,
-                                                 llvm::Optional<UUID> knownID = llvm::None);
+  static CanTypeWrapper<OpenedArchetypeType>
+  get(CanType existential, Type interfaceType, GenericSignature parentSig,
+      llvm::Optional<UUID> knownID = llvm::None);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.

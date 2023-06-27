@@ -47,10 +47,10 @@ static StringRef toFileName(const SanitizerKind kind) {
   llvm_unreachable("Unknown sanitizer");
 }
 
-static llvm::Optional<SanitizerKind> parse(const char* arg) {
+static llvm::Optional<SanitizerKind> parse(const char *arg) {
   return llvm::StringSwitch<llvm::Optional<SanitizerKind>>(arg)
-      #define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
-      #include "swift/Basic/Sanitizers.def"
+#define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
+#include "swift/Basic/Sanitizers.def"
       .Default(llvm::None);
 }
 

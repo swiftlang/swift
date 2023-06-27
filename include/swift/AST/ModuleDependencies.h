@@ -898,7 +898,7 @@ private:
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  llvm::Optional<const ModuleDependencyInfo*>
+  llvm::Optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName,
                  llvm::Optional<ModuleDependencyKind> kind,
                  StringRef scanContextHash) const;
@@ -973,7 +973,7 @@ public:
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  llvm::Optional<const ModuleDependencyInfo*>
+  llvm::Optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName,
                  llvm::Optional<ModuleDependencyKind> kind) const;
 

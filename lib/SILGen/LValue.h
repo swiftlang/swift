@@ -215,7 +215,7 @@ class PhysicalPathComponent : public PathComponent {
 protected:
   PhysicalPathComponent(LValueTypeData typeData, KindTy Kind,
                         llvm::Optional<ActorIsolation> actorIso = llvm::None)
-    : PathComponent(typeData, Kind), ActorIso(actorIso) {
+      : PathComponent(typeData, Kind), ActorIso(actorIso) {
     assert(isPhysical() && "PhysicalPathComponent Kind isn't physical");
   }
 
@@ -447,13 +447,11 @@ public:
   // given actor's isolation domain. If the indicator is not present, that
   // only means that a switch does not need to be emitted during the access.
 
-  void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
-                                VarDecl *var, SubstitutionMap subs,
-                                LValueOptions options,
-                                SGFAccessKind accessKind,
-                                AccessStrategy strategy,
-                                CanType formalRValueType,
-                                llvm::Optional<ActorIsolation> actorIso = llvm::None);
+  void addNonMemberVarComponent(
+      SILGenFunction &SGF, SILLocation loc, VarDecl *var, SubstitutionMap subs,
+      LValueOptions options, SGFAccessKind accessKind, AccessStrategy strategy,
+      CanType formalRValueType,
+      llvm::Optional<ActorIsolation> actorIso = llvm::None);
 
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
@@ -467,29 +465,21 @@ public:
                           PreparedArguments &&indices,
                           ArgumentList *argListForDiagnostics);
 
-  void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
-                             VarDecl *var,
-                             SubstitutionMap subs,
-                             LValueOptions options,
-                             bool isSuper,
-                             SGFAccessKind accessKind,
-                             AccessStrategy accessStrategy,
-                             CanType formalRValueType,
-                             bool isOnSelf = false,
-                             llvm::Optional<ActorIsolation> actorIso = llvm::None);
+  void
+  addMemberVarComponent(SILGenFunction &SGF, SILLocation loc, VarDecl *var,
+                        SubstitutionMap subs, LValueOptions options,
+                        bool isSuper, SGFAccessKind accessKind,
+                        AccessStrategy accessStrategy, CanType formalRValueType,
+                        bool isOnSelf = false,
+                        llvm::Optional<ActorIsolation> actorIso = llvm::None);
 
-  void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
-                                   SubscriptDecl *subscript,
-                                   SubstitutionMap subs,
-                                   LValueOptions options,
-                                   bool isSuper,
-                                   SGFAccessKind accessKind,
-                                   AccessStrategy accessStrategy,
-                                   CanType formalRValueType,
-                                   PreparedArguments &&indices,
-                                   ArgumentList *argListForDiagnostics,
-                                   bool isOnSelfParameter = false,
-                                   llvm::Optional<ActorIsolation> actorIso = llvm::None);
+  void addMemberSubscriptComponent(
+      SILGenFunction &SGF, SILLocation loc, SubscriptDecl *subscript,
+      SubstitutionMap subs, LValueOptions options, bool isSuper,
+      SGFAccessKind accessKind, AccessStrategy accessStrategy,
+      CanType formalRValueType, PreparedArguments &&indices,
+      ArgumentList *argListForDiagnostics, bool isOnSelfParameter = false,
+      llvm::Optional<ActorIsolation> actorIso = llvm::None);
 
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted

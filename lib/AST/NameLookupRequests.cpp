@@ -131,7 +131,8 @@ void ProtocolRequirementsRequest::cacheResult(ArrayRef<ValueDecl *> PDs) const {
 // Missing designated initializers computation
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> HasMissingDesignatedInitializersRequest::getCachedResult() const {
+llvm::Optional<bool>
+HasMissingDesignatedInitializersRequest::getCachedResult() const {
   auto classDecl = std::get<0>(getStorage());
   return classDecl->getCachedHasMissingDesignatedInitializers();
 }
@@ -172,7 +173,8 @@ HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
 // Extended nominal computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {
+llvm::Optional<NominalTypeDecl *>
+ExtendedNominalRequest::getCachedResult() const {
   // Note: if we fail to compute any nominal declaration, it's considered
   // a cache miss. This allows us to recompute the extended nominal types
   // during extension binding.
@@ -227,7 +229,8 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 // GenericParamListRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
+llvm::Optional<GenericParamList *>
+GenericParamListRequest::getCachedResult() const {
   using GenericParamsState = GenericContext::GenericParamsState;
   auto *decl = std::get<0>(getStorage());
   switch (decl->GenericParamsAndState.getInt()) {

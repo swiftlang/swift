@@ -39,10 +39,9 @@
 using namespace swift;
 using namespace Lowering;
 
-
 llvm::Optional<SILVTable::Entry>
-SILGenModule::emitVTableMethod(ClassDecl *theClass,
-                               SILDeclRef derived, SILDeclRef base) {
+SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
+                               SILDeclRef base) {
   assert(base.kind == derived.kind);
 
   auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
@@ -907,9 +906,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                       requirement.getDecl());
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
-                          requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true,
-                          llvm::None);
+                          requirement, reqtSubs, requirement, witnessSubs,
+                          isFree, /*isSelfConformance*/ true, llvm::None);
 
   SGM.emitLazyConformancesForFunction(f);
 

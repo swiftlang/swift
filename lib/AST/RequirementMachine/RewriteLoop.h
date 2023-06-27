@@ -25,7 +25,6 @@ namespace llvm {
 
 namespace swift {
 
-
 namespace rewriting {
 
 class RewriteSystem;

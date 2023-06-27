@@ -174,10 +174,10 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
 }
 
 /// Create a unique name of the expansion. The result is *appended* to \p out.
-static void addExpansionDiscriminator(SmallString<32> &out,
-                                      const SourceFile *SF, SourceLoc loc,
-                                      llvm::Optional<SourceLoc> supplementalLoc = llvm::None,
-                                      llvm::Optional<MacroRole> role = llvm::None) {
+static void addExpansionDiscriminator(
+    SmallString<32> &out, const SourceFile *SF, SourceLoc loc,
+    llvm::Optional<SourceLoc> supplementalLoc = llvm::None,
+    llvm::Optional<MacroRole> role = llvm::None) {
   SourceManager &SM = SF->getASTContext().SourceMgr;
 
   StableHasher hasher = StableHasher::defaultHasher();

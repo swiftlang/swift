@@ -4034,11 +4034,10 @@ bool SILFunctionType::hasNonDerivableClangType() {
   if (clangTypeInfo.empty())
     return false;
   auto results = getResults();
-  auto computedClangType =
-      getASTContext().getCanonicalClangFunctionType(
-          getParameters(),
-          results.empty() ? llvm::None : llvm::Optional<SILResultInfo>(results[0]),
-          getRepresentation());
+  auto computedClangType = getASTContext().getCanonicalClangFunctionType(
+      getParameters(),
+      results.empty() ? llvm::None : llvm::Optional<SILResultInfo>(results[0]),
+      getRepresentation());
   assert(computedClangType && "Failed to compute Clang type.");
   return clangTypeInfo != ClangTypeInfo(computedClangType);
 }
@@ -4135,19 +4134,20 @@ static bool transformSILParameter(
 }
 
 Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
-  return transformWithPosition(TypePosition::Invariant,
-                               [fn](TypeBase *type, auto) -> llvm::Optional<Type> {
-    Type transformed = fn(Type(type));
-    if (!transformed)
-      return Type();
+  return transformWithPosition(
+      TypePosition::Invariant,
+      [fn](TypeBase *type, auto) -> llvm::Optional<Type> {
+        Type transformed = fn(Type(type));
+        if (!transformed)
+          return Type();
 
-    // If the function didn't change the type at
-    // all, let transformRec() recurse.
-    if (transformed.getPointer() == type)
-      return llvm::None;
+        // If the function didn't change the type at
+        // all, let transformRec() recurse.
+        if (transformed.getPointer() == type)
+          return llvm::None;
 
-    return transformed;
-  });
+        return transformed;
+      });
 }
 
 static PackType *getTransformedPack(Type substType) {
@@ -4175,7 +4175,8 @@ Type Type::transformRec(
 
 Type Type::transformWithPosition(
     TypePosition pos,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) const {
+    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn)
+    const {
   if (!isa<ParenType>(getPointer())) {
     // Transform this type node.
     if (llvm::Optional<Type> transformed = fn(getPointer(), pos))

@@ -896,7 +896,8 @@ private:
 
   void emitNoteForMismatch(int mismatchPosition);
 
-  llvm::Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+  llvm::Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
   BoundGenericType *getActual() const {
@@ -1491,7 +1492,8 @@ private:
 
   /// Gather information associated with expression that represents
   /// a call - function and argument list.
-  llvm::Optional<std::pair<Expr *, ArgumentList *>> getCallInfo(ASTNode anchor) const;
+  llvm::Optional<std::pair<Expr *, ArgumentList *>>
+  getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`

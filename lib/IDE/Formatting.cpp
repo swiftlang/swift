@@ -70,8 +70,8 @@ static bool isLineAtLocEmpty(SourceManager &SM, SourceLoc Loc) {
 }
 
 /// \returns the first token after the token at \c Loc.
-static llvm::Optional<Token>
-getTokenAfter(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
+static llvm::Optional<Token> getTokenAfter(SourceManager &SM, SourceLoc Loc,
+                                           bool SkipComments = true) {
   assert(Loc.isValid());
   CommentRetentionMode Mode = SkipComments
     ? CommentRetentionMode::None
@@ -86,9 +86,10 @@ getTokenAfter(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
 
 /// \returns the last token of the given kind in the open range between \c From
 ///   and \c To.
-static llvm::Optional<Token>
-getLastTokenOfKindInOpenRange(SourceManager &SM, tok Kind,
-                              SourceLoc From, SourceLoc To) {
+static llvm::Optional<Token> getLastTokenOfKindInOpenRange(SourceManager &SM,
+                                                           tok Kind,
+                                                           SourceLoc From,
+                                                           SourceLoc To) {
   llvm::Optional<Token> Match;
   while (auto Next = getTokenAfter(SM, From)) {
     if (!Next || !SM.isBeforeInBuffer(Next->getLoc(), To))
@@ -283,12 +284,10 @@ class FormatContext {
   bool InCommentLine;
 
 public:
-  FormatContext(SourceManager &SM,
-                llvm::Optional<IndentContext> IndentCtx,
-                bool InDocCommentBlock = false,
-                bool InCommentLine = false)
-    :SM(SM), InnermostCtx(IndentCtx), InDocCommentBlock(InDocCommentBlock),
-     InCommentLine(InCommentLine) { }
+  FormatContext(SourceManager &SM, llvm::Optional<IndentContext> IndentCtx,
+                bool InDocCommentBlock = false, bool InCommentLine = false)
+      : SM(SM), InnermostCtx(IndentCtx), InDocCommentBlock(InDocCommentBlock),
+        InCommentLine(InCommentLine) {}
 
   bool IsInDocCommentBlock() {
     return InDocCommentBlock;
@@ -927,7 +926,8 @@ private:
 /// after such a node.
 class TrailingInfo {
   llvm::Optional<Token> TrailingToken;
-  TrailingInfo(llvm::Optional<Token> TrailingToken) : TrailingToken(TrailingToken) {}
+  TrailingInfo(llvm::Optional<Token> TrailingToken)
+      : TrailingToken(TrailingToken) {}
 
 public:
   /// Whether the trailing target is on an empty line.
@@ -944,9 +944,9 @@ public:
 
   /// Checks if the target location immediately follows the provided \p EndLoc,
   /// optionally allowing for a single comma in between.
-  static llvm::Optional<TrailingInfo>
-  find(SourceManager &SM, SourceLoc EndLoc, SourceLoc TargetLoc,
-       bool LookPastTrailingComma = true) {
+  static llvm::Optional<TrailingInfo> find(SourceManager &SM, SourceLoc EndLoc,
+                                           SourceLoc TargetLoc,
+                                           bool LookPastTrailingComma = true) {
     // If the target is before the end of the end token, it's not trailing.
     SourceLoc TokenEndLoc = Lexer::getLocForEndOfToken(SM, EndLoc);
     if (SM.isBeforeInBuffer(TargetLoc, TokenEndLoc))
@@ -955,7 +955,7 @@ public:
     // If there is no next token, the target directly trails the end token.
     auto Next = getTokenAfter(SM, EndLoc, /*SkipComments=*/false);
     if (!Next)
-      return TrailingInfo {llvm::None};
+      return TrailingInfo{llvm::None};
 
     // If the target is before or at the next token's locations, it directly
     // trails the end token.
@@ -963,7 +963,7 @@ public:
     if (NextTokLoc == TargetLoc)
       return TrailingInfo {Next};
     if (SM.isBeforeInBuffer(TargetLoc, Next->getLoc()))
-      return TrailingInfo {llvm::None};
+      return TrailingInfo{llvm::None};
 
     // The target does not directly trail the end token. If we should look past
     // trailing commas, do so.
@@ -1250,7 +1250,6 @@ public:
   }
 
 private:
-
   llvm::Optional<IndentContext> indentWithinStringLiteral() {
     assert(StringLiteralRange.isValid() && "Target is not within a string literal");
 
@@ -1565,7 +1564,8 @@ private:
     if (Start.isInvalid())
       return {VisitAction::VisitChildren, llvm::None};
 
-    llvm::Optional<TrailingInfo> Trailing = TrailingInfo::find(SM, End, TargetLocation);
+    llvm::Optional<TrailingInfo> Trailing =
+        TrailingInfo::find(SM, End, TargetLocation);
     scanTokensUntil(Start);
 
     if (!isTargetContext(Start, End) && !Trailing)
@@ -1963,9 +1963,9 @@ private:
     return Aligner.getContextAndSetAlignment(CtxOverride);
   }
 
-  llvm::Optional<IndentContext>
-  getIndentContextFrom(TrailingWhereClause *TWC, SourceLoc ContextLoc,
-                       Decl *WalkableParent) {
+  llvm::Optional<IndentContext> getIndentContextFrom(TrailingWhereClause *TWC,
+                                                     SourceLoc ContextLoc,
+                                                     Decl *WalkableParent) {
     if (!TWC)
       return llvm::None;
     return getIndentContextFromWhereClause(TWC->getRequirements(),
@@ -1973,9 +1973,9 @@ private:
                                            ContextLoc, WalkableParent);
   }
 
-  llvm::Optional<IndentContext>
-  getIndentContextFrom(GenericParamList *GP, SourceLoc ContextLoc,
-                       Decl *WalkableParent) {
+  llvm::Optional<IndentContext> getIndentContextFrom(GenericParamList *GP,
+                                                     SourceLoc ContextLoc,
+                                                     Decl *WalkableParent) {
     if (!GP)
       return llvm::None;
 
@@ -2036,8 +2036,8 @@ private:
 
   template <typename T>
   llvm::Optional<IndentContext>
-  getIndentContextFromBraces(SourceLoc Open, SourceLoc Close, SourceLoc ContextLoc,
-                             T* WalkableParent) {
+  getIndentContextFromBraces(SourceLoc Open, SourceLoc Close,
+                             SourceLoc ContextLoc, T *WalkableParent) {
     SourceLoc L = getLocIfKind(SM, Open, tok::l_brace);
     SourceLoc R = getLocIfKind(SM, Close, tok::r_brace);
     if (L.isInvalid() || !overlapsTarget(L, R))
@@ -2051,9 +2051,9 @@ private:
   }
 
   template <typename T>
-  llvm::Optional<IndentContext>
-  getIndentContextFromBraces(SourceRange Braces, SourceLoc ContextLoc,
-                             T* WalkableParent) {
+  llvm::Optional<IndentContext> getIndentContextFromBraces(SourceRange Braces,
+                                                           SourceLoc ContextLoc,
+                                                           T *WalkableParent) {
     return getIndentContextFromBraces(Braces.Start, Braces.End, ContextLoc,
                                       WalkableParent);
   }
@@ -2323,8 +2323,8 @@ private:
   }
 
   template <typename T>
-  llvm::Optional<IndentContext>
-  getIndentContextFrom(PoundAvailableInfo *A, T *WalkableParent) {
+  llvm::Optional<IndentContext> getIndentContextFrom(PoundAvailableInfo *A,
+                                                     T *WalkableParent) {
     SourceLoc ContextLoc = A->getStartLoc();
     SourceLoc L = A->getLParenLoc();
     SourceLoc R = getLocIfKind(SM, A->getRParenLoc(), tok::r_paren);
@@ -2507,7 +2507,8 @@ private:
   }
 
   llvm::Optional<IndentContext>
-  getIndentContextFrom(AbstractClosureExpr *ACE, SourceLoc ContextLoc = SourceLoc(),
+  getIndentContextFrom(AbstractClosureExpr *ACE,
+                       SourceLoc ContextLoc = SourceLoc(),
                        CaptureListExpr *ParentCapture = nullptr) {
     // Explicit capture lists should always have an explicit ClosureExpr as
     // their subexpression.
@@ -2680,10 +2681,9 @@ private:
     return Aligner.getContextAndSetAlignment(CtxOverride);
   }
 
-  llvm::Optional<IndentContext>
-  getIndentContextFromTrailingClosure(ArgumentList *Args,
-                                      llvm::Optional<TrailingInfo> TrailingTarget,
-                                      SourceLoc ContextLoc) {
+  llvm::Optional<IndentContext> getIndentContextFromTrailingClosure(
+      ArgumentList *Args, llvm::Optional<TrailingInfo> TrailingTarget,
+      SourceLoc ContextLoc) {
     if (!Args->hasAnyTrailingClosures())
       return llvm::None;
 
@@ -2760,7 +2760,8 @@ private:
 #pragma mark TypeRepr indent contexts
 
   llvm::Optional<IndentContext>
-  getIndentContextFrom(TypeRepr *T, llvm::Optional<TrailingInfo> TrailingTarget) {
+  getIndentContextFrom(TypeRepr *T,
+                       llvm::Optional<TrailingInfo> TrailingTarget) {
     if (TrailingTarget)
       return llvm::None;
 
@@ -2851,7 +2852,8 @@ private:
 #pragma mark Pattern indent contexts
 
   llvm::Optional<IndentContext>
-  getIndentContextFrom(Pattern *P, llvm::Optional<TrailingInfo> TrailingTarget) {
+  getIndentContextFrom(Pattern *P,
+                       llvm::Optional<TrailingInfo> TrailingTarget) {
     if (TrailingTarget)
       return llvm::None;
 

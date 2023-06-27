@@ -21,8 +21,7 @@ using namespace swift;
 using namespace Lowering;
 
 void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
-                                   bool isThrowing,
-                                   CleanupLocation CleanupL) {
+                                   bool isThrowing, CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.

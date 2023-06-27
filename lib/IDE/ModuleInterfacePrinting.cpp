@@ -53,8 +53,10 @@ public:
       ClangLoader(ClangLoader) {}
 
 private:
-  void printDeclPre(const Decl *D, llvm::Optional<BracketOptions> Bracket) override;
-  void printDeclPost(const Decl *D, llvm::Optional<BracketOptions> Bracket) override;
+  void printDeclPre(const Decl *D,
+                    llvm::Optional<BracketOptions> Bracket) override;
+  void printDeclPost(const Decl *D,
+                     llvm::Optional<BracketOptions> Bracket) override;
   void avoidPrintDeclPost(const Decl *D) override;
   // Forwarding implementations.
 
@@ -83,16 +85,15 @@ private:
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
   }
-  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    TypeOrExtensionDecl Target,
-                                    llvm::Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPre(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      llvm::Optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPre(ED, Target, Bracket);
   }
 
-  void
-  printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                TypeOrExtensionDecl Target,
-                                llvm::Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPost(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      llvm::Optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPost(ED, Target, Bracket);
   }
 
@@ -219,8 +220,8 @@ static bool extensionHasClangNode(ExtensionDecl *ext) {
   return static_cast<bool>(swift::ide::extensionGetClangNode(ext));
 }
 
-llvm::Optional<StringRef>
-swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
+llvm::Optional<StringRef> swift::ide::findGroupNameForUSR(ModuleDecl *M,
+                                                          StringRef USR) {
   for (auto File : M->getTopLevelModule()->getFiles()) {
     if (auto Name = File->getGroupNameByUSR(USR)) {
       return Name;
@@ -967,8 +968,8 @@ void ClangCommentPrinter::printDeclPre(const Decl *D,
   return OtherPrinter.printDeclPre(D, Bracket);
 }
 
-void ClangCommentPrinter::printDeclPost(const Decl *D,
-                                        llvm::Optional<BracketOptions> Bracket) {
+void ClangCommentPrinter::printDeclPost(
+    const Decl *D, llvm::Optional<BracketOptions> Bracket) {
   OtherPrinter.printDeclPost(D, Bracket);
 
   // Skip parameters; see printDeclPre().

@@ -642,8 +642,8 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   llvm_unreachable("covered switch");
 }
 
-Type ASTBuilder::createExistentialMetatypeType(Type instance,
-                          llvm::Optional<Demangle::ImplMetatypeRepresentation> repr) {
+Type ASTBuilder::createExistentialMetatypeType(
+    Type instance, llvm::Optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (auto existential = instance->getAs<ExistentialType>())
     instance = existential->getConstraintType();
   if (!instance->isAnyExistentialType())
@@ -695,8 +695,8 @@ Type ASTBuilder::createSymbolicExtendedExistentialType(NodePointer shapeNode,
   return Type();
 }
 
-Type ASTBuilder::createMetatypeType(Type instance,
-                         llvm::Optional<Demangle::ImplMetatypeRepresentation> repr) {
+Type ASTBuilder::createMetatypeType(
+    Type instance, llvm::Optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (!repr)
     return MetatypeType::get(instance);
 

@@ -443,11 +443,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 }
 
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
-                                                   CanSILFunctionType BlockType,
-                                                   CanType ResultType,
-                                                   CanGenericSignature Sig,
-                                                   llvm::Optional<bool> ErrorOnZero,
-                                                   bool predefined) {
+    CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
+    llvm::Optional<bool> ErrorOnZero, bool predefined) {
   beginMangling();
   appendType(BlockType, Sig);
   appendType(ResultType, Sig);
@@ -987,16 +984,18 @@ static StringRef getPrivateDiscriminatorIfNecessary(const Decl *decl) {
 /// specified name.
 ///
 /// \param useObjCProtocolNames When false, always returns \c None.
-static llvm::Optional<std::string> getOverriddenSwiftProtocolObjCName(
-                                                  const ValueDecl *decl,
-                                                  bool useObjCProtocolNames) {
+static llvm::Optional<std::string>
+getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
+                                   bool useObjCProtocolNames) {
   if (!useObjCProtocolNames)
     return llvm::None;
 
   auto proto = dyn_cast<ProtocolDecl>(decl);
-  if (!proto) return llvm::None;
+  if (!proto)
+    return llvm::None;
 
-  if (!proto->isObjC()) return llvm::None;
+  if (!proto->isObjC())
+    return llvm::None;
 
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = proto->getAttrs().getAttribute<ObjCAttr>()) {
@@ -2296,7 +2295,8 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static llvm::Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
+static llvm::Optional<VarDecl *>
+findFirstVariable(PatternBindingDecl *binding) {
   for (auto idx : range(binding->getNumPatternEntries())) {
     auto var = FindFirstVariable().visit(binding->getPattern(idx));
     if (var) return var;

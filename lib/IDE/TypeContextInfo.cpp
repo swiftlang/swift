@@ -73,8 +73,8 @@ void ContextInfoCallbacks::completeReturnStmt(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeYieldStmt(CodeCompletionExpr *E,
-                                             llvm::Optional<unsigned> yieldIndex) {
+void ContextInfoCallbacks::completeYieldStmt(
+    CodeCompletionExpr *E, llvm::Optional<unsigned> yieldIndex) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }

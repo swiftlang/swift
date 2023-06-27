@@ -101,10 +101,9 @@ struct swift::RequirementCheck {
 };
 
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
-  return swift::Witness(this->Witness, WitnessSubstitutions,
-                        ReqEnv->getWitnessThunkSignature(),
-                        ReqEnv->getRequirementToWitnessThunkSubs(),
-                        DerivativeGenSig, llvm::None);
+  return swift::Witness(
+      this->Witness, WitnessSubstitutions, ReqEnv->getWitnessThunkSignature(),
+      ReqEnv->getRequirementToWitnessThunkSubs(), DerivativeGenSig, llvm::None);
 }
 
 AssociatedTypeDecl *
@@ -530,8 +529,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
 /// \returns None iff the witness satisfies the requirement's effects limit.
 ///          Otherwise, it returns the RequirementMatch that describes the
 ///          problem.
-static llvm::Optional<RequirementMatch> checkEffects(AbstractStorageDecl *witness,
-                                               AbstractStorageDecl *req) {
+static llvm::Optional<RequirementMatch>
+checkEffects(AbstractStorageDecl *witness, AbstractStorageDecl *req) {
 
   if (!witness->isLessEffectfulThan(req, EffectKind::Async))
     return RequirementMatch(getStandinForAccessor(witness, AccessorKind::Get),
@@ -544,17 +543,14 @@ static llvm::Optional<RequirementMatch> checkEffects(AbstractStorageDecl *witnes
   return llvm::None; // OK
 }
 
-RequirementMatch
-swift::matchWitness(
-             DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             llvm::function_ref<
-                     std::tuple<llvm::Optional<RequirementMatch>, Type, Type>(void)> 
-               setup,
-             llvm::function_ref<llvm::Optional<RequirementMatch>(Type, Type)>
-               matchTypes,
-             llvm::function_ref<
-                     RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > finalize) {
+RequirementMatch swift::matchWitness(
+    DeclContext *dc, ValueDecl *req, ValueDecl *witness,
+    llvm::function_ref<
+        std::tuple<llvm::Optional<RequirementMatch>, Type, Type>(void)>
+        setup,
+    llvm::function_ref<llvm::Optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
+        finalize) {
 
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
@@ -888,7 +884,8 @@ static const RequirementEnvironment &getOrCreateRequirementEnvironment(
   return cacheIter->getSecond();
 }
 
-static llvm::Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
+static llvm::Optional<RequirementMatch>
+findMissingGenericRequirementForSolutionFix(
     constraints::Solution &solution, constraints::ConstraintFix *fix,
     ValueDecl *witness, ProtocolConformance *conformance,
     const RequirementEnvironment &reqEnvironment) {
@@ -1081,7 +1078,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                                         covariantSelf, conformance);
 
   // Set up the constraint system for matching.
-  auto setup = [&]() -> std::tuple<llvm::Optional<RequirementMatch>, Type, Type> {
+  auto setup =
+      [&]() -> std::tuple<llvm::Optional<RequirementMatch>, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -2115,7 +2113,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // Foreign classes cannot conform to objc protocols.
     if (auto clazz = DC->getSelfClassDecl()) {
       llvm::Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
-      diagKind;
+          diagKind;
       switch (clazz->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
           break;
@@ -3007,8 +3005,9 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
-llvm::Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
-    ValueDecl *requirement, ValueDecl *witness) {
+llvm::Optional<ActorIsolation>
+ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
+                                        ValueDecl *witness) {
 
   // Determine the isolation of the requirement itself.
   auto requirementIsolation = getActorIsolation(requirement);
@@ -3024,8 +3023,8 @@ llvm::Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
     loc = Conformance->getLoc();
 
   auto refResult = ActorReferenceResult::forReference(
-      getDeclRefInContext(witness), witness->getLoc(), DC, llvm::None, llvm::None,
-      llvm::None, requirementIsolation);
+      getDeclRefInContext(witness), witness->getLoc(), DC, llvm::None,
+      llvm::None, llvm::None, requirementIsolation);
   bool sameConcurrencyDomain = false;
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
@@ -3440,7 +3439,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         // non-resilient modules.
         llvm::Optional<AccessScope> underlyingTypeScope =
             TypeAccessScopeChecker::getAccessScope(type, DC,
-                                                   /*usableFromInline*/false).Scope;
+                                                   /*usableFromInline*/ false)
+                .Scope;
         assert(underlyingTypeScope.has_value() &&
                "the type is already invalid and we shouldn't have gotten here");
 
@@ -4040,8 +4040,8 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
 
   // A null repr indicates we don't have a valid location to diagnose. But
   // at least we have a requirement we can signal is bogus.
-  llvm::Optional<std::pair<RequirementRepr *, Requirement>> target
-    = std::make_pair((RequirementRepr *)nullptr, Requirement(*it));
+  llvm::Optional<std::pair<RequirementRepr *, Requirement>> target =
+      std::make_pair((RequirementRepr *)nullptr, Requirement(*it));
   if (!where) {
     return target;
   }
@@ -4084,10 +4084,9 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
           bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
           auto &diags = ctor->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, ctor);
-          llvm::Optional<InFlightDiagnostic> fixItDiag =
-              diags.diagnose(diagLoc, diag::witness_initializer_not_required,
-                             requirement->getName(), inExtension,
-                             conformance->getType());
+          llvm::Optional<InFlightDiagnostic> fixItDiag = diags.diagnose(
+              diagLoc, diag::witness_initializer_not_required,
+              requirement->getName(), inExtension, conformance->getType());
           if (diagLoc != ctor->getLoc() && !ctor->isImplicit()) {
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
@@ -5232,8 +5231,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                 diagLoc,
                 isOptional ? diag::witness_non_objc_storage_optional
                            : diag::witness_non_objc_storage,
-                /*isSubscript=*/false, witness->getName(),
-                Proto->getName());
+                /*isSubscript=*/false, witness->getName(), Proto->getName());
             if (diagLoc != witness->getLoc()) {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
@@ -5253,8 +5251,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                 diagLoc,
                 isOptional ? diag::witness_non_objc_storage_optional
                            : diag::witness_non_objc_storage,
-                /*isSubscript=*/true, witness->getName(),
-                Proto->getName());
+                /*isSubscript=*/true, witness->getName(), Proto->getName());
             if (diagLoc != witness->getLoc()) {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
@@ -5876,9 +5873,9 @@ combineBaseNameAndFirstArgument(Identifier baseName,
 /// effectively the sum of the edit distances between the corresponding
 /// argument labels.
 static llvm::Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
-                                                        DeclName rhs,
-                                                        bool isFunc,
-                                                        unsigned limit) {
+                                                              DeclName rhs,
+                                                              bool isFunc,
+                                                              unsigned limit) {
   // If there are a different number of argument labels, we're done.
   if (lhs.getArgumentNames().size() != rhs.getArgumentNames().size())
     return llvm::None;
@@ -5912,14 +5909,16 @@ static llvm::Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
       return llvm::None;
     }
   }
-  if (score > limit) return llvm::None;
+  if (score > limit)
+    return llvm::None;
 
   // Compute the edit distance between matching argument names.
   for (unsigned i = isFunc ? 1 : 0; i < lhs.getArgumentNames().size(); ++i) {
     score += scoreIdentifiers(lhs.getArgumentNames()[i],
                               rhs.getArgumentNames()[i],
                               limit - score);
-    if (score > limit) return llvm::None;
+    if (score > limit)
+      return llvm::None;
   }
 
   return score;
@@ -5929,7 +5928,8 @@ static llvm::Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
 static llvm::Optional<unsigned>
 scorePotentiallyMatching(ValueDecl *req, ValueDecl *witness, unsigned limit) {
   /// Apply omit-needless-words to the given declaration, if possible.
-  auto omitNeedlessWordsIfPossible = [](ValueDecl *VD) -> llvm::Optional<DeclName> {
+  auto omitNeedlessWordsIfPossible =
+      [](ValueDecl *VD) -> llvm::Optional<DeclName> {
     if (auto func = dyn_cast<AbstractFunctionDecl>(VD))
       return TypeChecker::omitNeedlessWords(func);
     if (auto var = dyn_cast<VarDecl>(VD)) {
@@ -5977,7 +5977,8 @@ canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
 
   // A stored property cannot be moved to an extension.
   if (auto var = dyn_cast<VarDecl>(witness)) {
-    if (var->hasStorage()) return llvm::None;
+    if (var->hasStorage())
+      return llvm::None;
   }
 
   // If the witness is within a struct or enum, it can be freely moved to
@@ -5988,7 +5989,8 @@ canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
 
   // From here on, we only handle members of classes.
   auto classDecl = dyn_cast<ClassDecl>(witness->getDeclContext());
-  if (!classDecl) return llvm::None;
+  if (!classDecl)
+    return llvm::None;
 
   // If the witness is a designated or required initializer, we can't move it
   // to an extension.

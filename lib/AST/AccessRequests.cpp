@@ -323,7 +323,7 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 // So we decode Max as the last (high) bit that is set, and Default as the first
 // (low). And add one to each, to map them back into AccessLevels.
 
-llvm::Optional<std::pair<AccessLevel,AccessLevel>>
+llvm::Optional<std::pair<AccessLevel, AccessLevel>>
 DefaultAndMaxAccessLevelRequest::getCachedResult() const {
   auto extensionDecl = std::get<0>(getStorage());
   if (extensionDecl->hasDefaultAccessLevel()) {

@@ -531,8 +531,9 @@ class ExternalDependencyEnumerator {
   const DependencyKey sourceFileImplementation;
 
 public:
-  using UseEnumerator = llvm::function_ref<void(
-      const DependencyKey &, const DependencyKey &, llvm::Optional<Fingerprint>)>;
+  using UseEnumerator =
+      llvm::function_ref<void(const DependencyKey &, const DependencyKey &,
+                              llvm::Optional<Fingerprint>)>;
 
   ExternalDependencyEnumerator(const DependencyTracker &depTracker,
                                StringRef swiftDeps)

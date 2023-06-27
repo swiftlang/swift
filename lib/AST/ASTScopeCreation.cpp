@@ -190,10 +190,9 @@ public:
   /// \param endLoc Must be valid iff the pattern binding is in a local
   /// scope, in which case this is the last source location where the
   /// pattern bindings are going to be visible.
-  ASTScopeImpl *
-  addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
-                               ASTScopeImpl *parent,
-                               llvm::Optional<SourceLoc> endLoc);
+  ASTScopeImpl *addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
+                                             ASTScopeImpl *parent,
+                                             llvm::Optional<SourceLoc> endLoc);
 
   SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
@@ -535,10 +534,8 @@ public:
 
 // These definitions are way down here so it can call into
 // NodeAdder
-ASTScopeImpl *
-ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
-                                                    ASTScopeImpl *parent,
-                                                    llvm::Optional<SourceLoc> endLoc) {
+ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
+    ASTNode n, ASTScopeImpl *parent, llvm::Optional<SourceLoc> endLoc) {
   if (!n)
     return parent;
 

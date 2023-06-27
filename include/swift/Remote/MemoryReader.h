@@ -20,8 +20,8 @@
 
 #include "swift/Remote/RemoteAddress.h"
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 
 #include <cstring>
 #include <functional>

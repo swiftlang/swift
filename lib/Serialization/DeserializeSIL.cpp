@@ -60,12 +60,12 @@ fromStableStringEncoding(unsigned value) {
   case SIL_BYTES: return StringLiteralInst::Encoding::Bytes;
   case SIL_UTF8: return StringLiteralInst::Encoding::UTF8;
   case SIL_OBJC_SELECTOR: return StringLiteralInst::Encoding::ObjCSelector;
-  default: return llvm::None;
+  default:
+    return llvm::None;
   }
 }
 
-static llvm::Optional<SILLinkage>
-fromStableSILLinkage(unsigned value) {
+static llvm::Optional<SILLinkage> fromStableSILLinkage(unsigned value) {
   switch (value) {
   case SIL_LINKAGE_PUBLIC: return SILLinkage::Public;
   case SIL_LINKAGE_PUBLIC_NON_ABI: return SILLinkage::PublicNonABI;
@@ -74,7 +74,8 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
-  default: return llvm::None;
+  default:
+    return llvm::None;
   }
 }
 
@@ -84,7 +85,8 @@ fromStableVTableEntryKind(unsigned value) {
   case SIL_VTABLE_ENTRY_NORMAL: return SILVTable::Entry::Kind::Normal;
   case SIL_VTABLE_ENTRY_INHERITED: return SILVTable::Entry::Kind::Inherited;
   case SIL_VTABLE_ENTRY_OVERRIDE: return SILVTable::Entry::Kind::Override;
-  default: return llvm::None;
+  default:
+    return llvm::None;
   }
 }
 
@@ -1032,7 +1034,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   
   if (kind == KeyPathComponentKindEncoding::Trivial)
     return llvm::None;
-  
+
   auto type = MF->getType(ListOfValues[nextValue++])
     ->getCanonicalType();
 
@@ -1335,8 +1337,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool usesMoveableValueDebugInfo = (Attr >> 2) & 0x1;
     bool pointerEscape = (Attr >> 3) & 0x1;
     ResultInst = Builder.createAllocBox(
-        Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), llvm::None,
-        hasDynamicLifetime, reflection, usesMoveableValueDebugInfo,
+        Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
+        llvm::None, hasDynamicLifetime, reflection, usesMoveableValueDebugInfo,
         /*skipVarDeclAssert*/ false, pointerEscape);
     break;
   }
@@ -2635,9 +2637,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                             getBBForReference(Fn, ListOfValues[I+1])} );
     }
     if (OpCode == SILInstructionKind::SwitchEnumInst) {
-      ResultInst = Builder.createSwitchEnum(Loc, Cond, DefaultBB, CaseBBs,
-                                            llvm::None, ProfileCounter(),
-                                            forwardingOwnership);
+      ResultInst =
+          Builder.createSwitchEnum(Loc, Cond, DefaultBB, CaseBBs, llvm::None,
+                                   ProfileCounter(), forwardingOwnership);
     } else {
       ResultInst = Builder.createSwitchEnumAddr(Loc, Cond, DefaultBB, CaseBBs);
     }
@@ -3071,7 +3073,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i + 1], Fn);
       operands.push_back(getLocalValue(ListOfValues[i + 2], silTy));
     }
-    llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions = llvm::None;
+    llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions =
+        llvm::None;
     if (hasDerivativeFunctions)
       derivativeFunctions = std::make_pair(operands[1], operands[2]);
     ResultInst = Builder.createDifferentiableFunction(
@@ -3273,7 +3276,6 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   return true;
 }
 
-
 SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
                                                 bool declarationOnly) {
   if (!FuncTable)
@@ -3363,11 +3365,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-      SILMod, linkage.value(),
-      isSerialized ? IsSerialized : IsNotSerialized,
-      Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
-      llvm::None,
-      dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);
+      SILMod, linkage.value(), isSerialized ? IsSerialized : IsNotSerialized,
+      Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr), llvm::None,
+      dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
   v->setLet(IsLet);
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);

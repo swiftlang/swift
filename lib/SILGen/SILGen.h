@@ -108,31 +108,31 @@ public:
   llvm::Optional<SILDeclRef> BoolToWindowsBoolFn;
   llvm::Optional<SILDeclRef> WindowsBoolToBoolFn;
 
-  llvm::Optional<ProtocolDecl*> PointerProtocol;
+  llvm::Optional<ProtocolDecl *> PointerProtocol;
 
-  llvm::Optional<ProtocolDecl*> ObjectiveCBridgeable;
-  llvm::Optional<FuncDecl*> BridgeToObjectiveCRequirement;
-  llvm::Optional<FuncDecl*> UnconditionallyBridgeFromObjectiveCRequirement;
-  llvm::Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
+  llvm::Optional<ProtocolDecl *> ObjectiveCBridgeable;
+  llvm::Optional<FuncDecl *> BridgeToObjectiveCRequirement;
+  llvm::Optional<FuncDecl *> UnconditionallyBridgeFromObjectiveCRequirement;
+  llvm::Optional<AssociatedTypeDecl *> BridgedObjectiveCType;
 
-  llvm::Optional<ProtocolDecl*> BridgedStoredNSError;
-  llvm::Optional<VarDecl*> NSErrorRequirement;
+  llvm::Optional<ProtocolDecl *> BridgedStoredNSError;
+  llvm::Optional<VarDecl *> NSErrorRequirement;
 
   llvm::Optional<ProtocolConformance *> NSErrorConformanceToError;
 
-  llvm::Optional<FuncDecl*> AsyncLetStart;
-  llvm::Optional<FuncDecl*> AsyncLetGet;
-  llvm::Optional<FuncDecl*> AsyncLetGetThrowing;
-  llvm::Optional<FuncDecl*> EndAsyncLet;
+  llvm::Optional<FuncDecl *> AsyncLetStart;
+  llvm::Optional<FuncDecl *> AsyncLetGet;
+  llvm::Optional<FuncDecl *> AsyncLetGetThrowing;
+  llvm::Optional<FuncDecl *> EndAsyncLet;
 
-  llvm::Optional<FuncDecl*> TaskFutureGet;
-  llvm::Optional<FuncDecl*> TaskFutureGetThrowing;
+  llvm::Optional<FuncDecl *> TaskFutureGet;
+  llvm::Optional<FuncDecl *> TaskFutureGetThrowing;
 
-  llvm::Optional<FuncDecl*> RunTaskForBridgedAsyncMethod;
-  llvm::Optional<FuncDecl*> ResumeUnsafeContinuation;
-  llvm::Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
-  llvm::Optional<FuncDecl*> CheckExpectedExecutor;
+  llvm::Optional<FuncDecl *> RunTaskForBridgedAsyncMethod;
+  llvm::Optional<FuncDecl *> ResumeUnsafeContinuation;
+  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuation;
+  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
+  llvm::Optional<FuncDecl *> CheckExpectedExecutor;
 
   llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
   llvm::Optional<FuncDecl *> GetMainExecutor;
@@ -170,9 +170,8 @@ public:
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
-  llvm::Optional<SILVTable::Entry> emitVTableMethod(ClassDecl *theClass,
-                                              SILDeclRef derived,
-                                              SILDeclRef base);
+  llvm::Optional<SILVTable::Entry>
+  emitVTableMethod(ClassDecl *theClass, SILDeclRef derived, SILDeclRef base);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);

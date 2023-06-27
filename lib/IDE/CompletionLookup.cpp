@@ -1497,8 +1497,8 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
                                           DeclVisibilityKind Reason,
                                           DynamicLookupInfo dynamicLookupInfo,
                                           llvm::Optional<Type> BaseType,
-                                          llvm::Optional<Type> Result, bool IsOnType,
-                                          Identifier addName) {
+                                          llvm::Optional<Type> Result,
+                                          bool IsOnType, Identifier addName) {
   foundFunction(CD);
   Type MemberType = getTypeOfMember(CD, BaseType.value_or(ExprType));
   AnyFunctionType *ConstructorType = nullptr;
@@ -2032,7 +2032,8 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
             return;
         }
         if (IsSelfRefExpr || IsSuperRefExpr)
-          addConstructorCall(CD, Reason, dynamicLookupInfo, llvm::None, llvm::None,
+          addConstructorCall(CD, Reason, dynamicLookupInfo, llvm::None,
+                             llvm::None,
                              /*IsOnType=*/false);
       }
       return;
@@ -2994,8 +2995,8 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
-void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
-                                                   llvm::Optional<DeclKind> DK) {
+void CompletionLookup::getAttributeDeclCompletions(
+    bool IsInSil, llvm::Optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
   if (DK.has_value()) {

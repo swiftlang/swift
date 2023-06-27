@@ -20,7 +20,7 @@
 using namespace swift;
 
 SwiftMetatype SILGlobalVariable::registeredMetatype;
-    
+
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              IsSerialized_t isSerialized,
                                              StringRef name,
@@ -42,19 +42,14 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   return var;
 }
 
-
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      IsSerialized_t isSerialized,
                                      StringRef Name, SILType LoweredType,
-                                     llvm::Optional<SILLocation> Loc, VarDecl *Decl)
-  : SwiftObjectHeader(registeredMetatype),
-    Module(Module),
-    Name(Name),
-    LoweredType(LoweredType),
-    Location(Loc.value_or(SILLocation::invalid())),
-    Linkage(unsigned(Linkage)),
-    HasLocation(Loc.has_value()),
-    VDecl(Decl) {
+                                     llvm::Optional<SILLocation> Loc,
+                                     VarDecl *Decl)
+    : SwiftObjectHeader(registeredMetatype), Module(Module), Name(Name),
+      LoweredType(LoweredType), Location(Loc.value_or(SILLocation::invalid())),
+      Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), VDecl(Decl) {
   setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(Decl ? Decl->isLet() : false);
