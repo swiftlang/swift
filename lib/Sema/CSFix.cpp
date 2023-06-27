@@ -2837,3 +2837,34 @@ AllowInvalidMemberReferenceInInitAccessor::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       AllowInvalidMemberReferenceInInitAccessor(cs, memberName, locator);
 }
+
+bool AllowConcreteTypeSpecialization::diagnose(const Solution &solution,
+                                               bool asNote) const {
+  ConcreteTypeSpecialization failure(solution, ConcreteType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowConcreteTypeSpecialization *
+AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowConcreteTypeSpecialization(cs, concreteTy, locator);
+}
+
+bool IgnoreGenericSpecializationArityMismatch::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidTypeSpecializationArity failure(solution, D, NumParams, NumArgs,
+                                         HasParameterPack, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreGenericSpecializationArityMismatch *
+IgnoreGenericSpecializationArityMismatch::create(ConstraintSystem &cs,
+                                                 ValueDecl *decl,
+                                                 unsigned numParams,
+                                                 unsigned numArgs,
+                                                 bool hasParameterPack,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreGenericSpecializationArityMismatch(
+      cs, decl, numParams, numArgs, hasParameterPack, locator);
+}
