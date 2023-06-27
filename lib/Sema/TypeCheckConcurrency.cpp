@@ -3651,7 +3651,7 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
     return llvm::None;
 
   if (!nominal->getParentSourceFile())
-    return None;
+    return llvm::None;
 
   ASTContext &ctx = nominal->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::DisableActorInferenceFromPropertyWrapperUsage)) {
