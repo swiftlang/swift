@@ -2177,11 +2177,6 @@ namespace {
       }
 
       if (auto apply = dyn_cast<ApplyExpr>(expr)) {
-        applyStack.push_back(apply);  // record this encounter
-
-        // Check the call itself.
-        (void)checkApply(apply);
-
         // If this is a call to a partial apply thunk, decompose it to check it
         // like based on the original written syntax, e.g., "self.method".
         if (auto partialApply = decomposePartialApplyThunk(
@@ -2195,44 +2190,30 @@ namespace {
 
             partialApply->base->walk(*this);
 
-            // manual clean-up since normal traversal is skipped
-            assert(applyStack.back() == apply);
-            applyStack.pop_back();
-
             return Action::SkipChildren(expr);
           }
         }
-      }
 
-      // NOTE: SelfApplyExpr is a subtype of ApplyExpr
-      if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
-        Expr *fn = call->getFn()->getValueProvidingExpr();
-        if (auto memberRef = findReference(fn)) {
-          checkReference(
-              call->getBase(), memberRef->first, memberRef->second,
-              /*partialApply=*/None, call);
+        applyStack.push_back(apply);  // record this encounter
 
-          call->getBase()->walk(*this);
-
+        if (isa<SelfApplyExpr>(apply)) {
+          // Self applications are checked as part of the outer call.
+          // However, we look for inout issues here.
           if (applyStack.size() >= 2) {
             ApplyExpr *outerCall = applyStack[applyStack.size() - 2];
             if (isAsyncCall(outerCall)) {
               // This call is a partial application within an async call.
               // If the partial application take a value inout, it is bad.
               if (InOutExpr *inoutArg = dyn_cast<InOutExpr>(
-                      call->getBase()->getSemanticsProvidingExpr()))
+                     apply->getArgs()->getExpr(0)->getSemanticsProvidingExpr()))
                 diagnoseInOutArg(outerCall, inoutArg, true);
             }
           }
-
-          // manual clean-up since normal traversal is skipped
-          assert(applyStack.back() == dyn_cast<ApplyExpr>(expr));
-          applyStack.pop_back();
-
-          return Action::SkipChildren(expr);
+        } else {
+          // Check the call itself.
+          (void)checkApply(apply);
         }
       }
-
 
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr))
         checkKeyPathExpr(keyPath);
@@ -2434,41 +2415,6 @@ namespace {
       return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::NonIsolatedParameter);
     }
 
-    VarDecl *findReferencedBaseSelf(Expr *expr) {
-      if (auto selfVar = getReferencedParamOrCapture(expr))
-        if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
-          return selfVar;
-
-      // Look through identity expressions and implicit conversions.
-      Expr *prior;
-      do {
-        prior = expr;
-
-        expr = expr->getSemanticsProvidingExpr();
-
-        if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
-          expr = conversion->getSubExpr();
-        if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
-          expr = fnConv->getSubExpr();
-      } while (prior != expr);
-
-      if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
-        for (auto arg : *call->getArgs()) {
-          if (auto declRef = dyn_cast<DeclRefExpr>(arg.getExpr())) {
-            if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-              if (var->isSelfParameter()) {
-                return var;
-              }
-            }
-          }
-        }
-      }
-
-
-      // Not a self reference.
-      return nullptr;
-    }
-
     /// Note that the given actor member is isolated.
     /// @param context is allowed to be null if no context is appropriate.
     void noteIsolatedActorMember(ValueDecl const* decl, Expr *context) {
@@ -2609,13 +2555,17 @@ namespace {
     Optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                            Expr *context) {
-      // If base of the call is 'local' we permit skip distributed checks.
-      if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+      // If the actor itself is, we're not doing any distributed access.
+      if (getIsolatedActor(context).isKnownToBeLocal()) {
         return std::make_pair(
             /*setThrows=*/false,
             /*isDistributedThunk=*/false);
-        }
+      }
+
+      // If there is no declaration, it can't possibly be distributed.
+      if (!decl) {
+        ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method);
+        return None;
       }
 
       // Check that we have a distributed function or computed property.
@@ -2646,6 +2596,8 @@ namespace {
         }
       }
 
+      // FIXME: Subscript?
+
       // This is either non-distributed variable, subscript, or something else.
       ctx.Diags.diagnose(declLoc,
                          diag::distributed_actor_isolated_non_self_reference,
@@ -2663,7 +2615,6 @@ namespace {
                                               bool isDistributed) {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
-      bool isAsyncCall = false;
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
@@ -2708,58 +2659,6 @@ namespace {
             result = AsyncMarkingResult::FoundAsync;
           }
         }
-
-      } else if (isa_and_nonnull<SelfApplyExpr>(context) &&
-          isa<AbstractFunctionDecl>(decl)) {
-        // actor-isolated non-isolated-self calls are implicitly async
-        // and thus OK.
-
-        if (!getDeclContext()->isAsyncContext())
-          return AsyncMarkingResult::SyncContext;
-
-        isAsyncCall = true;
-      } else if (!applyStack.empty()) {
-        // Check our applyStack metadata from the traversal.
-        // Our goal is to identify whether the actor reference appears
-        // as the called value of the enclosing ApplyExpr. We cannot simply
-        // inspect Parent here because of expressions like (callee)()
-        // and the fact that the reference may be just an argument to an apply
-        ApplyExpr *apply = applyStack.back();
-        Expr *fn = apply->getFn()->getValueProvidingExpr();
-        if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
-          fn = fnConv->getSubExpr()->getValueProvidingExpr();
-        if (auto memberRef = findReference(fn)) {
-          auto concDecl = memberRef->first;
-          if (decl == concDecl.getDecl() && !apply->isImplicitlyAsync()) {
-
-            if (!getDeclContext()->isAsyncContext())
-              return AsyncMarkingResult::SyncContext;
-
-            // then this ValueDecl appears as the called value of the ApplyExpr.
-            isAsyncCall = true;
-          }
-        }
-      }
-
-      // Set up an implicit async call.
-      if (isAsyncCall) {
-        // If we're calling to a distributed actor, make sure the function
-        // is actually 'distributed'.
-        bool setThrows = false;
-        bool usesDistributedThunk = false;
-        if (isDistributed) {
-          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
-            std::tie(setThrows, usesDistributedThunk) = *access;
-          } else {
-            return AsyncMarkingResult::NotDistributed;
-          }
-        }
-
-        // Mark call as implicitly 'async', and also potentially as
-        // throwing and using a distributed thunk.
-        markNearestCallAsImplicitly(
-            /*setAsync=*/target, setThrows, usesDistributedThunk);
-        result = AsyncMarkingResult::FoundAsync;
       }
 
       if (result == AsyncMarkingResult::FoundAsync) {
@@ -2797,19 +2696,61 @@ namespace {
         return *contextIsolation;
       };
 
-      // If the function type is global-actor-qualified, determine whether
-      // we are within that global actor already.
+      // Default the call options to allow promotion to async, if it will be
+      // warranted.
+      ActorReferenceResult::Options callOptions;
+      if (!fnType->getExtInfo().isAsync())
+        callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
+
+      // Determine from the callee whether actor isolation is unsatisfied.
       Optional<ActorIsolation> unsatisfiedIsolation;
+      bool mayExitToNonisolated = true;
+      Expr *argForIsolatedParam = nullptr;
+      auto calleeDecl = apply->getCalledValue(/*skipFunctionConversions=*/true);
       if (Type globalActor = fnType->getGlobalActor()) {
+        // If the function type is global-actor-qualified, determine whether
+        // we are within that global actor already.
         if (!(getContextIsolation().isGlobalActor() &&
             getContextIsolation().getGlobalActor()->isEqual(globalActor))) {
           unsatisfiedIsolation = ActorIsolation::forGlobalActor(
               globalActor, /*unsafe=*/false);
         }
-      }
 
-      if (isa<SelfApplyExpr>(apply) && !unsatisfiedIsolation)
+        mayExitToNonisolated = false;
+      } else if (auto *selfApplyFn = dyn_cast<SelfApplyExpr>(
+                    apply->getFn()->getValueProvidingExpr())) {
+        // If we're calling a member function, check whether the function
+        // itself is isolated.
+        auto memberFn = selfApplyFn->getFn()->getValueProvidingExpr();
+        if (auto memberRef = findReference(memberFn)) {
+          auto isolatedActor = getIsolatedActor(selfApplyFn->getBase());
+          auto result = ActorReferenceResult::forReference(
+              memberRef->first, selfApplyFn->getLoc(), getDeclContext(),
+              kindOfUsage(memberRef->first.getDecl(), selfApplyFn),
+              isolatedActor, None, None, getClosureActorIsolation);
+          switch (result) {
+          case ActorReferenceResult::SameConcurrencyDomain:
+            break;
+
+          case ActorReferenceResult::ExitsActorToNonisolated:
+            unsatisfiedIsolation = ActorIsolation::forIndependent();
+            break;
+
+          case ActorReferenceResult::EntersActor:
+            unsatisfiedIsolation = result.isolation;
+            break;
+          }
+
+          callOptions = result.options;
+          mayExitToNonisolated = false;
+          calleeDecl = memberRef->first.getDecl();
+          argForIsolatedParam = selfApplyFn->getBase();
+        }
+      } else if (calleeDecl &&
+                 calleeDecl->getAttrs()
+                     .hasAttribute<UnsafeInheritExecutorAttr>()) {
         return false;
+      }
 
       // Check for isolated parameters.
       for (unsigned paramIdx : range(fnType->getNumParams())) {
@@ -2822,6 +2763,7 @@ namespace {
           continue;
 
         auto *arg = args->getExpr(paramIdx);
+        argForIsolatedParam = arg;
         if (getIsolatedActor(arg))
           continue;
 
@@ -2837,17 +2779,31 @@ namespace {
 
         unsatisfiedIsolation =
             ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
+
+        if (!fnType->getExtInfo().isAsync())
+          callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
+        mayExitToNonisolated = false;
+
         break;
       }
+
+      // If we're calling an async function that's nonisolated, and we're in
+      // an isolated context, then we're exiting the actor context.
+      if (mayExitToNonisolated && fnType->isAsync() &&
+          getContextIsolation().isActorIsolated())
+        unsatisfiedIsolation = ActorIsolation::forIndependent();
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
         return false;
 
-      // If we are not in an asynchronous context, complain.
-      if (!getDeclContext()->isAsyncContext()) {
-        if (auto calleeDecl = apply->getCalledValue(
-                /*skipFunctionConversions=*/true)) {
+      bool requiresAsync =
+          callOptions.contains(ActorReferenceResult::Flags::AsyncPromotion);
+
+      // If we need to mark the call as implicitly asynchronous, make sure
+      // we're in an asynchronous context.
+      if (requiresAsync && !getDeclContext()->isAsyncContext()) {
+        if (calleeDecl) {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
@@ -2873,9 +2829,25 @@ namespace {
         return true;
       }
 
-      // Mark as implicitly async.
-      if (!fnType->getExtInfo().isAsync() && unsatisfiedIsolation) {
-        apply->setImplicitlyAsync(*unsatisfiedIsolation);
+      // If the actor we're hopping to is distributed, we might also need
+      // to mark the call as throwing and/or using the distributed thunk.
+      // FIXME: ActorReferenceResult has this information, too.
+      bool setThrows = false;
+      bool usesDistributedThunk = false;
+      if (unsatisfiedIsolation->isDistributedActor() &&
+          !(calleeDecl && isa<ConstructorDecl>(calleeDecl))) {
+        auto distributedAccess = checkDistributedAccess(
+            apply->getFn()->getLoc(), calleeDecl, argForIsolatedParam);
+        if (!distributedAccess)
+          return true;
+
+        std::tie(setThrows, usesDistributedThunk) = *distributedAccess;
+      }
+
+      // Mark as implicitly async/throws/distributed thunk as needed.
+      if (requiresAsync || setThrows || usesDistributedThunk) {
+        markNearestCallAsImplicitly(
+            unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
       // Check for sendability of the parameter types.
@@ -2891,11 +2863,13 @@ namespace {
             argLoc = arg.getStartLoc();
         }
 
+        bool isExiting = !unsatisfiedIsolation->isActorIsolated();
+        ActorIsolation diagnoseIsolation = isExiting ? getContextIsolation()
+                                                     : *unsatisfiedIsolation;
         if (diagnoseNonSendableTypes(
                 param.getParameterType(), getDeclContext(), argLoc,
-                diag::non_sendable_call_param_type,
-                apply->isImplicitlyAsync().has_value(),
-                *unsatisfiedIsolation))
+                diag::non_sendable_call_argument,
+                isExiting, diagnoseIsolation))
           return true;
       }
 
@@ -3088,6 +3062,16 @@ namespace {
         return false;
 
       auto decl = declRef.getDecl();
+
+      // If this declaration is a callee from the enclosing application,
+      // it's already been checked via the call.
+      if (!applyStack.empty()) {
+        auto immediateCallee =
+            applyStack.back()->getCalledValue(/*skipFunctionConversions=*/true);
+        if (decl == immediateCallee)
+          return false;
+      }
+
       Optional<ReferencedActor> isolatedActor;
       if (base)
         isolatedActor.emplace(getIsolatedActor(base));
@@ -5498,7 +5482,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
       declIsolation = declIsolation.subst(declRef.getSubstitutions());
   }
 
-  // If the entity we are referencing is not a value, we're in thesame
+  // If the entity we are referencing is not a value, we're in the same
   // concurrency domain.
   if (isNonValueReference(declRef.getDecl()))
     return forSameConcurrencyDomain(declIsolation);
