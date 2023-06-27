@@ -626,7 +626,7 @@ struct UseState {
 
   /// memInstMustReinitialize insts. Contains both insts like copy_addr/store
   /// [assign] that are reinits that we will convert to inits and true reinits.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> reinitInsts;
+  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> reinitInsts;
 
   /// The set of drop_deinits of this mark_must_check
   SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
@@ -668,6 +668,16 @@ struct UseState {
 
   void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
     auto &bits = getOrCreateLivenessUse(inst);
+    range.setBits(bits);
+  }
+
+  void recordReinitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    auto iter = reinitInsts.find(inst);
+    if (iter == reinitInsts.end()) {
+      iter =
+          reinitInsts.insert({inst, SmallBitVector(getNumSubelements())}).first;
+    }
+    auto &bits = iter->second;
     range.setBits(bits);
   }
 
@@ -778,6 +788,11 @@ struct UseState {
     range.setBits(consumingBits);
   }
 
+  void recordConsumingBlock(SILBasicBlock *block, SmallBitVector &bits) {
+    auto &consumingBits = getOrCreateConsumingBlock(block);
+    consumingBits |= bits;
+  }
+
   void
   initializeLiveness(FieldSensitiveMultiDefPrunedLiveRange &prunedLiveness);
 
@@ -842,7 +857,7 @@ struct UseState {
     if (!isReinitToInitConvertibleInst(inst)) {
       auto iter = reinitInsts.find(inst);
       if (iter != reinitInsts.end()) {
-        if (span.setIntersection(iter->second))
+        if (span.intersects(iter->second))
           return true;
       }
     }
@@ -867,7 +882,7 @@ struct UseState {
     if (isReinitToInitConvertibleInst(inst)) {
       auto iter = reinitInsts.find(inst);
       if (iter != reinitInsts.end()) {
-        if (span.setIntersection(iter->second))
+        if (span.intersects(iter->second))
           return true;
       }
     }
@@ -1744,11 +1759,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   if (::memInstMustReinitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *user);
-    assert(!useState.reinitInsts.count(user));
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
-    useState.reinitInsts.insert({user, *leafRange});
+    useState.recordReinitUse(user, *leafRange);
     return true;
   }
 
@@ -2733,9 +2747,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
   for (auto reinitPair : addressUseState.reinitInsts) {
     if (!isReinitToInitConvertibleInst(reinitPair.first))
       continue;
-    SmallBitVector bits(liveness.getNumSubElements());
-    reinitPair.second.setBits(bits);
-    if (!consumes.claimConsume(reinitPair.first, bits))
+    if (!consumes.claimConsume(reinitPair.first, reinitPair.second))
       convertMemoryReinitToInitForm(reinitPair.first, debugVar);
   }
 
@@ -2926,7 +2938,7 @@ void ExtendUnconsumedLiveness::run() {
       }
     }
     for (auto pair : addressUseState.reinitInsts) {
-      if (pair.second.contains(element)) {
+      if (pair.second.test(element)) {
         destroys[pair.first] = DestroyKind::Reinit;
       }
     }
