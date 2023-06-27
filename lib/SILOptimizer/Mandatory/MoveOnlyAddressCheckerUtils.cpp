@@ -563,6 +563,9 @@ namespace {
 struct UseState {
   MarkMustCheckInst *address;
 
+  using InstToBitMap =
+      llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
+
   Optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
@@ -576,7 +579,7 @@ struct UseState {
 
   /// A map from a liveness requiring use to the part of the type that it
   /// requires liveness for.
-  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> livenessUses;
+  InstToBitMap livenessUses;
 
   /// A map from a load [copy] or load [take] that we determined must be
   /// converted to a load_borrow to the part of the type tree that it needs to
@@ -626,7 +629,7 @@ struct UseState {
 
   /// memInstMustReinitialize insts. Contains both insts like copy_addr/store
   /// [assign] that are reinits that we will convert to inits and true reinits.
-  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> reinitInsts;
+  InstToBitMap reinitInsts;
 
   /// The set of drop_deinits of this mark_must_check
   SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
@@ -653,32 +656,35 @@ struct UseState {
     return *cachedNumSubelements;
   }
 
-  SmallBitVector &getOrCreateLivenessUse(SILInstruction *inst) {
-    auto iter = livenessUses.find(inst);
-    if (iter == livenessUses.end()) {
-      iter = livenessUses.insert({inst, SmallBitVector(getNumSubelements())})
-                 .first;
+  SmallBitVector &getOrCreateAffectedBits(SILInstruction *inst,
+                                          InstToBitMap &map) {
+    auto iter = map.find(inst);
+    if (iter == map.end()) {
+      iter = map.insert({inst, SmallBitVector(getNumSubelements())}).first;
     }
     return iter->second;
   }
 
+  void setAffectedBits(SILInstruction *inst, SmallBitVector const &bits,
+                       InstToBitMap &map) {
+    getOrCreateAffectedBits(inst, map) |= bits;
+  }
+
+  void setAffectedBits(SILInstruction *inst, TypeTreeLeafTypeRange range,
+                       InstToBitMap &map) {
+    range.setBits(getOrCreateAffectedBits(inst, map));
+  }
+
   void recordLivenessUse(SILInstruction *inst, SmallBitVector const &bits) {
-    getOrCreateLivenessUse(inst) |= bits;
+    setAffectedBits(inst, bits, livenessUses);
   }
 
   void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
-    auto &bits = getOrCreateLivenessUse(inst);
-    range.setBits(bits);
+    setAffectedBits(inst, range, livenessUses);
   }
 
   void recordReinitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
-    auto iter = reinitInsts.find(inst);
-    if (iter == reinitInsts.end()) {
-      iter =
-          reinitInsts.insert({inst, SmallBitVector(getNumSubelements())}).first;
-    }
-    auto &bits = iter->second;
-    range.setBits(bits);
+    setAffectedBits(inst, range, reinitInsts);
   }
 
   /// Returns true if this is a terminator instruction that although it doesn't
