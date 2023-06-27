@@ -1641,3 +1641,16 @@ public struct InitializableMacro: ConformanceMacro, MemberMacro {
     return [requirement]
   }
 }
+
+public struct PeerValueWithSuffixNameMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let identified = declaration.asProtocol(IdentifiedDeclSyntax.self) else {
+      throw CustomError.message("Macro can only be applied to an identified declarations.")
+    }
+    return ["var \(raw: identified.identifier.text)_peer: Int { 1 }"]
+  }
+}
