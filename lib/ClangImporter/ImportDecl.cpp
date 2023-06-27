@@ -3211,10 +3211,10 @@ namespace {
               d->getName() == "cos" || d->getName() == "exit";
         };
         if (decl->getOwningModule() &&
-            (decl->getOwningModule()
+            decl->getOwningModule()
                      ->getTopLevelModule()
-                     ->getFullModuleName() == "std" ||
-             isAlternativeCStdlibFunctionFromTextualHeader(decl))) {
+                     ->getFullModuleName() == "std" &&
+            isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
           auto filename =
               Impl.getClangPreprocessor().getSourceManager().getFilename(
                   decl->getLocation());
