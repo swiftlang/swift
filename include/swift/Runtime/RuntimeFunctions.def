@@ -2315,6 +2315,17 @@ FUNCTION(GenericInitWithTake,
          ATTRS(NoUnwind),
          EFFECT(Refcounting))
 
+// void *swift_generic_initializeBufferWithCopyOfBuffer(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
+FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
+         swift_generic_initializeBufferWithCopyOfBuffer,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(getFixedBufferTy()->getPointerTo(),
+              getFixedBufferTy()->getPointerTo(),
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Refcounting))
+
 // unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
 //                                      const Metadata *metadata);
 FUNCTION(EnumSimpleGetEnumTag,

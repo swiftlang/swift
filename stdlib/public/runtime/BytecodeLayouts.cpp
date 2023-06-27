@@ -784,6 +784,20 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   return 0;
 }
 
+extern "C" swift::OpaqueValue *
+swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
+                                               swift::ValueBuffer *src,
+                                               const Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isValueInline()) {
+    return swift_generic_initWithCopy((swift::OpaqueValue *)dest,
+                                      (swift::OpaqueValue *)src, metadata);
+  } else {
+    memcpy(dest, src, sizeof(swift::HeapObject *));
+    swift_retain(*(swift::HeapObject **)src);
+    return (swift::OpaqueValue *)&(*(swift::HeapObject **)dest)[1];
+  }
+}
+
 void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                              size_t layoutStrOffset,
                                              const uint8_t *fieldLayoutStr,
