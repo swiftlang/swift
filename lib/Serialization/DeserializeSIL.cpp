@@ -1854,7 +1854,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     if (OpCode == SILInstructionKind::GlobalAddrInst) {
       ResultInst = Builder.createGlobalAddr(Loc, g);
     } else {
-      ResultInst = Builder.createGlobalValue(Loc, g);
+      ResultInst = Builder.createGlobalValue(Loc, g, /*isBare=*/ (Attr & 1) != 0);
     }
     break;
   }

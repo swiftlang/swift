@@ -682,9 +682,9 @@ public:
     return insert(new (F->getModule())
                   GlobalAddrInst(getSILDebugLocation(Loc), Ty));
   }
-  GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g) {
+  GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g, bool isBare) {
     return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,
-                                                    getTypeExpansionContext()));
+                                                    getTypeExpansionContext(), isBare));
   }
   BaseAddrForOffsetInst *createBaseAddrForOffset(SILLocation Loc, SILType Ty) {
     return insert(new (F->getModule())

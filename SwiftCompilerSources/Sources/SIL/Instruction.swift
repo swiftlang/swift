@@ -523,7 +523,9 @@ final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 
 final public class GlobalAddrInst : GlobalAccessInst {}
 
-final public class GlobalValueInst : GlobalAccessInst {}
+final public class GlobalValueInst : GlobalAccessInst {
+  public var isBare: Bool { bridged.GlobalValueInst_isBare() }
+}
 
 final public class AllocGlobalInst : Instruction {
   public var global: GlobalVariable {

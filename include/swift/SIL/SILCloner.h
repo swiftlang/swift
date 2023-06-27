@@ -1125,7 +1125,8 @@ SILCloner<ImplClass>::visitGlobalValueInst(GlobalValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createGlobalValue(getOpLocation(Inst->getLoc()),
-                                           Inst->getReferencedGlobal()));
+                                           Inst->getReferencedGlobal(),
+                                           Inst->isBare()));
 }
 
 template<typename ImplClass>

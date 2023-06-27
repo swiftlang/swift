@@ -5850,6 +5850,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       Identifier GlobalName;
       SourceLoc IdLoc;
       SILType Ty;
+      bool isBare = false;
+      if (P.consumeIf(tok::l_square)) {
+        Identifier Id;
+        parseSILIdentifier(Id, diag::expected_in_attribute_list);
+        StringRef Optional = Id.str();
+        if (Optional == "bare" && Opcode == SILInstructionKind::GlobalValueInst) {
+          isBare = true;
+        } else {
+          return true;
+        }
+        P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      }
+
       if (P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
           parseSILIdentifier(GlobalName, IdLoc,
                              diag::expected_sil_value_name) ||
@@ -5877,7 +5890,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (Opcode == SILInstructionKind::GlobalAddrInst) {
         ResultVal = B.createGlobalAddr(InstLoc, global);
       } else {
-        ResultVal = B.createGlobalValue(InstLoc, global);
+        ResultVal = B.createGlobalValue(InstLoc, global, isBare);
       }
       break;
     }

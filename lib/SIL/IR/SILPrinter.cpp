@@ -1624,6 +1624,8 @@ public:
   }
 
   void visitGlobalValueInst(GlobalValueInst *GVI) {
+    if (GVI->isBare())
+      *this << "[bare] ";
     GVI->getReferencedGlobal()->printName(PrintState.OS);
     *this << " : " << GVI->getType();
   }

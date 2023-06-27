@@ -4119,9 +4119,18 @@ class GlobalValueInst
     : public InstructionBase<SILInstructionKind::GlobalValueInst,
                              GlobalAccessInst> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
   GlobalValueInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global,
-                  TypeExpansionContext context);
+                  TypeExpansionContext context, bool isBare);
+public:
+  bool isBare() const {
+    return sharedUInt8().GlobalValueInst.isBare;
+  }
+
+  void setBare(bool isBare = true) {
+    sharedUInt8().GlobalValueInst.isBare = isBare;
+  }
 };
 
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally

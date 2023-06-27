@@ -1254,9 +1254,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
     auto *G = GI->getReferencedGlobal();
     addReferencedGlobalVariable(G);
+    bool isBare = false;
+    if (auto *gv = dyn_cast<GlobalValueInst>(&SI))
+      isBare = gv->isBare();
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
+        (unsigned)SI.getKind(), isBare ? 1 : 0,
         S.addTypeRef(GI->getType().getRawASTType()),
         (unsigned)GI->getType().getCategory(),
         S.addUniquedStringRef(G->getName()));

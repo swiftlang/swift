@@ -763,6 +763,8 @@ sil @test_bare_flags : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_ref [bare] $Class1
   %0 = alloc_ref [bare] $Class1
+  // CHECK: global_value [bare] @static_array : $TestArrayStorage
+  %1 = global_value [bare] @static_array : $TestArrayStorage
   %2 = tuple ()
   return %2 : $()
 }

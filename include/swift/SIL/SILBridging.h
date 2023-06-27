@@ -794,6 +794,14 @@ struct BridgedInstruction {
       }, [](swift::SILDeclRef) {});
   }
 
+  bool GlobalValueInst_isBare() const {
+    return getAs<swift::GlobalValueInst>()->isBare();
+  }
+
+  void GlobalValueInst_setIsBare() const {
+    getAs<swift::GlobalValueInst>()->setBare(true);
+  }
+
   SWIFT_IMPORT_UNSAFE
   inline BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
 
@@ -1250,8 +1258,8 @@ struct BridgedBuilder{
   }
 
   SWIFT_IMPORT_UNSAFE
-  BridgedInstruction createGlobalValue(BridgedGlobalVar global) const {
-    return {builder().createGlobalValue(regularLoc(), global.getGlobal())};
+  BridgedInstruction createGlobalValue(BridgedGlobalVar global, bool isBare) const {
+    return {builder().createGlobalValue(regularLoc(), global.getGlobal(), isBare)};
   }
 
   SWIFT_IMPORT_UNSAFE

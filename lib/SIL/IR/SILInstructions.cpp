@@ -1019,10 +1019,12 @@ GlobalAddrInst::GlobalAddrInst(SILDebugLocation DebugLoc,
 
 GlobalValueInst::GlobalValueInst(SILDebugLocation DebugLoc,
                                  SILGlobalVariable *Global,
-                                 TypeExpansionContext context)
+                                 TypeExpansionContext context, bool bare)
     : InstructionBase(DebugLoc,
                       Global->getLoweredTypeInContext(context).getObjectType(),
-                      Global) {}
+                      Global) {
+  sharedUInt8().GlobalValueInst.isBare = bare;
+}
 
 const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
   return getModule().getIntrinsicInfo(getName());
