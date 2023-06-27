@@ -3893,6 +3893,8 @@ internal func _instantiateKeyPathBuffer(
   return offset
 }
 
+#if SWIFT_ENABLE_REFLECTION
+
 @available(SwiftStdlib 5.9, *)
 public func _createOffsetBasedKeyPath(
   root: Any.Type,
@@ -3942,8 +3944,6 @@ public func _createOffsetBasedKeyPath(
 
   return kp
 }
-
-#if SWIFT_ENABLE_REFLECTION
 
 @_silgen_name("swift_keyPath_copySymbolName")
 fileprivate func keyPath_copySymbolName(
