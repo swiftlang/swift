@@ -66,11 +66,15 @@ bb0:
   return %22 : $()
 }
 
+// Two non-contiguous fields (#M4.s2, #M4.s4) are reinitialized by @replace_2.
+//
+// Verify that #M4.s4 is not destroyed before being passed to replace_2.
 // CHECK-LABEL: sil [ossa] @rdar111356251 : $@convention(thin) () -> () {
 // CHECK:         [[STACK:%[^,]+]] = alloc_stack $M4
 // CHECK:         [[GET_M4:%[^,]+]] = function_ref @get_M4 : $@convention(thin) () -> @owned M4
 // CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_M4]]() : $@convention(thin) () -> @owned M4
 // CHECK:         store [[INSTANCE]] to [init] [[STACK]] : $*M4
+// CHECK-NOT:     destroy_addr
 // CHECK:         [[S2_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
 // CHECK:         [[S4_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
 // CHECK:         [[REPLACE_2:%[^,]+]] = function_ref @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
@@ -109,6 +113,8 @@ bb0:
   return %22 : $()
 }
 
+// Two non-contiguous fields (#M4.s2, #M4.s4) are initialized by @get_out_2.
+//
 // Verify that M4.s4 is not leaked after it is set.
 // CHECK-LABEL: sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
 // CHECK:         [[GET_OUT_2:%[^,]+]] = function_ref @get_out_2
