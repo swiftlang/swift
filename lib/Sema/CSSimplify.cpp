@@ -13631,6 +13631,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   }
 
   // Map the generic parameters we have over to their opened types.
+  bool hasParameterPack = false;
   SmallVector<Type, 2> openedGenericParams;
   auto genericParamDepth = genericParams->getParams()[0]->getDepth();
   for (const auto &openedType : openedTypes) {
@@ -13652,6 +13653,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
 
         auto *expansion = PackExpansionType::get(patternType, shapeType);
         openedGenericParams.push_back(expansion);
+        hasParameterPack = true;
       } else {
         openedGenericParams.push_back(Type(openedType.second));
       }
@@ -13674,8 +13676,15 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   auto specializedArgs = type2->castTo<PackType>()->getElementTypes();
   PackMatcher matcher(openedGenericParams, specializedArgs, getASTContext(),
                       isPackExpansionType);
-  if (matcher.match())
-    return SolutionKind::Error;
+  if (matcher.match()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    auto *fix = IgnoreGenericSpecializationArityMismatch::create(
+        *this, decl, openedGenericParams.size(), specializedArgs.size(),
+        hasParameterPack, getConstraintLocator(locator));
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
 
   // Bind the opened generic parameters to the specialization arguments.
   for (const auto &pair : matcher.pairs) {
