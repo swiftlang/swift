@@ -3657,7 +3657,7 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
   if (ctx.LangOpts.hasFeature(Feature::DisableActorInferenceFromPropertyWrapperUsage)) {
     // In Swift 6, we no longer infer isolation of a nominal type
     // based on the property wrappers used in its stored properties
-    return None;
+    return llvm::None;
   }
 
   llvm::Optional<ActorIsolation> foundIsolation;
