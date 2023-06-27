@@ -2082,10 +2082,53 @@ public:
   }
 };
 
+/// Describes the reason why the type must be copyable
+struct NoncopyableMatchFailure {
+  enum Kind {
+    CopyableConstraint,
+    ExistentialCast,
+  };
+
+private:
+  Kind reason;
+  union {
+    Type type;
+  };
+
+  NoncopyableMatchFailure(Kind reason, Type type)
+      : reason(reason), type(type) {}
+
+public:
+  Kind getKind() const { return reason; }
+
+  Type getType() const {
+    switch (reason) {
+    case ExistentialCast:
+      return type;
+
+    case CopyableConstraint:
+      llvm_unreachable("no type payload");
+    };
+  }
+
+  static NoncopyableMatchFailure forCopyableConstraint() {
+    return NoncopyableMatchFailure(CopyableConstraint, Type());
+  }
+
+  static NoncopyableMatchFailure forExistentialCast(Type existential) {
+    assert(existential->isAnyExistentialType());
+    return NoncopyableMatchFailure(ExistentialCast, existential);
+  }
+};
+
 class MustBeCopyable final : public ConstraintFix {
   Type noncopyableTy;
+  NoncopyableMatchFailure failure;
 
-  MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator);
+  MustBeCopyable(ConstraintSystem &cs,
+                 Type noncopyableTy,
+                 NoncopyableMatchFailure failure,
+                 ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "remove move-only from type"; }
@@ -2096,6 +2139,7 @@ public:
 
   static MustBeCopyable *create(ConstraintSystem &cs,
                              Type noncopyableTy,
+                             NoncopyableMatchFailure failure,
                              ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {

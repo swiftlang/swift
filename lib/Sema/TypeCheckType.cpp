@@ -1000,13 +1000,14 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 /// returns true iff an error diagnostic was emitted
 static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
                                          SourceLoc loc,
+                                         Type unboundTy,
                                          ArrayRef<Type> genericArgs) {
   bool didEmitDiag = false;
   for (auto t: genericArgs) {
     if (!t->isPureMoveOnly())
       continue;
 
-    ctx.Diags.diagnose(loc, diag::noncopyable_generics, t);
+    ctx.Diags.diagnose(loc, diag::noncopyable_generics_specific, t, unboundTy);
     didEmitDiag = true;
   }
 
@@ -1034,8 +1035,9 @@ Type TypeResolution::applyUnboundGenericArguments(
   bool skipRequirementsCheck = false;
 
   // check for generic args that are move-only
-  if (didDiagnoseMoveOnlyGenericArgs(getASTContext(), loc, genericArgs))
-    return ErrorType::get(getASTContext());
+  auto &ctx = getASTContext();
+  if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs))
+    return ErrorType::get(ctx);
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -2023,7 +2025,8 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
-    bool diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy);
+    bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
+                                 Type unboundTy, Type genericArgTy);
     bool diagnoseMoveOnlyMissingOwnership(TypeRepr *repr,
                                           TypeResolutionOptions options);
     
@@ -2277,10 +2280,17 @@ bool TypeResolver::diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr) {
 /// as an argument for type parameters.
 ///
 /// returns true if an error diagnostic was emitted
-bool TypeResolver::diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy) {
+bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
+                                           Type unboundTy,
+                                           Type genericArgTy) {
   if (genericArgTy->isPureMoveOnly()) {
-    diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics,
-                    genericArgTy);
+    if (unboundTy) {
+      diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_specific,
+                      genericArgTy, unboundTy);
+    } else {
+      diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics,
+                      genericArgTy);
+    }
     return true;
   }
   return false;
@@ -4368,8 +4378,11 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   }
 
   // do not allow move-only types in an array
-  if (diagnoseMoveOnly(repr, baseTy))
+  if (diagnoseMoveOnlyGeneric(repr,
+                              ctx.getArrayDecl()->getDeclaredInterfaceType(),
+                              baseTy)) {
     return ErrorType::get(ctx);
+  }
 
   return ArraySliceType::get(baseTy);
 }
@@ -4409,21 +4422,25 @@ NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
                                                 TypeResolutionOptions options) {
   TypeResolutionOptions elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::ImmediateOptionalTypeArgument);
+  ASTContext &ctx = getASTContext();
 
   auto baseTy = resolveType(repr->getBase(), elementOptions);
   if (baseTy->hasError()) {
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   auto optionalTy = TypeChecker::getOptionalType(repr->getQuestionLoc(),
                                                  baseTy);
   if (optionalTy->hasError()) {
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   // do not allow move-only types in an optional
-  if (diagnoseMoveOnly(repr, baseTy))
-    return ErrorType::get(getASTContext());
+  if (diagnoseMoveOnlyGeneric(repr,
+                              ctx.getOptionalDecl()->getDeclaredInterfaceType(),
+                              baseTy)) {
+    return ErrorType::get(ctx);
+  }
 
   return optionalTy;
 }
@@ -4431,6 +4448,7 @@ NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     ImplicitlyUnwrappedOptionalTypeRepr *repr, TypeResolutionOptions options,
     bool isDirect) {
+  ASTContext &ctx = getASTContext();
   TypeResolutionFlags allowIUO = TypeResolutionFlags::SILType;
 
   bool doDiag = false;
@@ -4479,7 +4497,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-    if (getASTContext().isSwiftVersionAtLeast(5)) {
+    if (ctx.isSwiftVersionAtLeast(5)) {
       // Mark this repr as invalid. This is the only way to indicate that
       // something went wrong without supressing checking other reprs in
       // the same type. For example:
@@ -4513,18 +4531,21 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
   auto baseTy = resolveType(repr->getBase(), elementOptions);
   if (baseTy->hasError()) {
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   auto uncheckedOptionalTy =
       TypeChecker::getOptionalType(repr->getExclamationLoc(), baseTy);
   if (uncheckedOptionalTy->hasError()) {
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   // do not allow move-only types in an implicitly-unwrapped optional
-  if (diagnoseMoveOnly(repr, baseTy))
-    return ErrorType::get(getASTContext());
+  if (diagnoseMoveOnlyGeneric(repr,
+                              ctx.getOptionalDecl()->getDeclaredInterfaceType(),
+                              baseTy)) {
+    return ErrorType::get(ctx);
+  }
 
   return uncheckedOptionalTy;
 }
@@ -4541,8 +4562,11 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
-  if (diagnoseMoveOnly(repr, element))
+  if (element->isPureMoveOnly()) {
+    diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
+                    element);
     return ErrorType::get(getASTContext());
+  }
 
   return element;
 }
@@ -4773,8 +4797,10 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   if (moveOnlyElementIndex.has_value()
       && !options.contains(TypeResolutionFlags::SILType)
       && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
-    diagnose(repr->getElementType(*moveOnlyElementIndex)->getLoc(),
-             diag::tuple_move_only_not_supported);
+    auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
+    auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
+    assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
+    diagnose(loc, diag::tuple_move_only_not_supported, noncopyableTy);
   }
 
   return TupleType::get(elements, ctx);

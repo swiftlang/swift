@@ -5520,7 +5520,9 @@ ERROR(tuple_pack_element_label,none,
       "cannot use label with pack expansion tuple element",
       ())
 ERROR(tuple_move_only_not_supported,none,
-      "tuples with noncopyable elements are not supported", ())
+      "tuple with noncopyable element type %0 is not supported", (Type))
+ERROR(tuple_containing_move_only_not_supported,none,
+      "type %0 containing noncopyable element is not supported", (Type))
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
@@ -7267,7 +7269,33 @@ ERROR(self_ownership_specifier_copyable,none,
       (SelfAccessKind, DescriptiveDeclKind))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics, none, "noncopyable type %0 cannot be used with generics yet", (Type))
+ERROR(noncopyable_generics, none,
+      "noncopyable type %0 cannot be used with generics yet",
+      (Type))
+ERROR(noncopyable_generics_variadic, none,
+      "noncopyable type %0 cannot be used within a variadic type yet",
+      (Type))
+ERROR(noncopyable_generics_specific, none,
+      "noncopyable type %0 cannot be used with generic type %1 yet",
+      (Type, Type))
+ERROR(noncopyable_generics_erasure, none,
+      "noncopyable type %0 cannot be erased to copyable existential type %1",
+      (Type, Type))
+ERROR(noncopyable_generics_metatype_cast, none,
+      "metatype %0 cannot be cast to %1 because %2 is noncopyable",
+      (Type, Type, Type))
+ERROR(noncopyable_generics_generic_param, none,
+      "noncopyable type %0 cannot be substituted for copyable %1 %2 in %3",
+      (Type, DescriptiveDeclKind, Type, DeclName))
+ERROR(noncopyable_generics_generic_param_metatype, none,
+      "metatype %4 of noncopyable type %0 cannot be substituted for copyable %1 %2 in %3",
+      (Type, DescriptiveDeclKind, Type, DeclName, Type))
+NOTE(noncopyable_generics_implicit_copyable, none,
+      "%0 %1 has an implicit Copyable requirement",
+      (DescriptiveDeclKind, Type))
+ERROR(noncopyable_element_of_pack_not_supported,none,
+      "parameter pack containing noncopyable element %0 is not supported",
+      (Type))
 ERROR(noncopyable_effectful_getter,none,
       "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noncopyable_enums_do_not_support_indirect,none,
