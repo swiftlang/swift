@@ -668,9 +668,7 @@ struct UseState {
 
   void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
     auto &bits = getOrCreateLivenessUse(inst);
-    for (auto element : range.getRange()) {
-      bits.set(element);
-    }
+    range.setBits(bits);
   }
 
   /// Returns true if this is a terminator instruction that although it doesn't
