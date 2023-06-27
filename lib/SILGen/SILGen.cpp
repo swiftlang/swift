@@ -2201,10 +2201,6 @@ public:
     for (auto *D : sf->getTopLevelDecls()) {
       // Emit auxiliary decls.
       D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-        // Skip extensions decls; they are visited below.
-        if (isa<ExtensionDecl>(auxiliaryDecl))
-          return;
-
         FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                         "SILgen-decl", auxiliaryDecl);
         SGM.visit(auxiliaryDecl);

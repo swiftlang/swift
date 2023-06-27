@@ -1452,7 +1452,13 @@ swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
     extension->setExtendedNominal(nominal);
     nominal->addExtension(extension);
 
-    // Make it accessible to getTopLevelDecls()
+    // Most other macro-generated declarations are visited through calling
+    // 'visitAuxiliaryDecls' on the original declaration the macro is attached
+    // to. We don't do this for macro-generated extensions, because the
+    // extension is not a peer of the original declaration. Instead of
+    // requiring all callers of 'visitAuxiliaryDecls' to understand the
+    // hoisting behavior of macro-generated extensions, we make the
+    // extension accessible through 'getTopLevelDecls()'.
     if (auto file = dyn_cast<FileUnit>(
             decl->getDeclContext()->getModuleScopeContext()))
       file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
