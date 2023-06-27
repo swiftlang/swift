@@ -287,107 +287,8 @@ llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
                    "move-only values."));
 
 //===----------------------------------------------------------------------===//
-//                           MARK: Memory Utilities
+//                              MARK: Utilities
 //===----------------------------------------------------------------------===//
-
-static bool memInstMustInitialize(Operand *memOper) {
-  SILValue address = memOper->get();
-
-  SILInstruction *memInst = memOper->getUser();
-
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return CAI->getDest() == address && CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::ExplicitCopyAddrInst: {
-    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
-    return CAI->getDest() == address && CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
-    return cast<MarkUnresolvedMoveAddrInst>(memInst)->getDest() == address;
-  }
-  case SILInstructionKind::InitExistentialAddrInst:
-  case SILInstructionKind::InitEnumDataAddrInst:
-  case SILInstructionKind::InjectEnumAddrInst:
-    return true;
-
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::ApplyInst: {
-    FullApplySite applySite(memInst);
-    return applySite.isIndirectResultOperand(*memOper);
-  }
-  case SILInstructionKind::StoreInst: {
-    auto qual = cast<StoreInst>(memInst)->getOwnershipQualifier();
-    return qual == StoreOwnershipQualifier::Init ||
-           qual == StoreOwnershipQualifier::Trivial;
-  }
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  case SILInstructionKind::Store##Name##Inst:                                  \
-    return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
-#include "swift/AST/ReferenceStorage.def"
-  }
-}
-
-static bool memInstMustReinitialize(Operand *memOper) {
-  SILValue address = memOper->get();
-
-  SILInstruction *memInst = memOper->getUser();
-
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::ExplicitCopyAddrInst: {
-    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::YieldInst: {
-    auto *yield = cast<YieldInst>(memInst);
-    return yield->getYieldInfoForOperand(*memOper).isIndirectInOut();
-  }
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::ApplyInst: {
-    FullApplySite applySite(memInst);
-    return applySite.getArgumentOperandConvention(*memOper).isInoutConvention();
-  }
-  case SILInstructionKind::StoreInst:
-    return cast<StoreInst>(memInst)->getOwnershipQualifier() ==
-           StoreOwnershipQualifier::Assign;
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  case SILInstructionKind::Store##Name##Inst:                                  \
-    return !cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
-#include "swift/AST/ReferenceStorage.def"
-  }
-}
-
-/// Is this a reinit instruction that we know how to convert into its init form.
-static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *cai = cast<CopyAddrInst>(memInst);
-    return !cai->isInitializationOfDest();
-  }
-  case SILInstructionKind::StoreInst: {
-    auto *si = cast<StoreInst>(memInst);
-    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
-  }
-  }
-}
 
 static void insertDebugValueBefore(SILInstruction *insertPt,
                                    DebugVarCarryingInst debugVar,
@@ -432,47 +333,20 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
                        [&]{ return debugVar.getOperandForDebugValueClone(); });
 }
 
-static bool memInstMustConsume(Operand *memOper) {
-  SILValue address = memOper->get();
-
-  SILInstruction *memInst = memOper->getUser();
-
-  // FIXME: drop_deinit must be handled here!
+/// Is this a reinit instruction that we know how to convert into its init form.
+static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
   switch (memInst->getKind()) {
   default:
     return false;
 
   case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
-           (CAI->getDest() == address && !CAI->isInitializationOfDest());
+    auto *cai = cast<CopyAddrInst>(memInst);
+    return !cai->isInitializationOfDest();
   }
-  case SILInstructionKind::ExplicitCopyAddrInst: {
-    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
-    return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
-           (CAI->getDest() == address && !CAI->isInitializationOfDest());
+  case SILInstructionKind::StoreInst: {
+    auto *si = cast<StoreInst>(memInst);
+    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
   }
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::ApplyInst: {
-    FullApplySite applySite(memInst);
-    return applySite.getArgumentOperandConvention(*memOper).isOwnedConvention();
-  }
-  case SILInstructionKind::PartialApplyInst: {
-    // If we are on the stack or have an inout convention, we do not
-    // consume. Otherwise, we do.
-    auto *pai = cast<PartialApplyInst>(memInst);
-    if (pai->isOnStack())
-      return false;
-    ApplySite applySite(pai);
-    auto convention = applySite.getArgumentConvention(*memOper);
-    return !convention.isInoutConvention();
-  }
-  case SILInstructionKind::DestroyAddrInst:
-    return true;
-  case SILInstructionKind::LoadInst:
-    return cast<LoadInst>(memInst)->getOwnershipQualifier() ==
-           LoadOwnershipQualifier::Take;
   }
 }
 
@@ -1725,7 +1599,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *user;);
 
   // First check if we have init/reinit. These are quick/simple.
-  if (::memInstMustInitialize(op)) {
+  if (noncopyable::memInstMustInitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found init: " << *user);
 
     // TODO: What about copy_addr of itself. We really should just pre-process
@@ -1739,7 +1613,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
-  if (::memInstMustReinitialize(op)) {
+  if (noncopyable::memInstMustReinitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *user);
     assert(!useState.reinitInsts.count(user));
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
@@ -2024,7 +1898,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our
   // additional pure takes.
-  if (::memInstMustConsume(op)) {
+  if (noncopyable::memInstMustConsume(op)) {
     // If we don't have a consumeable and assignable check kind, then we can't
     // consume. Emit an error.
     //
@@ -3186,6 +3060,24 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
       return false;
     }
     state.process();
+  }
+
+  // Then if we have a let allocation, see if we have any copy_addr on our
+  // markedAddress that form temporary allocation chains. This occurs when we
+  // emit SIL for code like:
+  //
+  // let x: AddressOnlyType = ...
+  // let _ = x.y.z
+  //
+  // SILGen will treat y as a separate rvalue from x and will create a temporary
+  // allocation. In contrast if we have a var, we treat x like an lvalue and
+  // just create GEPs appropriately.
+  if (eliminateTemporaryAllocationsFromLet(markedAddress)) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+            << "Succeeded in eliminating temporary allocations! Fn after:\n";
+        markedAddress->getFunction()->dump());
+    changed = true;
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this
