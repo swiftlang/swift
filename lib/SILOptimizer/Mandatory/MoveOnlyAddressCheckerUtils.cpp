@@ -763,14 +763,19 @@ struct UseState {
     }
   }
 
-  void recordConsumingBlock(SILBasicBlock *block, TypeTreeLeafTypeRange range) {
+  SmallBitVector &getOrCreateConsumingBlock(SILBasicBlock *block) {
     auto iter = consumingBlocks.find(block);
     if (iter == consumingBlocks.end()) {
       iter =
           consumingBlocks.insert({block, SmallBitVector(getNumSubelements())})
               .first;
     }
-    range.setBits(iter->second);
+    return iter->second;
+  }
+
+  void recordConsumingBlock(SILBasicBlock *block, TypeTreeLeafTypeRange range) {
+    auto &consumingBits = getOrCreateConsumingBlock(block);
+    range.setBits(consumingBits);
   }
 
   void
