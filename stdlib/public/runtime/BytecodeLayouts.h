@@ -113,6 +113,9 @@ swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest,
                                                swift::OpaqueValue *src,
                                                const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
+unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+                                     const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
 unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
                                  const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT

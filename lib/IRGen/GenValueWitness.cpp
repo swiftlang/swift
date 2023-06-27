@@ -900,8 +900,11 @@ static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
 }
 
 static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
-                                   const EnumTypeLayoutEntry *typeLayoutEntry) {
-  if (typeLayoutEntry->isSingleton()) {
+                                     const EnumTypeLayoutEntry *typeLayoutEntry,
+                                          GenericSignature genericSig) {
+  if (!typeLayoutEntry->layoutString(IGM, genericSig) &&
+      !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry) ||
+      typeLayoutEntry->isSingleton()) {
     return nullptr;
   } else if (!typeLayoutEntry->isFixedSize(IGM)) {
     if (typeLayoutEntry->isMultiPayloadEnum()) {
@@ -923,7 +926,7 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
          (tzCount % toCount != 0))) {
       return IGM.getEnumFnGetEnumTagFn();
     } else {
-      return nullptr;
+      return IGM.getEnumSimpleGetEnumTagFn();
     }
   }
 }
@@ -1156,7 +1159,9 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       if (auto *typeLayoutEntry = typeInfo.buildTypeLayoutEntry(
               IGM, ty, /*useStructLayouts*/ true)) {
         if (auto *enumLayoutEntry = typeLayoutEntry->getAsEnum()) {
-          if (auto *fn = getEnumTagFunction(IGM, enumLayoutEntry)) {
+          auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+                              ->getGenericSignature();
+          if (auto *fn = getEnumTagFunction(IGM, enumLayoutEntry, genericSig)) {
             return addFunction(fn);
           }
         }
