@@ -289,29 +289,29 @@ func blender(_ peeler : () -> Void) {
 
 
   await wisk({})
-  // expected-warning@-1{{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   await wisk(1)
-  // expected-warning@-1{{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
   await (peelBanana)()
   await (((((peelBanana)))))()
   await (((wisk)))((wisk)((wisk)(1)))
-  // expected-warning@-1 3{{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
 
   blender((peelBanana))
   // expected-warning@-1 2{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
 
   await wisk(peelBanana)
-  // expected-warning@-1{{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   await wisk(wisk)
-  // expected-warning@-1{{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-warning@-1{{passing argument of non-sendable type '(Any) -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   await (((wisk)))(((wisk)))
-  // expected-warning@-1{{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-warning@-1{{passing argument of non-sendable type '(Any) -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
-  // expected-warning@+1 {{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
   await {wisk}()(1)
 
-  // expected-warning@+1 {{passing argument of non-sendable type 'Any' into global actor 'BananaActor'-isolated context may introduce data races}}
   await (true ? wisk : {n in return})(1)
 }
 
