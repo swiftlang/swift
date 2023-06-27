@@ -2829,3 +2829,15 @@ AllowInvalidMemberReferenceInInitAccessor::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       AllowInvalidMemberReferenceInInitAccessor(cs, memberName, locator);
 }
+
+bool AllowConcreteTypeSpecialization::diagnose(const Solution &solution,
+                                               bool asNote) const {
+  return false;
+}
+
+AllowConcreteTypeSpecialization *
+AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowConcreteTypeSpecialization(cs, concreteTy, locator);
+}

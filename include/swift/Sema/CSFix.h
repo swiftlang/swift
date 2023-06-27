@@ -454,6 +454,9 @@ enum class FixKind : uint8_t {
   /// Ignore the fact that member couldn't be referenced within init accessor
   /// because its name doesn't appear in 'initializes' or 'accesses' attributes.
   AllowInvalidMemberReferenceInInitAccessor,
+
+  /// Ignore an attempt to specialize non-generic type.
+  AllowConcreteTypeSpecialization,
 };
 
 class ConstraintFix {
@@ -3644,6 +3647,33 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidMemberReferenceInInitAccessor;
+  }
+};
+
+class AllowConcreteTypeSpecialization final : public ConstraintFix {
+  Type ConcreteType;
+
+  AllowConcreteTypeSpecialization(ConstraintSystem &cs, Type concreteTy,
+                                  ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowConcreteTypeSpecialization, locator),
+        ConcreteType(concreteTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow concrete type specialization";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowConcreteTypeSpecialization *
+  create(ConstraintSystem &cs, Type concreteTy, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowConcreteTypeSpecialization;
   }
 };
 

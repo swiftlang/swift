@@ -13657,6 +13657,10 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
       }
     }
   }
+
+  if (openedGenericParams.empty())
+    return SolutionKind::Error;
+
   assert(openedGenericParams.size() == genericParams->size());
 
   // Match the opened generic parameters to the specialized arguments.
@@ -14764,7 +14768,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::AllowAssociatedValueMismatch:
-  case FixKind::GenericArgumentsMismatch: {
+  case FixKind::GenericArgumentsMismatch:
+  case FixKind::AllowConcreteTypeSpecialization: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {
