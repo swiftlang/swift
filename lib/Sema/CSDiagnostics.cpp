@@ -9162,3 +9162,8 @@ bool InvalidMemberReferenceWithinInitAccessor::diagnoseAsError() {
   emitDiagnostic(diag::init_accessor_invalid_member_ref, MemberName);
   return true;
 }
+
+bool ConcreteTypeSpecialization::diagnoseAsError() {
+  emitDiagnostic(diag::not_a_generic_type, ConcreteType);
+  return true;
+}

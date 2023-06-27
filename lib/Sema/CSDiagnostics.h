@@ -3049,6 +3049,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose attempts to specialize a concrete type or its alias:
+///
+/// \code
+/// struct Test {}
+/// typealias X = Test
+///
+/// _ = X<Int>() // error
+/// \endcode
+class ConcreteTypeSpecialization final : public FailureDiagnostic {
+  Type ConcreteType;
+
+public:
+  ConcreteTypeSpecialization(const Solution &solution, Type concreteTy,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ConcreteType(resolveType(concreteTy)) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

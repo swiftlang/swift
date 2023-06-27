@@ -2832,7 +2832,8 @@ AllowInvalidMemberReferenceInInitAccessor::create(ConstraintSystem &cs,
 
 bool AllowConcreteTypeSpecialization::diagnose(const Solution &solution,
                                                bool asNote) const {
-  return false;
+  ConcreteTypeSpecialization failure(solution, ConcreteType, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowConcreteTypeSpecialization *
