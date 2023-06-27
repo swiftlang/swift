@@ -2845,7 +2845,9 @@ AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
 
 bool IgnoreGenericSpecializationArityMismatch::diagnose(
     const Solution &solution, bool asNote) const {
-  return false;
+  InvalidTypeSpecializationArity failure(solution, D, NumParams, NumArgs,
+                                         HasParameterPack, getLocator());
+  return failure.diagnose(asNote);
 }
 
 IgnoreGenericSpecializationArityMismatch *
