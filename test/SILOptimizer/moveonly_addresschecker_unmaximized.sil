@@ -17,6 +17,7 @@ sil @get_M4 : $@convention(thin) () -> @owned M4
 sil @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
 sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
 sil @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
+sil @get_out_2 : $@convention(thin) () -> (@out M, @out M)
 
 /// Two non-contiguous fields (#M4.s2, #M4.s4) are borrowed by @see_addr_2.
 /// Two non-contiguous fields (#M4.s1, #M$.s3) are consumed by @end_2.
@@ -102,6 +103,40 @@ bb0:
   %15 = load [copy] %14 : $*M
   %16 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
   %17 = apply %16(%13, %15) : $@convention(thin) (@owned M, @owned M) -> ()
+  destroy_addr %stack : $*M4
+  dealloc_stack %stack_addr : $*M4
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// Verify that M4.s4 is not leaked after it is set.
+// CHECK-LABEL: sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
+// CHECK:         [[GET_OUT_2:%[^,]+]] = function_ref @get_out_2
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         [[S2_ADDR_1:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         [[S4_ADDR_1:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         apply [[GET_OUT_2]]([[S2_ADDR_1]], [[S4_ADDR_1]])
+// CHECK:         [[S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         [[S4_ADDR_4:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         destroy_addr [[S2_ADDR_2]]
+// CHECK:         destroy_addr [[S4_ADDR_4]]
+// CHECK-LABEL: } // end sil function 'rdar111391893'
+sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
+  %get_out_2 = function_ref @get_out_2 : $@convention(thin) () -> (@out M, @out M)
+  %end_2 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+  %stack_addr = alloc_stack $M4
+  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*M4
+  %s2_addr = struct_element_addr %stack : $*M4, #M4.s2
+  %s4_addr = struct_element_addr %stack : $*M4, #M4.s4
+  apply %get_out_2(%s2_addr, %s4_addr) : $@convention(thin) () -> (@out M, @out M)
+  %s1_addr = struct_element_addr %stack : $*M4, #M4.s1
+  %s3_addr = struct_element_addr %stack : $*M4, #M4.s3
+  apply %get_out_2(%s1_addr, %s3_addr) : $@convention(thin) () -> (@out M, @out M)
+  %12 = struct_element_addr %stack : $*M4, #M4.s1
+  %13 = load [copy] %12 : $*M
+  %14 = struct_element_addr %stack : $*M4, #M4.s3
+  %15 = load [copy] %14 : $*M
+  %17 = apply %end_2(%13, %15) : $@convention(thin) (@owned M, @owned M) -> ()
   destroy_addr %stack : $*M4
   dealloc_stack %stack_addr : $*M4
   %22 = tuple ()

@@ -625,7 +625,7 @@ struct UseState {
 
   /// A map from an instruction that initializes memory to the description of
   /// the part of the type tree that it initializes.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> initInsts;
+  InstToBitMap initInsts;
 
   /// memInstMustReinitialize insts. Contains both insts like copy_addr/store
   /// [assign] that are reinits that we will convert to inits and true reinits.
@@ -685,6 +685,10 @@ struct UseState {
 
   void recordReinitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
     setAffectedBits(inst, range, reinitInsts);
+  }
+
+  void recordInitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    setAffectedBits(inst, range, initInsts);
   }
 
   /// Returns true if this is a terminator instruction that although it doesn't
@@ -881,7 +885,7 @@ struct UseState {
     {
       auto iter = initInsts.find(inst);
       if (iter != initInsts.end()) {
-        if (span.setIntersection(iter->second))
+        if (span.intersects(iter->second))
           return true;
       }
     }
@@ -1026,7 +1030,7 @@ void UseState::initializeLiveness(
             llvm::dbgs()
             << "Found in/in_guaranteed/inout/inout_aliasable argument as "
                "an init... adding mark_must_check as init!\n");
-        initInsts.insert({address, liveness.getTopLevelSpan()});
+        recordInitUse(address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
         break;
       case swift::SILArgumentConvention::Indirect_Out:
@@ -1057,14 +1061,14 @@ void UseState::initializeLiveness(
         // later invariants that we assert upon remain true.
         LLVM_DEBUG(llvm::dbgs() << "Found move only arg closure box use... "
                                    "adding mark_must_check as init!\n");
-        initInsts.insert({address, liveness.getTopLevelSpan()});
+        recordInitUse(address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
       }
     } else if (auto *box = dyn_cast<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs() << "Found move only var allocbox use... "
                  "adding mark_must_check as init!\n");
-      initInsts.insert({address, liveness.getTopLevelSpan()});
+      recordInitUse(address, liveness.getTopLevelSpan());
       liveness.initializeDef(address, liveness.getTopLevelSpan());
     }
   }
@@ -1075,7 +1079,7 @@ void UseState::initializeLiveness(
           stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found ref_element_addr use... "
                                "adding mark_must_check as init!\n");
-    initInsts.insert({address, liveness.getTopLevelSpan()});
+    recordInitUse(address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
@@ -1085,7 +1089,7 @@ void UseState::initializeLiveness(
           dyn_cast<GlobalAddrInst>(stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found global_addr use... "
                                "adding mark_must_check as init!\n");
-    initInsts.insert({address, liveness.getTopLevelSpan()});
+    recordInitUse(address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
@@ -1758,8 +1762,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!leafRange)
       return false;
 
-    assert(!useState.initInsts.count(user));
-    useState.initInsts.insert({user, *leafRange});
+    useState.recordInitUse(user, *leafRange);
     return true;
   }
 
