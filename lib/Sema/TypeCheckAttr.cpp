@@ -6723,10 +6723,11 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       }
     }
 
-    // Using 'nonisolated' with wrapped properties is unsupported, because
-    // backing storage is a stored 'var' that is part of the internal state
-    // of the actor which could only be accessed in actor's isolation context.
-    if (var->hasAttachedPropertyWrapper()) {
+    // Using 'nonisolated' with `var` declared wrapped properties is
+    // unsupported, because backing storage is a stored 'var' that is part of
+    // the internal state of the actor which could only be accessed in actor's
+    // isolation context.
+    if (var->hasAttachedPropertyWrapper() && !var->isLet()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property);
       return;
     }

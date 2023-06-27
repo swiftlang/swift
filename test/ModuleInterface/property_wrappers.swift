@@ -18,6 +18,15 @@ public struct Wrapper<T> {
 }
 
 @propertyWrapper
+public struct WrapperWithWrappedValueInit<T> {
+  public var wrappedValue: T
+
+  public init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@propertyWrapper
 public struct WrapperWithInitialValue<T> {
   private var value: T
   
@@ -26,8 +35,8 @@ public struct WrapperWithInitialValue<T> {
     set { value = newValue }
   }
 
-  public init(initialValue: T) {
-    self.value = initialValue
+  public init(wrappedValue: T) {
+    self.value = wrappedValue
   }
 
   public init(alternate value: T) {
@@ -42,6 +51,11 @@ public struct WrapperWithInitialValue<T> {
 
 // CHECK: public struct HasWrappers {
 public struct HasWrappers {
+  // CHECK: @TestResilient.WrapperWithInitialValue @_projectedValueProperty($v) public var v: Swift.String {
+  // CHECK-NEXT: get
+  // CHECK-NEXT: }
+  @WrapperWithInitialValue public let v: String = "Hello"
+  
   // CHECK: @TestResilient.Wrapper public var x: {{(Swift.)?}}Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: set

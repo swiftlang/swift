@@ -2819,6 +2819,8 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
                                         VarDecl::Introducer::Var,
                                         var->getLoc(),
                                         name, dc);
+  if (var->isLet() && var->getAttrs().hasAttribute<NonisolatedAttr>())
+    property->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
   property->setImplicit();
   property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
@@ -2837,7 +2839,7 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   } else {
     bool hasSetter = wrapperVar->isSettable(nullptr) &&
     wrapperVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
-    if (hasSetter)
+    if (hasSetter && !var->isLet())
       property->setImplInfo(StorageImplInfo::getMutableComputed());
     else
       property->setImplInfo(StorageImplInfo::getImmutableComputed());
@@ -3069,11 +3071,17 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar = ParamDecl::cloneWithoutType(ctx, param);
     backingVar->setName(name);
   } else {
-    auto introducer = isa<ParamDecl>(var) ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+
+    auto introducer = (isa<ParamDecl>(var) || var->isLet())
+                          ? VarDecl::Introducer::Let
+                          : VarDecl::Introducer::Var;
     backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
                                    introducer,
                                    var->getLoc(),
                                    name, dc);
+    if (var->isLet() && var->getAttrs().hasAttribute<NonisolatedAttr>())
+      backingVar->getAttrs().add(new (ctx)
+                                     NonisolatedAttr(/*isImplicit=*/true));
     backingVar->setImplicit();
     backingVar->setOriginalWrappedProperty(var);
 
@@ -3085,6 +3093,7 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
   }
 
   if (wrapperInfo.projectedValueVar || var->getName().hasDollarPrefix()) {
+
     projectionVar = synthesizePropertyWrapperProjectionVar(
         ctx, var, wrapperInfo.projectedValueVar);
   }

@@ -15,6 +15,9 @@ struct TL {
 
   @TaskLocal
   var notStatic: String? // expected-error{{property 'notStatic', must be static because property wrapper 'TaskLocal<String?>' can only be applied to static properties}}
+  
+  @TaskLocal
+  static let meltingPoint: Double = 273.1 // expected-note {{change 'let' to 'var' to make it mutable}}
 }
 
 @TaskLocal // expected-error{{property wrappers are not yet supported in top-level code}}
@@ -26,6 +29,7 @@ class NotSendable {}
 func test () async {
   TL.number = 10 // expected-error{{cannot assign to property: 'number' is a get-only property}}
   TL.$number = 10 // expected-error{{cannot assign value of type 'Int' to type 'TaskLocal<Int>'}}
+  TL.meltingPoint = 100.0 // expected-error {{cannot assign to property: 'meltingPoint' is a 'let' constant}}
   let _: Int = TL.number
   let _: Int = TL.$number.get()
 }

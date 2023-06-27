@@ -545,14 +545,18 @@ struct UseMutatingnessWrappers {
   @WrapperWithMutatingGetter
   var y = 17
 
-  @WrapperWithNonMutatingSetter // expected-error{{property wrapper can only be applied to a 'var'}}
+  @WrapperWithNonMutatingSetter
   let z = 3.14159 // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
   @ClassWrapper
   var w = "Hello"
+  
+  @ClassWrapper
+  let v = "Good morning" // expected-note 2{{change 'let' to 'var' to make it mutable}}
 }
 
 func testMutatingness() {
+  
   var mutable = UseMutatingnessWrappers()
 
   _ = mutable.x
@@ -566,6 +570,9 @@ func testMutatingness() {
 
   _ = mutable.w
   mutable.w = "Goodbye"
+  
+  _ = mutable.v
+  mutable.v = "Good night" // expected-error{{cannot assign to property: 'v' is a 'let' constant}}
 
   let nonmutable = UseMutatingnessWrappers() // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
@@ -582,6 +589,23 @@ func testMutatingness() {
   // Okay due to implicitly nonmutating setter
   _ = nonmutable.w
   nonmutable.w = "World"
+  
+  _ = nonmutable.v
+  nonmutable.v = "Good afternoon" // expected-error{{cannot assign to property: 'v' is a 'let' constant}}
+}
+
+struct LetWrappedPropertyReassignment {
+  @ClassWrapper
+  let u: String // expected-note{{change 'let' to 'var' to make it mutable}}
+  
+  init() {
+    self.u = "Red"
+  }
+}
+
+func testLetReassignment() {
+  var m = LetWrappedPropertyReassignment()
+  m.u = "Yellow" // expected-error{{cannot assign to property: 'u' is a 'let' constant}}
 }
 
 // ---------------------------------------------------------------------------
