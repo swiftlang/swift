@@ -1371,6 +1371,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
+
+    // Suppress @attached(extension) if needed.
+    if (!Options.PrintExtensionMacroAttributes &&
+        Attr->getMacroRole() == MacroRole::Extension) {
+      break;
+    }
+
     switch (Attr->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
       Printer.printAttrName("@freestanding");
