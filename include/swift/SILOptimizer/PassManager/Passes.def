@@ -446,6 +446,8 @@ PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",
      "Utility pass that enforces move only invariants on raw SIL for addresses for testing purposes")
 PASS(MoveOnlyChecker, "sil-move-only-checker",
      "Pass that enforces move only invariants on raw SIL for addresses and objects")
+PASS(MoveOnlyTempAllocationFromLetTester, "sil-move-only-temp-allocation-from-let-tester",
+     "Pass that allows us to run separately SIL test cases for the eliminateTemporaryAllocationsFromLet utility")
 PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
      "Pass that performs checking of the consume operator for copyable values")
 PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",

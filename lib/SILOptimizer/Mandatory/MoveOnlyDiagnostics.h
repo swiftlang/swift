@@ -169,6 +169,11 @@ public:
                                                StringRef pathString,
                                                NominalTypeDecl *deinitedNominal,
                                                SILInstruction *consumingUser);
+  void emitCannotDestructureNominalError(MarkMustCheckInst *markedValue,
+                                         StringRef pathString,
+                                         NominalTypeDecl *nominal,
+                                         SILInstruction *consumingUser,
+                                         bool isDueToDeinit);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing

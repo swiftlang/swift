@@ -3300,6 +3300,11 @@ static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
+  // Partial consumption does not affect declarations directly.
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
