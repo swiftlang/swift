@@ -2476,6 +2476,25 @@ public func addressOnlyGenericAccessConsumeGrandFieldArg4a<T>(_ x2: consuming Ad
     }
 }
 
+public func addressOnlyGenericBorrowingConsume<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    let _ = x // expected-note {{consumed here}}
+}
+
+public func addressOnlyGenericBorrowingConsumeField<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    let _ = x.moveOnly // expected-note {{consumed here}}
+}
+
+public func addressOnlyGenericBorrowingConsumeField2<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    let _ = x.copyable
+}
+
+public func addressOnlyGenericBorrowingConsumeGrandField<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    let _ = x.moveOnly.k // expected-note {{consumed here}}
+}
+
 extension AddressOnlyGeneric {
     func testNoUseSelf() { // expected-error {{'self' is borrowed and cannot be consumed}}
         let x = self // expected-note {{consumed here}}
