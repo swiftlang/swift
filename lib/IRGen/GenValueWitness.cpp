@@ -1012,6 +1012,26 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
         return addFunction(getInitWithCopyStrongFunction(IGM));
       }
     }
+
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      auto ty = boundGenericCharacteristics
+                    ? boundGenericCharacteristics->concreteType
+                    : concreteType;
+      auto &typeInfo = boundGenericCharacteristics
+                           ? *boundGenericCharacteristics->TI
+                           : concreteTI;
+      if (auto *typeLayoutEntry = typeInfo.buildTypeLayoutEntry(
+              IGM, ty, /*useStructLayouts*/ true)) {
+        auto genericSig = concreteType.getNominalOrBoundGenericNominal()
+                              ->getGenericSignature();
+        if (typeLayoutEntry->layoutString(IGM, genericSig) ||
+            isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
+          return addFunction(
+              IGM.getGenericInitializeBufferWithCopyOfBufferFn());
+        }
+      }
+    }
     goto standard;
 
   case ValueWitness::InitializeWithTake:
