@@ -3208,16 +3208,20 @@ namespace {
               d->getName() == "cos" || d->getName() == "exit";
         };
         if (decl->getOwningModule() &&
-            decl->getOwningModule()
-                     ->getTopLevelModule()
-                     ->getFullModuleName() == "std" &&
-            isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
+            (decl->getOwningModule()
+                ->getTopLevelModule()
+                ->getFullModuleName() == "std" ||
+             decl->getOwningModule()
+                ->getTopLevelModule()
+                ->getFullModuleName() == "_SwiftConcurrencyShims")) {
+          if (isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
+            return nullptr;
+          }
           auto filename =
               Impl.getClangPreprocessor().getSourceManager().getFilename(
                   decl->getLocation());
           if (filename.endswith("cmath") || filename.endswith("math.h") ||
-              filename.endswith("stdlib.h") || filename.endswith("cstdlib") ||
-              filename.endswith("string.h")) {
+              filename.endswith("stdlib.h") || filename.endswith("cstdlib")) {
             return nullptr;
           }
         }
