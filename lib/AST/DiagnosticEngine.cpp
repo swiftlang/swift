@@ -1288,6 +1288,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       case GeneratedSourceInfo::MemberMacroExpansion:
       case GeneratedSourceInfo::PeerMacroExpansion:
       case GeneratedSourceInfo::ConformanceMacroExpansion:
+      case GeneratedSourceInfo::ExtensionMacroExpansion:
       case GeneratedSourceInfo::PrettyPrinted:
         fixIts = {};
         break;
@@ -1335,7 +1336,8 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
     case GeneratedSourceInfo::MemberMacroExpansion:
     case GeneratedSourceInfo::PeerMacroExpansion:
-    case GeneratedSourceInfo::ConformanceMacroExpansion: {
+    case GeneratedSourceInfo::ConformanceMacroExpansion:
+    case GeneratedSourceInfo::ExtensionMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName = getGeneratedSourceInfoMacroName(*generatedInfo);
 
@@ -1533,7 +1535,8 @@ swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion: {
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion: {
     DeclName macroName;
     if (auto customAttr = info.attachedMacroCustomAttr) {
       // FIXME: How will we handle deserialized custom attributes like this?

@@ -220,7 +220,7 @@ struct RawCharSourceRange {
   unsigned Length;
 };
 
-enum class MacroRole : uint8_t {
+enum class MacroRole : uint32_t {
   // This should align with 'swift::MacroRole'.
   Expression = 0x01,
   Declaration = 0x02,
@@ -230,6 +230,7 @@ enum class MacroRole : uint8_t {
   Peer = 0x20,
   Conformance = 0x40,
   CodeItem = 0x80,
+  Extension = 0x100,
 };
 using MacroRoles = swift::OptionSet<MacroRole>;
 
