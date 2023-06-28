@@ -1852,11 +1852,28 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
           assert(checkKind == MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
-        } else {
-          // Otherwise, we need to emit an escaping closure error.
+          return true;
+        }
+
+        // If we have a function argument that is no_consume_or_assign and we do
+        // not have any partial apply uses, then we know that we have a use of
+        // an address only borrowed parameter that we need to
+        if (fArg &&
+            checkKind == MarkMustCheckInst::CheckKind::NoConsumeOrAssign &&
+            !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        // Finally try to emit either a global or class field error...
+        if (!moveChecker.diagnosticEmitter
+                 .emitGlobalOrClassFieldLoadedAndConsumed(markedValue)) {
+          // And otherwise if we failed emit an escaping closure error.
           moveChecker.diagnosticEmitter
               .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
         }
+
         return true;
       }
 

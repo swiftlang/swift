@@ -780,7 +780,7 @@ void DiagnosticEmitter::emitObjectInstConsumesAndUsesValue(
   registerDiagnosticEmitted(markedValue);
 }
 
-void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
+bool DiagnosticEmitter::emitGlobalOrClassFieldLoadedAndConsumed(
     MarkMustCheckInst *markedValue) {
   SmallString<64> varName;
   getVariableNameForValue(markedValue, varName);
@@ -794,7 +794,7 @@ void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
              diag::sil_movechecking_notconsumable_but_assignable_was_consumed,
              varName, /*isGlobal=*/false);
     registerDiagnosticEmitted(markedValue);
-    return;
+    return true;
   }
 
   // is it a global?
@@ -804,10 +804,16 @@ void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
              diag::sil_movechecking_notconsumable_but_assignable_was_consumed,
              varName, /*isGlobal=*/true);
     registerDiagnosticEmitted(markedValue);
-    return;
+    return true;
   }
 
-  // remaining cases must be a closure capture.
+  return false;
+}
+
+void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
+    MarkMustCheckInst *markedValue) {
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
   diagnose(markedValue->getModule().getASTContext(),
            markedValue,
            diag::sil_movechecking_capture_consumed,
