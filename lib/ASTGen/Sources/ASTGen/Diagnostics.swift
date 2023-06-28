@@ -66,3 +66,30 @@ struct MissingChildTokenError: ASTGenError {
     """
   }
 }
+
+/// An error emitted when a syntax collection entry is encountered that is considered a duplicate of a previous entry
+/// per the language grammar.
+struct DuplicateSyntaxError: ASTGenError {
+  let duplicate: Syntax
+  let original: Syntax
+
+  init(duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
+    precondition(duplicate.kind == original.kind, "Expected duplicate and original to be of same kind")
+
+    guard let duplicateParent = duplicate.parent, let originalParent = original.parent, duplicateParent == originalParent, duplicateParent.kind.isSyntaxCollection else {
+      preconditionFailure("Expected a shared syntax collection parent")
+    }
+
+    self.duplicate = Syntax(duplicate)
+    self.original = Syntax(original)
+  }
+
+  var message: String {
+    """
+    unexpected duplicate syntax in list:
+      \(duplicate.debugDescription(indentString: "  "))
+    previous syntax:
+      \(original.debugDescription(indentString: "  "))
+    """
+  }
+}

@@ -350,6 +350,116 @@ extension ASTGenVisitor {
   }
 }
 
+// MARK: - PrecedenceGroupDecl
+
+extension BridgedAssociativity {
+  fileprivate init?(from tokenKind: TokenKind) {
+    switch tokenKind {
+    case .keyword(.none): self = .none
+    case .keyword(.left): self = .left
+    case .keyword(.right): self = .right
+    default: return nil
+    }
+  }
+}
+
+extension ASTGenVisitor {
+  func visit(_ node: PrecedenceGroupDeclSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+
+    struct PrecedenceGroupBody {
+      var associativity: PrecedenceGroupAssociativitySyntax? = nil
+      var assignment: PrecedenceGroupAssignmentSyntax? = nil
+      var higherThanRelation: PrecedenceGroupRelationSyntax? = nil
+      var lowerThanRelation: PrecedenceGroupRelationSyntax? = nil
+    }
+
+    func diagnoseDuplicateSyntax(_ duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
+      self.diagnose(Diagnostic(node: duplicate, message: DuplicateSyntaxError(duplicate: duplicate, original: original)))
+    }
+
+    let body = node.groupAttributes.reduce(into: PrecedenceGroupBody()) { body, element in
+      switch element {
+      case .precedenceGroupRelation(let relation):
+        let keyword = relation.higherThanOrLowerThanLabel
+        switch keyword.tokenKind {
+        case .keyword(.higherThan):
+          if let current = body.higherThanRelation {
+            diagnoseDuplicateSyntax(relation, original: current)
+          } else {
+            body.higherThanRelation = relation
+          }
+        case .keyword(.lowerThan):
+          if let current = body.lowerThanRelation {
+            diagnoseDuplicateSyntax(relation, original: current)
+          } else {
+            body.lowerThanRelation = relation
+          }
+        default:
+          return self.diagnose(Diagnostic(node: keyword, message: UnexpectedTokenKindError(token: keyword)))
+        }
+      case .precedenceGroupAssignment(let assignment):
+        if let current = body.assignment {
+          diagnoseDuplicateSyntax(assignment, original: current)
+        } else {
+          body.assignment = assignment
+        }
+      case .precedenceGroupAssociativity(let associativity):
+        if let current = body.associativity {
+          diagnoseDuplicateSyntax(node, original: current)
+        } else {
+          body.associativity = associativity
+        }
+      }
+    }
+
+    let associativityValue: BridgedAssociativity
+    if let token = body.associativity?.value {
+      if let value = BridgedAssociativity(from: token.tokenKind) {
+        associativityValue = value
+      } else {
+        self.diagnose(Diagnostic(node: token, message: UnexpectedTokenKindError(token: token)))
+        associativityValue = .none
+      }
+    } else {
+      associativityValue = .none
+    }
+
+    let assignmentValue: Bool
+    if let token = body.assignment?.value {
+      if token.tokenKind == .keyword(.true) {
+        assignmentValue = true
+      } else {
+        self.diagnose(Diagnostic(node: token, message: UnexpectedTokenKindError(token: token)))
+        assignmentValue = false
+      }
+    } else {
+      assignmentValue = false
+    }
+
+    return .decl(
+      PrecedenceGroupDecl_create(
+        self.declContext,
+        self.bridgedSourceLoc(for: node.precedencegroupKeyword),
+        name,
+        nameLoc,
+        self.bridgedSourceLoc(for: node.leftBrace),
+        self.bridgedSourceLoc(for: body.associativity?.associativityLabel),
+        self.bridgedSourceLoc(for: body.associativity?.value),
+        associativityValue,
+        self.bridgedSourceLoc(for: body.assignment?.assignmentLabel),
+        self.bridgedSourceLoc(for: body.assignment?.value),
+        assignmentValue,
+        self.bridgedSourceLoc(for: body.higherThanRelation?.higherThanOrLowerThanLabel),
+        self.visit(body.higherThanRelation?.precedenceGroups),
+        self.bridgedSourceLoc(for: body.lowerThanRelation?.higherThanOrLowerThanLabel),
+        self.visit(body.lowerThanRelation?.precedenceGroups),
+        self.bridgedSourceLoc(for: node.rightBrace)
+      )
+    )
+  }
+}
+
 // MARK: - ImportDecl
 
 extension BridgedImportKind {
@@ -405,5 +515,12 @@ extension ASTGenVisitor {
   @inline(__always)
   func visit(_ node: InheritedTypeListSyntax) -> BridgedArrayRef {
     node.lazy.map { self.visit($0.type).rawValue }.bridgedArray(in: self)
+  }
+
+  @inline(__always)
+  func visit(_ node: PrecedenceGroupNameListSyntax) -> BridgedArrayRef {
+    node.lazy.map {
+      $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
+    }.bridgedArray(in: self)
   }
 }

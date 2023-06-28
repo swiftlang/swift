@@ -807,6 +807,48 @@ void *OperatorDecl_create(BridgedASTContext cContext,
   return static_cast<Decl *>(decl);
 }
 
+void *PrecedenceGroupDecl_create(
+    BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
+    BridgedSourceLoc cAssociativityKeywordLoc,
+    BridgedSourceLoc cAssociativityValueLoc,
+    BridgedAssociativity cAssociativity, BridgedSourceLoc cAssignmentKeywordLoc,
+    BridgedSourceLoc cAssignmentValueLoc, bool isAssignment,
+    BridgedSourceLoc cHigherThanKeywordLoc, BridgedArrayRef cHigherThanNames,
+    BridgedSourceLoc cLowerThanKeywordLoc, BridgedArrayRef cLowerThanNames,
+    BridgedSourceLoc cRightBraceLoc) {
+
+  SmallVector<PrecedenceGroupDecl::Relation, 2> higherThanNames;
+  for (auto &pair :
+       convertArrayRef<BridgedIdentifierAndSourceLoc>(cHigherThanNames)) {
+    higherThanNames.push_back({convertSourceLoc(pair.nameLoc),
+                               convertIdentifier(pair.name), nullptr});
+  }
+
+  SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
+  for (auto &pair :
+       convertArrayRef<BridgedIdentifierAndSourceLoc>(cLowerThanNames)) {
+    lowerThanNames.push_back({convertSourceLoc(pair.nameLoc),
+                              convertIdentifier(pair.name), nullptr});
+  }
+
+  auto *decl = PrecedenceGroupDecl::create(
+      convertDeclContext(cDeclContext),
+      convertSourceLoc(cPrecedencegroupKeywordLoc), convertSourceLoc(cNameLoc),
+      convertIdentifier(cName), convertSourceLoc(cLeftBraceLoc),
+      convertSourceLoc(cAssociativityKeywordLoc),
+      convertSourceLoc(cAssociativityValueLoc),
+      static_cast<Associativity>(cAssociativity),
+      convertSourceLoc(cAssignmentKeywordLoc),
+      convertSourceLoc(cAssignmentValueLoc), isAssignment,
+      convertSourceLoc(cHigherThanKeywordLoc), higherThanNames,
+      convertSourceLoc(cLowerThanKeywordLoc), lowerThanNames,
+      convertSourceLoc(cRightBraceLoc));
+
+  return static_cast<Decl *>(decl);
+}
+
 void *ImportDecl_create(BridgedASTContext cContext,
                         BridgedDeclContext cDeclContext,
                         BridgedSourceLoc cImportKeywordLoc,

@@ -434,6 +434,24 @@ void *OperatorDecl_create(BridgedASTContext cContext,
                           BridgedIdentifier cPrecedenceGroupName,
                           BridgedSourceLoc cPrecedenceGroupLoc);
 
+typedef enum ENUM_EXTENSIBILITY_ATTR(closed) {
+  BridgedAssociativityNone,
+  BridgedAssociativityLeft,
+  BridgedAssociativityRight,
+} BridgedAssociativity;
+
+void *PrecedenceGroupDecl_create(
+    BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
+    BridgedSourceLoc cAssociativityKeywordLoc,
+    BridgedSourceLoc cAssociativityValueLoc,
+    BridgedAssociativity cAssociativity, BridgedSourceLoc cAssignmentKeywordLoc,
+    BridgedSourceLoc cAssignmentValueLoc, _Bool isAssignment,
+    BridgedSourceLoc cHigherThanKeywordLoc, BridgedArrayRef cHigherThanNames,
+    BridgedSourceLoc cLowerThanKeywordLoc, BridgedArrayRef cLowerThanNames,
+    BridgedSourceLoc cRightBraceLoc);
+
 typedef enum ENUM_EXTENSIBILITY_ATTR(open) {
   BridgedImportKindModule,
   BridgedImportKindType,

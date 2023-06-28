@@ -242,6 +242,15 @@ extension ASTGenVisitor {
 
     return self.visit(node)
   }
+
+  @inline(__always)
+  func visit(_ node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
+    guard let node else {
+      return .init()
+    }
+
+    return self.visit(node)
+  }
 }
 
 extension Collection {

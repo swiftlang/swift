@@ -191,3 +191,14 @@ operator
 
 postfix
 operator ⎩^-^⎩
+
+
+precedencegroup Precedence1 {
+}
+
+precedencegroup Precedence2 {
+  lowerThan: BitwiseShiftPrecedence, MultiplicationPrecedence
+  higherThan: Precedence1, AdditionPrecedence
+  associativity: left
+  assignment: true
+}
