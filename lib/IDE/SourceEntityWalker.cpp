@@ -732,22 +732,22 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
     if (auto *Repr = customAttr->getTypeRepr()) {
       // It's a little weird that attached macros have a `TypeRepr` to begin
       // with, but given they aren't types they then don't get bound. So check
-      // for a macro here and and pass a reference to it, or just walk the
-      // `TypeRepr` where we will then pull out the bound decl otherwise.
+      // for a macro here and and pass a reference to it.
       auto *mutableAttr = const_cast<CustomAttr *>(customAttr);
       if (auto macroDecl = D->getResolvedMacro(mutableAttr)) {
         Type macroRefType = macroDecl->getDeclaredInterfaceType();
-        if (!passReference(
-                macroDecl, macroRefType, DeclNameLoc(Repr->getStartLoc()),
-                ReferenceMetaData(
-                    SemaReferenceKind::DeclRef, None,
-                    /*isImplicit=*/false,
-                    std::make_pair(customAttr,
-                                   expansion ? expansion.get<Decl *>() : D))))
+        auto customAttrRef =
+            std::make_pair(customAttr, expansion ? expansion.get<Decl *>() : D);
+        auto refMetadata =
+            ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None,
+                              /*isImplicit=*/false, customAttrRef);
+        if (!passReference(macroDecl, macroRefType,
+                           DeclNameLoc(Repr->getStartLoc()), refMetadata))
           return false;
-      } else if (!Repr->walk(*this)) {
-        return false;
       }
+
+      if (!Repr->walk(*this))
+        return false;
     }
 
     if (auto *SemaInit = customAttr->getSemanticInit()) {
