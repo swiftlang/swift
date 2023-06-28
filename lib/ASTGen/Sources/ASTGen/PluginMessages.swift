@@ -32,6 +32,7 @@ internal enum HostToPluginMessage: Codable {
     macro: PluginMessage.MacroReference,
     macroRole: PluginMessage.MacroRole,
     discriminator: String,
+    qualifiedType: String,
     attributeSyntax: PluginMessage.Syntax,
     declSyntax: PluginMessage.Syntax,
     parentDeclSyntax: PluginMessage.Syntax?
