@@ -18,7 +18,7 @@
 /// the ``Observation/Observable-swift.macro`` macro when adding observation
 /// support to a type.
 @available(SwiftStdlib 5.9, *)
-@_marker public protocol Observable { }
+public protocol Observable { }
 
 #if $Macros && hasAttribute(attached)
 
