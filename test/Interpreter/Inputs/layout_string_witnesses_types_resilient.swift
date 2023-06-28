@@ -51,6 +51,10 @@ public enum ResilientSinglePayloadEnumSimple {
     case nonEmpty(AnyObject)
 }
 
+public enum ResilientSingletonEnum {
+    case nonEmpty(AnyObject)
+}
+
 public func getResilientSinglePayloadEnumGenericEmpty0<T>(_ t: T.Type) -> ResilientSinglePayloadEnumGeneric<T> {
     return .empty0
 }
@@ -69,4 +73,8 @@ public func getResilientSinglePayloadEnumComplexEmpty0() -> ResilientSinglePaylo
 
 public func getResilientSinglePayloadEnumSimpleEmpty0() -> ResilientSinglePayloadEnumSimple {
     return .empty0
+}
+
+public func getResilientSingletonEnumNonEmpty(_ x: AnyObject) -> ResilientSingletonEnum {
+    return .nonEmpty(x)
 }

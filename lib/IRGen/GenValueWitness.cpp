@@ -905,7 +905,7 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
   if ((!typeLayoutEntry->layoutString(IGM, genericSig) &&
       !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) ||
       typeLayoutEntry->isSingleton()) {
-    return nullptr;
+    return IGM.getSingletonEnumGetEnumTagFn();
   } else if (!typeLayoutEntry->isFixedSize(IGM)) {
     if (typeLayoutEntry->isMultiPayloadEnum()) {
       return IGM.getMultiPayloadEnumGenericGetEnumTagFn();
