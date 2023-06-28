@@ -145,7 +145,7 @@ inline static void handleRefCounts(const Metadata *metadata,
                                        std::forward<Params>(params)...)) {
     }
   } else {
-    for (int i = 0; i < N; i++) {
+    for (unsigned i = 0; i < N; i++) {
       handleNextRefCount<Handler>(metadata, reader, addrOffset,
                                   std::forward<Params>(params)...);
     }
