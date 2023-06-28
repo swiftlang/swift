@@ -37,7 +37,7 @@ func referenceGlobalActor() async {
 
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a[1]  // expected-note{{subscript access is 'async'}}
-  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
+  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' cannot be mutated from outside the actor}}
 
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = 32 + a[1] // expected-note@:12{{subscript access is 'async'}}
@@ -51,10 +51,12 @@ func referenceGlobalActor2() {
 }
 
 
+// expected-note@+2 {{add '@SomeGlobalActor' to make global function 'referenceAsyncGlobalActor()' part of global actor 'SomeGlobalActor'}}
 // expected-note@+1 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
 func referenceAsyncGlobalActor() {
-  let y = asyncGlobalActFn
+  let y = asyncGlobalActFn // expected-note{{calls to let 'y' from outside of its actor context are implicitly asynchronous}}
   y() // expected-error{{'async' call in a function that does not support concurrency}}
+  // expected-error@-1{{call to global actor 'SomeGlobalActor'-isolated let 'y' in a synchronous nonisolated context}}
 }
 
 
@@ -111,7 +113,7 @@ func fromAsync() async {
 
   let y = asyncGlobalActFn
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  y() // expected-note{{call is 'async'}}
+  y() // expected-note{{calls to let 'y' from outside of its actor context are implicitly asynchronous}}
 
   let a = Alex()
   let fn = a.method
@@ -124,7 +126,7 @@ func fromAsync() async {
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a[1]  // expected-note{{subscript access is 'async'}}
   _ = await a[1]
-  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
+  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' cannot be mutated from outside the actor}}
 }
 
 // expected-note@+1{{mutation of this var is only permitted within the actor}}

@@ -2041,48 +2041,41 @@ namespace {
       contextStack.push_back(dc);
     }
 
-    /// Searches the applyStack from back to front for the inner-most CallExpr
-    /// and marks that CallExpr as implicitly async.
-    ///
-    /// NOTE: Crashes if no CallExpr was found.
-    ///
-    /// For example, for global actor function `curryAdd`, if we have:
-    ///     ((curryAdd 1) 2)
-    /// then we want to mark the inner-most CallExpr, `(curryAdd 1)`.
-    ///
-    /// The same goes for calls to member functions, such as calc.add(1, 2),
-    /// aka ((add calc) 1 2), looks like this:
-    ///
-    ///  (call_expr
-    ///    (dot_syntax_call_expr
-    ///      (declref_expr add)
-    ///      (declref_expr calc))
-    ///    (tuple_expr
-    ///      ...))
-    ///
-    /// and we reach up to mark the CallExpr.
-    void markNearestCallAsImplicitly(llvm::Optional<ActorIsolation> setAsync,
-                                     bool setThrows = false,
-                                     bool setDistributedThunk = false) {
-      assert(applyStack.size() > 0 && "not contained within an Apply?");
-
-      const auto End = applyStack.rend();
-      for (auto I = applyStack.rbegin(); I != End; ++I)
-        if (auto call = dyn_cast<CallExpr>(*I)) {
-          if (setAsync) {
-            call->setImplicitlyAsync(*setAsync);
-          }
-          if (setThrows) {
-            call->setImplicitlyThrows(true);
-          }else {
-            call->setImplicitlyThrows(false);
-          }
-          if (setDistributedThunk) {
-            call->setShouldApplyDistributedThunk(true);
-          }
-          return;
+    /// Mark the given expression
+    void markImplicitlyPromoted(
+        Expr *expr,
+        llvm::Optional<ActorIsolation> setAsync,
+        bool setThrows = false,
+        bool setDistributedThunk = false) {
+      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        if (setAsync) {
+          apply->setImplicitlyAsync(*setAsync);
         }
-      llvm_unreachable("expected a CallExpr in applyStack!");
+
+        apply->setImplicitlyThrows(setThrows);
+        if (setDistributedThunk) {
+          apply->setShouldApplyDistributedThunk(true);
+        }
+
+        return;
+      }
+
+      if (auto lookup = dyn_cast<LookupExpr>(expr)) {
+        assert(usageEnv(lookup) == VarRefUseEnv::Read);
+
+        if (setAsync)
+          lookup->setImplicitlyAsync(*setAsync);
+        lookup->setImplicitlyThrows(setThrows);
+
+        if (setDistributedThunk) {
+          if (auto memberRef = dyn_cast<MemberRefExpr>(lookup))
+            memberRef->setAccessViaDistributedThunk();
+        }
+
+        return;
+      }
+
+      llvm_unreachable("Node cannot be implicitly promoted");
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
@@ -2153,6 +2146,19 @@ namespace {
       if (auto load = dyn_cast<LoadExpr>(expr))
         recordMutableVarParent(load, load->getSubExpr());
 
+      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
+        if (ConcreteDeclRef subscriptDecl = subscript->getMember()) {
+          Type type = subscriptDecl.getDecl()->getInterfaceType().subst(
+              subscriptDecl.getSubstitutions());
+          if (auto fnType = type->getAs<FunctionType>()) {
+            (void)checkApply(
+                 subscript, subscriptDecl, subscript->getBase(),
+                 fnType, subscript->getArgs());
+          }
+        }
+        return Action::Continue(expr);
+      }
+
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
         checkReference(lookup->getBase(), lookup->getMember(), lookup->getLoc(),
                        /*partialApply*/ llvm::None, lookup);
@@ -2207,7 +2213,14 @@ namespace {
           }
         } else {
           // Check the call itself.
-          (void)checkApply(apply);
+          if (auto fnExprType = getType(apply->getFn())) {
+            if (auto fnType = fnExprType->getAs<FunctionType>()) {
+              (void)checkApply(
+                  apply,
+                  apply->getCalledValue(/*skipFunctionConversions=*/true),
+                  apply->getFn(), fnType, apply->getArgs());
+            }
+          }
         }
       }
 
@@ -2591,8 +2604,6 @@ namespace {
         }
       }
 
-      // FIXME: Subscript?
-
       // This is either non-distributed variable, subscript, or something else.
       ctx.Diags.diagnose(declLoc,
                          diag::distributed_actor_isolated_non_self_reference,
@@ -2697,14 +2708,11 @@ namespace {
     }
 
     /// Check actor isolation for a particular application.
-    bool checkApply(ApplyExpr *apply) {
-      auto fnExprType = getType(apply->getFn());
-      if (!fnExprType)
-        return false;
-
-      auto fnType = fnExprType->getAs<FunctionType>();
-      if (!fnType)
-        return false;
+    bool checkApply(
+        Expr *apply, ConcreteDeclRef callee, Expr *base,
+        AnyFunctionType *fnType, ArgumentList *args
+    ) {
+      SourceLoc loc = apply->getLoc();
 
       // The isolation of the context we're in.
       llvm::Optional<ActorIsolation> contextIsolation;
@@ -2718,17 +2726,22 @@ namespace {
         return *contextIsolation;
       };
 
+      // Determine whether the calle itself is async.
+      auto calleeDecl = callee.getDecl();
+      bool isCalleeAsync = calleeDecl
+        ? isAsyncDecl(calleeDecl)
+        : fnType->getExtInfo().isAsync();
+
       // Default the call options to allow promotion to async, if it will be
       // warranted.
       ActorReferenceResult::Options callOptions;
-      if (!fnType->getExtInfo().isAsync())
+      if (!isCalleeAsync)
         callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
 
       // Determine from the callee whether actor isolation is unsatisfied.
       llvm::Optional<ActorIsolation> unsatisfiedIsolation;
       bool mayExitToNonisolated = true;
       Expr *argForIsolatedParam = nullptr;
-      auto calleeDecl = apply->getCalledValue(/*skipFunctionConversions=*/true);
       if (Type globalActor = fnType->getGlobalActor()) {
         // If the function type is global-actor-qualified, determine whether
         // we are within that global actor already.
@@ -2739,8 +2752,35 @@ namespace {
         }
 
         mayExitToNonisolated = false;
+      } else if (calleeDecl &&
+                 calleeDecl->getAttrs()
+                   .hasAttribute<UnsafeInheritExecutorAttr>()) {
+        // The callee always inherits the executor.
+        return false;
+      } else if (calleeDecl && isa<SubscriptDecl>(calleeDecl)) {
+        auto isolatedActor = getIsolatedActor(base);
+        auto result = ActorReferenceResult::forReference(
+            callee, base->getLoc(), getDeclContext(),
+            kindOfUsage(calleeDecl, apply),
+            isolatedActor, llvm::None, llvm::None, getClosureActorIsolation);
+        switch (result) {
+        case ActorReferenceResult::SameConcurrencyDomain:
+          break;
+
+        case ActorReferenceResult::ExitsActorToNonisolated:
+          unsatisfiedIsolation = ActorIsolation::forIndependent();
+          break;
+
+        case ActorReferenceResult::EntersActor:
+          unsatisfiedIsolation = result.isolation;
+          break;
+        }
+
+        callOptions = result.options;
+        mayExitToNonisolated = false;
+        argForIsolatedParam = base;
       } else if (auto *selfApplyFn = dyn_cast<SelfApplyExpr>(
-                    apply->getFn()->getValueProvidingExpr())) {
+                    base->getValueProvidingExpr())) {
         // If we're calling a member function, check whether the function
         // itself is isolated.
         auto memberFn = selfApplyFn->getFn()->getValueProvidingExpr();
@@ -2768,10 +2808,6 @@ namespace {
           calleeDecl = memberRef->first.getDecl();
           argForIsolatedParam = selfApplyFn->getBase();
         }
-      } else if (calleeDecl &&
-                 calleeDecl->getAttrs()
-                     .hasAttribute<UnsafeInheritExecutorAttr>()) {
-        return false;
       }
 
       // Check for isolated parameters.
@@ -2780,7 +2816,6 @@ namespace {
         if (!fnType->getParams()[paramIdx].isIsolated())
           continue;
 
-        auto *args = apply->getArgs();
         if (paramIdx >= args->size())
           continue;
 
@@ -2802,7 +2837,7 @@ namespace {
         unsatisfiedIsolation =
             ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
 
-        if (!fnType->getExtInfo().isAsync())
+        if (!isCalleeAsync)
           callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
         mayExitToNonisolated = false;
 
@@ -2811,7 +2846,7 @@ namespace {
 
       // If we're calling an async function that's nonisolated, and we're in
       // an isolated context, then we're exiting the actor context.
-      if (mayExitToNonisolated && fnType->isAsync() &&
+      if (mayExitToNonisolated && isCalleeAsync &&
           getContextIsolation().isActorIsolated())
         unsatisfiedIsolation = ActorIsolation::forIndependent();
 
@@ -2827,7 +2862,7 @@ namespace {
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
         if (calleeDecl) {
           ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call_decl,
+              loc, diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
               calleeDecl->getDescriptiveKind(), calleeDecl->getName(),
               getContextIsolation())
@@ -2837,7 +2872,7 @@ namespace {
               calleeDecl->getName());
         } else {
           ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
+              loc, diag::actor_isolated_call, *unsatisfiedIsolation,
               getContextIsolation())
             .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
         }
@@ -2859,7 +2894,7 @@ namespace {
       if (unsatisfiedIsolation->isDistributedActor() &&
           !(calleeDecl && isa<ConstructorDecl>(calleeDecl))) {
         auto distributedAccess = checkDistributedAccess(
-            apply->getFn()->getLoc(), calleeDecl, argForIsolatedParam);
+            loc, calleeDecl, argForIsolatedParam);
         if (!distributedAccess)
           return true;
 
@@ -2868,8 +2903,23 @@ namespace {
 
       // Mark as implicitly async/throws/distributed thunk as needed.
       if (requiresAsync || setThrows || usesDistributedThunk) {
-        markNearestCallAsImplicitly(
-            unsatisfiedIsolation, setThrows, usesDistributedThunk);
+        // For a subscript, make sure it's a read-only access.
+        if (calleeDecl && isa<SubscriptDecl>(calleeDecl)) {
+          auto useKind = usageEnv(cast<LookupExpr>(apply));
+          if (useKind != VarRefUseEnv::Read) {
+            ctx.Diags.diagnose(loc, diag::subscript_mutation_outside_actor,
+                               *unsatisfiedIsolation,
+                               calleeDecl->getDescriptiveKind(),
+                               calleeDecl->getName());
+            calleeDecl->diagnose(
+                diag::actor_mutable_state, calleeDecl->getDescriptiveKind());
+
+            return true;
+          }
+        }
+
+        markImplicitlyPromoted(
+            apply, unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
       // Check for sendability of the parameter types.
@@ -2878,9 +2928,9 @@ namespace {
         const auto &param = params[paramIdx];
 
         // Dig out the location of the argument.
-        SourceLoc argLoc = apply->getLoc();
+        SourceLoc argLoc = loc;
         Type argType;
-        if (auto argList = apply->getArgs()) {
+        if (auto argList = args) {
           auto arg = argList->get(paramIdx);
           if (arg.getStartLoc().isValid())
             argLoc = arg.getStartLoc();
@@ -2904,9 +2954,9 @@ namespace {
 
       // Check for sendability of the result type.
       if (diagnoseNonSendableTypes(
-             fnType->getResult(), getDeclContext(), apply->getLoc(),
+             fnType->getResult(), getDeclContext(), loc,
              diag::non_sendable_call_result_type,
-             apply->isImplicitlyAsync().has_value(),
+             requiresAsync,
              *unsatisfiedIsolation))
         return true;
 

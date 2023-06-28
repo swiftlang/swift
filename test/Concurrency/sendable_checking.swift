@@ -223,10 +223,19 @@ class SubWUnsafeSubscript : SuperWUnsafeSubscript {
 extension MyActor {
   func f(_: Any) { }
   func g(_: () -> Void) { }
+
+  subscript (value: Any) -> String { "\(value)" }
+  subscript (value: () -> Void) -> String {
+    value()
+    return "hello"
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
 func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> Void) async {
   await a.f(s)
   await a.g(f)
+
+  _ = await a[s]
+  _ = await a[f]
 }
