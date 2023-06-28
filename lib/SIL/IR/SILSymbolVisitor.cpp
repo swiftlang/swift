@@ -465,17 +465,22 @@ public:
 
     // Add derivative function symbols.
     for (const auto *differentiableAttr :
-         AFD->getAttrs().getAttributes<DifferentiableAttr>())
+           AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+        AFD,
+        differentiableAttr->getParameterIndices());
       addDerivativeConfiguration(
           differentiableAttr->getDifferentiabilityKind(), AFD,
           AutoDiffConfig(differentiableAttr->getParameterIndices(),
-                         autodiff::getAllFunctionSemanticResultIndices(AFD),
+                         resultIndices,
                          differentiableAttr->getDerivativeGenericSignature()));
+    }
 
     for (const auto *derivativeAttr :
          AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-      auto *resultIndices = autodiff::getAllFunctionSemanticResultIndices(
-        derivativeAttr->getOriginalFunction(AFD->getASTContext()));
+      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
+        derivativeAttr->getParameterIndices());
       addDerivativeConfiguration(
           DifferentiabilityKind::Reverse,
           derivativeAttr->getOriginalFunction(AFD->getASTContext()),
@@ -533,7 +538,8 @@ public:
           differentiableAttr->getDifferentiabilityKind(),
           accessorDecl,
           AutoDiffConfig(differentiableAttr->getParameterIndices(),
-                         autodiff::getAllFunctionSemanticResultIndices(accessorDecl),
+                         autodiff::getFunctionSemanticResultIndices(accessorDecl,
+                                                                    differentiableAttr->getParameterIndices()),
                          differentiableAttr->getDerivativeGenericSignature()));
     }
   }

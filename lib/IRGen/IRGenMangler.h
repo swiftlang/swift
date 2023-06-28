@@ -58,7 +58,8 @@ public:
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
-        autodiff::getAllFunctionSemanticResultIndices(func);
+      autodiff::getFunctionSemanticResultIndices(func,
+                                                 derivativeId->getParameterIndices());
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
         resultIndices,
@@ -89,7 +90,8 @@ public:
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
-        autodiff::getAllFunctionSemanticResultIndices(func);
+      autodiff::getFunctionSemanticResultIndices(func,
+                                                 derivativeId->getParameterIndices());
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
         resultIndices,

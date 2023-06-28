@@ -5669,10 +5669,10 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
         derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
             ->castTo<AnyFunctionType>();
   
-  autodiff::getFunctionSemanticResultTypes(originalFnRemappedTy, semanticResults);
-  auto numResults = semanticResults.size();
-  auto *resultIndices = IndexSubset::getDefault(
-      ctx, numResults, /*includeAll*/ true);
+  auto *resultIndices =
+    autodiff::getFunctionSemanticResultIndices(originalFnRemappedTy,
+                                               resolvedDiffParamIndices);
+
   original->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
   return resolvedDiffParamIndices;
@@ -6220,7 +6220,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
 
   // Register derivative function configuration.
   auto *resultIndices =
-    autodiff::getAllFunctionSemanticResultIndices(originalAFD);
+    autodiff::getFunctionSemanticResultIndices(originalAFD,
+                                               resolvedDiffParamIndices);
   originalAFD->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices,
        derivative->getGenericSignature()});

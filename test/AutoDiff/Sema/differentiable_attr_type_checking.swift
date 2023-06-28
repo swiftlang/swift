@@ -680,6 +680,19 @@ struct InoutParameters: Differentiable {
   mutating func move(by _: TangentVector) {}
 }
 
+extension NonDiffableStruct {
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'NonDiffableStruct' does not conform to 'Differentiable'}}
+  @differentiable(reverse)
+  static func nondiffResult(x: Int, y: inout NonDiffableStruct, z: Float) {}
+
+  @differentiable(reverse)
+  static func diffResult(x: Int, y: inout NonDiffableStruct, z: Float) -> Float {}
+
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'NonDiffableStruct' does not conform to 'Differentiable'}}
+  @differentiable(reverse, wrt: (y, z))
+  static func diffResult2(x: Int, y: inout NonDiffableStruct, z: Float) -> Float {}
+}
+
 extension InoutParameters {
   @differentiable(reverse)
   static func staticMethod(_ lhs: inout Self, rhs: Self) {}
@@ -702,11 +715,20 @@ extension InoutParameters {
   @differentiable(reverse)
   static func tupleResults(_ x: Self) -> (Self, Self) {}
 
+  // Int does not conform to Differentiable
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
   @differentiable(reverse)
   static func tupleResultsInt(_ x: Self) -> (Int, Self) {}
 
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
   @differentiable(reverse)
   static func tupleResultsInt2(_ x: Self) -> (Self, Int) {}
+
+  @differentiable(reverse)
+  static func tupleResultsFloat(_ x: Self) -> (Float, Self) {}
+
+  @differentiable(reverse)
+  static func tupleResultsFloat2(_ x: Self) -> (Self, Float) {}
 }
 
 // Test accessors: `set`, `_read`, `_modify`.

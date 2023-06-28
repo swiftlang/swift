@@ -724,7 +724,8 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     // NOTE(TF-1038): Result indices are currently unsupported in derivative
     // registration attributes. In the meantime, always use all results.
     auto *resultIndices =
-        autodiff::getAllFunctionSemanticResultIndices(originalAFD);
+      autodiff::getFunctionSemanticResultIndices(originalAFD,
+                                                 parameterIndices);
     results.insert({parameterIndices, resultIndices, derivativeGenSig});
   }
 }

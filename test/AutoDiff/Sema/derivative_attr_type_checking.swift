@@ -757,6 +757,7 @@ func vjpMultipleSemanticResults(x: inout Float) -> (
 func inoutNonDifferentiableResult(_ x: inout Float) -> Int {
   return 5
 }
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
 @derivative(of: inoutNonDifferentiableResult)
 func vjpInoutNonDifferentiableResult(x: inout Float) -> (
   value: Int, pullback: (inout Float) -> Void
@@ -915,6 +916,7 @@ extension InoutParameters {
   ) { fatalError() }
 
   func tupleResultsInt(_ x: Float) -> (Int, Float) { (1, x) }
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
   @derivative(of: tupleResultsInt, wrt: x)
   func vjpTupleResults(_ x: Float) -> (
     value: (Int, Float), pullback: (Float) -> Float

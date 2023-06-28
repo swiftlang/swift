@@ -5550,85 +5550,41 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
 
   // Get the original non-inout semantic result types.
   SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
-  autodiff::getFunctionSemanticResultTypes(this, originalResults);
+  autodiff::getFunctionSemanticResults(this, parameterIndices, originalResults);
   // Error if no original semantic results.
   if (originalResults.empty())
     return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NoSemanticResults);
+
   // Accumulate non-inout result tangent spaces.
-  SmallVector<Type, 1> resultTanTypes;
-  bool hasInoutResult = false;
+  SmallVector<Type, 1> resultTanTypes, inoutTanTypes;
   for (auto i : range(originalResults.size())) {
     auto originalResult = originalResults[i];
     auto originalResultType = originalResult.type;
+
     // Voids currently have a defined tangent vector, so ignore them.
     if (originalResultType->isVoid())
       continue;
-    if (originalResult.isInout) {
-      hasInoutResult = true;
-      continue;
-    }
+
     // Get the original semantic result type's `TangentVector` associated type.
+    // Error if a semantic result has no tangent space.
     auto resultTan =
         originalResultType->getAutoDiffTangentSpace(lookupConformance);
     if (!resultTan)
-      continue;
-    auto resultTanType = resultTan->getType();
-    resultTanTypes.push_back(resultTanType);
-  }
-  // Append non-wrt inout result tangent spaces.
-  // This uses the logic from getSubsetParameters(), only operating over all
-  // parameter indices and looking for non-wrt indices.
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  // An inlined version of unwrapCurryLevels().
-  AnyFunctionType *fnTy = this;
-  while (fnTy != nullptr) {
-    curryLevels.push_back(fnTy);
-    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
-  }
-
-  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
-  unsigned currentOffset = 0;
-  for (unsigned curryLevelIndex : llvm::reverse(indices(curryLevels))) {
-    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
-    currentOffset += curryLevels[curryLevelIndex]->getNumParams();
-  }
-
-  if (!makeSelfParamFirst) {
-    std::reverse(curryLevels.begin(), curryLevels.end());
-    std::reverse(curryLevelParameterIndexOffsets.begin(),
-                 curryLevelParameterIndexOffsets.end());
-  }
-
-  for (unsigned curryLevelIndex : indices(curryLevels)) {
-    auto *curryLevel = curryLevels[curryLevelIndex];
-    unsigned parameterIndexOffset =
-        curryLevelParameterIndexOffsets[curryLevelIndex];
-    for (unsigned paramIndex : range(curryLevel->getNumParams())) {
-      if (parameterIndices->contains(parameterIndexOffset + paramIndex))
-        continue;
-
-      auto param = curryLevel->getParams()[paramIndex];
-      if (param.isInOut()) {
-        auto resultType = param.getPlainType();
-        if (resultType->isVoid())
-          continue;
-        auto resultTan = resultType->getAutoDiffTangentSpace(lookupConformance);
-        if (!resultTan)
-          continue;
-        auto resultTanType = resultTan->getType();
-        resultTanTypes.push_back(resultTanType);
-      }
-    }
-  }
-
-  // Error if no semantic result has a tangent space.
-  if (resultTanTypes.empty() && !hasInoutResult) {
-    return llvm::make_error<DerivativeFunctionTypeError>(
+      return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NonDifferentiableResult,
-        std::make_pair(originalResults.front().type, /*index*/ 0));
+        std::make_pair(originalResultType, unsigned(originalResult.index)));
+
+    if (!originalResult.isInout)
+      resultTanTypes.push_back(resultTan->getType());
+    else if (originalResult.isInout && !originalResult.isWrtParam)
+      inoutTanTypes.push_back(resultTan->getType());
   }
 
+  // Treat non-wrt inouts as semantic results for functions returning Void
+  if (resultTanTypes.empty())
+    resultTanTypes = inoutTanTypes;
+  
   // Compute the result linear map function type.
   FunctionType *linearMapType;
   switch (kind) {
@@ -5641,24 +5597,24 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     //
     // Case 2: original function has a non-wrt `inout` parameter.
     // - Original:      `(T0, inout T1, ...) -> Void`
-    // - Differential: `(T0.Tan, ...) -> T1.Tan`
+    // - Differential:  `(T0.Tan, ...) -> T1.Tan`
     //
     // Case 3: original function has a wrt `inout` parameter.
-    // - Original:     `(T0, inout T1, ...) -> Void`
-    // - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
+    // - Original:      `(T0, inout T1, ...) -> Void`
+    // - Differential:  `(T0.Tan, inout T1.Tan, ...) -> Void`
     SmallVector<AnyFunctionType::Param, 4> differentialParams;
     for (auto i : range(diffParams.size())) {
       auto diffParam = diffParams[i];
       auto paramType = diffParam.getPlainType();
       auto paramTan = paramType->getAutoDiffTangentSpace(lookupConformance);
       // Error if parameter has no tangent space.
-      if (!paramTan) {
+      if (!paramTan)
         return llvm::make_error<DerivativeFunctionTypeError>(
             this,
             DerivativeFunctionTypeError::Kind::
                 NonDifferentiableDifferentiabilityParameter,
             std::make_pair(paramType, i));
-      }
+
       differentialParams.push_back(AnyFunctionType::Param(
           paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
     }
@@ -5704,13 +5660,13 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       auto paramType = diffParam.getPlainType();
       auto paramTan = paramType->getAutoDiffTangentSpace(lookupConformance);
       // Error if parameter has no tangent space.
-      if (!paramTan) {
+      if (!paramTan)
         return llvm::make_error<DerivativeFunctionTypeError>(
             this,
             DerivativeFunctionTypeError::Kind::
                 NonDifferentiableDifferentiabilityParameter,
             std::make_pair(paramType, i));
-      }
+
       if (diffParam.isInOut()) {
         if (paramType->isVoid())
           continue;

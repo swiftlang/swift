@@ -549,8 +549,9 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   SILGenFunctionBuilder builder(*this);
   auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
   Mangle::ASTMangler mangler;
-  auto *resultIndices = autodiff::getAllFunctionSemanticResultIndices(
-      originalFnDeclRef.getAbstractFunctionDecl());
+  auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+    originalFnDeclRef.getAbstractFunctionDecl(),
+    derivativeId->getParameterIndices());
   auto name = mangler.mangleAutoDiffDerivativeFunction(
       originalFnDeclRef.getAbstractFunctionDecl(),
       derivativeId->getKind(),
@@ -575,8 +576,12 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       derivativeId->getParameterIndices(),
       derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
-  auto *loweredResultIndices = autodiff::getAllFunctionSemanticResultIndices(
-      originalFnDeclRef.getAbstractFunctionDecl());
+  // FIXME: Do we need to lower the result indices? Likely yes.
+  auto *loweredResultIndices =
+    autodiff::getFunctionSemanticResultIndices(
+      originalFnDeclRef.getAbstractFunctionDecl(),
+      derivativeId->getParameterIndices()
+    );
   auto diffFn = SGF.B.createDifferentiableFunction(
       loc, loweredParamIndices, loweredResultIndices, originalFn);
   auto derivativeFn = SGF.B.createDifferentiableFunctionExtract(

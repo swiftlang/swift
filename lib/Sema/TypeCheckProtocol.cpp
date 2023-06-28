@@ -493,7 +493,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
           success = true;
           // Register derivative function configuration.
           auto *resultIndices =
-              autodiff::getAllFunctionSemanticResultIndices(witnessAFD);
+            autodiff::getFunctionSemanticResultIndices(witnessAFD,
+                                                       newAttr->getParameterIndices());
           witnessAFD->addDerivativeFunctionConfiguration(
               {newAttr->getParameterIndices(), resultIndices,
                newAttr->getDerivativeGenericSignature()});
