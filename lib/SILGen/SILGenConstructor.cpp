@@ -360,6 +360,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
 
   // Emit the indirect return argument, if any.
+  bool hasInitAccessors = !decl->getInitAccessorProperties().empty();
   SILValue resultSlot;
   if (selfTy.isAddress()) {
     auto &AC = SGF.getASTContext();
@@ -371,7 +372,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(selfIfaceTy);
     resultSlot = SGF.F.begin()->createFunctionArgument(selfTy, VD);
-  } else if (!initializedViaAccessor.empty()) {
+  } else if (hasInitAccessors) {
     // Allocate "self" on stack which we are going to use to
     // reference/init fields and then load to return.
     resultSlot = SGF.emitTemporaryAllocation(Loc, selfTy);
@@ -504,7 +505,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     }
 
     // Load as "take" from our stack allocation and return.
-    if (!selfTy.isAddress() && !initializedViaAccessor.empty()) {
+    if (!selfTy.isAddress() && hasInitAccessors) {
       auto resultValue = SGF.B.emitLoadValueOperation(
           Loc, resultSlot, LoadOwnershipQualifier::Take);
 

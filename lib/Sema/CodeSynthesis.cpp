@@ -1300,10 +1300,6 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 
-      // If init accessors are not involved, we are done.
-      if (initializedViaAccessor.empty())
-        return true;
-
       // Check whether use of init accessors results in access to uninitialized
       // properties.
 
