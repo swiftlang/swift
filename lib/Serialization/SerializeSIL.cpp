@@ -1381,30 +1381,29 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // for condition, the list has value for condition, result type,
     //   hasDefault, default
     // basic block ID, a list of (DeclID, BasicBlock ID).
-    const SelectEnumInstBase *SOI = cast<SelectEnumInstBase>(&SI);
+    auto SEO = SelectEnumOperation(&SI);
     SmallVector<ValueID, 4> ListOfValues;
-    ListOfValues.push_back(addValueRef(SOI->getEnumOperand()));
-    ListOfValues.push_back(S.addTypeRef(SOI->getType().getRawASTType()));
-    ListOfValues.push_back((unsigned)SOI->getType().getCategory());
-    ListOfValues.push_back((unsigned)SOI->hasDefault());
-    if (SOI->hasDefault()) {
-      ListOfValues.push_back(addValueRef(SOI->getDefaultResult()));
+    ListOfValues.push_back(addValueRef(SEO.getEnumOperand()));
+    ListOfValues.push_back(S.addTypeRef(SEO->getType().getRawASTType()));
+    ListOfValues.push_back((unsigned)SEO->getType().getCategory());
+    ListOfValues.push_back((unsigned)SEO.hasDefault());
+    if (SEO.hasDefault()) {
+      ListOfValues.push_back(addValueRef(SEO.getDefaultResult()));
     } else {
       ListOfValues.push_back(0);
     }
-    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+    for (unsigned i = 0, e = SEO.getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILValue result;
-      std::tie(elt, result) = SOI->getCase(i);
+      std::tie(elt, result) = SEO.getCase(i);
       ListOfValues.push_back(S.addDeclRef(elt));
       ListOfValues.push_back(addValueRef(result));
     }
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(),
-        S.addTypeRef(SOI->getEnumOperand()->getType().getRawASTType()),
-        (unsigned)SOI->getEnumOperand()->getType().getCategory(),
-        ListOfValues);
+        S.addTypeRef(SEO.getEnumOperand()->getType().getRawASTType()),
+        (unsigned)SEO.getEnumOperand()->getType().getCategory(), ListOfValues);
     break;
   }
   case SILInstructionKind::SwitchValueInst: {
