@@ -192,15 +192,12 @@ public:
     // If we have local archetypes to substitute, check whether that's
     // relevant to this particular substitution.
     if (!LocalArchetypeSubs.empty()) {
-      for (auto ty : Subs.getReplacementTypes()) {
+      if (Subs.hasLocalArchetypes()) {
         // If we found a type containing a local archetype, substitute
         // open existentials throughout the substitution map.
-        if (ty->hasLocalArchetype()) {
-          Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{
-                              LocalArchetypeSubs},
-                            MakeAbstractConformanceForGenericType());
-          break;
-        }
+        Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{
+                            LocalArchetypeSubs},
+                          MakeAbstractConformanceForGenericType());
       }
     }
 
