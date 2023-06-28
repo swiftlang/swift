@@ -554,7 +554,7 @@ TupleElementGenerator::TupleElementGenerator(
   assert(origTupleType.matchesTuple(substType));
 
   origTupleVanishes =
-    origTupleType.getVanishingTupleElementPatternType().hasValue();
+    origTupleType.getVanishingTupleElementPatternType().has_value();
   origTupleTypeIsOpaque = origTupleType.isOpaqueTuple();
   numOrigElts = origTupleType.getNumTupleElements();
 

@@ -1663,7 +1663,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     consumeToken(tok::kw_case);
 
     auto newPatternBindingState = PatternBindingState::get(BindingKindStr)
-      .getValueOr(PatternBindingState(PatternBindingState::InVar));
+      .value_or(PatternBindingState(PatternBindingState::InVar));
     BindingKindStr = "case";
     
     // In our recursive parse, remember that we're in a var/let pattern.
@@ -1693,7 +1693,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // Otherwise, this is an implicit optional binding "if let".
     ThePattern = parseMatchingPatternAsBinding(
         PatternBindingState::get(BindingKindStr)
-            .getValueOr(PatternBindingState(PatternBindingState::InVar)),
+            .value_or(PatternBindingState(PatternBindingState::InVar)),
         IntroducerLoc,
         /*isExprBasic*/ true);
     // The let/var pattern is part of the statement.

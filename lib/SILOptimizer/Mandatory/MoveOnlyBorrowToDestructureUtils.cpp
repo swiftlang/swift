@@ -741,7 +741,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
                  << "        Recursively loading its available values!\n");
       auto &predAvailableValues = computeAvailableValues(bb);
       for (unsigned i : range(predAvailableValues.size())) {
-        if (!smallestTypeAvailable[i].hasValue())
+        if (!smallestTypeAvailable[i].has_value())
           continue;
 
         if (!predAvailableValues[i]) {

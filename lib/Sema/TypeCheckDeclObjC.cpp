@@ -2998,7 +2998,7 @@ private:
 
   static ObjCSelector getExplicitObjCName(ValueDecl *VD) {
     if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
-      return attr->getName().getValueOr(ObjCSelector());
+      return attr->getName().value_or(ObjCSelector());
     return ObjCSelector();
   }
 

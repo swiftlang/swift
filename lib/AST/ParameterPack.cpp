@@ -481,7 +481,7 @@ static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
       formalEltTypes->push_back(formalEltType);
     }
 
-    assert(isLegal || formalEltTypes.hasValue());
+    assert(isLegal || formalEltTypes.has_value());
   }
 
   // Use the array we built if we made one (if we ever saw a non-legal
