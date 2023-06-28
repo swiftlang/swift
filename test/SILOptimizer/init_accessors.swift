@@ -293,11 +293,12 @@ struct TestGeneric<T, U> {
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors11TestGenericV1a1b1cACyxq_Gx_xq_tcfC : $@convention(method) <T, U> (@in T, @in T, @in U, @thin TestGeneric<T, U>.Type) -> @out TestGeneric<T, U>
   //
   // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors11TestGenericV4datax_xtvi : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout τ_0_1) -> (@out τ_0_0, @out τ_0_0)
-  // CHECK: {{.*}} = apply [[INIT_ACCESSOR]]<T, U>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout τ_0_1) -> (@out τ_0_0, @out τ_0_0)
+  // CHECK-NEXT: [[SUBST_INIT_ACCESSOR:%.*]] = partial_apply [callee_guaranteed] [[INIT_ACCESSOR]]<T, U>() : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout τ_0_1) -> (@out τ_0_0, @out τ_0_0)
+  // CHECK: {{.*}} = apply [[SUBST_INIT_ACCESSOR]]({{.*}}) : $@callee_guaranteed (@in T, @in T, @inout U) -> (@out T, @out T)
   //
   // CHECK: [[SETTER:%.*]] = function_ref @$s14init_accessors11TestGenericV4datax_xtvs : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
   // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER]]<T, U>([[SELF_VALUE:%.*]]) : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
-  // CHECK: %55 = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (@in T, @in T) -> ()
+  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (@in T, @in T) -> ()
   // CHECK-NEXT: end_access [[SELF_VALUE]] : $*TestGeneric<T, U>
   init(a: T, b: T, c: U) {
     self.c = c

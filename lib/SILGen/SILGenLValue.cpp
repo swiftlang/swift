@@ -1630,6 +1630,25 @@ namespace {
                                           SGF.getTypeExpansionContext());
       };
 
+      auto emitPartialInitAccessorApply =
+          [&](AccessorDecl *initAccessor) -> SILValue {
+        assert(initAccessor->isInitAccessor());
+        auto initConstant = SGF.getAccessorDeclRef(initAccessor);
+        SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
+
+        // If there are no substitutions there is no need to emit partial
+        // apply.
+        if (Substitutions.empty())
+          return initFRef;
+
+        // Emit partial apply without argument to produce a substituted
+        // init accessor reference.
+        PartialApplyInst *initPAI = SGF.B.createPartialApply(
+            loc, initFRef, Substitutions, ArrayRef<SILValue>(),
+            ParameterConvention::Direct_Guaranteed);
+        return SGF.emitManagedRValueWithCleanup(initPAI).getValue();
+      };
+
       auto emitPartialSetterApply =
           [&](SILValue setterFRef,
               const SILFunctionConventions &setterConv) -> ManagedValue {
@@ -1719,9 +1738,8 @@ namespace {
         }
 
         // Emit the init accessor function partially applied to the base.
-        auto *initAccessor = field->getOpaqueAccessor(AccessorKind::Init);
-        auto initConstant = SGF.getAccessorDeclRef(initAccessor);
-        SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
+        auto initFn = emitPartialInitAccessorApply(
+            field->getOpaqueAccessor(AccessorKind::Init));
 
         // Emit the set accessor function partially applied to the base.
         auto setterFRef = getSetterFRef();
@@ -1732,7 +1750,7 @@ namespace {
         // Create the assign_or_init with the initializer and setter.
         auto value = emitValue(field, FieldType, setterTy, setterConv);
         SGF.B.createAssignOrInit(loc, base.getValue(), value.forward(SGF),
-                                 initFRef, setterFn.getValue(),
+                                 initFn, setterFn.getValue(),
                                  AssignOrInitInst::Unknown);
         return;
       }
