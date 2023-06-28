@@ -748,16 +748,17 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::OpaqueTypeDescriptor: {
     auto *opaqueType = cast<OpaqueTypeDecl>(getDecl());
 
-    // The opaque result type descriptor with availability conditions
-    // has to be emitted into a client module when associated with
+    // With conditionally available substitutions, the opaque result type
+    // descriptor has to be emitted into a client module when associated with
     // `@_alwaysEmitIntoClient` declaration which means it's linkage
     // has to be "shared".
-    if (opaqueType->hasConditionallyAvailableSubstitutions()) {
-      if (auto *srcDecl = opaqueType->getNamingDecl()) {
-        if (srcDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-          return SILLinkage::Shared;
-      }
-    }
+    //
+    // If we don't have conditionally available substitutions, we won't emit
+    // the descriptor at all, but still make sure we report "shared" linkage
+    // so that TBD files don't include a bogus symbol.
+    auto *srcDecl = opaqueType->getNamingDecl();
+    if (srcDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return SILLinkage::Shared;
 
     return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
   }
