@@ -680,6 +680,25 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
+      // Next, prefer any other module over the (_)Observation module.
+      auto obsModule = ctx.getLoadedModule(ctx.Id_Observation);
+      if (!obsModule)
+        obsModule = ctx.getLoadedModule(ctx.Id_Observation_);
+      if (obsModule) {
+        if ((firstModule == obsModule) != (secondModule == obsModule)) {
+          // If second module is (_)Observation, then it is shadowed by
+          // first.
+          if (secondModule == obsModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // Otherwise, the first declaration is shadowed by the second.
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+
       // The Foundation overlay introduced Data.withUnsafeBytes, which is
       // treated as being ambiguous with SwiftNIO's Data.withUnsafeBytes
       // extension. Apply a special-case name shadowing rule to use the
