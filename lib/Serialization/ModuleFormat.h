@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 788; // PluginSearchOption
+const uint16_t SWIFTMODULE_VERSION_MINOR = 789; // extension macros
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -638,7 +638,7 @@ enum class MacroRole : uint8_t {
   CodeItem,
   Extension,
 };
-using MacroRoleField = BCFixed<3>;
+using MacroRoleField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -2317,11 +2317,13 @@ namespace decls_block {
     BCFixed<1>,                // macro syntax
     MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
+    BCVBR<5>,                  // number of conformances
     BCArray<IdentifierIDField> // introduced names, where each is encoded as
                                //   - introduced kind
                                //   - base name
                                //   - # of argument labels + 1 (or 0 if none)
                                //   - argument labels
+                               // trialed by introduced conformances
   >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT

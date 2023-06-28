@@ -2368,17 +2368,20 @@ public:
 /// which declares one of the roles that a given macro can inhabit.
 class MacroRoleAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<MacroRoleAttr, MacroIntroducedDeclName> {
+      private llvm::TrailingObjects<MacroRoleAttr, MacroIntroducedDeclName,
+                                    TypeExpr *> {
   friend TrailingObjects;
 
   MacroSyntax syntax;
   MacroRole role;
   unsigned numNames;
+  unsigned numConformances;
   SourceLoc lParenLoc, rParenLoc;
 
   MacroRoleAttr(SourceLoc atLoc, SourceRange range, MacroSyntax syntax,
                 SourceLoc lParenLoc, MacroRole role,
                 ArrayRef<MacroIntroducedDeclName> names,
+                ArrayRef<TypeExpr *> conformances,
                 SourceLoc rParenLoc, bool implicit);
 
 public:
@@ -2386,10 +2389,15 @@ public:
                                SourceRange range, MacroSyntax syntax,
                                SourceLoc lParenLoc, MacroRole role,
                                ArrayRef<MacroIntroducedDeclName> names,
+                               ArrayRef<TypeExpr *> conformances,
                                SourceLoc rParenLoc, bool implicit);
 
   size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
     return numNames;
+  }
+
+  size_t numTrailingObjects(OverloadToken<TypeExpr *>) const {
+    return numConformances;
   }
 
   SourceLoc getLParenLoc() const { return lParenLoc; }
@@ -2398,6 +2406,7 @@ public:
   MacroSyntax getMacroSyntax() const { return syntax; }
   MacroRole getMacroRole() const { return role; }
   ArrayRef<MacroIntroducedDeclName> getNames() const;
+  ArrayRef<TypeExpr *> getConformances() const;
   bool hasNameKind(MacroIntroducedDeclNameKind kind) const;
 
   static bool classof(const DeclAttribute *DA) {
