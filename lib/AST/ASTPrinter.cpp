@@ -3445,6 +3445,10 @@ static bool usesFeatureParameterPacks(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDeferredSendableChecking(Decl *decl) {
+    return false;
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -5027,6 +5031,11 @@ void PrintAST::visitArrowExpr(ArrowExpr *expr) {
 
 void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   Printer << "await ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitSendNonSendableExpr(SendNonSendableExpr *expr) {
+  Printer << "sendNonSendable ";
   visit(expr->getSubExpr());
 }
 

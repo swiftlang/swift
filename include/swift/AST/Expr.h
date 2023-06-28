@@ -3084,6 +3084,20 @@ public:
   }
 };
 
+class SendNonSendableExpr : public ImplicitConversionExpr {
+  DeferredSendableDiagnostic *Diagnostic;
+public:
+  SendNonSendableExpr(
+      ASTContext &ctx, DeferredSendableDiagnostic diagnostic, Expr *sub,
+      Type type = Type());
+
+  void produceDiagnostics() { Diagnostic->produceDiagnostics(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SendNonSendable;
+  }
+};
+
 /// Use an opaque type to abstract a value of the underlying concrete type,
 /// possibly nested inside other types. E.g. can perform conversions "T --->
 /// (opaque type)" and "S<T> ---> S<(opaque type)>".

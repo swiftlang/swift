@@ -262,6 +262,98 @@ bool safeToDropGlobalActor(
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 
+/// A DeferredSendableDiagnostic wraps a list of closures that emit
+/// Diagnostics when called. It is used to allow the logic for forming
+/// those diagnostics to take place ahead of time, while delaying the
+/// actual emission until several passes later. In particular, diagnostics
+/// that identify NonSendable types being sent between isolation domains
+/// are deferred thus so that a later flow-sensitive SIL pass can eliminate
+/// diagnostics for sends that are provably safe.
+struct DeferredSendableDiagnostic {
+private:
+
+  // This field indicates whether any errors (as opposed to just warnings
+  // and notes) are produced by this DeferredSendableDiagnostic instance.
+  // This exists to allow existing control flow through the call stack in
+  // ActorIsolationChecker's walk methods. Because that control flow wasn't
+  // entirely principled, sometime the use of this field doesn't exactly
+  // align with the presence of errors vs warnings.
+  bool ProducesErrors;
+
+  // This field stores a vector, each entry of which is a closure that can be
+  // called, in order, to emit diagnostics.
+  std::vector<std::function<void()>> Diagnostics;
+
+public:
+  DeferredSendableDiagnostic()
+      : ProducesErrors(false){}
+
+  // In general, an empty no-op closure should not be passed to
+  // Diagnostic here, or ProducesDiagnostics will contain an
+  // imprecise value.
+  DeferredSendableDiagnostic(
+      bool ProducesErrors, std::function<void()> Diagnostic)
+      : ProducesErrors(ProducesErrors),
+        Diagnostics({Diagnostic}) {
+    assert(Diagnostic && "Empty diagnostics function");
+  }
+
+  bool produceAndCheckForErrors() {
+    produceDiagnostics();
+    return producesErrors();
+  }
+
+  bool producesErrors() const {
+    return ProducesErrors;
+  }
+
+  bool producesDiagnostics() const {
+    return Diagnostics.size() != 0;
+  }
+
+  // Idempotent operation: call the contained closures in Diagnostics in order,
+  // and clear out the list so subsequent invocations are a no-op
+  void produceDiagnostics() {
+    for (auto Diagnostic : Diagnostics) {
+      Diagnostic();
+    }
+    ProducesErrors = false;
+    Diagnostics = {};
+  }
+
+  void setProducesErrors(bool producesErrors) {
+    ProducesErrors = producesErrors;
+  }
+
+  // In general, an empty no-op closure should not be passed to
+  // Diagnostic here, or ProducesDiagnostics will contain an
+  // imprecise value.
+  void addDiagnostic(std::function<void()> Diagnostic) {
+    assert(Diagnostic && "Empty diagnostics function");
+
+    Diagnostics.push_back(Diagnostic);
+  }
+
+  /// This variation on addErrorProducingDiagnostic should be called
+  /// when the passed lambda will definitely through a diagnostic
+  /// for the sake of maintaining existing control flow paths, it
+  /// is not used everywhere.
+  void addErrorProducingDiagnostic(std::function<void()> produceMoreDiagnostics) {
+    addDiagnostic(produceMoreDiagnostics);
+    setProducesErrors(true);
+  }
+
+  // compose this DeferredSendableDiagnostic with another - calling their
+  // wrapped Diagnostics closure in sequence and disjuncting their
+  // respective ProducesErrors flags
+  void followWith(DeferredSendableDiagnostic other) {
+    for (auto Diagnostic : other.Diagnostics) {
+      Diagnostics.push_back(Diagnostic);
+    }
+    ProducesErrors = ProducesErrors || other.ProducesErrors;
+  }
+};
+
 } // end namespace swift
 
 #endif /* SWIFT_AST_ACTORISOLATIONSTATE_H */

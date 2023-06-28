@@ -135,7 +135,6 @@ EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyResilientTypes, true)
-EXPERIMENTAL_FEATURE(MoveOnlyPartialConsumption, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
@@ -210,6 +209,9 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, false)
 
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
+
+/// Defer Sendable checking to SIL diagnostic phase.
+EXPERIMENTAL_FEATURE(DeferredSendableChecking, false)
 
 // Enable strict concurrency.
 EXPERIMENTAL_FEATURE(StrictConcurrency, true)

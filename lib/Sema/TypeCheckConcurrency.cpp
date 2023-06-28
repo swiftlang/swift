@@ -838,33 +838,33 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   }
 }
 
-bool swift::diagnoseSendabilityErrorBasedOn(
+DeferredSendableDiagnostic swift::deferredDiagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
-    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<DeferredSendableDiagnostic(DiagnosticBehavior)> diagnose) {
   auto behavior = DiagnosticBehavior::Unspecified;
 
   if (nominal) {
-    behavior = fromContext.diagnosticBehavior(nominal);
+      behavior = fromContext.diagnosticBehavior(nominal);
   } else {
-    behavior = fromContext.implicitSendableDiagnosticBehavior();
+      behavior = fromContext.implicitSendableDiagnosticBehavior();
   }
 
-  bool wasSuppressed = diagnose(behavior);
+  DeferredSendableDiagnostic deferred = diagnose(behavior);
 
   SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
   if (sourceFile && shouldDiagnosePreconcurrencyImports(*sourceFile)) {
-    bool emittedDiagnostics =
-        behavior != DiagnosticBehavior::Ignore && !wasSuppressed;
+      bool emittedDiagnostics =
+          behavior != DiagnosticBehavior::Ignore && deferred.producesErrors();
 
-    // When the type is explicitly Sendable *or* explicitly non-Sendable, we
-    // assume it has been audited and `@preconcurrency` is not recommended even
-    // though it would actually affect the diagnostic.
-    bool nominalIsImportedAndHasImplicitSendability =
-        nominal &&
-        nominal->getParentModule() != fromContext.fromDC->getParentModule() &&
-        !hasExplicitSendableConformance(nominal);
+      // When the type is explicitly Sendable *or* explicitly non-Sendable, we
+      // assume it has been audited and `@preconcurrency` is not recommended even
+      // though it would actually affect the diagnostic.
+      bool nominalIsImportedAndHasImplicitSendability =
+          nominal &&
+          nominal->getParentModule() != fromContext.fromDC->getParentModule() &&
+          !hasExplicitSendableConformance(nominal);
 
-    if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
+      if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
       // This type was imported from another module; try to find the
       // corresponding import.
       llvm::Optional<AttributedImport<swift::ImportedModule>> import =
@@ -880,18 +880,36 @@ bool swift::diagnoseSendabilityErrorBasedOn(
         SourceLoc importLoc = import->importLoc;
         ASTContext &ctx = nominal->getASTContext();
 
-        ctx.Diags
-            .diagnose(importLoc, diag::add_predates_concurrency_import,
-                      ctx.LangOpts.isSwiftVersionAtLeast(6),
-                      nominal->getParentModule()->getName())
-            .fixItInsert(importLoc, "@preconcurrency ");
+        deferred.addDiagnostic([=, ctx=&ctx]() {
+          ctx->Diags
+              .diagnose(importLoc, diag::add_predates_concurrency_import,
+                        ctx->LangOpts.isSwiftVersionAtLeast(6),
+                        nominal->getParentModule()->getName())
+              .fixItInsert(importLoc, "@preconcurrency ");
+        });
 
         sourceFile->setImportUsedPreconcurrency(*import);
       }
-    }
+      }
   }
 
-  return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
+  deferred.setProducesErrors(behavior == DiagnosticBehavior::Unspecified && deferred.producesErrors());
+
+  return deferred;
+}
+
+/// This function overloads diagnoseSendabilityErrorBasedOn to obtain a
+/// non-deferring version with the same semantics - the same is done to
+/// diagnoseNonSendableTypes
+bool swift::diagnoseSendabilityErrorBasedOn(
+    NominalTypeDecl *nominal, SendableCheckContext fromContext,
+    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
+  DeferredSendableDiagnostic deferred = deferredDiagnoseSendabilityErrorBasedOn(nominal, fromContext, [=](DiagnosticBehavior behavior) {
+    bool wasSuppressed = diagnose(behavior);
+    return DeferredSendableDiagnostic(!wasSuppressed, [](){});
+  });
+  deferred.produceDiagnostics();
+  return deferred.producesErrors();
 }
 
 void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
@@ -917,70 +935,82 @@ void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 
 /// Produce a diagnostic for a single instance of a non-Sendable type where
 /// a Sendable type is required.
-static bool diagnoseSingleNonSendableType(
+DeferredSendableDiagnostic swift::diagnoseSingleNonSendableType(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
 
   auto module = fromContext.fromDC->getParentModule();
   auto nominal = type->getAnyNominal();
 
-  return diagnoseSendabilityErrorBasedOn(nominal, fromContext,
-                                         [&](DiagnosticBehavior behavior) {
-    bool wasSuppressed = diagnose(type, behavior);
+  return deferredDiagnoseSendabilityErrorBasedOn(
+      nominal, fromContext,
+      [=](DiagnosticBehavior behavior) {
+        DeferredSendableDiagnostic deferred = diagnose(type, behavior);
 
-    // Don't emit the following notes if we didn't have any diagnostics to
-    // attach them to.
-    if (wasSuppressed || behavior == DiagnosticBehavior::Ignore)
-      return true;
+        // Don't emit the following notes if we didn't have any diagnostics to
+        // attach them to.
+        if (!deferred.producesErrors() || behavior == DiagnosticBehavior::Ignore)
+          return deferred;
 
-    if (type->is<FunctionType>()) {
-      module->getASTContext().Diags
-          .diagnose(loc, diag::nonsendable_function_type);
-    } else if (nominal && nominal->getParentModule() == module) {
-      // If the nominal type is in the current module, suggest adding
-      // `Sendable` if it might make sense. Otherwise, just complain.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-        auto note = nominal->diagnose(
-            diag::add_nominal_sendable_conformance,
-            nominal->getDescriptiveKind(), nominal->getName());
-        addSendableFixIt(nominal, note, /*unchecked=*/false);
-      } else {
-        nominal->diagnose(
-            diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-            nominal->getName());
-      }
-    } else if (nominal) {
-      // Note which nominal type does not conform to `Sendable`.
-      nominal->diagnose(
-          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-          nominal->getName());
-    } else if (auto genericArchetype = type->getAs<ArchetypeType>()) {
-      auto interfaceType = genericArchetype->getInterfaceType();
-      if (auto genericParamType =
+        if (type->is<FunctionType>()) {
+          deferred.addDiagnostic([=](){
+            module->getASTContext().Diags.diagnose(
+                loc, diag::nonsendable_function_type);
+          });
+        } else if (nominal && nominal->getParentModule() == module) {
+          // If the nominal type is in the current module, suggest adding
+          // `Sendable` if it might make sense. Otherwise, just complain.
+          if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+            deferred.addDiagnostic([=](){
+              auto note = nominal->diagnose(diag::add_nominal_sendable_conformance,
+                                            nominal->getDescriptiveKind(),
+                                            nominal->getName());
+              addSendableFixIt(nominal, note, /*unchecked=*/false);
+            });
+          } else {
+            deferred.addDiagnostic([=](){
+              nominal->diagnose(diag::non_sendable_nominal,
+                                nominal->getDescriptiveKind(), nominal->getName());
+            });
+          }
+        } else if (nominal) {
+          // Note which nominal type does not conform to `Sendable`.
+          deferred.addDiagnostic([=](){
+            nominal->diagnose(diag::non_sendable_nominal,
+                              nominal->getDescriptiveKind(), nominal->getName());
+          });
+        } else if (auto genericArchetype = type->getAs<ArchetypeType>()) {
+          auto interfaceType = genericArchetype->getInterfaceType();
+          if (auto genericParamType =
               interfaceType->getAs<GenericTypeParamType>()) {
-        auto *genericParamTypeDecl = genericParamType->getDecl();
-        if (genericParamTypeDecl &&
-            genericParamTypeDecl->getModuleContext() == module) {
-          auto diag = genericParamTypeDecl->diagnose(
-              diag::add_generic_parameter_sendable_conformance, type);
-          addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+            auto *genericParamTypeDecl = genericParamType->getDecl();
+            if (genericParamTypeDecl &&
+                genericParamTypeDecl->getModuleContext() == module) {
+              deferred.addDiagnostic([=](){
+                auto diag = genericParamTypeDecl->diagnose(
+                    diag::add_generic_parameter_sendable_conformance, type);
+                addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+              });
+            }
+          }
         }
-      }
-    }
 
-    return false;
-  });
+        return deferred;
+      });
 }
 
-bool swift::diagnoseNonSendableTypes(
+DeferredSendableDiagnostic swift::deferredDiagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<DeferredSendableDiagnostic(Type, DiagnosticBehavior)> diagnose) {
   auto module = fromContext.fromDC->getParentModule();
+  // maintain a running DeferredSendableDiagnostic instance
+  // for any diagnostics computed by this function
+  auto deferred = DeferredSendableDiagnostic();
 
   // If the Sendable protocol is missing, do nothing.
   auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
-    return false;
+    return deferred;
 
   // FIXME: More detail for unavailable conformances.
   auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
@@ -989,18 +1019,30 @@ bool swift::diagnoseNonSendableTypes(
   }
 
   // Walk the conformance, diagnosing any missing Sendable conformances.
-  bool anyMissing = false;
+
   conformance.forEachMissingConformance(module,
-      [&](BuiltinProtocolConformance *missing) {
-        if (diagnoseSingleNonSendableType(
-                missing->getType(), fromContext, loc, diagnose)) {
-          anyMissing = true;
-        }
+                                        [&](BuiltinProtocolConformance *missing) {
+                                          deferred.followWith(diagnoseSingleNonSendableType(
+                                              missing->getType(), fromContext, loc, diagnose));
 
-        return false;
-      });
+                                          return false;
+                                        });
 
-  return anyMissing;
+  return deferred;
+}
+
+/// This function overloads diagnoseNonSendableTypes to obtain a
+/// non-deferring version with the same semantics - the same is done to
+/// diagnoseSendabilityErrorBasedOn
+bool swift::diagnoseNonSendableTypes(
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+  return deferredDiagnoseNonSendableTypes(
+      type, fromContext, loc,
+      [=](Type type, DiagnosticBehavior behavior) {
+        bool wasSuppressed = diagnose(type, behavior);
+        return DeferredSendableDiagnostic(!wasSuppressed, [](){});
+      }).produceAndCheckForErrors();
 }
 
 bool swift::diagnoseNonSendableTypesInReference(
@@ -2120,6 +2162,10 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // check if language features ask us to defer sendable diagnostics
+      auto deferSendableDiagnostics =
+          ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking);
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -2206,8 +2252,10 @@ namespace {
             }
           }
         } else {
-          // Check the call itself.
-          (void)checkApply(apply);
+          // Check the call itself, and insert any necessary SendNonSendableExprs
+          // to wrap its args
+          checkApply(apply)
+              .insertSendNonSendableExprs(ctx, apply, deferSendableDiagnostics);
         }
       }
 
@@ -2696,8 +2744,52 @@ namespace {
       return expr->getType()->getRValueType();
     }
 
+    struct CheckApplyResult {
+    private:
+      bool DiagnosticProduced;
+      std::vector<std::pair<unsigned, DeferredSendableDiagnostic>>
+          ArgDeferredDiagnostics;
+
+    public:
+      CheckApplyResult(bool DiagnosticProduced)
+          : DiagnosticProduced(DiagnosticProduced) {}
+
+      void setDiagnosticProduced() {
+        DiagnosticProduced = true;
+      }
+
+      void addArgDeferredDiagnostic(unsigned ArgIdx, DeferredSendableDiagnostic DeferredDiagnostic) {
+        ArgDeferredDiagnostics.push_back({ArgIdx, DeferredDiagnostic});
+        if (DeferredDiagnostic.producesErrors())
+          DiagnosticProduced = true;
+      }
+
+      void insertSendNonSendableExprs(
+          ASTContext &ctx, ApplyExpr *applyExpr, bool deferSendableDiagnostics) {
+
+        auto argList = applyExpr->getArgs();
+
+        for (auto ArgDeferredDiagnostic : ArgDeferredDiagnostics) {
+          if (!deferSendableDiagnostics) {
+            ArgDeferredDiagnostic.second.produceDiagnostics();
+            continue;
+          }
+
+          unsigned idx = ArgDeferredDiagnostic.first;
+          auto arg = argList->getExpr(idx);
+
+          argList->setExpr(idx, new (ctx) SendNonSendableExpr(
+                               ctx, ArgDeferredDiagnostic.second,
+                               arg, arg->getType()));
+        }
+
+        applyExpr->setArgs(argList);
+      }
+    };
+
+
     /// Check actor isolation for a particular application.
-    bool checkApply(ApplyExpr *apply) {
+    CheckApplyResult checkApply(ApplyExpr *apply) {
       auto fnExprType = getType(apply->getFn());
       if (!fnExprType)
         return false;
@@ -2872,6 +2964,8 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
+      CheckApplyResult result = false;
+
       // Check for sendability of the parameter types.
       auto params = fnType->getParams();
       for (unsigned paramIdx : indices(params)) {
@@ -2893,13 +2987,13 @@ namespace {
         }
 
         bool isExiting = !unsatisfiedIsolation->isActorIsolated();
-        ActorIsolation diagnoseIsolation = isExiting ? getContextIsolation()
-                                                     : *unsatisfiedIsolation;
-        if (diagnoseNonSendableTypes(
-                argType ? argType : param.getParameterType(), getDeclContext(),
-                argLoc, diag::non_sendable_call_argument,
-                isExiting, diagnoseIsolation))
-          return true;
+        ActorIsolation diagnoseIsolation =
+            isExiting ? getContextIsolation() : *unsatisfiedIsolation;
+        result.addArgDeferredDiagnostic(
+            paramIdx, deferredDiagnoseNonSendableTypes(
+                argType ? argType : param.getParameterType(),
+                getDeclContext(), argLoc, diag::non_sendable_call_argument,
+                isExiting, diagnoseIsolation));
       }
 
       // Check for sendability of the result type.
@@ -2908,9 +3002,9 @@ namespace {
              diag::non_sendable_call_result_type,
              apply->isImplicitlyAsync().has_value(),
              *unsatisfiedIsolation))
-        return true;
+        result.setDiagnosticProduced();
 
-      return false;
+      return result;
     }
 
     /// Find the innermost context in which this declaration was explicitly

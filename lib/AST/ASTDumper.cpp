@@ -2205,6 +2205,12 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitSendNonSendableExpr(SendNonSendableExpr *E) {
+    printCommon(E, "send_non_sendable_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitConsumeExpr(ConsumeExpr *E) {
     printCommon(E, "consume_expr");
     OS << '\n';
