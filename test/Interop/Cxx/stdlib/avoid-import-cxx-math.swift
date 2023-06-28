@@ -5,13 +5,15 @@
 import CxxStdlib
 
 func test() {
-    let x: Float = 1.0
-    let y: Float = 2.0
+    let x: Double = 1.0
+    let y: Double = 2.0
 
     let _ =  pow(x, y)
 
     let _ = abs(x)
     let _ = div(42, 2)
+    let _ = sin(x)
+    let _ = cos(x)
     let _ = strstr("a", "aaa")
   
     exit(0)
