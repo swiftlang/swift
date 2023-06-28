@@ -5086,7 +5086,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     if (type->hasParameterizedExistential())
       (void)diagnoseParameterizedProtocolAvailability(typeDecl->getLoc(),
                                                       where.getDeclContext());
-    return false;
   });
 
   for (auto req : proto->getRequirementSignature().getRequirements()) {

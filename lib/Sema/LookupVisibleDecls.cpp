@@ -626,7 +626,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
     if (!NormalConformance)
       continue;
     NormalConformance->forEachTypeWitness(
-        [](AssociatedTypeDecl *, Type, TypeDecl *) { return false; },
+        [](AssociatedTypeDecl *, Type, TypeDecl *) {},
         /*useResolver=*/true);
     NormalConformance->forEachValueWitness([](ValueDecl *, Witness) {},
                                            /*useResolver=*/true);

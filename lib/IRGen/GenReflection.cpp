@@ -1582,12 +1582,11 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
 
   auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
                                 Type Replacement,
-                                const TypeDecl *TD) -> bool {
+                                const TypeDecl *TD) {
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),
       Replacement->getCanonicalType()
     });
-    return false;
   };
 
   normalConf->forEachTypeWitness(collectTypeWitness);

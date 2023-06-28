@@ -1939,9 +1939,8 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
     ProtocolConformanceRef(Conform)).createSDKNode(SDKNodeKind::Conformance));
   Conform->forEachTypeWitness(
-    [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
+    [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
-      return false;
     });
   return ConfNode;
 }

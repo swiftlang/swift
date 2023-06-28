@@ -1188,10 +1188,9 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
 
       conf->forEachTypeWitness([&](const AssociatedTypeDecl *assoc,
                                    Type type,
-                                   TypeDecl *typeDecl) -> bool {
+                                   TypeDecl *typeDecl) {
         if (typeDecl == member)
           reqs.push_back(const_cast<AssociatedTypeDecl*>(assoc));
-        return false;
       });
     }
   } else {

@@ -169,11 +169,8 @@ public:
   /// The function object should accept an \c AssociatedTypeDecl* for the
   /// requirement followed by the \c Type for the witness and a
   /// (possibly null) \c TypeDecl* that explicitly declared the type.
-  /// It should return true to indicate an early exit.
-  ///
-  /// \returns true if the function ever returned true
   template<typename F>
-  bool forEachTypeWitness(F f, bool useResolver=false) const {
+  void forEachTypeWitness(F f, bool useResolver=false) const {
     const ProtocolDecl *protocol = getProtocol();
     for (auto assocTypeReq : protocol->getAssociatedTypeMembers()) {
       if (assocTypeReq->isInvalid())
@@ -184,11 +181,8 @@ public:
         continue;
 
       const auto &TWInfo = getTypeWitnessAndDecl(assocTypeReq);
-      if (f(assocTypeReq, TWInfo.getWitnessType(), TWInfo.getWitnessDecl()))
-        return true;
+      f(assocTypeReq, TWInfo.getWitnessType(), TWInfo.getWitnessDecl());
     }
-
-    return false;
   }
 
   /// Retrieve the value witness declaration corresponding to the given

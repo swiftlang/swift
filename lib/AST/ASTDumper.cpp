@@ -3477,14 +3477,13 @@ static void dumpProtocolConformanceRec(
     } else {
       normal->forEachTypeWitness(
           [&](const AssociatedTypeDecl *req, Type ty,
-              const TypeDecl *) -> bool {
+              const TypeDecl *) {
             out << '\n';
             out.indent(indent + 2);
             PrintWithColorRAII(out, ParenthesisColor) << '(';
             out << "assoc_type req=" << req->getName() << " type=";
             PrintWithColorRAII(out, TypeColor) << Type(ty->getDesugaredType());
             PrintWithColorRAII(out, ParenthesisColor) << ')';
-            return false;
           });
       normal->forEachValueWitness([&](const ValueDecl *req,
                                       Witness witness) {

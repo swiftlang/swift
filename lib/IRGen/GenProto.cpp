@@ -932,22 +932,21 @@ static bool hasDependentTypeWitness(
   if (!DC->isGenericContext())
     return false;
 
+  bool isDependent = false;
+
   // Check whether any of the associated types are dependent.
-  if (conformance->forEachTypeWitness(
-        [&](AssociatedTypeDecl *requirement, Type type,
-            TypeDecl *explicitDecl) -> bool {
-          // Skip associated types that don't have witness table entries.
-          if (!requirement->getOverriddenDecls().empty())
-            return false;
+  conformance->forEachTypeWitness(
+      [&](AssociatedTypeDecl *requirement, Type type, TypeDecl *typeDecl) {
+        // Skip associated types that don't have witness table entries.
+        if (!requirement->getOverriddenDecls().empty())
+          return;
 
-          // RESILIENCE: this could be an opaque conformance
-          return type->getCanonicalType()->hasTypeParameter();
-       },
-       /*useResolver=*/true)) {
-    return true;
-  }
+        // RESILIENCE: this could be an opaque conformance
+        isDependent |= type->getCanonicalType()->hasTypeParameter();
+     },
+     /*useResolver=*/true);
 
-  return false;
+  return isDependent;
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {

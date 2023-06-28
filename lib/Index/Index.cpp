@@ -1269,9 +1269,10 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
     normal->forEachTypeWitness(
                 [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
       if (Cancelled)
-        return true;
+        return;
+
       if (typeDecl == nullptr)
-        return false;
+        return;
 
       if (typeDecl->getDeclContext() == DC) {
         explicitWitnesses.push_back({typeDecl, assoc});
@@ -1279,7 +1280,6 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
         // Report the implicit conformance.
         reportImplicitConformance(typeDecl, assoc, D);
       }
-      return false;
     });
   }
 

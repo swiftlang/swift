@@ -903,7 +903,6 @@ void writeAssociatedTypeAliases(llvm::json::OStream &JSON,
                 writeSubstitutedOpaqueTypeAliasDetails(JSON, *OpaqueTy);
               }
             });
-            return false;
           });
     }
   });

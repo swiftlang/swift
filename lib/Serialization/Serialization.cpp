@@ -1686,7 +1686,6 @@ void Serializer::writeLocalNormalProtocolConformance(
     data.push_back(addTypeRef(type));
     data.push_back(addDeclRef(typeDecl, /*allowTypeAliasXRef*/true));
     ++numTypeWitnesses;
-    return false;
   });
 
   conformance->forEachValueWitness([&](ValueDecl *req, Witness witness) {
