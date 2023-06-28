@@ -3213,13 +3213,14 @@ namespace {
                    d->getName() == "cos" || d->getName() == "exit";
           return false;
         };
-        if (decl->getOwningModule() &&
-            (decl->getOwningModule()
-                ->getTopLevelModule()
-                ->getFullModuleName() == "std" ||
-             decl->getOwningModule()
-                ->getTopLevelModule()
-                ->getFullModuleName() == "_SwiftConcurrencyShims")) {
+        auto topLevelModuleEq =
+            [](const clang::FunctionDecl *d, StringRef n) -> bool {
+          return d->getOwningModule() &&
+                 d->getOwningModule()
+                    ->getTopLevelModule()
+                    ->getFullModuleName() == n;
+        };
+        if (topLevelModuleEq(decl, "std")) {
           if (isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
             return nullptr;
           }
@@ -3230,6 +3231,13 @@ namespace {
               filename.endswith("stdlib.h") || filename.endswith("cstdlib")) {
             return nullptr;
           }
+        }
+        // Use the exit function from _SwiftConcurrency.h as it is platform
+        // agnostic.
+        if ((topLevelModuleEq(decl, "Darwin") ||
+             topLevelModuleEq(decl, "SwiftGlibc")) &&
+            decl->getDeclName().isIdentifier() && decl->getName() == "exit") {
+          return nullptr;
         }
       }
 
