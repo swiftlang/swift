@@ -3625,7 +3625,7 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_initializer_value_anyobject;
   }
 
-  if (diagnostic.hasValue()) {
+  if (diagnostic.has_value()) {
     emitDiagnostic(*diagnostic, fromType, toType);
     return true;
   }

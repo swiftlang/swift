@@ -3232,7 +3232,7 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
 
 ImportAccessLevel
 SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
-  assert(Imports.hasValue());
+  assert(Imports.has_value());
 
   // Leave it to the caller to avoid calling this service for a self import.
   // We want to return AccessLevel::Public, but there's no import site to return.

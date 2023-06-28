@@ -1668,7 +1668,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::kw_self: {   // self
     auto canParseBindingInPattern = [&]() {
       if (InBindingPattern != PatternBindingState::ImplicitlyImmutable &&
-          !InBindingPattern.getIntroducer().hasValue()) {
+          !InBindingPattern.getIntroducer().has_value()) {
         return false;
       }
       // If we have "case let x.", "case let x(", or "case let x[", we parse 'x'
@@ -1699,7 +1699,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       // If we have an inout/let/var, set that as our introducer. otherwise
       // default to Let.
       auto introducer =
-          InBindingPattern.getIntroducer().getValueOr(VarDecl::Introducer::Let);
+          InBindingPattern.getIntroducer().value_or(VarDecl::Introducer::Let);
       auto pattern = createBindingFromPattern(loc, name, introducer);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }

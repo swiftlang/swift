@@ -2700,7 +2700,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
       return llvm::DIExpression::createFragmentExpression(
                  DIExpr, PieceFragment.OffsetInBits, PieceFragment.SizeInBits)
-          .getValueOr(nullptr);
+          .value_or(nullptr);
     }
 
     llvm::SmallVector<uint64_t, 2> Operands;
@@ -2715,7 +2715,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (VarFragment.SizeInBits)
       DIExpr = llvm::DIExpression::createFragmentExpression(
                    DIExpr, VarFragment.OffsetInBits, VarFragment.SizeInBits)
-                   .getValueOr(nullptr);
+                   .value_or(nullptr);
 
     if (!DIExpr)
       return nullptr;
@@ -2726,7 +2726,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (PieceFragment.SizeInBits)
       return llvm::DIExpression::createFragmentExpression(
                  DIExpr, PieceFragment.OffsetInBits, PieceFragment.SizeInBits)
-          .getValueOr(nullptr);
+          .value_or(nullptr);
 
     return DIExpr;
   };

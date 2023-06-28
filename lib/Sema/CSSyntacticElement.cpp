@@ -1199,7 +1199,7 @@ private:
           element,
           cs.getConstraintLocator(locator,
                                   LocatorPathElt::SyntacticElement(element)),
-          contextInfo.getValueOr(ContextualTypeInfo()), isDiscarded));
+          contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
     }
 
     createConjunction(cs, elements, locator);

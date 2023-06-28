@@ -243,7 +243,7 @@ public:
                                        compactXIByteCount << 59 |
                                        enumData.xiOffset;
         B.addInt64(byteCountsAndOffset);
-        B.addSize(enumData.payload->fixedSize(IGM).getValue());
+        B.addSize(enumData.payload->fixedSize(IGM).value());
         B.addInt64(enumData.zeroTagValue);
         B.addSize(Size(enumData.xiTagValues));
         auto nestedRefCountBytesPlaceholder =

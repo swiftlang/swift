@@ -2679,7 +2679,7 @@ TypeResolver::resolvePackElementArchetype(
     TypeResolutionOptions options) {
   assert(silContext);
   assert(attrs.has(TAK_pack_element));
-  assert(attrs.OpenedID.hasValue());
+  assert(attrs.OpenedID.has_value());
 
   attrs.clearAttribute(TAK_pack_element);
 
