@@ -2225,6 +2225,7 @@ llvm::Optional<MacroRole> getMacroRole(StringRef roleName) {
       .Case("member", MacroRole::Member)
       .Case("peer", MacroRole::Peer)
       .Case("conformance", MacroRole::Conformance)
+      .Case("extension", MacroRole::Extension)
       .Default(llvm::None);
 }
 
@@ -2313,13 +2314,18 @@ Parser::parseMacroRoleAttribute(
         : diag::macro_role_attr_expected_freestanding_kind;
       Identifier roleName;
       SourceLoc roleNameLoc;
-      if (parseIdentifier(roleName, roleNameLoc, diagKind,
-                          /*diagnoseDollarPrefix=*/true)) {
+      if (Tok.is(tok::kw_extension)) {
+        roleNameLoc = consumeToken();
+        role = MacroRole::Extension;
+      } else if (parseIdentifier(roleName, roleNameLoc, diagKind,
+                                 /*diagnoseDollarPrefix=*/true)) {
         status.setIsParseError();
         return status;
       }
 
-      role = getMacroRole(roleName.str());
+      if (!role)
+        role = getMacroRole(roleName.str());
+
       if (!role) {
         diagnose(roleNameLoc, diag::macro_role_attr_expected_kind, isAttached);
         status.setIsParseError();

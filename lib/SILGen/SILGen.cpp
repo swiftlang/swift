@@ -2222,7 +2222,8 @@ public:
           continue;
 
         auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
-        if (sf->getFulfilledMacroRole() != MacroRole::Conformance)
+        if (sf->getFulfilledMacroRole() != MacroRole::Conformance &&
+            sf->getFulfilledMacroRole() != MacroRole::Extension)
           continue;
 
         FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,

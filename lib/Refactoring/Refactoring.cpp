@@ -8681,6 +8681,14 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
     }
   }
 
+  if (roles.contains(MacroRole::Extension)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      auto bufferIDs = evaluateOrDefault(
+          ctx.evaluator, ExpandExtensionMacros{nominal}, { });
+      allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+    }
+  }
+
   // Drop any buffers that come from other macros. We could eliminate this
   // step by adding more fine-grained requests above, which only expand for a
   // single custom attribute.

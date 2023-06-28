@@ -331,7 +331,8 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion: {
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion: {
     auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {

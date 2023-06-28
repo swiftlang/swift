@@ -60,14 +60,15 @@ enum MacroPluginKind: UInt8 {
 extension MacroRole {
   init(rawMacroRole: UInt8) {
     switch rawMacroRole {
-    case 0x01: self = .expression
-    case 0x02: self = .declaration
-    case 0x04: self = .accessor
-    case 0x08: self = .memberAttribute
-    case 0x10: self = .member
-    case 0x20: self = .peer
-    case 0x40: self = .conformance
-    case 0x80: self = .codeItem
+    case 0: self = .expression
+    case 1: self = .declaration
+    case 2: self = .accessor
+    case 3: self = .memberAttribute
+    case 4: self = .member
+    case 5: self = .peer
+    case 6: self = .conformance
+    case 7: self = .codeItem
+    case 8: self = .`extension`
 
     default: fatalError("unknown macro role")
     }
@@ -523,7 +524,7 @@ func expandFreestandingMacroIPC(
   // Map the macro role.
   let pluginMacroRole: PluginMessage.MacroRole
   switch macroRole {
-  case .accessor, .member, .memberAttribute, .peer, .conformance:
+  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension:
     preconditionFailure("unhandled macro role for freestanding macro")
 
   case .expression: pluginMacroRole = .expression
@@ -812,6 +813,7 @@ func expandAttachedMacroIPC(
   case .memberAttribute: macroRole = .memberAttribute
   case .peer: macroRole = .peer
   case .conformance: macroRole = .conformance
+  case .extension: macroRole = .`extension`
   case
       .expression,
       .declaration,

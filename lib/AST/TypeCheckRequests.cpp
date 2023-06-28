@@ -1873,6 +1873,22 @@ void ExpandConformanceMacros::noteCycleStep(DiagnosticEngine &diags) const {
                  decl->getName());
 }
 
+void ExpandExtensionMacros::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "extension",
+                 decl->getName());
+}
+
+void ExpandExtensionMacros::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "extension",
+                 decl->getName());
+}
+
 void ExpandMemberAttributeMacros::diagnoseCycle(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   if (auto value = dyn_cast<ValueDecl>(decl)) {
