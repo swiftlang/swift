@@ -1284,10 +1284,17 @@ bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {
 }
 
 AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
-  auto *initRef = cast<FunctionRefInst>(getInitializer());
-  auto *accessorRef = initRef->getReferencedFunctionOrNull();
-  assert(accessorRef);
-  return dyn_cast_or_null<AccessorDecl>(accessorRef->getDeclContext());
+  SILValue initRef = getInitializer();
+  SILFunction *accessorFn = nullptr;
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(initRef)) {
+    accessorFn = PAI->getReferencedFunctionOrNull();
+  } else {
+    accessorFn = cast<FunctionRefInst>(initRef)->getReferencedFunctionOrNull();
+  }
+
+  assert(accessorFn);
+  return dyn_cast_or_null<AccessorDecl>(accessorFn->getDeclContext());
 }
 
 unsigned AssignOrInitInst::getNumInitializedProperties() const {
