@@ -3346,6 +3346,11 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
   return false;
 }
 
+
+static bool usesFeatureDisableActorInferenceFromPropertyWrapperUsage(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportSymbolicCXXDecls(Decl *decl) { return false; }
 
 static bool usesFeatureGenerateBindingsForThrowingFunctionsInCXX(Decl *decl) {

@@ -3653,6 +3653,13 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
   if (!nominal->getParentSourceFile())
     return llvm::None;
 
+  ASTContext &ctx = nominal->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::DisableActorInferenceFromPropertyWrapperUsage)) {
+    // In Swift 6, we no longer infer isolation of a nominal type
+    // based on the property wrappers used in its stored properties
+    return llvm::None;
+  }
+
   llvm::Optional<ActorIsolation> foundIsolation;
   for (auto member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
@@ -4266,8 +4273,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (auto inferred = inferredIsolation(*conformanceIsolation))
           return inferred;
 
-      // If the declaration is a nominal type and any property wrappers on
-      // its stored properties require isolation, use that.
+      // Before Swift 6: If the declaration is a nominal type and any property
+      // wrappers on its stored properties require isolation, use that.
       if (auto wrapperIsolation = getIsolationFromWrappers(nominal)) {
         if (auto inferred = inferredIsolation(*wrapperIsolation))
           return inferred;
