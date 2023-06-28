@@ -39,3 +39,18 @@ func requiresP(_ value: (some P).Type) {
 
 // CHECK: Wrapped.requirement
 requiresP(Generic<Wrapped>.self)
+
+struct Outer {
+  @DelegatedConformance
+  struct Nested<Element> {}
+}
+
+// CHECK-DUMP: @__swiftmacro_23macro_expand_extensions5OuterV6Nested20DelegatedConformancefMe_.swift
+// CHECK-DUMP: extension Outer.Nested: P where Element: P {
+// CHECK-DUMP:   static func requirement() {
+// CHECK-DUMP:     Element.requirement()
+// CHECK-DUMP:   }
+// CHECK-DUMP: }
+
+// CHECK: Wrapped.requirement
+requiresP(Outer.Nested<Wrapped>.self)

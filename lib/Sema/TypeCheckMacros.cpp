@@ -74,6 +74,7 @@ extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
     const char *discriminator, ptrdiff_t discriminatorLength,
+    const char *qualifiedType, ptrdiff_t qualifiedTypeLength,
     uint8_t rawMacroRole,
     void *customAttrSourceFile, const void *customAttrSourceLocation,
     void *declarationSourceFile, const void *declarationSourceLocation,
@@ -1152,6 +1153,19 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
 #endif
   });
 
+  std::string extendedType;
+  {
+    llvm::raw_string_ostream OS(extendedType);
+    if (role == MacroRole::Extension) {
+      auto *nominal = dyn_cast<NominalTypeDecl>(attachedTo);
+      PrintOptions options;
+      options.FullyQualifiedExtendedTypesIfAmbiguous = true;
+      nominal->getDeclaredType()->print(OS, options);
+    } else {
+      OS << "";
+    }
+  }
+
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -1224,8 +1238,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->data(),
-        discriminator->size(), getRawMacroRole(role),
+        static_cast<uint32_t>(externalDef->kind),
+        discriminator->data(), discriminator->size(),
+        extendedType.data(), extendedType.size(),
+        getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceAddress,
