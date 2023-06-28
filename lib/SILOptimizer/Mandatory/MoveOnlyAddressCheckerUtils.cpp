@@ -563,6 +563,9 @@ namespace {
 struct UseState {
   MarkMustCheckInst *address;
 
+  using InstToBitMap =
+      llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
+
   llvm::Optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
@@ -576,7 +579,7 @@ struct UseState {
 
   /// A map from a liveness requiring use to the part of the type that it
   /// requires liveness for.
-  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> livenessUses;
+  InstToBitMap livenessUses;
 
   /// A map from a load [copy] or load [take] that we determined must be
   /// converted to a load_borrow to the part of the type tree that it needs to
@@ -622,11 +625,11 @@ struct UseState {
 
   /// A map from an instruction that initializes memory to the description of
   /// the part of the type tree that it initializes.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> initInsts;
+  InstToBitMap initInsts;
 
   /// memInstMustReinitialize insts. Contains both insts like copy_addr/store
   /// [assign] that are reinits that we will convert to inits and true reinits.
-  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4> reinitInsts;
+  InstToBitMap reinitInsts;
 
   /// The set of drop_deinits of this mark_must_check
   SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
@@ -653,32 +656,39 @@ struct UseState {
     return *cachedNumSubelements;
   }
 
-  SmallBitVector &getOrCreateLivenessUse(SILInstruction *inst) {
-    auto iter = livenessUses.find(inst);
-    if (iter == livenessUses.end()) {
-      iter = livenessUses.insert({inst, SmallBitVector(getNumSubelements())})
-                 .first;
+  SmallBitVector &getOrCreateAffectedBits(SILInstruction *inst,
+                                          InstToBitMap &map) {
+    auto iter = map.find(inst);
+    if (iter == map.end()) {
+      iter = map.insert({inst, SmallBitVector(getNumSubelements())}).first;
     }
     return iter->second;
   }
 
+  void setAffectedBits(SILInstruction *inst, SmallBitVector const &bits,
+                       InstToBitMap &map) {
+    getOrCreateAffectedBits(inst, map) |= bits;
+  }
+
+  void setAffectedBits(SILInstruction *inst, TypeTreeLeafTypeRange range,
+                       InstToBitMap &map) {
+    range.setBits(getOrCreateAffectedBits(inst, map));
+  }
+
   void recordLivenessUse(SILInstruction *inst, SmallBitVector const &bits) {
-    getOrCreateLivenessUse(inst) |= bits;
+    setAffectedBits(inst, bits, livenessUses);
   }
 
   void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
-    auto &bits = getOrCreateLivenessUse(inst);
-    range.setBits(bits);
+    setAffectedBits(inst, range, livenessUses);
   }
 
   void recordReinitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
-    auto iter = reinitInsts.find(inst);
-    if (iter == reinitInsts.end()) {
-      iter =
-          reinitInsts.insert({inst, SmallBitVector(getNumSubelements())}).first;
-    }
-    auto &bits = iter->second;
-    range.setBits(bits);
+    setAffectedBits(inst, range, reinitInsts);
+  }
+
+  void recordInitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    setAffectedBits(inst, range, initInsts);
   }
 
   /// Returns true if this is a terminator instruction that although it doesn't
@@ -875,7 +885,7 @@ struct UseState {
     {
       auto iter = initInsts.find(inst);
       if (iter != initInsts.end()) {
-        if (span.setIntersection(iter->second))
+        if (span.intersects(iter->second))
           return true;
       }
     }
@@ -1020,7 +1030,7 @@ void UseState::initializeLiveness(
             llvm::dbgs()
             << "Found in/in_guaranteed/inout/inout_aliasable argument as "
                "an init... adding mark_must_check as init!\n");
-        initInsts.insert({address, liveness.getTopLevelSpan()});
+        recordInitUse(address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
         break;
       case swift::SILArgumentConvention::Indirect_Out:
@@ -1051,14 +1061,14 @@ void UseState::initializeLiveness(
         // later invariants that we assert upon remain true.
         LLVM_DEBUG(llvm::dbgs() << "Found move only arg closure box use... "
                                    "adding mark_must_check as init!\n");
-        initInsts.insert({address, liveness.getTopLevelSpan()});
+        recordInitUse(address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
       }
     } else if (auto *box = dyn_cast<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs() << "Found move only var allocbox use... "
                  "adding mark_must_check as init!\n");
-      initInsts.insert({address, liveness.getTopLevelSpan()});
+      recordInitUse(address, liveness.getTopLevelSpan());
       liveness.initializeDef(address, liveness.getTopLevelSpan());
     }
   }
@@ -1069,7 +1079,7 @@ void UseState::initializeLiveness(
           stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found ref_element_addr use... "
                                "adding mark_must_check as init!\n");
-    initInsts.insert({address, liveness.getTopLevelSpan()});
+    recordInitUse(address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
@@ -1079,7 +1089,7 @@ void UseState::initializeLiveness(
           dyn_cast<GlobalAddrInst>(stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found global_addr use... "
                                "adding mark_must_check as init!\n");
-    initInsts.insert({address, liveness.getTopLevelSpan()});
+    recordInitUse(address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
@@ -1752,8 +1762,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!leafRange)
       return false;
 
-    assert(!useState.initInsts.count(user));
-    useState.initInsts.insert({user, *leafRange});
+    useState.recordInitUse(user, *leafRange);
     return true;
   }
 
