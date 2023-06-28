@@ -3200,15 +3200,18 @@ namespace {
         // presence in the C++ standard library will cause overloading
         // ambiguities or other type checking errors in Swift.
         auto isAlternativeCStdlibFunctionFromTextualHeader =
-            [](const clang::FunctionDecl *d) -> bool {
+            [this](const clang::FunctionDecl *d) -> bool {
           // stdlib.h might be a textual header in libc++'s module map.
           // in this case, check for known ambiguous functions by their name
           // instead of checking if they come from the `std` module.
           if (!d->getDeclName().isIdentifier())
             return false;
-          return d->getName() == "abs" || d->getName() == "div" ||
-              d->getName() == "strstr" || d->getName() == "sin" ||
-              d->getName() == "cos" || d->getName() == "exit";
+          if (d->getName() == "abs" || d->getName() == "div")
+            return true;
+          if (Impl.SwiftContext.LangOpts.Target.isOSDarwin())
+            return d->getName() == "strstr" || d->getName() == "sin" ||
+                   d->getName() == "cos" || d->getName() == "exit";
+          return false;
         };
         if (decl->getOwningModule() &&
             (decl->getOwningModule()
