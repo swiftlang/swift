@@ -902,8 +902,8 @@ static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
 static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
                                      const EnumTypeLayoutEntry *typeLayoutEntry,
                                           GenericSignature genericSig) {
-  if (!typeLayoutEntry->layoutString(IGM, genericSig) &&
-      !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry) ||
+  if ((!typeLayoutEntry->layoutString(IGM, genericSig) &&
+      !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) ||
       typeLayoutEntry->isSingleton()) {
     return nullptr;
   } else if (!typeLayoutEntry->isFixedSize(IGM)) {
