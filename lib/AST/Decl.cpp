@@ -7170,7 +7170,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // other stored properties.
   if (hasInitAccessor()) {
     if (auto *init = getAccessor(AccessorKind::Init))
-      return init->getAttrs().hasAttribute<InitializesAttr>();
+      return true;
   }
 
   // If this is a computed property, it's not memberwise initialized unless
