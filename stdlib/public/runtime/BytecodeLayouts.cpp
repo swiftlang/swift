@@ -652,6 +652,11 @@ swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   return swift_generic_initWithTake(dest, src, metadata);
 }
 
+extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                                   const Metadata *metadata) {
+  return 0;
+}
+
 extern "C"
 unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
                                      const Metadata *metadata) {

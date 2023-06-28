@@ -118,6 +118,9 @@ swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
                                                swift::ValueBuffer *src,
                                                const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
+unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                        const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
 unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
                                      const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
