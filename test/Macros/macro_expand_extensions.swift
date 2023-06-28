@@ -10,7 +10,7 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
-@attached(extension, names: named(requirement))
+@attached(extension, conformances: P, names: named(requirement))
 macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceMacro")
 
 protocol P {

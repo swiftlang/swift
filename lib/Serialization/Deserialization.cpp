@@ -2986,6 +2986,7 @@ static llvm::Optional<swift::MacroRole> getActualMacroRole(uint8_t context) {
   CASE(Peer)
   CASE(Conformance)
   CASE(CodeItem)
+  CASE(Extension)
 #undef CASE
   }
   return llvm::None;
@@ -5857,14 +5858,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         uint8_t rawMacroSyntax;
         uint8_t rawMacroRole;
         uint64_t numNames;
+        uint64_t numConformances;
         ArrayRef<uint64_t> introducedDeclNames;
         serialization::decls_block::MacroRoleDeclAttrLayout::
             readRecord(scratch, isImplicit, rawMacroSyntax, rawMacroRole,
-                       numNames, introducedDeclNames);
+                       numNames, numConformances, introducedDeclNames);
         auto role = *getActualMacroRole(rawMacroRole);
         SmallVector<MacroIntroducedDeclName, 1> names;
         unsigned nameIdx = 0;
-        while (nameIdx < introducedDeclNames.size()) {
+        while (nameIdx < numNames) {
           auto kind = getActualMacroIntroducedDeclNameKind(
               (uint8_t)introducedDeclNames[nameIdx++]);
           auto baseName =
@@ -5889,10 +5891,22 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           names.push_back(MacroIntroducedDeclName(*kind, name));
         }
 
+        introducedDeclNames = introducedDeclNames.slice(numNames);
+        SmallVector<TypeExpr *, 1> conformances;
+        for (TypeID conformanceID : introducedDeclNames) {
+          auto conformance = MF.getTypeChecked(conformanceID);
+          if (!conformance) {
+            return conformance.takeError();
+          }
+
+          conformances.push_back(
+              TypeExpr::createImplicit(conformance.get(), ctx));
+        }
+
         Attr = MacroRoleAttr::create(
             ctx, SourceLoc(), SourceRange(),
             static_cast<MacroSyntax>(rawMacroSyntax), SourceLoc(), role, names,
-            SourceLoc(), isImplicit);
+            conformances, SourceLoc(), isImplicit);
         break;
       }
 
