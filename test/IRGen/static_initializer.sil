@@ -185,6 +185,17 @@ bb0:
   return %1 : $TestArray
 }
 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @bare_static_array() {{.*}} {
+sil @bare_static_array : $@convention(thin) () -> Int32 {
+bb0:
+  // CHECK: %0 = load i32, {{.*}}@static_array
+  // CHECK: ret i32 %0
+  %0 = global_value [bare] @static_array : $TestArrayStorage
+  %1 = ref_element_addr %0 : $TestArrayStorage, #TestArrayStorage.count
+  %2 = load %1 : $*Int32
+  return %2 : $Int32
+}
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T18static_initializer16TestArrayStorageC* @phi_nodes(i1 %0, %T18static_initializer16TestArrayStorageC* %1)
 // CHECK: [[T0:%.*]] = call %swift.refcounted* @swift_initStaticObject
 // CHECK: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to %T18static_initializer16TestArrayStorageC*

@@ -22,11 +22,11 @@ let stripObjectHeadersPass = FunctionPass(name: "strip-object-headers") {
   for inst in function.instructions {
     switch inst {
     case let gv as GlobalValueInst:
-      if !gv.isBare && !gv.needObjectHeader(context) {
+      if !gv.isBare && !gv.needObjectHeader() {
         gv.setIsBare(context)
       }
     case let ar as AllocRefInst:
-      if !ar.isBare && !ar.needObjectHeader(context) {
+      if !ar.isBare && !ar.needObjectHeader() {
         ar.setIsBare(context)
       }
     default:
@@ -36,7 +36,7 @@ let stripObjectHeadersPass = FunctionPass(name: "strip-object-headers") {
 }
 
 private extension Value {
-  func needObjectHeader(_ context: FunctionPassContext) -> Bool {
+  func needObjectHeader() -> Bool {
     var walker = IsBareObjectWalker()
     return walker.walkDownUses(ofValue: self, path: SmallProjectionPath()) == .abortWalk
   }
@@ -47,6 +47,7 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
 
   mutating func walkDown(value operand: Operand, path: Path) -> WalkResult {
     switch operand.instruction {
+    // White-list all instructions which don't use the object header.
     case is StructInst, is TupleInst, is EnumInst,
          is StructExtractInst, is TupleExtractInst, is UncheckedEnumDataInst,
          is DestructureStructInst, is DestructureTupleInst,
@@ -62,6 +63,7 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
 
   mutating func leafUse(value operand: Operand, path: SmallProjectionPath) -> WalkResult {
     switch operand.instruction {
+    // White-list all instructions which don't use the object header.
     case is RefElementAddrInst, is RefTailAddrInst,
          is DeallocRefInst, is DeallocStackRefInst, is SetDeallocatingInst,
          is DebugValueInst, is FixLifetimeInst:
