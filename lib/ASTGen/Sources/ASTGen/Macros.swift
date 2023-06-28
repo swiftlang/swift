@@ -816,6 +816,14 @@ func expandAttachedMacroIPC(
     parentDeclSyntax = nil
   }
 
+  let extendedTypeSyntax: PluginMessage.Syntax?
+  if (!qualifiedType.isEmpty) {
+    let typeSyntax: TypeSyntax = "\(raw: qualifiedType)"
+    extendedTypeSyntax = .init(syntax: Syntax(typeSyntax), in: parentDeclSourceFilePtr!)!
+  } else {
+    extendedTypeSyntax = nil
+  }
+
   // Send the message.
   let message = HostToPluginMessage.expandAttachedMacro(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
@@ -824,7 +832,8 @@ func expandAttachedMacroIPC(
     qualifiedType: qualifiedType,
     attributeSyntax: customAttributeSyntax,
     declSyntax: declSyntax,
-    parentDeclSyntax: parentDeclSyntax)
+    parentDeclSyntax: parentDeclSyntax,
+    extendedTypeSyntax: extendedTypeSyntax)
   do {
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
