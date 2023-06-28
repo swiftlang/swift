@@ -321,6 +321,10 @@ struct TypeTreeLeafTypeRange {
       SmallVectorImpl<std::pair<SILValue, TypeTreeLeafTypeRange>>
           &resultingProjections);
 
+  static void visitContiguousRanges(
+      SmallBitVector const &bits,
+      llvm::function_ref<void(TypeTreeLeafTypeRange)> callback);
+
   bool operator==(const TypeTreeLeafTypeRange &other) const {
     return startEltOffset == other.startEltOffset &&
            endEltOffset == other.endEltOffset;
@@ -1215,6 +1219,11 @@ public:
     assert(isInitialized());
     defs.setFrozen();
     defBlocks.setFrozen();
+  }
+
+  void initializeDef(SILInstruction *def, SmallBitVector const &bits) {
+    TypeTreeLeafTypeRange::visitContiguousRanges(
+        bits, [&](auto range) { initializeDef(def, range); });
   }
 
   void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {

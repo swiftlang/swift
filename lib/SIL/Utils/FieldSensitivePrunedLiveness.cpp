@@ -474,6 +474,29 @@ void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
   }
 }
 
+void TypeTreeLeafTypeRange::visitContiguousRanges(
+    SmallBitVector const &bits,
+    llvm::function_ref<void(TypeTreeLeafTypeRange)> callback) {
+  if (bits.size() == 0)
+    return;
+
+  llvm::Optional<unsigned> current = llvm::None;
+  for (unsigned bit = 0, size = bits.size(); bit < size; ++bit) {
+    auto isSet = bits.test(bit);
+    if (current) {
+      if (!isSet) {
+        callback(TypeTreeLeafTypeRange(*current, bit));
+        current = llvm::None;
+      }
+    } else if (isSet) {
+      current = bit;
+    }
+  }
+  if (current) {
+    callback(TypeTreeLeafTypeRange(*current, bits.size()));
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                    MARK: FieldSensitivePrunedLiveBlocks
 //===----------------------------------------------------------------------===//
