@@ -54,3 +54,11 @@ struct Outer {
 
 // CHECK: Wrapped.requirement
 requiresP(Outer.Nested<Wrapped>.self)
+
+#if TEST_DIAGNOSTICS
+func testLocal() {
+  @DelegatedConformance
+  struct Local<Element> {}
+  // expected-error@-1{{local type cannot have attached extension macro}}
+}
+#endif

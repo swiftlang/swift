@@ -1487,6 +1487,11 @@ ExpandExtensionMacros::evaluate(Evaluator &evaluator,
 llvm::Optional<unsigned>
 swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
                         MacroRole role, NominalTypeDecl *nominal) {
+  if (nominal->getDeclContext()->isLocalContext()) {
+    nominal->diagnose(diag::local_extension_macro);
+    return llvm::None;
+  }
+
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
                                                  role);
