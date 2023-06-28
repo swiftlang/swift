@@ -342,6 +342,21 @@ bool Implementation::gatherUses(SILValue value) {
         return false;
       }
 
+      // Check if our use type is trivial. In such a case, just treat this as a
+      // liveness use.
+      SILType type = nextUse->get()->getType();
+      if (type.isTrivial(nextUse->getUser()->getFunction())) {
+        LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), *leafRange,
+                              false /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), *leafRange,
+                              false /*is lifetime ending*/);
+        instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+        continue;
+      }
+
       LLVM_DEBUG(llvm::dbgs() << "        Found lifetime ending use!\n");
       destructureNeedingUses.push_back(nextUse);
       blocksToUses.insert(nextUse->getParentBlock(),
