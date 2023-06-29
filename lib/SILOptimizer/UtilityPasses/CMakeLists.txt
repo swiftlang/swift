@@ -32,6 +32,5 @@ target_sources(swiftSILOptimizer PRIVATE
   StripDebugInfo.cpp
   UnitTestRunner.cpp
   OwnershipDumper.cpp
-  OwnershipVerifierTextualErrorDumper.cpp
-  ParseTestSpecification.cpp)
+  OwnershipVerifierTextualErrorDumper.cpp)
   
