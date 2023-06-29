@@ -867,8 +867,10 @@ static uint8_t getRawMacroRole(MacroRole role) {
   case MacroRole::MemberAttribute: return 3;
   case MacroRole::Member: return 4;
   case MacroRole::Peer: return 5;
-  case MacroRole::Conformance: return 6;
   case MacroRole::CodeItem: return 7;
+  // Use the same raw macro role for conformance and extension
+  // in ASTGen.
+  case MacroRole::Conformance:
   case MacroRole::Extension: return 8;
   }
 }
@@ -1156,7 +1158,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   std::string extendedType;
   {
     llvm::raw_string_ostream OS(extendedType);
-    if (role == MacroRole::Extension) {
+    if (role == MacroRole::Extension || role == MacroRole::Conformance) {
       auto *nominal = dyn_cast<NominalTypeDecl>(attachedTo);
       PrintOptions options;
       options.FullyQualifiedExtendedTypesIfAmbiguous = true;
@@ -1474,13 +1476,27 @@ ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;
-  nominal->forEachAttachedMacro(MacroRole::Extension,
-      [&](CustomAttr *attr, MacroDecl *macro) {
-        if (auto bufferID = expandExtensions(attr, macro,
-                                             MacroRole::Extension,
-                                             nominal))
-          bufferIDs.push_back(*bufferID);
-      });
+  for (auto customAttrConst : nominal->getSemanticAttrs().getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto *macro = nominal->getResolvedMacro(customAttr);
+
+    if (!macro)
+      continue;
+
+    // Prefer the extension role
+    MacroRole role;
+    if (macro->getMacroRoles().contains(MacroRole::Extension)) {
+      role = MacroRole::Extension;
+    } else if (macro->getMacroRoles().contains(MacroRole::Conformance)) {
+      role = MacroRole::Conformance;
+    } else {
+      continue;
+    }
+
+    if (auto bufferID = expandExtensions(customAttr, macro,
+                                         role, nominal))
+      bufferIDs.push_back(*bufferID);
+  }
 
   return nominal->getASTContext().AllocateCopy(bufferIDs);
 }
