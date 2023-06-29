@@ -11,7 +11,8 @@ func test() {
     let _ =  pow(x, y)
 
     let _ = abs(x)
-    let _ = div(42, 2)
+    // https://github.com/apple/swift/issues/67006
+    // let _ = div(42, 2)
     let _ = sin(x)
     let _ = cos(x)
     let _ = strstr("a", "aaa")
