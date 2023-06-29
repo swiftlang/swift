@@ -13607,14 +13607,12 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
       return nullptr;
 
     auto genericParams = genericContext->getGenericParams();
-    if (!genericParams || genericParams->size() == 0) {
+    if (!genericParams) {
       // If declaration is a non-generic typealias, let's point
       // to the underlying generic declaration.
       if (auto *TA = dyn_cast<TypeAliasDecl>(decl)) {
-        if (TA->isGeneric())
-          return nullptr;
-        if (auto underlying = TA->getUnderlyingType()->getAnyNominal())
-          return getGenericParams(underlying);
+        if (auto *UGT = TA->getUnderlyingType()->getAs<AnyGenericType>())
+          return getGenericParams(UGT->getDecl());
       }
     }
 
@@ -13625,7 +13623,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     return SolutionKind::Error;
 
   auto genericParams = getGenericParams(decl);
-  if (!genericParams || genericParams->size() == 0) {
+  if (!genericParams) {
     // FIXME: Record an error here that we're ignoring the parameters.
     return SolutionKind::Solved;
   }
