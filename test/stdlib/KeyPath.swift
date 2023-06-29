@@ -1100,7 +1100,7 @@ if #available(SwiftStdlib 5.9, *) {
     let catNameKp = _createOffsetBasedKeyPath(
       root: Cat.self,
       value: String.self,
-      offset: 16
+      offset: 2 * MemoryLayout<UnsafeRawPointer>.size
     ) as? KeyPath<Cat, String>
 
     expectNotNil(catNameKp)
