@@ -4833,8 +4833,9 @@ public:
             "unwind dest of 'yield' must be uniquely used");
   }
 
-  void checkSelectEnumCases(SelectEnumInstBase *I) {
-    EnumDecl *eDecl = I->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+  void checkSelectEnumCases(SelectEnumOperation SEO) {
+    EnumDecl *eDecl =
+        SEO.getEnumOperand()->getType().getEnumOrBoundGenericEnum();
     require(eDecl, "select_enum operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -4843,10 +4844,10 @@ public:
     eDecl->getAllElements(unswitchedElts);
 
     // Verify the set of enum cases we dispatch on.
-    for (unsigned i = 0, e = I->getNumCases(); i < e; ++i) {
+    for (unsigned i = 0, e = SEO.getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILValue result;
-      std::tie(elt, result) = I->getCase(i);
+      std::tie(elt, result) = SEO.getCase(i);
 
       require(elt->getDeclContext() == eDecl,
               "select_enum dispatches on enum element that is not part of "
@@ -4856,34 +4857,35 @@ public:
       unswitchedElts.erase(elt);
 
       // The result value must match the type of the instruction.
-      requireSameType(result->getType(), I->getType(),
-                    "select_enum case operand must match type of instruction");
+      requireSameType(
+          result->getType(), SEO->getType(),
+          "select_enum case operand must match type of instruction");
     }
 
     // If the select is non-exhaustive, we require a default.
     bool isExhaustive =
         eDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
                                        F.getResilienceExpansion());
-    require((isExhaustive && unswitchedElts.empty()) || I->hasDefault(),
-            "nonexhaustive select_enum must have a default destination");
-    if (I->hasDefault()) {
-      requireSameType(I->getDefaultResult()->getType(),
-                  I->getType(),
-                  "select_enum default operand must match type of instruction");
+    require((isExhaustive && unswitchedElts.empty()) || SEO.hasDefault(),
+            "nonexhaustive select_:enum must have a default destination");
+    if (SEO.hasDefault()) {
+      requireSameType(
+          SEO.getDefaultResult()->getType(), SEO->getType(),
+          "select_enum default operand must match type of instruction");
     }
   }
 
   void checkSelectEnumInst(SelectEnumInst *SEI) {
     require(SEI->getEnumOperand()->getType().isObject(),
             "select_enum operand must be an object");
-    
-    checkSelectEnumCases(SEI);
+
+    checkSelectEnumCases(SelectEnumOperation(SEI));
   }
   void checkSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     require(SEI->getEnumOperand()->getType().isAddress(),
             "select_enum_addr operand must be an address");
-    
-    checkSelectEnumCases(SEI);
+
+    checkSelectEnumCases(SelectEnumOperation(SEI));
   }
 
   void checkSwitchValueInst(SwitchValueInst *SVI) {

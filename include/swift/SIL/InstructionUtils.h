@@ -257,7 +257,7 @@ private:
 /// return SILValue().
 SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 
-/// An ADT for writing generic code against conversion instructions.
+/// A wrapper type for writing generic code against conversion instructions.
 struct ConversionOperation {
   SingleValueInstruction *inst = nullptr;
 
@@ -329,6 +329,101 @@ struct ConversionOperation {
   }
 
   SILValue getConverted() { return inst->getOperand(0); }
+};
+
+/// A wrapper type for writing generic code against SelectEnumAddrInst and
+/// SelectEnumInst.
+///
+/// We use this instead of SelectEnumInstBase in order to avoid the need for
+/// templating SelectEnumInstBase.
+class SelectEnumOperation {
+  PointerUnion<SelectEnumAddrInst *, SelectEnumInst *> value;
+
+public:
+  SelectEnumOperation(SelectEnumAddrInst *seai) : value(seai) {}
+  SelectEnumOperation(SelectEnumInst *seai) : value(seai) {}
+  SelectEnumOperation(SILInstruction *i) : value(nullptr) {
+    if (auto *seai = dyn_cast<SelectEnumAddrInst>(i)) {
+      value = seai;
+      return;
+    }
+
+    if (auto *sei = dyn_cast<SelectEnumInst>(i)) {
+      value = sei;
+      return;
+    }
+  }
+
+  SelectEnumOperation(const SILInstruction *i)
+      : SelectEnumOperation(const_cast<SILInstruction *>(i)) {}
+
+  operator SingleValueInstruction *() const {
+    if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
+      return seai;
+    return value.get<SelectEnumInst *>();
+  }
+
+  SingleValueInstruction *operator*() const {
+    if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
+      return seai;
+    return value.get<SelectEnumInst *>();
+  }
+
+  SingleValueInstruction *operator->() const {
+    if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
+      return seai;
+    return value.get<SelectEnumInst *>();
+  }
+
+  operator bool() const { return bool(value); }
+
+  SILValue getOperand() {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getOperand();
+    return value.get<SelectEnumAddrInst *>()->getOperand();
+  }
+
+  SILValue getEnumOperand() { return getOperand(); }
+
+  const Operand &getEnumOperandRef() {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getEnumOperandRef();
+    return value.get<SelectEnumAddrInst *>()->getEnumOperandRef();
+  }
+
+  unsigned getNumCases() const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getNumCases();
+    return value.get<SelectEnumAddrInst *>()->getNumCases();
+  }
+
+  std::pair<EnumElementDecl *, SILValue> getCase(unsigned i) const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCase(i);
+    return value.get<SelectEnumAddrInst *>()->getCase(i);
+  }
+  /// Return the value that will be used as the result for the specified enum
+  /// case.
+  SILValue getCaseResult(EnumElementDecl *D) {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseResult(D);
+    return value.get<SelectEnumAddrInst *>()->getCaseResult(D);
+  }
+
+  /// If the default refers to exactly one case decl, return it.
+  NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
+
+  bool hasDefault() const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->hasDefault();
+    return value.get<SelectEnumAddrInst *>()->hasDefault();
+  }
+
+  SILValue getDefaultResult() const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getDefaultResult();
+    return value.get<SelectEnumAddrInst *>()->getDefaultResult();
+  }
 };
 
 } // end namespace swift

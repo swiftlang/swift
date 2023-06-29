@@ -6504,52 +6504,11 @@ public:
   }
 };
 
-// Abstract base class of all select instructions like select_enum.
-// The template parameter represents a type of case values
-// to be compared with the operand of a select instruction.
-//
-// Subclasses must provide tail allocated storage.
-// The first operand is the operand of select_xxx instruction. The rest of
-// the operands are the case values and results of a select instruction.
-template <class Derived, class T, class Base = SingleValueInstruction>
-class SelectInstBase : public Base {
-public:
-  template <typename... Args>
-  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type,
-                 Args &&... otherArgs)
-      : Base(kind, Loc, type, std::forward<Args>(otherArgs)...) {}
-
-  SILValue getOperand() const { return getAllOperands()[0].get(); }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return static_cast<const Derived *>(this)->getAllOperands();
-  }
-  MutableArrayRef<Operand> getAllOperands() {
-    return static_cast<Derived *>(this)->getAllOperands();
-  }
-
-  std::pair<T, SILValue> getCase(unsigned i) const {
-    return static_cast<const Derived *>(this)->getCase(i);
-  }
-
-  unsigned getNumCases() const {
-    return static_cast<const Derived *>(this)->getNumCases();
-  }
-
-  bool hasDefault() const {
-    return static_cast<const Derived *>(this)->hasDefault();
-  }
-
-  SILValue getDefaultResult() const {
-    return static_cast<const Derived *>(this)->getDefaultResult();
-  }
-};
-
 /// Common base class for the select_enum and select_enum_addr instructions,
 /// which select one of a set of possible results based on the case of an enum.
-class SelectEnumInstBase
-    : public SelectInstBase<SelectEnumInstBase, EnumElementDecl *> {
-  USE_SHARED_UINT8;
+template <typename DerivedTy, typename BaseTy>
+class SelectEnumInstBase : public BaseTy {
+  TEMPLATE_USE_SHARED_UINT8(BaseTy);
 
   // Tail-allocated after the operands is an array of `NumCases`
   // EnumElementDecl* pointers, referencing the case discriminators for each
@@ -6561,20 +6520,22 @@ class SelectEnumInstBase
   }
 
 protected:
+  template <typename... Rest>
   SelectEnumInstBase(SILInstructionKind kind, SILDebugLocation debugLoc,
                      SILType type, bool defaultValue,
                      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                     ProfileCounter DefaultCount)
-      : SelectInstBase(kind, debugLoc, type) {
+                     ProfileCounter DefaultCount, Rest &&...rest)
+      : BaseTy(kind, debugLoc, type, std::forward<Rest>(rest)...) {
     sharedUInt8().SelectEnumInstBase.hasDefault = defaultValue;
   }
-  template <typename SELECT_ENUM_INST>
-  static SELECT_ENUM_INST *createSelectEnum(
-      SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
-      SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind);
+  template <typename... RestTys>
+  static DerivedTy *
+  createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
+                   SILValue DefaultValue,
+                   ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                   SILModule &M,
+                   llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                   ProfileCounter DefaultCount, RestTys &&...restArgs);
 
 public:
   ArrayRef<Operand> getAllOperands() const;
@@ -6601,9 +6562,6 @@ public:
     // didn't find anything.
     return getDefaultResult();
   }
-  
-  /// If the default refers to exactly one case decl, return it.
-  NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
   bool hasDefault() const {
     return sharedUInt8().SelectEnumInstBase.hasDefault;
@@ -6618,45 +6576,67 @@ public:
     return getAllOperands().size() - 1 - hasDefault();
   }
 
+  /// If the default refers to exactly one case decl, return it.
+  NullablePtr<EnumElementDecl> getUniqueCaseForDefault() {
+    assert(this->hasDefault() && "doesn't have a default");
+    auto enumValue = getEnumOperand();
+    SILType enumType = enumValue->getType();
+
+    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    assert(decl && "switch_enum operand is not an enum");
+
+    if (!enumType.isEffectivelyExhaustiveEnumType(this->getFunction())) {
+      return nullptr;
+    }
+
+    llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
+    for (auto elt : decl->getAllElements())
+      unswitchedElts.insert(elt);
+
+    for (unsigned i = 0, e = this->getNumCases(); i != e; ++i) {
+      auto Entry = this->getCase(i);
+      unswitchedElts.erase(Entry.first);
+    }
+
+    if (unswitchedElts.size() == 1)
+      return *unswitchedElts.begin();
+
+    return nullptr;
+  }
+
   /// If there is a single case that returns a literal "true" value (an
   /// "integer_literal $Builtin.Int1, 1" value), return it.
   ///
   /// FIXME: This is used to interoperate with passes that reasoned about the
   /// old enum_is_tag insn. Ideally those passes would become general enough
   /// not to need this.
-  NullablePtr<EnumElementDecl> getSingleTrueElement() const;
-};
+  NullablePtr<EnumElementDecl> getSingleTrueElement() const {
+    auto SEIType = static_cast<const DerivedTy *>(this)
+                       ->getType()
+                       .template getAs<BuiltinIntegerType>();
+    if (!SEIType)
+      return nullptr;
+    if (SEIType->getWidth() != BuiltinIntegerWidth::fixed(1))
+      return nullptr;
 
-/// A select enum inst that produces a static OwnershipKind.
-class OwnershipForwardingSelectEnumInstBase : public SelectEnumInstBase,
-                                              public ForwardingInstruction {
-protected:
-  OwnershipForwardingSelectEnumInstBase(
-      SILInstructionKind kind, SILDebugLocation debugLoc, SILType type,
-      bool defaultValue, llvm::Optional<ArrayRef<ProfileCounter>> caseCounts,
-      ProfileCounter defaultCount, ValueOwnershipKind ownershipKind)
-      : SelectEnumInstBase(kind, debugLoc, type, defaultValue, caseCounts,
-                           defaultCount),
-        ForwardingInstruction(kind, ownershipKind) {
-    assert(classof(kind) && "classof missing subclass");
-  }
-
-public:
-  static bool classof(SILNodePointer node) {
-    if (auto *i = dyn_cast<SILInstruction>(node.get()))
-      return classof(i);
-    return false;
-  }
-
-  static bool classof(const SILInstruction *i) { return classof(i->getKind()); }
-
-  static bool classof(SILInstructionKind kind) {
-    switch (kind) {
-    case SILInstructionKind::SelectEnumInst:
-      return true;
-    default:
-      return false;
+    // Try to find a single literal "true" case.
+    llvm::Optional<EnumElementDecl *> TrueElement;
+    for (unsigned i = 0, e = getNumCases(); i < e; ++i) {
+      auto casePair = getCase(i);
+      if (auto intLit = dyn_cast<IntegerLiteralInst>(casePair.second)) {
+        if (intLit->getValue() == APInt(1, 1)) {
+          if (!TrueElement)
+            TrueElement = casePair.first;
+          else
+            // Use Optional(nullptr) to represent more than one.
+            TrueElement = llvm::Optional<EnumElementDecl *>(nullptr);
+        }
+      }
     }
+
+    if (!TrueElement || !*TrueElement)
+      return nullptr;
+    return *TrueElement;
   }
 };
 
@@ -6664,12 +6644,14 @@ public:
 class SelectEnumInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectEnumInst, SelectEnumInst,
-          OwnershipForwardingSelectEnumInstBase, EnumElementDecl *> {
+          SelectEnumInstBase<SelectEnumInst,
+                             OwnershipForwardingSingleValueInstruction>,
+          EnumElementDecl *> {
   friend SILBuilder;
+  friend SelectEnumInstBase<SelectEnumInst,
+                            OwnershipForwardingSingleValueInstruction>;
 
-private:
-  friend SelectEnumInstBase;
-
+public:
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                  bool DefaultValue, ArrayRef<SILValue> CaseValues,
                  ArrayRef<EnumElementDecl *> CaseDecls,
@@ -6696,20 +6678,20 @@ private:
 class SelectEnumAddrInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectEnumAddrInst, SelectEnumAddrInst,
-          SelectEnumInstBase, EnumElementDecl *> {
+          SelectEnumInstBase<SelectEnumAddrInst, SingleValueInstruction>,
+          EnumElementDecl *> {
   friend SILBuilder;
-  friend SelectEnumInstBase;
+  friend SelectEnumInstBase<SelectEnumAddrInst, SingleValueInstruction>;
 
+public:
   SelectEnumAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                      bool DefaultValue, ArrayRef<SILValue> CaseValues,
                      ArrayRef<EnumElementDecl *> CaseDecls,
                      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                     ProfileCounter DefaultCount,
-                     ValueOwnershipKind forwardingOwnershipKind)
+                     ProfileCounter DefaultCount)
       : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
                                             bool(DefaultValue), CaseCounts,
                                             DefaultCount) {
-    (void)forwardingOwnershipKind;
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -10553,6 +10535,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
+  case SILInstructionKind::SelectEnumInst:
     return true;
   default:
     return false;
@@ -10780,31 +10763,25 @@ inline MutableArrayRef<Operand> AllocRefInstBase::getAllOperands() {
   llvm_unreachable("Unhandled AllocRefInstBase subclass");
 }
 
-inline ArrayRef<Operand> SelectEnumInstBase::getAllOperands() const {
-  // If the size of the subclasses are equal, then all of this compiles away.
-  if (auto I = dyn_cast<SelectEnumInst>(this))
-    return I->getAllOperands();
-  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
-    return I->getAllOperands();
-  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+template <typename DerivedTy, typename BaseTy>
+inline ArrayRef<Operand>
+SelectEnumInstBase<DerivedTy, BaseTy>::getAllOperands() const {
+  const auto &I = static_cast<const DerivedTy &>(*this);
+  return I.getAllOperands();
 }
 
-inline MutableArrayRef<Operand> SelectEnumInstBase::getAllOperands() {
-  // If the size of the subclasses are equal, then all of this compiles away.
-  if (auto I = dyn_cast<SelectEnumInst>(this))
-    return I->getAllOperands();
-  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
-    return I->getAllOperands();
-  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+template <typename DerivedTy, typename BaseTy>
+inline MutableArrayRef<Operand>
+SelectEnumInstBase<DerivedTy, BaseTy>::getAllOperands() {
+  auto &I = static_cast<DerivedTy &>(*this);
+  return I.getAllOperands();
 }
 
-inline EnumElementDecl **SelectEnumInstBase::getEnumElementDeclStorage() {
-  // If the size of the subclasses are equal, then all of this compiles away.
-  if (auto I = dyn_cast<SelectEnumInst>(this))
-    return I->getTrailingObjects<EnumElementDecl*>();
-  if (auto I = dyn_cast<SelectEnumAddrInst>(this))
-    return I->getTrailingObjects<EnumElementDecl*>();
-  llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+template <typename DerivedTy, typename BaseTy>
+inline EnumElementDecl **
+SelectEnumInstBase<DerivedTy, BaseTy>::getEnumElementDeclStorage() {
+  auto &I = static_cast<DerivedTy &>(*this);
+  return I.template getTrailingObjects<EnumElementDecl *>();
 }
 
 inline void SILSuccessor::pred_iterator::cacheBasicBlock() {
@@ -10824,7 +10801,6 @@ inline bool Operand::isTypeDependent() const {
 inline bool ForwardingInstruction::isa(SILInstructionKind kind) {
   return OwnershipForwardingSingleValueInstruction::classof(kind) ||
          OwnershipForwardingTermInst::classof(kind) ||
-         OwnershipForwardingSelectEnumInstBase::classof(kind) ||
          OwnershipForwardingMultipleValueInstruction::classof(kind);
 }
 
@@ -10836,8 +10812,6 @@ inline ForwardingInstruction *ForwardingInstruction::get(SILInstruction *inst) {
   if (auto *result = dyn_cast<OwnershipForwardingSingleValueInstruction>(inst))
     return result;
   if (auto *result = dyn_cast<OwnershipForwardingTermInst>(inst))
-    return result;
-  if (auto *result = dyn_cast<OwnershipForwardingSelectEnumInstBase>(inst))
     return result;
   if (auto *result =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
