@@ -554,6 +554,7 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
   SmallVector<MissingDecl *, 4> unexpandedDecls;
   for (auto &entry : TopLevelAuxiliaryDecls) {
     for (auto &decl : entry.second) {
+      (void) decl;
       unexpandedDecls.append(entry.second.begin(), entry.second.end());
     }
   }
