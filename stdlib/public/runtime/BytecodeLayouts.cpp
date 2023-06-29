@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <type_traits>
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
