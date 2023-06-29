@@ -177,7 +177,7 @@ public:
 
   Kind getKind() const { return SignatureAndKind.getInt(); }
 
-  TypeArrayView<GenericTypeParamType> getGenericParams() const;
+  ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
   /// Retrieve the existential type for an opened existential environment.
   Type getOpenedExistentialType() const;

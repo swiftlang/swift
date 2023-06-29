@@ -241,7 +241,7 @@ AssociatedTypeDecl *PropertyBag::getAssociatedType(Identifier name) {
 /// Compute the interface type for a range of symbols.
 static Type
 getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
-                      TypeArrayView<GenericTypeParamType> genericParams,
+                      ArrayRef<GenericTypeParamType *> genericParams,
                       const PropertyMap &map) {
   auto &ctx = map.getRewriteContext();
   Type result;
@@ -391,12 +391,12 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 }
 
 Type PropertyMap::getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
+                      ArrayRef<GenericTypeParamType *> genericParams) const {
   return getTypeForSymbolRange(term.begin(), term.end(), genericParams, *this);
 }
 
 Type PropertyMap::getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
+                      ArrayRef<GenericTypeParamType *> genericParams) const {
   return getTypeForSymbolRange(term.begin(), term.end(), genericParams, *this);
 }
 
@@ -474,7 +474,7 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
 /// RewriteSystemBuilder::getConcreteSubstitutionSchema().
 Type PropertyMap::getTypeFromSubstitutionSchema(
     Type schema, ArrayRef<Term> substitutions,
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     const MutableTerm &prefix) const {
   assert(!schema->isTypeParameter() && "Must have a concrete type here");
 
