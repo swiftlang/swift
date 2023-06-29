@@ -3174,6 +3174,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureStrictConcurrency(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)
