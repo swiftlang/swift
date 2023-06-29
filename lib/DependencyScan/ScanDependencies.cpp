@@ -1016,20 +1016,6 @@ static void writeJSON(llvm::raw_ostream &out,
                              5,
                              /*trailingComma=*/true);
         out.indent(5 * 2);
-        out << "\"commandLine\": [\n";
-        for (int i = 0, count = swiftTextualDeps->command_line->count;
-             i < count; ++i) {
-          const auto &arg =
-              get_C_string(swiftTextualDeps->command_line->strings[i]);
-          out.indent(6 * 2);
-          out << "\"" << quote(arg) << "\"";
-          if (i != count - 1)
-            out << ",";
-          out << "\n";
-        }
-        out.indent(5 * 2);
-        out << "],\n";
-        out.indent(5 * 2);
         out << "\"compiledModuleCandidates\": [\n";
         for (int i = 0,
                  count = swiftTextualDeps->compiled_module_candidates->count;
@@ -1045,6 +1031,20 @@ static void writeJSON(llvm::raw_ostream &out,
         out.indent(5 * 2);
         out << "],\n";
       }
+      out.indent(5 * 2);
+      out << "\"commandLine\": [\n";
+      for (int i = 0, count = swiftTextualDeps->command_line->count; i < count;
+           ++i) {
+        const auto &arg =
+            get_C_string(swiftTextualDeps->command_line->strings[i]);
+        out.indent(6 * 2);
+        out << "\"" << quote(arg) << "\"";
+        if (i != count - 1)
+          out << ",";
+        out << "\n";
+      }
+      out.indent(5 * 2);
+      out << "],\n";
       bool hasBridgingHeaderPath =
           swiftTextualDeps->bridging_header_path.data &&
           get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0';
