@@ -3417,8 +3417,7 @@ private:
     // If the original parameter type is a vanishing tuple, we want to emit
     // this as if the argument source was wrapped in an extra level of
     // tuple literal.
-    bool origTupleVanishes =
-      origParamType.getVanishingTupleElementPatternType().has_value();
+    bool origTupleVanishes = origParamType.doesTupleVanish();
 
     auto substType = arg.getSubstRValueType();
 
