@@ -5201,7 +5201,11 @@ namespace {
         }
       }
 
-      auto importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
+      auto fieldType = decl->getType();
+      ImportedType importedType = tryImportOptionsTypeForField(fieldType, Impl);
+
+      if (!importedType)
+        importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::objc_property_not_imported, decl),
