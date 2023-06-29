@@ -369,16 +369,46 @@ bool Implementation::gatherUses(SILValue value) {
       continue;
     }
 
-    case OperandOwnership::GuaranteedForwarding:
-      // Look through guaranteed forwarding.
+    case OperandOwnership::GuaranteedForwarding: {
+      // Look through guaranteed forwarding if we have at least one non-trivial
+      // value. If we have all non-trivial values, treat this as a liveness use.
+      SmallVector<SILValue, 8> forwardedValues;
+      auto *fn = nextUse->getUser()->getFunction();
       ForwardingOperand(nextUse).visitForwardedValues([&](SILValue value) {
-        for (auto *use : value->getUses()) {
-          useWorklist.push_back(use);
-        }
+        if (value->getType().isTrivial(fn))
+          return true;
+        forwardedValues.push_back(value);
         return true;
       });
-      continue;
 
+      if (forwardedValues.empty()) {
+        auto leafRange =
+          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
+        if (!leafRange) {
+          LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
+          return false;
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), *leafRange,
+                              false /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), *leafRange,
+                              false /*is lifetime ending*/);
+        instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+        continue;
+      }
+
+      // If we had at least one forwarded value that is non-trivial, we need to
+      // visit those uses.
+      while (!forwardedValues.empty()) {
+        for (auto *use : forwardedValues.pop_back_val()->getUses()) {
+          useWorklist.push_back(use);
+        }
+      }
+      continue;
+    }
     case OperandOwnership::Borrow: {
       // Look through borrows.
       if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser())) {
