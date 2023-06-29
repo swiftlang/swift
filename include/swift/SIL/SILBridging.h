@@ -219,7 +219,7 @@ struct BridgedFunction {
 
   BridgedArgumentConvention getSILArgumentConvention(SwiftInt idx) const {
     swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
-    return castToArgumentConvention(swift::SILArgumentConvention(conv.getParamInfoForSILArg(idx).getConvention()));
+    return castToArgumentConvention(conv.getSILArgumentConvention(idx));
   }
 
   swift::SILType getSILResultType() const {
