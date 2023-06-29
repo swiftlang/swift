@@ -751,29 +751,29 @@ static inline T handleSinglePayloadEnumGenericTag(
     LayoutStringReader &reader, uint8_t *addr,
     std::function<std::optional<T>(const Metadata *, size_t, uint8_t)>
         extraTagBytesHandler,
-    std::function<T(const Metadata *, unsigned, unsigned)> xiHandler) {
+    std::function<T(const Metadata *, unsigned, unsigned, size_t, uint8_t)>
+        xiHandler) {
   auto tagBytesAndOffset = reader.readBytes<uint64_t>();
   auto extraTagBytesPattern = (uint8_t)(tagBytesAndOffset >> 62);
   auto xiTagBytesOffset =
       tagBytesAndOffset & std::numeric_limits<uint32_t>::max();
-  const Metadata *xiType = nullptr;
+  auto numExtraTagBytes = 1 << (extraTagBytesPattern - 1);
+  auto payloadSize = reader.readBytes<size_t>();
+  auto xiType = reader.readBytes<const Metadata *>();
 
   if (extraTagBytesPattern) {
-    auto numExtraTagBytes = 1 << (extraTagBytesPattern - 1);
-    auto payloadSize = reader.readBytes<size_t>();
-    xiType = reader.readBytes<const Metadata *>();
     if (auto result =
             extraTagBytesHandler(xiType, payloadSize, numExtraTagBytes)) {
       return *result;
     }
   } else {
     reader.skip(sizeof(size_t));
-    xiType = reader.readBytes<const Metadata *>();
   }
 
   auto numEmptyCases = reader.readBytes<unsigned>();
 
-  return xiHandler(xiType, xiTagBytesOffset, numEmptyCases);
+  return xiHandler(xiType, xiTagBytesOffset, numEmptyCases, payloadSize,
+                   numExtraTagBytes);
 }
 
 extern "C" unsigned
@@ -803,7 +803,8 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   };
 
   auto xihandler = [addr](const Metadata *xiType, unsigned xiTagBytesOffset,
-                          unsigned numEmptyCases) -> unsigned {
+                          unsigned numEmptyCases, size_t payloadSize,
+                          uint8_t numExtraTagBytes) -> unsigned {
     if (xiType) {
       return xiType->vw_getEnumTagSinglePayload(
           (const OpaqueValue *)(addr + xiTagBytesOffset), numEmptyCases);
@@ -814,6 +815,64 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
 
   return handleSinglePayloadEnumGenericTag<unsigned>(
       reader, addr, extraTagBytesHandler, xihandler);
+}
+
+extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  auto addr = reinterpret_cast<uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+
+  auto extraTagBytesHandler =
+      [=](const Metadata *xiType, size_t payloadSize,
+          uint8_t numExtraTagBytes) -> std::optional<bool> {
+    unsigned payloadNumExtraInhabitants =
+        xiType ? xiType->vw_getNumExtraInhabitants() : 0;
+    if (tag <= payloadNumExtraInhabitants) {
+      return std::nullopt;
+    }
+
+    unsigned noPayloadIndex = tag - 1;
+    unsigned caseIndex = noPayloadIndex - payloadNumExtraInhabitants;
+    unsigned payloadIndex, extraTagIndex;
+    if (payloadSize >= 4) {
+      extraTagIndex = 1;
+      payloadIndex = caseIndex;
+    } else {
+      unsigned payloadBits = payloadSize * 8U;
+      extraTagIndex = 1U + (caseIndex >> payloadBits);
+      payloadIndex = caseIndex & ((1U << payloadBits) - 1U);
+    }
+
+    // Store into the value.
+    if (payloadSize)
+      storeEnumElement(addr, payloadIndex, payloadSize);
+    if (numExtraTagBytes)
+      storeEnumElement(addr + payloadSize, extraTagIndex, numExtraTagBytes);
+
+    return true;
+  };
+
+  auto xihandler = [=](const Metadata *xiType, unsigned xiTagBytesOffset,
+                       unsigned numEmptyCases, size_t payloadSize,
+                       uint8_t numExtraTagBytes) -> bool {
+    unsigned payloadNumExtraInhabitants =
+        xiType ? xiType->vw_getNumExtraInhabitants() : 0;
+    if (tag <= payloadNumExtraInhabitants) {
+      if (numExtraTagBytes != 0)
+        storeEnumElement(addr + payloadSize, 0, numExtraTagBytes);
+
+      if (tag == 0)
+        return true;
+
+      xiType->vw_storeEnumTagSinglePayload(
+          (swift::OpaqueValue *)(addr + xiTagBytesOffset), tag, numEmptyCases);
+    }
+    return true;
+  };
+
+  handleSinglePayloadEnumGenericTag<bool>(reader, addr, extraTagBytesHandler,
+                                          xihandler);
 }
 
 extern "C" swift::OpaqueValue *

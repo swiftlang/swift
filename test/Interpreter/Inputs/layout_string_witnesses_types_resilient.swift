@@ -22,7 +22,7 @@ public struct GenericResilient<C, T> {
 public enum ResilientSinglePayloadEnumGeneric<T> {
     case empty0
     case empty1
-    case nonEmpty0(T)
+    case nonEmpty(T)
 }
 
 public enum ResilientMultiPayloadEnumGeneric<T> {
