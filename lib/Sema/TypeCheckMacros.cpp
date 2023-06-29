@@ -1457,21 +1457,6 @@ llvm::Optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
 }
 
 ArrayRef<unsigned>
-ExpandConformanceMacros::evaluate(Evaluator &evaluator,
-                                  NominalTypeDecl *nominal) const {
-  SmallVector<unsigned, 2> bufferIDs;
-  nominal->forEachAttachedMacro(MacroRole::Conformance,
-      [&](CustomAttr *attr, MacroDecl *macro) {
-        if (auto bufferID = expandExtensions(attr, macro,
-                                             MacroRole::Conformance,
-                                             nominal))
-          bufferIDs.push_back(*bufferID);
-      });
-
-  return nominal->getASTContext().AllocateCopy(bufferIDs);
-}
-
-ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;

@@ -4031,28 +4031,6 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Expand all conformance macros attached to the given declaration.
-///
-/// Produces the set of macro expansion buffer IDs.
-class ExpandConformanceMacros
-    : public SimpleRequest<ExpandConformanceMacros,
-                           ArrayRef<unsigned>(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ArrayRef<unsigned> evaluate(Evaluator &evaluator,
-                              NominalTypeDecl *nominal) const;
-
-public:
-  bool isCached() const { return true; }
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-};
-
 /// Expand all extension macros attached to the given declaration.
 ///
 /// Produces the set of macro expansion buffer IDs.
