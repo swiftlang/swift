@@ -60,14 +60,15 @@ enum MacroPluginKind: UInt8 {
 extension MacroRole {
   init(rawMacroRole: UInt8) {
     switch rawMacroRole {
-    case 0x01: self = .expression
-    case 0x02: self = .declaration
-    case 0x04: self = .accessor
-    case 0x08: self = .memberAttribute
-    case 0x10: self = .member
-    case 0x20: self = .peer
-    case 0x40: self = .conformance
-    case 0x80: self = .codeItem
+    case 0: self = .expression
+    case 1: self = .declaration
+    case 2: self = .accessor
+    case 3: self = .memberAttribute
+    case 4: self = .member
+    case 5: self = .peer
+    case 6: self = .conformance
+    case 7: self = .codeItem
+    case 8: self = .`extension`
 
     default: fatalError("unknown macro role")
     }
@@ -523,7 +524,7 @@ func expandFreestandingMacroIPC(
   // Map the macro role.
   let pluginMacroRole: PluginMessage.MacroRole
   switch macroRole {
-  case .accessor, .member, .memberAttribute, .peer, .conformance:
+  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension:
     preconditionFailure("unhandled macro role for freestanding macro")
 
   case .expression: pluginMacroRole = .expression
@@ -703,6 +704,8 @@ func expandAttachedMacro(
   macroKind: UInt8,
   discriminatorText: UnsafePointer<UInt8>,
   discriminatorTextLength: Int,
+  qualifiedTypeText: UnsafePointer<UInt8>,
+  qualifiedTypeLength: Int,
   rawMacroRole: UInt8,
   customAttrSourceFilePtr: UnsafeRawPointer,
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
@@ -754,6 +757,12 @@ func expandAttachedMacro(
   )
   let discriminator = String(decoding: discriminatorBuffer, as: UTF8.self)
 
+  let qualifiedTypeBuffer = UnsafeBufferPointer(
+    start: qualifiedTypeText, count: qualifiedTypeLength
+  )
+  let qualifiedType = String(decoding: qualifiedTypeBuffer, as: UTF8.self)
+
+
   let expandedSource: String?
   switch MacroPluginKind(rawValue: macroKind)! {
   case .Executable:
@@ -762,6 +771,7 @@ func expandAttachedMacro(
       macroPtr: macroPtr,
       rawMacroRole: rawMacroRole,
       discriminator: discriminator,
+      qualifiedType: qualifiedType,
       customAttrSourceFilePtr: customAttrSourceFilePtr,
       customAttrNode: customAttrNode,
       declarationSourceFilePtr: declarationSourceFilePtr,
@@ -774,6 +784,7 @@ func expandAttachedMacro(
       macroPtr: macroPtr,
       rawMacroRole: rawMacroRole,
       discriminator: discriminator,
+      qualifiedType: qualifiedType,
       customAttrSourceFilePtr: customAttrSourceFilePtr,
       customAttrNode: customAttrNode,
       declarationSourceFilePtr: declarationSourceFilePtr,
@@ -794,6 +805,7 @@ func expandAttachedMacroIPC(
   macroPtr: UnsafeRawPointer,
   rawMacroRole: UInt8,
   discriminator: String,
+  qualifiedType: String,
   customAttrSourceFilePtr: UnsafePointer<ExportedSourceFile>,
   customAttrNode: AttributeSyntax,
   declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
@@ -812,6 +824,7 @@ func expandAttachedMacroIPC(
   case .memberAttribute: macroRole = .memberAttribute
   case .peer: macroRole = .peer
   case .conformance: macroRole = .conformance
+  case .extension: macroRole = .`extension`
   case
       .expression,
       .declaration,
@@ -833,14 +846,24 @@ func expandAttachedMacroIPC(
     parentDeclSyntax = nil
   }
 
+  let extendedTypeSyntax: PluginMessage.Syntax?
+  if (!qualifiedType.isEmpty) {
+    let typeSyntax: TypeSyntax = "\(raw: qualifiedType)"
+    extendedTypeSyntax = .init(syntax: Syntax(typeSyntax))!
+  } else {
+    extendedTypeSyntax = nil
+  }
+
   // Send the message.
   let message = HostToPluginMessage.expandAttachedMacro(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: macroRole,
     discriminator: discriminator,
+    qualifiedType: qualifiedType,
     attributeSyntax: customAttributeSyntax,
     declSyntax: declSyntax,
-    parentDeclSyntax: parentDeclSyntax)
+    parentDeclSyntax: parentDeclSyntax,
+    extendedTypeSyntax: extendedTypeSyntax)
   do {
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
@@ -904,6 +927,7 @@ func expandAttachedMacroInProcess(
   macroPtr: UnsafeRawPointer,
   rawMacroRole: UInt8,
   discriminator: String,
+  qualifiedType: String,
   customAttrSourceFilePtr: UnsafePointer<ExportedSourceFile>,
   customAttrNode: AttributeSyntax,
   declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
@@ -949,6 +973,7 @@ func expandAttachedMacroInProcess(
   )
   let declarationNode = sourceManager.detach(declarationNode)
   let parentDeclNode = parentDeclNode.map { sourceManager.detach($0) }
+  let extendedType: TypeSyntax = "\(raw: qualifiedType)"
 
   return SwiftSyntaxMacroExpansion.expandAttachedMacro(
     definition: macro,
@@ -956,6 +981,7 @@ func expandAttachedMacroInProcess(
     attributeNode: attributeNode,
     declarationNode: declarationNode,
     parentDeclNode: parentDeclNode,
+    extendedType: extendedType,
     in: context
   )
 }

@@ -163,6 +163,7 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
 
     auto *attr = MacroRoleAttr::create(ctx, /*atLoc=*/{}, /*range=*/{}, syntax,
                                        /*lParenLoc=*/{}, role, /*names=*/{},
+                                       /*conformances=*/{},
                                        /*rParenLoc=*/{}, /*implicit=*/true);
     macro->getAttrs().add(attr);
   }
@@ -280,6 +281,10 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
   if (roles.contains(MacroRole::Conformance)) {
     if (isa<NominalTypeDecl>(attachedDecl))
       evaluate(attachedDecl, /*passParent=*/false, MacroRole::Conformance);
+  }
+  if (roles.contains(MacroRole::Extension)) {
+    if (isa<NominalTypeDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Extension);
   }
   return bufferIDs;
 }

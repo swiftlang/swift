@@ -392,4 +392,31 @@ extension PluginMessage.Syntax {
         line: loc.line,
         column: loc.column))
   }
+
+  init?(syntax: Syntax) {
+    let kind: PluginMessage.Syntax.Kind
+    switch true {
+    case syntax.is(DeclSyntax.self): kind = .declaration
+    case syntax.is(ExprSyntax.self): kind = .expression
+    case syntax.is(StmtSyntax.self): kind = .statement
+    case syntax.is(TypeSyntax.self): kind = .type
+    case syntax.is(PatternSyntax.self): kind = .pattern
+    case syntax.is(AttributeSyntax.self): kind = .attribute
+    default: return nil
+    }
+
+    let source = syntax.description
+
+    self.init(
+      kind: kind,
+      source: source,
+      location: .init(
+        fileID: "",
+        fileName: "",
+        offset: 0,
+        line: 0,
+        column: 0
+      )
+    )
+  }
 }

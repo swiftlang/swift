@@ -215,7 +215,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
     }
 
-    case GeneratedSourceInfo::ConformanceMacroExpansion: {
+    case GeneratedSourceInfo::ConformanceMacroExpansion:
+    case GeneratedSourceInfo::ExtensionMacroExpansion: {
       parser.parseTopLevelItems(items);
       break;
     }

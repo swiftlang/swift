@@ -123,6 +123,9 @@ EXPERIMENTAL_FEATURE(CodeItemMacros, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(InitAccessors, false)
 
+EXPERIMENTAL_FEATURE(ExtensionMacros, false)
+SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", true)
+
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
 

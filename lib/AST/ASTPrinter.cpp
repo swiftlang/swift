@@ -2852,6 +2852,26 @@ static bool usesFeatureCodeItemMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::CodeItem);
 }
 
+static bool usesFeatureExtensionMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::Extension);
+}
+
+static bool usesFeatureExtensionMacroAttr(Decl *decl) {
+  return usesFeatureExtensionMacros(decl);
+}
+
+static void suppressingFeatureExtensionMacroAttr(PrintOptions &options,
+                                                 llvm::function_ref<void()> action) {
+  bool originalPrintExtensionMacroAttrs = options.PrintExtensionMacroAttributes;
+  options.PrintExtensionMacroAttributes = false;
+  action();
+  options.PrintExtensionMacroAttributes = originalPrintExtensionMacroAttrs;
+}
+
 static bool usesFeatureAttachedMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)
