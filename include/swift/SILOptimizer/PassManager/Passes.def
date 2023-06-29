@@ -401,6 +401,8 @@ SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
     "Cleanup debug_step instructions for Onone")
 SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimization",
     "Optimize copies to an indirect return value")
+SWIFT_FUNCTION_PASS(StripObjectHeaders, "strip-object-headers",
+    "Sets the bare flag on objects which don't need their headers")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",

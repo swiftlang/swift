@@ -446,14 +446,14 @@ public:
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool objc, bool canAllocOnStack,
+                               bool objc, bool canAllocOnStack, bool isBare,
                                ArrayRef<SILType> ElementTypes,
                                ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
     return insert(AllocRefInst::create(getSILDebugLocation(Loc), getFunction(),
-                                       ObjectType, objc, canAllocOnStack,
+                                       ObjectType, objc, canAllocOnStack, isBare,
                                        ElementTypes, ElementCountOperands));
   }
 
@@ -682,9 +682,9 @@ public:
     return insert(new (F->getModule())
                   GlobalAddrInst(getSILDebugLocation(Loc), Ty));
   }
-  GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g) {
+  GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g, bool isBare) {
     return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,
-                                                    getTypeExpansionContext()));
+                                                    getTypeExpansionContext(), isBare));
   }
   BaseAddrForOffsetInst *createBaseAddrForOffset(SILLocation Loc, SILType Ty) {
     return insert(new (F->getModule())

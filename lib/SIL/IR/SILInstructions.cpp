@@ -317,11 +317,12 @@ AllocPackInst *AllocPackInst::create(SILDebugLocation loc,
 AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,
-                                   bool objc, bool canBeOnStack,
+                                   bool objc, bool canBeOnStack, bool isBare,
                                    ArrayRef<SILType> ElementTypes)
     : AllocationInst(Kind, Loc, ObjectType) {
   sharedUInt8().AllocRefInstBase.objC = objc;
   sharedUInt8().AllocRefInstBase.onStack = canBeOnStack;
+  sharedUInt8().AllocRefInstBase.isBare = isBare;
   sharedUInt8().AllocRefInstBase.numTailTypes = ElementTypes.size();
   assert(sharedUInt8().AllocRefInstBase.numTailTypes ==
          ElementTypes.size() && "Truncation");
@@ -330,7 +331,7 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
 
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                    SILType ObjectType,
-                                   bool objc, bool canBeOnStack,
+                                   bool objc, bool canBeOnStack, bool isBare,
                                    ArrayRef<SILType> ElementTypes,
                                    ArrayRef<SILValue> ElementCountOperands) {
   assert(ElementTypes.size() == ElementCountOperands.size());
@@ -341,7 +342,7 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
   auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefInst));
-  return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack,
+  return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack, isBare,
                                      ElementTypes, AllOperands);
 }
 
@@ -1018,10 +1019,12 @@ GlobalAddrInst::GlobalAddrInst(SILDebugLocation DebugLoc,
 
 GlobalValueInst::GlobalValueInst(SILDebugLocation DebugLoc,
                                  SILGlobalVariable *Global,
-                                 TypeExpansionContext context)
+                                 TypeExpansionContext context, bool bare)
     : InstructionBase(DebugLoc,
                       Global->getLoweredTypeInContext(context).getObjectType(),
-                      Global) {}
+                      Global) {
+  sharedUInt8().GlobalValueInst.isBare = bare;
+}
 
 const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
   return getModule().getIntrinsicInfo(getName());

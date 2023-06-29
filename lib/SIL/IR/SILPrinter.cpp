@@ -1452,6 +1452,8 @@ public:
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
+    if (ARI->isBare())
+      *this << "[bare] ";
     printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }
@@ -1622,6 +1624,8 @@ public:
   }
 
   void visitGlobalValueInst(GlobalValueInst *GVI) {
+    if (GVI->isBare())
+      *this << "[bare] ";
     GVI->getReferencedGlobal()->printName(PrintState.OS);
     *this << " : " << GVI->getType();
   }

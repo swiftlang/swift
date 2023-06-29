@@ -2987,23 +2987,6 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   setLoweredAddress(i, addr);
 }
 
-/// Returns true if \p val has no other uses than ref_element_addr or
-/// ref_tail_addr.
-static bool hasOnlyProjections(SILValue val) {
-  for (Operand *use : val->getUses()) {
-    SILInstruction *user = use->getUser();
-    if (auto *upCast = dyn_cast<UpcastInst>(user)) {
-      if (!hasOnlyProjections(upCast))
-        return false;
-      continue;
-    }
-    if (isa<RefElementAddrInst>(user) || isa<RefTailAddrInst>(user))
-      continue;
-    return false;
-  }
-  return true;
-}
-
 void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
   SILGlobalVariable *var = i->getReferencedGlobal();
   assert(var->isInitializedObject() &&
@@ -3017,7 +3000,7 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
                                                 NotForDefinition).getAddress();
   // We don't need to initialize the global object if it's never used for
   // something which can access the object header.
-  if (!hasOnlyProjections(i) && !IGM.canMakeStaticObjectsReadOnly()) {
+  if (!i->isBare() && !IGM.canMakeStaticObjectsReadOnly()) {
     auto ClassType = loweredTy.getASTType();
     llvm::Value *Metadata =
       emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata,
@@ -4805,6 +4788,9 @@ void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
 void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
   auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
   if (ARI && StackAllocs.count(ARI)) {
+    if (ARI->isBare())
+      return;
+
     // A small peep-hole optimization: If the operand is allocated on stack and
     // there is no "significant" code between the set_deallocating and the final
     // dealloc_ref, the set_deallocating is not required.
@@ -5712,7 +5698,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
   buildTailArrays(*this, TailArrays, i);
 
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(),
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
                                              StackAllocSize, TailArrays);
   if (StackAllocSize >= 0) {
     // Remember that this alloc_ref allocates the object on the stack.

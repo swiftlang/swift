@@ -1057,8 +1057,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     const AllocRefInstBase *ARI = cast<AllocRefInstBase>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
     SmallVector<ValueID, 4> Args;
+    bool isBare = false;
+    if (auto *ar = dyn_cast<AllocRefInst>(&SI))
+      isBare = ar->isBare();
     Args.push_back((unsigned)ARI->isObjC() |
-                   ((unsigned)ARI->canAllocOnStack() << 1));
+                   ((unsigned)ARI->canAllocOnStack() << 1) |
+                   ((unsigned)isBare << 2));
     ArrayRef<SILType> TailTypes = ARI->getTailAllocatedTypes();
     ArrayRef<Operand> AllOps = ARI->getAllOperands();
     unsigned NumTailAllocs = TailTypes.size();
@@ -1250,9 +1254,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
     auto *G = GI->getReferencedGlobal();
     addReferencedGlobalVariable(G);
+    bool isBare = false;
+    if (auto *gv = dyn_cast<GlobalValueInst>(&SI))
+      isBare = gv->isBare();
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
+        (unsigned)SI.getKind(), isBare ? 1 : 0,
         S.addTypeRef(GI->getType().getRawASTType()),
         (unsigned)GI->getType().getCategory(),
         S.addUniquedStringRef(G->getName()));

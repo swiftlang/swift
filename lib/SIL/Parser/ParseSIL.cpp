@@ -5031,6 +5031,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AllocRefDynamicInst: {
     bool IsObjC = false;
     bool OnStack = false;
+    bool isBare = false;
     SmallVector<SILType, 2> ElementTypes;
     SmallVector<SILValue, 2> ElementCounts;
     while (P.consumeIf(tok::l_square)) {
@@ -5041,6 +5042,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         IsObjC = true;
       } else if (Optional == "stack") {
         OnStack = true;
+      } else if (Optional == "bare" && Opcode == SILInstructionKind::AllocRefInst) {
+        isBare = true;
       } else if (Optional == "tail_elems") {
         SILType ElemTy;
         if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
@@ -5082,7 +5085,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                           OnStack,
                                           ElementTypes, ElementCounts);
     } else {
-      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack,
+      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack, isBare,
                                    ElementTypes, ElementCounts);
     }
     break;
@@ -5847,6 +5850,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       Identifier GlobalName;
       SourceLoc IdLoc;
       SILType Ty;
+      bool isBare = false;
+      if (P.consumeIf(tok::l_square)) {
+        Identifier Id;
+        parseSILIdentifier(Id, diag::expected_in_attribute_list);
+        StringRef Optional = Id.str();
+        if (Optional == "bare" && Opcode == SILInstructionKind::GlobalValueInst) {
+          isBare = true;
+        } else {
+          return true;
+        }
+        P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      }
+
       if (P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
           parseSILIdentifier(GlobalName, IdLoc,
                              diag::expected_sil_value_name) ||
@@ -5874,7 +5890,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (Opcode == SILInstructionKind::GlobalAddrInst) {
         ResultVal = B.createGlobalAddr(InstLoc, global);
       } else {
-        ResultVal = B.createGlobalValue(InstLoc, global);
+        ResultVal = B.createGlobalValue(InstLoc, global, isBare);
       }
       break;
     }

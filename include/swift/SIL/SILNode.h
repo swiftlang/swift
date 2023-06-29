@@ -202,6 +202,7 @@ protected:
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
+    SHARED_FIELD(GlobalValueInst, bool isBare);
 
     SHARED_FIELD(SILArgument, uint8_t
                  valueOwnershipKind : NumVOKindBits,
@@ -228,6 +229,7 @@ protected:
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
       onStack : 1,
+      isBare : 1,   // Only used in AllocRefInst
       numTailTypes: NumAllocRefTailTypesBits);
 
     SHARED_FIELD(BeginBorrowInst, uint8_t
