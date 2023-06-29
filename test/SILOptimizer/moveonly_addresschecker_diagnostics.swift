@@ -2495,6 +2495,41 @@ public func addressOnlyGenericBorrowingConsumeGrandField<T>(_ x: borrowing Addre
     let _ = x.moveOnly.k // expected-note {{consumed here}}
 }
 
+public func addressOnlyGenericLetAccessFieldTest<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x
+
+    let _ = x2.moveOnly
+}
+
+public func addressOnlyGenericLetAccessFieldTest2<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+
+    let _ = x2.moveOnly // expected-note {{consumed here}}
+    let _ = x2.moveOnly // expected-note {{consumed again here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest2a<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+
+    let _ = x2.moveOnly // expected-note {{consumed here}}
+    let _ = x2.moveOnly.k // expected-note {{consumed again here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest2b<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+
+    let _ = x2.moveOnly // expected-note {{consumed here}}
+    let _ = x2.copyable
+    let _ = x2.moveOnly.k // expected-note {{consumed again here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest3<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x
+
+    let _ = x2.moveOnly
+    let _ = x2.copyable
+}
+
 extension AddressOnlyGeneric {
     func testNoUseSelf() { // expected-error {{'self' is borrowed and cannot be consumed}}
         let x = self // expected-note {{consumed here}}
