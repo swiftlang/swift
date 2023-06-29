@@ -2366,6 +2366,17 @@ FUNCTION(MultiPayloadEnumGenericGetEnumTag,
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect))
 
+// void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
+//                                                             unsigned tag,
+//                                                             const Metadata *metadata)
+FUNCTION(MultiPayloadEnumGenericDestructiveInjectEnumTag,
+         swift_multiPayloadEnumGeneric_destructiveInjectEnumTag,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(NoEffect))
+
 // unsigned swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
 //                                                    const Metadata *metadata);
 FUNCTION(SinglePayloadEnumGenericGetEnumTag,
