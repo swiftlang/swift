@@ -1344,6 +1344,10 @@ public:
   /// returned element is the pattern type of the expansion.
   Optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
 
+  /// Does this tuple type vanish, i.e. is it flattened to a singleton
+  /// non-expansion element under substitution?
+  bool doesTupleVanish() const;
+
   static AbstractionPattern
   projectTupleElementType(const AbstractionPattern *base, size_t index) {
     return base->getTupleElementType(index);

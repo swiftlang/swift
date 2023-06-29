@@ -314,7 +314,7 @@ bool AbstractionPattern::matchesTuple(CanType substType) const {
       return false;
     LLVM_FALLTHROUGH;
   case Kind::Tuple: {
-    if (getVanishingTupleElementPatternType()) {
+    if (doesTupleVanish()) {
       // TODO: recurse into elements.
       return true;
     }
@@ -480,6 +480,11 @@ bool AbstractionPattern::doesTupleContainPackExpansionType() const {
   llvm_unreachable("bad kind");
 }
 
+bool AbstractionPattern::doesTupleVanish() const {
+  assert(isTuple());
+  return getVanishingTupleElementPatternType().hasValue();
+}
+
 Optional<AbstractionPattern>
 AbstractionPattern::getVanishingTupleElementPatternType() const {
   if (!isTuple()) return None;
@@ -552,8 +557,7 @@ TupleElementGenerator::TupleElementGenerator(
   assert(origTupleType.isTuple());
   assert(origTupleType.matchesTuple(substType));
 
-  origTupleVanishes =
-    origTupleType.getVanishingTupleElementPatternType().hasValue();
+  origTupleVanishes = origTupleType.doesTupleVanish();
   origTupleTypeIsOpaque = origTupleType.isOpaqueTuple();
   numOrigElts = origTupleType.getNumTupleElements();
 
