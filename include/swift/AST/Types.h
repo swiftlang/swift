@@ -3792,7 +3792,7 @@ public:
   }
   
   /// Retrieve the generic parameters of this polymorphic function type.
-  TypeArrayView<GenericTypeParamType> getGenericParams() const;
+  ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
   /// Retrieve the requirements of this polymorphic function type.
   ArrayRef<Requirement> getRequirements() const;
@@ -6869,7 +6869,7 @@ public:
   static PackType *getSingletonPackExpansion(Type packParameter);
 
   static SmallVector<Type, 2> getExpandedGenericArgs(
-      TypeArrayView<GenericTypeParamType> params,
+      ArrayRef<GenericTypeParamType *> params,
       ArrayRef<Type> args);
 
 public:

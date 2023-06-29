@@ -232,12 +232,12 @@ public:
   void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                                 SourceLoc signatureLoc,
                                                 const PropertyMap &map,
-                                                TypeArrayView<GenericTypeParamType> genericParams);
+                                                ArrayRef<GenericTypeParamType *> genericParams);
 
   void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                               SourceLoc signatureLoc,
                                               const PropertyMap &map,
-                                              TypeArrayView<GenericTypeParamType> genericParams);
+                                              ArrayRef<GenericTypeParamType *> genericParams);
 
 private:
   struct CriticalPair {

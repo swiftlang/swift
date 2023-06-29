@@ -123,7 +123,7 @@ public:
   }
 
   Type getSuperclassBound(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       const MutableTerm &lookupTerm,
       const PropertyMap &map) const;
 
@@ -136,7 +136,7 @@ public:
   }
 
   Type getConcreteType(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       const MutableTerm &lookupTerm,
       const PropertyMap &map) const;
 
@@ -227,15 +227,15 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
 
   Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
 
   Type getTypeFromSubstitutionSchema(
                       Type schema,
                       ArrayRef<Term> substitutions,
-                      TypeArrayView<GenericTypeParamType> genericParams,
+                      ArrayRef<GenericTypeParamType *> genericParams,
                       const MutableTerm &prefix) const;
 
 private:
