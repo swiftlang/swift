@@ -192,7 +192,7 @@ static llvm::Optional<std::string> extractRawLiteral(Expr *expr) {
       break;
     }
   }
-  return None;
+  return llvm::None;
 }
 
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
@@ -242,17 +242,17 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
           auto elementExpr = std::get<0>(pair);
           auto elementName = std::get<1>(pair);
 
-          Optional<std::string> label =
+          llvm::Optional<std::string> label =
               elementName.empty()
-                  ? Optional<std::string>()
-                  : Optional<std::string>(elementName.str().str());
+                  ? llvm::None
+                  : llvm::Optional<std::string>(elementName.str().str());
 
           elements.push_back({label, elementExpr->getType(),
                               extractCompileTimeValue(elementExpr)});
         }
       } else {
         for (auto elementExpr : tupleExpr->getElements()) {
-          elements.push_back({Optional<std::string>(), elementExpr->getType(),
+          elements.push_back({llvm::None, elementExpr->getType(),
                               extractCompileTimeValue(elementExpr)});
         }
       }
@@ -291,7 +291,7 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         auto declRefExpr = cast<DeclRefExpr>(fn);
         auto caseName =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
-        return std::make_shared<EnumValue>(caseName, None);
+        return std::make_shared<EnumValue>(caseName, llvm::None);
       }
 
       break;
@@ -443,10 +443,10 @@ extractEnumCases(NominalTypeDecl *Decl) {
         std::vector<EnumElementParameterValue> Parameters;
         if (const ParameterList *Params = EED->getParameterList()) {
           for (const ParamDecl *Parameter : Params->getArray()) {
-            Optional<std::string> Label =
+            llvm::Optional<std::string> Label =
                 Parameter->getParameterName().empty()
-                    ? Optional<std::string>()
-                    : Optional<std::string>(
+                    ? llvm::None
+                    : llvm::Optional<std::string>(
                           Parameter->getParameterName().str().str());
 
             Parameters.push_back({Label, Parameter->getType()});
@@ -454,7 +454,7 @@ extractEnumCases(NominalTypeDecl *Decl) {
         }
 
         if (Parameters.empty()) {
-          Elements.push_back({Name, RawValue, None});
+          Elements.push_back({Name, RawValue, llvm::None});
         } else {
           Elements.push_back({Name, RawValue, Parameters});
         }
@@ -463,7 +463,7 @@ extractEnumCases(NominalTypeDecl *Decl) {
     return Elements;
   }
 
-  return None;
+  return llvm::None;
 }
 
 ConstValueTypeInfo

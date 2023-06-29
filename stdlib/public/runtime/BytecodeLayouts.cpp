@@ -26,7 +26,9 @@
 #include "swift/Runtime/HeapObject.h"
 #include "llvm/Support/SwapByteOrder.h"
 #include <cstdint>
+#include <functional>
 #include <limits>
+#include <optional>
 #include <type_traits>
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
@@ -145,7 +147,7 @@ inline static void handleRefCounts(const Metadata *metadata,
                                        std::forward<Params>(params)...)) {
     }
   } else {
-    for (int i = 0; i < N; i++) {
+    for (unsigned i = 0; i < N; i++) {
       handleNextRefCount<Handler>(metadata, reader, addrOffset,
                                   std::forward<Params>(params)...);
     }
@@ -652,6 +654,58 @@ swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   return swift_generic_initWithTake(dest, src, metadata);
 }
 
+extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                                   const Metadata *metadata) {
+  return 0;
+}
+
+extern "C"
+unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+                                     const Metadata *metadata) {
+  auto addr = reinterpret_cast<uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+  auto byteCountsAndOffset = reader.readBytes<uint64_t>();
+  auto extraTagBytesPattern = (uint8_t)(byteCountsAndOffset >> 62);
+  auto xiTagBytesPattern = ((uint8_t)(byteCountsAndOffset >> 59)) & 0x7;
+  auto xiTagBytesOffset =
+      byteCountsAndOffset & std::numeric_limits<uint32_t>::max();
+
+  if (extraTagBytesPattern) {
+    auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
+    auto payloadSize = reader.readBytes<size_t>();
+    auto tagBytes = readTagBytes(addr + payloadSize, extraTagBytes);
+    if (tagBytes) {
+      reader.skip(sizeof(uint64_t));
+      auto payloadNumExtraInhabitants = reader.readBytes<size_t>();
+      unsigned caseIndexFromExtraTagBits =
+          payloadSize >= 4 ? 0 : (tagBytes - 1U) << (payloadSize * 8U);
+      unsigned caseIndexFromValue = loadEnumElement(addr, payloadSize);
+      unsigned noPayloadIndex =
+          (caseIndexFromExtraTagBits | caseIndexFromValue) +
+          payloadNumExtraInhabitants;
+      return noPayloadIndex + 1;
+    }
+  } else {
+    reader.skip(sizeof(size_t));
+  }
+
+  if (xiTagBytesPattern) {
+    auto zeroTagValue = reader.readBytes<uint64_t>();
+    auto xiTagValues = reader.readBytes<size_t>();
+
+    auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
+    uint64_t tagBytes =
+        readTagBytes(addr + xiTagBytesOffset, xiTagBytes) -
+        zeroTagValue;
+    if (tagBytes < xiTagValues) {
+      return tagBytes + 1;
+    }
+  }
+
+  return 0;
+}
+
 extern "C"
 unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
                                  const Metadata *metadata) {
@@ -692,13 +746,12 @@ swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   }
 }
 
-extern "C" unsigned
-swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
-                                          const Metadata *metadata) {
-  auto addr = reinterpret_cast<const uint8_t *>(address);
-  LayoutStringReader reader{metadata->getLayoutString(),
-                            layoutStringHeaderSize + sizeof(uint64_t)};
-
+template <typename T>
+static inline T handleSinglePayloadEnumGenericTag(
+    LayoutStringReader &reader, uint8_t *addr,
+    std::function<std::optional<T>(const Metadata *, size_t, uint8_t)>
+        extraTagBytesHandler,
+    std::function<T(const Metadata *, unsigned, unsigned)> xiHandler) {
   auto tagBytesAndOffset = reader.readBytes<uint64_t>();
   auto extraTagBytesPattern = (uint8_t)(tagBytesAndOffset >> 62);
   auto xiTagBytesOffset =
@@ -706,11 +759,35 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   const Metadata *xiType = nullptr;
 
   if (extraTagBytesPattern) {
-    auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
+    auto numExtraTagBytes = 1 << (extraTagBytesPattern - 1);
     auto payloadSize = reader.readBytes<size_t>();
-    auto tagBytes = readTagBytes(addr + payloadSize, extraTagBytes);
+    xiType = reader.readBytes<const Metadata *>();
+    if (auto result =
+            extraTagBytesHandler(xiType, payloadSize, numExtraTagBytes)) {
+      return *result;
+    }
+  } else {
+    reader.skip(sizeof(size_t));
+    xiType = reader.readBytes<const Metadata *>();
+  }
+
+  auto numEmptyCases = reader.readBytes<unsigned>();
+
+  return xiHandler(xiType, xiTagBytesOffset, numEmptyCases);
+}
+
+extern "C" unsigned
+swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                          const Metadata *metadata) {
+  auto addr = reinterpret_cast<uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+
+  auto extraTagBytesHandler =
+      [addr](const Metadata *xiType, size_t payloadSize,
+             uint8_t numExtraTagBytes) -> std::optional<unsigned> {
+    auto tagBytes = readTagBytes(addr + payloadSize, numExtraTagBytes);
     if (tagBytes) {
-      xiType = reader.readBytes<const Metadata *>();
       unsigned payloadNumExtraInhabitants =
           xiType ? xiType->vw_getNumExtraInhabitants() : 0;
       unsigned caseIndexFromExtraTagBits =
@@ -721,20 +798,36 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
           payloadNumExtraInhabitants;
       return noPayloadIndex + 1;
     }
+
+    return std::nullopt;
+  };
+
+  auto xihandler = [addr](const Metadata *xiType, unsigned xiTagBytesOffset,
+                          unsigned numEmptyCases) -> unsigned {
+    if (xiType) {
+      return xiType->vw_getEnumTagSinglePayload(
+          (const OpaqueValue *)(addr + xiTagBytesOffset), numEmptyCases);
+    }
+
+    return 0;
+  };
+
+  return handleSinglePayloadEnumGenericTag<unsigned>(
+      reader, addr, extraTagBytesHandler, xihandler);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
+                                               swift::ValueBuffer *src,
+                                               const Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isValueInline()) {
+    return swift_generic_initWithCopy((swift::OpaqueValue *)dest,
+                                      (swift::OpaqueValue *)src, metadata);
   } else {
-    reader.skip(sizeof(size_t));
+    memcpy(dest, src, sizeof(swift::HeapObject *));
+    swift_retain(*(swift::HeapObject **)src);
+    return (swift::OpaqueValue *)&(*(swift::HeapObject **)dest)[1];
   }
-
-  xiType = reader.readBytes<const Metadata *>();
-
-  if (xiType) {
-    auto numEmptyCases = reader.readBytes<unsigned>();
-
-    return xiType->vw_getEnumTagSinglePayload(
-        (const OpaqueValue *)(addr + xiTagBytesOffset), numEmptyCases);
-  }
-
-  return 0;
 }
 
 void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,

@@ -268,7 +268,7 @@ public:
   /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
   /// user to be explicit that they want to use this API.
   ManagedValue createInputFunctionArgument(SILType type,
-                                           Optional<SILLocation> loc);
+                                           llvm::Optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,

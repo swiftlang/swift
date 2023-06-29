@@ -292,7 +292,7 @@ public:
 private:
   // Look up the flags and optionally the writeback address associated with the
   // cleanup at \p depth. If
-  std::tuple<Cleanup::Flags, Optional<SILValue>>
+  std::tuple<Cleanup::Flags, llvm::Optional<SILValue>>
   getFlagsAndWritebackBuffer(CleanupHandle depth);
 };
 
@@ -327,7 +327,7 @@ private:
 /// writeback buffers.
 class CleanupCloner {
   SILGenFunction &SGF;
-  Optional<SILValue> writebackBuffer;
+  llvm::Optional<SILValue> writebackBuffer;
   bool hasCleanup;
   bool isLValue;
   bool isFormalAccess;

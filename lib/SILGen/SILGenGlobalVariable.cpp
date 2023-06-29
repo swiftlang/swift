@@ -58,9 +58,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   SILType silTy = SILType::getPrimitiveObjectType(
     M.Types.getLoweredTypeOfGlobal(gDecl));
 
-  auto *silGlobal = SILGlobalVariable::create(M, silLinkage, IsNotSerialized,
-                                              mangledName, silTy,
-                                              None, gDecl);
+  auto *silGlobal = SILGlobalVariable::create(
+      M, silLinkage, IsNotSerialized, mangledName, silTy, llvm::None, gDecl);
   silGlobal->setDeclaration(!forDef);
 
   return silGlobal;
@@ -68,7 +67,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
 ManagedValue
 SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
-                                      Optional<ActorIsolation> actorIso) {
+                                      llvm::Optional<ActorIsolation> actorIso) {
   assert(!VarLocs.count(var));
   if (var->isLazilyInitializedGlobal()) {
     // Call the global accessor to get the variable's address.
@@ -81,7 +80,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
     // variable first. So, we must call this accessor with the same
     // isolation that the variable itself requires during access.
     ExecutorBreadcrumb prevExecutor = emitHopToTargetActor(loc, actorIso,
-                                                                /*base=*/None);
+                                                           /*base=*/llvm::None);
 
     SILValue addr = B.createApply(loc, accessor, SubstitutionMap(), {});
 
