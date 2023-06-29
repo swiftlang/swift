@@ -100,8 +100,7 @@ bb0:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bare_alloc_ref
 // CHECK:         %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT:    [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to i8*
-// CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[O]])
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.raw)
 // CHECK-NEXT:    ret void
 sil @bare_alloc_ref : $@convention(thin) () -> () {
 bb0:
