@@ -192,15 +192,12 @@ public:
     // If we have local archetypes to substitute, check whether that's
     // relevant to this particular substitution.
     if (!LocalArchetypeSubs.empty()) {
-      for (auto ty : Subs.getReplacementTypes()) {
+      if (Subs.hasLocalArchetypes()) {
         // If we found a type containing a local archetype, substitute
         // open existentials throughout the substitution map.
-        if (ty->hasLocalArchetype()) {
-          Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{
-                              LocalArchetypeSubs},
-                            MakeAbstractConformanceForGenericType());
-          break;
-        }
+        Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+                          MakeAbstractConformanceForGenericType(),
+                          SubstFlags::PreservePackExpansionLevel);
       }
     }
 
@@ -223,7 +220,9 @@ public:
     return Ty.subst(
       Builder.getModule(),
       QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType());
+      MakeAbstractConformanceForGenericType(),
+      CanGenericSignature(),
+      SubstFlags::PreservePackExpansionLevel);
   }
   SILType getOpType(SILType Ty) {
     Ty = getTypeInClonedContext(Ty);
@@ -242,7 +241,8 @@ public:
 
     return ty.subst(
       QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType()
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::PreservePackExpansionLevel
     )->getCanonicalType();
   }
 
@@ -355,7 +355,8 @@ public:
         conformance.subst(ty,
                           QueryTypeSubstitutionMapOrIdentity{
                                                         LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
+                          MakeAbstractConformanceForGenericType(),
+                          SubstFlags::PreservePackExpansionLevel);
     }
 
     return asImpl().remapConformance(getASTTypeInClonedContext(ty),

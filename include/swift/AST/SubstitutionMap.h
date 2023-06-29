@@ -168,7 +168,7 @@ public:
 
   /// Query whether any replacement types in the map contain an opened
   /// existential.
-  bool hasOpenedExistential() const;
+  bool hasLocalArchetypes() const;
 
   /// Query whether any replacement types in the map contain dynamic Self.
   bool hasDynamicSelf() const;
