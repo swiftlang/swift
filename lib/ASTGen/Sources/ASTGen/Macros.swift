@@ -819,7 +819,7 @@ func expandAttachedMacroIPC(
   let extendedTypeSyntax: PluginMessage.Syntax?
   if (!qualifiedType.isEmpty) {
     let typeSyntax: TypeSyntax = "\(raw: qualifiedType)"
-    extendedTypeSyntax = .init(syntax: Syntax(typeSyntax), in: parentDeclSourceFilePtr!)!
+    extendedTypeSyntax = .init(syntax: Syntax(typeSyntax))!
   } else {
     extendedTypeSyntax = nil
   }
