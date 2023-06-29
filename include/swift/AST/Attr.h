@@ -491,15 +491,18 @@ public:
 /// Defines the @_silgen_name attribute.
 class SILGenNameAttr : public DeclAttribute {
 public:
-  SILGenNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+  SILGenNameAttr(StringRef Name, bool Raw, SourceLoc AtLoc, SourceRange Range, bool Implicit)
     : DeclAttribute(DAK_SILGenName, AtLoc, Range, Implicit),
-      Name(Name) {}
+      Name(Name), Raw(Raw) {}
 
-  SILGenNameAttr(StringRef Name, bool Implicit)
-    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+  SILGenNameAttr(StringRef Name, bool Raw, bool Implicit)
+    : SILGenNameAttr(Name, Raw, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
+
+  /// If true, the name is not to be mangled (underscore prefix on Darwin)
+  bool Raw;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SILGenName;
