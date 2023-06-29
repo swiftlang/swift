@@ -40,7 +40,7 @@ func test() {
   // FIXME: Should be more user friendly message.
 
   let _: String = #fooMacro(1)
-  // expected-error @-1 {{typeMismatch(swiftASTGen.PluginToHostMessage}}
+  // expected-error @-1 {{typeMismatch(SwiftCompilerPluginMessageHandling.PluginToHostMessage}}
   let _: String = #fooMacro(2)
   // expected-error @-1 {{failed to receive result from plugin (from macro 'fooMacro')}}
   let _: String = #fooMacro(3)

@@ -15,8 +15,10 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftParser
 import SwiftSyntax
+import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 import SwiftSyntaxMacroExpansion
+@_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
@@ -859,7 +861,6 @@ func expandAttachedMacroIPC(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: macroRole,
     discriminator: discriminator,
-    qualifiedType: qualifiedType,
     attributeSyntax: customAttributeSyntax,
     declSyntax: declSyntax,
     parentDeclSyntax: parentDeclSyntax,
