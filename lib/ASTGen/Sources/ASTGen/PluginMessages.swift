@@ -32,9 +32,11 @@ internal enum HostToPluginMessage: Codable {
     macro: PluginMessage.MacroReference,
     macroRole: PluginMessage.MacroRole,
     discriminator: String,
+    qualifiedType: String,
     attributeSyntax: PluginMessage.Syntax,
     declSyntax: PluginMessage.Syntax,
-    parentDeclSyntax: PluginMessage.Syntax?
+    parentDeclSyntax: PluginMessage.Syntax?,
+    extendedTypeSyntax: PluginMessage.Syntax?
   )
 
   /// Optionally implemented message to load a dynamic link library.
@@ -76,7 +78,7 @@ internal enum PluginToHostMessage: Codable {
 }
 
 /*namespace*/ internal enum PluginMessage {
-  static var PROTOCOL_VERSION_NUMBER: Int { 5 }  // Added 'expandMacroResult'.
+  static var PROTOCOL_VERSION_NUMBER: Int { 6 }  // Added 'expandMacroResult'.
 
   struct HostCapability: Codable {
     var protocolVersion: Int
@@ -107,6 +109,7 @@ internal enum PluginToHostMessage: Codable {
     case peer
     case conformance
     case codeItem
+    case `extension`
   }
 
   struct SourceLocation: Codable {

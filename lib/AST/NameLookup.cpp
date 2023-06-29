@@ -1813,6 +1813,21 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
     }
   }
 
+  // Trigger the expansion of extension macros on the container, if any of the
+  // names match.
+  {
+    MacroIntroducedNameTracker nameTracker;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(container.getAsDecl())) {
+      forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
+      if (nameTracker.shouldExpandForName(name)) {
+        (void)evaluateOrDefault(
+            ctx.evaluator,
+            ExpandExtensionMacros{nominal},
+            false);
+      }
+    }
+  }
+
   auto dc = container.getAsDeclContext();
   auto *module = dc->getParentModule();
   auto idc = container.getAsIterableDeclContext();

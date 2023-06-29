@@ -641,6 +641,14 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                             false);
   }
 
+  // Expand extension macros.
+  if (!ctx.evaluator.hasActiveRequest(
+          ExpandExtensionMacros{NTD})) {
+    (void)evaluateOrDefault(ctx.evaluator,
+                            ExpandExtensionMacros{NTD},
+                            false);
+  }
+
   synthesizePropertyWrapperVariables(NTD);
 }
 

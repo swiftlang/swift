@@ -7100,6 +7100,8 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
         diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
                               getMacroRoleString(attr->getMacroRole()));
       break;
+    case MacroRole::Extension:
+      break;
     default:
       diagnoseAndRemoveAttr(attr, diag::invalid_macro_role_for_macro_syntax,
                             /*attached*/1);
@@ -7107,6 +7109,25 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
     }
     break;
   }
+  }
+
+  for (auto *typeExpr : attr->getConformances()) {
+    if (auto *typeRepr = typeExpr->getTypeRepr()) {
+      auto *dc = D->getDeclContext();
+      auto resolved =
+          TypeResolution::forInterface(
+              dc, TypeResolverContext::GenericRequirement,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr)
+          .resolveType(typeRepr);
+
+      if (resolved->is<ErrorType>()) {
+        attr->setInvalid();
+      } else {
+        typeExpr->setType(MetatypeType::get(resolved));
+      }
+    }
   }
 }
 

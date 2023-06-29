@@ -1904,6 +1904,8 @@ static void handleRequestSyntacticMacroExpansion(
         macroRoles |= MacroRole::Peer;
       if (uid == KindMacroRoleConformance)
         macroRoles |= MacroRole::Conformance;
+      if (uid == KindMacroRoleExtension)
+        macroRoles |= MacroRole::Extension;
     }
 
     // definition.

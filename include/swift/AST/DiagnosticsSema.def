@@ -7148,6 +7148,9 @@ ERROR(global_arbitrary_name,none,
       "'%0' macros are not allowed to introduce arbitrary names "
       "at global scope",
       (StringRef))
+ERROR(local_extension_macro,none,
+      "local type cannot have attached extension macro",
+      ())
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",

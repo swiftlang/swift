@@ -2318,6 +2318,7 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   CASE(Peer)
   CASE(Conformance)
   CASE(CodeItem)
+  CASE(Extension)
   }
 #undef CASE
   llvm_unreachable("bad result declaration macro kind");
@@ -3136,10 +3137,19 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           introducedDeclNames.push_back(S.addDeclBaseNameRef(label));
       }
 
+      unsigned numNames = introducedDeclNames.size();
+
+      unsigned numConformances = 0;
+      for (auto conformance : theAttr->getConformances()) {
+        introducedDeclNames.push_back(
+            S.addTypeRef(conformance->getInstanceType()));
+        ++numConformances;
+      }
+
       MacroRoleDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           static_cast<uint8_t>(theAttr->getMacroSyntax()),
-          rawMacroRole, introducedDeclNames.size(),
+          rawMacroRole, numNames, numConformances,
           introducedDeclNames);
       return;
     }

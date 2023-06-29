@@ -1365,6 +1365,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
+
+    // Suppress @attached(extension) if needed.
+    if (!Options.PrintExtensionMacroAttributes &&
+        Attr->getMacroRole() == MacroRole::Extension) {
+      break;
+    }
+
     switch (Attr->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
       Printer.printAttrName("@freestanding");
@@ -2480,29 +2487,45 @@ MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
                              MacroSyntax syntax, SourceLoc lParenLoc,
                              MacroRole role,
                              ArrayRef<MacroIntroducedDeclName> names,
+                             ArrayRef<TypeExpr *> conformances,
                              SourceLoc rParenLoc, bool implicit)
     : DeclAttribute(DAK_MacroRole, atLoc, range, implicit),
-      syntax(syntax), role(role), numNames(names.size()), lParenLoc(lParenLoc),
+      syntax(syntax), role(role), numNames(names.size()),
+      numConformances(conformances.size()), lParenLoc(lParenLoc),
       rParenLoc(rParenLoc) {
   auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
   std::uninitialized_copy(names.begin(), names.end(), trailingNamesBuffer);
+
+  auto *trailingConformancesBuffer = getTrailingObjects<TypeExpr *>();
+  std::uninitialized_copy(conformances.begin(), conformances.end(),
+                          trailingConformancesBuffer);
 }
 
 MacroRoleAttr *
 MacroRoleAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
                       MacroSyntax syntax, SourceLoc lParenLoc, MacroRole role,
                       ArrayRef<MacroIntroducedDeclName> names,
+                      ArrayRef<TypeExpr *> conformances,
                       SourceLoc rParenLoc, bool implicit) {
-  unsigned size = totalSizeToAlloc<MacroIntroducedDeclName>(names.size());
+  unsigned size =
+      totalSizeToAlloc<MacroIntroducedDeclName, TypeExpr *>(
+          names.size(), conformances.size());
   auto *mem = ctx.Allocate(size, alignof(MacroRoleAttr));
   return new (mem) MacroRoleAttr(atLoc, range, syntax, lParenLoc, role, names,
-                                 rParenLoc, implicit);
+                                 conformances, rParenLoc, implicit);
 }
 
 ArrayRef<MacroIntroducedDeclName> MacroRoleAttr::getNames() const {
   return {
     getTrailingObjects<MacroIntroducedDeclName>(),
     numNames
+  };
+}
+
+ArrayRef<TypeExpr *> MacroRoleAttr::getConformances() const {
+  return {
+    getTrailingObjects<TypeExpr *>(),
+    numConformances
   };
 }
 
