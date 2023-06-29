@@ -119,6 +119,8 @@ import SubE
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
+// CHECK: "-cache-compile-job"
+// CHECK: "-cas-path"
 // CHECK: "-module-name"
 // CHECK: "G"
 // CHECK: "-swift-version"
