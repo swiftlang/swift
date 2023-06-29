@@ -282,12 +282,8 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           addInheritedProtocols(nominal,
                                 ConformanceSource::forExplicit(nominal));
 
-          // Expand conformance macros.
-          ASTContext &ctx = nominal->getASTContext();
-          (void)evaluateOrDefault(
-              ctx.evaluator, ExpandConformanceMacros{nominal}, { });
-
           // Expand extension macros.
+          ASTContext &ctx = nominal->getASTContext();
           (void)evaluateOrDefault(
               ctx.evaluator, ExpandExtensionMacros{nominal}, { });
         },

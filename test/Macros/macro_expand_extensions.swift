@@ -11,7 +11,7 @@
 // RUN: %target-run %t/main | %FileCheck %s
 
 @attached(extension, conformances: P, names: named(requirement))
-macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceMacro")
+macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")
 
 protocol P {
   static func requirement()

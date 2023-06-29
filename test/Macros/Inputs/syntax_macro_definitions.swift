@@ -1299,7 +1299,7 @@ public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
   }
 }
 
-extension DelegatedConformanceMacro: ExtensionMacro {
+public struct DelegatedConformanceViaExtensionMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo decl: some DeclGroupSyntax,
