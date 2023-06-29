@@ -30,7 +30,7 @@ target_sources(swiftSILOptimizer PRIVATE
   SILSkippingChecker.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
-  UnitTestRunner.cpp
+  TestRunner.cpp
   OwnershipDumper.cpp
   OwnershipVerifierTextualErrorDumper.cpp)
   
