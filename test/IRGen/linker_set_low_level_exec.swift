@@ -4,17 +4,33 @@
 // REQUIRES: swift_in_compiler
 
 @_used
+#if canImport(Darwin)
 @_section("__TEXT,__mysection")
+#else
+@_section("__mysection")
+#endif
 let my_global1: Int = 42
 
 @_used
+#if canImport(Darwin)
 @_section("__TEXT,__mysection")
+#else
+@_section("__mysection")
+#endif
 let my_global2: Int = 46
 
+#if canImport(Darwin)
 @_silgen_name(raw: "section$start$__TEXT$__mysection")
+#else
+@_silgen_name(raw: "__start___mysection")
+#endif
 var mysection_start: Int
 
+#if canImport(Darwin)
 @_silgen_name(raw: "section$end$__TEXT$__mysection")
+#else
+@_silgen_name(raw: "__stop___mysection")
+#endif
 var mysection_end: Int
 
 @main
