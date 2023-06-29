@@ -139,6 +139,7 @@
 # stdlib
 # TODO: /stdlib/
 /stdlib/public/Backtracing/               @al45tair
+/stdlib/public/Concurrency/               @ktoso @kavon
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Windows/                   @compnerd
@@ -146,6 +147,7 @@
 
 # test
 /test/ASTGen/                                       @zoecarver @CodaFi
+/test/Concurrency/                                  @ktoso @kavon
 /test/Constraints/                                  @hborla @xedin
 /test/DebugInfo/                                    @adrian-prantl
 /test/Distributed/                                  @ktoso

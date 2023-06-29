@@ -1098,7 +1098,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     options |= TypeResolutionFlags::AllowPackReferences;
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
-  Optional<TypeResolution> resolution;
+  llvm::Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution = TypeResolution::forStructural(owner.dc, options,

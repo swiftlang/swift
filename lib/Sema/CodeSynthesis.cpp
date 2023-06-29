@@ -543,8 +543,8 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.
-  Optional<ForeignAsyncConvention> asyncConvention;
-  Optional<ForeignErrorConvention> errorConvention;
+  llvm::Optional<ForeignAsyncConvention> asyncConvention;
+  llvm::Optional<ForeignErrorConvention> errorConvention;
   if (superclassCtor->isObjC() &&
       !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
                              asyncConvention, errorConvention))
@@ -1299,10 +1299,6 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
 
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
-
-      // If init accessors are not involved, we are done.
-      if (initializedViaAccessor.empty())
-        return true;
 
       // Check whether use of init accessors results in access to uninitialized
       // properties.

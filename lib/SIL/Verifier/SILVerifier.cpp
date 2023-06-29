@@ -1376,7 +1376,7 @@ public:
   }
 
   void checkDebugVariable(SILInstruction *inst) {
-    Optional<SILDebugVariable> varInfo;
+    llvm::Optional<SILDebugVariable> varInfo;
     if (auto *di = dyn_cast<AllocStackInst>(inst))
       varInfo = di->getVarInfo();
     else if (auto *di = dyn_cast<AllocBoxInst>(inst))
@@ -3645,7 +3645,7 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    Optional<Requirement> selfRequirement;
+    llvm::Optional<Requirement> selfRequirement;
     for (auto req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::SameType) {
         selfRequirement = req;

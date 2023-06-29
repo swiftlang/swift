@@ -120,13 +120,13 @@ lookupMacroTypeMetadataByExternalName(ASTContext &ctx, StringRef moduleName,
 
 /// Translate an argument provided as a string literal into an identifier,
 /// or return \c None and emit an error if it cannot be done.
-Optional<Identifier> getIdentifierFromStringLiteralArgument(
+llvm::Optional<Identifier> getIdentifierFromStringLiteralArgument(
     ASTContext &ctx, MacroExpansionExpr *expansion, unsigned index) {
   auto argList = expansion->getArgs();
 
   // If there's no argument here, an error was diagnosed elsewhere.
   if (!argList || index >= argList->size()) {
-    return None;
+    return llvm::None;
   }
 
   auto arg = argList->getExpr(index);
@@ -136,7 +136,7 @@ Optional<Identifier> getIdentifierFromStringLiteralArgument(
         arg->getLoc(), diag::external_macro_arg_not_type_name, index
     );
 
-    return None;
+    return llvm::None;
   }
 
 
@@ -146,7 +146,7 @@ Optional<Identifier> getIdentifierFromStringLiteralArgument(
         arg->getLoc(), diag::external_macro_arg_not_type_name, index
     );
 
-    return None;
+    return llvm::None;
   }
 
   return ctx.getIdentifier(contents);
@@ -292,6 +292,15 @@ initializeExecutablePlugin(ASTContext &ctx,
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
       return nullptr;
     }
+
+    // Resend the compiler capability on reconnect.
+    auto *callback = new std::function<void(void)>(
+        [executablePlugin]() {
+          (void)swift_ASTGen_initializePlugin(
+              executablePlugin, /*diags=*/nullptr);
+        });
+    executablePlugin->addOnReconnect(callback);
+
     executablePlugin->setCleanup([executablePlugin] {
       swift_ASTGen_deinitializePlugin(executablePlugin);
     });
@@ -360,7 +369,7 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   return nullptr;
 }
 
-static Optional<ExternalMacroDefinition>
+static llvm::Optional<ExternalMacroDefinition>
 resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
                       Identifier typeName, LoadedLibraryPlugin *plugin) {
 #if SWIFT_SWIFT_PARSER
@@ -380,10 +389,10 @@ resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
     }
   }
 #endif
-  return None;
+  return llvm::None;
 }
 
-static Optional<ExternalMacroDefinition>
+static llvm::Optional<ExternalMacroDefinition>
 resolveExecutableMacro(ASTContext &ctx,
                        LoadedExecutablePlugin *executablePlugin,
                        Identifier moduleName, Identifier typeName) {
@@ -398,10 +407,10 @@ resolveExecutableMacro(ASTContext &ctx,
         ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
 #endif
-  return None;
+  return llvm::None;
 }
 
-Optional<ExternalMacroDefinition>
+llvm::Optional<ExternalMacroDefinition>
 ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                          Identifier moduleName,
                                          Identifier typeName) const {
@@ -424,7 +433,7 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     }
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Adjust the given mangled name for a macro expansion to produce a valid
@@ -444,7 +453,7 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   return result;
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionExpr *mee) const {
   ConcreteDeclRef macroRef = mee->getMacroRef();
@@ -465,12 +474,12 @@ ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
     // Return the expanded buffer ID.
     return evaluateOrDefault(
         evaluator, ExpandMacroExpansionDeclRequest(mee->getSubstituteDecl()),
-        None);
+        llvm::None);
   }
 
   // Other macro roles may also be encountered here, as they use
   // `MacroExpansionExpr` for resolution. In those cases, do not expand.
-  return None;
+  return llvm::None;
 }
 
 ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
@@ -710,21 +719,21 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
 
 // If this storage declaration is a variable with an explicit initializer,
 // return the range from the `=` to the end of the explicit initializer.
-static Optional<SourceRange>
+static llvm::Optional<SourceRange>
 getExplicitInitializerRange(AbstractStorageDecl *storage) {
   auto var = dyn_cast<VarDecl>(storage);
   if (!var)
-    return None;
+    return llvm::None;
 
   auto pattern = var->getParentPatternBinding();
   if (!pattern)
-    return None;
+    return llvm::None;
 
   unsigned index = pattern->getPatternEntryIndexForVarDecl(var);
   SourceLoc equalLoc = pattern->getEqualLoc(index);
   SourceRange initRange = pattern->getOriginalInitRange(index);
   if (equalLoc.isInvalid() || initRange.End.isInvalid())
-    return None;
+    return llvm::None;
 
   return SourceRange(equalLoc, initRange.End);
 }
@@ -917,7 +926,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     auto external = macroDef.getExternalMacro();
     ExternalMacroDefinitionRequest request{&ctx, external.moduleName,
                                            external.macroTypeName};
-    auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
+    auto externalDef = evaluateOrDefault(ctx.evaluator, request, llvm::None);
     if (!externalDef) {
       ctx.Diags.diagnose(loc, diag::external_macro_not_found,
                          external.moduleName.str(),
@@ -974,10 +983,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
                                /*attr=*/nullptr);
 }
 
-Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
+llvm::Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   SourceFile *macroSourceFile = ::evaluateFreestandingMacro(mee);
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   DeclContext *dc = mee->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
@@ -1033,11 +1042,11 @@ Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
 }
 
 /// Expands the given macro expansion declaration.
-Optional<unsigned>
+llvm::Optional<unsigned>
 swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   SourceFile *macroSourceFile = ::evaluateFreestandingMacro(med);
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
   DeclContext *dc = med->getDeclContext();
@@ -1150,7 +1159,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     ExternalMacroDefinitionRequest request{
         &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
+    auto externalDef = evaluateOrDefault(ctx.evaluator, request, llvm::None);
     if (!externalDef) {
       attachedTo->diagnose(diag::external_macro_not_found,
                         external.moduleName.str(),
@@ -1263,15 +1272,15 @@ bool swift::accessorMacroIntroducesInitAccessor(
   return false;
 }
 
-Optional<unsigned> swift::expandAccessors(
-    AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
-) {
+llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
+                                                CustomAttr *attr,
+                                                MacroDecl *macro) {
   // Evaluate the macro.
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, storage, attr,
                               /*passParentContext=*/false, MacroRole::Accessor);
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded accessor macro", storage);
@@ -1341,14 +1350,14 @@ ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
   return storage->getASTContext().AllocateCopy(bufferIDs);
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
   auto macroSourceFile = ::evaluateAttachedMacro(macro, member, attr,
                                                  /*passParentContext=*/true,
                                                  MacroRole::MemberAttribute);
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
@@ -1366,14 +1375,14 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   return macroSourceFile->getBufferID();
 }
 
-Optional<unsigned>
-swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
+llvm::Optional<unsigned> swift::expandMembers(CustomAttr *attr,
+                                              MacroDecl *macro, Decl *decl) {
   // Evaluate the macro.
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
                               /*passParentContext=*/false, MacroRole::Member);
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", decl);
@@ -1394,13 +1403,13 @@ swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   return macroSourceFile->getBufferID();
 }
 
-Optional<unsigned>
-swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
+llvm::Optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
+                                            Decl *decl) {
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
                               /*passParentContext=*/false, MacroRole::Peer);
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
   return macroSourceFile->getBufferID();
@@ -1419,15 +1428,15 @@ ExpandConformanceMacros::evaluate(Evaluator &evaluator,
   return nominal->getASTContext().AllocateCopy(bufferIDs);
 }
 
-Optional<unsigned>
-swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
-                          NominalTypeDecl *nominal) {
+llvm::Optional<unsigned> swift::expandConformances(CustomAttr *attr,
+                                                   MacroDecl *macro,
+                                                   NominalTypeDecl *nominal) {
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
                                                  MacroRole::Conformance);
 
   if (!macroSourceFile)
-    return None;
+    return llvm::None;
 
   PrettyStackTraceDecl debugStack(
       "applying expanded conformance macro", nominal);
@@ -1442,7 +1451,13 @@ swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
     extension->setExtendedNominal(nominal);
     nominal->addExtension(extension);
 
-    // Make it accessible to getTopLevelDecls()
+    // Most other macro-generated declarations are visited through calling
+    // 'visitAuxiliaryDecls' on the original declaration the macro is attached
+    // to. We don't do this for macro-generated extensions, because the
+    // extension is not a peer of the original declaration. Instead of
+    // requiring all callers of 'visitAuxiliaryDecls' to understand the
+    // hoisting behavior of macro-generated extensions, we make the
+    // extension accessible through 'getTopLevelDecls()'.
     if (auto file = dyn_cast<FileUnit>(
             decl->getDeclContext()->getModuleScopeContext()))
       file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);

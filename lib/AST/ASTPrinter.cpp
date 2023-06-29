@@ -410,7 +410,7 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
 }
 
 void ASTPrinter::callPrintDeclPre(const Decl *D,
-                                  Optional<BracketOptions> Bracket) {
+                                  llvm::Optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && isa<ExtensionDecl>(D))
@@ -3173,6 +3173,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureStrictConcurrency(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)
@@ -3310,6 +3314,11 @@ static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
+  // Partial consumption does not affect declarations directly.
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
@@ -3343,6 +3352,11 @@ static bool usesFeatureASTGenTypes(Decl *decl) {
 }
 
 static bool usesFeatureBuiltinMacros(Decl *decl) {
+  return false;
+}
+
+
+static bool usesFeatureDisableActorInferenceFromPropertyWrapperUsage(Decl *decl) {
   return false;
 }
 
@@ -5682,7 +5696,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
+  llvm::Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> flatArgs) {
@@ -6675,7 +6689,7 @@ public:
     // substituted types in terms of a generic signature declared on the decl,
     // which would make this logic more uniform.
     TypePrinter *sub = this;
-    Optional<TypePrinter> subBuffer;
+    llvm::Optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
     if (auto substitutions = T->getPatternSubstitutions()) {
       subOptions.GenericSig = nullptr;

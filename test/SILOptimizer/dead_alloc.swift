@@ -45,3 +45,12 @@ public class C<T> {
 public func deadClassInstance() {
     let _ = C<Int>()
 }
+
+// CHECK-LABEL: sil @$s10dead_alloc0A13ManagedBufferyyF :
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function '$s10dead_alloc0A13ManagedBufferyyF'
+public func deadManagedBuffer() -> () {
+  _ = ManagedBuffer<Void, Void>.create(minimumCapacity: 1, makingHeaderWith: { _ in () })
+}
