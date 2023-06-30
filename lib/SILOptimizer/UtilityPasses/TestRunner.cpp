@@ -226,18 +226,6 @@ static FunctionTest TestSpecificationTest(
       }
     });
 
-// Arguments:
-// - value: whose type will be printed
-// Dumps:
-// - the type lowering of the type
-static FunctionTest PrintTypeLowering("print-type-lowering", [](auto &function,
-                                                                auto &arguments,
-                                                                auto &test) {
-  auto value = arguments.takeValue();
-  auto ty = value->getType();
-  function.getTypeLowering(ty).print(llvm::dbgs());
-});
-
 //===----------------------------------------------------------------------===//
 // MARK: OSSA Lifetime Unit Tests
 //===----------------------------------------------------------------------===//
