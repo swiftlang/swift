@@ -5,10 +5,9 @@
 
 // REQUIRES: CPU=x86_64
 
-// CHECK: [[TYPE:%swift.type]] = type {
 // CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK-DAG: [[TUPLE_TYPE:%swift.tuple_type]] = type { [[TYPE]], i64, ptr, [0 x %swift.tuple_element_type] }
-// CHECK: %swift.tuple_element_type = type { ptr, i32 }
+// CHECK-DAG: [[TUPLE_TYPE:%swift.tuple_type]] = type { %swift.type, i64, ptr, [0 x %swift.tuple_element_type] }
+// CHECK-DAG: %swift.tuple_element_type = type { ptr, i32 }
 
 func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK:    define hidden swiftcc void @"$s14generic_tuples3dupyx_xtxlF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr noalias nocapture %2, ptr %T)
