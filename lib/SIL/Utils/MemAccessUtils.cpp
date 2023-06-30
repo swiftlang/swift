@@ -900,13 +900,15 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
       return root;
 
     if (auto *inst = root->getDefiningInstruction()) {
-      if (ForwardingInstruction::canForwardFirstOperandOnly(inst)) {
-        // The `enum` instruction can have no operand.
-        if (inst->getNumOperands() == 0)
-          return root;
+      if (auto fwdOp = ForwardingOperation(inst)) {
+        if (fwdOp.canForwardFirstOperandOnly()) {
+          // The `enum` instruction can have no operand.
+          if (inst->getNumOperands() == 0)
+            return root;
 
-        root = inst->getOperand(0);
-        continue;
+          root = inst->getOperand(0);
+          continue;
+        }
       }
     }
     if (auto *termResult = SILArgument::isTerminatorResult(root)) {
