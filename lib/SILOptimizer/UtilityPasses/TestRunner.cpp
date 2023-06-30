@@ -312,22 +312,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
     });
 
 // Arguments:
-// - SILValue: value to canonicalize
-// Dumps:
-// - function after value canonicalization
-static FunctionTest CanonicalizeBorrowScopeTest(
-    "canonicalize-borrow-scope",
-    [](auto &function, auto &arguments, auto &test) {
-      auto value = arguments.takeValue();
-      auto borrowedValue = BorrowedValue(value);
-      assert(borrowedValue && "specified value isn't a BorrowedValue!?");
-      InstructionDeleter deleter;
-      CanonicalizeBorrowScope canonicalizer(value->getFunction(), deleter);
-      canonicalizer.canonicalizeBorrowScope(borrowedValue);
-      function.dump();
-    });
-
-// Arguments:
 // - instruction
 // Dumps:
 // - instruction
