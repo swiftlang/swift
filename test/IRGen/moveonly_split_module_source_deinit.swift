@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -module-name server -primary-file %s %S/Inputs/moveonly_split_module_source_input.swift -emit-ir -emit-module-path %t/server.swiftmodule | %FileCheck %s -check-prefix=REFERRING_MODULE
 // RUN: %target-swift-frontend -module-name server  %s -primary-file %S/Inputs/moveonly_split_module_source_input.swift -emit-ir -emit-module-path %t/server.swiftmodule | %FileCheck %s -check-prefix=DEFINING_MODULE
 
+// UNSUPPORTED: CPU=arm64e
+
 // Make sure we call the deinit through the value witness table in the other module.
 
 // REFERRING_MODULE-LABEL: define {{.*}}swiftcc void @"$s6serverAAV4mainyyKFZ"(ptr swiftself %0, ptr noalias nocapture swifterror dereferenceable({{(8|4)}}) %1) {{.*}}{
