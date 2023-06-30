@@ -315,21 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // - SILValue: value
 // Dumps:
 // - function
-// - the borrow introducers
-static FunctionTest FindBorrowIntroducers(
-    "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      llvm::dbgs() << "Introducers:\n";
-      visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
-        def->dump();
-        return true;
-      });
-    });
-
-// Arguments:
-// - SILValue: value
-// Dumps:
-// - function
 // - the computed pruned liveness
 // - the liveness boundary
 static FunctionTest LinearLivenessTest("linear-liveness", [](auto &function,

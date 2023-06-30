@@ -2088,6 +2088,23 @@ bool swift::visitBorrowIntroducers(SILValue value,
     .visitBorrowIntroducers(value, visitor);
 }
 
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the borrow introducers
+static FunctionTest FindBorrowIntroducers(
+    "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
+      function.dump();
+      llvm::dbgs() << "Introducers:\n";
+      visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
+        def->dump();
+        return true;
+      });
+    });
+} // end namespace swift::test
+
 /// Return true of the lifetime of \p innerPhiVal depends on \p outerPhiVal.
 ///
 /// This handles SIL values with nested lifetimes that cross a control flow
