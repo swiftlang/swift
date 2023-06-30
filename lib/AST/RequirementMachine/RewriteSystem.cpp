@@ -711,6 +711,7 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
       loop.dump(out, *this);
       out << "\n";
     }
+    out << "}\n";
   }
   if (!WrittenRequirements.empty()) {
     out << "Written requirements: {\n";
