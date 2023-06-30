@@ -401,13 +401,13 @@ static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
 }
 
 void SwiftLangSupport::indexToStore(
-    StringRef InputFile, ArrayRef<const char *> Args,
+    StringRef PrimaryFilePath, ArrayRef<const char *> Args,
     IndexStoreOptions Opts,
     SourceKitCancellationToken CancellationToken,
     IndexToStoreReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<IndexStoreInfo>::fromError(Error));
@@ -439,10 +439,8 @@ void SwiftLangSupport::indexToStore(
   };
 
   auto ASTConsumer = std::make_shared<IndexStoreASTConsumer>(std::move(Receiver), std::move(Opts));
-  /// FIXME: When request cancellation is implemented and Xcode adopts it,
-  /// don't use 'OncePerASTToken'.
-  static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
+  getASTManager()->processASTAsync(Invok, ASTConsumer,
+                                   /*OncePerASTToken=*/nullptr,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }

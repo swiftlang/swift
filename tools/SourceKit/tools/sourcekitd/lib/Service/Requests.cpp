@@ -1444,7 +1444,7 @@ static void handleRequestIndexToStore(
     else
       return Rec(createErrorRequestInvalid("'key.index_unit_output_path' is required"));
 
-    SmallVector<const char *, 8> Args;
+    SmallVector<const char *, 0> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
