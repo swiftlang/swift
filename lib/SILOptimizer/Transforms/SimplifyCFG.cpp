@@ -1066,6 +1066,22 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   return true;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - BranchInst - the branch whose destination might be merged into its parent
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGTryJumpThreading(
+    "simplify-cfg-try-jump-threading",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .tryJumpThreading(cast<BranchInst>(arguments.takeInstruction()));
+    });
+} // end namespace swift::test
 
 /// simplifyBranchOperands - Simplify operands of branches, since it can
 /// result in exposing opportunities for CFG simplification.
