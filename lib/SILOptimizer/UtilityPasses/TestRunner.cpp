@@ -315,18 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
 
-static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
-    "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
-      passToRun->injectPassManager(test.getPassManager());
-      passToRun->injectFunction(&function);
-      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
-                  /*EnableJumpThread=*/false)
-          .simplifySwitchEnumOnObjcClassOptional(
-              cast<SwitchEnumInst>(arguments.takeInstruction()));
-    });
-
 static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
     "simplify-cfg-simplify-switch-enum-unreachable-blocks",
     [](auto &function, auto &arguments, auto &test) {

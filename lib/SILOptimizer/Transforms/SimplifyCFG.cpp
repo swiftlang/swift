@@ -2082,6 +2082,24 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
   return true;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - SwitchEnumInst - the instruction to to simplify
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
+    "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .simplifySwitchEnumOnObjcClassOptional(
+              cast<SwitchEnumInst>(arguments.takeInstruction()));
+    });
+} // end namespace swift::test
+
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction that gets its operand from an enum
 /// instruction.
