@@ -312,22 +312,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
     });
 
 // Arguments:
-// - SILValue: phi
-// Dumps:
-// - function
-// - the adjacent phis
-static FunctionTest VisitInnerAdjacentPhisTest(
-    "visit-inner-adjacent-phis",
-    [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
-                             [](auto *argument) -> bool {
-                               argument->dump();
-                               return true;
-                             });
-    });
-
-// Arguments:
 // - SILValue: value
 // Dumps:
 // - function

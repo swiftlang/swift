@@ -2173,6 +2173,24 @@ bool swift::visitInnerAdjacentPhis(SILArgument *phi,
   return true;
 }
 
+namespace swift::test {
+// Arguments:
+// - SILValue: phi
+// Dumps:
+// - function
+// - the adjacent phis
+static FunctionTest VisitInnerAdjacentPhisTest(
+    "visit-inner-adjacent-phis",
+    [](auto &function, auto &arguments, auto &test) {
+      function.dump();
+      visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
+                             [](auto *argument) -> bool {
+                               argument->dump();
+                               return true;
+                             });
+    });
+} // end namespace swift::test
+
 void swift::visitTransitiveEndBorrows(
     SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow) {
