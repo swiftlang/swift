@@ -499,3 +499,35 @@ CleanupCloner::cloneForRemainingPackComponents(SILValue packAddr,
                                                    firstComponentIndex);
   return ManagedValue(packAddr, cleanup);
 }
+
+ManagedValue
+CleanupCloner::cloneForRemainingTupleComponents(SILValue tupleAddr,
+                                                CanPackType inducedPackType,
+                                                unsigned firstComponentIndex) const {
+  if (isLValue) {
+    return ManagedValue::forLValue(tupleAddr);
+  }
+
+  if (!hasCleanup) {
+    return ManagedValue::forUnmanaged(tupleAddr);
+  }
+
+  assert(!writebackBuffer.has_value());
+  bool isTrivial = true;
+  auto tupleTy = tupleAddr->getType().castTo<TupleType>();
+  for (auto eltTy : tupleTy.getElementTypes().slice(firstComponentIndex)) {
+    if (!SILType::getPrimitiveObjectType(eltTy).isTrivial(SGF.F)) {
+      isTrivial = false;
+      break;
+    }
+  }
+
+  if (isTrivial)
+    return ManagedValue::forUnmanaged(tupleAddr);
+
+  auto cleanup =
+    SGF.enterDestroyRemainingTupleElementsCleanup(tupleAddr,
+                                                  inducedPackType,
+                                                  firstComponentIndex);
+  return ManagedValue(tupleAddr, cleanup);
+}

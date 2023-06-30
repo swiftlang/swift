@@ -990,7 +990,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origFormalType = AbstractionPattern(constantInfo.LoweredType);
+  auto origFormalType = AbstractionPattern(subs, constantInfo.LoweredType);
 
   // - the substituted type
   auto substFormalType = expectedType;
