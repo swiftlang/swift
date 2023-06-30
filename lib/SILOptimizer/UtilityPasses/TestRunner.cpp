@@ -312,22 +312,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
     });
 
 // Arguments:
-// - instruction
-// Dumps:
-// - instruction
-// - whether it's a deinit barrier
-static FunctionTest IsDeinitBarrierTest("is-deinit-barrier", [](auto &function,
-                                                                auto &arguments,
-                                                                auto &test) {
-  auto *instruction = arguments.takeInstruction();
-  auto *analysis = test.template getAnalysis<BasicCalleeAnalysis>();
-  auto isBarrier = isDeinitBarrier(instruction, analysis);
-  instruction->dump();
-  auto *boolString = isBarrier ? "true" : "false";
-  llvm::errs() << boolString << "\n";
-});
-
-// Arguments:
 // - value
 // Dumps:
 // - value
