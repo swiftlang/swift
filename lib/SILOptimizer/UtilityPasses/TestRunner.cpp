@@ -312,21 +312,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
     });
 
 // Arguments:
-// - value
-// Dumps:
-// - value
-// - whether it's lexical
-static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
-                                                   auto &arguments,
-                                                   auto &test) {
-  auto value = arguments.takeValue();
-  auto isLexical = value->isLexical();
-  value->dump();
-  auto *boolString = isLexical ? "true" : "false";
-  llvm::errs() << boolString << "\n";
-});
-
-// Arguments:
 // - SILValue: phi
 // Dumps:
 // - function
