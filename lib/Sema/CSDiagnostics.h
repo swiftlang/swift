@@ -3036,6 +3036,50 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose attempts to specialize a concrete type or its alias:
+///
+/// \code
+/// struct Test {}
+/// typealias X = Test
+///
+/// _ = X<Int>() // error
+/// \endcode
+class ConcreteTypeSpecialization final : public FailureDiagnostic {
+  Type ConcreteType;
+
+public:
+  ConcreteTypeSpecialization(const Solution &solution, Type concreteTy,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ConcreteType(resolveType(concreteTy)) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose attempts to specialize with invalid number of generic arguments:
+///
+/// \code
+/// struct Test<T, U> {}
+///
+/// _ = Test<Int>() // error
+/// \endcode
+class InvalidTypeSpecializationArity final : public FailureDiagnostic {
+  ValueDecl *D;
+  unsigned NumParams;
+  unsigned NumArgs;
+  bool HasParameterPack;
+
+public:
+  InvalidTypeSpecializationArity(const Solution &solution, ValueDecl *decl,
+                                 unsigned numParams, unsigned numArgs,
+                                 bool hasParameterPack,
+                                 ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), D(decl), NumParams(numParams),
+        NumArgs(numArgs), HasParameterPack(hasParameterPack) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
