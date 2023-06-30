@@ -17,7 +17,7 @@
 
 // CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { ptr @"OBJC_METACLASS_$_NSObject", ptr @"OBJC_METACLASS_$_Gizmo", ptr @_objc_empty_cache, ptr null, [[LLVM_PTRSIZE_INT]] ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to [[LLVM_PTRSIZE_INT]]) }
 
-// CHECK-32: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { ptr } {
+// CHECK-32: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}ptr } {
 // CHECK-32:   i32 129,
 // CHECK-32:   i32 20,
 // CHECK-32:   i32 20,
@@ -30,7 +30,7 @@
 // CHECK-32:   ptr null
 // CHECK-32: }, section "__DATA, {{.*}}", align 4
 
-// CHECK-64: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { ptr } {
+// CHECK-64: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}ptr } {
 // CHECK-64:   i32 129,
 // CHECK-64:   i32 40,
 // CHECK-64:   i32 40,
@@ -166,7 +166,7 @@
 // CHECK-64:     i32 8 }]
 // CHECK-64: }, section "__DATA, {{.*}}", align 8
 
-// CHECK-32: @_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { ptr } {
+// CHECK-32: @_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}ptr } {
 // CHECK-32:   i32 132,
 // CHECK-32:   i32 4,
 // CHECK-32:   i32 8,
@@ -179,7 +179,7 @@
 // CHECK-32:   @_PROPERTIES__TtC13objc_subclass10SwiftGizmo
 // CHECK-32: }, section "__DATA, {{.*}}", align 4
 
-// CHECK-64: @_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { ptr } {
+// CHECK-64: @_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}ptr } {
 // CHECK-64:    i32 132,
 // CHECK-64:    i32 8,
 // CHECK-64:    i32 16,
