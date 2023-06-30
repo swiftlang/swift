@@ -2980,30 +2980,65 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         #if 01
         if (const char *ep = (const char *)
             repr->getEndLoc().getOpaquePointerValue()) {
-            while (isalnum(*ep))
+            const char *save = ep;
+            // skip to end of identifier
+            while (isalnum(*ep) || *ep == '.')
                 ep++;
-//            fprintf(stderr, "[[%.100s\n", ep-10);
-            if (*ep == '\n' || *ep == '>' || *ep++ == ' ' &&
-                (*ep++ == '=' && *ep++ == ' ' || *ep--) &&
-                *ep++ == '{')
+            // exlucde system protocols used in conformances
+            if (strncmp(save, "Codeable", ep-save) == 0 ||
+                strncmp(save, "Encoder", ep-save) == 0 ||
+                strncmp(save, "Decoder", ep-save) == 0 ||
+                strncmp(save, "Encodable", ep-save) == 0 ||
+                strncmp(save, "Decodable", ep-save) == 0 ||
+                strncmp(save, "Subscription", ep-save) == 0 ||
+                strncmp(save, "Swift.Error", ep-save) == 0 ||
+                strncmp(save, "Error", ep-save) == 0 ||
+                // exclude meta-types
+                strncmp(ep-9, ".Protocol", 9) == 0 ||
+                strncmp(ep-5, ".Type", 5) == 0)
                 return Action::SkipChildren();
 
-            if (const char *line = strrchr(ep, '\n')) {
-                if (const char *objc = strstr(line, "@objc"))
-                    if (objc-line < 10)
-                        return Action::SkipChildren();
-                if (const char *over = strstr(line, "override"))
-                    if (over-line < 10)
-                        return Action::SkipChildren();
-            }
-        }
-        #endif
+//            fprintf(stderr, "[[%.100s\n", ep-10);
+            if (*ep == '\n' || // unitialised properties
+                *ep == '>' || // protocols in containers
+                *ep == '<' || // "" w/ associated types
+                save[-2] == '&' || // combined with &
+                *ep++ == ' ' && // exclude initialised
+                (*ep++ == '=' && *ep++ == ' ' || *ep--) &&
+                // with numbers, closures, or combined with &
+                (isdigit(*ep) || *ep++ == '{' || *ep++ == '&'))
+                return Action::SkipChildren();
 
+            // exclude return types
+            if (strncmp(save-3, "-> ", 3) == 0)
+                return Action::SkipChildren();
+
+            // exlcude methods marked @objc
+            const char *line = save;
+            for (int i=0; i<100; i++, line--)
+                if (*line == '\n')
+                    break;
+            if (strncmp(line-5, "@objc", 5) == 0)
+                return Action::SkipChildren();
+            if (const char *objc = strstr(line, "@objc"))
+                if (objc-line < 10)
+                    return Action::SkipChildren();
+
+//            if (const char *over = strstr(line, "override"))
+//                if (over-line < 10)
+//                    return Action::SkipChildren();
+//            if (const char *over = strstr(line, "init("))
+//                if (over-line < 10)
+//                    return Action::SkipChildren();
+        }
+
+        // exclude all containers
         if (isa<DictionaryTypeRepr>(repr) ||
             isa<ArrayTypeRepr>(repr) ||
             isa<FunctionTypeRepr>(repr) ||
             isa<OptionalTypeRepr>(repr))
           return Action::SkipChildren();
+        #endif
 
       // Don't allow variadic opaque parameter or return types.
       if (isa<PackExpansionTypeRepr>(repr) || isa<VarargTypeRepr>(repr))
