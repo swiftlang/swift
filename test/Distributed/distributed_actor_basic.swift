@@ -23,4 +23,3 @@ distributed actor Second {
     try! await first.one(second: self)
   }
 }
-
