@@ -315,26 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // - SILValue: value
 // Dumps:
 // - function
-// - the computed pruned liveness
-// - the liveness boundary
-static FunctionTest ExtendedLinearLivenessTest(
-    "extended-liveness", [](auto &function, auto &arguments, auto &test) {
-      SILValue value = arguments.takeValue();
-      function.dump();
-      llvm::dbgs() << "Extended liveness: " << value;
-      ExtendedLinearLiveness liveness(value);
-      liveness.compute();
-      liveness.print(llvm::outs());
-
-      PrunedLivenessBoundary boundary;
-      liveness.getLiveness().computeBoundary(boundary);
-      boundary.print(llvm::outs());
-    });
-
-// Arguments:
-// - SILValue: value
-// Dumps:
-// - function
 static FunctionTest OSSALifetimeCompletionTest(
     "ossa-lifetime-completion",
     [](auto &function, auto &arguments, auto &test) {
