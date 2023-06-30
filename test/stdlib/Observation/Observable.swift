@@ -75,11 +75,6 @@ final class SendableClass: Sendable {
 }
 
 @Observable
-class SendableClass: Sendable {
-  let field: Int = 3
-}
-
-@Observable
 class CodableClass: Codable {
   var field: Int = 3
 }
