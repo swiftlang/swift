@@ -2619,6 +2619,23 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   return true;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - SILBasicBlock - the block whose terminator's destinations are all the same
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
+    "simplify-cfg-simplify-term-with-identical-dest-blocks",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .simplifyTermWithIdenticalDestBlocks(arguments.takeBlock());
+    });
+} // end namespace swift::test
+
 /// Checks if the block contains a cond_fail as first side-effect instruction
 /// and tries to move it to the predecessors (if beneficial). A sequence
 ///

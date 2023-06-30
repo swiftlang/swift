@@ -315,17 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
 
-static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
-    "simplify-cfg-simplify-term-with-identical-dest-blocks",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
-      passToRun->injectPassManager(test.getPassManager());
-      passToRun->injectFunction(&function);
-      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
-                  /*EnableJumpThread=*/false)
-          .simplifyTermWithIdenticalDestBlocks(arguments.takeBlock());
-    });
-
 static FunctionTest SimplifyCFGTryJumpThreading(
     "simplify-cfg-try-jump-threading",
     [](auto &function, auto &arguments, auto &test) {
