@@ -311,20 +311,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
       boundary.print(llvm::errs());
     });
 
-// Arguments:
-// - SILValue: value
-// Dumps:
-// - function
-static FunctionTest OSSALifetimeCompletionTest(
-    "ossa-lifetime-completion",
-    [](auto &function, auto &arguments, auto &test) {
-      SILValue value = arguments.takeValue();
-      llvm::dbgs() << "OSSA lifetime completion: " << value;
-      OSSALifetimeCompletion completion(&function, /*domInfo*/ nullptr);
-      completion.completeOSSALifetime(value);
-      function.dump();
-    });
-
 //===----------------------------------------------------------------------===//
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
