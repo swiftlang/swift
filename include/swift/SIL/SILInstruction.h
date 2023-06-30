@@ -4870,7 +4870,7 @@ class AssignOrInitInst
   friend SILBuilder;
   USE_SHARED_UINT8;
 
-  FixedOperandList<3> Operands;
+  FixedOperandList<4> Operands;
 
   /// Marks all of the properties in `initializes(...)` list that
   /// have been initialized before this intruction to help Raw SIL
@@ -4890,14 +4890,14 @@ public:
   };
 
 private:
-  AssignOrInitInst(SILDebugLocation DebugLoc,
-                   SILValue Src, SILValue Initializer,
-                   SILValue Setter, Mode mode);
+  AssignOrInitInst(SILDebugLocation DebugLoc, SILValue Self, SILValue Src,
+                   SILValue Initializer, SILValue Setter, Mode mode);
 
 public:
-  SILValue getSrc() const { return Operands[0].get(); }
-  SILValue getInitializer() const { return Operands[1].get(); }
-  SILValue getSetter() { return  Operands[2].get(); }
+  SILValue getSelf() const { return Operands[0].get(); }
+  SILValue getSrc() const { return Operands[1].get(); }
+  SILValue getInitializer() const { return Operands[2].get(); }
+  SILValue getSetter() { return  Operands[3].get(); }
 
   Mode getMode() const {
     return Mode(sharedUInt8().AssignOrInitInst.mode);

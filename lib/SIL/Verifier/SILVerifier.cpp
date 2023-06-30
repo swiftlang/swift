@@ -2725,17 +2725,12 @@ public:
     SILValue initFn = AI->getInitializer();
     SILValue setterFn = AI->getSetter();
 
-    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
     // Check init - it's an unapplied reference that takes property addresses
     // and `initialValue`.
     {
-      // We need to map un-applied function reference into context before
-      // check `initialValue` argument.
-      auto subs = cast<PartialApplyInst>(setterFn)->getSubstitutionMap();
-      initTy = initTy->substGenericArgs(F.getModule(), subs,
-                                        F.getTypeExpansionContext());
-
+      CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions initConv(initTy, AI->getModule());
+
       require(initConv.getNumIndirectSILResults() ==
                   AI->getInitializedProperties().size(),
               "init function has invalid number of indirect results");

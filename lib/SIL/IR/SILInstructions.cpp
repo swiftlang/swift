@@ -1259,11 +1259,12 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
-AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Src,
-                                   SILValue Initializer, SILValue Setter,
-                                   AssignOrInitInst::Mode Mode)
-    : InstructionBase<SILInstructionKind::AssignOrInitInst, NonValueInstruction>(Loc),
-      Operands(this, Src, Initializer, Setter) {
+AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Self,
+                                   SILValue Src, SILValue Initializer,
+                                   SILValue Setter, AssignOrInitInst::Mode Mode)
+    : InstructionBase<SILInstructionKind::AssignOrInitInst,
+                      NonValueInstruction>(Loc),
+      Operands(this, Self, Src, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
@@ -1290,10 +1291,17 @@ bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {
 }
 
 AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
-  auto *initRef = cast<FunctionRefInst>(getInitializer());
-  auto *accessorRef = initRef->getReferencedFunctionOrNull();
-  assert(accessorRef);
-  return dyn_cast_or_null<AccessorDecl>(accessorRef->getDeclContext());
+  SILValue initRef = getInitializer();
+  SILFunction *accessorFn = nullptr;
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(initRef)) {
+    accessorFn = PAI->getReferencedFunctionOrNull();
+  } else {
+    accessorFn = cast<FunctionRefInst>(initRef)->getReferencedFunctionOrNull();
+  }
+
+  assert(accessorFn);
+  return dyn_cast_or_null<AccessorDecl>(accessorFn->getDeclContext());
 }
 
 unsigned AssignOrInitInst::getNumInitializedProperties() const {
