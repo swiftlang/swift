@@ -15,7 +15,13 @@ func test() {
     // let _ = div(42, 2)
     let _ = sin(x)
     let _ = cos(x)
+
+    // strstr comes from stdlib.h or cstdlib on *some* flavors of linux, so it
+    // won't get imported. We may need a more fine grained approach for those
+    // platforms.
+#if !os(Linux)
     let _ = strstr("a", "aaa")
-  
+#endif
+
     exit(0)
 }
