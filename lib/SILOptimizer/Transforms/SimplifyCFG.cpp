@@ -2138,6 +2138,24 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   return true;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - SwitchEnumInst - the instruction to to simplify
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
+    "simplify-cfg-simplify-switch-enum-block",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .simplifySwitchEnumBlock(
+              cast<SwitchEnumInst>(arguments.takeInstruction()));
+    });
+} // end namespace swift::test
+
 /// simplifySwitchValueBlock - Simplify a basic block that ends with a
 /// switch_value instruction that gets its operand from an integer
 /// literal instruction.
