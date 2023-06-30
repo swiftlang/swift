@@ -2793,6 +2793,23 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
   return Changed;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - none
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
+    "simplify-cfg-canonicalize-switch-enum",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .canonicalizeSwitchEnums();
+    });
+} // end namespace swift::test
+
 static SILBasicBlock *isObjCMethodCallBlock(SILBasicBlock &Block) {
   auto *Branch = dyn_cast<BranchInst>(Block.getTerminator());
   if (!Branch)

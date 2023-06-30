@@ -315,17 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
 
-static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
-    "simplify-cfg-canonicalize-switch-enum",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
-      passToRun->injectPassManager(test.getPassManager());
-      passToRun->injectFunction(&function);
-      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
-                  /*EnableJumpThread=*/false)
-          .canonicalizeSwitchEnums();
-    });
-
 static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
     "simplify-cfg-simplify-switch-enum-block",
     [](auto &function, auto &arguments, auto &test) {
