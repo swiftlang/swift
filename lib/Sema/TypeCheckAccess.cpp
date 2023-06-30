@@ -354,10 +354,10 @@ static void noteLimitingImport(ASTContext &ctx,
          "a public import shouldn't limit the access level of a decl");
 
   if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = ITR->getBoundDecl();
-    ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::decl_import_via_here,
-                       DescriptiveDeclKind::Type,
-                       VD->getName(),
+    ValueDecl *VD = ITR->getBoundDecl();
+    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+                       diag::decl_import_via_here,
+                       VD,
                        limitImport->accessLevel,
                        limitImport->module.importedModule->getName());
   } else {

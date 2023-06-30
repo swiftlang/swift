@@ -2310,10 +2310,10 @@ NOTE(module_imported_here,none,
      "module %0 imported as '%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' here",
      (Identifier, AccessLevel))
 NOTE(decl_import_via_here,none,
-     "%0 %1 imported as "
-     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}2' "
-     "from %3 here",
-     (DescriptiveDeclKind, DeclName, AccessLevel, Identifier))
+     "%kind0 imported as "
+     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
+     "from %2 here",
+     (const ValueDecl *, AccessLevel, Identifier))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -6500,14 +6500,14 @@ ERROR(local_type_in_inlinable_function,
       (Identifier, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|package|%error|%error}2 and "
-      "cannot be referenced from " FRAGILE_FUNC_KIND "3",
-      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
+      none, "%kind0 is %select{private|fileprivate|internal|package|%error|%error}1 and "
+      "cannot be referenced from " FRAGILE_FUNC_KIND "2",
+      (const ValueDecl *, AccessLevel, unsigned))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|package|%error|%error}2 and "
-        "should not be referenced from " FRAGILE_FUNC_KIND "3",
-        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
+        none, "%kind0 is %select{private|fileprivate|internal|package|%error|%error}1 and "
+        "should not be referenced from " FRAGILE_FUNC_KIND "2",
+        (const ValueDecl *, AccessLevel, unsigned))
 
 ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
@@ -6547,10 +6547,8 @@ ERROR(availability_macro_in_inlinable, none,
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here,
-     none, DECL_OR_ACCESSOR "2 %1 is not '@usableFromInline' or public",
-     (DescriptiveDeclKind, DeclName, bool))
-
-#undef DECL_OR_ACCESSOR
+     none, "%kind0 is not '@usableFromInline' or public",
+     (const ValueDecl *))
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
