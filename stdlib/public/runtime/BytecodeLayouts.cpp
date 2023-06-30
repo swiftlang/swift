@@ -801,8 +801,6 @@ static inline T handleSinglePayloadEnumGenericTag(
             extraTagBytesHandler(xiType, payloadSize, numExtraTagBytes)) {
       return *result;
     }
-  } else {
-    reader.skip(sizeof(size_t));
   }
 
   auto numEmptyCases = reader.readBytes<unsigned>();
