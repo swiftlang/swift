@@ -315,21 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // - SILValue: value
 // Dumps:
 // - function
-// - the enclosing defs
-static FunctionTest FindEnclosingDefsTest(
-    "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      llvm::dbgs() << "Enclosing Defs:\n";
-      visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
-        def->dump();
-        return true;
-      });
-    });
-
-// Arguments:
-// - SILValue: value
-// Dumps:
-// - function
 // - the borrow introducers
 static FunctionTest FindBorrowIntroducers(
     "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {

@@ -2063,6 +2063,23 @@ bool swift::visitEnclosingDefs(SILValue value,
     .visitEnclosingDefs(value, visitor);
 }
 
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the enclosing defs
+static FunctionTest FindEnclosingDefsTest(
+    "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
+      function.dump();
+      llvm::dbgs() << "Enclosing Defs:\n";
+      visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
+        def->dump();
+        return true;
+      });
+    });
+} // end namespace swift::test
+
 bool swift::visitBorrowIntroducers(SILValue value,
                                    function_ref<bool(SILValue)> visitor) {
   if (isa<SILUndef>(value))
