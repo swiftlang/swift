@@ -1604,7 +1604,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (clangImporterOpts.CASOpts) {
     genericSubInvocation.getClangImporterOptions().CASOpts =
         clangImporterOpts.CASOpts;
-    GenericArgs.push_back("-enable-cas");
+    GenericArgs.push_back("-cache-compile-job");
     if (!clangImporterOpts.CASOpts->CASPath.empty()) {
       GenericArgs.push_back("-cas-path");
       GenericArgs.push_back(clangImporterOpts.CASOpts->CASPath);

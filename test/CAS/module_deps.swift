@@ -66,7 +66,8 @@ import SubE
 // CHECK-DAG:     "swift": "_Concurrency"
 // CHECK-DAG:     "swift": "_cross_import_E"
 // CHECK: ],
-
+// CHECK:      "commandLine":
+// CHECK:      "casFSRootID":
 // CHECK:      "extraPcmArgs": [
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "-target",
@@ -124,6 +125,8 @@ import SubE
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
+// CHECK: "-cache-compile-job"
+// CHECK: "-cas-path"
 // CHECK: "-module-name"
 // CHECK: "G"
 // CHECK: "-swift-version"
