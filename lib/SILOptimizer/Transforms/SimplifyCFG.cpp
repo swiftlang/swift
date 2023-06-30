@@ -30,6 +30,7 @@
 
 #define DEBUG_TYPE "sil-simplify-cfg"
 
+#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
@@ -40,13 +41,13 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
@@ -3618,6 +3619,26 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   return true;
 }
+
+namespace swift::test {
+/// Arguments
+/// - block - the block whose argument is to be simplified
+/// - index - the index of the argument to be simplified
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGSimplifyArgument(
+    "simplify-cfg-simplify-argument",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      auto *block = arguments.takeBlock();
+      auto index = arguments.takeUInt();
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .simplifyArgument(block, index);
+    });
+} // end namespace swift::test
 
 // OWNERSHIP NOTE: This is always safe for guaranteed and owned arguments since
 // in both cases the phi will consume its input.

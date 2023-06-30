@@ -315,19 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
 
-static FunctionTest SimplifyCFGSimplifyArgument(
-    "simplify-cfg-simplify-argument",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
-      passToRun->injectPassManager(test.getPassManager());
-      passToRun->injectFunction(&function);
-      auto *block = arguments.takeBlock();
-      auto index = arguments.takeUInt();
-      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
-                  /*EnableJumpThread=*/false)
-          .simplifyArgument(block, index);
-    });
-
 static FunctionTest SimplifyCFGSimplifyBlockArgs(
     "simplify-cfg-simplify-block-args",
     [](auto &function, auto &arguments, auto &test) {
