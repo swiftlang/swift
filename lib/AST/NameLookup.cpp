@@ -680,11 +680,8 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
-      // Next, prefer any other module over the (_)Observation module.
-      auto obsModule = ctx.getLoadedModule(ctx.Id_Observation);
-      if (!obsModule)
-        obsModule = ctx.getLoadedModule(ctx.Id_Observation_);
-      if (obsModule) {
+      // Next, prefer any other module over the Observation module.
+      if (auto obsModule = ctx.getLoadedModule(ctx.Id_Observation)) {
         if ((firstModule == obsModule) != (secondModule == obsModule)) {
           // If second module is (_)Observation, then it is shadowed by
           // first.
