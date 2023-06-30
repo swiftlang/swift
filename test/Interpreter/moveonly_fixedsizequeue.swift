@@ -1,19 +1,21 @@
-// REQUIRES: executable_test
-
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
+
+// REQUIRES: executable_test
 
 enum FixedSizeQueueError : Error {
     case outOfSpace
 }
 
 struct FixedSizeQueue<T> : ~Copyable {
-    private var readOffset: Int = 0
-    private var writeOffset: Int = 0
+    private var readOffset: Int
+    private var writeOffset: Int
     private var ptr: UnsafeMutableBufferPointer<T>
 
-    init(size: Int) {
-        ptr = UnsafeMutableBufferPointer.allocate(capacity: size)
+    init(capacity: Int) {
+        readOffset = 0
+        writeOffset = 0
+        ptr = UnsafeMutableBufferPointer.allocate(capacity: capacity)
     }
 
     deinit {
@@ -38,16 +40,23 @@ struct FixedSizeQueue<T> : ~Copyable {
         writeOffset = (writeOffset + 1) % ptr.count
     }
 
-    // Drain the queue... returning the value.
-    consuming func drain() -> UnsafeMutableBufferPointer<T> {
+    private consuming func cleanupQueue() -> UnsafeMutableBufferPointer<T> {
         let buffer = self.ptr
         discard self
+        return buffer
+    }
+
+    // Drain the queue... returning the value.
+    mutating func drain() -> UnsafeMutableBufferPointer<T> {
+        let count = ptr.count
+        let buffer = cleanupQueue()
+        self = .init(capacity: count)
         return buffer
     }
 }
 
 func main() throws {
-    var x = FixedSizeQueue<Int>(size: 10)
+    var x = FixedSizeQueue<Int>(capacity: 10)
     precondition(x.read() == nil)
     try x.write(0)
     try x.write(9)
@@ -63,6 +72,16 @@ func main() throws {
     precondition(d[1] == 9)
     precondition(d[2] == 1)
     precondition(d[3] == 3)
+
+    precondition(x.read() == nil)
+    try x.write(3)
+    try x.write(1)
+    try x.write(9)
+    try x.write(0)
+    precondition(x.read() == 3)
+    precondition(x.read() == 1)
+    precondition(x.read() == 9)
+    precondition(x.read() == 0)
 }
 
 try main()
