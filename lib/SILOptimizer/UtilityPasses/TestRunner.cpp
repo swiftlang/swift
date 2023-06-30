@@ -231,39 +231,6 @@ static FunctionTest TestSpecificationTest(
 //===----------------------------------------------------------------------===//
 
 // Arguments:
-// - variadic list of live-range defining values or instructions
-// Dumps:
-// - the liveness result and boundary
-//
-// Computes liveness for the specified def nodes by finding all their direct SSA
-// uses. If the def is an instruction, then all results are considered.
-static FunctionTest MultiDefLivenessTest(
-    "multidef-liveness", [](auto &function, auto &arguments, auto &test) {
-      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-      MultiDefPrunedLiveness liveness(&function, &discoveredBlocks);
-
-      llvm::outs() << "MultiDef lifetime analysis:\n";
-      while (arguments.hasUntaken()) {
-        auto argument = arguments.takeArgument();
-        if (isa<InstructionArgument>(argument)) {
-          auto *instruction = cast<InstructionArgument>(argument).getValue();
-          llvm::outs() << "  def instruction: " << instruction;
-          liveness.initializeDef(instruction);
-        } else {
-          SILValue value = cast<ValueArgument>(argument).getValue();
-          llvm::outs() << "  def value: " << value;
-          liveness.initializeDef(value);
-        }
-      }
-      liveness.computeSimple();
-      liveness.print(llvm::outs());
-
-      PrunedLivenessBoundary boundary;
-      liveness.computeBoundary(boundary);
-      boundary.print(llvm::outs());
-    });
-
-// Arguments:
 // - the string "defs:"
 // - list of live-range defining values or instructions
 // - the string "uses:"
