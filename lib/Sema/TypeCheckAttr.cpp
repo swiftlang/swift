@@ -7149,9 +7149,16 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
 
       if (resolved->is<ErrorType>()) {
         attr->setInvalid();
-      } else {
-        typeExpr->setType(MetatypeType::get(resolved));
+        continue;
       }
+
+      if (!resolved->isConstraintType()) {
+        diagnoseAndRemoveAttr(attr, diag::extension_macro_invalid_conformance,
+                              resolved);
+        continue;
+      }
+
+      typeExpr->setType(MetatypeType::get(resolved));
     }
   }
 }

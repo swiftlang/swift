@@ -8598,6 +8598,15 @@ public:
   void getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
                           SmallVectorImpl<DeclName> &names) const;
 
+  /// Populate the \c conformances vector with the protocols that
+  /// this macro generates conformances to.
+  ///
+  /// Only extension macros can add conformances; no results will
+  /// be added if this macro does not contain an extension role.
+  void getIntroducedConformances(
+      NominalTypeDecl *attachedTo,
+      SmallVectorImpl<ProtocolDecl *> &conformances) const;
+
   /// Returns a DeclName that represents arbitrary names.
   static DeclName getArbitraryName() {
     return DeclName();

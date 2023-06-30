@@ -1304,8 +1304,13 @@ public struct DelegatedConformanceViaExtensionMacro: ExtensionMacro {
     of node: AttributeSyntax,
     attachedTo decl: some DeclGroupSyntax,
     providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
     let decl: DeclSyntax =
       """
       extension \(raw: type.trimmedDescription): P where Element: P {
