@@ -28,8 +28,8 @@ let memBehaviorDumper = FunctionPass(name: "dump-mem-behavior") {
     for value in values where value.definingInstruction != inst {
 
       if value.type.isAddress || value is AddressToPointerInst {
-        let read = aliasAnalysis.mayRead(inst, fromAddress: value)
-        let write = aliasAnalysis.mayWrite(inst, toAddress: value)
+        let read = inst.mayRead(fromAddress: value, aliasAnalysis)
+        let write = inst.mayWrite(toAddress: value, aliasAnalysis)
         print("PAIR #\(currentPair).")
         print("  \(inst)")
         print("  \(value)")
