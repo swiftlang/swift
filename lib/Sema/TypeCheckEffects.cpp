@@ -2927,7 +2927,7 @@ private:
            auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
            if (callee) {
              Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
-                                callee->getDescriptiveKind(), callee->getName());
+                                callee);
            } else {
              Ctx.Diags.diagnose(
                  diag.expr.getStartLoc(), diag::actor_isolated_sync_func_value,

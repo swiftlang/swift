@@ -411,8 +411,7 @@ llvm::Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     }
 
     // Declarations that cannot be part of a key-path.
-    diags.diagnose(componentNameLoc, diag::expr_keypath_not_property,
-                   found->getDescriptiveKind(), found->getName(),
+    diags.diagnose(componentNameLoc, diag::expr_keypath_not_property, found,
                    /*isForDynamicKeyPathMemberLookup=*/false);
     isInvalid = true;
     break;

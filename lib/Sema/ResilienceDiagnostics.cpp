@@ -224,15 +224,14 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   auto reason = where.getExportabilityReason();
 
   if (fragileKind.kind == FragileFunctionKind::None) {
-    auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
-                              diag::decl_from_hidden_module_warn:
-                              diag::decl_from_hidden_module;
-    ctx.Diags.diagnose(loc, errorOrWarning,
-                       D->getDescriptiveKind(),
-                       diagName,
+    DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
+                             ? DiagnosticBehavior::Warning
+                             : DiagnosticBehavior::Unspecified;
+    ctx.Diags.diagnose(loc, diag::decl_from_hidden_module, D,
                        static_cast<unsigned>(*reason),
                        definingModule->getName(),
-                       static_cast<unsigned>(originKind));
+                       static_cast<unsigned>(originKind))
+        .limitBehavior(limit);
 
     D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   } else {
@@ -241,14 +240,12 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     assert(downgradeToWarning == DowngradeToWarning::No ||
            originKind == DisallowedOriginKind::MissingImport &&
            "Only implicitly imported decls should be reported as a warning.");
-    auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
-                              diag::inlinable_decl_ref_from_hidden_module_warn:
-                              diag::inlinable_decl_ref_from_hidden_module;
 
-    ctx.Diags.diagnose(loc, errorOrWarning,
-                       D->getDescriptiveKind(), diagName,
+    ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
                        fragileKind.getSelector(), definingModule->getName(),
-                       static_cast<unsigned>(originKind));
+                       static_cast<unsigned>(originKind))
+        .warnUntilSwiftVersionIf(downgradeToWarning == DowngradeToWarning::Yes,
+                                 6);
 
     if (originKind == DisallowedOriginKind::MissingImport &&
         downgradeToWarning == DowngradeToWarning::Yes)

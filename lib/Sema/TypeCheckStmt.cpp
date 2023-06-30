@@ -151,16 +151,6 @@ namespace {
     }
   };
 
-  static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
-    DeclName name = AFD->getName();
-    if (!name) {
-      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        name = accessor->getStorage()->getName();
-      }
-    }
-    return name;
-  }
-
   /// Used for debugging which parts of the code are taking a long time to
   /// compile.
   class FunctionBodyTimer {
@@ -187,7 +177,8 @@ namespace {
         if (AFD) {
           llvm::errs()
             << "\t" << Decl::getDescriptiveKindName(AFD->getDescriptiveKind())
-            << " " << getDescriptiveName(AFD);
+            << " ";
+          AFD->dumpRef(llvm::errs());
         } else {
           llvm::errs() << "\t(closure)";
         }
@@ -198,8 +189,7 @@ namespace {
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
-                             AFD->getDescriptiveKind(), getDescriptiveName(AFD),
-                             elapsedMS, WarnLimit);
+                             AFD, elapsedMS, WarnLimit);
         } else {
           ctx.Diags.diagnose(Function.getLoc(), diag::debug_long_closure_body,
                              elapsedMS, WarnLimit);
@@ -2223,8 +2213,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
         ExportContext::forFunctionBody(fromCtor, loc));
     if (didDiagnose) {
       fromCtor->diagnose(diag::availability_unavailable_implicit_init,
-                         ctor->getDescriptiveKind(), ctor->getName(),
-                         superclassDecl->getName());
+                         ctor, superclassDecl->getName());
     }
 
     // Not allowed to implicitly generate a super.init() call if the init

@@ -2082,12 +2082,12 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     return Diagnostic(
         IsError ? diag::availability_decl_only_version_newer_for_clients
                 : diag::availability_decl_only_version_newer_for_clients_warn,
-        D->getName(), Platform, Version, ReferenceDC->getParentModule());
+        D, Platform, Version, ReferenceDC->getParentModule());
   }
 
   IsError = true;
-  return Diagnostic(diag::availability_decl_only_version_newer, D->getName(),
-                    Platform, Version);
+  return Diagnostic(diag::availability_decl_only_version_newer, D, Platform,
+                    Version);
 }
 
 bool TypeChecker::diagnosePotentialUnavailability(
@@ -2123,18 +2123,14 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
 
   assert(Accessor->isGetterOrSetter());
 
-  const AbstractStorageDecl *ASD = Accessor->getStorage();
-  DeclName Name = ASD->getName();
-
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
-                        : diag::availability_accessor_only_version_newer;
+                        : diag::availability_decl_only_version_newer;
 
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
     auto Err =
       Context.Diags.diagnose(
-               ReferenceRange.Start, diag,
-               static_cast<unsigned>(Accessor->getAccessorKind()), Name,
+               ReferenceRange.Start, diag, Accessor,
                prettyPlatformString(targetPlatform(Context.LangOpts)),
                Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
@@ -3593,8 +3589,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   if (const AvailableAttr *attr = D->getAttrs().getNoAsync(ctx)) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl,
-                                   D->getDescriptiveKind(), D->getBaseName(),
-                                   attr->Message);
+                                   D, attr->Message);
     diag.warnUntilSwiftVersion(6);
 
     if (!attr->Rename.empty()) {
@@ -3613,8 +3608,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
       D->getAttrs().getAttribute<UnavailableFromAsyncAttr>();
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   ctx.Diags
-      .diagnose(diagLoc, diag::async_unavailable_decl, D->getDescriptiveKind(),
-                D->getBaseName(), attr->Message)
+      .diagnose(diagLoc, diag::async_unavailable_decl, D, attr->Message)
       .warnUntilSwiftVersion(6);
   D->diagnose(diag::decl_declared_here, D->getName());
   return true;

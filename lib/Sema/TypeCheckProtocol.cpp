@@ -3167,8 +3167,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   // actor isolation.
   witness->diagnose(diag::actor_isolated_witness,
                     isDistributed && !isDistributedDecl(witness),
-                    refResult.isolation, witness->getDescriptiveKind(),
-                    witness->getName(), requirementIsolation)
+                    refResult.isolation, witness, requirementIsolation)
     .limitBehavior(behavior);
 
   // If we need 'distributed' on the witness, add it.
@@ -3318,8 +3317,7 @@ public:
 
     SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
     ctx.Diags.diagnose(diagLoc, diagID,
-                       witness->getDescriptiveKind(),
-                       witness->getName(),
+                       witness,
                        proto->getName());
     emitDeclaredHereIfNeeded(ctx.Diags, diagLoc, witness);
   }
@@ -3404,8 +3402,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         auto &diags = DC->getASTContext().Diags;
         diags.diagnose(getLocForDiagnosingWitness(conformance, typeDecl),
                        diagKind,
-                       typeDecl->getDescriptiveKind(),
-                       typeDecl->getName(),
+                       typeDecl,
                        requiredAccess,
                        proto->getName());
         diagnoseWitnessFixAccessLevel(diags, typeDecl, requiredAccess);
@@ -4166,11 +4163,9 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
       auto &diags = proto->getASTContext().Diags;
       SourceLoc diagLoc = getLocForDiagnosingWitness(Conformance, witness);
       diags.diagnose(diagLoc, diag::witness_self_same_type,
-                     witness->getDescriptiveKind(),
-                     witness->getName(),
+                     witness,
                      Conformance->getType(),
-                     requirement->getDescriptiveKind(),
-                     requirement->getName(),
+                     requirement,
                      proto->getDeclaredInterfaceType());
       emitDeclaredHereIfNeeded(diags, diagLoc, witness);
 
@@ -4284,8 +4279,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           {
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
             auto diag = diags.diagnose(
-                diagLoc, diag::witness_argument_name_mismatch,
-                witness->getDescriptiveKind(), witness->getName(),
+                diagLoc, diag::witness_argument_name_mismatch, witness,
                 proto->getDeclaredInterfaceType(), requirement->getName());
             if (diagLoc == witness->getLoc()) {
               fixDeclarationName(diag, witness, requirement->getName());
@@ -4319,8 +4313,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             auto &diags = DC->getASTContext().Diags;
             diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
                            diag::witness_not_as_sendable,
-                           witness->getDescriptiveKind(), witness->getName(),
-                           conformance->getProtocol()->getName())
+                           witness, conformance->getProtocol()->getName())
                 .limitBehavior(limit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here)
                 .limitBehavior(limit);
@@ -4478,8 +4471,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto *attr = AvailableAttr::isUnavailable(witness);
           EncodedDiagnosticMessage EncodedMessage(attr->Message);
           diags.diagnose(diagLoc, diag::witness_unavailable,
-                         witness->getDescriptiveKind(), witness->getName(),
-                         conformance->getProtocol()->getName(),
+                         witness, conformance->getProtocol()->getName(),
                          EncodedMessage.Message);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement, diag::kind_declname_declared_here,
@@ -5297,7 +5289,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                   Swift3ObjCInferenceWarnings::Minimal) {
             C.Diags.diagnose(
                 Conformance->getLoc(), diag::witness_swift3_objc_inference,
-                witness->getDescriptiveKind(), witness->getName(),
+                witness,
                 Conformance->getProtocol()->getDeclaredInterfaceType());
             witness
                 ->diagnose(diag::make_decl_objc, witness->getDescriptiveKind())
@@ -6141,8 +6133,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
   // Primary warning.
-  witness->diagnose(diag::req_near_match, witness->getDescriptiveKind(),
-                    witness->getName(),
+  witness->diagnose(diag::req_near_match, witness,
                     req->getAttrs().hasAttribute<OptionalAttr>(),
                     req->getName(), proto->getName());
 
@@ -6639,8 +6630,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
             continue;
 
           value->diagnose(diag::redundant_conformance_witness_ignored,
-                          value->getDescriptiveKind(), value->getName(),
-                          diag.Protocol->getName());
+                          value, diag.Protocol->getName());
           break;
         }
       }

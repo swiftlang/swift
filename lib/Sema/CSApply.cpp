@@ -1647,7 +1647,7 @@ namespace {
                   Swift3ObjCInferenceWarnings::Minimal) {
             context.Diags.diagnose(
                 memberLoc, diag::expr_dynamic_lookup_swift3_objc_inference,
-                member->getDescriptiveKind(), member->getName(),
+                member,
                 member->getDeclContext()->getSelfNominalTypeDecl()->getName());
             context.Diags
                 .diagnose(member, diag::make_decl_objc,
@@ -4844,7 +4844,7 @@ namespace {
           de.diagnose(E->getModifierLoc(),
                       diag::expr_selector_expected_property,
                       E->getSelectorKind() == ObjCSelectorExpr::Setter,
-                      foundDecl->getDescriptiveKind(), foundDecl->getName())
+                      foundDecl)
               .fixItRemoveChars(E->getModifierLoc(),
                                 E->getSubExpr()->getStartLoc());
 
@@ -4914,7 +4914,7 @@ namespace {
           // Make sure we actually have a setter.
           if (!var->isSettable(dc)) {
             de.diagnose(E->getLoc(), diag::expr_selector_property_not_settable,
-                        var->getDescriptiveKind(), var->getName());
+                        var);
             de.diagnose(var, diag::decl_declared_here, var->getName());
             return E;
           }
@@ -4922,8 +4922,7 @@ namespace {
           // Make sure the setter is accessible.
           if (!var->isSetterAccessibleFrom(dc)) {
             de.diagnose(E->getLoc(),
-                        diag::expr_selector_property_setter_inaccessible,
-                        var->getDescriptiveKind(), var->getName());
+                        diag::expr_selector_property_setter_inaccessible, var);
             de.diagnose(var, diag::decl_declared_here, var->getName());
             return E;
           }
@@ -4954,8 +4953,7 @@ namespace {
           return E;
         }
 
-        de.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                    foundDecl->getDescriptiveKind(), foundDecl->getName())
+        de.diagnose(E->getLoc(), diag::expr_selector_not_objc, foundDecl)
             .highlight(subExpr->getSourceRange());
         de.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
@@ -4968,10 +4966,9 @@ namespace {
             cs.getASTContext().LangOpts.WarnSwift3ObjCInference ==
                 Swift3ObjCInferenceWarnings::Minimal) {
           de.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
-                      foundDecl->getDescriptiveKind(), foundDecl->getName(),
-                      foundDecl->getDeclContext()
-                          ->getSelfNominalTypeDecl()
-                          ->getName())
+                      foundDecl, foundDecl->getDeclContext()
+                                    ->getSelfNominalTypeDecl()
+                                    ->getName())
               .highlight(subExpr->getSourceRange());
           de.diagnose(foundDecl, diag::make_decl_objc,
                       foundDecl->getDescriptiveKind())

@@ -455,8 +455,7 @@ bool RequirementFailure::diagnoseAsError() {
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
     emitDiagnostic(diag::type_does_not_conform_in_opaque_return,
-                   namingDecl->getDescriptiveKind(), namingDecl->getName(),
-                   lhs, rhs, rhs->isAnyObject());
+                   namingDecl, lhs, rhs, rhs->isAnyObject());
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
       emitDiagnosticAt(repr->getLoc(), diag::opaque_return_type_declared_here)
@@ -470,11 +469,10 @@ bool RequirementFailure::diagnoseAsError() {
        isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(
-        getDiagnosticInRereference(), AffectedDecl->getDescriptiveKind(),
-        AffectedDecl->getName(), NTD->getDeclaredType(), lhs, rhs);
+        getDiagnosticInRereference(), AffectedDecl, NTD->getDeclaredType(),
+        lhs, rhs);
   } else {
-    emitDiagnostic(getDiagnosticOnDecl(), AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getName(), lhs, rhs);
+    emitDiagnostic(getDiagnosticOnDecl(), AffectedDecl, lhs, rhs);
   }
 
   maybeEmitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
@@ -669,8 +667,7 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
     auto *namingDecl = OTD->getNamingDecl();
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
       emitDiagnosticAt(repr->getLoc(), diag::required_by_opaque_return,
-                       namingDecl->getDescriptiveKind(),
-                       namingDecl->getName())
+                       namingDecl)
           .highlight(repr->getSourceRange());
     }
     return true;
@@ -692,15 +689,12 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   } else if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
                                      isStaticOrInstanceMember(AffectedDecl))) {
     emitDiagnosticAt(noteLocation, diag::required_by_decl_ref,
-                     AffectedDecl->getDescriptiveKind(),
-                     AffectedDecl->getName(),
+                     AffectedDecl,
                      reqDC->getSelfNominalTypeDecl()->getDeclaredType(),
                      req.getFirstType(), nonConformingType);
   } else {
     emitDiagnosticAt(noteLocation, diag::required_by_decl,
-                     AffectedDecl->getDescriptiveKind(),
-                     AffectedDecl->getName(), req.getFirstType(),
-                     nonConformingType);
+                     AffectedDecl, req.getFirstType(), nonConformingType);
   }
 
   return true;
@@ -1912,8 +1906,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
     return false;
 
   auto *decl = overload->choice.getDecl();
-  emitDiagnosticAt(decl, diag::candidate_is_not_assignable,
-                   decl->getDescriptiveKind(), decl->getName());
+  emitDiagnosticAt(decl, diag::candidate_is_not_assignable, decl);
   return true;
 }
 
@@ -3817,8 +3810,7 @@ bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,
-                   member->getDescriptiveKind(), member->getName(), false,
-                   getToType())
+                   member, false, getToType())
         .fixItInsert(getLoc(), newPrefix);
     return true;
   }
@@ -3834,8 +3826,7 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,
-                   member->getDescriptiveKind(), member->getName(), true,
-                   getToType())
+                   member, true, getToType())
         .fixItRemoveChars(getLoc(), endLoc);
     return true;
   }
@@ -6088,7 +6079,7 @@ bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
 }
 
 bool InvalidMethodRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_not_property, getKind(), getName(),
+  emitDiagnostic(diag::expr_keypath_not_property, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
@@ -6931,7 +6922,7 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
                              choice->getDescriptiveKind(), paramTy, subsStr)
           : emitDiagnosticAt(
                 args->getLoc(), diag::single_tuple_parameter_mismatch_normal,
-                choice->getDescriptiveKind(), name, paramTy, subsStr);
+                choice, paramTy, subsStr);
 
   auto newLeftParenLoc = args->getStartLoc();
   auto firstArgLabel = args->getLabel(0);
@@ -8040,15 +8031,14 @@ bool MissingQualifierInMemberRefFailure::diagnoseAsError() {
   auto *DC = choice->getDeclContext();
   if (!(DC->isModuleContext() || DC->isModuleScopeContext())) {
     emitDiagnostic(diag::member_shadows_function, UDE->getName(), methodKind,
-                   choice->getDescriptiveKind(), choice->getName());
+                   choice);
     return true;
   }
 
   auto qualifier = DC->getParentModule()->getName();
 
   emitDiagnostic(diag::member_shadows_global_function, UDE->getName(),
-                 methodKind, choice->getDescriptiveKind(),
-                 choice->getName(), qualifier);
+                 methodKind, choice, qualifier);
 
   SmallString<32> namePlusDot = qualifier.str();
   namePlusDot.push_back('.');
@@ -8570,7 +8560,7 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
 
   emitDiagnostic(
       diag::contextual_member_ref_on_protocol_requires_self_requirement,
-      member->getDescriptiveKind(), member->getName());
+      member);
 
   auto *extension = dyn_cast<ExtensionDecl>(member->getDeclContext());
 
@@ -8920,7 +8910,7 @@ bool SwiftToCPointerConversionInInvalidContext::diagnoseAsError() {
   auto paramType = resolveType(argInfo->getParamType());
 
   emitDiagnostic(diag::cannot_convert_argument_value_for_swift_func, argType,
-                 paramType, callee->getDescriptiveKind(), callee->getName());
+                 paramType, callee);
   return true;
 }
 

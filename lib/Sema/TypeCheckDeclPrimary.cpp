@@ -2611,8 +2611,7 @@ public:
       if (mentionsItself) {
         auto &DE = getASTContext().Diags;
         DE.diagnose(AT->getDefaultDefinitionTypeRepr()->getLoc(),
-                    diag::recursive_decl_reference, AT->getDescriptiveKind(),
-                    AT->getName());
+                    diag::recursive_decl_reference, AT);
         AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
       }
     }
@@ -2743,8 +2742,7 @@ public:
       if (!ED->getASTContext().LangOpts.hasFeature(
               Feature::MoveOnlyResilientTypes) &&
           ED->isResilient()) {
-        ED->diagnose(diag::noncopyable_types_cannot_be_resilient,
-                     ED->getDescriptiveKind(), ED->getBaseIdentifier());
+        ED->diagnose(diag::noncopyable_types_cannot_be_resilient, ED);
       }
     }
   }
@@ -2790,8 +2788,7 @@ public:
     if (!SD->getASTContext().LangOpts.hasFeature(
             Feature::MoveOnlyResilientTypes) &&
         SD->isResilient() && SD->isMoveOnly()) {
-      SD->diagnose(diag::noncopyable_types_cannot_be_resilient,
-                   SD->getDescriptiveKind(), SD->getBaseIdentifier());
+      SD->diagnose(diag::noncopyable_types_cannot_be_resilient, SD);
     }
   }
 
@@ -2916,11 +2913,8 @@ public:
     }
 
     auto &ctx = moveonlyType->getASTContext();
-    ctx.Diags.diagnose(loc,
-                       diag::noncopyable_cannot_conform_to_type,
-                       moveonlyType->getDescriptiveKind(),
-                       moveonlyType->getBaseName(),
-                       type);
+    ctx.Diags.diagnose(loc, diag::noncopyable_cannot_conform_to_type,
+                       moveonlyType, type);
     return true;
   }
 

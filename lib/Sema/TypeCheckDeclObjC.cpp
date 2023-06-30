@@ -467,8 +467,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   case ActorIsolation::ActorInstance:
     if (!canExposeActorIsolatedAsObjC(VD, isolation)) {
       // Actor-isolated functions cannot be @objc.
-      VD->diagnose(diag::actor_isolated_objc, VD->getDescriptiveKind(),
-                   VD->getName());
+      VD->diagnose(diag::actor_isolated_objc, VD);
       Reason.describe(VD);
       if (auto FD = dyn_cast<FuncDecl>(VD)) {
         addAsyncNotes(const_cast<FuncDecl *>(FD));
@@ -1861,8 +1860,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
     // If this requirement has a different name from one we've seen,
     // note the ambiguity.
     if (*requirementObjCName != *req->getObjCRuntimeName()) {
-      decl->diagnose(diag::objc_ambiguous_inference,
-                     decl->getDescriptiveKind(), decl->getName(),
+      decl->diagnose(diag::objc_ambiguous_inference, decl,
                      *requirementObjCName, *req->getObjCRuntimeName());
 
       // Note the candidates and what Objective-C names they provide.

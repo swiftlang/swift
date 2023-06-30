@@ -494,7 +494,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
           AccessLevel diagAccessLevel) {
         if (checkUsableFromInline) {
           auto diag = D->diagnose(diag::global_actor_not_usable_from_inline,
-                                  D->getDescriptiveKind(), VD->getName());
+                                  VD);
           highlightOffendingType(diag, complainRepr);
           noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
           return;
@@ -2324,7 +2324,7 @@ public:
 
     auto &DE = PGD->getASTContext().Diags;
     auto diag =
-        DE.diagnose(diagLoc, diag::decl_from_hidden_module,
+        DE.diagnose(diagLoc, diag::decl_from_hidden_module_name,
                     PGD->getDescriptiveKind(), PGD->getName(),
                     static_cast<unsigned>(ExportabilityReason::General), M->getName(),
                     static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)

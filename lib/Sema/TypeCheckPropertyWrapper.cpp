@@ -82,8 +82,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   VarDecl *var = vars.front();
   if (isDeclNotAsAccessibleAsParent(var, nominal)) {
     var->diagnose(diag::property_wrapper_type_requirement_not_accessible,
-                  var->getFormalAccess(), var->getDescriptiveKind(),
-                  var->getName(), nominal->getDeclaredType(),
+                  var->getFormalAccess(), var, nominal->getDeclaredType(),
                   nominal->getFormalAccess());
     return nullptr;
   }
@@ -232,9 +231,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
       case NonViableReason::Inaccessible:
         init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
-                       init->getFormalAccess(), init->getDescriptiveKind(),
-                       init->getName(), nominal->getDeclaredType(),
-                       nominal->getFormalAccess());
+                       init->getFormalAccess(), init,
+                       nominal->getDeclaredType(), nominal->getFormalAccess());
         break;
 
       case NonViableReason::ParameterTypeMismatch:
@@ -320,8 +318,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   if (isDeclNotAsAccessibleAsParent(subscript, nominal)) {
     subscript->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                         subscript->getFormalAccess(),
-                        subscript->getDescriptiveKind(),
-                        subscript->getName(), nominal->getDeclaredType(),
+                        subscript, nominal->getDeclaredType(),
                         nominal->getFormalAccess());
     return nullptr;
   }
