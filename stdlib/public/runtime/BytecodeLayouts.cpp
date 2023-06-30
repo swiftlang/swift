@@ -746,6 +746,41 @@ swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   }
 }
 
+extern "C" void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  auto addr = reinterpret_cast<uint8_t *>(address);
+  LayoutStringReader reader{metadata->getLayoutString(),
+                            layoutStringHeaderSize + sizeof(uint64_t)};
+
+  auto numTagBytes = reader.readBytes<size_t>();
+  auto numPayloads = reader.readBytes<size_t>();
+  reader.skip(sizeof(size_t));
+  auto enumSize = reader.readBytes<size_t>();
+  auto payloadSize = enumSize - numTagBytes;
+
+  if (tag < numPayloads) {
+    // For a payload case, store the tag after the payload area.
+    auto tagBytes = addr + payloadSize;
+    storeEnumElement(tagBytes, tag, numTagBytes);
+  } else {
+    // For an empty case, factor out the parts that go in the payload and
+    // tag areas.
+    unsigned whichEmptyCase = tag - numPayloads;
+    unsigned whichTag, whichPayloadValue;
+    if (payloadSize >= 4) {
+      whichTag = numPayloads;
+      whichPayloadValue = whichEmptyCase;
+    } else {
+      unsigned numPayloadBits = payloadSize * CHAR_BIT;
+      whichTag = numPayloads + (whichEmptyCase >> numPayloadBits);
+      whichPayloadValue = whichEmptyCase & ((1U << numPayloadBits) - 1U);
+    }
+    auto tagBytes = addr + payloadSize;
+    storeEnumElement(tagBytes, whichTag, numTagBytes);
+    storeEnumElement(addr, whichPayloadValue, payloadSize);
+  }
+}
+
 template <typename T>
 static inline T handleSinglePayloadEnumGenericTag(
     LayoutStringReader &reader, uint8_t *addr,

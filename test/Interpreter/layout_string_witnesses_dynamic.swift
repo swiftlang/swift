@@ -618,6 +618,34 @@ func testResilientSinglePayloadEnumGenericInjectTag() {
 
 testResilientSinglePayloadEnumGenericInjectTag()
 
+@inline(never)
+func matchResilientMultiPayloadEnumGenericTag(_ x: ResilientMultiPayloadEnumGeneric<AnyObject>) -> Int {
+    return switch x {
+    case .nonEmpty0: 0
+    case .nonEmpty1: 1
+    case .empty0: 2
+    case .empty1: 3
+    }
+}
+
+func testResilientMultiPayloadEnumGenericInjectTag() {
+    let x = ResilientMultiPayloadEnumGeneric<AnyObject>.nonEmpty0(SimpleClass(x: 23))
+    let y = ResilientMultiPayloadEnumGeneric<AnyObject>.nonEmpty1(SimpleClass(x: 32))
+    let z = ResilientMultiPayloadEnumGeneric<AnyObject>.empty0
+    let w = ResilientMultiPayloadEnumGeneric<AnyObject>.empty1
+
+    // CHECK: Enum case: 0
+    print("Enum case: \(matchResilientMultiPayloadEnumGenericTag(x))")
+    // CHECK: Enum case: 1
+    print("Enum case: \(matchResilientMultiPayloadEnumGenericTag(y))")
+    // CHECK: Enum case: 2
+    print("Enum case: \(matchResilientMultiPayloadEnumGenericTag(z))")
+    // CHECK: Enum case: 3
+    print("Enum case: \(matchResilientMultiPayloadEnumGenericTag(w))")
+}
+
+testResilientMultiPayloadEnumGenericInjectTag()
+
 #if os(macOS)
 
 import Foundation

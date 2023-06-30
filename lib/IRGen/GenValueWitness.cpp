@@ -937,12 +937,13 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
                                     const EnumTypeLayoutEntry *typeLayoutEntry,
                                     GenericSignature genericSig) {
   if ((!typeLayoutEntry->layoutString(IGM, genericSig) &&
-       !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) ||
-      typeLayoutEntry->isSingleton()) {
+       !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry))) {
+    return nullptr;
+  } else if (typeLayoutEntry->isSingleton()) {
     return nullptr;
   } else if (!typeLayoutEntry->isFixedSize(IGM)) {
     if (typeLayoutEntry->isMultiPayloadEnum()) {
-      return nullptr;
+      return IGM.getMultiPayloadEnumGenericDestructiveInjectEnumTagFn();
     } else {
       return IGM.getSinglePayloadEnumGenericDestructiveInjectEnumTagFn();
     }
