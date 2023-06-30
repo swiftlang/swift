@@ -22,6 +22,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -93,6 +94,22 @@ bool swift::findPointerEscape(SILValue original) {
   }
   return false;
 }
+
+namespace swift::test {
+// Arguments:
+// - value: the value to check for escaping
+// Dumps:
+// - the value
+// - whether it has a pointer escape
+static FunctionTest OwnershipUtilsHasPointerEscape(
+    "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      auto has = findPointerEscape(value);
+      value->print(llvm::errs());
+      auto *boolString = has ? "true" : "false";
+      llvm::errs() << boolString << "\n";
+    });
+} // end namespace swift::test
 
 bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
   if (auto *inst = value->getDefiningInstructionOrTerminator()) {

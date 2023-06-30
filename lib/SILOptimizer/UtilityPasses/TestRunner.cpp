@@ -227,20 +227,6 @@ static FunctionTest TestSpecificationTest(
     });
 
 // Arguments:
-// - value: the value to check for escaping
-// Dumps:
-// - the value
-// - whether it has a pointer escape
-static FunctionTest OwnershipUtilsHasPointerEscape(
-    "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
-      auto value = arguments.takeValue();
-      auto has = findPointerEscape(value);
-      value->print(llvm::errs());
-      auto *boolString = has ? "true" : "false";
-      llvm::errs() << boolString << "\n";
-    });
-
-// Arguments:
 // - value: whose type will be printed
 // Dumps:
 // - the type lowering of the type
