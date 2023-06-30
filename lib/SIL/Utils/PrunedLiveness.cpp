@@ -601,6 +601,65 @@ bool MultiDefPrunedLiveness::isUserBeforeDef(SILInstruction *user) const {
   }
 }
 
+namespace swift::test {
+// Arguments:
+// - the string "defs:"
+// - list of live-range defining values or instructions
+// - the string "uses:"
+// - variadic list of live-range user instructions
+// Dumps:
+// - the liveness result and boundary
+//
+// Computes liveness for the specified def nodes by considering only the
+// specified uses. The actual uses of the def nodes are ignored.
+//
+// This is useful for testing non-ssa liveness, for example, of memory
+// locations. In that case, the def nodes may be stores and the uses may be
+// destroy_addrs.
+static FunctionTest MultiDefUseLivenessTest(
+    "multidefuse-liveness", [](auto &function, auto &arguments, auto &test) {
+      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+      MultiDefPrunedLiveness liveness(&function, &discoveredBlocks);
+
+      llvm::outs() << "MultiDef lifetime analysis:\n";
+      if (arguments.takeString() != "defs:") {
+        llvm::report_fatal_error(
+            "test specification expects the 'defs:' label\n");
+      }
+      while (true) {
+        auto argument = arguments.takeArgument();
+        if (isa<InstructionArgument>(argument)) {
+          auto *instruction = cast<InstructionArgument>(argument).getValue();
+          llvm::outs() << "  def instruction: " << *instruction;
+          liveness.initializeDef(instruction);
+          continue;
+        }
+        if (isa<ValueArgument>(argument)) {
+          SILValue value = cast<ValueArgument>(argument).getValue();
+          llvm::outs() << "  def value: " << value;
+          liveness.initializeDef(value);
+          continue;
+        }
+        if (cast<StringArgument>(argument).getValue() != "uses:") {
+          llvm::report_fatal_error(
+              "test specification expects the 'uses:' label\n");
+        }
+        break;
+      }
+      while (arguments.hasUntaken()) {
+        auto *inst = arguments.takeInstruction();
+        // lifetimeEnding has no effects on liveness, it's only a cache for the
+        // caller.
+        liveness.updateForUse(inst, /*lifetimeEnding*/ false);
+      }
+      liveness.print(llvm::outs());
+
+      PrunedLivenessBoundary boundary;
+      liveness.computeBoundary(boundary);
+      boundary.print(llvm::outs());
+    });
+} // end namespace swift::test
+
 void MultiDefPrunedLiveness::findBoundariesInBlock(
     SILBasicBlock *block, bool isLiveOut,
     PrunedLivenessBoundary &boundary) const {
