@@ -1547,6 +1547,111 @@ namespace {
     }
   };
 
+  class InitAccessorComponent
+      : public AccessorBasedComponent<LogicalPathComponent> {
+  public:
+    InitAccessorComponent(AbstractStorageDecl *decl,
+                          SILDeclRef accessor,
+                          bool isSuper,
+                          bool isDirectAccessorUse,
+                          SubstitutionMap substitutions,
+                          CanType baseFormalType,
+                          LValueTypeData typeData,
+                          ArgumentList *subscriptArgList,
+                          PreparedArguments &&indices,
+                          bool isOnSelfParameter,
+                          Optional<ActorIsolation> actorIso)
+        : AccessorBasedComponent(
+              InitAccessorKind, decl, accessor, isSuper, isDirectAccessorUse,
+              substitutions, baseFormalType, typeData, subscriptArgList,
+              std::move(indices), isOnSelfParameter, actorIso) {
+      assert(getAccessorDecl()->isInitAccessor());
+    }
+
+    InitAccessorComponent(const InitAccessorComponent &copied,
+                          SILGenFunction &SGF, SILLocation loc)
+        : AccessorBasedComponent(copied, SGF, loc) {}
+
+    void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
+             ManagedValue base) &&
+        override {
+      VarDecl *field = cast<VarDecl>(Storage);
+      auto fieldType = field->getValueInterfaceType();
+      if (!Substitutions.empty()) {
+        fieldType = fieldType.subst(Substitutions);
+      }
+
+      // Emit the init accessor function partially applied to the base.
+      SILValue initFRef =
+          emitPartialInitAccessorReference(SGF, loc, getAccessorDecl());
+
+      SILValue setterFRef;
+      CanSILFunctionType setterTy;
+      std::tie(setterFRef, setterTy) = applySetterToBase(
+          SGF, loc, SILDeclRef(field->getOpaqueAccessor(AccessorKind::Set)),
+          base);
+
+      auto Mval =
+          emitValue(SGF, loc, field, fieldType, std::move(value), setterTy);
+
+      SGF.B.createAssignOrInit(loc, base.getValue(), Mval.forward(SGF),
+                               initFRef, setterFRef, AssignOrInitInst::Unknown);
+    }
+
+    RValue get(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
+               SGFContext c) &&
+        override {
+      llvm_unreachable("called get on an init accessor component");
+    }
+
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &SGF, SILLocation loc) const override {
+      LogicalPathComponent *clone = new InitAccessorComponent(*this, SGF, loc);
+      return std::unique_ptr<LogicalPathComponent>(clone);
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      printBase(OS, indent, "InitAccessorComponent");
+    }
+
+    /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
+                           Indices.isNull() ? nullptr : &Indices,
+                           ArgListForDiagnostics};
+    }
+
+  private:
+    SILValue emitPartialInitAccessorReference(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              AccessorDecl *initAccessor) {
+      assert(initAccessor->isInitAccessor());
+      auto initConstant = SGF.getAccessorDeclRef(initAccessor);
+      SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
+
+      // If there are no substitutions there is no need to emit partial
+      // apply.
+      if (Substitutions.empty())
+        return initFRef;
+
+      CanSILFunctionType initTy =
+          initFRef->getType().castTo<SILFunctionType>()->substGenericArgs(
+              SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
+
+      SILFunctionConventions setterConv(initTy, SGF.SGM.M);
+
+      // Emit partial apply without argument to produce a substituted
+      // init accessor reference.
+      PartialApplyInst *initPAI = SGF.B.createPartialApply(
+          loc, initFRef, Substitutions, ArrayRef<SILValue>(),
+          ParameterConvention::Direct_Guaranteed);
+      return SGF.emitManagedRValueWithCleanup(initPAI).getValue();
+    }
+  };
+
   class GetterSetterComponent
     : public AccessorBasedComponent<LogicalPathComponent> {
   public:
@@ -1700,51 +1805,24 @@ namespace {
       assert(!ActorIso && "no support for cross-actor set operations");
       SILDeclRef setter = Accessor;
 
-      auto emitPartialInitAccessorApply =
-          [&](AccessorDecl *initAccessor) -> SILValue {
-        assert(initAccessor->isInitAccessor());
-        auto initConstant = SGF.getAccessorDeclRef(initAccessor);
-        SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
-
-        // If there are no substitutions there is no need to emit partial
-        // apply.
-        if (Substitutions.empty())
-          return initFRef;
-
-        // Emit partial apply without argument to produce a substituted
-        // init accessor reference.
-        PartialApplyInst *initPAI = SGF.B.createPartialApply(
-            loc, initFRef, Substitutions, ArrayRef<SILValue>(),
-            ParameterConvention::Direct_Guaranteed);
-        return SGF.emitManagedRValueWithCleanup(initPAI).getValue();
-      };
-
       if (canRewriteSetAsInitAccessor(SGF)) {
         // Emit an assign_or_init with the allocating initializer function and the
         // setter function as arguments. DefiniteInitialization will then decide
         // between the two functions, depending if it's an init call or a
         // set call.
-        VarDecl *field = cast<VarDecl>(Storage);
-        auto FieldType = field->getValueInterfaceType();
-        if (!Substitutions.empty()) {
-          FieldType = FieldType.subst(Substitutions);
-        }
-
-        // Emit the init accessor function partially applied to the base.
-        auto initFn = emitPartialInitAccessorApply(
-            field->getOpaqueAccessor(AccessorKind::Init));
-
-        // Emit the set accessor function partially applied to the base.
-        SILValue setterFn;
-        CanSILFunctionType setterTy;
-        std::tie(setterFn, setterTy) =
-            applySetterToBase(SGF, loc, Accessor, base);
-
-        // Create the assign_or_init with the initializer and setter.
-        auto Mval =
-            emitValue(SGF, loc, field, FieldType, std::move(value), setterTy);
-        SGF.B.createAssignOrInit(loc, base.getValue(), Mval.forward(SGF),
-                                 initFn, setterFn, AssignOrInitInst::Unknown);
+        SILDeclRef initAccessorRef(Storage->getAccessor(AccessorKind::Init));
+        InitAccessorComponent IAC(Storage,
+                                  initAccessorRef,
+                                  IsSuper,
+                                  IsDirectAccessorUse,
+                                  Substitutions,
+                                  BaseFormalType,
+                                  getTypeData(),
+                                  ArgListForDiagnostics,
+                                  std::move(Indices),
+                                  IsOnSelfParameter,
+                                  ActorIso);
+        std::move(IAC).set(SGF, loc, std::move(value), base);
         return;
       }
 
