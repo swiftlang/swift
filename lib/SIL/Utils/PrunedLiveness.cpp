@@ -19,6 +19,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ScopedAddressUtils.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -160,6 +161,24 @@ void PrunedLivenessBoundary::visitInsertionPoints(
       visitor(std::next(cast<SILInstruction>(deadDef)->getIterator()));
   }
 }
+
+namespace swift::test {
+// Arguments:
+// - variadic list of - instruction: a last user
+// Dumps:
+// - the insertion points
+static FunctionTest
+    PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest(
+        "pruned-liveness-boundary-with-list-of-last-users-insertion-points",
+        [](auto &function, auto &arguments, auto &test) {
+          PrunedLivenessBoundary boundary;
+          while (arguments.hasUntaken()) {
+            boundary.lastUsers.push_back(arguments.takeInstruction());
+          }
+          boundary.visitInsertionPoints(
+              [](SILBasicBlock::iterator point) { point->dump(); });
+        });
+} // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
 //                              PrunedLiveRange

@@ -243,22 +243,6 @@ static FunctionTest PrintTypeLowering("print-type-lowering", [](auto &function,
 //===----------------------------------------------------------------------===//
 
 // Arguments:
-// - variadic list of - instruction: a last user
-// Dumps:
-// - the insertion points
-static FunctionTest
-    PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest(
-        "pruned-liveness-boundary-with-list-of-last-users-insertion-points",
-        [](auto &function, auto &arguments, auto &test) {
-          PrunedLivenessBoundary boundary;
-          while (arguments.hasUntaken()) {
-            boundary.lastUsers.push_back(arguments.takeInstruction());
-          }
-          boundary.visitInsertionPoints(
-              [](SILBasicBlock::iterator point) { point->dump(); });
-        });
-
-// Arguments:
 // - SILValue: value to a analyze
 // Dumps:
 // - the liveness result and boundary
