@@ -1790,6 +1790,24 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   return true;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - SwitchEnumInst - the instruction to to simplify
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
+    "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .simplifySwitchEnumUnreachableBlocks(
+              cast<SwitchEnumInst>(arguments.takeInstruction()));
+    });
+} // end namespace swift::test
+
 /// Checks that the someBB only contains obj_method calls (possibly chained) on
 /// the optional value.
 ///

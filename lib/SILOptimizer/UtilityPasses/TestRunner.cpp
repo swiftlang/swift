@@ -315,18 +315,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
 
-static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
-    "simplify-cfg-simplify-switch-enum-unreachable-blocks",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
-      passToRun->injectPassManager(test.getPassManager());
-      passToRun->injectFunction(&function);
-      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
-                  /*EnableJumpThread=*/false)
-          .simplifySwitchEnumUnreachableBlocks(
-              cast<SwitchEnumInst>(arguments.takeInstruction()));
-    });
-
 static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
     "simplify-cfg-simplify-term-with-identical-dest-blocks",
     [](auto &function, auto &arguments, auto &test) {
