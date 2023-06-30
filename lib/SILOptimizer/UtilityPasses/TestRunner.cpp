@@ -317,31 +317,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // - function
 // - the computed pruned liveness
 // - the liveness boundary
-static FunctionTest InteriorLivenessTest(
-    "interior-liveness", [](auto &function, auto &arguments, auto &test) {
-      SILValue value = arguments.takeValue();
-      function.dump();
-      llvm::dbgs() << "Interior liveness: " << value;
-      auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
-      DominanceInfo *domTree = dominanceAnalysis->get(&function);
-      InteriorLiveness liveness(value);
-      auto handleInnerScope = [](SILValue innerBorrow) {
-        llvm::outs() << "Inner scope: " << innerBorrow;
-      };
-      liveness.compute(domTree, handleInnerScope);
-      liveness.print(llvm::outs());
-
-      PrunedLivenessBoundary boundary;
-      liveness.getLiveness().computeBoundary(boundary);
-      boundary.print(llvm::outs());
-    });
-
-// Arguments:
-// - SILValue: value
-// Dumps:
-// - function
-// - the computed pruned liveness
-// - the liveness boundary
 static FunctionTest ExtendedLinearLivenessTest(
     "extended-liveness", [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
