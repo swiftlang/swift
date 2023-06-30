@@ -231,29 +231,6 @@ static FunctionTest TestSpecificationTest(
 //===----------------------------------------------------------------------===//
 
 // Arguments:
-// - SILValue: value to a analyze
-// Dumps:
-// - the liveness result and boundary
-static FunctionTest ScopedAddressLivenessTest(
-    "scoped-address-liveness", [](auto &function, auto &arguments, auto &test) {
-      auto value = arguments.takeValue();
-      assert(!arguments.hasUntaken());
-      llvm::outs() << "Scoped address analysis: " << value;
-
-      ScopedAddressValue scopedAddress(value);
-      assert(scopedAddress);
-
-      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-      SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
-      scopedAddress.computeTransitiveLiveness(liveness);
-      liveness.print(llvm::outs());
-
-      PrunedLivenessBoundary boundary;
-      liveness.computeBoundary(boundary);
-      boundary.print(llvm::outs());
-    });
-
-// Arguments:
 // - variadic list of live-range defining values or instructions
 // Dumps:
 // - the liveness result and boundary
