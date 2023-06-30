@@ -55,6 +55,51 @@ struct Outer {
 // CHECK: Wrapped.requirement
 requiresP(Outer.Nested<Wrapped>.self)
 
+@DelegatedConformance
+struct AlreadyConforms: P {
+  static func requirement() {}
+}
+
+// CHECK-DUMP-LABEL: @__swiftmacro_23macro_expand_extensions15AlreadyConforms20DelegatedConformancefMe_.swift
+// CHECK-DUMP-NOT: extension AlreadyConforms
+
+@DelegatedConformance
+struct AlreadyConformsInExtension {}
+
+extension AlreadyConformsInExtension: P {
+  static func requirement() {}
+}
+
+// CHECK-DUMP-LABEL: @__swiftmacro_23macro_expand_extensions26AlreadyConformsInExtension20DelegatedConformancefMe_.swift
+// CHECK-DUMP-NOT: extension AlreadyConformsInExtension
+
+class ConformsExplicitly<Element>: P {
+  static func requirement() {}
+}
+
+@DelegatedConformance
+class InheritsConformance<Element>: ConformsExplicitly<Element> {}
+
+// CHECK-DUMP-LABEL: @__swiftmacro_23macro_expand_extensions19InheritsConformance09DelegatedE0fMe_.swift
+// CHECK-DUMP-NOT: extension InheritsConformance
+
+@DelegatedConformance
+class ConformsViaMacro<Element> {
+}
+
+// CHECK-DUMP-LABEL: @__swiftmacro_23macro_expand_extensions16ConformsViaMacro20DelegatedConformancefMe_.swift
+// CHECK-DUMP: extension ConformsViaMacro: P where Element: P {
+// CHECK-DUMP:   static func requirement() {
+// CHECK-DUMP:     Element.requirement()
+// CHECK-DUMP:   }
+// CHECK-DUMP: }
+
+@DelegatedConformance
+class InheritsConformanceViaMacro<Element: P>: ConformsViaMacro<Element> {}
+
+// CHECK-DUMP-LABEL: @__swiftmacro_23macro_expand_extensions27InheritsConformanceViaMacro09DelegatedE0fMe_.swift
+// CHECK-DUMP-NOT: extension InheritsConformanceViaMacro
+
 #if TEST_DIAGNOSTICS
 func testLocal() {
   @DelegatedConformance
