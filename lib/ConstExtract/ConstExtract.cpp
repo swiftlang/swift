@@ -815,7 +815,6 @@ void writeParameterizedProtocolSameTypeRequirements(
     llvm::json::OStream &JSON,
     const ParameterizedProtocolType &ParameterizedProtoTy) {
   auto Protocol = ParameterizedProtoTy.getProtocol();
-  auto ProtocolTy = ParameterizedProtoTy.getBaseType();
   auto Requirements = Protocol->getProtocolRequirements();
   auto ParameterTypeNames = Protocol->getPrimaryAssociatedTypeNames();
   auto ProtocolArguments = ParameterizedProtoTy.getArgs();
