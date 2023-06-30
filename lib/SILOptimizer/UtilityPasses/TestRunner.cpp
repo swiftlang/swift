@@ -243,21 +243,6 @@ static FunctionTest PrintTypeLowering("print-type-lowering", [](auto &function,
 //===----------------------------------------------------------------------===//
 
 // Arguments:
-// - the lexical borrow to fold
-// Dumps:
-// - the function
-static FunctionTest LexicalDestroyFoldingTest(
-    "lexical-destroy-folding", [](auto &function, auto &arguments, auto &test) {
-      auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
-      DominanceInfo *domTree = dominanceAnalysis->get(&function);
-      auto value = arguments.takeValue();
-      auto *bbi = cast<BeginBorrowInst>(value);
-      InstructionDeleter deleter;
-      foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
-      function.dump();
-    });
-
-// Arguments:
 // - variadic list of - instruction: a last user
 // Dumps:
 // - the insertion points
