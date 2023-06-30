@@ -349,6 +349,9 @@ public:
   ManagedValue cloneForRemainingPackComponents(SILValue packAddr,
                                                CanPackType formalPackType,
                                                unsigned firstComponentIndex) const;
+  ManagedValue cloneForRemainingTupleComponents(SILValue tupleAddr,
+                                                CanPackType inducedPackType,
+                                                unsigned firstComponentIndex) const;
 
   static void
   getClonersForRValue(SILGenFunction &SGF, const RValue &rvalue,

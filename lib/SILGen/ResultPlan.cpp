@@ -1326,7 +1326,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // emit directly into the initialization.  If the orig tuple vanishes,
   // that counts as the initialization being splittable.
   if (init) {
-    bool vanishes = origType.getVanishingTupleElementPatternType().hasValue();
+    bool vanishes = origType.doesTupleVanish();
     if (vanishes || init->canSplitIntoTupleElements()) {
       return ResultPlanPtr(
         new TupleInitializationResultPlan(*this, init, origType, substType,
