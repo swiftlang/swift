@@ -12,3 +12,9 @@ module CxxClassWithNSStringInit [extern_c] {
 module NSOptionsMangling {
   header "NSOptionsMangling.h"
 }
+
+module NSNofiticationBridging {
+  header "nsnotification-bridging.h"
+  requires objc
+  requires cplusplus
+}
