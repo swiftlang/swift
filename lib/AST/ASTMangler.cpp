@@ -653,13 +653,14 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
 static Type getTypeForDWARFMangling(Type t) {
   return t.subst(
     [](SubstitutableType *t) -> Type {
-      if (isa<GenericTypeParamType>(t))
-        return t->getCanonicalType();
-      return t;
+      if (isa<GenericTypeParamType>(t) &&
+          cast<GenericTypeParamType>(t)->isParameterPack()) {
+        return PackType::getSingletonPackExpansion(t->getCanonicalType());
+      }
+      return t->getCanonicalType();
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes |
-    SubstFlags::PreservePackExpansionLevel);
+    SubstFlags::AllowLoweredTypes);
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
