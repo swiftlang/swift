@@ -11,7 +11,7 @@ import HasObservable
 #if VIA_REEXPORT
 import ReexportsObservation
 #else
-import _Observation
+import Observation
 #endif
 
 func foo() -> Observable<Int> {
