@@ -3547,6 +3547,23 @@ bool SimplifyCFG::simplifyBlockArgs() {
   return Changed;
 }
 
+namespace swift::test {
+/// Arguments:
+/// - none
+/// Dumps:
+/// - nothing
+static FunctionTest SimplifyCFGSimplifyBlockArgs(
+    "simplify-cfg-simplify-block-args",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+      passToRun->injectPassManager(test.getPassManager());
+      passToRun->injectFunction(&function);
+      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
+                  /*EnableJumpThread=*/false)
+          .simplifyBlockArgs();
+    });
+} // end namespace swift::test
+
 // Attempt to simplify the ith argument of BB.  We simplify cases
 // where there is a single use of the argument that is an extract from
 // a struct, tuple or enum and where the predecessors all build the struct,
