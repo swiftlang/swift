@@ -317,27 +317,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 // - function
 // - the computed pruned liveness
 // - the liveness boundary
-static FunctionTest LinearLivenessTest("linear-liveness", [](auto &function,
-                                                             auto &arguments,
-                                                             auto &test) {
-  SILValue value = arguments.takeValue();
-  function.dump();
-  llvm::dbgs() << "Linear liveness: " << value;
-  LinearLiveness liveness(value);
-  liveness.compute();
-  liveness.print(llvm::outs());
-
-  PrunedLivenessBoundary boundary;
-  liveness.getLiveness().computeBoundary(boundary);
-  boundary.print(llvm::outs());
-});
-
-// Arguments:
-// - SILValue: value
-// Dumps:
-// - function
-// - the computed pruned liveness
-// - the liveness boundary
 static FunctionTest InteriorLivenessTest(
     "interior-liveness", [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();

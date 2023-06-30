@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/Test.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -365,3 +366,26 @@ void ExtendedLinearLiveness::print(llvm::raw_ostream &OS) const {
 void ExtendedLinearLiveness::dump() const { print(llvm::dbgs()); }
 
 } // namespace swift
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+static FunctionTest LinearLivenessTest("linear-liveness", [](auto &function,
+                                                             auto &arguments,
+                                                             auto &test) {
+  SILValue value = arguments.takeValue();
+  function.dump();
+  llvm::dbgs() << "Linear liveness: " << value;
+  LinearLiveness liveness(value);
+  liveness.compute();
+  liveness.print(llvm::outs());
+
+  PrunedLivenessBoundary boundary;
+  liveness.getLiveness().computeBoundary(boundary);
+  boundary.print(llvm::outs());
+});
+} // end namespace swift::test
