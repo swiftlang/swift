@@ -312,36 +312,6 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
     });
 
 // Arguments:
-// - bool: pruneDebug
-// - bool: maximizeLifetimes
-// - bool: "respectAccessScopes", whether to contract lifetimes to end within
-//         access scopes which they previously enclosed but can't be hoisted
-//         before
-// - SILValue: value to canonicalize
-// Dumps:
-// - function after value canonicalization
-static FunctionTest CanonicalizeOSSALifetimeTest(
-    "canonicalize-ossa-lifetime",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *accessBlockAnalysis =
-          test.template getAnalysis<NonLocalAccessBlockAnalysis>();
-      auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
-      DominanceInfo *domTree = dominanceAnalysis->get(&function);
-      auto *calleeAnalysis = test.template getAnalysis<BasicCalleeAnalysis>();
-      auto pruneDebug = arguments.takeBool();
-      auto maximizeLifetimes = arguments.takeBool();
-      auto respectAccessScopes = arguments.takeBool();
-      InstructionDeleter deleter;
-      CanonicalizeOSSALifetime canonicalizer(
-          pruneDebug, maximizeLifetimes, &function,
-          respectAccessScopes ? accessBlockAnalysis : nullptr, domTree,
-          calleeAnalysis, deleter);
-      auto value = arguments.takeValue();
-      canonicalizer.canonicalizeValueLifetime(value);
-      function.dump();
-    });
-
-// Arguments:
 // - SILValue: value to canonicalize
 // Dumps:
 // - function after value canonicalization
