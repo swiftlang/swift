@@ -1025,8 +1025,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
             paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
-            (unsigned)refKind, function->getDescriptiveKind(),
-            function->getName(), getActorIsolation()))
+            (unsigned)refKind, function, getActorIsolation()))
           return true;
       }
     }
@@ -1039,8 +1038,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
             resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_result_type,
-            (unsigned)refKind, func->getDescriptiveKind(), func->getName(),
-            getActorIsolation()))
+            (unsigned)refKind, func, getActorIsolation()))
           return true;
       }
     }
@@ -1055,7 +1053,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (diagnoseNonSendableTypes(
             propertyType, fromDC, refLoc,
             diag::non_sendable_property_type,
-            var->getDescriptiveKind(), var->getName(),
+            var,
             var->isLocalCapture(),
             (unsigned)refKind,
             getActorIsolation()))
@@ -1070,8 +1068,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
-                (unsigned)refKind, subscript->getDescriptiveKind(),
-                subscript->getName(), getActorIsolation()))
+                (unsigned)refKind, subscript, getActorIsolation()))
           return true;
       }
     }
@@ -1082,8 +1079,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
           resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
               diag::non_sendable_result_type,
-          (unsigned)refKind, subscript->getDescriptiveKind(),
-          subscript->getName(), getActorIsolation()))
+          (unsigned)refKind, subscript, getActorIsolation()))
         return true;
     }
 
