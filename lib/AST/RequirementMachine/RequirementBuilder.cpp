@@ -133,7 +133,7 @@ class RequirementBuilder {
   // Input parameters.
   const RewriteSystem &System;
   const PropertyMap &Map;
-  TypeArrayView<GenericTypeParamType> GenericParams;
+  ArrayRef<GenericTypeParamType *> GenericParams;
   bool ReconstituteSugar;
   bool Debug;
 
@@ -147,7 +147,7 @@ public:
   std::vector<ProtocolTypeAlias> Aliases;
 
   RequirementBuilder(const RewriteSystem &system, const PropertyMap &map,
-                     TypeArrayView<GenericTypeParamType> genericParams,
+                     ArrayRef<GenericTypeParamType *> genericParams,
                      bool reconstituteSugar)
     : System(system), Map(map),
       GenericParams(genericParams),
@@ -380,7 +380,7 @@ void
 RequirementMachine::buildRequirementsFromRules(
     ArrayRef<unsigned> requirementRules,
     ArrayRef<unsigned> typeAliasRules,
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const {

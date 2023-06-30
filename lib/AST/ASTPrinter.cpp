@@ -910,11 +910,11 @@ public:
   printGenericSignature(GenericSignature genericSig, unsigned flags,
                         llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
@@ -1641,7 +1641,7 @@ void PrintAST::printGenericSignature(
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool isFirstReq = true;
@@ -1650,7 +1650,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
@@ -1692,7 +1692,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
   /// Separate the explicit generic parameters from the implicit, opaque
   /// generic parameters. We only print the former.
-  TypeArrayView<GenericTypeParamType> opaqueGenericParams;
+  ArrayRef<GenericTypeParamType *> opaqueGenericParams;
   for (unsigned index : indices(genericParams)) {
     auto gpDecl = genericParams[index]->getDecl();
     if (!gpDecl)
@@ -5728,7 +5728,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   }
 
   void printGenericArgs(ASTContext &ctx,
-                        TypeArrayView<GenericTypeParamType> params,
+                        ArrayRef<GenericTypeParamType *> params,
                         ArrayRef<Type> args) {
     printGenericArgs(PackType::getExpandedGenericArgs(params, args));
   }
