@@ -234,36 +234,6 @@ static FunctionTest TestSpecificationTest(
 // - SILValue: value to a analyze
 // Dumps:
 // - the liveness result and boundary
-static FunctionTest SSALivenessTest("ssa-liveness", [](auto &function,
-                                                       auto &arguments,
-                                                       auto &test) {
-  auto value = arguments.takeValue();
-  assert(!arguments.hasUntaken());
-  llvm::outs() << "SSA lifetime analysis: " << value;
-
-  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-  SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
-  liveness.initializeDef(value);
-  LiveRangeSummary summary = liveness.computeSimple();
-  if (summary.innerBorrowKind == InnerBorrowKind::Reborrowed)
-    llvm::outs() << "Incomplete liveness: Reborrowed inner scope\n";
-
-  if (summary.addressUseKind == AddressUseKind::PointerEscape)
-    llvm::outs() << "Incomplete liveness: Escaping address\n";
-  else if (summary.addressUseKind == AddressUseKind::Unknown)
-    llvm::outs() << "Incomplete liveness: Unknown address use\n";
-
-  liveness.print(llvm::outs());
-
-  PrunedLivenessBoundary boundary;
-  liveness.computeBoundary(boundary);
-  boundary.print(llvm::outs());
-});
-
-// Arguments:
-// - SILValue: value to a analyze
-// Dumps:
-// - the liveness result and boundary
 static FunctionTest ScopedAddressLivenessTest(
     "scoped-address-liveness", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
