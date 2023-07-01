@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -enable-objc-interop -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -enable-objc-interop -emit-ir
+// RUN: %target-swift-frontend -primary-file %s -enable-objc-interop -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 // https://github.com/apple/swift/issues/43667
 
