@@ -17,6 +17,7 @@
 #include "TypeCheckMacros.h"
 #include "../AST/InlinableText.h"
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -1673,6 +1674,43 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   }
 
   return macroExpansion->getMacroRef();
+}
+
+ArrayRef<Type>
+ResolveExtensionMacroConformances::evaluate(Evaluator &evaluator,
+                                            const MacroRoleAttr *attr,
+                                            const Decl *decl) const {
+  auto *dc = decl->getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  SmallVector<Type, 2> protocols;
+  for (auto *typeExpr : attr->getConformances()) {
+    if (auto *typeRepr = typeExpr->getTypeRepr()) {
+      auto resolved =
+          TypeResolution::forInterface(
+              dc, TypeResolverContext::GenericRequirement,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr)
+          .resolveType(typeRepr);
+
+      if (resolved->is<ErrorType>())
+        continue;
+
+      if (!resolved->isConstraintType()) {
+        diagnoseAndRemoveAttr(
+            decl, attr,
+            diag::extension_macro_invalid_conformance,
+            resolved);
+        continue;
+      }
+
+      typeExpr->setType(MetatypeType::get(resolved));
+      protocols.push_back(resolved);
+    }
+  }
+
+  return ctx.AllocateCopy(protocols);
 }
 
 // MARK: for IDE.
