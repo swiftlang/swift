@@ -10692,8 +10692,13 @@ void MacroDecl::getIntroducedConformances(
   if (!attr)
     return;
 
-  for (auto repr : attr->getConformances()) {
-    auto constraint = repr->getInstanceType();
+  auto &ctx = getASTContext();
+  auto constraintTypes = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveExtensionMacroConformances{attr, this},
+      {});
+
+  for (auto constraint : constraintTypes) {
     assert(constraint->isConstraintType());
 
     std::function<void(Type)> addConstraint =

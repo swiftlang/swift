@@ -7111,31 +7111,10 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
   }
   }
 
-  for (auto *typeExpr : attr->getConformances()) {
-    if (auto *typeRepr = typeExpr->getTypeRepr()) {
-      auto *dc = D->getDeclContext();
-      auto resolved =
-          TypeResolution::forInterface(
-              dc, TypeResolverContext::GenericRequirement,
-              /*unboundTyOpener*/ nullptr,
-              /*placeholderHandler*/ nullptr,
-              /*packElementOpener*/ nullptr)
-          .resolveType(typeRepr);
-
-      if (resolved->is<ErrorType>()) {
-        attr->setInvalid();
-        continue;
-      }
-
-      if (!resolved->isConstraintType()) {
-        diagnoseAndRemoveAttr(attr, diag::extension_macro_invalid_conformance,
-                              resolved);
-        continue;
-      }
-
-      typeExpr->setType(MetatypeType::get(resolved));
-    }
-  }
+  (void)evaluateOrDefault(
+      Ctx.evaluator,
+      ResolveExtensionMacroConformances{attr, D},
+      {});
 }
 
 namespace {

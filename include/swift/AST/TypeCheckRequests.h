@@ -3337,6 +3337,25 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Returns the resolved constraint types that an extension macro
+/// adds conformances to.
+class ResolveExtensionMacroConformances
+    : public SimpleRequest<ResolveExtensionMacroConformances,
+                           ArrayRef<Type>(const MacroRoleAttr *, const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<Type> evaluate(Evaluator &evaluator,
+                          const MacroRoleAttr *, const Decl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ResolveTypeEraserTypeRequest
     : public SimpleRequest<ResolveTypeEraserTypeRequest,
                            Type (ProtocolDecl *, TypeEraserAttr *),
