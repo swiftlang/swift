@@ -3571,15 +3571,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
       SourceLoc diagLoc = call ? call->getLoc() : R.Start;
       ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
-      if (auto *accessor = dyn_cast<AccessorDecl>(asyncAlt)) {
-        SmallString<32> name;
-        llvm::raw_svector_ostream os(name);
-        accessor->printUserFacingName(os);
-        ctx.Diags.diagnose(asyncAlt->getLoc(),
-                           diag::descriptive_decl_declared_here, name);
-      } else {
-        asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
-      }
+      asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
     }
   }
 
