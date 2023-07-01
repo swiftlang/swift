@@ -816,6 +816,31 @@ static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
 using MirroredMethodEntry =
   std::tuple<const clang::ObjCMethodDecl*, ProtocolDecl*, bool /*isAsync*/>;
 
+ImportedType tryImportOptionsTypeForField(const clang::QualType type,
+                                          ClangImporter::Implementation &Impl) {
+  ImportedType importedType;
+  auto fieldType = type;
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
+    fieldType = elaborated->desugar();
+  if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
+    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
+      if (auto clangEnum =
+              findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
+        // If this fails, it means that we need a stronger predicate for
+        // determining the relationship between an enum and typedef.
+        assert(
+            clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+            typedefType->getCanonicalTypeInternal());
+        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
+          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
+                          false};
+        }
+      }
+    }
+  }
+  return importedType;
+}
+
 namespace {
   /// Customized llvm::DenseMapInfo for storing borrowed APSInts.
   struct APSIntRefDenseMapInfo {
@@ -3663,23 +3688,8 @@ namespace {
           return nullptr;
       }
 
-      ImportedType importedType;
       auto fieldType = decl->getType();
-      if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
-        fieldType = elaborated->desugar();
-      if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
-        if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-          if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
-            // If this fails, it means that we need a stronger predicate for
-            // determining the relationship between an enum and typedef.
-            assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-                   typedefType->getCanonicalTypeInternal());
-            if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-              importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
-            }
-          }
-        }
-      }
+      ImportedType importedType = tryImportOptionsTypeForField(fieldType, Impl);
 
       if (!importedType)
         importedType =
@@ -5201,7 +5211,11 @@ namespace {
         }
       }
 
-      auto importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
+      auto fieldType = decl->getType();
+      ImportedType importedType = tryImportOptionsTypeForField(fieldType, Impl);
+
+      if (!importedType)
+        importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::objc_property_not_imported, decl),
