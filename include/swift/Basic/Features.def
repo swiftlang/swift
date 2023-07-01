@@ -119,7 +119,7 @@ UPCOMING_FEATURE(DisableActorInferenceFromPropertyWrapperUsage, 401, 6)
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
-EXPERIMENTAL_FEATURE(CodeItemMacros, true)
+EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(InitAccessors, false)
 
