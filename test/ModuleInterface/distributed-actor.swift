@@ -1,5 +1,3 @@
-// REQUIRES: rdar111572280
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
