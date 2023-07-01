@@ -4828,7 +4828,7 @@ namespace {
                       func->getDeclContext()->isModuleScopeContext(),
                       func->getName())
               .highlight(subExpr->getSourceRange());
-          de.diagnose(func, diag::decl_declared_here, func->getName());
+          de.diagnose(func, diag::decl_declared_here, func);
           return E;
         }
 
@@ -4863,7 +4863,7 @@ namespace {
           de.diagnose(E->getLoc(), diag::expr_selector_not_property,
                       isa<ParamDecl>(var), var->getName())
               .highlight(subExpr->getSourceRange());
-          de.diagnose(var, diag::decl_declared_here, var->getName());
+          de.diagnose(var, diag::decl_declared_here, var);
           return E;
         }
 
@@ -4915,7 +4915,7 @@ namespace {
           if (!var->isSettable(dc)) {
             de.diagnose(E->getLoc(), diag::expr_selector_property_not_settable,
                         var);
-            de.diagnose(var, diag::decl_declared_here, var->getName());
+            de.diagnose(var, diag::decl_declared_here, var);
             return E;
           }
 
@@ -4923,7 +4923,7 @@ namespace {
           if (!var->isSetterAccessibleFrom(dc)) {
             de.diagnose(E->getLoc(),
                         diag::expr_selector_property_setter_inaccessible, var);
-            de.diagnose(var, diag::decl_declared_here, var->getName());
+            de.diagnose(var, diag::decl_declared_here, var);
             return E;
           }
 
@@ -4934,8 +4934,7 @@ namespace {
         // Cannot reference with #selector.
         de.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
             .highlight(subExpr->getSourceRange());
-        de.diagnose(foundDecl, diag::decl_declared_here,
-                    foundDecl->getName());
+        de.diagnose(foundDecl, diag::decl_declared_here, foundDecl);
         return E;
       }
       assert(method && "Didn't find a method?");

@@ -27,13 +27,17 @@ DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
 NOTE(decl_declared_here,none,
+     "%0 declared here", (const ValueDecl *))
+NOTE(decl_declared_here_base,none,
+     "%base0 declared here", (const ValueDecl *))
+NOTE(name_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
 NOTE(descriptive_decl_declared_here,none,
      "'%0' declared here", (StringRef))
 NOTE(implicit_member_declared_here,none,
-     "%1 '%0' is implicitly declared", (StringRef, StringRef))
+     "%kindbase0 is implicitly declared", (const ValueDecl *))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 NOTE(opaque_return_type_declared_here,none,
@@ -1043,7 +1047,7 @@ ERROR(cannot_find_type_in_scope,none,
 ERROR(cannot_find_type_in_scope_did_you_mean,none,
       "cannot find type %0 in scope; did you mean to use '%1'?", (DeclNameRef, StringRef))
 NOTE(note_typo_candidate_implicit_member,none,
-     "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
+     "did you mean the implicitly-synthesized %kindbase0?", (const ValueDecl *))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 NOTE(note_module_as_type,none,

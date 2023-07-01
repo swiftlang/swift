@@ -601,8 +601,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         .fixItInsertAfter(arg->getEndLoc(), ")");
 
       // Point to callee parameter
-      Ctx.Diags.diagnose(calleeParam, diag::decl_declared_here,
-                         calleeParam->getName());
+      Ctx.Diags.diagnose(calleeParam, diag::decl_declared_here, calleeParam);
     }
 
     llvm::Optional<MagicIdentifierLiteralExpr::Kind>
@@ -785,7 +784,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                          VD->getBaseIdentifier(),
                          VD->getDescriptiveKind(),
                          declParent);
-      Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD->getName());
+      Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD);
 
       if (VD->getDeclContext()->isTypeContext()) {
         Ctx.Diags.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
@@ -2376,7 +2375,7 @@ static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
   ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
     .highlight(diagRange);
 
-  ctx.Diags.diagnose(varDecl, diag::decl_declared_here, varDecl->getName());
+  ctx.Diags.diagnose(varDecl, diag::decl_declared_here, varDecl);
 }
 
 void swift::diagnoseUnownedImmediateDeallocation(ASTContext &ctx,

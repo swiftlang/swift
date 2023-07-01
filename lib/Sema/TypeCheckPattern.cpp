@@ -1030,8 +1030,7 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
   }
 
   if (addDeclNote)
-    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here,
-                enumCase->getName());
+    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here, enumCase);
 }
 
 NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,

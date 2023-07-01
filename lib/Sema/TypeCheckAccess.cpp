@@ -2332,7 +2332,7 @@ public:
     if (refRange.isValid())
       diag.highlight(refRange);
     diag.flush();
-    PGD->diagnose(diag::decl_declared_here, PGD->getName());
+    PGD->diagnose(diag::name_declared_here, PGD->getName());
   }
 
   void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {

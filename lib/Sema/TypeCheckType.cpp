@@ -742,8 +742,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
                      protoType)
            .fixItRemove(generic->getAngleBrackets());
       if (!protoDecl->isImplicit()) {
-        diags.diagnose(protoDecl, diag::decl_declared_here,
-                       protoDecl->getName());
+        diags.diagnose(protoDecl, diag::decl_declared_here, protoDecl);
       }
       return ErrorType::get(ctx);
     }
@@ -1471,8 +1470,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
       if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
-        ctx.Diags.diagnose(typeDecl, diag::decl_declared_here,
-                           typeDecl->getName());
+        ctx.Diags.diagnose(typeDecl, diag::decl_declared_here, typeDecl);
       }
     }
   }

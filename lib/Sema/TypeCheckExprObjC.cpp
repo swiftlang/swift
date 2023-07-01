@@ -313,7 +313,7 @@ llvm::Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       for (auto result : lookup) {
         diags.diagnose(result.getValueDecl(), diag::decl_declared_here,
-                       result.getValueDecl()->getName());
+                       result.getValueDecl());
       }
       isInvalid = true;
       break;

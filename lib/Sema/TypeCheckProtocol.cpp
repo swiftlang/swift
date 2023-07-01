@@ -2985,7 +2985,7 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
     return;
   if (mainDiagLoc == value->getLoc())
     return;
-  diags.diagnose(value, diag::decl_declared_here, value->getName());
+  diags.diagnose(value, diag::decl_declared_here, value);
 }
 
 /// Whether this declaration has the 'distributed' modifier on it.
@@ -3248,7 +3248,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         diag.fixItInsert(insertLoc, modifiers);
     }
   } else {
-    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    requirement->diagnose(diag::decl_declared_here, requirement);
   }
 
   return llvm::None;
@@ -4092,7 +4092,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
             // defined.
             fixItDiag.value().flush();
             fixItDiag.emplace(diags.diagnose(ctor, diag::decl_declared_here,
-                                             ctor->getName()));
+                                             ctor));
           }
           if (!inExtension) {
             fixItDiag->fixItInsert(ctor->getAttributeInsertionLoc(true),
@@ -4199,8 +4199,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                            getProtocolRequirementKind(requirement),
                            requirement->getName(),
                            conformance->getType());
-            diags.diagnose(witness, diag::decl_declared_here,
-                           witness->getName());
+            diags.diagnose(witness, diag::decl_declared_here, witness);
           });
       }
     }
@@ -4285,8 +4284,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
               fixDeclarationName(diag, witness, requirement->getName());
             } else {
               diag.flush();
-              diags.diagnose(witness, diag::decl_declared_here,
-                             witness->getName());
+              diags.diagnose(witness, diag::decl_declared_here, witness);
             }
           }
 
@@ -4433,8 +4431,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
               addOptionalityFixIts(adjustments, ctx, witness, diag);
             } else {
               diag.flush();
-              diags.diagnose(witness, diag::decl_declared_here,
-                             witness->getName());
+              diags.diagnose(witness, diag::decl_declared_here, witness);
             }
           }
 

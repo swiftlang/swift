@@ -3571,7 +3571,6 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
       SourceLoc diagLoc = call ? call->getLoc() : R.Start;
       ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
-
       if (auto *accessor = dyn_cast<AccessorDecl>(asyncAlt)) {
         SmallString<32> name;
         llvm::raw_svector_ostream os(name);
@@ -3579,8 +3578,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
         ctx.Diags.diagnose(asyncAlt->getLoc(),
                            diag::descriptive_decl_declared_here, name);
       } else {
-        ctx.Diags.diagnose(asyncAlt->getLoc(), diag::decl_declared_here,
-                           asyncAlt->getName());
+        asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
       }
     }
   }
@@ -3610,7 +3608,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   ctx.Diags
       .diagnose(diagLoc, diag::async_unavailable_decl, D, attr->Message)
       .warnUntilSwiftVersion(6);
-  D->diagnose(diag::decl_declared_here, D->getName());
+  D->diagnose(diag::decl_declared_here, D);
   return true;
 }
 

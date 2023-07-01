@@ -606,7 +606,7 @@ emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
       .fixItReplace(SourceRange(targetLoc),
                     corrections.begin()->Value->getLabelInfo().Name.str());
     DE.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                diag::decl_declared_here,
+                diag::name_declared_here,
                 corrections.begin()->Value->getLabelInfo().Name);
   } else {
     // If we have multiple corrections or none, produce a generic diagnostic

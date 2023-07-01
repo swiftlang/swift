@@ -239,7 +239,7 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
         init->diagnose(diag::property_wrapper_wrong_initial_value_init,
                        init->getName(), paramType,
                        valueVar->getValueInterfaceType());
-        valueVar->diagnose(diag::decl_declared_here, valueVar->getName());
+        valueVar->diagnose(diag::decl_declared_here, valueVar);
         break;
       }
     }
