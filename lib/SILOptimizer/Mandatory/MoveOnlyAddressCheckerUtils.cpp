@@ -290,6 +290,22 @@ llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
+struct RAIILLVMDebug {
+  StringRef str;
+
+  RAIILLVMDebug(StringRef str) : str(str) {
+    LLVM_DEBUG(llvm::dbgs() << "===>>> Starting " << str << '\n');
+  }
+
+  RAIILLVMDebug(StringRef str, SILInstruction *u) : str(str) {
+    LLVM_DEBUG(llvm::dbgs() << "===>>> Starting " << str << ":" << *u);
+  }
+
+  ~RAIILLVMDebug() {
+    LLVM_DEBUG(llvm::dbgs() << "===<<< Completed " << str << '\n');
+  }
+};
+
 static void insertDebugValueBefore(SILInstruction *insertPt,
                                    DebugVarCarryingInst debugVar,
                                    llvm::function_ref<SILValue ()> operand) {
@@ -3121,6 +3137,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // [copy] + begin_borrow for further processing. This just eliminates a case
   // that the checker doesn't need to know about.
   {
+    RAIILLVMDebug l("CopiedLoadBorrowEliminationVisitor");
+
     CopiedLoadBorrowEliminationState state(markedAddress->getFunction());
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
     if (AddressUseKind::Unknown ==
@@ -3142,12 +3160,16 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // SILGen will treat y as a separate rvalue from x and will create a temporary
   // allocation. In contrast if we have a var, we treat x like an lvalue and
   // just create GEPs appropriately.
-  if (eliminateTemporaryAllocationsFromLet(markedAddress)) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-            << "Succeeded in eliminating temporary allocations! Fn after:\n";
-        markedAddress->getFunction()->dump());
-    changed = true;
+  {
+    RAIILLVMDebug l("temporary allocations from rvalue accesses");
+
+    if (eliminateTemporaryAllocationsFromLet(markedAddress)) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+              << "Succeeded in eliminating temporary allocations! Fn after:\n";
+          markedAddress->getFunction()->dump());
+      changed = true;
+    }
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this
@@ -3156,10 +3178,16 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
                             diagnosticEmitter);
   SWIFT_DEFER { visitor.clear(); };
-  visitor.reset(markedAddress);
-  if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
-    LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
-    return false;
+
+  {
+    RAIILLVMDebug l("main use gathering visitor");
+
+    visitor.reset(markedAddress);
+    if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Failed access path visit: " << *markedAddress);
+      return false;
+    }
   }
 
   // If we found a load [copy] or copy_addr that requires multiple copies or an
@@ -3187,18 +3215,28 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   //===---
   // Liveness Checking
   //
+
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
   FieldSensitiveMultiDefPrunedLiveRange liveness(fn, markedAddress,
                                                  &discoveredBlocks);
-  addressUseState.initializeLiveness(liveness);
 
-  // Then compute the takes that are within the cumulative boundary of
-  // liveness that we have computed. If we find any, they are the errors ones.
-  GlobalLivenessChecker emitter(addressUseState, diagnosticEmitter, liveness);
+  {
+    RAIILLVMDebug logger("liveness initialization");
 
-  // If we had any errors, we do not want to modify the SIL... just bail.
-  if (emitter.compute()) {
-    return true;
+    addressUseState.initializeLiveness(liveness);
+  }
+
+  {
+    RAIILLVMDebug l("global liveness checking");
+
+    // Then compute the takes that are within the cumulative boundary of
+    // liveness that we have computed. If we find any, they are the errors ones.
+    GlobalLivenessChecker emitter(addressUseState, diagnosticEmitter, liveness);
+
+    // If we had any errors, we do not want to modify the SIL... just bail.
+    if (emitter.compute()) {
+      return true;
+    }
   }
 
   //===
@@ -3242,6 +3280,22 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+#ifndef NDEBUG
+static llvm::cl::opt<uint64_t> NumTopLevelToProcess(
+    "sil-move-only-address-checker-num-top-level-to-process",
+    llvm::cl::desc("Allows for bisecting on move introducer that causes an "
+                   "error. Only meant for debugging!"),
+    llvm::cl::init(UINT64_MAX));
+#endif
+
+static llvm::cl::opt<bool> DumpSILBeforeRemovingMarkMustCheck(
+    "sil-move-only-address-checker-dump-before-removing-mark-must-check",
+    llvm::cl::desc("When bisecting it is useful to dump the SIL before the "
+                   "rest of the checker removes mark_must_check. This lets one "
+                   "grab the SIL of a bad variable after all of the rest have "
+                   "been processed to work with further in sil-opt."),
+    llvm::cl::init(false));
+
 bool MoveOnlyAddressChecker::check(
     SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess) {
   assert(moveIntroducersToProcess.size() &&
@@ -3249,8 +3303,17 @@ bool MoveOnlyAddressChecker::check(
   MoveOnlyAddressCheckerPImpl pimpl(fn, diagnosticEmitter, domTree, poa,
                                     allocator);
 
+#ifndef NDEBUG
+  static uint64_t numProcessed = 0;
+#endif
   for (auto *markedValue : moveIntroducersToProcess) {
-    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
+#ifndef NDEBUG
+    ++numProcessed;
+    if (NumTopLevelToProcess <= numProcessed)
+      break;
+#endif
+    LLVM_DEBUG(llvm::dbgs()
+               << "======>>> Visiting top level: " << *markedValue);
 
     // Perform our address check.
     unsigned diagnosticEmittedByEarlierPassCount =
@@ -3271,5 +3334,10 @@ bool MoveOnlyAddressChecker::check(
     }
   }
 
+  if (DumpSILBeforeRemovingMarkMustCheck) {
+    LLVM_DEBUG(llvm::dbgs()
+                   << "Dumping SIL before removing mark must checks!\n";
+               fn->dump());
+  }
   return pimpl.changed;
 }
