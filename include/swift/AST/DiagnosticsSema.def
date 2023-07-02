@@ -1657,6 +1657,49 @@ ERROR(objc_implementation_required_attr_mismatch,none,
       "the header",
       (DescriptiveDeclKind, ValueDecl *, bool))
 
+ERROR(objc_implementation_candidate_has_error_convention,none,
+      "%0 %1 does not match the declaration in the header because it throws an "
+      "error",
+      (DescriptiveDeclKind, ValueDecl *))
+
+ERROR(objc_implementation_candidate_lacks_error_convention,none,
+      "%0 %1 does not match the declaration in the header because it does not "
+      "throw an error",
+      (DescriptiveDeclKind, ValueDecl *))
+
+#define SELECT_FOREIGN_ERROR_CONVENTION_KIND \
+      "select{returning zero|returning non-zero|returning zero or a result|" \
+      "returning nil|setting the error parameter|%error}"
+
+ERROR(objc_implementation_mismatched_error_convention_kind,none,
+      "%0 %1 does not match the declaration in the header because it indicates "
+      "an error by %" SELECT_FOREIGN_ERROR_CONVENTION_KIND "2, rather than by "
+      "%" SELECT_FOREIGN_ERROR_CONVENTION_KIND "3",
+      (DescriptiveDeclKind, ValueDecl *, unsigned, unsigned))
+
+ERROR(objc_implementation_mismatched_error_convention_index,none,
+      "%0 %1 does not match the declaration in the header because it uses "
+      "parameter #%2 for the error, not parameter #%3; a selector part called "
+      "'error:' can control which parameter to use",
+      (DescriptiveDeclKind, ValueDecl *, unsigned, unsigned))
+
+ERROR(objc_implementation_mismatched_error_convention_void_param,none,
+      "%0 %1 does not match the declaration in the header because it "
+      "%select{removes the error parameter|makes the error parameter 'Void'}2 "
+      "rather than %select{making it 'Void'|removing it}2",
+      (DescriptiveDeclKind, ValueDecl *, bool))
+
+ERROR(objc_implementation_mismatched_error_convention_ownership,none,
+      "%0 %1 does not match the declaration in the header because it "
+      "%select{does not own|owns}2 the error parameter",
+      (DescriptiveDeclKind, ValueDecl *, bool))
+
+ERROR(objc_implementation_mismatched_error_convention_other,none,
+      "%0 %1 does not match the declaration in the header because it uses a "
+      "different Objective-C error convention; please file a bug report with a "
+      "sample project, as the compiler should be able to describe the mismatch",
+      (DescriptiveDeclKind, ValueDecl *))
+
 ERROR(objc_implementation_wrong_objc_name,none,
       "selector %0 for %1 %2 not found in header; did you mean %3?",
       (ObjCSelector, DescriptiveDeclKind, ValueDecl *, ObjCSelector))
