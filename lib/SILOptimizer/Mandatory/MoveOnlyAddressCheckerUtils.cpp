@@ -401,17 +401,6 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
     }
   }
 
-  // See if we have an assignable_but_not_consumable from a formal access.
-  // In this case, the value must be live at the end of the
-  // access, similar to an inout parameter.
-  if (markedAddr->getCheckKind() ==
-      MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
-    if (isa<BeginAccessInst>(operand)) {
-      return true;
-    }
-  }
-
-
   return false;
 }
 
@@ -529,7 +518,7 @@ struct UseState {
   /// terminator user and so that we can use the set to quickly identify later
   /// while emitting diagnostics that a liveness use is a terminator user and
   /// emit a specific diagnostic message.
-  SmallSetVector<SILInstruction *, 2> inoutTermUsers;
+  SmallSetVector<SILInstruction *, 2> implicitEndOfLifetimeLivenessUses;
 
   /// We add debug_values to liveness late after we diagnose, but before we
   /// hoist destroys to ensure that we do not hoist destroys out of access
@@ -581,11 +570,17 @@ struct UseState {
     setAffectedBits(inst, range, initInsts);
   }
 
-  /// Returns true if this is a terminator instruction that although it doesn't
-  /// use our inout argument directly is used by the pass to ensure that we
-  /// reinit said argument if we consumed it in the body of the function.
-  bool isInOutTermUser(SILInstruction *inst) const {
-    return inoutTermUsers.count(inst);
+  /// Returns true if this is an instruction that is used by the pass to ensure
+  /// that we reinit said argument if we consumed it in a region of code.
+  ///
+  /// Example:
+  ///
+  /// 1. In the case of an inout argument, this will contain the terminator
+  /// instruction.
+  /// 2. In the case of a ref_element_addr or a global, this will contain the
+  /// end_access.
+  bool isImplicitEndOfLifetimeLivenessUses(SILInstruction *inst) const {
+    return implicitEndOfLifetimeLivenessUses.count(inst);
   }
 
   /// Returns true if the given instruction is within the same block as a reinit
@@ -625,7 +620,7 @@ struct UseState {
     initInsts.clear();
     reinitInsts.clear();
     dropDeinitInsts.clear();
-    inoutTermUsers.clear();
+    implicitEndOfLifetimeLivenessUses.clear();
     debugValue = nullptr;
   }
 
@@ -663,8 +658,8 @@ struct UseState {
     for (auto *inst : dropDeinitInsts) {
       llvm::dbgs() << *inst;
     }
-    llvm::dbgs() << "InOut Term Users:\n";
-    for (auto *inst : inoutTermUsers) {
+    llvm::dbgs() << "Implicit End Of Lifetime Liveness Users:\n";
+    for (auto *inst : implicitEndOfLifetimeLivenessUses) {
       llvm::dbgs() << *inst;
     }
     llvm::dbgs() << "Debug Value User:\n";
@@ -696,16 +691,28 @@ struct UseState {
   void
   initializeLiveness(FieldSensitiveMultiDefPrunedLiveRange &prunedLiveness);
 
-  void initializeInOutTermUsers() {
-    if (!isInOutDefThatNeedsEndOfFunctionLiveness(address))
+  void initializeImplicitEndOfLifetimeLivenessUses() {
+    if (isInOutDefThatNeedsEndOfFunctionLiveness(address)) {
+      SmallVector<SILBasicBlock *, 8> exitBlocks;
+      address->getFunction()->findExitingBlocks(exitBlocks);
+      for (auto *block : exitBlocks) {
+        LLVM_DEBUG(llvm::dbgs() << "    Adding term as liveness user: "
+                                << *block->getTerminator());
+        implicitEndOfLifetimeLivenessUses.insert(block->getTerminator());
+      }
       return;
+    }
 
-    SmallVector<SILBasicBlock *, 8> exitBlocks;
-    address->getFunction()->findExitingBlocks(exitBlocks);
-    for (auto *block : exitBlocks) {
-      LLVM_DEBUG(llvm::dbgs() << "    Adding term as liveness user: "
-                              << *block->getTerminator());
-      inoutTermUsers.insert(block->getTerminator());
+    if (address->getCheckKind() ==
+        MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+      if (auto *bai = dyn_cast<BeginAccessInst>(address->getOperand())) {
+        for (auto *eai : bai->getEndAccesses()) {
+          LLVM_DEBUG(llvm::dbgs() << "    Adding end_access as implicit end of "
+                                     "lifetime liveness user: "
+                                  << *eai);
+          implicitEndOfLifetimeLivenessUses.insert(eai);
+        }
+      }
     }
   }
 
@@ -765,7 +772,7 @@ struct UseState {
     // An "inout terminator use" is an implicit liveness use of the entire
     // value. This is because we need to ensure that our inout value is
     // reinitialized along exit paths.
-    if (inoutTermUsers.count(inst))
+    if (implicitEndOfLifetimeLivenessUses.count(inst))
       return true;
 
     return false;
@@ -1080,13 +1087,11 @@ void UseState::initializeLiveness(
                liveness.print(llvm::dbgs()));
   }
 
-  // Finally, if we have an inout argument, add a liveness use of the entire
-  // value on terminators in blocks that are exits from the function. This
-  // ensures that along all paths, if our inout is not reinitialized before we
-  // exit the function, we will get an error. We also stash these users into
-  // inoutTermUser so we can quickly recognize them later and emit a better
-  // error msg.
-  for (auto *inst : inoutTermUsers) {
+  // Finally, if we have an inout argument or an access scope associated with a
+  // ref_element_addr or global_addr, add a liveness use of the entire value on
+  // the implicit end lifetime instruction. For inout this is terminators for
+  // ref_element_addr, global_addr it is the end_access instruction.
+  for (auto *inst : implicitEndOfLifetimeLivenessUses) {
     liveness.updateForUse(inst, TypeTreeLeafTypeRange(address),
                           false /*lifetime ending*/);
     LLVM_DEBUG(llvm::dbgs() << "Added liveness for inoutTermUser: " << *inst;
@@ -2245,7 +2250,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
         if (addressUseState.isLivenessUse(&*ii, errorSpan)) {
           diagnosticEmitter.emitAddressDiagnostic(
               addressUseState.address, &*ii, errorUser, false /*is consuming*/,
-              addressUseState.isInOutTermUser(&*ii));
+              addressUseState.isImplicitEndOfLifetimeLivenessUses(&*ii));
           foundSingleBlockError = true;
           emittedDiagnostic = true;
           break;
@@ -2265,8 +2270,9 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
                   &*ii, FieldSensitivePrunedLiveness::NonLifetimeEndingUse,
                   errorSpan)) {
             diagnosticEmitter.emitAddressDiagnostic(
-                addressUseState.address, &*ii, errorUser, false /*is consuming*/,
-                addressUseState.isInOutTermUser(&*ii));
+                addressUseState.address, &*ii, errorUser,
+                false /*is consuming*/,
+                addressUseState.isImplicitEndOfLifetimeLivenessUses(&*ii));
             foundSingleBlockError = true;
             emittedDiagnostic = true;
             break;
@@ -2356,7 +2362,8 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
               diagnosticEmitter.emitAddressDiagnostic(
                   addressUseState.address, &blockInst, errorUser,
                   false /*is consuming*/,
-                  addressUseState.isInOutTermUser(&blockInst));
+                  addressUseState.isImplicitEndOfLifetimeLivenessUses(
+                      &blockInst));
               foundSingleBlockError = true;
               emittedDiagnostic = true;
               break;
@@ -2580,6 +2587,18 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
             // instruction.
             insertUndefDebugValue(insertPt);
           }
+          continue;
+        }
+
+        // If we have an implicit end of lifetime use, we do not insert a
+        // destroy_addr. Instead, we insert an undef debug value after the
+        // use. This occurs if we have an end_access associated with a
+        // global_addr or a ref_element_addr field access.
+        if (addressUseState.isImplicitEndOfLifetimeLivenessUses(inst)) {
+          LLVM_DEBUG(
+              llvm::dbgs()
+              << "    Use was an implicit end of lifetime liveness use!\n");
+          insertUndefDebugValue(inst->getNextInstruction());
           continue;
         }
 
@@ -3210,7 +3229,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // DISCUSSION: For non address only types, this is not an issue since we
   // eagerly load
 
-  addressUseState.initializeInOutTermUsers();
+  addressUseState.initializeImplicitEndOfLifetimeLivenessUses();
 
   //===---
   // Liveness Checking
