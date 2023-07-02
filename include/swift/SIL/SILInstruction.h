@@ -1239,46 +1239,6 @@ public:
     ownershipKind = newKind;
   }
 
-  static bool canForwardAllOperands(SILInstruction *inst) {
-    switch (inst->getKind()) {
-    case SILInstructionKind::StructInst:
-    case SILInstructionKind::TupleInst:
-    case SILInstructionKind::LinearFunctionInst:
-    case SILInstructionKind::DifferentiableFunctionInst:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  static bool canForwardFirstOperandOnly(SILInstruction *inst) {
-    if (!ForwardingInstruction::isa(inst)) {
-      return false;
-    }
-    return !canForwardAllOperands(inst);
-  }
-
-  static bool canForwardOwnedCompatibleValuesOnly(SILInstruction *inst) {
-    switch (inst->getKind()) {
-    case SILInstructionKind::MarkUninitializedInst:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  static bool canForwardGuaranteedCompatibleValuesOnly(SILInstruction *inst) {
-    switch (inst->getKind()) {
-    case SILInstructionKind::TupleExtractInst:
-    case SILInstructionKind::StructExtractInst:
-    case SILInstructionKind::DifferentiableFunctionExtractInst:
-    case SILInstructionKind::LinearFunctionExtractInst:
-      return true;
-    default:
-      return false;
-    }
-  }
-
   /// Defined inline below due to forward declaration issues.
   static ForwardingInstruction *get(SILInstruction *inst);
   static bool isa(SILInstructionKind kind);
@@ -1288,18 +1248,6 @@ public:
       return isa(i);
     return false;
   }
-
-  /// Return true if the forwarded value has the same representation. If true,
-  /// then the result can be mapped to the same storage without a move or copy.
-  ///
-  /// \p inst is an ForwardingInstruction
-  static bool hasSameRepresentation(SILInstruction *inst);
-
-  /// Return true if the forwarded value is address-only either before or after
-  /// forwarding.
-  ///
-  /// \p inst is an ForwardingInstruction
-  static bool isAddressOnly(SILInstruction *inst);
 };
 
 /// A single value inst that forwards a static ownership from its first operand.

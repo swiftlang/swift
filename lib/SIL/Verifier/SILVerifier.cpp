@@ -1295,8 +1295,9 @@ public:
       }
     }
 
-    if (I->getFunction()->hasOwnership() && ForwardingInstruction::isa(I)) {
-      checkOwnershipForwardingInst(I);
+    if (I->getFunction()->hasOwnership()) {
+      if (auto fwdOp = ForwardingOperation(I))
+        checkOwnershipForwardingInst(fwdOp);
     }
   }
 
@@ -1340,25 +1341,24 @@ public:
 
   /// For an instruction \p i that forwards ownership from an operand to one
   /// of its results, check forwarding invariants.
-  void checkOwnershipForwardingInst(SILInstruction *i) {
-    ValueOwnershipKind ownership =
-        ForwardingInstruction::get(i)->getForwardingOwnershipKind();
+  void checkOwnershipForwardingInst(ForwardingOperation fwdOp) {
+    auto ownership = fwdOp.getForwardingOwnershipKind();
 
-    if (ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(i)) {
+    if (fwdOp.canForwardOwnedCompatibleValuesOnly()) {
       ValueOwnershipKind kind = OwnershipKind::Owned;
       require(kind.isCompatibleWith(ownership),
               "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
               "compatible with owned");
     }
 
-    if (ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(i)) {
+    if (fwdOp.canForwardGuaranteedCompatibleValuesOnly()) {
       ValueOwnershipKind kind = OwnershipKind::Guaranteed;
       require(kind.isCompatibleWith(ownership),
               "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
               "must be compatible with guaranteed");
     }
 
-    if (auto *term = dyn_cast<OwnershipForwardingTermInst>(i)) {
+    if (auto *term = dyn_cast<OwnershipForwardingTermInst>(*fwdOp)) {
       checkOwnershipForwardingTermInst(term);
     }
 
@@ -1367,9 +1367,8 @@ public:
     // representation. Non-destructive projection is allowed. Aggregation and
     // destructive disaggregation is not allowed. See SIL.rst, Forwarding
     // Addres-Only Values.
-    if (ownership == OwnershipKind::Guaranteed &&
-        ForwardingInstruction::isAddressOnly(i)) {
-      require(ForwardingInstruction::hasSameRepresentation(i),
+    if (ownership == OwnershipKind::Guaranteed && fwdOp.isAddressOnly()) {
+      require(fwdOp.hasSameRepresentation(),
               "Forwarding a guaranteed address-only value requires the same "
               "representation since no move or copy is allowed.");
     }

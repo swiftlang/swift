@@ -3149,47 +3149,6 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
          "result info?!");
 }
 
-bool ForwardingInstruction::hasSameRepresentation(SILInstruction *inst) {
-  switch (inst->getKind()) {
-  // Explicitly list instructions which definitely involve a representation
-  // change.
-  case SILInstructionKind::SwitchEnumInst:
-  default:
-    // Conservatively assume that a conversion changes representation.
-    // Operations can be added as needed to participate in SIL opaque values.
-    assert(ForwardingInstruction::isa(inst));
-    return false;
-
-  case SILInstructionKind::ConvertFunctionInst:
-  case SILInstructionKind::DestructureTupleInst:
-  case SILInstructionKind::DestructureStructInst:
-  case SILInstructionKind::InitExistentialRefInst:
-  case SILInstructionKind::ObjectInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::MarkMustCheckInst:
-  case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::StructExtractInst:
-  case SILInstructionKind::TupleExtractInst:
-    return true;
-  }
-}
-
-bool ForwardingInstruction::isAddressOnly(SILInstruction *inst) {
-  if (canForwardAllOperands(inst)) {
-    // All ForwardingInstructions that forward all operands are currently a
-    // single value instruction.
-    auto *aggregate = cast<OwnershipForwardingSingleValueInstruction>(inst);
-    // If any of the operands are address-only, then the aggregate must be.
-    return aggregate->getType().isAddressOnly(*inst->getFunction());
-  }
-  // All other forwarding instructions must forward their first operand.
-  assert(canForwardFirstOperandOnly(inst));
-  return inst->getOperand(0)->getType().isAddressOnly(*inst->getFunction());
-}
-
 // This may be called in an invalid SIL state. SILCombine creates new
 // terminators in non-terminator position and defers deleting the original
 // terminator until after all modification.
