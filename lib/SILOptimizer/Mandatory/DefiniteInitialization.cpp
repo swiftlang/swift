@@ -2365,6 +2365,21 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     assert(!CA->isInitializationOfDest() &&
            "should not modify copy_addr that already knows it is initialized");
     CA->setIsInitializationOfDest(InitKind);
+
+    // If we had an initialization and had an assignable_but_not_consumable
+    // noncopyable type, convert it to be an initable_but_not_consumable so that
+    // we do not consume an uninitialized value.
+    if (InitKind == IsInitialization) {
+      if (auto *mmci =
+          dyn_cast<MarkMustCheckInst>(stripAccessMarkers(CA->getDest()))) {
+        if (mmci->getCheckKind() ==
+            MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+          mmci->setCheckKind(
+              MarkMustCheckInst::CheckKind::InitableButNotConsumable);
+        }
+      }
+    }
+
     return;
   }
 
