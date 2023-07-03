@@ -1,3 +1,5 @@
+// REQUIRES: executable_test
+
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
 
