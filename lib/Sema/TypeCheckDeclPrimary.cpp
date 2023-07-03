@@ -1936,6 +1936,14 @@ public:
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
+
+      // Expand extension macros.
+      if (auto *nominal = dyn_cast<NominalTypeDecl>(VD)) {
+        (void)evaluateOrDefault(
+            Ctx.evaluator,
+            ExpandExtensionMacros{nominal},
+            { });
+      }
     }
   }
 
