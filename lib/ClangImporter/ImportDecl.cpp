@@ -3137,16 +3137,13 @@ namespace {
 
       if (auto recordType = dyn_cast<clang::RecordType>(
               decl->getReturnType().getCanonicalType())) {
-        if (recordHasReferenceSemantics(recordType->getDecl())) {
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(diag::reference_passed_by_value,
-                         Impl.SwiftContext.AllocateCopy(
-                             recordType->getDecl()->getNameAsString()),
-                         "the return"),
-              decl->getLocation());
-          return true;
-        }
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::reference_passed_by_value,
+                             Impl.SwiftContext.AllocateCopy(
+                                 recordType->getDecl()->getNameAsString()),
+                             "the return"),
+            decl->getLocation());
+        return recordHasReferenceSemantics(recordType->getDecl());
       }
 
       return false;
@@ -3532,14 +3529,6 @@ namespace {
         func->setAccess(AccessLevel::Public);
       }
 
-      if (!isa<clang::CXXConstructorDecl>(decl) && !importedType) {
-        if (!Impl.importFunctionReturnType(decl, result->getDeclContext())) {
-          Impl.addImportDiagnostic(
-              decl, Diagnostic(diag::unsupported_return_type, decl),
-              decl->getSourceRange().getBegin());
-          return nullptr;
-        }
-      }
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
