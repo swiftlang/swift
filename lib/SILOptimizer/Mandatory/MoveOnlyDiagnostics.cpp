@@ -883,10 +883,10 @@ void DiagnosticEmitter::emitCannotPartiallyConsumeError(
     astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
 }
 
-void DiagnosticEmitter::emitCannotDestructureNominalError(
+void DiagnosticEmitter::emitCannotPartiallyReinitError(
     MarkMustCheckInst *markedValue, StringRef pathString,
-    NominalTypeDecl *nominal, SILInstruction *consumingUser,
-    bool isDueToDeinit) {
+    NominalTypeDecl *nominal, SILInstruction *initingUser,
+    SILInstruction *consumingUser, bool isForDeinit) {
   auto &astContext = fn->getASTContext();
 
   SmallString<64> varName;
@@ -895,20 +895,28 @@ void DiagnosticEmitter::emitCannotDestructureNominalError(
   if (!pathString.empty())
     varName.append(pathString);
 
-  assert(
-      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ==
-          isDueToDeinit &&
-      "Should only emit deinit error if we have partial consumption enabled");
-  if (isDueToDeinit) {
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_cannot_destructure_has_deinit, varName);
+  bool hasPartialConsumption =
+      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
+  (void)hasPartialConsumption;
+
+  if (isForDeinit) {
+    assert(hasPartialConsumption);
+    diagnose(astContext, initingUser,
+             diag::sil_movechecking_cannot_partially_reinit_has_deinit,
+             varName);
+
   } else {
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_cannot_destructure, varName);
+    assert(!hasPartialConsumption);
+    diagnose(astContext, initingUser,
+             diag::sil_movechecking_cannot_partially_reinit, varName);
   }
+
+  diagnose(astContext, consumingUser,
+           diag::sil_movechecking_consuming_use_here);
+
   registerDiagnosticEmitted(markedValue);
 
-  if (!isDueToDeinit)
+  if (!isForDeinit)
     return;
 
   // Point to the deinit if we know where it is.
