@@ -10695,6 +10695,43 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   }
 }
 
+void MacroDecl::getIntroducedConformances(
+    NominalTypeDecl *attachedTo,
+    SmallVectorImpl<ProtocolDecl *> &conformances) const {
+  auto *attr = getMacroRoleAttr(MacroRole::Extension);
+  if (!attr)
+    return;
+
+  auto &ctx = getASTContext();
+  auto constraintTypes = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveExtensionMacroConformances{attr, this},
+      {});
+
+  for (auto constraint : constraintTypes) {
+    assert(constraint->isConstraintType());
+
+    std::function<void(Type)> addConstraint =
+        [&](Type constraint) -> void {
+          if (auto *proto = constraint->getAs<ParameterizedProtocolType>()) {
+            conformances.push_back(proto->getProtocol());
+            return;
+          } else if (auto *proto = constraint->getAs<ProtocolType>()) {
+            conformances.push_back(proto->getDecl());
+            return;
+          }
+
+          auto *composition =
+              constraint->castTo<ProtocolCompositionType>();
+          for (auto constraint : composition->getMembers()) {
+            addConstraint(constraint);
+          }
+        };
+
+    addConstraint(constraint);
+  }
+}
+
 MacroDefinition MacroDecl::getDefinition() const {
   return evaluateOrDefault(
       getASTContext().evaluator,

@@ -1961,6 +1961,17 @@ LookupConformanceInModuleRequest::evaluate(
   if (!nominal || isa<ProtocolDecl>(nominal))
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 
+  // Expand conformances added by extension macros.
+  //
+  // FIXME: This expansion should only be done if the
+  // extension macro can generate a conformance to the
+  // given protocol, but conformance macros do not specify
+  // that information upfront.
+  (void)evaluateOrDefault(
+      ctx.evaluator,
+      ExpandExtensionMacros{nominal},
+      { });
+
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(protocol, conformances)) {
