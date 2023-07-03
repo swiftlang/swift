@@ -3420,6 +3420,11 @@ public:
   void recordCallAsFunction(UnresolvedDotExpr *root, ArgumentList *arguments,
                             ConstraintLocator *locator);
 
+  /// Record root, value, and declContext of keypath expression for use across
+  /// constraint system.
+  void recordKeyPath(KeyPathExpr *keypath, TypeVariableType *root,
+                     TypeVariableType *value, DeclContext *dc);
+
   /// Walk a closure AST to determine its effects.
   ///
   /// \returns a function's extended info describing the effects, as

@@ -3607,8 +3607,8 @@ namespace {
       auto rootLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathRoot);
       auto locator = CS.getConstraintLocator(E);
-      Type root = CS.createTypeVariable(rootLocator, TVO_CanBindToNoEscape |
-                                        TVO_CanBindToHole);
+      auto *root = CS.createTypeVariable(rootLocator, TVO_CanBindToNoEscape |
+                                                          TVO_CanBindToHole);
 
       // If a root type was explicitly given, then resolve it now.
       if (auto rootRepr = E->getRootType()) {
@@ -3747,9 +3747,10 @@ namespace {
 
       auto valueLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
-      auto value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
-                                                           TVO_CanBindToHole);
+      auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
+                                                            TVO_CanBindToHole);
       CS.addConstraint(ConstraintKind::Equal, base, value, locator);
+      CS.recordKeyPath(E, root, value, CurDC);
 
       // The result is a KeyPath from the root to the end component.
       // The type of key path depends on the overloads chosen for the key
@@ -3761,6 +3762,7 @@ namespace {
                                                      TVO_CanBindToHole);
 
       CS.addKeyPathConstraint(kpTy, root, value, componentTypeVars, locator);
+
       return kpTy;
     }
 

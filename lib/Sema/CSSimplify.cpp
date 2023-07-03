@@ -14536,6 +14536,12 @@ void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
       getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
 }
 
+void ConstraintSystem::recordKeyPath(KeyPathExpr *keypath,
+                                     TypeVariableType *root,
+                                     TypeVariableType *value, DeclContext *dc) {
+  KeyPaths.insert(std::make_pair(keypath, std::make_tuple(root, value, dc)));
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
