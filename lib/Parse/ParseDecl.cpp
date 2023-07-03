@@ -2225,6 +2225,7 @@ llvm::Optional<MacroRole> getMacroRole(StringRef roleName) {
       .Case("member", MacroRole::Member)
       .Case("peer", MacroRole::Peer)
       .Case("conformance", MacroRole::Conformance)
+      .Case("extension", MacroRole::Extension)
       .Default(llvm::None);
 }
 
@@ -2264,8 +2265,10 @@ Parser::parseMacroRoleAttribute(
   SourceLoc rParenLoc;
   llvm::Optional<MacroRole> role;
   bool sawRole = false;
+  bool sawConformances = false;
   bool sawNames = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
+  SmallVector<TypeExpr *, 2> conformances;
   auto argumentsStatus = parseList(tok::r_paren, lParenLoc, rParenLoc,
                                    /*AllowSepAfterLast=*/false,
                                    diag::expected_rparen_expr_list,
@@ -2294,7 +2297,8 @@ Parser::parseMacroRoleAttribute(
     parseOptionalArgumentLabel(fieldName, fieldNameLoc);
 
     // If there is a field name, it better be 'names'.
-    if (!(fieldName.empty() || fieldName.is("names"))) {
+    if (!(fieldName.empty() || fieldName.is("names") ||
+          fieldName.is("conformances"))) {
       diagnose(
          fieldNameLoc, diag::macro_attribute_unknown_label, isAttached,
          fieldName);
@@ -2304,7 +2308,7 @@ Parser::parseMacroRoleAttribute(
 
     // If there is no field name and we haven't seen either names or the role,
     // this is the role.
-    if (fieldName.empty() && !sawNames && !sawRole) {
+    if (fieldName.empty() && !sawConformances && !sawNames && !sawRole) {
       // Whether we saw anything we tried to treat as a role.
       sawRole = true;
 
@@ -2313,13 +2317,18 @@ Parser::parseMacroRoleAttribute(
         : diag::macro_role_attr_expected_freestanding_kind;
       Identifier roleName;
       SourceLoc roleNameLoc;
-      if (parseIdentifier(roleName, roleNameLoc, diagKind,
-                          /*diagnoseDollarPrefix=*/true)) {
+      if (Tok.is(tok::kw_extension)) {
+        roleNameLoc = consumeToken();
+        role = MacroRole::Extension;
+      } else if (parseIdentifier(roleName, roleNameLoc, diagKind,
+                                 /*diagnoseDollarPrefix=*/true)) {
         status.setIsParseError();
         return status;
       }
 
-      role = getMacroRole(roleName.str());
+      if (!role)
+        role = getMacroRole(roleName.str());
+
       if (!role) {
         diagnose(roleNameLoc, diag::macro_role_attr_expected_kind, isAttached);
         status.setIsParseError();
@@ -2340,6 +2349,25 @@ Parser::parseMacroRoleAttribute(
         status.setIsParseError();
         return status;
       }
+
+      return status;
+    }
+
+    if (fieldName.is("conformances") ||
+        (fieldName.empty() && sawConformances && !sawNames)) {
+      if (fieldName.is("conformances") && sawConformances) {
+        diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
+                 diag::macro_attribute_duplicate_label,
+                 isAttached,
+                 "conformances");
+      }
+
+      sawConformances = true;
+
+      // Parse the introduced conformances
+      auto type = parseType();
+      auto *typeExpr = new (Context) TypeExpr(type.get());
+      conformances.push_back(typeExpr);
 
       return status;
     }
@@ -2447,7 +2475,7 @@ Parser::parseMacroRoleAttribute(
   SourceRange range(Loc, rParenLoc);
   return makeParserResult(MacroRoleAttr::create(
       Context, AtLoc, range, syntax, lParenLoc, *role, names,
-      rParenLoc, /*isImplicit*/ false));
+      conformances, rParenLoc, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
@@ -2893,6 +2921,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       ParseSymbolName = consumeIf(tok::comma);
     }
 
+    bool Raw = false;
+    if (DK == DAK_SILGenName) {
+      if (Tok.is(tok::identifier) && Tok.getText() == "raw") {
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+        Raw = true;
+      }
+    }
+
     llvm::Optional<StringRef> AsmName;
     if (ParseSymbolName) {
       if (Tok.isNot(tok::string_literal)) {
@@ -2928,7 +2965,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     if (!DiscardAttribute) {
       if (DK == DAK_SILGenName)
-        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), AtLoc,
+        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), Raw, AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,
@@ -3861,7 +3898,7 @@ ParserStatus Parser::parseDeclAttribute(
     auto attr = MacroRoleAttr::create(
         Context, AtLoc, SourceRange(AtLoc, attrLoc),
         MacroSyntax::Freestanding, SourceLoc(), MacroRole::Expression, { },
-        SourceLoc(), /*isImplicit*/ false);
+        /*conformances=*/{}, SourceLoc(), /*isImplicit*/ false);
     Attributes.add(attr);
     return makeParserSuccess();
   }

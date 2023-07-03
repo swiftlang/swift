@@ -5061,7 +5061,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       if (result == CheckGenericArgumentsResult::RequirementFailure) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), Loc, Loc,
-            proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
+            proto->getDeclaredInterfaceType(),
+            {proto->getSelfInterfaceType()->castTo<GenericTypeParamType>()},
             QuerySubstitutionMap{substitutions}, module);
       }
 
@@ -6443,7 +6444,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
-  auto conformances = idc->getLocalConformances();
+  auto conformances = idc->getLocalConformances(
+      ConformanceLookupKind::ExcludeUnexpandedMacros);
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();

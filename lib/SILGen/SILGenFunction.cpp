@@ -331,7 +331,8 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion: {
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion: {
     auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {
@@ -989,7 +990,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origFormalType = AbstractionPattern(constantInfo.LoweredType);
+  auto origFormalType = AbstractionPattern(subs, constantInfo.LoweredType);
 
   // - the substituted type
   auto substFormalType = expectedType;
@@ -1446,7 +1447,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
         {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
         getASTContext().getNeverType(), moduleDecl);
     drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
-        "swift_task_asyncMainDrainQueue", /*implicit*/ true));
+        "swift_task_asyncMainDrainQueue", /*raw*/ false, /*implicit*/ true));
   }
 
   SILFunction *drainQueueSILFunc = SGM.getFunction(

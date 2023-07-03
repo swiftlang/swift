@@ -17,6 +17,7 @@
 #include "TypeCheckMacros.h"
 #include "../AST/InlinableText.h"
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -74,6 +75,8 @@ extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
     const char *discriminator, ptrdiff_t discriminatorLength,
+    const char *qualifiedType, ptrdiff_t qualifiedTypeLength,
+    const char *conformances, ptrdiff_t conformancesLength,
     uint8_t rawMacroRole,
     void *customAttrSourceFile, const void *customAttrSourceLocation,
     void *declarationSourceFile, const void *declarationSourceLocation,
@@ -565,7 +568,8 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
 
     // Certain macro roles can generate special declarations.
     if ((isa<AccessorDecl>(decl) && role == MacroRole::Accessor) ||
-        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance)) {
+        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance) ||
+        (isa<ExtensionDecl>(decl) && role == MacroRole::Extension)) { // FIXME: Check extension for generated names.
       continue;
     }
 
@@ -713,6 +717,8 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
     return GeneratedSourceInfo::PeerMacroExpansion;
   case MacroRole::Conformance:
     return GeneratedSourceInfo::ConformanceMacroExpansion;
+  case MacroRole::Extension:
+    return GeneratedSourceInfo::ExtensionMacroExpansion;
   }
   llvm_unreachable("unhandled MacroRole");
 }
@@ -800,6 +806,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     return CharSourceRange(afterDeclLoc, 0);
   }
 
+  case MacroRole::Extension: {
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    return CharSourceRange(afterDeclLoc, 0);
+  }
+
   case MacroRole::Expression:
   case MacroRole::Declaration:
   case MacroRole::CodeItem:
@@ -847,6 +859,22 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   macroSourceFile->setImports(dc->getParentSourceFile()->getImports());
   return macroSourceFile;
+}
+
+static uint8_t getRawMacroRole(MacroRole role) {
+  switch (role) {
+  case MacroRole::Expression: return 0;
+  case MacroRole::Declaration: return 1;
+  case MacroRole::Accessor: return 2;
+  case MacroRole::MemberAttribute: return 3;
+  case MacroRole::Member: return 4;
+  case MacroRole::Peer: return 5;
+  case MacroRole::CodeItem: return 7;
+  // Use the same raw macro role for conformance and extension
+  // in ASTGen.
+  case MacroRole::Conformance:
+  case MacroRole::Extension: return 8;
+  }
 }
 
 /// Evaluate the given freestanding macro expansion.
@@ -958,7 +986,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
         &ctx.Diags, externalDef->opaqueHandle,
         static_cast<uint32_t>(externalDef->kind), discriminator->data(),
         discriminator->size(),
-        static_cast<uint32_t>(macroRole), astGenSourceFile,
+        getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
@@ -1069,11 +1097,12 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
 static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          CustomAttr *attr,
                                          bool passParentContext, MacroRole role,
+                                         ArrayRef<ProtocolDecl *> conformances = {},
                                          StringRef discriminatorStr = "") {
   DeclContext *dc;
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
-  } else if (role == MacroRole::Conformance) {
+  } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
     // Conformance macros always expand to extensions at file-scope.
     dc = attachedTo->getDeclContext()->getParentSourceFile();
   } else {
@@ -1128,6 +1157,31 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     return "";
 #endif
   });
+
+  std::string extendedType;
+  {
+    llvm::raw_string_ostream OS(extendedType);
+    if (role == MacroRole::Extension || role == MacroRole::Conformance) {
+      auto *nominal = dyn_cast<NominalTypeDecl>(attachedTo);
+      PrintOptions options;
+      options.FullyQualifiedExtendedTypesIfAmbiguous = true;
+      nominal->getDeclaredType()->print(OS, options);
+    } else {
+      OS << "";
+    }
+  }
+
+  std::string conformanceList;
+  {
+    llvm::raw_string_ostream OS(conformanceList);
+    if (role == MacroRole::Extension) {
+      for (auto *protocol : conformances) {
+        protocol->getDeclaredType()->print(OS);
+      }
+    } else {
+      OS << "";
+    }
+  }
 
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
@@ -1200,8 +1254,11 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->data(),
-        discriminator->size(), static_cast<uint32_t>(role),
+        static_cast<uint32_t>(externalDef->kind),
+        discriminator->data(), discriminator->size(),
+        extendedType.data(), extendedType.size(),
+        conformanceList.data(), conformanceList.size(),
+        getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceAddress,
@@ -1416,30 +1473,75 @@ llvm::Optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
 }
 
 ArrayRef<unsigned>
-ExpandConformanceMacros::evaluate(Evaluator &evaluator,
-                                  NominalTypeDecl *nominal) const {
+ExpandExtensionMacros::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;
-  nominal->forEachAttachedMacro(MacroRole::Conformance,
-      [&](CustomAttr *attr, MacroDecl *macro) {
-        if (auto bufferID = expandConformances(attr, macro, nominal))
-          bufferIDs.push_back(*bufferID);
-      });
+  for (auto customAttrConst : nominal->getSemanticAttrs().getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto *macro = nominal->getResolvedMacro(customAttr);
+
+    if (!macro)
+      continue;
+
+    // Prefer the extension role
+    MacroRole role;
+    if (macro->getMacroRoles().contains(MacroRole::Extension)) {
+      role = MacroRole::Extension;
+    } else if (macro->getMacroRoles().contains(MacroRole::Conformance)) {
+      role = MacroRole::Conformance;
+    } else {
+      continue;
+    }
+
+    if (auto bufferID = expandExtensions(customAttr, macro,
+                                         role, nominal))
+      bufferIDs.push_back(*bufferID);
+  }
 
   return nominal->getASTContext().AllocateCopy(bufferIDs);
 }
 
-llvm::Optional<unsigned> swift::expandConformances(CustomAttr *attr,
-                                                   MacroDecl *macro,
-                                                   NominalTypeDecl *nominal) {
+llvm::Optional<unsigned>
+swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
+                        MacroRole role, NominalTypeDecl *nominal) {
+  if (nominal->getDeclContext()->isLocalContext()) {
+    nominal->diagnose(diag::local_extension_macro);
+    return llvm::None;
+  }
+
+  // Collect the protocol conformances that the macro can add. The
+  // macro should not add conformances that are already stated in
+  // the original source.
+
+  SmallVector<ProtocolDecl *, 2> potentialConformances;
+  macro->getIntroducedConformances(nominal, potentialConformances);
+
+  SmallVector<ProtocolDecl *, 2> introducedConformances;
+  for (auto protocol : potentialConformances) {
+    SmallVector<ProtocolConformance *, 2> existingConformances;
+    nominal->lookupConformance(protocol, existingConformances);
+
+    bool hasExistingConformance = llvm::any_of(
+        existingConformances,
+        [&](ProtocolConformance *conformance) {
+          return conformance->getSourceKind() !=
+              ConformanceEntryKind::PreMacroExpansion;
+        });
+
+    if (!hasExistingConformance) {
+      introducedConformances.push_back(protocol);
+    }
+  }
+
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
-                                                 MacroRole::Conformance);
+                                                 role, introducedConformances);
 
   if (!macroSourceFile)
     return llvm::None;
 
   PrettyStackTraceDecl debugStack(
-      "applying expanded conformance macro", nominal);
+      "applying expanded extension macro", nominal);
 
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto *decl : topLevelDecls) {
@@ -1574,6 +1676,43 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   return macroExpansion->getMacroRef();
 }
 
+ArrayRef<Type>
+ResolveExtensionMacroConformances::evaluate(Evaluator &evaluator,
+                                            const MacroRoleAttr *attr,
+                                            const Decl *decl) const {
+  auto *dc = decl->getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  SmallVector<Type, 2> protocols;
+  for (auto *typeExpr : attr->getConformances()) {
+    if (auto *typeRepr = typeExpr->getTypeRepr()) {
+      auto resolved =
+          TypeResolution::forInterface(
+              dc, TypeResolverContext::GenericRequirement,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr)
+          .resolveType(typeRepr);
+
+      if (resolved->is<ErrorType>())
+        continue;
+
+      if (!resolved->isConstraintType()) {
+        diagnoseAndRemoveAttr(
+            decl, attr,
+            diag::extension_macro_invalid_conformance,
+            resolved);
+        continue;
+      }
+
+      typeExpr->setType(MetatypeType::get(resolved));
+      protocols.push_back(resolved);
+    }
+  }
+
+  return ctx.AllocateCopy(protocols);
+}
+
 // MARK: for IDE.
 
 SourceFile *swift::evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
@@ -1581,7 +1720,7 @@ SourceFile *swift::evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          bool passParentContext, MacroRole role,
                                          StringRef discriminator) {
   return ::evaluateAttachedMacro(macro, attachedTo, attr, passParentContext,
-                                 role, discriminator);
+                                 role, {}, discriminator);
 }
 
 SourceFile *

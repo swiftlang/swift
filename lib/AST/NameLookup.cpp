@@ -680,11 +680,8 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
-      // Next, prefer any other module over the (_)Observation module.
-      auto obsModule = ctx.getLoadedModule(ctx.Id_Observation);
-      if (!obsModule)
-        obsModule = ctx.getLoadedModule(ctx.Id_Observation_);
-      if (obsModule) {
+      // Next, prefer any other module over the Observation module.
+      if (auto obsModule = ctx.getLoadedModule(ctx.Id_Observation)) {
         if ((firstModule == obsModule) != (secondModule == obsModule)) {
           // If second module is (_)Observation, then it is shadowed by
           // first.
@@ -1810,6 +1807,21 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
           ctx.evaluator,
           ExpandSynthesizedMemberMacroRequest{decl},
           false);
+    }
+  }
+
+  // Trigger the expansion of extension macros on the container, if any of the
+  // names match.
+  {
+    MacroIntroducedNameTracker nameTracker;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(container.getAsDecl())) {
+      forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
+      if (nameTracker.shouldExpandForName(name)) {
+        (void)evaluateOrDefault(
+            ctx.evaluator,
+            ExpandExtensionMacros{nominal},
+            false);
+      }
     }
   }
 

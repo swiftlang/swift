@@ -663,17 +663,6 @@ inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
 }
 
-template <typename T>
-inline T *staticCastHelper(const Type &Ty) {
-  // The constructor of the ArrayRef<Type> must guarantee this invariant.
-  // XXX -- We use reinterpret_cast instead of static_cast so that files
-  // can avoid including Types.h if they want to.
-  return reinterpret_cast<T*>(Ty.getPointer());
-}
-/// TypeArrayView allows arrays of 'Type' to have a static type.
-template <typename T>
-using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
-                                   /*AllowOrigAccess*/true>;
 } // end namespace swift
 
 namespace llvm {

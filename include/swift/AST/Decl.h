@@ -1358,7 +1358,7 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  TypeArrayView<GenericTypeParamType> getInnermostGenericParamTypes() const;
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -3148,7 +3148,7 @@ public:
 
   /// Retrieve the generic parameters that represent the opaque types described by this opaque
   /// type declaration.
-  TypeArrayView<GenericTypeParamType> getOpaqueGenericParams() const {
+  ArrayRef<GenericTypeParamType *> getOpaqueGenericParams() const {
     return OpaqueInterfaceGenericSignature.getInnermostGenericParams();
   }
 
@@ -8597,6 +8597,15 @@ public:
   /// by a given role of this macro.
   void getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
                           SmallVectorImpl<DeclName> &names) const;
+
+  /// Populate the \c conformances vector with the protocols that
+  /// this macro generates conformances to.
+  ///
+  /// Only extension macros can add conformances; no results will
+  /// be added if this macro does not contain an extension role.
+  void getIntroducedConformances(
+      NominalTypeDecl *attachedTo,
+      SmallVectorImpl<ProtocolDecl *> &conformances) const;
 
   /// Returns a DeclName that represents arbitrary names.
   static DeclName getArbitraryName() {

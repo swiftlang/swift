@@ -54,6 +54,9 @@ public:
     /// The expansion of an attached conformance macro.
     ConformanceMacroExpansion,
 
+    /// The expansion of an attached extension macro.
+    ExtensionMacroExpansion,
+
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 

@@ -192,15 +192,11 @@ public:
     // If we have local archetypes to substitute, check whether that's
     // relevant to this particular substitution.
     if (!LocalArchetypeSubs.empty()) {
-      for (auto ty : Subs.getReplacementTypes()) {
+      if (Subs.hasLocalArchetypes()) {
         // If we found a type containing a local archetype, substitute
         // open existentials throughout the substitution map.
-        if (ty->hasLocalArchetype()) {
-          Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{
-                              LocalArchetypeSubs},
-                            MakeAbstractConformanceForGenericType());
-          break;
-        }
+        Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+                          MakeAbstractConformanceForGenericType());
       }
     }
 
@@ -223,7 +219,8 @@ public:
     return Ty.subst(
       Builder.getModule(),
       QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType());
+      MakeAbstractConformanceForGenericType(),
+      CanGenericSignature());
   }
   SILType getOpType(SILType Ty) {
     Ty = getTypeInClonedContext(Ty);
@@ -922,7 +919,7 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
                                       getOpType(Inst->getType()),
-                                      Inst->isObjC(), Inst->canAllocOnStack(),
+                                      Inst->isObjC(), Inst->canAllocOnStack(), Inst->isBare(),
                                       ElemTypes, CountArgs);
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1125,7 +1122,8 @@ SILCloner<ImplClass>::visitGlobalValueInst(GlobalValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createGlobalValue(getOpLocation(Inst->getLoc()),
-                                           Inst->getReferencedGlobal()));
+                                           Inst->getReferencedGlobal(),
+                                           Inst->isBare()));
 }
 
 template<typename ImplClass>
@@ -1358,6 +1356,7 @@ void SILCloner<ImplClass>::visitAssignOrInitInst(AssignOrInitInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAssignOrInit(
                 getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getSelf()),
                 getOpValue(Inst->getSrc()),
                 getOpValue(Inst->getInitializer()),
                 getOpValue(Inst->getSetter()), Inst->getMode()));

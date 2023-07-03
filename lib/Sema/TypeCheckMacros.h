@@ -70,12 +70,15 @@ llvm::Optional<unsigned> expandMembers(CustomAttr *attr, MacroDecl *macro,
 llvm::Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro,
                                      Decl *decl);
 
-/// Expand the conformances for the given declaration based on
-/// the custom attribute that references the given macro.
+/// Expand the extensions for the given declaration based on
+/// the custom attribute that references the given macro. Extensions
+/// can be produced by either conformance macros or extension macros.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-llvm::Optional<unsigned> expandConformances(CustomAttr *attr, MacroDecl *macro,
-                                            NominalTypeDecl *nominal);
+llvm::Optional<unsigned> expandExtensions(CustomAttr *attr,
+                                          MacroDecl *macro,
+                                          MacroRole role,
+                                          NominalTypeDecl *nominal);
 
 /// Determine whether an accessor macro with the given attribute only
 /// introduces observers like willSet and didSet.

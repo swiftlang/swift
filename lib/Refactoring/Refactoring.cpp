@@ -8673,10 +8673,11 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
     allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
   }
 
-  if (roles.contains(MacroRole::Conformance)) {
+  if (roles.contains(MacroRole::Conformance) ||
+      roles.contains(MacroRole::Extension)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       auto bufferIDs = evaluateOrDefault(
-          ctx.evaluator, ExpandConformanceMacros{nominal}, { });
+          ctx.evaluator, ExpandExtensionMacros{nominal}, { });
       allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
     }
   }

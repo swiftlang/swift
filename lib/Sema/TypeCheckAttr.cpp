@@ -7125,6 +7125,8 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
         diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
                               getMacroRoleString(attr->getMacroRole()));
       break;
+    case MacroRole::Extension:
+      break;
     default:
       diagnoseAndRemoveAttr(attr, diag::invalid_macro_role_for_macro_syntax,
                             /*attached*/1);
@@ -7133,6 +7135,11 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
     break;
   }
   }
+
+  (void)evaluateOrDefault(
+      Ctx.evaluator,
+      ResolveExtensionMacroConformances{attr, D},
+      {});
 }
 
 namespace {

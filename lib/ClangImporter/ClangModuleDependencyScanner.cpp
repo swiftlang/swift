@@ -238,7 +238,7 @@ void ClangImporter::recordModuleDependencies(
         clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
 
     if (ctx.ClangImporterOpts.CASOpts) {
-      swiftArgs.push_back("-enable-cas");
+      swiftArgs.push_back("-cache-compile-job");
       if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
         swiftArgs.push_back("-cas-path");
         swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
@@ -345,7 +345,7 @@ void ClangImporter::recordBridgingHeaderOptions(
   llvm::for_each(clangArgs, addClangArg);
 
   if (ctx.ClangImporterOpts.CASOpts) {
-    swiftArgs.push_back("-enable-cas");
+    swiftArgs.push_back("-cache-compile-job");
     if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
       swiftArgs.push_back("-cas-path");
       swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);

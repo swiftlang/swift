@@ -1253,6 +1253,30 @@ public struct EquatableMacro: ConformanceMacro {
   }
 }
 
+public struct ConformanceViaExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): MyProtocol {
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct HashableMacro: ConformanceMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -1296,6 +1320,38 @@ public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
       """
 
     return [requirement]
+  }
+}
+
+public struct DelegatedConformanceViaExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P where Element: P {
+        static func requirement() {
+          Element.requirement()
+        }
+      }
+
+      """
+
+    guard let extensionDecl = decl.as(ExtensionDeclSyntax.self) else {
+      return []
+    }
+
+    return [
+      extensionDecl
+    ]
   }
 }
 

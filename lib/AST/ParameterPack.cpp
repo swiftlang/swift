@@ -351,14 +351,13 @@ SmallVector<Type, 2> BoundGenericType::getExpandedGenericArgs() {
   // It would be nicer to use genericSig.getInnermostGenericParams() here,
   // but that triggers a request cycle if we're in the middle of computing
   // the generic signature already.
-  SmallVector<Type, 2> params;
+  SmallVector<GenericTypeParamType *, 2> params;
   for (auto *paramDecl : getDecl()->getGenericParams()->getParams()) {
-    params.push_back(paramDecl->getDeclaredInterfaceType());
+    params.push_back(paramDecl->getDeclaredInterfaceType()
+                         ->castTo<GenericTypeParamType>());
   }
 
-  return PackType::getExpandedGenericArgs(
-                       TypeArrayView<GenericTypeParamType>(params),
-                       getGenericArgs());
+  return PackType::getExpandedGenericArgs(params, getGenericArgs());
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
@@ -374,7 +373,7 @@ SmallVector<Type, 2> TypeAliasType::getExpandedGenericArgs() {
 
 /// <T...> Pack{T, Pack{Int, String}} => {T..., Int, String}
 SmallVector<Type, 2>
-PackType::getExpandedGenericArgs(TypeArrayView<GenericTypeParamType> params,
+PackType::getExpandedGenericArgs(ArrayRef<GenericTypeParamType *> params,
                                  ArrayRef<Type> args) {
   SmallVector<Type, 2> wrappedArgs;
 

@@ -653,13 +653,14 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
 static Type getTypeForDWARFMangling(Type t) {
   return t.subst(
     [](SubstitutableType *t) -> Type {
-      if (isa<GenericTypeParamType>(t))
-        return t->getCanonicalType();
-      return t;
+      if (isa<GenericTypeParamType>(t) &&
+          cast<GenericTypeParamType>(t)->isParameterPack()) {
+        return PackType::getSingletonPackExpansion(t->getCanonicalType());
+      }
+      return t->getCanonicalType();
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes |
-    SubstFlags::PreservePackExpansionLevel);
+    SubstFlags::AllowLoweredTypes);
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
@@ -3914,7 +3915,8 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion: {
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion: {
     auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
       .get<Decl *>();
     auto attr = generatedSourceInfo->attachedMacroCustomAttr;
@@ -3938,6 +3940,10 @@ void ASTMangler::appendMacroExpansionContext(
 
     case GeneratedSourceInfo::ConformanceMacroExpansion:
       role = MacroRole::Conformance;
+      break;
+
+    case GeneratedSourceInfo::ExtensionMacroExpansion:
+      role = MacroRole::Extension;
       break;
 
     default:
@@ -4003,6 +4009,10 @@ void ASTMangler::appendMacroExpansionOperator(
 
   case MacroRole::Conformance:
     appendOperator("fMc", Index(discriminator));
+    break;
+
+  case MacroRole::Extension:
+    appendOperator("fMe", Index(discriminator));
     break;
   }
 }

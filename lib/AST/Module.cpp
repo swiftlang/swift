@@ -554,6 +554,7 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
   SmallVector<MissingDecl *, 4> unexpandedDecls;
   for (auto &entry : TopLevelAuxiliaryDecls) {
     for (auto &decl : entry.second) {
+      (void) decl;
       unexpandedDecls.append(entry.second.begin(), entry.second.end());
     }
   }
@@ -848,7 +849,8 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
     case GeneratedSourceInfo::MemberMacroExpansion:
     case GeneratedSourceInfo::PeerMacroExpansion:
-    case GeneratedSourceInfo::ConformanceMacroExpansion: {
+    case GeneratedSourceInfo::ConformanceMacroExpansion:
+    case GeneratedSourceInfo::ExtensionMacroExpansion: {
       // Location was within a macro expansion, return the expansion site, not
       // the insertion location.
       if (info->attachedMacroCustomAttr) {
@@ -1157,6 +1159,9 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 
   case GeneratedSourceInfo::ConformanceMacroExpansion:
     return MacroRole::Conformance;
+
+  case GeneratedSourceInfo::ExtensionMacroExpansion:
+    return MacroRole::Extension;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
@@ -1955,6 +1960,17 @@ LookupConformanceInModuleRequest::evaluate(
   // If we don't have a nominal type, there are no conformances.
   if (!nominal || isa<ProtocolDecl>(nominal))
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+
+  // Expand conformances added by extension macros.
+  //
+  // FIXME: This expansion should only be done if the
+  // extension macro can generate a conformance to the
+  // given protocol, but conformance macros do not specify
+  // that information upfront.
+  (void)evaluateOrDefault(
+      ctx.evaluator,
+      ExpandExtensionMacros{nominal},
+      { });
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;

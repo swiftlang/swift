@@ -130,8 +130,14 @@ SWIFT_RUNTIME_EXPORT
 unsigned swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
                                                   const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
+void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
 unsigned swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
                                                    const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
 void swift_generic_instantiateLayoutString(const uint8_t *layoutStr,
                                            Metadata *type);

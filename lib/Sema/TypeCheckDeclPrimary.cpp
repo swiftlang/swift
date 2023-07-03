@@ -1935,6 +1935,14 @@ public:
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
+
+      // Expand extension macros.
+      if (auto *nominal = dyn_cast<NominalTypeDecl>(VD)) {
+        (void)evaluateOrDefault(
+            Ctx.evaluator,
+            ExpandExtensionMacros{nominal},
+            { });
+      }
     }
   }
 
@@ -2313,6 +2321,9 @@ public:
 
         // If the variable has no storage, it never needs an initializer.
         if (!var->hasStorage())
+          return;
+
+        if (var->getAttrs().hasAttribute<SILGenNameAttr>())
           return;
 
         if (var->isInvalid() || PBD->isInvalid())

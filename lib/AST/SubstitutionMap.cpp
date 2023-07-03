@@ -132,9 +132,9 @@ bool SubstitutionMap::hasArchetypes() const {
   return false;
 }
 
-bool SubstitutionMap::hasOpenedExistential() const {
+bool SubstitutionMap::hasLocalArchetypes() const {
   for (Type replacementTy : getReplacementTypesBuffer()) {
-    if (replacementTy && replacementTy->hasOpenedExistential())
+    if (replacementTy && replacementTy->hasLocalArchetype())
       return true;
   }
   return false;

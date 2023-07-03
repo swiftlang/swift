@@ -2494,6 +2494,13 @@ public:
                                            unsigned componentIndex,
                                            SILValue currentIndexWithinComponent);
 
+  /// Enter a cleanup to destroy all of the components in a tuple starting
+  /// at a particular component index.
+  CleanupHandle
+  enterDestroyRemainingTupleElementsCleanup(SILValue addr,
+                                            CanPackType inducedPackType,
+                                            unsigned componentIndex);
+
   /// Copy the elements of a pack, which must consist of a single pack expansion,
   /// into a tuple value having the same pack expansion and its sole element type.
   void copyPackElementsToTuple(SILLocation loc, SILValue tupleAddr, SILValue pack,
@@ -2713,6 +2720,19 @@ public:
                        SILValue packAddr,
                        CanPackType formalPackType,
                        unsigned firstComponentIndex = 0);
+
+  /// Emit instructions to destroy a suffix of a tuple value.
+  ///
+  /// \param tupleAddr - the address of the overall tuple value
+  /// \param inducedPackType - a pack type with the same shape as the
+  ///   element types of the overall tuple value; can be null if the
+  ///   tuple type doesn't contain pack expansions
+  /// \param componentIndex - the index of the first component to
+  ///   destroy in the tuple
+  void emitDestroyRemainingTupleElements(SILLocation loc,
+                                         SILValue tupleAddr,
+                                         CanPackType inducedPackType,
+                                         unsigned componentIndex);
 
   /// Emit a loop which destroys a prefix of a pack expansion component
   /// of a tuple value.

@@ -1452,6 +1452,8 @@ public:
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
+    if (ARI->isBare())
+      *this << "[bare] ";
     printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }
@@ -1622,6 +1624,8 @@ public:
   }
 
   void visitGlobalValueInst(GlobalValueInst *GVI) {
+    if (GVI->isBare())
+      *this << "[bare] ";
     GVI->getReferencedGlobal()->printName(PrintState.OS);
     *this << " : " << GVI->getType();
   }
@@ -1802,7 +1806,8 @@ public:
       }
     }
 
-    *this << getIDAndType(AI->getSrc());
+    *this << "self " << getIDAndType(AI->getSelf());
+    *this << ", value " << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
   }
@@ -2694,20 +2699,20 @@ public:
     printSwitchEnumInst(switchEnum);
   }
 
-  void printSelectEnumInst(SelectEnumInstBase *SEI) {
-    *this << getIDAndType(SEI->getEnumOperand());
+  void printSelectEnumInst(SelectEnumOperation SEO) {
+    *this << getIDAndType(SEO.getEnumOperand());
 
-    for (unsigned i = 0, e = SEI->getNumCases(); i < e; ++i) {
+    for (unsigned i = 0, e = SEO.getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILValue result;
-      std::tie(elt, result) = SEI->getCase(i);
+      std::tie(elt, result) = SEO.getCase(i);
       *this << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
             << ": " << Ctx.getID(result);
     }
-    if (SEI->hasDefault())
-      *this << ", default " << Ctx.getID(SEI->getDefaultResult());
+    if (SEO.hasDefault())
+      *this << ", default " << Ctx.getID(SEO.getDefaultResult());
 
-    *this << " : " << SEI->getType();
+    *this << " : " << SEO->getType();
   }
 
   void visitSelectEnumInst(SelectEnumInst *SEI) {

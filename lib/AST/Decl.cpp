@@ -1219,7 +1219,7 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
   }
 }
 
-TypeArrayView<GenericTypeParamType>
+ArrayRef<GenericTypeParamType *>
 GenericContext::getInnermostGenericParamTypes() const {
   return getGenericSignature().getInnermostGenericParams();
 }
@@ -6861,6 +6861,9 @@ bool VarDecl::isLazilyInitializedGlobal() const {
   if (isDebuggerVar())
     return false;
 
+  if (getAttrs().hasAttribute<SILGenNameAttr>())
+    return false;
+
   // Top-level global variables in the main source file and in the REPL are not
   // lazily initialized.
   return !isTopLevelGlobal();
@@ -10359,7 +10362,7 @@ std::vector<MacroRole> swift::getAllMacroRoles() {
   return {
       MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
       MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
-      MacroRole::Conformance,     MacroRole::CodeItem,
+      MacroRole::Conformance,     MacroRole::CodeItem,    MacroRole::Extension,
   };
 }
 
@@ -10388,6 +10391,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::CodeItem:
     return "codeItem";
+
+  case MacroRole::Extension:
+    return "extension";
   }
 }
 
@@ -10447,7 +10453,8 @@ static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::MemberAttribute |
                                         MacroRole::Member |
                                         MacroRole::Peer |
-                                        MacroRole::Conformance);
+                                        MacroRole::Conformance |
+                                        MacroRole::Extension);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
@@ -10477,6 +10484,8 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
     return true;
   case MacroRole::CodeItem:
     return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
+  case MacroRole::Extension:
+    return ctx.LangOpts.hasFeature(Feature::ExtensionMacros);
   }
 }
 
@@ -10675,6 +10684,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Member:
   case MacroRole::Peer:
   case MacroRole::CodeItem:
+  case MacroRole::Extension:
     names.push_back(MacroDecl::getUniqueNamePlaceholder(getASTContext()));
     break;
 
@@ -10682,6 +10692,43 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Conformance:
   case MacroRole::MemberAttribute:
     break;
+  }
+}
+
+void MacroDecl::getIntroducedConformances(
+    NominalTypeDecl *attachedTo,
+    SmallVectorImpl<ProtocolDecl *> &conformances) const {
+  auto *attr = getMacroRoleAttr(MacroRole::Extension);
+  if (!attr)
+    return;
+
+  auto &ctx = getASTContext();
+  auto constraintTypes = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveExtensionMacroConformances{attr, this},
+      {});
+
+  for (auto constraint : constraintTypes) {
+    assert(constraint->isConstraintType());
+
+    std::function<void(Type)> addConstraint =
+        [&](Type constraint) -> void {
+          if (auto *proto = constraint->getAs<ParameterizedProtocolType>()) {
+            conformances.push_back(proto->getProtocol());
+            return;
+          } else if (auto *proto = constraint->getAs<ProtocolType>()) {
+            conformances.push_back(proto->getDecl());
+            return;
+          }
+
+          auto *composition =
+              constraint->castTo<ProtocolCompositionType>();
+          for (auto constraint : composition->getMembers()) {
+            addConstraint(constraint);
+          }
+        };
+
+    addConstraint(constraint);
   }
 }
 
@@ -10870,6 +10917,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return origDC;
