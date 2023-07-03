@@ -1489,6 +1489,13 @@ public:
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, Type>
       keyPathComponentTypes;
 
+  /// The key path expression and its root type, value type, and decl context
+  /// introduced by this solution.
+  llvm::MapVector<const KeyPathExpr *,
+                  std::tuple</*root=*/TypeVariableType *,
+                             /*value=*/TypeVariableType *, DeclContext *>>
+      KeyPaths;
+
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
@@ -2154,6 +2161,12 @@ private:
       std::tuple<const KeyPathExpr *, /*component index=*/unsigned, Type>>
       addedKeyPathComponentTypes;
 
+  /// Maps a key path root, value, and decl context to the key path expression.
+  llvm::MapVector<const KeyPathExpr *,
+                  std::tuple</*root=*/TypeVariableType *,
+                             /*value=*/TypeVariableType *, DeclContext *>>
+      KeyPaths;
+
   /// Maps AST entries to their targets.
   llvm::MapVector<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
@@ -2779,6 +2792,9 @@ public:
 
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;
+
+    /// The length of \c KeyPaths.
+    unsigned numKeyPaths;
 
     /// The length of \c ArgumentLists.
     unsigned numArgumentLists;
