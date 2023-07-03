@@ -1,6 +1,7 @@
 #include "../../Sema/TypeCheckConcurrency.h"
 #include "swift/AST/Expr.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/PartitionUtils.h"
 
 using namespace swift;
 
