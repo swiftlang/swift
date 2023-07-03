@@ -1560,7 +1560,7 @@ namespace {
                           ArgumentList *subscriptArgList,
                           PreparedArguments &&indices,
                           bool isOnSelfParameter,
-                          Optional<ActorIsolation> actorIso)
+                          llvm::Optional<ActorIsolation> actorIso)
         : AccessorBasedComponent(
               InitAccessorKind, decl, accessor, isSuper, isDirectAccessorUse,
               substitutions, baseFormalType, typeData, subscriptArgList,
@@ -1587,9 +1587,14 @@ namespace {
 
       SILValue setterFRef;
       CanSILFunctionType setterTy;
-      std::tie(setterFRef, setterTy) = applySetterToBase(
-          SGF, loc, SILDeclRef(field->getOpaqueAccessor(AccessorKind::Set)),
-          base);
+
+      if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
+        std::tie(setterFRef, setterTy) =
+            applySetterToBase(SGF, loc, SILDeclRef(setter), base);
+      } else {
+        setterFRef = SILUndef::get(initFRef->getType(), SGF.F);
+        setterTy = initFRef->getType().castTo<SILFunctionType>();
+      }
 
       auto Mval =
           emitValue(SGF, loc, field, fieldType, std::move(value), setterTy);
@@ -1618,7 +1623,7 @@ namespace {
     /// the same dynamic PathComponent type as the receiver) to see if they are
     /// identical.  If so, there is a conflicting writeback happening, so emit a
     /// diagnostic.
-    Optional<AccessStorage> getAccessStorage() const override {
+    llvm::Optional<AccessStorage> getAccessStorage() const override {
       return AccessStorage{Storage, IsSuper,
                            Indices.isNull() ? nullptr : &Indices,
                            ArgListForDiagnostics};
@@ -3095,8 +3100,12 @@ namespace {
       case AccessorKind::DidSet:
         llvm_unreachable("cannot use accessor directly to perform an access");
 
-      case AccessorKind::Init:
-        llvm_unreachable("init accessor not yet implemented");
+      case AccessorKind::Init: {
+        auto typeData =
+            getLogicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
+                                      AccessKind, FormalRValueType);
+        return asImpl().emitUsingInitAccessor(accessor, isDirect, typeData);
+      }
       }
 
       llvm_unreachable("bad kind");
@@ -3255,6 +3264,11 @@ void LValue::addNonMemberVarComponent(
 
     void emitUsingDistributedThunk() {
       llvm_unreachable("cannot dispatch non-member var via distributed thunk");
+    }
+
+    void emitUsingInitAccessor(SILDeclRef accessor, bool isDirect,
+                               LValueTypeData typeData) {
+      llvm_unreachable("cannot dispatch non-member var via init accessor");
     }
 
   } emitter(SGF, loc, var, subs, accessKind, formalRValueType, options,
@@ -3788,6 +3802,13 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
         Storage, IsSuper, Subs, Options, readStrategy, writeStrategy,
         BaseFormalType, typeData, ArgListForDiagnostics, std::move(Indices),
         IsOnSelfParameter);
+  }
+
+  void emitUsingInitAccessor(SILDeclRef accessor, bool isDirect,
+                             LValueTypeData typeData) {
+    LV.add<InitAccessorComponent>(
+        Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
+        ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter, ActorIso);
   }
 };
 } // end anonymous namespace
