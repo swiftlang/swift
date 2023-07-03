@@ -10,7 +10,7 @@
 // REQUIRES: objc_interop
 
 import StdlibUnittest
-import _Observation
+import Observation
 
 @usableFromInline
 @inline(never)
