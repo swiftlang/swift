@@ -2739,6 +2739,9 @@ public:
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }
 
+    if (isa<SILUndef>(setterFn))
+      return;
+
     // Check setter - it's a partially applied reference which takes
     // `initialValue`.
     CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
