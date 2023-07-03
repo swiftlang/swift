@@ -5121,6 +5121,9 @@ ERROR(actor_isolated_non_self_reference,none,
         "from a non-isolated autoclosure}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type,
          ActorIsolation))
+ERROR(subscript_mutation_outside_actor,none,
+      "%0 %1 %2 cannot be mutated from outside the actor",
+      (ActorIsolation, DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "
       "non-isolated context",
