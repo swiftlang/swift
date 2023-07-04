@@ -6665,10 +6665,6 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }
 
-  if (hasUnsafeAPIAttr(cxxDecl)) {
-    return CxxRecordSemanticsKind::ExplicitlyUnsafe;
-  }
-
   if (hasOwnedValueAttr(cxxDecl)) {
     return CxxRecordSemanticsKind::Owned;
   }
@@ -6677,11 +6673,6 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Iterator;
   }
   
-  if (!hasCustomCopyOrMoveConstructor(cxxDecl) &&
-      hasPointerInSubobjects(cxxDecl)) {
-    return CxxRecordSemanticsKind::UnsafePointerMember;
-  }
-
   if (hasCopyTypeOperations(cxxDecl)) {
     return CxxRecordSemanticsKind::Owned;
   }
