@@ -543,6 +543,67 @@ static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
   return Identifier();
 }
 
+static void diagnoseInvalidDecl(Decl *decl,
+                                MacroDecl *macro,
+                                llvm::function_ref<bool(DeclName)> coversName) {
+  auto &ctx = decl->getASTContext();
+
+  // Diagnose invalid declaration kinds.
+  if (isa<ImportDecl>(decl) ||
+      isa<OperatorDecl>(decl) ||
+      isa<PrecedenceGroupDecl>(decl) ||
+      isa<MacroDecl>(decl) ||
+      isa<ExtensionDecl>(decl)) {
+    decl->diagnose(diag::invalid_decl_in_macro_expansion,
+                   decl->getDescriptiveKind());
+    decl->setInvalid();
+
+    if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+      extension->setExtendedNominal(nullptr);
+    }
+
+    return;
+  }
+
+  // Diagnose `@main` types.
+  if (auto *mainAttr = decl->getAttrs().getAttribute<MainTypeAttr>()) {
+    ctx.Diags.diagnose(mainAttr->getLocation(),
+                       diag::invalid_main_type_in_macro_expansion);
+    mainAttr->setInvalid();
+  }
+
+  // Diagnose default literal type overrides.
+  if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
+    auto name = typeAlias->getBaseIdentifier();
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(_, __, typeName,   \
+                                                supportsOverride)    \
+    if (supportsOverride && name == makeIdentifier(ctx, typeName)) { \
+      typeAlias->diagnose(diag::literal_type_in_macro_expansion,     \
+                          makeIdentifier(ctx, typeName));            \
+      typeAlias->setInvalid();                                       \
+      return;                                                        \
+    }
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+  }
+
+  // Diagnose value decls with names not covered by the macro
+  if (auto *value = dyn_cast<ValueDecl>(decl)) {
+    auto name = value->getName();
+
+    // Unique names are always permitted.
+    if (MacroDecl::isUniqueMacroName(name.getBaseName().userFacingName()))
+      return;
+
+    if (coversName(name)) {
+      return;
+    }
+
+    value->diagnose(diag::invalid_macro_introduced_name,
+                    name, macro->getBaseName());
+  }
+}
+
 /// Diagnose macro expansions that produce any of the following declarations:
 ///   - Import declarations
 ///   - Operator and precedence group declarations
@@ -559,75 +620,33 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
   llvm::SmallVector<DeclName, 2> introducedNames;
   macro->getIntroducedNames(role, attachedTo, introducedNames);
 
-  llvm::SmallDenseSet<DeclName, 2> coversName(introducedNames.begin(),
-                                              introducedNames.end());
+  llvm::SmallDenseSet<DeclName, 2> introducedNameSet(
+      introducedNames.begin(), introducedNames.end());
+
+  auto coversName = [&](DeclName name) -> bool {
+    return (introducedNameSet.count(name) ||
+            introducedNameSet.count(name.getBaseName()) ||
+            introducedNameSet.count(MacroDecl::getArbitraryName()));
+  };
 
   for (auto *decl : expansionBuffer->getTopLevelDecls()) {
-    auto &ctx = decl->getASTContext();
-
     // Certain macro roles can generate special declarations.
     if ((isa<AccessorDecl>(decl) && role == MacroRole::Accessor) ||
-        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance) ||
-        (isa<ExtensionDecl>(decl) && role == MacroRole::Extension)) { // FIXME: Check extension for generated names.
+        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance)) {
       continue;
     }
 
-    // Diagnose invalid declaration kinds.
-    if (isa<ImportDecl>(decl) ||
-        isa<OperatorDecl>(decl) ||
-        isa<PrecedenceGroupDecl>(decl) ||
-        isa<MacroDecl>(decl) ||
-        isa<ExtensionDecl>(decl)) {
-      decl->diagnose(diag::invalid_decl_in_macro_expansion,
-                     decl->getDescriptiveKind());
-      decl->setInvalid();
+    if (role == MacroRole::Extension) {
+      auto *extension = dyn_cast<ExtensionDecl>(decl);
 
-      if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
-        extension->setExtendedNominal(nullptr);
+      for (auto *member : extension->getMembers()) {
+        diagnoseInvalidDecl(member, macro, coversName);
       }
 
       continue;
     }
 
-    // Diagnose `@main` types.
-    if (auto *mainAttr = decl->getAttrs().getAttribute<MainTypeAttr>()) {
-      ctx.Diags.diagnose(mainAttr->getLocation(),
-                         diag::invalid_main_type_in_macro_expansion);
-      mainAttr->setInvalid();
-    }
-
-    // Diagnose default literal type overrides.
-    if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
-      auto name = typeAlias->getBaseIdentifier();
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(_, __, typeName,     \
-                                                  supportsOverride)    \
-      if (supportsOverride && name == makeIdentifier(ctx, typeName)) { \
-        typeAlias->diagnose(diag::literal_type_in_macro_expansion,     \
-                            makeIdentifier(ctx, typeName));            \
-        typeAlias->setInvalid();                                       \
-        continue;                                                      \
-      }
-#include "swift/AST/KnownProtocols.def"
-#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    }
-
-    // Diagnose value decls with names not covered by the macro
-    if (auto *value = dyn_cast<ValueDecl>(decl)) {
-      auto name = value->getName();
-
-      // Unique names are always permitted.
-      if (MacroDecl::isUniqueMacroName(name.getBaseName().userFacingName()))
-        continue;
-
-      if (coversName.count(name) ||
-          coversName.count(name.getBaseName()) ||
-          coversName.count(MacroDecl::getArbitraryName())) {
-        continue;
-      }
-
-      value->diagnose(diag::invalid_macro_introduced_name,
-                      name, macro->getBaseName());
-    }
+    diagnoseInvalidDecl(decl, macro, coversName);
   }
 }
 
