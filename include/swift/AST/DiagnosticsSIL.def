@@ -856,5 +856,11 @@ NOTE(sil_referencebinding_inout_binding_here, none,
       "inout binding here",
       ())
 
+// SendNonSendable checking
+
+WARNING(send_non_sendable, none,
+        "Non-Sendable value %0 consumed, then used at this site; could be race",
+        (unsigned))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

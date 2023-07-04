@@ -166,6 +166,7 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_TRUE(Partition::equals(p1, p3));
 }
 
+// This test tests that consumption consumes entire regions as expected
 TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   Partition p;
 
@@ -199,13 +200,13 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (11))
 
-  auto never_called = [](const PartitionOp &_) {
+  auto never_called = [](const PartitionOp &, unsigned) {
       EXPECT_TRUE(false);
   };
 
   int times_called = 0;
   int expected_times_called = 0;
-  auto increment_times_called = [&](const PartitionOp &_) {
+  auto increment_times_called = [&](const PartitionOp &, unsigned) {
         times_called++;
       };
   auto get_increment_times_called = [&]() {
@@ -227,4 +228,22 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   p.apply(PartitionOp::Require(11), never_called);
 
   EXPECT_TRUE(times_called == expected_times_called);
+}
+
+// This test tests that the copy constructor is usable to create fresh
+// copies of partitions
+TEST(PartitionUtilsTest, TestCopyConstructor) {
+  Partition p1;
+  p1.apply(PartitionOp::AssignFresh(0));
+  Partition p2 = p1;
+  p1.apply(PartitionOp::Consume(0));
+  bool failure = false;
+  p1.apply(PartitionOp::Require(0), [&](const PartitionOp &, unsigned) {
+      failure = true;
+    });
+  EXPECT_TRUE(failure);
+
+  p2.apply(PartitionOp::Require(0), [](const PartitionOp &, unsigned) {
+    EXPECT_TRUE(false);
+  });
 }
