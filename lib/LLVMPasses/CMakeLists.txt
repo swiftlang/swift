@@ -10,6 +10,7 @@ add_swift_host_library(swiftLLVMPasses STATIC
 
   LLVM_LINK_COMPONENTS
   analysis
+  targetparser
   )
 target_link_libraries(swiftLLVMPasses PRIVATE
   swiftDemangling)

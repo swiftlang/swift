@@ -24,7 +24,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/TextAPI/InterfaceFile.h"
 
 using namespace swift::irgen;

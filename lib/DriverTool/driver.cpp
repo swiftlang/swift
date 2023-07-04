@@ -32,7 +32,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errno.h"

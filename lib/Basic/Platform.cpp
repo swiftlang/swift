@@ -13,7 +13,7 @@
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/VersionTuple.h"
 
 using namespace swift;

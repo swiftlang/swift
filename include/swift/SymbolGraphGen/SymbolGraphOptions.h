@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "swift/AST/AttrKind.h"
 
 #ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHOPTIONS_H

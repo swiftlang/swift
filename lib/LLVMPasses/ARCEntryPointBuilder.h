@@ -18,7 +18,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
