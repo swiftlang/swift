@@ -5137,7 +5137,7 @@ void Parser::recordLocalType(TypeDecl *TD) {
   if (!TD->getDeclContext()->isLocalContext())
     return;
 
-  if (!InInactiveClauseEnvironment)
+  if (!InInactiveClauseEnvironment && !InFreestandingMacroArgument)
     SF.getOutermostParentSourceFile()->LocalTypeDecls.insert(TD);
 }
 
@@ -7907,7 +7907,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
       hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
     }
-    auto sf = CurDeclContext->getParentSourceFile();
+    auto sf = CurDeclContext->getOutermostParentSourceFile();
     
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
@@ -7919,7 +7919,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       setOriginalDeclarationForDifferentiableAttributes(Attributes, VD);
 
       Decls.push_back(VD);
-      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
+      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment
+          && !InFreestandingMacroArgument) {
         sf->addUnvalidatedDeclWithOpaqueResultType(VD);
       }
     });
@@ -8209,8 +8210,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
   // Let the source file track the opaque return type mapping, if any.
   if (FuncRetTy && FuncRetTy->hasOpaque() &&
-      !InInactiveClauseEnvironment) {
-    if (auto sf = CurDeclContext->getParentSourceFile()) {
+      !InInactiveClauseEnvironment && !InFreestandingMacroArgument) {
+    if (auto sf = CurDeclContext->getOutermostParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
     }
   }
@@ -9156,8 +9157,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   
   // Let the source file track the opaque return type mapping, if any.
   if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
-      !InInactiveClauseEnvironment) {
-    if (auto sf = CurDeclContext->getParentSourceFile()) {
+      !InInactiveClauseEnvironment && !InFreestandingMacroArgument) {
+    if (auto sf = CurDeclContext->getOutermostParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
     }
   }

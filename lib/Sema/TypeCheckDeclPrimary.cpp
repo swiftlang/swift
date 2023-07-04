@@ -1851,6 +1851,10 @@ public:
   ASTContext &getASTContext() const { return Ctx; }
   void addDelayedFunction(AbstractFunctionDecl *AFD) {
     if (!SF) return;
+
+    while (auto enclosingSF = SF->getEnclosingSourceFile())
+      SF = enclosingSF;
+
     SF->DelayedFunctions.push_back(AFD);
   }
 
