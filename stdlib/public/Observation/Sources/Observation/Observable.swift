@@ -72,4 +72,10 @@ public macro ObservationTracked() =
 public macro ObservationIgnored() =
   #externalMacro(module: "ObservationMacros", type: "ObservationIgnoredMacro")
 
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@attached(peer, names: prefixed(_), suffixed(Values))
+public macro ObservableValues() =
+  #externalMacro(module: "ObservationMacros", type: "ObservableValuesMacro")
+
+
 #endif

@@ -35,6 +35,12 @@ public struct ObservableMacro {
   
   static let trackedMacroName = "ObservationTracked"
   static let ignoredMacroName = "ObservationIgnored"
+  static let valuesMacroName = "ObservableValues"
+
+  static let valuesName = "ObservedValues"
+  static var qualifiedValuesTypeName: String {
+    return "\(moduleName).\(valuesName)"
+  }
 
   static let registrarVariableName = "_$observationRegistrar"
   
@@ -46,7 +52,7 @@ public struct ObservableMacro {
   }
   
   static func accessFunction(_ observableType: TokenSyntax) -> DeclSyntax {
-    return 
+    return
       """
       internal nonisolated func access<Member>(
           keyPath: KeyPath<\(observableType), Member>
@@ -56,23 +62,32 @@ public struct ObservableMacro {
       """
   }
   
-  static func withMutationFunction(_ observableType: TokenSyntax) -> DeclSyntax {
-    return 
+  static func withMutationFunction(_ observableType: TokenSyntax, structural: Bool) -> DeclSyntax {
+    return
       """
-      internal nonisolated func withMutation<Member, T>(
+      internal \(raw: structural ? "mutating " : "")nonisolated func withMutation<Member, T>(
         keyPath: KeyPath<\(observableType), Member>,
         _ mutation: () throws -> T
       ) rethrows -> T {
-        try \(raw: registrarVariableName).withMutation(of: self, keyPath: keyPath, mutation)
+        try \(raw: registrarVariableName).\(raw: structural ? "withUniqueMutation" : "withMutation")(of: self, keyPath: keyPath, mutation)
       }
       """
   }
-
+  
   static var ignoredAttribute: AttributeSyntax {
     AttributeSyntax(
       leadingTrivia: .space,
       atSignToken: .atSignToken(),
       attributeName: SimpleTypeIdentifierSyntax(name: .identifier(ignoredMacroName)),
+      trailingTrivia: .space
+    )
+  }
+  
+  static var valuesAttribute: AttributeSyntax {
+    AttributeSyntax(
+      leadingTrivia: .space,
+      atSignToken: .atSignToken(),
+      attributeName: SimpleTypeIdentifierSyntax(name: .identifier(valuesMacroName)),
       trailingTrivia: .space
     )
   }
@@ -173,10 +188,26 @@ extension PatternBindingListSyntax {
 }
 
 extension VariableDeclSyntax {
-    func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
-    VariableDeclSyntax(
+  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax? = nil) -> VariableDeclSyntax {
+    let filtered = attributes?.filter {
+      switch $0 {
+      case .attribute(let attr):
+        if attr.trimmed.attributeName.identifier == attribute.trimmed.attributeName.identifier {
+          return false
+        } else if let toRemove, attr.trimmed.attributeName.identifier == toRemove.trimmed.attributeName.identifier {
+          return false
+        } else {
+          return true
+        }
+      default:
+        return true
+      }
+    } ?? []
+    
+    
+    return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
-      attributes: attributes?.appending(.attribute(attribute)) ?? [.attribute(attribute)],
+      attributes: AttributeListSyntax(filtered + [.attribute(attribute)]),
       modifiers: modifiers?.privatePrefixed(prefix) ?? ModifierListSyntax(keyword: .private),
       bindingKeyword: TokenSyntax(bindingKeyword.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
       bindings: bindings.privatePrefixed(prefix),
@@ -186,6 +217,10 @@ extension VariableDeclSyntax {
   
   var isValidForObservation: Bool {
     !isComputed && isInstance && !isImmutable && identifier != nil
+  }
+  
+  var isValidForValueObservation: Bool {
+    isInstance && !isImmutable && identifier != nil
   }
 }
 
@@ -217,17 +252,8 @@ extension ObservableMacro: MemberMacro {
 
     declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType), to: &declarations)
     declaration.addIfNeeded(ObservableMacro.accessFunction(observableType), to: &declarations)
-    declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType), to: &declarations)
-
-#if !OBSERVATION_SUPPORTS_PEER_MACROS
-    let storedInstanceVariables = declaration.definedVariables.filter { $0.isValidForObservation }
-    for property in storedInstanceVariables {
-       if property.hasMacroApplication(ObservableMacro.ignoredMacroName) { continue }
-       let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
-       declaration.addIfNeeded(storage, to: &declarations)
-    }
-#endif
-
+    declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType, structural: declaration.isStruct), to: &declarations)
+    
     return declarations
   }
 }
@@ -249,8 +275,7 @@ extension ObservableMacro: MemberAttributeMacro {
     }
 
     // dont apply to ignored properties or properties that are already flaged as tracked
-    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
-       property.hasMacroApplication(ObservableMacro.trackedMacroName) {
+    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
     }
     
@@ -288,7 +313,9 @@ extension ObservableMacro: ConformanceMacro {
   }
 }
 
-public struct ObservationTrackedMacro: AccessorMacro {
+public struct ObservationTrackedMacro {}
+
+extension ObservationTrackedMacro: AccessorMacro {
   public static func expansion<
     Context: MacroExpansionContext,
     Declaration: DeclSyntaxProtocol
@@ -336,21 +363,19 @@ public struct ObservationTrackedMacro: AccessorMacro {
 }
 
 extension ObservationTrackedMacro: PeerMacro {
-  public static func expansion<
-    Context: MacroExpansionContext,
-    Declaration: DeclSyntaxProtocol
-  >(
+  public static func expansion(
     of node: SwiftSyntax.AttributeSyntax,
-    providingPeersOf declaration: Declaration,
-    in context: Context
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     guard let property = declaration.as(VariableDeclSyntax.self),
           property.isValidForObservation else {
       return []
     }
-    
+
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
-       property.hasMacroApplication(ObservableMacro.trackedMacroName) {
+       property.hasMacroApplication(ObservableMacro.trackedMacroName) || 
+       property.hasMacroApplication(ObservableMacro.valuesMacroName) {
       return []
     }
     
@@ -369,5 +394,54 @@ public struct ObservationIgnoredMacro: AccessorMacro {
     in context: Context
   ) throws -> [AccessorDeclSyntax] {
     return []
+  }
+}
+
+public struct ObservableValuesMacro { }
+
+extension ObservableValuesMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let property = declaration.as(VariableDeclSyntax.self),
+          property.isValidForValueObservation else {
+      return []
+    }
+
+    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
+      return []
+    }
+    
+    guard let identifier = property.identifier else {
+      return []
+    }
+    
+    guard let type = property.type else {
+      throw DiagnosticsError(syntax: node, message: "@ObservableValues may only be applied to properties with specified types", id: .invalidApplication)
+    }
+    var modifiers = "\((property.visibility?.description ?? "")) "
+    if property.isOverride {
+      modifiers += "override "
+    }
+    if property.isComputed {
+      let values: DeclSyntax =
+        """
+        \(raw: modifiers)var \(identifier)Values: \(raw: ObservableMacro.qualifiedValuesTypeName)<\(type)> {
+          \(raw: ObservableMacro.qualifiedValuesTypeName)(of: self, computed: \\.\(identifier))
+        }
+        """
+      return [values]
+    } else {
+      let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.valuesAttribute))
+      let values: DeclSyntax =
+        """
+        \(raw: modifiers)var \(identifier)Values: \(raw: ObservableMacro.qualifiedValuesTypeName)<\(type)> {
+          \(raw: ObservableMacro.qualifiedValuesTypeName)(of: self, stored: \\.\(identifier), registrar: \(raw: ObservableMacro.registrarVariableName))
+        }
+        """
+      return [storage, values]
+    }
   }
 }

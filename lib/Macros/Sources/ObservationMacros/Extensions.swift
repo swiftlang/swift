@@ -83,6 +83,20 @@ extension VariableDeclSyntax {
     }
   }
   
+  var isOverride: Bool {
+    if let modifiers {
+      for modifier in modifiers {
+        if modifier.name.trimmed.tokenKind == .keyword(.override) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  var hasSetter: Bool {
+    return accessorsMatching({ $0 == .keyword(.set) }).count > 0
+  }
   
   var isImmutable: Bool {
     return bindingKeyword.tokenKind == .keyword(.let)
@@ -97,6 +111,26 @@ extension VariableDeclSyntax {
   
   var initializer: InitializerClauseSyntax? {
     bindings.first?.initializer
+  }
+
+  var visibility: SyntaxVisibility? {
+    if let modifiers {
+      for modifier in modifiers {
+        switch modifier.name.tokenKind {
+        case .keyword(.public):
+          return .public
+        case .keyword(.internal):
+          return .internal
+        case .keyword(.private):
+          return .private
+        case .keyword(.fileprivate):
+          return .fileprivate
+        default:
+          break
+        }
+      }
+    }
+    return nil
   }
   
   func hasMacroApplication(_ name: String) -> Bool {
@@ -198,14 +232,30 @@ extension FunctionDeclSyntax {
   var signatureStandin: SignatureStandin {
     var parameters = [String]()
     for parameter in signature.input.parameterList {
-      parameters.append(parameter.firstName.text + ":" + (parameter.type.genericSubstitution(genericParameterClause?.genericParameterList) ?? "" ))
+      parameters.append(parameter.firstName.text + ":" + (parameter.type.genericSubstitution(genericParameterClause?.parameters) ?? "" ))
     }
-    let returnType = signature.output?.returnType.genericSubstitution(genericParameterClause?.genericParameterList) ?? "Void"
+    let returnType = signature.output?.returnType.genericSubstitution(genericParameterClause?.parameters) ?? "Void"
     return SignatureStandin(isInstance: isInstance, identifier: identifier.text, parameters: parameters, returnType: returnType)
   }
   
   func isEquivalent(to other: FunctionDeclSyntax) -> Bool {
     return signatureStandin == other.signatureStandin
+  }
+}
+
+enum SyntaxVisibility {
+  case `public`
+  case `internal`
+  case `private`
+  case `fileprivate`
+  
+  var description: String {
+    switch self {
+    case .public: return "public"
+    case .internal: return "internal"
+    case .private: return "private"
+    case .fileprivate: return "fileprivate"
+    }
   }
 }
 
@@ -250,6 +300,39 @@ extension DeclGroupSyntax {
       return nil
     }
   }
+
+  func hasMemberType<I: IdentifiedDeclSyntax>(equivalentTo other: I) -> Bool {
+    for member in memberBlock.members {
+      guard let member = member.as(MemberDeclListItemSyntax.self) else {
+        continue
+      }
+      if let ty = member.decl.as(EnumDeclSyntax.self) {
+        if other.identifier.text == ty.identifier.text {
+          return true
+        }
+      } else if let ty = member.decl.as(StructDeclSyntax.self) {
+        if other.identifier.text == ty.identifier.text {
+          return true
+        }
+      } else if let ty = member.decl.as(ClassDeclSyntax.self) {
+        if other.identifier.text == ty.identifier.text {
+          return true
+        }
+      } else if let ty = member.decl.as(ActorDeclSyntax.self) {
+        if other.identifier.text == ty.identifier.text {
+          return true
+        }
+      }
+    }
+    return false
+  }
+  
+  
+  func addIfNeeded(_ decls: [DeclSyntax], to declarations: inout [DeclSyntax]) {
+    for declaration in decls {
+      addIfNeeded(declaration, to: &declarations)
+    }
+  }
   
   func addIfNeeded(_ decl: DeclSyntax?, to declarations: inout [DeclSyntax]) {
     guard let decl else { return }
@@ -259,6 +342,22 @@ extension DeclGroupSyntax {
       }
     } else if let property = decl.as(VariableDeclSyntax.self) {
       if !hasMemberProperty(equivalentTo: property) {
+        declarations.append(decl)
+      }
+    } else if let ty = decl.as(EnumDeclSyntax.self) {
+      if !hasMemberType(equivalentTo: ty) {
+        declarations.append(decl)
+      }
+    } else if let ty = decl.as(StructDeclSyntax.self) {
+      if !hasMemberType(equivalentTo: ty) {
+        declarations.append(decl)
+      }
+    } else if let ty = decl.as(ClassDeclSyntax.self) {
+      if !hasMemberType(equivalentTo: ty) {
+        declarations.append(decl)
+      }
+    } else if let ty = decl.as(ActorDeclSyntax.self) {
+      if !hasMemberType(equivalentTo: ty) {
         declarations.append(decl)
       }
     }
@@ -274,5 +373,40 @@ extension DeclGroupSyntax {
   
   var isEnum: Bool {
     return self.is(EnumDeclSyntax.self)
+  }
+
+  var isStruct: Bool {
+    return self.is(StructDeclSyntax.self)
+  }
+  
+  var isPublic: Bool {
+    if let modifiers {
+      for modifier in modifiers {
+        if modifier.name.tokenKind == .keyword(.public) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+  
+  var visibility: SyntaxVisibility? {
+    if let modifiers {
+      for modifier in modifiers {
+        switch modifier.name.tokenKind {
+        case .keyword(.public):
+          return .public
+        case .keyword(.internal):
+          return .internal
+        case .keyword(.private):
+          return .private
+        case .keyword(.fileprivate):
+          return .fileprivate
+        default:
+          break
+        }
+      }
+    }
+    return nil
   }
 }
