@@ -471,8 +471,7 @@ ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
   else if (macro->getMacroRoles().contains(MacroRole::Declaration) ||
            macro->getMacroRoles().contains(MacroRole::CodeItem)) {
     if (!mee->getSubstituteDecl()) {
-      auto *med = mee->createSubstituteDecl();
-      TypeChecker::typeCheckDecl(med);
+      (void)mee->createSubstituteDecl();
     }
     // Return the expanded buffer ID.
     return evaluateOrDefault(
