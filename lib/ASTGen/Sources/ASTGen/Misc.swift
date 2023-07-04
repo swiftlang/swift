@@ -1,6 +1,5 @@
 import CASTBridging
 import CBasicBridging
-import SwiftParser
 
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
