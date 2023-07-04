@@ -198,6 +198,22 @@ public struct Outer {
 // CHECK: (2, "a + b")
 testStringify(a: 1, b: 1)
 
+protocol P { }
+extension Int: P { }
+
+// Stringify with closures that have local types.
+@available(SwiftStdlib 5.1, *)
+func testStringifyWithLocalTypes() {
+  _ = #stringify({
+    struct LocalType: P {
+      static var name: String = "Taylor"
+      var something: some P { self }
+    }
+
+    func f() -> some P { return LocalType().something }
+  })
+}
+
 func maybeThrowing() throws -> Int { 5 }
 
 #if TEST_DIAGNOSTICS
