@@ -1,5 +1,7 @@
-// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature DeferredSendableChecking
 // REQUIRES: concurrency
+// REQUIRES: asserts
+
+// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature DeferredSendableChecking
 
 /*
  This file tests the experimental DeferredSendableChecking feature. This features the passing
