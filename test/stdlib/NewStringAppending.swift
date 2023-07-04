@@ -50,6 +50,12 @@ func repr(_ x: _StringRepresentation) -> String {
     return """
       Unmanaged(count: \(x._count))
       """
+  case ._shared(let object):
+    return """
+      Shared(\
+      object: \(hexAddrVal(object)), \
+      count: \(x._count))
+      """
   }
 }
 
