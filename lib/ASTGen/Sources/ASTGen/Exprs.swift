@@ -6,14 +6,15 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   public func visit(_ node: ClosureExprSyntax) -> ASTNode {
-    let statements = node.statements.map { self.visit($0).bridged }
-    let body: UnsafeMutableRawPointer = statements.withBridgedArrayRef { ref in
-      let startLoc = bridgedSourceLoc(for: node.leftBrace)
-      let endLoc = bridgedSourceLoc(for: node.rightBrace)
-      return BraceStmt_create(ctx, startLoc, ref, endLoc)
-    }
+    let body = BraceStmt_create(
+      self.ctx,
+      self.bridgedSourceLoc(for: node.leftBrace),
+      self.visit(node.statements),
+      self.bridgedSourceLoc(for: node.rightBrace)
+    )
 
-    return .expr(ClosureExpr_create(ctx, body, declContext))
+    // FIXME: Translate the signature, capture list, 'in' location, etc.
+    return .expr(ClosureExpr_create(self.ctx, body, self.declContext))
   }
 
   public func visit(_ node: FunctionCallExprSyntax) -> ASTNode {
@@ -66,26 +67,32 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: LabeledExprListSyntax) -> ASTNode {
-    let elements = node.map { self.visit($0).rawValue }
-    let labels: [BridgedIdentifier] = node.map {
-      $0.label.bridgedIdentifier(in: self)
-    }
-    let labelLocs: [BridgedSourceLoc] = node.map {
-      let pos = $0.label?.position ?? $0.position
-      return bridgedSourceLoc(at: pos)
-    }
-
     let lParenLoc = bridgedSourceLoc(for: node)
     let rParenLoc = bridgedSourceLoc(at: node.endPosition)
 
+    let expressions = node.lazy.map {
+      self.visit($0.expression).rawValue
+    }
+    let labels = node.lazy.map {
+      $0.label.bridgedIdentifier(in: self)
+    }
+    let labelLocations = node.lazy.map {
+      if let label = $0.label {
+        return self.bridgedSourceLoc(for: label)
+      }
+
+      return self.bridgedSourceLoc(for: $0)
+    }
+
     return .expr(
-      elements.withBridgedArrayRef { elementsRef in
-        labels.withBridgedArrayRef { labelsRef in
-          labelLocs.withBridgedArrayRef { labelLocRef in
-            TupleExpr_create(self.ctx, lParenLoc, elementsRef, labelsRef,
-                             labelLocRef, rParenLoc)
-          }
-        }
-      })
+      TupleExpr_create(
+        self.ctx,
+        lParenLoc,
+        expressions.bridgedArray(in: self),
+        labels.bridgedArray(in: self),
+        labelLocations.bridgedArray(in: self),
+        rParenLoc
+      )
+    )
   }
 }

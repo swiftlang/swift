@@ -19,16 +19,20 @@ extension ASTGenVisitor {
       return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
     }
 
-    let lAngle = bridgedSourceLoc(for: generics.leftAngle)
-    let rAngle = bridgedSourceLoc(for: generics.rightAngle)
+    let genericArguments = generics.arguments.lazy.map {
+      self.visit($0.argument).rawValue
+    }
+
     return .type(
-      generics.arguments.map({
-        self.visit($0.argument).rawValue
-      }).withBridgedArrayRef {
-          genericArgs in
-          GenericIdentTypeRepr_create(
-            self.ctx, id, loc, genericArgs, lAngle, rAngle)
-      })
+      GenericIdentTypeRepr_create(
+        self.ctx,
+        id,
+        loc,
+        genericArguments.bridgedArray(in: self),
+        bridgedSourceLoc(for: generics.leftAngle),
+        bridgedSourceLoc(for: generics.rightAngle)
+      )
+    )
   }
 
   public func visit(_ node: MemberTypeSyntax) -> ASTNode {
@@ -37,17 +41,23 @@ extension ASTGenVisitor {
 
     var baseType = Syntax(node)
     while let memberType = baseType.as(MemberTypeSyntax.self) {
-      let generics = memberType.genericArgumentClause
       let (name, nameLoc) = memberType.name.bridgedIdentifierAndSourceLoc(in: self)
 
-      if let generics = generics {
-        let lAngle = bridgedSourceLoc(for: generics.leftAngle)
-        let rAngle = bridgedSourceLoc(for: generics.rightAngle)
+      if let generics = memberType.genericArgumentClause {
+        let genericArguments = generics.arguments.lazy.map {
+          self.visit($0.argument).rawValue
+        }
+
         reverseMemberComponents.append(
-          generics.arguments.map({ self.visit($0.argument).rawValue }).withBridgedArrayRef {
-            genericArgs in
-            GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
-          })
+          GenericIdentTypeRepr_create(
+            self.ctx,
+            name,
+            nameLoc,
+            genericArguments.bridgedArray(in: self),
+            bridgedSourceLoc(for: generics.leftAngle),
+            bridgedSourceLoc(for: generics.rightAngle)
+          )
+        )
       } else {
         reverseMemberComponents.append(SimpleIdentTypeRepr_create(self.ctx, nameLoc, name))
       }
@@ -56,11 +66,9 @@ extension ASTGenVisitor {
     }
 
     let baseComponent = visit(baseType).rawValue
+    let memberComponents = reverseMemberComponents.reversed().bridgedArray(in: self)
 
-    return .type(
-      reverseMemberComponents.reversed().withBridgedArrayRef { memberComponents in
-        return MemberTypeRepr_create(self.ctx, baseComponent, memberComponents)
-      })
+    return .type(MemberTypeRepr_create(self.ctx, baseComponent, memberComponents))
   }
 
   public func visit(_ node: ArrayTypeSyntax) -> ASTNode {
@@ -110,35 +118,50 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: TupleTypeSyntax) -> ASTNode {
-    return self.withBridgedTupleElements(node.elements) { elements in
-      let lParenLoc = bridgedSourceLoc(for: node.leftParen)
-      let rParenLoc = bridgedSourceLoc(for: node.rightParen)
-      return .type(TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc))
-    }
+    .type(
+      TupleTypeRepr_create(
+        self.ctx,
+        self.visit(node.elements),
+        bridgedSourceLoc(for: node.leftParen),
+        bridgedSourceLoc(for: node.rightParen)
+      )
+    )
   }
 
   public func visit(_ node: CompositionTypeSyntax) -> ASTNode {
     assert(node.elements.count > 1)
-    let types = node.elements.map { visit($0.type) }.map { $0.rawValue }
-    let firstTypeLoc = bridgedSourceLoc(for: node.elements.first?.type)
-    let firstAmpLoc = bridgedSourceLoc(for: node.elements.first?.ampersand)
+
+    let types = node.elements.lazy.map {
+      visit($0.type).rawValue
+    }
+
     return .type(
-      types.withBridgedArrayRef { types in
-        return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc, firstAmpLoc)
-      })
+      CompositionTypeRepr_create(
+        self.ctx,
+        types.bridgedArray(in: self),
+        bridgedSourceLoc(for: node.elements.first?.type),
+        bridgedSourceLoc(for: node.elements.first?.ampersand)
+      )
+    )
   }
 
   public func visit(_ node: FunctionTypeSyntax) -> ASTNode {
-    return self.withBridgedTupleElements(node.parameters) { elements in
-      let lParenLoc = bridgedSourceLoc(for: node.leftParen)
-      let rParenLoc = bridgedSourceLoc(for: node.rightParen)
-      let args = TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc)
-      let asyncLoc = bridgedSourceLoc(for: node.effectSpecifiers?.asyncSpecifier)
-      let throwsLoc = bridgedSourceLoc(for: node.effectSpecifiers?.throwsSpecifier)
-      let arrowLoc = bridgedSourceLoc(for: node.returnClause.arrow)
-      let retTy = visit(node.returnClause.type).rawValue
-      return .type(FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy))
-    }
+    .type(
+      FunctionTypeRepr_create(
+        self.ctx,
+        // FIXME: Why does `FunctionTypeSyntax` not have a `TupleTypeSyntax` child?
+        TupleTypeRepr_create(
+          self.ctx,
+          self.visit(node.parameters),
+          bridgedSourceLoc(for: node.leftParen),
+          bridgedSourceLoc(for: node.rightParen)
+        ),
+        bridgedSourceLoc(for: node.effectSpecifiers?.asyncSpecifier),
+        bridgedSourceLoc(for: node.effectSpecifiers?.throwsSpecifier),
+        bridgedSourceLoc(for: node.returnClause.arrow),
+        visit(node.returnClause.type).rawValue
+      )
+    )
   }
 
   public func visit(_ node: NamedOpaqueReturnTypeSyntax) -> ASTNode {
@@ -234,36 +257,27 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  private func withBridgedTupleElements<T>(
-    _ elementList: TupleTypeElementListSyntax,
-    action: (BridgedArrayRef) -> T
-  ) -> T {
-    var elements = [BridgedTupleTypeElement]()
-    for element in elementList {
-      let (name, nameLoc) = element.firstName.bridgedIdentifierAndSourceLoc(in: self)
+  func visit(_ node: TupleTypeElementListSyntax) -> BridgedArrayRef {
+    node.lazy.map { element in
+      let (firstName, firstNameLoc) = element.firstName.bridgedIdentifierAndSourceLoc(in: self)
       let (secondName, secondNameLoc) = element.secondName.bridgedIdentifierAndSourceLoc(in: self)
-      let colonLoc = bridgedSourceLoc(for: element.colon)
       var type = visit(element.type).rawValue
       if let ellipsis = element.ellipsis {
         let ellipsisLoc = bridgedSourceLoc(at: ellipsis.positionAfterSkippingLeadingTrivia)
         type = VarargTypeRepr_create(self.ctx, type, ellipsisLoc)
       }
-      let trailingCommaLoc = bridgedSourceLoc(for: element.trailingComma)
 
-      elements.append(
-        BridgedTupleTypeElement(
-          Name: name,
-          NameLoc: nameLoc,
-          SecondName: secondName,
-          SecondNameLoc: secondNameLoc,
-          UnderscoreLoc: nil, /*N.B. Only important for SIL*/
-          ColonLoc: colonLoc,
-          Type: type,
-          TrailingCommaLoc: trailingCommaLoc))
-    }
-    return elements.withBridgedArrayRef { elements in
-      return action(elements)
-    }
+      return BridgedTupleTypeElement(
+        Name: firstName,
+        NameLoc: firstNameLoc,
+        SecondName: secondName,
+        SecondNameLoc: secondNameLoc,
+        UnderscoreLoc: nil, /*N.B. Only important for SIL*/
+        ColonLoc: self.bridgedSourceLoc(for: element.colon),
+        Type: type,
+        TrailingCommaLoc: self.bridgedSourceLoc(for: element.trailingComma)
+      )
+    }.bridgedArray(in: self)
   }
 }
 

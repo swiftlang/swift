@@ -3,15 +3,9 @@ import CBasicBridging
 
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
+// Needed to use BumpPtrAllocator
+@_spi(RawSyntax)
 import SwiftSyntax
-
-extension Array {
-  public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
-    withUnsafeBytes { buf in
-      c(BridgedArrayRef(data: buf.baseAddress!, numElements: SwiftInt(count)))
-    }
-  }
-}
 
 extension UnsafePointer {
   public var raw: UnsafeMutableRawPointer {
@@ -74,6 +68,8 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 
   @Boxed var declContext: BridgedDeclContext
 
+  fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(slabSize: 256)
+
   // TODO: this some how messes up the witness table when I uncomment it locally :/
   //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
   //    if let node = node { return visit(node) }
@@ -133,6 +129,11 @@ extension ASTGenVisitor {
   public func visit(_ node: ArrayElementSyntax) -> ASTNode {
     visit(node.expression)
   }
+
+  @inline(__always)
+  func visit(_ node: CodeBlockItemListSyntax) -> BridgedArrayRef {
+    node.lazy.map { self.visit($0).bridged }.bridgedArray(in: self)
+  }
 }
 
 // Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
@@ -145,6 +146,72 @@ extension ASTGenVisitor {
     }
 
     return self.visit(node)
+  }
+}
+
+extension Collection {
+  /// Like ``Sequence.compactMap(_:)``, but returns a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  ///
+  /// - Note: The purpose of this method is to make up for the performance toll of calling ``Collection.bridgedArray``
+  ///   on a ``LazyFilterSequence`` due to the `count` access.
+  func compactMap<T>(in astgen: ASTGenVisitor, _ transform: (Element) -> T?) -> BridgedArrayRef {
+    if self.isEmpty {
+      return .init()
+    }
+
+    let baseAddress = astgen.allocator.allocate(T.self, count: self.count).baseAddress!
+    do {
+      // A loop instead of `initialize(from: self.lazy.compactMap(transform))` because we aren't
+      // doing a great job optimizing the latter.
+      var currentAddress = baseAddress
+      for element in self {
+        guard let transformed = transform(element) else {
+          continue
+        }
+
+        currentAddress.initialize(to: transformed)
+        currentAddress += 1
+      }
+    }
+
+    return .init(data: baseAddress, numElements: SwiftInt(self.count))
+  }
+}
+
+extension LazyCollectionProtocol {
+  /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+    if self.isEmpty {
+      return .init()
+    }
+
+    let buffer = astgen.allocator.allocate(Element.self, count: self.count)
+    _ = buffer.initialize(from: self)
+
+    return .init(data: buffer.baseAddress, numElements: SwiftInt(self.count))
+  }
+}
+
+// 'ReversedCollection' does not conform to 'LazyCollectionProtocol', and cannot here because it only
+// conditionally conforms to 'LazySequenceProtocol' in the standard library.
+// FIXME: We could make it conform unconditionally
+extension ReversedCollection {
+  /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  @inline(__always)
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+    self.lazy.bridgedArray(in: astgen)
+  }
+}
+
+extension Optional where Wrapped: LazyCollectionProtocol {
+  /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  @inline(__always)
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+    guard let self else {
+      return .init()
+    }
+
+    return self.bridgedArray(in: astgen)
   }
 }
 

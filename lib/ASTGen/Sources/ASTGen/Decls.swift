@@ -31,11 +31,7 @@ extension ASTGenVisitor {
     declContext = out.declContext
     defer { declContext = oldDeclContext }
 
-    node.memberBlock.members
-      .map { self.visit($0).rawValue }
-      .withBridgedArrayRef { ref in
-        NominalTypeDecl_setMembers(out.nominalDecl, ref)
-      }
+    NominalTypeDecl_setMembers(out.nominalDecl, self.visit(node.memberBlock.members))
 
     return .decl(out.decl)
   }
@@ -49,11 +45,7 @@ extension ASTGenVisitor {
     declContext = out.declContext
     defer { declContext = oldDeclContext }
 
-    node.memberBlock.members
-      .map { self.visit($0).rawValue }
-      .withBridgedArrayRef { ref in
-        NominalTypeDecl_setMembers(out.nominalDecl, ref)
-      }
+    NominalTypeDecl_setMembers(out.nominalDecl, self.visit(node.memberBlock.members))
 
     return .decl(out.decl)
   }
@@ -95,8 +87,6 @@ extension ASTGenVisitor {
     let staticLoc = bridgedSourceLoc(for: node)
     let funcLoc = bridgedSourceLoc(for: node.funcKeyword)
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
-    let rParamLoc = bridgedSourceLoc(for: node.signature.parameterClause.leftParen)
-    let lParamLoc = bridgedSourceLoc(for: node.signature.parameterClause.rightParen)
 
     let returnType: ASTNode?
     if let output = node.signature.returnClause {
@@ -105,13 +95,24 @@ extension ASTGenVisitor {
       returnType = nil
     }
 
-    let params = node.signature.parameterClause.parameters.map { visit($0).rawValue }
-    let out = params.withBridgedArrayRef { ref in
-      FuncDecl_create(
-        ctx, staticLoc, false, funcLoc, name, nameLoc, false, nil, false, nil, rParamLoc, ref,
-        lParamLoc,
-        returnType?.rawValue, declContext)
-    }
+    let parameters = node.signature.parameterClause.parameters.lazy.map { visit($0).rawValue }
+    let out = FuncDecl_create(
+      self.ctx,
+      staticLoc,
+      false,
+      funcLoc,
+      name,
+      nameLoc,
+      false,
+      nil,
+      false,
+      nil,
+      self.bridgedSourceLoc(for: node.signature.parameterClause.leftParen),
+      parameters.bridgedArray(in: self),
+      self.bridgedSourceLoc(for: node.signature.parameterClause.rightParen),
+      returnType?.rawValue,
+      self.declContext
+    )
 
     let oldDeclContext = declContext
     declContext = out.declContext
@@ -129,5 +130,12 @@ extension ASTGenVisitor {
     }
 
     return .decl(out.decl)
+  }
+}
+
+extension ASTGenVisitor {
+  @inline(__always)
+  func visit(_ node: MemberBlockItemListSyntax) -> BridgedArrayRef {
+    node.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self)
   }
 }

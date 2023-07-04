@@ -43,52 +43,38 @@ extension ASTGenVisitor {
     _ node: GenericParameterClauseSyntax,
     action: (BridgedArrayRef, BridgedArrayRef) -> T
   ) -> T {
-    var params = [UnsafeMutableRawPointer]()
-    var requirements = [BridgedRequirementRepr]()
-    for param in node.parameters {
-      let loweredParameter = self.visit(param).rawValue
-      params.append(loweredParameter)
+    let parameters = node.parameters.lazy.map {
+      let loweredParameter = self.visit($0).rawValue
 
-      guard let requirement = param.inheritedType else {
-        continue
+      if let inheritedType = $0.inheritedType {
+        let loweredInheritedType = self.visit(inheritedType).rawValue
+        GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredInheritedType)
       }
 
-      let loweredRequirement = self.visit(requirement)
-      GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredRequirement.rawValue)
+      return loweredParameter
     }
 
-    if let nodeRequirements = node.genericWhereClause?.requirements {
-      for requirement in nodeRequirements {
-        switch requirement.requirement {
-        case .conformanceRequirement(let conformance):
-          let firstType = self.visit(conformance.leftType).rawValue
-          let separatorLoc = bridgedSourceLoc(for: conformance.colon)
-          let secondType = self.visit(conformance.rightType).rawValue
-          requirements.append(
-            BridgedRequirementRepr(
-              SeparatorLoc: separatorLoc,
-              Kind: .typeConstraint,
-              FirstType: firstType,
-              SecondType: secondType))
-        case .sameTypeRequirement(let sameType):
-          let firstType = self.visit(sameType.leftType).rawValue
-          let separatorLoc = bridgedSourceLoc(for: sameType.equal)
-          let secondType = self.visit(sameType.rightType).rawValue
-          requirements.append(
-            BridgedRequirementRepr(
-              SeparatorLoc: separatorLoc,
-              Kind: .sameType,
-              FirstType: firstType,
-              SecondType: secondType))
-        case .layoutRequirement(_):
-          fatalError("Cannot handle layout requirements!")
-        }
+    let requirements = node.genericWhereClause?.requirements.lazy.map {
+      switch $0.requirement {
+      case .conformanceRequirement(let conformance):
+        return BridgedRequirementRepr(
+          SeparatorLoc: self.bridgedSourceLoc(for: conformance.colon),
+          Kind: .typeConstraint,
+          FirstType: self.visit(conformance.leftType).rawValue,
+          SecondType: self.visit(conformance.rightType).rawValue
+        )
+      case .sameTypeRequirement(let sameType):
+        return BridgedRequirementRepr(
+          SeparatorLoc: self.bridgedSourceLoc(for: sameType.equal),
+          Kind: .sameType,
+          FirstType: self.visit(sameType.leftType).rawValue,
+          SecondType: self.visit(sameType.rightType).rawValue
+        )
+      case .layoutRequirement(_):
+        fatalError("Cannot handle layout requirements!")
       }
     }
-    return params.withBridgedArrayRef { params in
-      return requirements.withBridgedArrayRef { reqs in
-        return action(params, reqs)
-      }
-    }
+
+    return action(parameters.bridgedArray(in: self), requirements.bridgedArray(in: self))
   }
 }

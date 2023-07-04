@@ -6,14 +6,14 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   public func visit(_ node: CodeBlockSyntax) -> ASTNode {
-    let statements = node.statements.map { self.visit($0).bridged }
-    let startLoc = bridgedSourceLoc(for: node.leftBrace)
-    let endLoc = bridgedSourceLoc(for: node.rightBrace)
-
-    return .stmt(
-      statements.withBridgedArrayRef { ref in
-        BraceStmt_create(ctx, startLoc, ref, endLoc)
-      })
+    .stmt(
+      BraceStmt_create(
+        self.ctx,
+        self.bridgedSourceLoc(for: node.leftBrace),
+        self.visit(node.statements),
+        self.bridgedSourceLoc(for: node.rightBrace)
+      )
+    )
   }
 
   func makeIfStmt(_ node: IfExprSyntax) -> ASTNode {
