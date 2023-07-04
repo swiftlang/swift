@@ -3934,11 +3934,5 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
       !roles.contains(MacroRole::CodeItem))
     return llvm::None;
 
-  // For now, restrict global freestanding macros in script mode.
-  if (dc->isModuleScopeContext() &&
-      dc->getParentSourceFile()->isScriptMode()) {
-    MED->diagnose(diag::global_freestanding_macro_script);
-  }
-
   return expandFreestandingMacro(MED);
 }

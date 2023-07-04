@@ -336,14 +336,11 @@ let blah = false
 #endif
 
 // Test unqualified lookup from within a macro expansion
-// FIXME: Global freestanding macros not yet supported in script mode.
-#if false
 let world = 3 // to be used by the macro expansion below
 #structWithUnqualifiedLookup()
 _ = StructWithUnqualifiedLookup().foo()
 
 #anonymousTypes { "hello" }
-#endif
 
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
