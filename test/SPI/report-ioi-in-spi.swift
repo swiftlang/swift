@@ -2,20 +2,24 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
+// RUN:   -enable-library-evolution \
 // RUN:   -module-name Lib -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5
 
 /// Use of IOI types in SPI signatures is an error with -experimental-spi-only-imports
 // RUN: %target-swift-frontend -emit-module %t/ClientSPIOnlyMode.swift -I %t \
+// RUN:   -enable-library-evolution \
 // RUN:   -swift-version 5 -verify \
 // RUN:   -experimental-spi-only-imports
 
 /// Use of IOI types in SPI signatures is a warning without -experimental-spi-only-imports
 // RUN: %target-swift-frontend -emit-module %t/ClientDefaultMode.swift -I %t \
+// RUN:   -enable-library-evolution \
 // RUN:   -swift-version 5 -verify
 
 /// This is a warning in swiftinterfaces
 // R UN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \
+// RUN:   -enable-library-evolution \
 // R UN:   -I %t -module-name Client
 
 //--- Lib.swift
