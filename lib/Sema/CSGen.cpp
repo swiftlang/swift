@@ -3745,22 +3745,22 @@ namespace {
         base = optTy;
       }
 
-      auto baseLocator =
+      auto valueLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
-      auto rvalueBase = CS.createTypeVariable(
-          baseLocator, TVO_CanBindToNoEscape | TVO_CanBindToHole);
-      CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
+      auto value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
+                                                           TVO_CanBindToHole);
+      CS.addConstraint(ConstraintKind::Equal, base, value, locator);
 
       // The result is a KeyPath from the root to the end component.
       // The type of key path depends on the overloads chosen for the key
       // path components.
-      auto typeLoc = CS.getConstraintLocator(
-          locator, LocatorPathElt::KeyPathType(rvalueBase));
+      auto typeLoc =
+          CS.getConstraintLocator(locator, LocatorPathElt::KeyPathType(value));
 
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape |
                                                      TVO_CanBindToHole);
-      CS.addKeyPathConstraint(kpTy, root, rvalueBase, componentTypeVars,
-                              locator);
+
+      CS.addKeyPathConstraint(kpTy, root, value, componentTypeVars, locator);
       return kpTy;
     }
 
