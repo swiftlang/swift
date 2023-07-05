@@ -3428,7 +3428,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupObjCProtocolName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr))
+  if (!sema.LookupName(lookupResult, /*Scope=*/sema.TUScope))
     return Type();
 
   for (auto decl : lookupResult) {
