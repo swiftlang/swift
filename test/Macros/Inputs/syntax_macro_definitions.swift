@@ -422,8 +422,7 @@ extension PropertyWrapperMacro: AccessorMacro, Macro {
   ) throws -> [AccessorDeclSyntax] {
     guard let varDecl = declaration.as(VariableDeclSyntax.self),
       let binding = varDecl.bindings.first,
-      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
-      binding.accessor == nil
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier
     else {
       return []
     }
