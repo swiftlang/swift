@@ -6478,7 +6478,8 @@ void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
   auto record = Accessors.getPointer();
   if (record) {
     for (auto accessor : accessors) {
-      (void) record->addOpaqueAccessor(accessor);
+      if (!record->getAccessor(accessor->getAccessorKind()))
+        (void) record->addOpaqueAccessor(accessor);
     }
   } else {
     record = AccessorRecord::create(getASTContext(),

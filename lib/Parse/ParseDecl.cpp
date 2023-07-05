@@ -7448,8 +7448,14 @@ void Parser::parseTopLevelAccessors(
 
   bool hadLBrace = consumeIf(tok::l_brace);
 
-  ParserStatus status;
+  // Prepopulate the field for any accessors that were already parsed parsed accessors
   ParsedAccessors accessors;
+#define ACCESSOR(ID)                                            \
+    if (auto accessor = storage->getAccessor(AccessorKind::ID)) \
+      accessors.ID = accessor;
+#include "swift/AST/AccessorKinds.def"
+
+  ParserStatus status;
   bool hasEffectfulGet = false;
   bool parsingLimitedSyntax = false;
   while (!Tok.isAny(tok::r_brace, tok::eof)) {
