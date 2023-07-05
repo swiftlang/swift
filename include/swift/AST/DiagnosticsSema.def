@@ -6679,7 +6679,7 @@ WARNING(executor_enqueue_deprecated_owned_job_implementation,Deprecation,
 WARNING(executor_enqueue_unused_implementation, none,
         "'Executor.enqueue(ExecutorJob)' will never be used, due to the presence of "
         "'enqueue(UnownedJob)'",
-        (Type))
+        ())
 
 //------------------------------------------------------------------------------
 // MARK: property wrapper diagnostics
