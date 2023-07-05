@@ -1106,16 +1106,8 @@ protected:
     }
 
     case NodeKind::PackExpansion: {
-      if (Node->getNumChildren() < 2)
-        return MAKE_NODE_TYPE_ERROR(Node,
-                                    "fewer children (%zu) than required (2)",
-                                    Node->getNumChildren());
-
-      auto patternType = decodeMangledType(Node->getChild(0), depth + 1);
-      auto countType = decodeMangledType(Node->getChild(1), depth + 1);
-
-      return Builder.createPackExpansionType(patternType.getType(),
-                                             countType.getType());
+      return MAKE_NODE_TYPE_ERROR0(Node,
+                                   "pack expansion type in unsupported position");
     }
 
     case NodeKind::DependentGenericType: {

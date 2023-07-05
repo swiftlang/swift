@@ -355,10 +355,6 @@ Type ASTBuilder::createSILPackType(ArrayRef<Type> eltTypes,
   return SILPackType::get(Ctx, extInfo, elements);
 }
 
-Type ASTBuilder::createPackExpansionType(Type patternType, Type countType) {
-  return PackExpansionType::get(patternType, countType);
-}
-
 size_t ASTBuilder::beginPackExpansion(Type countType) {
   ActivePackExpansions.push_back(countType);
 

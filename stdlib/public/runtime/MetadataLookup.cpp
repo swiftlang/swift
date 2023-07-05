@@ -2021,12 +2021,6 @@ public:
     return TYPE_LOOKUP_ERROR_FMT("Lowered SILPackType cannot be demangled");
   }
 
-  TypeLookupErrorOr<BuiltType>
-  createPackExpansionType(BuiltType patternType, BuiltType countType) const {
-    // FIXME: Runtime support for variadic generics.
-    return BuiltType();
-  }
-
   size_t beginPackExpansion(BuiltType countType) {
     if (!countType.isMetadataPack()) {
       swift::fatalError(0, "Pack expansion count type should be a pack\n");
