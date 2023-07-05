@@ -123,8 +123,6 @@ public:
 
   Type createSILPackType(ArrayRef<Type> eltTypes, bool isElementAddress);
 
-  Type createPackExpansionType(Type patternType, Type countType);
-
   size_t beginPackExpansion(Type countType);
 
   void advancePackExpansion(size_t index);

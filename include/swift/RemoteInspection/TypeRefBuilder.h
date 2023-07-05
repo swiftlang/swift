@@ -758,12 +758,6 @@ public:
     return nullptr;
   }
 
-  const TypeRef *createPackExpansionType(const TypeRef *patternType,
-                                         const TypeRef *countType) {
-    // FIXME: Remote mirrors support for variadic generics.
-    return nullptr;
-  }
-
   size_t beginPackExpansion(const TypeRef *countType) {
     // FIXME: Remote mirrors support for variadic generics.
     return 0;
