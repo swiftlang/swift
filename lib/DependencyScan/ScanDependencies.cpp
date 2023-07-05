@@ -302,6 +302,10 @@ static llvm::Error resolveExplicitModuleInputs(
   if (moduleID.second == ModuleDependencyKind::SwiftPlaceholder)
     return llvm::Error::success();
 
+  // If the dependency is already finalized, nothing needs to be done.
+  if (resolvingDepInfo.isFinalized())
+    return llvm::Error::success();
+
   std::vector<std::string> rootIDs;
   if (auto ID = resolvingDepInfo.getCASFSRootID())
     rootIDs.push_back(*ID);
@@ -505,6 +509,7 @@ static llvm::Error resolveExplicitModuleInputs(
         return E;
     }
   }
+  dependencyInfoCopy.setIsFinalized(true);
   cache.updateDependency(moduleID, dependencyInfoCopy);
 
   return llvm::Error::success();
