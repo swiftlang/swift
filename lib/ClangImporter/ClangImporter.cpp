@@ -5711,7 +5711,13 @@ importName(const clang::NamedDecl *D,
 
 Type ClangImporter::importFunctionReturnType(
     const clang::FunctionDecl *clangDecl, DeclContext *dc) {
-  if (auto imported = Impl.importFunctionReturnType(clangDecl, dc).getType())
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool allowNSUIntegerAsInt =
+      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
+  if (auto imported =
+          Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
+              .getType())
     return imported;
   return dc->getASTContext().getNeverType();
 }
@@ -6792,6 +6798,11 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
     // If it returns a pointer or reference, that's a projection.
     if (method->getReturnType()->isPointerType() ||
         method->getReturnType()->isReferenceType())
+      return false;
+
+    // Check if it's one of the known unsafe methods we currently
+    // mark as safe by default.
+    if (isUnsafeStdMethod(method))
       return false;
 
     // Try to figure out the semantics of the return type. If it's a
