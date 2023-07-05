@@ -13,8 +13,6 @@ public distributed actor MyActor {
   // nothing
 }
 
-public protocol Kappa {}
-
 /// This combination of DistributedActor + Codable used to trigger a crash in DistributedAccessor::emit (rdar://111664985)
 /// So returning it from distributed methods in the types below covers this radar.
 public protocol ClusterSingleton: DistributedActor, Codable {}
