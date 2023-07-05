@@ -256,7 +256,6 @@ NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (c
 NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(record_method_not_imported, none, "method %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(objc_property_not_imported, none, "property %0 unavailable (cannot import)", (const clang::NamedDecl*))
-NOTE(unsupported_return_type, none, "C++ function %0 is unavailable: return type is unavailable in Swift", (const clang::NamedDecl*))
 
 NOTE(placeholder_for_forward_declared_interface_member_access_failure, none,
      "class '%0' will be imported as an opaque placeholder class and may be "
