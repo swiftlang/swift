@@ -8446,7 +8446,7 @@ class MissingDecl : public Decl {
   /// \c unexpandedMacro contains the macro reference and the base declaration
   /// where the macro expansion applies.
   struct {
-    llvm::PointerUnion<MacroExpansionDecl *, CustomAttr *> macroRef;
+    llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *> macroRef;
     Decl *baseDecl;
   } unexpandedMacro;
 
@@ -8470,7 +8470,7 @@ public:
 
   static MissingDecl *
   forUnexpandedMacro(
-      llvm::PointerUnion<MacroExpansionDecl *, CustomAttr *> macroRef,
+      llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *> macroRef,
       Decl *baseDecl) {
     auto &ctx = baseDecl->getASTContext();
     auto *dc = baseDecl->getDeclContext();
