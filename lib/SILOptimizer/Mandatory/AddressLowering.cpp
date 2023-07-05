@@ -872,6 +872,9 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
     return nullptr;
 
+  case ValueKind::MoveValueInst:
+    return &cast<MoveValueInst>(value)->getOperandRef();
+
   case ValueKind::MultipleValueInstructionResult: {
     SILInstruction *destructure =
         cast<MultipleValueInstructionResult>(value)->getParent();
@@ -3128,6 +3131,8 @@ protected:
   // types.
   void visitOpenExistentialValueInst(OpenExistentialValueInst *openExistential);
 
+  void visitMoveValueInst(MoveValueInst *mvi);
+
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
     // opaque value rewriting.
@@ -3293,6 +3298,10 @@ void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
 
 void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
   visitLifetimeIntroducer(borrow);
+}
+
+void UseRewriter::visitMoveValueInst(MoveValueInst *mvi) {
+  visitLifetimeIntroducer(mvi);
 }
 
 // Opening an opaque existential. Rewrite the opened existentials here on
