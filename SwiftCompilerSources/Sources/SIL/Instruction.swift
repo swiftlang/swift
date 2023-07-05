@@ -460,7 +460,9 @@ class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
-class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
+class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
+  public var existential: Value { operand.value }
+}
 
 final public
 class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
