@@ -71,7 +71,8 @@ private extension Instruction {
          is LoadInst,
          is StoreInst,
          is CopyAddrInst,
-         is BuiltinInst:
+         is BuiltinInst,
+         is DebugValueInst:
       return true
     default:
       return false
