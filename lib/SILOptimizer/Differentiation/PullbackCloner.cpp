@@ -1535,44 +1535,38 @@ public:
     builder.emitZeroIntoBuffer(cai->getLoc(), adjDest, IsNotInitialization);
   }
 
-  /// Handle `copy_value` instruction.
+  /// Handle any ownership instruction that deals with values: copy_value,
+  /// move_value, begin_borrow.
   ///   Original: y = copy_value x
   ///    Adjoint: adj[x] += adj[y]
-  void visitCopyValueInst(CopyValueInst *cvi) {
-    auto *bb = cvi->getParent();
-    switch (getTangentValueCategory(cvi)) {
+  void visitValueOwnershipInst(SingleValueInstruction *svi) {
+    assert(svi->getNumOperands() == 1);
+    auto *bb = svi->getParent();
+    switch (getTangentValueCategory(svi)) {
     case SILValueCategory::Object: {
-      auto adj = getAdjointValue(bb, cvi);
-      addAdjointValue(bb, cvi->getOperand(), adj, cvi->getLoc());
+      auto adj = getAdjointValue(bb, svi);
+      addAdjointValue(bb, svi->getOperand(0), adj, svi->getLoc());
       break;
     }
     case SILValueCategory::Address: {
-      auto adjDest = getAdjointBuffer(bb, cvi);
-      addToAdjointBuffer(bb, cvi->getOperand(), adjDest, cvi->getLoc());
-      builder.emitZeroIntoBuffer(cvi->getLoc(), adjDest, IsNotInitialization);
+      auto adjDest = getAdjointBuffer(bb, svi);
+      addToAdjointBuffer(bb, svi->getOperand(0), adjDest, svi->getLoc());
+      builder.emitZeroIntoBuffer(svi->getLoc(), adjDest, IsNotInitialization);
       break;
     }
     }
   }
 
+  /// Handle `copy_value` instruction.
+  ///   Original: y = copy_value x
+  ///    Adjoint: adj[x] += adj[y]
+  void visitCopyValueInst(CopyValueInst *cvi) { visitValueOwnershipInst(cvi); }
+
   /// Handle `begin_borrow` instruction.
   ///   Original: y = begin_borrow x
   ///    Adjoint: adj[x] += adj[y]
   void visitBeginBorrowInst(BeginBorrowInst *bbi) {
-    auto *bb = bbi->getParent();
-    switch (getTangentValueCategory(bbi)) {
-    case SILValueCategory::Object: {
-      auto adj = getAdjointValue(bb, bbi);
-      addAdjointValue(bb, bbi->getOperand(), adj, bbi->getLoc());
-      break;
-    }
-    case SILValueCategory::Address: {
-      auto adjDest = getAdjointBuffer(bb, bbi);
-      addToAdjointBuffer(bb, bbi->getOperand(), adjDest, bbi->getLoc());
-      builder.emitZeroIntoBuffer(bbi->getLoc(), adjDest, IsNotInitialization);
-      break;
-    }
-    }
+    visitValueOwnershipInst(bbi);
   }
 
   /// Handle `begin_access` instruction.
