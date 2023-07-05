@@ -764,6 +764,24 @@ public:
     return nullptr;
   }
 
+  size_t beginPackExpansion(const TypeRef *countType) {
+    // FIXME: Remote mirrors support for variadic generics.
+    return 0;
+  }
+
+  void advancePackExpansion(size_t index) {
+    // FIXME: Remote mirrors support for variadic generics.
+  }
+
+  const TypeRef *createExpandedPackElement(const TypeRef *patternType) {
+    // FIXME: Remote mirrors support for variadic generics.
+    return nullptr;
+  }
+
+  void endPackExpansion() {
+    // FIXME: Remote mirrors support for variadic generics.
+  }
+
   const FunctionTypeRef *createFunctionType(
       llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags,

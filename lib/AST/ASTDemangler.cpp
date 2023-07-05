@@ -359,6 +359,26 @@ Type ASTBuilder::createPackExpansionType(Type patternType, Type countType) {
   return PackExpansionType::get(patternType, countType);
 }
 
+size_t ASTBuilder::beginPackExpansion(Type countType) {
+  ActivePackExpansions.push_back(countType);
+
+  return 1;
+}
+
+void ASTBuilder::advancePackExpansion(size_t index) {
+  assert(index == 0);
+}
+
+Type ASTBuilder::createExpandedPackElement(Type patternType) {
+  assert(!ActivePackExpansions.empty());
+  auto countType = ActivePackExpansions.back();
+  return PackExpansionType::get(patternType, countType);
+}
+
+void ASTBuilder::endPackExpansion() {
+  ActivePackExpansions.pop_back();
+}
+
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags,
@@ -876,7 +896,7 @@ Type ASTBuilder::createParenType(Type base) {
 GenericSignature
 ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
                                    ArrayRef<BuiltRequirement> requirements) {
-  std::vector<BuiltGenericTypeParam> params;
+  std::vector<GenericTypeParamType *> params;
   for (auto &param : builtParams) {
     auto paramTy = param->getAs<GenericTypeParamType>();
     if (!paramTy)
