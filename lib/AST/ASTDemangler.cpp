@@ -327,18 +327,14 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   return aliasDecl->getDeclaredInterfaceType().subst(subMap);
 }
 
-Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
+Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> labels) {
   SmallVector<TupleTypeElt, 4> elements;
   elements.reserve(eltTypes.size());
-  for (auto eltType : eltTypes) {
+  for (unsigned i : indices(eltTypes)) {
     Identifier label;
-    if (!labels.empty()) {
-      auto split = labels.split(' ');
-      if (!split.first.empty())
-        label = Ctx.getIdentifier(split.first);
-      labels = split.second;
-    }
-    elements.emplace_back(eltType, label);
+    if (!labels[i].empty())
+      label = Ctx.getIdentifier(labels[i]);
+    elements.emplace_back(eltTypes[i], label);
   }
 
   return TupleType::get(elements, Ctx);

@@ -743,8 +743,8 @@ public:
   }
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
-                                      std::string &&labels) {
-    return TupleTypeRef::create(*this, elements, std::move(labels));
+                                      llvm::ArrayRef<StringRef> labels) {
+    return TupleTypeRef::create(*this, elements, labels);
   }
 
   const TypeRef *createPackType(llvm::ArrayRef<const TypeRef *> elements) {
@@ -825,7 +825,7 @@ public:
       break;
     }
 
-    auto result = createTupleType({}, "");
+    auto result = createTupleType({}, llvm::ArrayRef<llvm::StringRef>());
     return FunctionTypeRef::create(
         *this, {}, result, funcFlags, diffKind, nullptr);
   }

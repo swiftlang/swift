@@ -109,7 +109,7 @@ public:
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
                               Type parent);
 
-  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
+  Type createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> labels);
 
   Type createPackType(ArrayRef<Type> eltTypes);
 
