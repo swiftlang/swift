@@ -1505,6 +1505,9 @@ private:
   /// Ownership information related to the metadata we are trying to lookup.
   TypeReferenceOwnership ReferenceOwnership;
 
+  /// Stack of shape pack/current index pairs.
+  std::vector<std::pair<MetadataPackPointer, size_t>> ActivePackExpansions;
+
 public:
   using BuiltType = MetadataOrPack;
 
@@ -1859,9 +1862,26 @@ public:
   BuiltType
   createGenericTypeParameterType(unsigned depth, unsigned index) const {
     // Use the callback, when provided.
-    // FIXME: variadic-generics
-    if (substGenericParameter)
-      return BuiltType(substGenericParameter(depth, index));
+    if (substGenericParameter) {
+      BuiltType substType(substGenericParameter(depth, index));
+
+      // If we're in the middle of a pack expansion, return the correct element
+      // from the substituted pack type.
+      if (!ActivePackExpansions.empty()) {
+        size_t index = ActivePackExpansions.back().second;
+        if (substType.isMetadataPack()) {
+          auto substPack = substType.getMetadataPack();
+          if (index >= substPack.getNumElements()) {
+            swift::fatalError(0, "Pack index %zu exceeds pack length %zu\n",
+                              index, substPack.getNumElements());
+          }
+
+          return BuiltType(substPack.getElements()[index]);
+        }
+      }
+
+      return substType;
+    }
 
     return BuiltType();
   }
@@ -1995,6 +2015,37 @@ public:
   createPackExpansionType(BuiltType patternType, BuiltType countType) const {
     // FIXME: Runtime support for variadic generics.
     return BuiltType();
+  }
+
+  size_t beginPackExpansion(BuiltType countType) {
+    if (!countType.isMetadataPack()) {
+      swift::fatalError(0, "Pack expansion count type should be a pack\n");
+    }
+
+    auto pack = countType.getMetadataPack();
+    ActivePackExpansions.emplace_back(pack, /*index=*/0);
+
+    return pack.getNumElements();
+  }
+
+  void advancePackExpansion(size_t index) {
+    if (ActivePackExpansions.empty()) {
+      swift::fatalError(0, "advancePackExpansion() without beginPackExpansion()\n");
+    }
+
+    ActivePackExpansions.back().second = index;
+  }
+
+  BuiltType createExpandedPackElement(BuiltType patternType) {
+    return patternType;
+  }
+
+  void endPackExpansion() {
+    if (ActivePackExpansions.empty()) {
+      swift::fatalError(0, "endPackExpansion() without beginPackExpansion()\n");
+    }
+
+    ActivePackExpansions.pop_back();
   }
 
   TypeLookupErrorOr<BuiltType> createDependentMemberType(StringRef name,

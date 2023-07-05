@@ -63,12 +63,20 @@ class ASTBuilder {
   /// is a pack or not, so we have to find it here.
   GenericSignature GenericSig;
 
+  /// This builder doesn't perform "on the fly" substitutions, so we preserve
+  /// all pack expansions. We still need an active expansion stack though,
+  /// for the dummy implementation of these methods:
+  /// - beginPackExpansion()
+  /// - advancePackExpansion()
+  /// - createExpandedPackElement()
+  /// - endPackExpansion()
+  llvm::SmallVector<Type> ActivePackExpansions;
+
 public:
   using BuiltType = swift::Type;
   using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
   using BuiltGenericSignature = swift::GenericSignature;
-  using BuiltGenericTypeParam = swift::GenericTypeParamType *;
   using BuiltRequirement = swift::Requirement;
   using BuiltSubstitutionMap = swift::SubstitutionMap;
 
@@ -116,6 +124,14 @@ public:
   Type createSILPackType(ArrayRef<Type> eltTypes, bool isElementAddress);
 
   Type createPackExpansionType(Type patternType, Type countType);
+
+  size_t beginPackExpansion(Type countType);
+
+  void advancePackExpansion(size_t index);
+
+  Type createExpandedPackElement(Type patternType);
+
+  void endPackExpansion();
 
   Type createFunctionType(
       ArrayRef<Demangle::FunctionParam<Type>> params,

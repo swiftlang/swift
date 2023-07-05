@@ -179,7 +179,6 @@ public:
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
   using BuiltSubstitution = typename BuilderType::BuiltSubstitution;
   using BuiltSubstitutionMap = typename BuilderType::BuiltSubstitutionMap;
-  using BuiltGenericTypeParam = typename BuilderType::BuiltGenericTypeParam;
   using BuiltGenericSignature = typename BuilderType::BuiltGenericSignature;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
