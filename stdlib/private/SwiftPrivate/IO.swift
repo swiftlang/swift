@@ -19,6 +19,9 @@ let (platform_read, platform_write, platform_close) = (read, write, close)
 #elseif canImport(Glibc)
 import Glibc
 let (platform_read, platform_write, platform_close) = (read, write, close)
+#elseif canImport(Musl)
+import Musl
+let (platform_read, platform_write, platform_close) = (read, write, close)
 #elseif os(Windows)
 import CRT
 import WinSDK
