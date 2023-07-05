@@ -1350,10 +1350,13 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   // to be omitted in favor of moveOnlyEnqueueRequirement
   bool canRemoveOldDecls;
   if (!moveOnlyEnqueueRequirement) {
+    // The move only enqueue does not exist in this lib version, we must keep relying on the UnownedJob version
     canRemoveOldDecls = false;
   } else if (C.LangOpts.DisableAvailabilityChecking) {
+    // Assume we have all APIs available, and thus can use the ExecutorJob
     canRemoveOldDecls = true;
   } else {
+    // Check if the availability of nominal is high enough to be using the ExecutorJob version
     AvailabilityContext requirementInfo
         = AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
     AvailabilityContext declInfo =
@@ -1366,7 +1369,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   if (!canRemoveOldDecls &&
       unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid() &&
       moveOnlyEnqueueWitnessDecl && moveOnlyEnqueueWitnessDecl->getLoc().isValid()) {
-    diags.diagnose(moveOnlyEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_unused_implementation, nominalTy);
+    diags.diagnose(moveOnlyEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_unused_implementation);
   }
 
   // Old UnownedJob based impl is present, warn about it suggesting the new protocol requirement.
