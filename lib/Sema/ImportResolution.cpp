@@ -796,6 +796,18 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   if (topLevelModule.get() == ctx.TheBuiltinModule)
     return;
 
+  // @_implementationOnly is only supported when used from modules built with
+  // library-evolution. Otherwise it can lead to runtime crashes from a lack
+  // of memory layout information when building clients unaware of the
+  // dependency. The missing information is provided at run time by resilient
+  // modules.
+  if (import.options.contains(ImportFlags::ImplementationOnly) &&
+      !SF.getParentModule()->isResilient() && topLevelModule) {
+    ctx.Diags.diagnose(import.importLoc,
+                       diag::implementation_only_requires_library_evolution,
+                       SF.getParentModule()->getName());
+  }
+
   if (import.options.contains(ImportFlags::ImplementationOnly) ||
       import.accessLevel < AccessLevel::Public)
     return;
