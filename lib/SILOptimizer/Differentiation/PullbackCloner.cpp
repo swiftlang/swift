@@ -1569,6 +1569,11 @@ public:
     visitValueOwnershipInst(bbi);
   }
 
+  /// Handle `move_value` instruction.
+  ///   Original: y = move_value x
+  ///    Adjoint: adj[x] += adj[y]
+  void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
+
   /// Handle `begin_access` instruction.
   ///   Original: y = begin_access x
   ///    Adjoint: nothing
