@@ -1022,7 +1022,8 @@ protected:
 
     case NodeKind::Tuple: {
       llvm::SmallVector<BuiltType, 8> elements;
-      std::string labels;
+      llvm::SmallVector<StringRef, 8> labels;
+
       for (auto &element : *Node) {
         if (element->getKind() != NodeKind::TupleElement)
           return MAKE_NODE_TYPE_ERROR0(Node, "unexpected kind");
@@ -1034,18 +1035,12 @@ protected:
                                        "no children");
         }
         if (element->getChild(typeChildIndex)->getKind() == NodeKind::TupleElementName) {
-          // Add spaces to terminate all the previous labels if this
-          // is the first we've seen.
-          if (labels.empty()) labels.append(elements.size(), ' ');
-
-          // Add the label and its terminator.
-          labels += element->getChild(typeChildIndex)->getText();
-          labels += ' ';
+          labels.push_back(element->getChild(typeChildIndex)->getText());
           typeChildIndex++;
 
-        // Otherwise, add a space if a previous element had a label.
-        } else if (!labels.empty()) {
-          labels += ' ';
+        // Otherwise, add an empty label.
+        } else {
+          labels.push_back(StringRef());
         }
 
         // Decode the element type.
@@ -1057,7 +1052,7 @@ protected:
 
         elements.push_back(elementType.getType());
       }
-      return Builder.createTupleType(elements, std::move(labels));
+      return Builder.createTupleType(elements, labels);
     }
     case NodeKind::TupleElement:
       if (Node->getNumChildren() < 1)

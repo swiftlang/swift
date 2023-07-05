@@ -20,6 +20,7 @@
 #include "Tracing.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/RemoteInspection/Records.h"
@@ -1944,7 +1945,7 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createTupleType(llvm::ArrayRef<BuiltType> elements,
-                  std::string labels) const {
+                  llvm::ArrayRef<StringRef> labels) const {
     for (auto element : elements) {
       if (!element.isMetadata()) {
         return TYPE_LOOKUP_ERROR_FMT("Tried to build a tuple type where "
@@ -1952,14 +1953,32 @@ public:
       }
     }
 
+    std::string labelStr;
+    for (unsigned i : indices(labels)) {
+      auto label = labels[i];
+      if (label.empty()) {
+        if (!labelStr.empty())
+          labelStr += ' ';
+        continue;
+      }
+
+      // Add spaces to terminate all the previous labels if this
+      // is the first we've seen.
+      if (labelStr.empty()) labelStr.append(i, ' ');
+
+      // Add the label and its terminator.
+      labelStr += label;
+      labelStr += ' ';
+    }
+
     auto flags = TupleTypeFlags().withNumElements(elements.size());
-    if (!labels.empty())
+    if (!labelStr.empty())
       flags = flags.withNonConstantLabels(true);
     return BuiltType(
         swift_getTupleTypeMetadata(
           MetadataState::Abstract, flags,
           reinterpret_cast<const Metadata * const *>(elements.data()),
-          labels.empty() ? nullptr : labels.c_str(),
+          labelStr.empty() ? nullptr : labelStr.c_str(),
           /*proposedWitnesses=*/nullptr));
   }
 
