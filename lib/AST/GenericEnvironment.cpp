@@ -98,7 +98,7 @@ ArrayRef<Type> GenericEnvironment::getOpenedPackParams() const {
   return ArrayRef<Type>(begin, getNumOpenedPackParams());
 }
 
-TypeArrayView<GenericTypeParamType>
+ArrayRef<GenericTypeParamType *>
 GenericEnvironment::getGenericParams() const {
   return getGenericSignature().getGenericParams();
 }
@@ -152,7 +152,7 @@ namespace {
 
 struct FindOpenedElementParam {
   ArrayRef<Type> openedPacks;
-  TypeArrayView<GenericTypeParamType> packElementParams;
+  ArrayRef<GenericTypeParamType *> packElementParams;
 
   FindOpenedElementParam(const GenericEnvironment *env,
                          ArrayRef<Type> openedPacks)

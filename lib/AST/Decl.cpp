@@ -1238,7 +1238,7 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
   }
 }
 
-TypeArrayView<GenericTypeParamType>
+ArrayRef<GenericTypeParamType *>
 GenericContext::getInnermostGenericParamTypes() const {
   return getGenericSignature().getInnermostGenericParams();
 }

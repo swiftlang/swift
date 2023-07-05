@@ -5061,7 +5061,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       if (result == CheckGenericArgumentsResult::RequirementFailure) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), Loc, Loc,
-            proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
+            proto->getDeclaredInterfaceType(),
+            {proto->getSelfInterfaceType()->castTo<GenericTypeParamType>()},
             QuerySubstitutionMap{substitutions}, module);
       }
 

@@ -307,7 +307,7 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
+RequirementMachine::initWithGenericSignature(GenericSignature sig) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
                 sig.getGenericParams().end());
@@ -323,7 +323,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithGenericSignatureRequirements(sig.getRequirements());
+  builder.initWithGenericSignature(sig.getGenericParams(),
+                                   sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
@@ -366,7 +367,7 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   // For RequirementMachine::verify() when called by generic signature queries;
   // We have a single valid generic parameter at depth 0, index 0.
-  Params.push_back(component[0]->getSelfInterfaceType());
+  Params.push_back(component[0]->getSelfInterfaceType()->castTo<GenericTypeParamType>());
 
   if (Dump) {
     llvm::dbgs() << "Adding protocols";
@@ -425,7 +426,7 @@ RequirementMachine::initWithWrittenRequirements(
   // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithWrittenRequirements(requirements);
+  builder.initWithWrittenRequirements(genericParams, requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
@@ -557,8 +558,8 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   } else {
     out << "fresh signature <";
     for (auto paramTy : Params) {
-      out << " " << paramTy;
-      if (paramTy->castTo<GenericTypeParamType>()->isParameterPack())
+      out << " " << Type(paramTy);
+      if (paramTy->isParameterPack())
         out << "…";
     }
     out << " >";

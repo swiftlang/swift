@@ -1357,7 +1357,7 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  TypeArrayView<GenericTypeParamType> getInnermostGenericParamTypes() const;
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -3147,7 +3147,7 @@ public:
 
   /// Retrieve the generic parameters that represent the opaque types described by this opaque
   /// type declaration.
-  TypeArrayView<GenericTypeParamType> getOpaqueGenericParams() const {
+  ArrayRef<GenericTypeParamType *> getOpaqueGenericParams() const {
     return OpaqueInterfaceGenericSignature.getInnermostGenericParams();
   }
 
