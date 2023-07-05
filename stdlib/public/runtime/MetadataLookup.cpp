@@ -1624,8 +1624,7 @@ public:
         swift_getTypeByMangledName(MetadataState::Complete,
                                    mangledName, allGenericArgsVec.data(),
         [&substitutions](unsigned depth, unsigned index) {
-          // FIXME: Variadic generics
-          return substitutions.getMetadata(depth, index).getMetadataOrNull();
+          return substitutions.getMetadata(depth, index).Ptr;
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -2300,8 +2299,7 @@ swift_getTypeByMangledNameInEnvironment(
     MetadataState::Complete, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2333,8 +2331,7 @@ swift_getTypeByMangledNameInEnvironmentInMetadataState(
     (MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2365,8 +2362,7 @@ swift_getTypeByMangledNameInContext(
     MetadataState::Complete, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2398,8 +2394,7 @@ swift_getTypeByMangledNameInContextInMetadataState(
     (MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2585,8 +2580,7 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
       demangler,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
-        // FIXME: Variadic generics
-        return substFn.getMetadata(depth, index).getMetadataOrNull();
+        return substFn.getMetadata(depth, index).Ptr;
       },
       /*SubstDependentWitnessTableFn=*/
       [&substFn](const Metadata *type, unsigned index) {
@@ -2627,8 +2621,7 @@ swift_func_getParameterTypeInfo(
       demangler,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
-        // FIXME: Variadic generics
-        return substFn.getMetadata(depth, index).getMetadataOrNull();
+        return substFn.getMetadata(depth, index).Ptr;
       },
       /*SubstDependentWitnessTableFn=*/
       [&substFn](const Metadata *type, unsigned index) {
@@ -2671,8 +2664,7 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
   auto error = _checkGenericRequirements(
       genericEnv->getGenericRequirements(), witnessTables,
       [&substFn](unsigned depth, unsigned index) {
-        // FIXME: Variadic generics
-        return substFn.getMetadata(depth, index).getMetadataOrNull();
+        return substFn.getMetadata(depth, index).Ptr;
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
@@ -2706,8 +2698,7 @@ swift_getOpaqueTypeMetadata(MetadataRequest request,
   return swift_getTypeByMangledName(request.getState(),
                                     mangledName, arguments,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -3149,8 +3140,7 @@ static void _gatherWrittenGenericArgs(
             req.getMangledTypeName(),
             (const void * const *)allGenericArgs.data(),
             [&substitutions](unsigned depth, unsigned index) {
-              // FIXME: Variadic generics
-              return substitutions.getMetadata(depth, index).getMetadataOrNull();
+              return substitutions.getMetadata(depth, index).Ptr;
             },
             [&substitutions](const Metadata *type, unsigned index) {
               return substitutions.getWitnessTable(type, index);
