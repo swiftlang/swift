@@ -3050,6 +3050,9 @@ protected:
     }
   }
 
+  template <typename Introducer>
+  void visitLifetimeIntroducer(Introducer *introducer);
+
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
@@ -3263,15 +3266,16 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
   }
 }
 
-void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
-  assert(use == getProjectedDefOperand(borrow));
+template <typename Introducer>
+void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
+  assert(use == getProjectedDefOperand(introducer));
 
   // Mark the value as rewritten and use the operand's storage.
   auto address = pass.valueStorageMap.getStorage(use->get()).storageAddress;
-  markRewritten(borrow, address);
+  markRewritten(introducer, address);
 
-  // Borrows are irrelevant unless they are marked lexical.
-  if (borrow->isLexical()) {
+  // Lifetime introducers are irrelevant unless they are marked lexical.
+  if (introducer->isLexical()) {
     if (auto base = getAccessBase(address)) {
       if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
         allocStack->setIsLexical();
@@ -3285,6 +3289,10 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
     SWIFT_ASSERT_ONLY(address->dump());
     llvm_unreachable("^^^ unknown lexical address producer");
   }
+}
+
+void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
+  visitLifetimeIntroducer(borrow);
 }
 
 // Opening an opaque existential. Rewrite the opened existentials here on
