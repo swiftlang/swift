@@ -335,41 +335,6 @@ set(swiftCore_common_options
 set(swiftCore_common_dependencies
     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE})
 
-if(${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING")
-
-  set(b0_deps symlink-headers-bootstrapping0)
-  set(b1_deps symlink-headers-bootstrapping1)
-
-  list(FIND SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED" index_of_shared)
-  if(index_of_shared EQUAL -1)
-    message(FATAL_ERROR "bootstrapping requires SHARED stdlib build type")
-  endif()
-
-  set(swiftCore_common_bootstrapping_options
-                    SHARED
-                    ${swiftCore_common_options}
-                    SDK ${SWIFT_HOST_VARIANT_SDK}
-                    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-                    INSTALL_IN_COMPONENT
-                      "never_install")
-
-  # Bootstrapping - stage 0
-
-  add_swift_target_library_single(swiftCore-bootstrapping0 swiftCore
-                    ${swiftCore_common_bootstrapping_options}
-                    FILE_DEPENDS
-                      ${b0_deps} ${swiftCore_common_dependencies}
-                    BOOTSTRAPPING 0)
-
-  # Bootstrapping - stage 1
-
-  add_swift_target_library_single(swiftCore-bootstrapping1 swiftCore
-                    ${swiftCore_common_bootstrapping_options}
-                    FILE_DEPENDS
-                      ${b1_deps} ${swiftCore_common_dependencies}
-                    BOOTSTRAPPING 1)
-endif()
-
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
