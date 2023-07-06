@@ -364,10 +364,10 @@ public:
 class TupleTypeRef final : public TypeRef {
 protected:
   std::vector<const TypeRef *> Elements;
-  std::vector<StringRef> Labels;
+  std::vector<std::string> Labels;
 
   static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
-                           const std::vector<StringRef> &Labels) {
+                           const std::vector<std::string> &Labels) {
     TypeRefID ID;
     for (auto Element : Elements)
       ID.addPointer(Element);
@@ -378,20 +378,20 @@ protected:
 
 public:
   TupleTypeRef(std::vector<const TypeRef *> Elements,
-               std::vector<StringRef> Labels)
+               std::vector<std::string> Labels)
       : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)),
         Labels(std::move(Labels)) {}
 
   template <typename Allocator>
   static const TupleTypeRef *create(Allocator &A,
                                     std::vector<const TypeRef *> Elements,
-                                    const std::vector<StringRef> Labels) {
+                                    const std::vector<std::string> Labels) {
     FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Labels);
   }
 
   const std::vector<const TypeRef *> &getElements() const { return Elements; };
 
-  const std::vector<llvm::StringRef> &getLabels() const { return Labels; }
+  const std::vector<std::string> &getLabels() const { return Labels; }
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;

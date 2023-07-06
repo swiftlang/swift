@@ -116,7 +116,7 @@ public:
     for (auto NameElement : llvm::zip_first(Labels, T->getElements())) {
       auto Label = std::get<0>(NameElement);
       if (!Label.empty())
-        stream << Label.str() << " = ";
+        stream << Label << " = ";
       printRec(std::get<1>(NameElement));
     }
     stream << ")";
