@@ -5509,12 +5509,6 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
                     original->getName())
           .highlight(original->getSourceRange());
       return;
-    case DerivativeFunctionTypeError::Kind::MultipleSemanticResults:
-      diags
-          .diagnose(attr->getLocation(),
-                    diag::autodiff_attr_original_multiple_semantic_results)
-          .highlight(original->getSourceRange());
-      return;
     case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:
       diags.diagnose(attr->getLocation(),
                      diag::diff_params_clause_no_inferred_parameters);
@@ -5666,7 +5660,19 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
   }
 
   // Register derivative function configuration.
-  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+
+  // Compute the derivative function type.
+  auto originalFnRemappedTy = original->getInterfaceType()->castTo<AnyFunctionType>();
+  if (auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment())
+    originalFnRemappedTy =
+        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
+            ->castTo<AnyFunctionType>();
+  
+  auto *resultIndices =
+    autodiff::getFunctionSemanticResultIndices(originalFnRemappedTy,
+                                               resolvedDiffParamIndices);
+
   original->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
   return resolvedDiffParamIndices;
@@ -6124,12 +6130,6 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
                     originalAFD->getName())
           .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
       return;
-    case DerivativeFunctionTypeError::Kind::MultipleSemanticResults:
-      diags
-          .diagnose(attr->getLocation(),
-                    diag::autodiff_attr_original_multiple_semantic_results)
-          .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-      return;
     case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:
       diags.diagnose(attr->getLocation(),
                      diag::diff_params_clause_no_inferred_parameters);
@@ -6219,7 +6219,9 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Register derivative function configuration.
-  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  auto *resultIndices =
+    autodiff::getFunctionSemanticResultIndices(originalAFD,
+                                               resolvedDiffParamIndices);
   originalAFD->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices,
        derivative->getGenericSignature()});
