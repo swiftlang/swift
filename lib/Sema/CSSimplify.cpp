@@ -4406,6 +4406,12 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    return resolveKeyPath(typeVar, type, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -11471,6 +11477,15 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Generate constraints from the body of this closure.
   return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
+}
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+
+  assignFixedType(typeVar, contextualType);
+
+  return true;
 }
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
