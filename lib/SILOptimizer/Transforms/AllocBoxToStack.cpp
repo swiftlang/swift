@@ -1119,7 +1119,8 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
               // the alloc_stack/dealloc_stack instructions where the alloc_box/
               // destroy_value instructions are respectively.  The copy_value
               // can't keep the alloc_stack alive.
-              if ((svi = dyn_cast<CopyValueInst>(user))) {
+              if ((svi = dyn_cast<CopyValueInst>(user)) ||
+                  (svi = dyn_cast<MoveValueInst>(user))) {
                 worklist.push(svi);
               }
               users.push_back(user);
