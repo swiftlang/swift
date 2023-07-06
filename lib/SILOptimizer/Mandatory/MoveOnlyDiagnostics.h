@@ -176,15 +176,16 @@ public:
   void emitPromotedBoxArgumentError(MarkMustCheckInst *markedValue,
                                     SILFunctionArgument *arg);
 
-  void emitCannotDestructureDeinitNominalError(MarkMustCheckInst *markedValue,
-                                               StringRef pathString,
-                                               NominalTypeDecl *deinitedNominal,
-                                               SILInstruction *consumingUser);
   void emitCannotDestructureNominalError(MarkMustCheckInst *markedValue,
                                          StringRef pathString,
                                          NominalTypeDecl *nominal,
                                          SILInstruction *consumingUser,
                                          bool isDueToDeinit);
+  void emitCannotPartiallyConsumeError(MarkMustCheckInst *markedValue,
+                                       StringRef pathString,
+                                       NominalTypeDecl *nominal,
+                                       SILInstruction *consumingUser,
+                                       bool dueToDeinit);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
