@@ -467,6 +467,55 @@ extension PropertyWrapperMacro: PeerMacro {
   }
 }
 
+extension PatternBindingSyntax.Accessor {
+  var hasGetter: Bool {
+    switch self {
+    case .accessors(let accessors):
+      for accessor in accessors.accessors {
+        if accessor.accessorKind.text == "get" {
+          return true
+        }
+      }
+
+      return false
+    case .getter:
+      return true
+    }
+  }
+}
+
+public struct PropertyWrapperSkipsComputedMacro {}
+
+extension PropertyWrapperSkipsComputedMacro: AccessorMacro, Macro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier, !(binding.accessor?.hasGetter ?? false)
+    else {
+      return []
+    }
+
+    return [
+      """
+
+        get {
+          _\(identifier).wrappedValue
+        }
+      """,
+      """
+
+        set {
+          _\(identifier).wrappedValue = newValue
+        }
+      """,
+    ]
+  }
+}
+
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,

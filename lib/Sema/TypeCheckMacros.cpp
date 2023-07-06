@@ -1328,11 +1328,7 @@ llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
   // declaration, so there is nothing further to do.
   bool foundNonObservingAccessor = false;
   bool foundInitAccessor = false;
-  for (auto decl : macroSourceFile->getTopLevelItems()) {
-    auto accessor = dyn_cast_or_null<AccessorDecl>(decl.dyn_cast<Decl *>());
-    if (!accessor)
-      continue;
-
+  for (auto accessor : storage->getAllAccessors()) {
     if (accessor->isInitAccessor())
       foundInitAccessor = true;
 

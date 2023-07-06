@@ -23,6 +23,10 @@
 macro myPropertyWrapper() =
     #externalMacro(module: "MacroDefinition", type: "PropertyWrapperMacro")
 
+@attached(accessor)
+macro myPropertyWrapperSkipsComputed() =
+    #externalMacro(module: "MacroDefinition", type: "PropertyWrapperSkipsComputedMacro")
+
 struct Date { }
 
 struct MyWrapperThingy<T> {
@@ -64,6 +68,11 @@ struct MyStruct {
   // CHECK-DUMP: set {
   // CHECK-DUMP:   _birthDate.wrappedValue = newValue
   // CHECK-DUMP: }
+
+  @myPropertyWrapperSkipsComputed
+  var age: Int? {
+    get { nil }
+  }
 }
 
 // Test that the fake-property-wrapper-introduced accessors execute properly at
