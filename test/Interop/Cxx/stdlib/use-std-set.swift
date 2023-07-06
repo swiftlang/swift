@@ -47,4 +47,18 @@ StdSetTestSuite.test("MultisetOfCInt.contains") {
     expectFalse(s.contains(3))
 }
 
+StdSetTestSuite.test("SetOfCInt.init()") {
+    let s = SetOfCInt([1, 3, 5])
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt.init()") {
+    let s = UnorderedSetOfCInt([1, 3, 5])
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+}
+
 runAllTests()
