@@ -2608,6 +2608,26 @@ AccessesAttr::getPropertyDecls(AccessorDecl *attachedTo) const {
       {});
 }
 
+ArrayRef<VarDecl *> StorageRestrictionsAttr::getInitializesProperties(
+    AccessorDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           InitAccessorReferencedVariablesRequest{
+                               const_cast<StorageRestrictionsAttr *>(this),
+                               attachedTo, getInitializesNames()},
+                           {});
+}
+
+ArrayRef<VarDecl *>
+StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           InitAccessorReferencedVariablesRequest{
+                               const_cast<StorageRestrictionsAttr *>(this),
+                               attachedTo, getAccessesNames()},
+                           {});
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
