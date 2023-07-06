@@ -3326,8 +3326,16 @@ namespace {
           // then still add a generic so that it can be overrieded.
           // TODO(https://github.com/apple/swift/issues/57184): In the future we might want to import two overloads in this case so that the default type could still be used.
           if (templateTypeParam->hasDefaultArgument() &&
-              !templateParamTypeUsedInSignature(templateTypeParam))
+              !templateParamTypeUsedInSignature(templateTypeParam)) {
+            // We do not yet support instantiation of default values of template
+            // parameters when the function template is instantiated, so do not
+            // import the function template if the template parameter has
+            // dependent default value.
+            auto defaultArgumentType = templateTypeParam->getDefaultArgument();
+            if (defaultArgumentType->isDependentType())
+              return nullptr;
             continue;
+          }
 
           auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
               param, AccessLevel::Public, dc,
