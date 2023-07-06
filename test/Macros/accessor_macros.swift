@@ -48,6 +48,7 @@ struct MyWrapperThingy<T> {
 struct MyStruct {
   var _name: MyWrapperThingy<String> = .init(storage: "Hello")
   var _birthDate: MyWrapperThingy<Date?> = .init(storage: nil)
+  var _favoriteColor: MyWrapperThingy<String> = .init(storage: "Blue")
 
   @myPropertyWrapper
   var name: String
@@ -73,6 +74,11 @@ struct MyStruct {
   var age: Int? {
     get { nil }
   }
+
+  @myPropertyWrapper
+  var favoriteColor: String {
+    didSet { fatalError("Boom") }
+  }
 }
 
 // Test that the fake-property-wrapper-introduced accessors execute properly at
@@ -85,6 +91,8 @@ _ = ms.name
 // CHECK-NEXT: Setting value World
 ms.name = "World"
 
+// CHECK-NEXT: Setting value Yellow
+ms.favoriteColor = "Yellow"
 
 #if TEST_DIAGNOSTICS
 struct MyBrokenStruct {

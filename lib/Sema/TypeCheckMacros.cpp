@@ -1327,19 +1327,24 @@ llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
   // side effect of registering those accessor declarations with the storage
   // declaration, so there is nothing further to do.
   bool foundNonObservingAccessor = false;
+  bool foundNonObservingAccessorInMacro = false;
   bool foundInitAccessor = false;
   for (auto accessor : storage->getAllAccessors()) {
     if (accessor->isInitAccessor())
       foundInitAccessor = true;
 
-    if (!accessor->isObservingAccessor())
+    if (!accessor->isObservingAccessor()) {
       foundNonObservingAccessor = true;
+
+      if (accessor->isInMacroExpansionInContext())
+        foundNonObservingAccessorInMacro = true;
+    }
   }
 
   auto roleAttr = macro->getMacroRoleAttr(MacroRole::Accessor);
   bool expectedNonObservingAccessor =
     !accessorMacroOnlyIntroducesObservers(macro, roleAttr);
-  if (foundNonObservingAccessor) {
+  if (foundNonObservingAccessorInMacro) {
     // If any non-observing accessor was added, mark the initializer as
     // subsumed unless it has init accessor, because the initializer in
     // such cases could be used for memberwise initialization.
@@ -1350,6 +1355,13 @@ llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
         binding->setInitializerSubsumed(index);
       }
     }
+
+    // Also remove didSet and willSet, because they are subsumed by a
+    // macro expansion that turns a stored property into a computed one.
+    if (auto accessor = storage->getParsedAccessor(AccessorKind::WillSet))
+      storage->removeAccessor(accessor);
+    if (auto accessor = storage->getParsedAccessor(AccessorKind::DidSet))
+      storage->removeAccessor(accessor);
   }
 
   // Make sure we got non-observing accessors exactly where we expected to.
