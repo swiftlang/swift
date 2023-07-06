@@ -111,7 +111,7 @@ add_swift_target_library(swiftMusl ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OV
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALPINE
+    TARGET_SDKS MUSL
     INSTALL_IN_COMPONENT sdk-overlay)
 
 add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
