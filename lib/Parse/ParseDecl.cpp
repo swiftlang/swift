@@ -3371,6 +3371,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     llvm_unreachable("AccessesAttr not yet implemented");
   }
 
+  case DAK_StorageRestrictions: {
+    llvm_unreachable("StorageRestrictionsAttr not yet implemented");
+  }
+
   case DAK_Implements: {
     ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
     if (Attr.isNonNull()) {
