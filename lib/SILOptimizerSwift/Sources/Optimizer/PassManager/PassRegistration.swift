@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-
+import SIL
 import OptimizerBridging
+import Parse
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
@@ -81,6 +82,7 @@ private func registerSwiftPasses() {
   registerPass(cleanupDebugStepsPass, { cleanupDebugStepsPass.run($0) })
   registerPass(namedReturnValueOptimization, { namedReturnValueOptimization.run($0) })
   registerPass(stripObjectHeadersPass, { stripObjectHeadersPass.run($0) })
+  registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })

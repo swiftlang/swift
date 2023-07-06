@@ -13,7 +13,7 @@ target_link_libraries(swift-ide-test
                         swiftFrontend
                         swiftIDE
                         swiftIDETool
-                        swiftCompilerModules)
+                        swiftSILOptimizerSwift)
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(LLVM_ENABLE_LIBXML2)

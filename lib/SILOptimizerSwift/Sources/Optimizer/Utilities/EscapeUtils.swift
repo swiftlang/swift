@@ -65,7 +65,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-
+import SIL
 
 extension ProjectedValue {
 
@@ -144,7 +144,7 @@ extension Value {
 /// This protocol is used to customize `ProjectedValue.isEscaping` (and similar functions)
 /// by implementing `visitUse` and `visitDef` which are called for all uses and definitions
 /// encountered during a walk.
-public protocol EscapeVisitor {
+protocol EscapeVisitor {
   typealias UseResult = EscapeUtilityTypes.UseVisitResult
   typealias DefResult = EscapeUtilityTypes.DefVisitResult
   typealias EscapePath = EscapeUtilityTypes.EscapePath
@@ -489,9 +489,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return walkDownUses(ofValue: svi, path: path.with(knownType: nil))
     case let atp as AddressToPointerInst:
       return walkDownUses(ofValue: atp, path: path.with(knownType: nil))
-    case let ia as IndexAddrInst:
-      assert(operand.index == 0)
-      return walkDownUses(ofAddress: ia, path: path.with(knownType: nil))
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is DebugValueInst:
       return .continueWalk
@@ -741,7 +738,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       } else {
         return isEscaping
       }
-    case is PointerToAddressInst, is IndexAddrInst:
+    case is PointerToAddressInst:
       return walkUp(value: (def as! SingleValueInstruction).operands[0].value, path: path.with(knownType: nil))
     case let rta as RefTailAddrInst:
       return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0).with(knownType: nil))

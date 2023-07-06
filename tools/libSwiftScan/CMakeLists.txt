@@ -24,7 +24,7 @@ target_link_libraries(libSwiftScan PRIVATE
     swiftDriverTool
     swiftStaticMirror
     swiftRemoteInspection
-    swiftCompilerModules)
+    swiftSILOptimizerSwift)
 
 set_target_properties(libSwiftScan
     PROPERTIES
