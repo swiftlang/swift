@@ -521,3 +521,37 @@ do {
     }
   }
 }
+
+func test_invalid_storage_restrictions() {
+  struct Test {
+    var a: Int {
+      @storageRestrictions()
+      // expected-error@-1 {{missing label in @storageRestrictions attribute}}
+      init {}
+    }
+
+    var b: Int {
+      @storageRestrictions(initializes:)
+      // expected-error@-1 {{expected property name in @storageRestrictions list}}
+      init {}
+    }
+
+    var c: Int {
+      @storageRestrictions(initializes: a, initializes: b)
+      // expected-error@-1 {{duplicate label 'initializes' in @storageRestrictions attribute}}
+      init {}
+    }
+
+    var d: Int {
+      @storageRestrictions(accesses: a, accesses: c)
+      // expected-error@-1 {{duplicate label 'accesses' in @storageRestrictions attribute}}
+      init {}
+    }
+
+    var e: Int {
+      @storageRestrictions(initialize: a, b, accesses: c, d)
+      // expected-error@-1 {{unexpected label 'initialize' in @storageRestrictions attribute}}
+      init {}
+    }
+  }
+}
