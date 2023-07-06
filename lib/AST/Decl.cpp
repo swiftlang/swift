@@ -4939,11 +4939,8 @@ void NominalTypeDecl::collectPropertiesInitializableByInitAccessors(
     std::multimap<VarDecl *, VarDecl *> &result) const {
   for (auto *property : getInitAccessorProperties()) {
     auto *initAccessor = property->getAccessor(AccessorKind::Init);
-    if (auto *initAttr =
-            initAccessor->getAttrs().getAttribute<InitializesAttr>()) {
-      for (auto *subsumed : initAttr->getPropertyDecls(initAccessor))
-        result.insert({subsumed, property});
-    }
+    for (auto *subsumed : initAccessor->getInitializedProperties())
+      result.insert({subsumed, property});
   }
 }
 
@@ -6859,21 +6856,15 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // designated initializer(s) or by init accessors.
   if (isInstanceMember()) {
     // Init accessors allow assignments to `let` properties if a
-    // property is part of `initializes(...)` list.
+    // property is part of `initializes` list.
     if (auto *accessor =
             dyn_cast<AccessorDecl>(const_cast<DeclContext *>(UseDC))) {
-      // Check whether this property is part of `initializes(...)` list,
+      // Check whether this property is part of `initializes` list,
       // and allow assignment/mutation if so. DI would be responsible
       // for checking for re-assignment.
-      if (auto *initAttr =
-              accessor->getAttrs().getAttribute<InitializesAttr>()) {
-        return llvm::is_contained(initAttr->getPropertyDecls(accessor),
-                                  const_cast<VarDecl *>(this));
-      }
-
-      // If there is no `initializes` attribute, no referenced properties
-      // can be assignment to or mutated.
-      return false;
+      return accessor->isInitAccessor() &&
+             llvm::is_contained(accessor->getInitializedProperties(),
+                                const_cast<VarDecl *>(this));
     }
 
     auto *CD = dyn_cast<ConstructorDecl>(UseDC);
@@ -9534,6 +9525,20 @@ void AccessorDecl::printUserFacingName(raw_ostream &out) const {
     }
   }
   out << ")";
+}
+
+ArrayRef<VarDecl *> AccessorDecl::getInitializedProperties() const {
+  assert(isInitAccessor());
+  if (auto *initAttr = getAttrs().getAttribute<InitializesAttr>())
+    return initAttr->getPropertyDecls(const_cast<AccessorDecl *>(this));
+  return {};
+}
+
+ArrayRef<VarDecl *> AccessorDecl::getAccessedProperties() const {
+  assert(isInitAccessor());
+  if (auto *accessAttr = getAttrs().getAttribute<AccessesAttr>())
+    return accessAttr->getPropertyDecls(const_cast<AccessorDecl *>(this));
+  return {};
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
