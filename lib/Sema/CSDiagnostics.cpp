@@ -4012,9 +4012,6 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                              name.getBaseIdentifier().str());
           ctx.Diags.diagnose(loc, diag::iterator_potentially_unsafe);
         } else {
-          assert(methodSemantics ==
-                 CxxRecordSemanticsKind::UnsafePointerMember);
-
           auto baseSwiftLoc = ctx.getClangModuleLoader()->importSourceLocation(
               cxxRecord->getLocation());
 
