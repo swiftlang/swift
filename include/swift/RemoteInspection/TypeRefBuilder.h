@@ -744,7 +744,8 @@ public:
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
                                       llvm::ArrayRef<StringRef> labels) {
-    return TupleTypeRef::create(*this, elements, labels);
+    std::vector<std::string> labelsVec(labels.begin(), labels.end());
+    return TupleTypeRef::create(*this, elements, labelsVec);
   }
 
   const TypeRef *createPackType(llvm::ArrayRef<const TypeRef *> elements) {
