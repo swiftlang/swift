@@ -17,11 +17,6 @@
 // RUN:   -enable-library-evolution \
 // RUN:   -swift-version 5 -verify
 
-/// This is a warning in swiftinterfaces
-// R UN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \
-// RUN:   -enable-library-evolution \
-// R UN:   -I %t -module-name Client
-
 //--- Lib.swift
 
 public struct IOIStruct {
@@ -53,12 +48,3 @@ public struct IOIStruct {
     return IOIStruct() // expected-error {{struct 'IOIStruct' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
     // expected-error @-1 {{initializer 'init()' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
 }
-
-//--- Client.private.swiftinterface
-
-// swift-interface-format-version: 1.0
-// swift-compiler-version: Swift version 5.8-dev effective-4.1.50
-// swift-module-flags: -swift-version 4 -module-name Client
-@_implementationOnly import Lib
-
-@_spi(X) public func spiClient() -> IOIStruct { fatalError() }
