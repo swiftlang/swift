@@ -18,7 +18,7 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 import SwiftSyntaxMacroExpansion
-@_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
+import SwiftCompilerPluginMessageHandling
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
