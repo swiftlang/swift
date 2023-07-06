@@ -17,9 +17,15 @@ using namespace swift;
 
 namespace {
 
-static const bool DEBUG = true;
+static const bool DEBUG = false;
 static const char *SEP_STR = "╾──────────────────────────────╼\n";
 
+// SILApplyCrossesIsolation determines if a SIL instruction is an isolation
+// crossing apply expressiong. This is done by checking its correspondence
+// to an ApplyExpr AST node, and then checking the internal flags of that
+// AST node to see if the ActorIsolationChecker determined it crossed isolation.
+// It's possible this is brittle and a more nuanced check is needed, but this
+// suffices for all cases tested so far.
 static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>();
   // if the instruction doesn't correspond to an ApplyExpr, then it can't
@@ -29,6 +35,22 @@ static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   return apply->getIsolationCrossing().has_value();
 }
 
+// PartitionOpTranslator is responsible for performing the translation from
+// SILInstructions to PartitionOps. Not all SILInstructions have an effect on
+// the region partition, and some have multiple effects - such as an application
+// pairwise merging its arguments - so the core functions like
+// translateSILBasicBlock map SILInstructions to std::vectors of PartitionOps.
+// No more than a single instance of PartitionOpTranslator should be used for
+// each SILFunction, as SILValues are assigned unique IDs through the nodeIDMap.
+// Some special correspondences between SIL values are also tracked statefully
+// by instances of this class, such as the "projection" relationship:
+// instructions like begin_borrow and begin_access create effectively temporary
+// values used for alternative access to base "projected" values. These are
+// tracked to implement "write-through" semantics for assignments to projections
+// when they're addresses.
+//
+// TODO: when translating basic blocks, optimizations might be possible
+//       that reduce lists of PartitionOps to smaller, equivalent lists
 class PartitionOpTranslator {
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
@@ -38,12 +60,17 @@ class PartitionOpTranslator {
   llvm::DenseMap<const SILNode *, unsigned> nodeIDMap;
   unsigned nextNodeID = 0;
 
+  // projectionMap captures "projections" of addresses like begin_borrow
+  // and begin_access
+  llvm::DenseMap<SILValue, SILValue> projectionMap;
+
   bool nodeHasID(SILValue value) {
     assert(isNonSendable(value) &&
            "only non-Sendable values should be entered in the map");
     return nodeIDMap.count(value);
   }
 
+  // lookup the internally assigned unique ID of a SILValue, or create one
   unsigned lookupNodeID(SILValue value) {
     assert(isNonSendable(value) &&
            "only non-Sendable values should be entered in the map");
@@ -54,6 +81,25 @@ class PartitionOpTranslator {
     return nextNodeID++;
   }
 
+  // note the fact that `tgt` is a projection of `src`, arising from SIL
+  // instructions such as `tgt = begin_borrow src`. This yields "write-through"
+  // semantics: `store x to tgt` will then have the same effects as
+  // `store x to src`.
+  void addProjection(SILValue tgt, SILValue src) {
+    projectionMap[tgt] = src;
+  }
+
+  // lookup `val` to see if it is the target of a projection
+  llvm::Optional<SILValue> getProjection(SILValue val) {
+    if (projectionMap.count(val)) {
+      return projectionMap[val];
+    }
+    return {};
+  }
+
+  // check the passed type for sendability, special casing the type used for
+  // raw pointers to ensure it is treated as non-Sendable and strict checking
+  // is applied to it
   bool isNonSendableType(SILType type) {
     if (type.getASTType()->getKind() == TypeKind::BuiltinNativeObject) {
       // these are very unsafe... definitely not Sendable
@@ -65,6 +111,9 @@ class PartitionOpTranslator {
         .hasMissingConformance(function->getParentModule());
   }
 
+  // check the passed value for sendability, special casing for values known
+  // to be functions or class methods because these can safely be treated as
+  // Sendable despite not having true Sendable type
   bool isNonSendable(SILValue value) {
     SILInstruction *defInst = value.getDefiningInstruction();
     if (defInst && isa<ClassMethodInst, FunctionRefInst>(defInst)) {
@@ -80,6 +129,10 @@ class PartitionOpTranslator {
   // used to statefully track the instruction currently being translated,
   // for insertion into generated PartitionOps
   SILInstruction *currentInstruction;
+
+  // ===========================================================================
+  // The following section of functions create fresh PartitionOps referencing
+  // the current value of currentInstruction for ease of programming.
 
   PartitionOp AssignFresh(SILValue value) {
     return PartitionOp::AssignFresh(lookupNodeID(value),
@@ -113,8 +166,27 @@ class PartitionOpTranslator {
     return PartitionOp::Require(lookupNodeID(value),
                                 currentInstruction);
   }
+  // ===========================================================================
+
+  // Get the vector of IDs corresponding to the arguments to the underlying
+  // function, and the self parameter if there is one.
+  std::vector<unsigned> getArgIDs() {
+    std::vector<unsigned> argIDs;
+    for (SILArgument *arg : function->getArguments()) {
+      if (isNonSendableType(arg->getType())) {
+        argIDs.push_back(lookupNodeID(arg));
+      }
+    }
+    if (function->hasSelfParam() &&
+        isNonSendableType(function->getSelfArgument()->getType())) {
+      argIDs.push_back(lookupNodeID(function->getSelfArgument()));
+    }
+    return argIDs;
+  }
 
 public:
+  // create a new PartitionOpTranslator, all that's needed is the underlying
+  // SIL function
   PartitionOpTranslator(SILFunction *function) :
       function(function),
       sendableProtocol(function->getASTContext()
@@ -129,18 +201,23 @@ public:
   // arguments get IDs in doing so. This Partition will be used as the
   // entry point for the full partition analysis.
   Partition getEntryPartition() {
-    std::vector<unsigned> entryIDs;
-    for (SILArgument *arg : function->getArguments()) {
-      if (isNonSendableType(arg->getType())) {
-        entryIDs.push_back(lookupNodeID(arg));
-      }
-    }
-    if (function->hasSelfParam() &&
-        isNonSendableType(function->getSelfArgument()->getType())) {
-      entryIDs.push_back(lookupNodeID(function->getSelfArgument()));
-    }
-    return Partition::singleRegion(entryIDs);
+    return Partition::singleRegion(getArgIDs());
   }
+
+  // Get the vector of IDs that cannot be legally consumed at any point in
+  // this function. Since we place all args and self in a single region right
+  // now, it is only necessary to choose a single representative of the set.
+  std::vector<unsigned> getNonConsumables() {
+    if (const auto &argIDs = getArgIDs(); !argIDs.empty()) {
+      return {argIDs.front()};
+    }
+    return {};
+  }
+
+  // ===========================================================================
+  // The following section of functions wrap the more primitive Assign, Require,
+  // Merge, etc functions that generate PartitionOps with more logic common to
+  // the translations from source-level SILInstructions.
 
   std::vector<PartitionOp> translateSILApply(const SILInstruction *applyInst) {
     // accumulates the non-Sendable operands to this apply, include self and
@@ -201,13 +278,31 @@ public:
     return translated;
   }
 
-  std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
+  std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src,
+                                              bool projecting = false) {
     // no work to be done if assignment is to a Sendable target
     if (!isNonSendable(tgt))
       return {};
 
     if (isNonSendable(src)) {
-      return {Assign(tgt, src)};
+      // non-Sendable source and target of assignment
+
+      std::vector<PartitionOp> ops = {};
+      if (auto projected = getProjection(tgt))
+        ops = translateSILAssign(projected.value(), src);
+
+      //perform the assignment itself
+      ops.push_back(Assign(tgt, src));
+
+      // transfer any projections of the source to the target;
+      if (auto src_projected = getProjection(src))
+        addProjection(tgt, src_projected.value());
+
+      // add a projection if requested by the call
+      if (projecting)
+        addProjection(tgt, src);
+
+      return ops;
     }
 
     // a non-Sendable value is extracted from a Sendable value,
@@ -225,24 +320,47 @@ public:
     return {};
   }
 
+  std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
+    if (isNonSendable(fst) && isNonSendable(snd)) {
+      return {Merge(fst, snd)};
+    }
+    return {};
+  }
+
+  std::vector<PartitionOp> translateSILRequire(SILValue val) {
+    if (isNonSendable(val)) {
+      return {Require(val)};
+    }
+    return {};
+  }
+  // ===========================================================================
+
   // Some SILInstructions contribute to the partition of non-Sendable values
   // being analyzed. translateSILInstruction translate a SILInstruction
-  // to its effect on the non-Sendable partition, if it has one
+  // to its effect on the non-Sendable partition, if it has one.
+  //
+  // The current pattern of
   std::vector<PartitionOp> translateSILInstruction(SILInstruction *instruction) {
     currentInstruction = instruction;
 
+    // The following instructions are treated as assigning their result to a
+    // fresh region.
     if (isa<AllocRefInst,
             AllocStackInst,
             LiteralInst>(instruction)) {
       return translateSILAssignFresh(instruction->getResult(0));
     }
 
-    // the following instructions are treated as assignments
+    // The following instructions are treated as assignments that are NOT
+    // projections - this means that stores and other writes to their result
+    // don't need to be written through to their operand. This could be because
+    // the result is fundamentally a different value than the operand
+    // (e.g. CopyValueInst, LoadInst, IndexAddrInst) or because the operand
+    // is unusable once the result is defined (e.g. the unchecked casts)
     if (isa<AddressToPointerInst,
-            BeginAccessInst,
-            BeginBorrowInst,
             CopyValueInst,
             ConvertEscapeToNoEscapeInst,
+            ConvertFunctionInst,
             IndexAddrInst,
             LoadInst,
             LoadBorrowInst,
@@ -252,35 +370,56 @@ public:
             StrongCopyUnownedValueInst,
             TailAddrInst,
             UncheckedAddrCastInst,
+            UncheckedOwnershipConversionInst,
             UncheckedRefCastInst>(instruction)) {
       return translateSILAssign(
           instruction->getResult(0),
           instruction->getOperand(0));
     }
 
+    // The following instructions are treated as projecting assignments -
+    // this means that stores and other writes to their result need to be
+    // written through to their operand. So far, all instances in which this is
+    // necessary are shallow and temporary - meaning the projection eventually
+    // goes out of scope, and the projection can't itself be projected.
+    if (isa<BeginAccessInst,
+            BeginBorrowInst,
+            InitExistentialAddrInst>(instruction)) {
+      return translateSILAssign(
+          instruction->getResult(0),
+          instruction->getOperand(0),
+          /*projecting=*/ true);
+    }
+
+    // The following instructions are treated as non-projecting assignments,
+    // but between their two operands instead of their operand and result.
     if (isa<CopyAddrInst,
-        ExplicitCopyAddrInst>(instruction)) {
+        ExplicitCopyAddrInst,
+            StoreInst,
+            StoreBorrowInst,
+            StoreWeakInst>(instruction)) {
       return translateSILAssign(
           instruction->getOperand(1),
           instruction->getOperand(0));
     }
 
-    if (isa<StoreInst,
-        StoreBorrowInst,
-        StoreWeakInst>(instruction)) {
-      return {Merge(instruction->getOperand(0), instruction->getOperand(1))};
-    }
-
+    // Handle applications
     if (isa<ApplyInst, PartialApplyInst>(instruction)) {
       return translateSILApply(instruction);
     }
 
+    // Treat tuple desturction as a series of individual assignments
     if (auto destructTupleInst = dyn_cast<DestructureTupleInst>(instruction)) {
       std::vector<PartitionOp> translated;
       for (SILValue result : destructTupleInst->getResults())
         for (auto op : translateSILAssign(result, instruction->getOperand(0)))
           translated.push_back(op);
       return translated;
+    }
+
+    // Handle returns - require the operand to be non-consumed
+    if (auto *returnInst = dyn_cast<ReturnInst>(instruction)) {
+      return translateSILRequire(returnInst->getOperand());
     }
 
     return {};
@@ -320,6 +459,14 @@ public:
   }
 };
 
+// Instances of BlockPartitionState record all relevant state about a
+// SILBasicBlock for the region-based Sendable checking fixpoint analysis.
+// In particular, it records flags such as whether the block has been
+// reached by the analysis, whether the prior round indicated that this block
+// needs to be updated; it recorsd aux data such as the underlying basic block
+// and associated PartitionOpTranslator; and most importantly of all it includes
+// region partitions at entry and exit to this block - these are the stateful
+// component of the fixpoint analysis.
 class BlockPartitionState {
   friend class PartitionAnalysis;
 
@@ -365,15 +512,21 @@ class BlockPartitionState {
   // apply each PartitionOP in this block to the entry partition,
   // but this time pass in a handleFailure closure that can be used
   // to diagnose any failures
-  void diagnoseFailures(llvm::function_ref<void(const PartitionOp &, unsigned)> handleFailure) {
+  void diagnoseFailures(
+      llvm::function_ref<void(const PartitionOp&, unsigned)>
+          handleFailure,
+      llvm::function_ref<void(const PartitionOp&, unsigned)>
+          handleConsumeNonConsumable) {
     Partition workingPartition = entryPartition;
     for (auto &partitionOp : blockPartitionOps) {
-      workingPartition.apply(partitionOp, handleFailure);
+      workingPartition.apply(partitionOp, handleFailure,
+                             translator.getNonConsumables(),
+                             handleConsumeNonConsumable);
     }
   }
 
 public:
-  void dump() {
+  void dump() LLVM_ATTRIBUTE_USED {
     llvm::dbgs() << SEP_STR
                  << "BlockPartitionState[reached="
                  << reached
@@ -404,6 +557,12 @@ public:
   }
 };
 
+
+// Instances of PartitionAnalysis perform the region-based Sendable checking.
+// Internally, a PartitionOpTranslator is stored to perform the translation from
+// SILInstructions to PartitionOps, then a fixed point iteration is run to
+// determine the set of exit and entry partitions to each point satisfying
+// the flow equations.
 class PartitionAnalysis {
   PartitionOpTranslator translator;
   BasicBlockData<BlockPartitionState> blockStates;
@@ -492,27 +651,57 @@ class PartitionAnalysis {
     }
   }
 
+  // track the AST exprs that have already had diagnostics emitted about
+  llvm::DenseSet<Expr *> emittedExprs;
+
+  // check if a diagnostic has already been emitted about expr, only
+  // returns true false for each expr
+  bool hasBeenEmitted(Expr *expr) {
+    if (auto castExpr = dyn_cast<ImplicitConversionExpr>(expr))
+      return hasBeenEmitted(castExpr->getSubExpr());
+
+    if (emittedExprs.contains(expr)) return true;
+    emittedExprs.insert(expr);
+    return false;
+  }
+
+  // used for generating informative diagnostics
+  Expr *getExprForPartitionOp(const PartitionOp& op) {
+    SILInstruction *sourceInstr = op.getSourceInst();
+    assert(sourceInstr && "PartitionOps used in PartitionAnalysis should "
+                          "always have been generated with a sourceInst");
+    Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
+    assert(expr && "PartitionOp's source location should correspond to"
+                   "an AST node");
+    return expr;
+  }
+
   // once the fixpoint has been solved for, run one more pass over each basic
   // block, reporting any failures due to requiring consumed regions in the
   // fixpoint state
   void diagnose() {
     assert(solved && "diagnose should not be called before solve");
     for (auto [_, blockState] : blockStates) {
-      blockState.diagnoseFailures([&](
-          const PartitionOp & partitionOp, unsigned consumedVal) {
-        SILInstruction *sourceInstr = partitionOp.getSourceInst();
-        assert(sourceInstr && "PartitionOps used in PartitionAnalysis should "
-                              "always have been generated with a sourceInst");
-        function->getASTContext().Diags.diagnose(
-            sourceInstr->getLoc().getSourceLoc(),
-            diag::send_non_sendable, consumedVal);
-      });
+      blockState.diagnoseFailures(
+          /*handleFailure=*/
+          [&](const PartitionOp& partitionOp, unsigned consumedVal) {
+            auto expr = getExprForPartitionOp(partitionOp);
+            if (hasBeenEmitted(expr)) return;
+            function->getASTContext().Diags.diagnose(
+                expr->getLoc(), diag::consumed_value_used);
+          },
+          /*handleConsumeNonConsumable=*/
+          [&](const PartitionOp& partitionOp, unsigned consumedVal) {
+            auto expr = getExprForPartitionOp(partitionOp);
+            function->getASTContext().Diags.diagnose(
+                expr->getLoc(), diag::arg_region_consumed);
+          });
     }
   }
 
 public:
 
-  void dump() {
+  void dump() LLVM_ATTRIBUTE_USED {
     llvm::dbgs() << "\nPartitionAnalysis[fname=" << function->getName() << "]\n";
 
     for (auto [_, blockState] : blockStates) {
@@ -531,6 +720,9 @@ public:
   }
 };
 
+// this class is the entry point to the region-based Sendable analysis,
+// after certain checks are performed to ensure the analysis can be completed
+// a PartitionAnalysis object is created and used to run the analysis.
 class SendNonSendable : public SILFunctionTransform {
 
   // find any ApplyExprs in this function, and check if any of them make an

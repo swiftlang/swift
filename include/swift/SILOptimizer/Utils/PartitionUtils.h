@@ -9,15 +9,25 @@
 
 namespace swift {
 
+// PartitionOpKind represents the different kinds of PartitionOps that
+// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
   // Assign one value to the region of another, takes two args, second arg
   // must already be tracked with a non-consumed region
   Assign,
+
   // Assign one value to a fresh region, takes one arg.
   AssignFresh,
-  // Consume the region of a value, takes one arg
+
+  // Consume the region of a value, takes one arg. Region of arg must be
+  // non-consumed before the op.
   Consume,
+
+  // Merge the regions of two values, takes two args, both must be from
+  // non-consumed regions.
   Merge,
+
+  // Require the region of a value to be non-consumed, takes one arg.
   Require
 };
 
@@ -30,7 +40,7 @@ private:
   PartitionOpKind OpKind;
   llvm::SmallVector<unsigned, 2> OpArgs;
 
-  // record the SILInstruction that this PartitionOp was generated from, if
+  // Record the SILInstruction that this PartitionOp was generated from, if
   // generated during compilation from a SILBasicBlock
   SILInstruction *sourceInst;
 
@@ -75,7 +85,7 @@ public:
     return sourceInst;
   }
 
-  void dump() const {
+  void dump() const LLVM_ATTRIBUTE_USED {
     switch (OpKind) {
     case PartitionOpKind::Assign:
       llvm::dbgs() << "assign %" << OpArgs[0] << " = %" << OpArgs[1] << "\n";
@@ -110,6 +120,7 @@ static void horizontalUpdate(std::map<unsigned, signed> &map, unsigned key,
   }
 
   signed oldVal = map[key];
+  if (val == oldVal) return;
 
   for (auto [otherKey, otherVal] : map)
     if (otherVal == oldVal)
@@ -118,19 +129,48 @@ static void horizontalUpdate(std::map<unsigned, signed> &map, unsigned key,
 
 class Partition {
 private:
-  // label each index with a non-negative (unsigned) label if it is associated
+  // Label each index with a non-negative (unsigned) label if it is associated
   // with a valid region, and with -1 if it is associated with a consumed region
-  // in-order traversal relied upon
+  // in-order traversal relied upon.
   std::map<unsigned, signed> labels;
 
-  // track a label that is guaranteed to be fresh
+  // Track a label that is guaranteed to be strictly larger than all in use,
+  // and therefore safe for use as a fresh label.
   unsigned fresh_label = 0;
 
-  // in a canonical partition, all regions are labelled with the smallest index
+  // In a canonical partition, all regions are labelled with the smallest index
   // of any member. Certain operations like join and equals rely on canonicality
   // so when it's invalidated this boolean tracks that, and it must be
-  // reestablished by a call to canonicalize()
+  // reestablished by a call to canonicalize().
   bool canonical;
+
+  // Used only in assertions, check that Partitions promised to be canonical
+  // are actually canonical
+  bool is_canonical_correct() {
+    if (!canonical) return true; // vacuously correct
+
+    auto fail = [&](unsigned i, int type) {
+      llvm::dbgs() << "FAIL(i=" << i << "; type=" << type << "): ";
+      dump();
+      return false;
+    };
+
+    for (auto &[i, label] : labels) {
+      // correctness vacuous at consumed indices
+      if (label < 0) continue;
+
+      // this label should not exceed fresh_label
+      if (label >= fresh_label) return fail(i, 0);
+
+      // the label of a region should be at most as large as each index in it
+      if (i < label) return fail(i, 1);
+
+      // each region label should refer to an index in that region
+      if (labels[label] != label) return fail(i, 2);
+    }
+
+    return true;
+  }
 
   // linear time - For each region label that occurs, find the first index
   // at which it occurs and relabel all instances of it to that index.
@@ -163,10 +203,31 @@ private:
       // set fresh_label
       fresh_label = i + 1;
     }
+
+    assert(is_canonical_correct());
+  }
+
+  // linear time - merge the regions of two indices, maintaining canonicality
+  void merge(unsigned fst, unsigned snd) {
+    assert(labels.count(fst) && labels.count(snd));
+    if (labels[fst] == labels[snd])
+      return;
+
+    // maintain canonicality by renaming the greater-numbered region
+    if (labels[fst] < labels[snd])
+      horizontalUpdate(labels, snd, labels[fst]);
+    else
+      horizontalUpdate(labels, fst, labels[snd]);
+
+    assert(is_canonical_correct());
   }
 
 public:
   Partition() : labels({}), canonical(true) {}
+
+  // 1-arg constructor used when canonicality will be immediately invalidated,
+  // so set to false to begin with
+  Partition(bool canonical) : labels({}), canonical(canonical) {}
 
   static Partition singleRegion(std::vector<unsigned> indices) {
     Partition p;
@@ -177,17 +238,9 @@ public:
         p.labels[index] = min_index;
       }
     }
-    return p;
-  }
 
-  void dump() const {
-    llvm::dbgs() << "Partition";
-    if (canonical)
-      llvm::dbgs() << "(canonical)";
-    llvm::dbgs() << "{";
-    for (const auto &[i, label] : labels)
-      llvm::dbgs() << "[" << i << ": " << label << "] ";
-    llvm::dbgs() << "}\n";
+    assert(p.is_canonical_correct());
+    return p;
   }
 
   // linear time - Test two partititons for equality by first putting them
@@ -204,54 +257,52 @@ public:
   // and two indices are in the same region of the join iff they are in the same
   // region in either operand.
   static Partition join(Partition &fst, Partition &snd) {
-    fst.canonicalize();
-    snd.canonicalize();
+    //ensure copies are made
+    Partition fst_reduced = false;
+    Partition snd_reduced = false;
 
-    std::map<unsigned, signed> relabel_fst;
-    std::map<unsigned, signed> relabel_snd;
-    auto lookup_fst = [&](unsigned i) {
-      // signed to unsigned conversion... ?
-      return relabel_fst.count(fst.labels[i]) ? relabel_fst[fst.labels[i]]
-                                              : fst.labels[i];
-    };
+    // make canonical copies of fst and snd, reduced to their intersected domain
+    for (auto [i, _] : fst.labels)
+      if (snd.labels.count(i)) {
+        fst_reduced.labels[i] = fst.labels[i];
+        snd_reduced.labels[i] = snd.labels[i];
+      }
+    fst_reduced.canonicalize();
+    snd_reduced.canonicalize();
 
-    auto lookup_snd = [&](unsigned i) {
-      // signed to unsigned conversion... safe?
-      return relabel_snd.count(snd.labels[i]) ? relabel_snd[snd.labels[i]]
-                                              : snd.labels[i];
-    };
-
-    for (const auto &[i, _] : fst.labels) {
-      // only consider indices present in both fst and snd
-      if (!snd.labels.count(i))
-        continue;
-
-      signed label_joined = std::min(lookup_fst(i), lookup_snd(i));
-
-      horizontalUpdate(relabel_fst, fst.labels[i], label_joined);
-      horizontalUpdate(relabel_snd, snd.labels[i], label_joined);
+    // merging each index in fst with its label in snd ensures that all pairs
+    // of indices that are in the same region in snd are also in the same region
+    // in fst - the desired property
+    for (const auto [i, snd_label] : snd_reduced.labels) {
+      if (snd_label < 0)
+        // if snd says that the region has been consumed, mark it consumed in fst
+        horizontalUpdate(fst_reduced.labels, i, -1);
+      else
+        fst_reduced.merge(i, snd_label);
     }
 
-    Partition joined;
-    joined.canonical = true;
-    for (const auto &[i, _] : fst.labels) {
-      if (!snd.labels.count(i))
-        continue;
-      signed label_i = lookup_fst(i);
-      joined.labels[i] = label_i;
-      joined.fresh_label = std::max(joined.fresh_label, (unsigned) label_i + 1);
-    }
+    assert(fst_reduced.is_canonical_correct());
 
-    return joined;
+    // fst_reduced is now the join
+    return fst_reduced;
   }
 
   // Apply the passed PartitionOp to this partition, performing its action.
   // A `handleFailure` closure can optionally be passed in that will be called
   // if a consumed region is required. The closure is given the PartitionOp that
   // failed, and the index of the SIL value that was required but consumed.
+  // Additionally, a list of "nonconsumable" indices can be passed in along with
+  // a handleConsumeNonConsumable closure. In the event that a region containing
+  // one of the nonconsumable indices is consumed, the closure will be called
+  // with the offending Consume.
   void apply(
-      PartitionOp op, llvm::function_ref<void(const PartitionOp&, unsigned)> handleFailure =
-                          [](const PartitionOp&, unsigned) {}) {
+      PartitionOp op,
+      llvm::function_ref<void(const PartitionOp&, unsigned)>
+      handleFailure = [](const PartitionOp&, unsigned) {},
+      std::vector<unsigned> nonconsumables = {},
+      llvm::function_ref<void(const PartitionOp&, unsigned)>
+      handleConsumeNonConsumable = [](const PartitionOp&, unsigned) {}
+  ) {
     switch (op.OpKind) {
     case PartitionOpKind::Assign:
       assert(op.OpArgs.size() == 2 &&
@@ -290,6 +341,19 @@ public:
 
       // mark region as consumed
       horizontalUpdate(labels, op.OpArgs[0], -1);
+
+      // check if any nonconsumables were consumed, and handle the failure if so
+      for (unsigned nonconsumable : nonconsumables) {
+        assert(labels.count(nonconsumable) &&
+               "nonconsumables should be function args and self, and therefore"
+               "always present in the label map because of initialization at "
+               "entry");
+        if (labels[nonconsumable] < 0) {
+          handleConsumeNonConsumable(op, nonconsumable);
+          break;
+        }
+      }
+
       break;
     case PartitionOpKind::Merge:
       assert(op.OpArgs.size() == 2 &&
@@ -302,14 +366,7 @@ public:
       if (labels[op.OpArgs[1]] < 0)
           handleFailure(op, op.OpArgs[1]);
 
-      if (labels[op.OpArgs[0]] == labels[op.OpArgs[1]])
-        break;
-
-      // maintain canonicality by renaming the greater-numbered region
-      if (labels[op.OpArgs[0]] < labels[op.OpArgs[1]])
-        horizontalUpdate(labels, op.OpArgs[1], labels[op.OpArgs[0]]);
-      else
-        horizontalUpdate(labels, op.OpArgs[0], labels[op.OpArgs[1]]);
+      merge(op.OpArgs[0], op.OpArgs[1]);
       break;
     case PartitionOpKind::Require:
       assert(op.OpArgs.size() == 1 &&
@@ -319,9 +376,21 @@ public:
       if (labels[op.OpArgs[0]] < 0)
         handleFailure(op, op.OpArgs[0]);
     }
+
+    assert(is_canonical_correct());
   }
 
-  void dump() {
+  void dump_labels() const LLVM_ATTRIBUTE_USED {
+    llvm::dbgs() << "Partition";
+    if (canonical)
+      llvm::dbgs() << "(canonical)";
+    llvm::dbgs() << "(fresh=" << fresh_label << "){";
+    for (const auto &[i, label] : labels)
+      llvm::dbgs() << "[" << i << ": " << label << "] ";
+    llvm::dbgs() << "}\n";
+  }
+
+  void dump() LLVM_ATTRIBUTE_USED {
     std::map<signed, std::vector<unsigned>> buckets;
 
     for (auto [i, label] : labels) {
@@ -331,12 +400,15 @@ public:
     llvm::dbgs() << "[";
     for (auto [label, indices] : buckets) {
       llvm::dbgs() << (label < 0 ? "{" : "(");
+      int j = 0;
       for (unsigned i : indices) {
-        llvm::dbgs() << i << " ";
+        llvm::dbgs() << (j++? " " : "") << i;
       }
       llvm::dbgs() << (label < 0 ? "}" : ")");
     }
-    llvm::dbgs() << "]\n";
+    llvm::dbgs() << "] | ";
+
+    dump_labels();
   }
 };
 }
