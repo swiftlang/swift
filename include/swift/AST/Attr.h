@@ -1623,6 +1623,9 @@ public:
     return {getTrailingObjects<Identifier>() + NumInitializes, NumAccesses};
   }
 
+  ArrayRef<VarDecl *> getInitializesProperties(AccessorDecl *attachedTo) const;
+  ArrayRef<VarDecl *> getAccessesProperties(AccessorDecl *attachedTo) const;
+
   static StorageRestrictionsAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                          SourceRange range,
                                          ArrayRef<Identifier> initializes,

@@ -524,6 +524,9 @@ do {
 
 func test_invalid_storage_restrictions() {
   struct Test {
+    var _a: Int
+    var _b: Int
+
     var a: Int {
       @storageRestrictions()
       // expected-error@-1 {{missing label in @storageRestrictions attribute}}
@@ -552,6 +555,18 @@ func test_invalid_storage_restrictions() {
       @storageRestrictions(initialize: a, b, accesses: c, d)
       // expected-error@-1 {{unexpected label 'initialize' in @storageRestrictions attribute}}
       init {}
+    }
+
+    var f: Int {
+      @storageRestrictions(initializes: _a, accesses: _b, _a)
+      // expected-error@-1 {{property '_a' cannot be both initialized and accessed}}
+      init {}
+    }
+
+    var g: Int {
+      @storageRestrictions(initializes: _a)
+      // expected-error@-1 {{@storageRestrictions attribute could only be used with init accessors}}
+      get { 0 }
     }
   }
 }
