@@ -296,6 +296,7 @@ public:
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitInitializesAttr(InitializesAttr *attr);
   void visitAccessesAttr(AccessesAttr *attr);
+  void visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
 
@@ -3587,6 +3588,9 @@ void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
       }
     }
   }
+}
+
+void AttributeChecker::visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr) {
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
