@@ -1498,52 +1498,51 @@ struct CopiedLoadBorrowEliminationVisitor final
 } // namespace
 
 //===----------------------------------------------------------------------===//
-//                  MARK: DestructureThroughDeinit Checking
+//                   MARK: Partial Consume/Reinit Checking
 //===----------------------------------------------------------------------===//
+
+namespace {
 
 /// When partial consumption is enabled, we only allow for destructure through
 /// deinits. When partial consumption is disabled, we error on /all/ partial
 /// consumption.
-static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
-                                TypeTreeLeafTypeRange usedBits,
-                                DiagnosticEmitter &diagnosticEmitter) {
-  LLVM_DEBUG(llvm::dbgs() << "    DestructureNeedingUse: " << *use->getUser());
+enum class IsPartialConsumeOrReinit_t {
+  IsPartialConsume,
+  IsPartialReinit,
+};
 
-  SILFunction *fn = rootAddress->getFunction();
+} // namespace
 
-  // We walk down from our ancestor to our projection, emitting an error if any
-  // of our types have a deinit.
+static std::pair<SILType, NominalTypeDecl *>
+shouldEmitPartialError(UseState &useState, SILInstruction *user,
+                       SILType useType, TypeTreeLeafTypeRange usedBits) {
+  SILFunction *fn = useState.getFunction();
+
+  // We walk down from our ancestor to our projection, emitting an error if
+  // any of our types have a deinit.
+  auto iterType = useState.address->getType();
+  if (iterType.isMoveOnlyWrapped())
+    return {SILType(), nullptr};
+
   TypeOffsetSizePair pair(usedBits);
-  auto targetType = use->get()->getType();
-  auto iterType = rootAddress->getType();
+  auto targetType = useType;
   TypeOffsetSizePair iterPair(iterType, fn);
 
-  // If our rootAddress is moveonlywrapped, then we know that it must be
-  // copyable under the hood meanign that we copy its fields rather than
-  // destructure the fields.
-  if (iterType.isMoveOnlyWrapped())
-    return;
+  LLVM_DEBUG(llvm::dbgs() << "    Iter Type: " << iterType << '\n'
+                          << "    Target Type: " << targetType << '\n');
 
-  // If we are not allowing for any partial consumption, just emit an error
-  // immediately.
-  if (!rootAddress->getModule().getASTContext().LangOpts.hasFeature(
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
           Feature::MoveOnlyPartialConsumption)) {
+    LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption disabled!\n");
     // If the types equal, just bail early.
-    if (iterType == targetType)
-      return;
-
-    // Otherwise, build up the path string and emit the error.
-    SmallString<128> pathString;
-    auto rootType = rootAddress->getType();
-    if (iterType != rootType) {
-      llvm::raw_svector_ostream os(pathString);
-      pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
+    if (iterType == targetType) {
+      LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
+                                 "without emitting error!\n");
+      return {SILType(), nullptr};
     }
 
-    diagnosticEmitter.emitCannotDestructureNominalError(
-        rootAddress, pathString, nullptr /*nominal*/, use->getUser(),
-        false /*is for deinit error*/);
-    return;
+    // Emit the error.
+    return {iterType, nullptr};
   }
 
   // Otherwise, walk the type looking for the deinit.
@@ -1558,17 +1557,7 @@ static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
         // actual projection string.
-        SmallString<128> pathString;
-        auto rootType = rootAddress->getType();
-        if (iterType != rootType) {
-          llvm::raw_svector_ostream os(pathString);
-          pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
-        }
-
-        diagnosticEmitter.emitCannotDestructureNominalError(
-            rootAddress, pathString, nom, use->getUser(),
-            true /*is for deinit error*/);
-        break;
+        return {iterType, nom};
       }
     }
 
@@ -1577,6 +1566,63 @@ static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
     std::tie(iterPair, iterType) =
         *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
   }
+
+  return {SILType(), nullptr};
+}
+
+static void
+checkForPartialConsume(UseState &useState, DiagnosticEmitter &diagnosticEmitter,
+                       SILInstruction *user, SILType useType,
+                       TypeTreeLeafTypeRange usedBits,
+                       IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
+  SILFunction *fn = useState.getFunction();
+
+  // We walk down from our ancestor to our projection, emitting an error if
+  // any of our types have a deinit.
+  TypeOffsetSizePair pair(usedBits);
+  SILType errorIterType;
+  NominalTypeDecl *nom;
+  std::tie(errorIterType, nom) =
+      shouldEmitPartialError(useState, user, useType, usedBits);
+  if (!errorIterType)
+    return;
+
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
+          Feature::MoveOnlyPartialConsumption)) {
+    // Otherwise, build up the path string and emit the error.
+    SmallString<128> pathString;
+    auto rootType = useState.address->getType();
+    if (errorIterType != rootType) {
+      llvm::raw_svector_ostream os(pathString);
+      pair.constructPathString(errorIterType, {rootType, fn}, rootType, fn, os);
+    }
+
+    diagnosticEmitter.emitCannotPartiallyConsumeError(
+        useState.address, pathString, nullptr /*nominal*/, user,
+        false /*deinit only*/);
+    return;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
+
+  SmallString<128> pathString;
+  auto rootType = useState.address->getType();
+  if (errorIterType != rootType) {
+    llvm::raw_svector_ostream os(pathString);
+    pair.constructPathString(errorIterType, {rootType, fn}, rootType, fn, os);
+  }
+
+  diagnosticEmitter.emitCannotPartiallyConsumeError(
+      useState.address, pathString, nom, user, true /*deinit only*/);
+}
+
+static void
+checkForPartialConsume(UseState &useState, DiagnosticEmitter &diagnosticEmitter,
+                       Operand *op, TypeTreeLeafTypeRange usedBits,
+                       IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
+  return checkForPartialConsume(useState, diagnosticEmitter, op->getUser(),
+                                op->get()->getType(), usedBits,
+                                isPartialConsumeOrReinit);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1778,7 +1824,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // If we have a copy_addr, we are either going to have a take or a
     // copy... in either case, this copy_addr /is/ going to be a consuming
     // operation. Make sure to check if we semantically destructure.
-    checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+    checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
+                           IsPartialConsumeOrReinit_t::IsPartialConsume);
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -1965,7 +2012,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     } else {
       // Now that we know that we are going to perform a take, perform a
       // checkForDestructure.
-      checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+      checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
+                             IsPartialConsumeOrReinit_t::IsPartialConsume);
 
       // If we emitted an error diagnostic, do not transform further and instead
       // mark that we emitted an early diagnostic and return true.
@@ -2020,7 +2068,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // error.
     unsigned numDiagnostics =
         moveChecker.diagnosticEmitter.getDiagnosticCount();
-    checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+    checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
+                           IsPartialConsumeOrReinit_t::IsPartialConsume);
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");

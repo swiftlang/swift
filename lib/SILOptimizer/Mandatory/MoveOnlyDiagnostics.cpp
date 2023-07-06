@@ -845,9 +845,9 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
   }
 }
 
-void DiagnosticEmitter::emitCannotDestructureDeinitNominalError(
+void DiagnosticEmitter::emitCannotPartiallyConsumeError(
     MarkMustCheckInst *markedValue, StringRef pathString,
-    NominalTypeDecl *deinitedNominal, SILInstruction *consumingUser) {
+    NominalTypeDecl *nominal, SILInstruction *consumingUser, bool isForDeinit) {
   auto &astContext = fn->getASTContext();
 
   SmallString<64> varName;
@@ -856,15 +856,30 @@ void DiagnosticEmitter::emitCannotDestructureDeinitNominalError(
   if (!pathString.empty())
     varName.append(pathString);
 
-  diagnose(
-      astContext, consumingUser,
-      diag::sil_movechecking_cannot_destructure_has_deinit,
-      varName);
+  bool hasPartialConsumption =
+      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
+  (void)hasPartialConsumption;
+
+  if (isForDeinit) {
+    assert(hasPartialConsumption);
+    diagnose(astContext, consumingUser,
+             diag::sil_movechecking_cannot_destructure_has_deinit, varName);
+
+  } else {
+    assert(!hasPartialConsumption);
+    diagnose(astContext, consumingUser,
+             diag::sil_movechecking_cannot_destructure, varName);
+  }
+
   registerDiagnosticEmitted(markedValue);
 
-  // point to the deinit if we know where it is.
+  if (!isForDeinit)
+    return;
+
+  // Point to the deinit if we know where it is.
+  assert(nominal);
   if (auto deinitLoc =
-      deinitedNominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
+          nominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
     astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
 }
 
