@@ -6421,6 +6421,38 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
       ctx.evaluator, HasCircularInheritedProtocolsRequest{mutableThis}, true);
 }
 
+/// Returns a descriptive name for the given accessor/addressor kind.
+StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
+                                              bool article) {
+  switch (accessorKind) {
+  case AccessorKind::Get:
+    return article ? "a getter" : "getter";
+  case AccessorKind::Set:
+    return article ? "a setter" : "setter";
+  case AccessorKind::Address:
+    return article ? "an addressor" : "addressor";
+  case AccessorKind::MutableAddress:
+    return article ? "a mutable addressor" : "mutable addressor";
+  case AccessorKind::Read:
+    return article ? "a 'read' accessor" : "'read' accessor";
+  case AccessorKind::Modify:
+    return article ? "a 'modify' accessor" : "'modify' accessor";
+  case AccessorKind::WillSet:
+    return "'willSet'";
+  case AccessorKind::DidSet:
+    return "'didSet'";
+  case AccessorKind::Init:
+    return article ? "an init accessor" : "init accessor";
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
+StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
+                                              bool article) {
+  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
+                                      article);
+}
+
 bool AbstractStorageDecl::hasStorage() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -6488,7 +6520,8 @@ void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
   auto record = Accessors.getPointer();
   if (record) {
     for (auto accessor : accessors) {
-      (void) record->addOpaqueAccessor(accessor);
+      if (!record->getAccessor(accessor->getAccessorKind()))
+        (void) record->addOpaqueAccessor(accessor);
     }
   } else {
     record = AccessorRecord::create(getASTContext(),
@@ -6580,6 +6613,27 @@ void AbstractStorageDecl::AccessorRecord::addOpaqueAccessor(AccessorDecl *decl){
   bool isUnique = registerAccessor(decl, index);
   assert(isUnique && "adding opaque accessor that's already present");
   (void) isUnique;
+}
+
+void AbstractStorageDecl::AccessorRecord::removeAccessor(
+    AccessorDecl *accessor
+) {
+  // Remove this accessor from the list of accessors.
+  assert(getAccessor(accessor->getAccessorKind()) == accessor);
+  std::remove(getAccessorsBuffer().begin(), getAccessorsBuffer().end(),
+              accessor);
+
+  // Clear out the accessor kind -> index mapping.
+  std::memset(AccessorIndices, 0, sizeof(AccessorIndices));
+
+  // Re-add all of the remaining accessors to build up the index mapping.
+  unsigned numAccessorsLeft = NumAccessors - 1;
+  NumAccessors = numAccessorsLeft;
+  auto buffer = getAccessorsBuffer();
+  NumAccessors = 0;
+  for (auto index : range(0, numAccessorsLeft)) {
+    addOpaqueAccessor(buffer[index]);
+  }
 }
 
 /// Register that we have an accessor of the given kind.
