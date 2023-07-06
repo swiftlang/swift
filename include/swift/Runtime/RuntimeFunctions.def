@@ -2346,6 +2346,17 @@ FUNCTION(EnumSimpleGetEnumTag,
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect))
 
+// unsigned swift_enumSimple_destructiveInjectEnumTag(swift::OpaqueValue *address,
+//                                                    unsigned tag,
+//                                                    const Metadata *metadata)
+FUNCTION(EnumSimpleDestructiveInjectEnumTag,
+         swift_enumSimple_destructiveInjectEnumTag,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(NoEffect))
+
 // unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
 //                                  const Metadata *metadata);
 FUNCTION(EnumFnGetEnumTag,
