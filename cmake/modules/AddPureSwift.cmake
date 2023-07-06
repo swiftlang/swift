@@ -179,6 +179,13 @@ function(add_pure_swift_host_library name)
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
     ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    
+  target_compile_options("${name}" PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:
+      -Xfrontend -enable-experimental-cxx-interop
+      "SHELL:-Xcc -std=c++17"
+      "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+    >)
 
   if(APSHL_EMIT_MODULE)
     # Determine where Swift modules will be built and installed.
