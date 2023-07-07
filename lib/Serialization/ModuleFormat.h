@@ -2061,6 +2061,14 @@ namespace decls_block {
     BCVBR<8>    // alignment
   >;
   
+  using RawLayoutDeclAttrLayout = BCRecordLayout<
+    RawLayout_DECL_ATTR,
+    BCFixed<1>, // implicit
+    TypeIDField, // like type
+    BCVBR<32>, // size
+    BCVBR<8> // alignment
+  >;
+  
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
     SwiftNativeObjCRuntimeBase_DECL_ATTR,
     BCFixed<1>, // implicit flag

@@ -63,43 +63,137 @@ StructLayout::StructLayout(IRGenModule &IGM,
     builder.addHeapHeader();
   }
 
-  bool nonEmpty = builder.addFields(Elements, strategy);
-
   auto deinit = (decl && decl->getValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = (decl && decl->isMoveOnly())
     ? IsNotCopyable : IsCopyable;
 
-  // Special-case: there's nothing to store.
-  // In this case, produce an opaque type;  this tends to cause lovely
-  // assertions.
-  if (!nonEmpty) {
-    assert(!builder.empty() == requiresHeapHeader(layoutKind));
-    MinimumAlign = Alignment(1);
-    MinimumSize = Size(0);
-    headerSize = builder.getHeaderSize();
-    SpareBits.clear();
-    IsFixedLayout = true;
+  // Handle a raw layout specification on a struct.
+  RawLayoutAttr *rawLayout = nullptr;
+  if (decl) {
+    rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+  }
+  if (rawLayout) {
     IsKnownTriviallyDestroyable = deinit;
     IsKnownBitwiseTakable = IsBitwiseTakable;
-    IsKnownAlwaysFixedSize = IsFixedSize;
+    SpareBits.clear();
+    assert(!copyable);
     IsKnownCopyable = copyable;
-    Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
-  } else {
-    MinimumAlign = builder.getAlignment();
-    MinimumSize = builder.getSize();
-    headerSize = builder.getHeaderSize();
-    SpareBits = builder.getSpareBits();
-    IsFixedLayout = builder.isFixedLayout();
-    IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
-    IsKnownBitwiseTakable = builder.isBitwiseTakable();
-    IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
-    IsKnownCopyable = copyable & builder.isCopyable();
-    if (typeToFill) {
-      builder.setAsBodyOfStruct(typeToFill);
-      Ty = typeToFill;
+    assert(builder.getHeaderSize() == Size(0));
+    headerSize = Size(0);
+
+    auto &Diags = IGM.Context.Diags;
+    // Fixed size and alignment specified.
+    if (auto sizeAndAlign = rawLayout->getSizeAndAlignment()) {
+      auto size = Size(sizeAndAlign->first);
+      auto requestedAlignment = Alignment(sizeAndAlign->second);
+      MinimumAlign = IGM.getCappedAlignment(requestedAlignment);
+      if (requestedAlignment > MinimumAlign) {
+        Diags.diagnose(rawLayout->getLocation(),
+                       diag::alignment_more_than_maximum,
+                       MinimumAlign.getValue());
+      }
+      
+      MinimumSize = size;
+      SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
+      IsFixedLayout = true;
+      IsKnownAlwaysFixedSize = IsFixedSize;
+    } else if (auto likeType = rawLayout->getResolvedScalarLikeType()) {
+      const TypeInfo &likeTypeInfo
+        = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(),
+                                      *likeType);
+                                      
+      // Take layout attributes from the like type.
+      if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
+        MinimumSize = likeFixedType->getFixedSize();
+        SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
+        MinimumAlign = likeFixedType->getFixedAlignment();
+        IsFixedLayout = true;
+        IsKnownAlwaysFixedSize = IsFixedSize;
+      } else {
+        MinimumSize = Size(0);
+        MinimumAlign = Alignment(1);
+        IsFixedLayout = false;
+        IsKnownAlwaysFixedSize = IsNotFixedSize;
+      }
+    } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount()) {
+      auto elementType = likeArray->first;
+      unsigned count = likeArray->second;
+      
+      const TypeInfo &likeTypeInfo
+        = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(),
+                                      elementType);
+      
+      // Take layout attributes from the like type.
+      if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
+        MinimumSize = likeFixedType->getFixedStride() * count;
+        SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
+        MinimumAlign = likeFixedType->getFixedAlignment();
+        IsFixedLayout = true;
+        IsKnownAlwaysFixedSize = IsFixedSize;
+      } else {
+        MinimumSize = Size(0);
+        MinimumAlign = Alignment(1);
+        IsFixedLayout = false;
+        IsKnownAlwaysFixedSize = IsNotFixedSize;
+      }
     } else {
-      Ty = builder.getAsAnonStruct();
+      llvm_unreachable("unhandled raw layout variant?");
+    }
+    
+    // Set the LLVM struct type for a fixed layout according to the stride and
+    // alignment we determined.
+    if (IsKnownAlwaysFixedSize) {
+      auto eltTy = llvm::IntegerType::get(IGM.getLLVMContext(), 8);
+      auto bodyTy = llvm::ArrayType::get(eltTy, MinimumSize.getValue());
+      if (typeToFill) {
+        typeToFill->setBody(bodyTy, /*packed*/ true);
+        Ty = typeToFill;
+      } else {
+        Ty = llvm::StructType::get(IGM.getLLVMContext(), bodyTy, /*packed*/ true);
+      }
+    } else {
+      Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
+      
+      // TODO: For types with dependent layout, the metadata initialization also
+      // has to be updated to account for the raw layout description.
+      Diags.diagnose(rawLayout->getLocation(),
+                     diag::raw_layout_dynamic_type_layout_unsupported);
+    }
+  } else {
+    bool nonEmpty = builder.addFields(Elements, strategy);
+
+    // Special-case: there's nothing to store.
+    // In this case, produce an opaque type;  this tends to cause lovely
+    // assertions.
+    if (!nonEmpty) {
+      assert(!builder.empty() == requiresHeapHeader(layoutKind));
+      MinimumAlign = Alignment(1);
+      MinimumSize = Size(0);
+      headerSize = builder.getHeaderSize();
+      SpareBits.clear();
+      IsFixedLayout = true;
+      IsKnownTriviallyDestroyable = deinit;
+      IsKnownBitwiseTakable = IsBitwiseTakable;
+      IsKnownAlwaysFixedSize = IsFixedSize;
+      IsKnownCopyable = copyable;
+      Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
+    } else {
+      MinimumAlign = builder.getAlignment();
+      MinimumSize = builder.getSize();
+      headerSize = builder.getHeaderSize();
+      SpareBits = builder.getSpareBits();
+      IsFixedLayout = builder.isFixedLayout();
+      IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
+      IsKnownBitwiseTakable = builder.isBitwiseTakable();
+      IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
+      IsKnownCopyable = copyable & builder.isCopyable();
+      if (typeToFill) {
+        builder.setAsBodyOfStruct(typeToFill);
+        Ty = typeToFill;
+      } else {
+        Ty = builder.getAsAnonStruct();
+      }
     }
   }
 
@@ -122,6 +216,8 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
   auto &Diags = IGM.Context.Diags;
 
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
+    assert(!decl->getAttrs().hasAttribute<RawLayoutAttr>()
+           && "_alignment and _rawLayout not supported together");
     auto value = alignment->getValue();
     assert(value != 0 && ((value - 1) & value) == 0
            && "alignment not a power of two!");

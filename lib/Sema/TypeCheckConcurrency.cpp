@@ -1111,6 +1111,13 @@ namespace {
   llvm::Optional<bool>
   inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
                                    SmallVectorImpl<Requirement> &requirements) {
+    // Raw storage is assumed not to be sendable.
+    if (auto sd = dyn_cast<StructDecl>(nominal)) {
+      if (sd->getAttrs().hasAttribute<RawLayoutAttr>()) {
+        return true;
+      }
+    }
+      
     struct Visitor {
       NominalTypeDecl *nominal;
       SmallVectorImpl<Requirement> &requirements;
@@ -4609,6 +4616,21 @@ namespace {
 /// it is comprised only of Sendable instance storage.
 static bool checkSendableInstanceStorage(
     NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check) {
+  // Raw storage is assumed not to be sendable.
+  if (auto sd = dyn_cast<StructDecl>(nominal)) {
+    if (auto rawLayout = sd->getAttrs().getAttribute<RawLayoutAttr>()) {
+      auto behavior = SendableCheckContext(
+            dc, check).defaultDiagnosticBehavior();
+      if (!isImplicitSendableCheck(check)
+          && SendableCheckContext(dc, check)
+               .defaultDiagnosticBehavior() != DiagnosticBehavior::Ignore) {
+        sd->diagnose(diag::sendable_raw_storage, sd->getName())
+          .limitBehavior(behavior);
+      }
+      return true;
+    }
+  }
+
   // Stored properties of structs and classes must have
   // Sendable-conforming types.
   struct Visitor {
