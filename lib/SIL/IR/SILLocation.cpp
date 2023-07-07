@@ -184,12 +184,12 @@ DeclContext *SILLocation::getAsDeclContext() const {
   return nullptr;
 }
 
-SILLocation::FilenameAndLocation SILLocation::decode(SourceLoc Loc,
-                                              const SourceManager &SM,
-                                              bool ForceGeneratedSourceToDisk) {
+SILLocation::FilenameAndLocation
+SILLocation::decode(SourceLoc Loc, const SourceManager &SM,
+                    MacroExpansionOptions MacroExpansionOpts) {
   FilenameAndLocation DL;
   if (Loc.isValid()) {
-    DL.filename = SM.getDisplayNameForLoc(Loc, ForceGeneratedSourceToDisk);
+    DL.filename = SM.getDisplayNameForLoc(Loc, MacroExpansionOpts);
     std::tie(DL.line, DL.column) = SM.getPresumedLineAndColumnForLoc(Loc);
   }
   return DL;

@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "swift/Basic/MacroExpansionOptions.h"
 #include "llvm/ADT/Hashing.h"
 
 namespace swift {
@@ -73,8 +74,8 @@ public:
   /// descriptive style that's specific to Swift (currently experimental).
   FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
 
-  /// Whether to emit macro expansion buffers into separate, temporary files.
-  bool EmitMacroExpansionFiles = true;
+  /// Whether, and where, to emit macro expansion buffers into separate files.
+  MacroExpansionOptions MacroExpansionOpts = {true, ""};
 
   std::string DiagnosticDocumentationPath = "";
 
