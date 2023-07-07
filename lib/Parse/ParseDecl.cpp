@@ -3696,7 +3696,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
 
       argList = ArgumentList::createParsed(
           Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
-          /*trailingClosureIdx=*/None);
+          /*trailingClosureIdx=*/llvm::None);
       status.setHasCodeCompletionAndIsError();
     } else {
       // If we have no local context to parse the initial value into, create

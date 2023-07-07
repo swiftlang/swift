@@ -5324,10 +5324,11 @@ public:
   /// solution application target within the context.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(
-      Solution &solution, TapExpr *tapExpr, DeclContext *&currentDC,
-      std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
-          rewriteTarget);
+  bool applySolutionToBody(Solution &solution, TapExpr *tapExpr,
+                           DeclContext *&currentDC,
+                           std::function<llvm::Optional<SyntacticElementTarget>(
+                               SyntacticElementTarget)>
+                               rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

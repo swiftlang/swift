@@ -201,7 +201,7 @@ protected:
         // A statement that doesn't contain the code completion expression can't
         // influence the type of the code completion expression, so we can skip
         // it to improve performance.
-        return None;
+        return llvm::None;
       }
 
       auto result = visit(stmt, resultVar);
