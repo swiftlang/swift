@@ -5114,6 +5114,15 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // If this is a C++ record, look through any base classes.
   if (auto cxxRecord =
           dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+    // Capture the arity of already found members in the
+    // current record, to avoid adding ambiguous members
+    // from base classes.
+    const auto getArity =
+        ClangImporter::Implementation::getImportedBaseMemberDeclArity;
+    llvm::SmallSet<size_t, 4> foundNameArities;
+    for (const auto *valueDecl : result)
+      foundNameArities.insert(getArity(valueDecl));
+
     for (auto base : cxxRecord->bases()) {
       if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
         continue;
@@ -5149,6 +5158,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           }
         }
         for (auto foundInBase : baseResults) {
+          // Do not add duplicate entry with the same arity,
+          // as that would cause an ambiguous lookup.
+          if (foundNameArities.count(getArity(foundInBase)))
+            continue;
           if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
                   foundInBase, recordDecl)) {
             result.push_back(newDecl);
@@ -6320,6 +6333,16 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   }
 
   return known->second;
+}
+
+size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
+    const ValueDecl *valueDecl) {
+  if (auto *func = dyn_cast<FuncDecl>(valueDecl)) {
+    if (auto *params = func->getParameters()) {
+      return params->size();
+    }
+  }
+  return 0;
 }
 
 ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
