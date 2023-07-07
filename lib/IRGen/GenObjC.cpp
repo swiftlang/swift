@@ -161,8 +161,17 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
 
   // FIXME: Do this on all targets and at -O0 too. This can be enabled only if
   // the target backend knows how to handle the operand bundle.
-  if (IGM.getOptions().shouldOptimize() && (arch == llvm::Triple::aarch64 ||
-                                            arch == llvm::Triple::x86_64)) {
+  // Don't use clang.arc.attachedcall on non-darwin platforms for now. On these
+  // platforms we have a workaround in-place to deal with the un-availability of
+  // a arc runtime -- we have implemented objc_retainAutoreleasedReturnValue in
+  // a library (src/swift/DispatchStubs.cc) as swift_retain.
+  // Using clang.arc.attachedcall enables a LLVM optimization that can transform
+  // objc_retainAutoreleasedReturnValue into objc_retain in some circumstances.
+  // There is no objc_retain stub defined and we would run into missing symbol
+  // errors.
+  if (IGM.getOptions().shouldOptimize() && triple.isOSDarwin() &&
+      (arch == llvm::Triple::aarch64 ||
+       arch == llvm::Triple::x86_64)) {
     auto EP = llvm::Intrinsic::getDeclaration(&IGM.Module,
       (llvm::Intrinsic::ID)llvm::Intrinsic::objc_retainAutoreleasedReturnValue);
     llvm::Value *bundleArgs[] = {EP};
