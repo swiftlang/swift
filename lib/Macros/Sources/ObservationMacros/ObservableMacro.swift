@@ -71,7 +71,7 @@ public struct ObservableMacro {
   static var ignoredAttribute: AttributeSyntax {
     AttributeSyntax(
       leadingTrivia: .space,
-      atSignToken: .atSignToken(),
+      atSign: .atSignToken(),
       attributeName: SimpleTypeIdentifierSyntax(name: .identifier(ignoredMacroName)),
       trailingTrivia: .space
     )
@@ -173,12 +173,14 @@ extension PatternBindingListSyntax {
 }
 
 extension VariableDeclSyntax {
-    func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
-    VariableDeclSyntax(
+  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
+    let newAttributes = AttributeListSyntax(
+      (attributes.map(Array.init) ?? []) + [.attribute(attribute)])
+    return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
-      attributes: attributes?.appending(.attribute(attribute)) ?? [.attribute(attribute)],
+      attributes: newAttributes,
       modifiers: modifiers?.privatePrefixed(prefix) ?? ModifierListSyntax(keyword: .private),
-      bindingKeyword: TokenSyntax(bindingKeyword.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
+      bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
       bindings: bindings.privatePrefixed(prefix),
       trailingTrivia: trailingTrivia
     )
