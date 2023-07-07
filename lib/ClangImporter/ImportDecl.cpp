@@ -2914,12 +2914,12 @@ namespace {
       if (size_t(
               llvm::size(decl->getSpecializedTemplate()->specializations())) >
           specializationLimit) {
-        std::string name;
-        llvm::raw_string_ostream os(name);
-        decl->printQualifiedName(os);
-        // Emit a warning if we haven't warned about this decl yet.
-        if (Impl.tooDeepTemplateSpecializations.insert(name).second)
-          Impl.diagnose({}, diag::too_many_class_template_instantiations, name);
+        // Note: it would be nice to import a dummy unavailable struct,
+        // but we would then need to instantiate the template here,
+        // as we cannot import a struct without a definition. That would
+        // defeat the purpose. Also, we can't make the dummy
+        // struct simply unavailable, as that still makes the
+        // typelias that references it available.
         return nullptr;
       }
 
