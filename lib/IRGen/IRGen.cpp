@@ -314,13 +314,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
           }
         });
   }
-  if (RunSwiftSpecificLLVMOptzns) {
-    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel Level) {
-      MPM.addPass(
-          createModuleToFunctionPassAdaptor(SwiftDbgAddrBlockSplitterPass()));
-    });
-  }
 
   if (Opts.GenerateProfile) {
     InstrProfOptions options;
