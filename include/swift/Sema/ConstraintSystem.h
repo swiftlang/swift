@@ -3014,6 +3014,20 @@ public:
     return nullptr;
   }
 
+  TypeVariableType *getKeyPathValueType(const KeyPathExpr *keyPath) const {
+    auto result = getKeyPathValueTypeIfAvailable(keyPath);
+    assert(result);
+    return result;
+  }
+
+  TypeVariableType *
+  getKeyPathValueTypeIfAvailable(const KeyPathExpr *keyPath) const {
+    auto result = KeyPaths.find(keyPath);
+    if (result != KeyPaths.end())
+      return std::get<1>(result->second);
+    return nullptr;
+  }
+
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
