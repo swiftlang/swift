@@ -46,7 +46,7 @@ public protocol Observable { }
 @attached(member, names: named(_$observationRegistrar), named(access), named(withMutation), arbitrary)
 #endif
 @attached(memberAttribute)
-@attached(conformance)
+@attached(extension, conformances: Observable)
 public macro Observable() =
   #externalMacro(module: "ObservationMacros", type: "ObservableMacro")
 

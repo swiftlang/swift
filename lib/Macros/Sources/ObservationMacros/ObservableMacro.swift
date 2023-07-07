@@ -267,30 +267,25 @@ extension ObservableMacro: MemberAttributeMacro {
   }
 }
 
-extension ObservableMacro: ConformanceMacro {
-  public static func expansion<Declaration: DeclGroupSyntax, Context: MacroExpansionContext>(
+extension ObservableMacro: ExtensionMacro {
+  public static func expansion(
     of node: AttributeSyntax,
-    providingConformancesOf declaration: Declaration,
-    in context: Context
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    let inheritanceList: InheritedTypeListSyntax?
-    if let classDecl = declaration.as(ClassDeclSyntax.self) {
-      inheritanceList = classDecl.inheritanceClause?.inheritedTypeCollection
-    } else if let structDecl = declaration.as(StructDeclSyntax.self) {
-      inheritanceList = structDecl.inheritanceClause?.inheritedTypeCollection
-    } else {
-      inheritanceList = nil
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if protocols.isEmpty {
+      return []
     }
-    
-    if let inheritanceList {
-      for inheritance in inheritanceList {
-        if inheritance.typeName.identifier == ObservableMacro.conformanceName {
-          return []
-        }
-      }
-    }
-    
-    return [(ObservableMacro.observableConformanceType, nil)]
+
+    let decl: DeclSyntax = """
+      extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
   }
 }
 
