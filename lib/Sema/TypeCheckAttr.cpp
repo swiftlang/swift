@@ -5786,8 +5786,10 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
 
   // `@differentiable` attribute requires experimental differentiable
   // programming to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(attr, D))
+  if (checkIfDifferentiableProgrammingEnabled(attr, D)) {
+    attr->setInvalid();
     return nullptr;
+  }
 
   // If `@differentiable` attribute is declared directly on a
   // `AbstractStorageDecl` (a stored/computed property or subscript),
@@ -5797,8 +5799,10 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
 
   // Resolve the original `AbstractFunctionDecl`.
   auto *original = resolveDifferentiableAttrOriginalFunction(attr);
-  if (!original)
+  if (!original) {
+    attr->setInvalid();
     return nullptr;
+  }
 
   return typecheckDifferentiableAttrforDecl(original, attr);
 }
