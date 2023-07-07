@@ -560,3 +560,29 @@ func test_effects_are_still_supported() {
 
 test_effects_are_still_supported()
 // CHEKC: effects-support-test: Test(_a: 42, b: 0)
+
+func test_memberwise_without_stored_properties() {
+  struct Test {
+    var a: Int {
+      init {
+        print("no-stored: a = \(newValue)")
+      }
+
+      get { 0 }
+    }
+
+    var b: Int {
+      init {
+        print("no-stored: b = \(newValue)")
+      }
+
+      get { 1 }
+    }
+  }
+
+  _ = Test(a: 1, b: 2)
+}
+
+test_memberwise_without_stored_properties()
+// CHECK: no-stored: a = 1
+// CHECK-NEXT: no-stored: b = 2

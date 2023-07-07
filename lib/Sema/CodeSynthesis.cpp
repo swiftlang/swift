@@ -1311,6 +1311,7 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
 
         // Record all of the properties initialized by calling init accessor.
         auto properties = initAccessor->getInitializedProperties();
+        initializedProperties.insert(var);
         initializedProperties.insert(properties.begin(), properties.end());
         continue;
       }
