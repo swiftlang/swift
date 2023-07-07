@@ -63,13 +63,11 @@ conformances.test("tupleWitnesses") {
 
 conformances.test("singletonTupleWitnesses") {
   let g1 = SingletonTupleWitnesses<Bool>.self
-  // FIXME: Unwrap one-element tuples
-  // expectEqual(Bool.self, getA(g1))
+  expectEqual(Bool.self, getA(g1))
 
   let g2 = SingletonTupleWitnesses< >.self
-  // FIXME: Unwrap one-element tuples
-  // expectEqual(Int.self, getB(g2))
-  // expectEqual(Int.self, getC(g2))
+  expectEqual(Int.self, getB(g2))
+  expectEqual(Int.self, getC(g2))
 }
 
 conformances.test("functionWitnesses") {
