@@ -313,6 +313,14 @@ public:
     }
   }
 
+  SILValue getSingleForwardedValue() {
+    if (auto value = dyn_cast<OwnershipForwardingSingleValueInstruction>(
+            forwardingInst)) {
+      return value;
+    }
+    return SILValue();
+  }
+
   /// Return true if the forwarded value has the same representation. If true,
   /// then the result can be mapped to the same storage without a move or copy.
   bool hasSameRepresentation() const;
