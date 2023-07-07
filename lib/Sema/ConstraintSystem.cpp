@@ -2298,7 +2298,7 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     auto openedTypeVar = replacements.lookup(selfGP);
 
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
-                                               TypePosition::Covariant);
+                                               TypePosition::Covariant)->getRValueType();
 
     Type contextualTy;
 
