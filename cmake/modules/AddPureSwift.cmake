@@ -182,6 +182,7 @@ function(add_pure_swift_host_library name)
     
   target_compile_options("${name}" PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:
+      -wmo
       -Xfrontend -enable-experimental-cxx-interop
       "SHELL:-Xcc -std=c++17"
       "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
