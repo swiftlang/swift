@@ -275,7 +275,9 @@ extension ObservableMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    if protocols.isEmpty {
+    // This method can be called twice - first with an empty `protocols` when
+    // no conformance is needed, and second with a `MissingTypeSyntax` instance.
+    if protocols.isEmpty || protocols.first!.is(MissingTypeSyntax.self) {
       return []
     }
 
