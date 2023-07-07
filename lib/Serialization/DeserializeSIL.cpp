@@ -1702,7 +1702,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                                  TailTypes, Counts);
     } else {
       assert(i == NumVals);
-      ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,
+      bool isBare = (bool)((Flags >> 2) & 1);
+      ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack, isBare,
                                           TailTypes, Counts);
     }
     break;
@@ -1853,7 +1854,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     if (OpCode == SILInstructionKind::GlobalAddrInst) {
       ResultInst = Builder.createGlobalAddr(Loc, g);
     } else {
-      ResultInst = Builder.createGlobalValue(Loc, g);
+      ResultInst = Builder.createGlobalValue(Loc, g, /*isBare=*/ (Attr & 1) != 0);
     }
     break;
   }

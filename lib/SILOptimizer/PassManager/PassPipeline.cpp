@@ -132,6 +132,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addAddressLowering();
 
   P.addFlowIsolation();
+  P.addSendNonSendable();
 
   // Automatic differentiation: canonicalize all differentiability witnesses
   // and `differentiable_function` instructions.
@@ -807,6 +808,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addDCE();
   P.addSILCombine();
   P.addSimplifyCFG();
+  P.addStripObjectHeaders();
 
   // Try to hoist all releases, including epilogue releases. This should be
   // after FSO.

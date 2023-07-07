@@ -1781,6 +1781,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
 
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                      ARDI->isObjC(), ARDI->canAllocOnStack(),
+                                     /*isBare=*/ false,
                                      ARDI->getTailAllocatedTypes(),
                                      getCounts(ARDI));
 
@@ -1806,6 +1807,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
         return nullptr;
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), ARDI->canAllocOnStack(),
+                                       /*isBare=*/ false,
                                        ARDI->getTailAllocatedTypes(),
                                        getCounts(ARDI));
     }
@@ -1833,6 +1835,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       return nullptr;
     NewInst = Builder.createAllocRef(
         ARDI->getLoc(), *instanceTy, ARDI->isObjC(), false,
+        /*isBare=*/ false,
         ARDI->getTailAllocatedTypes(), getCounts(ARDI));
     NewInst = Builder.createUncheckedRefCast(ARDI->getLoc(), NewInst,
                                              ARDI->getType());

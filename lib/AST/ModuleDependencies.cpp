@@ -394,11 +394,31 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
   SharedFilesystemCache.emplace();
 }
 
+void SwiftDependencyTracker::addCommonSearchPathDeps(
+    const SearchPathOptions &Opts) {
+  // Add SDKSetting file.
+  SmallString<256> SDKSettingPath;
+  llvm::sys::path::append(SDKSettingPath, Opts.getSDKPath(),
+                          "SDKSettings.json");
+  FS->status(SDKSettingPath);
+
+  // Add Legacy layout file.
+  const std::vector<std::string> AllSupportedArches = {
+      "arm64", "arm64e", "x86_64", "i386",
+      "armv7", "armv7s", "armv7k", "arm64_32"};
+
+  for (auto RuntimeLibPath : Opts.RuntimeLibraryPaths) {
+    std::error_code EC;
+    for (auto &Arch : AllSupportedArches) {
+      SmallString<256> LayoutFile(RuntimeLibPath);
+      llvm::sys::path::append(LayoutFile, "layout-" + Arch + ".yaml");
+      FS->status(LayoutFile);
+    }
+  }
+}
+
 void SwiftDependencyTracker::startTracking() {
   FS->trackNewAccesses();
-
-  for (auto &file : Files)
-    (void)FS->status(file);
 }
 
 llvm::Expected<llvm::cas::ObjectProxy>
@@ -458,11 +478,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
         CommonDependencyFiles.emplace_back(F->path().str());
     }
   }
-
-  // Fetch some dependency files from clang importer.
-  auto clangImporter = static_cast<ClangImporter *>(
-      Instance.getASTContext().getClangModuleLoader());
-  clangImporter->addClangInvovcationDependencies(CommonDependencyFiles);
 
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());

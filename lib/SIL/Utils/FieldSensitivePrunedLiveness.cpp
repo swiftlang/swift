@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ScopedAddressUtils.h"
+#include "swift/SIL/Test.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
@@ -836,6 +837,89 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
   }
 }
 
+namespace swift::test {
+// Arguments:
+// - value: entity whose fields' livenesses are being computed
+// - string: "defs:"
+// - variadic list of triples consisting of
+//   - value: a live-range defining value
+//   - int: the beginning of the range of fields defined by the value
+//   - int: the end of the range of the fields defined by the value
+// - the string "uses:"
+// - variadic list of quadruples consisting of
+//   - instruction: a live-range user
+//   - bool: whether the user is lifetime-ending
+//   - int: the beginning of the range of fields used by the instruction
+//   - int: the end of the range of fields used by the instruction
+// Dumps:
+// - the liveness result and boundary
+//
+// Computes liveness for the specified def nodes by considering the
+// specified uses. The actual uses of the def nodes are ignored.
+//
+// This is useful for testing non-ssa liveness, for example, of memory
+// locations. In that case, the def nodes may be stores and the uses may be
+// destroy_addrs.
+static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
+    "fieldsensitive-multidefuse-liverange",
+    [](auto &function, auto &arguments, auto &test) {
+      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+      auto value = arguments.takeValue();
+      FieldSensitiveMultiDefPrunedLiveRange liveness(&function, value,
+                                                     &discoveredBlocks);
+
+      llvm::outs() << "FieldSensitive MultiDef lifetime analysis:\n";
+      if (arguments.takeString() != "defs:") {
+        llvm::report_fatal_error(
+            "test specification expects the 'defs:' label\n");
+      }
+      while (true) {
+        auto argument = arguments.takeArgument();
+        if (isa<StringArgument>(argument)) {
+          if (cast<StringArgument>(argument).getValue() != "uses:") {
+            llvm::report_fatal_error(
+                "test specification expects the 'uses:' label\n");
+          }
+          break;
+        }
+        auto begin = arguments.takeUInt();
+        auto end = arguments.takeUInt();
+        TypeTreeLeafTypeRange range(begin, end);
+        if (isa<InstructionArgument>(argument)) {
+          auto *instruction = cast<InstructionArgument>(argument).getValue();
+          llvm::outs() << "  def in range [" << begin << ", " << end
+                       << ") instruction: " << *instruction;
+          liveness.initializeDef(instruction, range);
+          continue;
+        }
+        if (isa<ValueArgument>(argument)) {
+          SILValue value = cast<ValueArgument>(argument).getValue();
+          llvm::outs() << "  def in range [" << begin << ", " << end
+                       << ") value: " << value;
+          liveness.initializeDef(value, range);
+          continue;
+        }
+        llvm::report_fatal_error(
+            "test specification expects the 'uses:' label\n");
+      }
+      liveness.finishedInitializationOfDefs();
+      while (arguments.hasUntaken()) {
+        auto *inst = arguments.takeInstruction();
+        auto lifetimeEnding = arguments.takeBool();
+        auto begin = arguments.takeUInt();
+        auto end = arguments.takeUInt();
+        TypeTreeLeafTypeRange range(begin, end);
+        liveness.updateForUse(inst, range, lifetimeEnding);
+      }
+      liveness.print(llvm::errs());
+
+      FieldSensitivePrunedLivenessBoundary boundary(
+          liveness.getNumSubElements());
+      liveness.computeBoundary(boundary);
+      boundary.print(llvm::errs());
+    });
+} // end namespace swift::test
+
 bool FieldSensitiveMultiDefPrunedLiveRange::isUserBeforeDef(
     SILInstruction *user, unsigned element) const {
   auto *block = user->getParent();
@@ -1107,7 +1191,107 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
                << "    Live at beginning of block! No dead args!\n");
   }
 
-  assert((isLiveOut ||
-          prevCount < boundary.getNumLastUsersAndDeadDefs(bitNo)) &&
-         "findBoundariesInBlock must be called on a live block");
+  assert(
+      (isLiveOut || prevCount < boundary.getNumLastUsersAndDeadDefs(bitNo)) &&
+      "findBoundariesInBlock must be called on a live block");
+}
+
+bool FieldSensitiveMultiDefPrunedLiveRange::findEarlierConsumingUse(
+    SILInstruction *inst, unsigned index,
+    llvm::function_ref<bool(SILInstruction *)> callback) const {
+  PRUNED_LIVENESS_LOG(
+      llvm::dbgs()
+      << "Performing single block search for consuming use for bit: " << index
+      << "!\n");
+
+  // Walk our block back from inst looking for defs or a consuming use. If we
+  // see a def, return true. If we see a use, we keep processing if the callback
+  // returns true... and return false early if the callback returns false.
+  for (auto ii = std::next(inst->getReverseIterator()),
+            ie = inst->getParent()->rend();
+       ii != ie; ++ii) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting: " << *ii);
+    // If we have a def, then we are automatically done.
+    if (isDef(&*ii, index)) {
+      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Is Def! Returning true!\n");
+      return true;
+    }
+
+    // If we have a consuming use, emit the error.
+    if (isInterestingUser(&*ii, index) ==
+        IsInterestingUser::LifetimeEndingUse) {
+      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Is Lifetime Ending Use!\n");
+      if (!callback(&*ii)) {
+        PRUNED_LIVENESS_LOG(llvm::dbgs()
+                            << "    Callback returned false... exiting!\n");
+        return false;
+      }
+      PRUNED_LIVENESS_LOG(llvm::dbgs()
+                          << "    Callback returned true... continuing!\n");
+    }
+
+    // Otherwise, keep going.
+  }
+
+  // Then check our argument defs.
+  for (auto *arg : inst->getParent()->getArguments()) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting arg: " << *arg);
+    if (isDef(arg, index)) {
+      PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found def. Returning true!\n");
+      return true;
+    }
+  }
+
+  PRUNED_LIVENESS_LOG(llvm::dbgs() << "Finished single block. Didn't find "
+                                      "anything... Performing interprocedural");
+
+  // Ok, we now know that we need to look further back.
+  BasicBlockWorklist worklist(inst->getFunction());
+  for (auto *predBlock : inst->getParent()->getPredecessorBlocks()) {
+    worklist.pushIfNotVisited(predBlock);
+  }
+
+  while (auto *next = worklist.pop()) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs()
+                        << "Checking block bb" << next->getDebugID() << '\n');
+    for (auto ii = next->rbegin(), ie = next->rend(); ii != ie; ++ii) {
+      PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting: " << *ii);
+      // If we have a def, then we are automatically done.
+      if (isDef(&*ii, index)) {
+        PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Is Def! Returning true!\n");
+        return true;
+      }
+
+      // If we have a consuming use, emit the error.
+      if (isInterestingUser(&*ii, index) ==
+          IsInterestingUser::LifetimeEndingUse) {
+        PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Is Lifetime Ending Use!\n");
+        if (!callback(&*ii)) {
+          PRUNED_LIVENESS_LOG(llvm::dbgs()
+                              << "    Callback returned false... exiting!\n");
+          return false;
+        }
+        PRUNED_LIVENESS_LOG(llvm::dbgs()
+                            << "    Callback returned true... continuing!\n");
+      }
+
+      // Otherwise, keep going.
+    }
+
+    for (auto *arg : next->getArguments()) {
+      PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting arg: " << *arg);
+      if (isDef(arg, index)) {
+        PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found def. Returning true!\n");
+        return true;
+      }
+    }
+
+    PRUNED_LIVENESS_LOG(llvm::dbgs()
+                        << "Didn't find anything... visiting predecessors!\n");
+    for (auto *predBlock : next->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(predBlock);
+    }
+  }
+
+  return true;
 }

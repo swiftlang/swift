@@ -422,8 +422,7 @@ extension PropertyWrapperMacro: AccessorMacro, Macro {
   ) throws -> [AccessorDeclSyntax] {
     guard let varDecl = declaration.as(VariableDeclSyntax.self),
       let binding = varDecl.bindings.first,
-      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
-      binding.accessor == nil
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier
     else {
       return []
     }
@@ -464,6 +463,55 @@ extension PropertyWrapperMacro: PeerMacro {
       """
       var _\(raw: identifier.trimmedDescription): MyWrapperThingy<\(type)>
       """
+    ]
+  }
+}
+
+extension PatternBindingSyntax.Accessor {
+  var hasGetter: Bool {
+    switch self {
+    case .accessors(let accessors):
+      for accessor in accessors.accessors {
+        if accessor.accessorKind.text == "get" {
+          return true
+        }
+      }
+
+      return false
+    case .getter:
+      return true
+    }
+  }
+}
+
+public struct PropertyWrapperSkipsComputedMacro {}
+
+extension PropertyWrapperSkipsComputedMacro: AccessorMacro, Macro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier, !(binding.accessor?.hasGetter ?? false)
+    else {
+      return []
+    }
+
+    return [
+      """
+
+        get {
+          _\(identifier).wrappedValue
+        }
+      """,
+      """
+
+        set {
+          _\(identifier).wrappedValue = newValue
+        }
+      """,
     ]
   }
 }
@@ -1253,6 +1301,30 @@ public struct EquatableMacro: ConformanceMacro {
   }
 }
 
+public struct ConformanceViaExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): MyProtocol {
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct HashableMacro: ConformanceMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -1296,6 +1368,38 @@ public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
       """
 
     return [requirement]
+  }
+}
+
+public struct DelegatedConformanceViaExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P where Element: P {
+        static func requirement() {
+          Element.requirement()
+        }
+      }
+
+      """
+
+    guard let extensionDecl = decl.as(ExtensionDeclSyntax.self) else {
+      return []
+    }
+
+    return [
+      extensionDecl
+    ]
   }
 }
 

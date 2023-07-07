@@ -49,7 +49,7 @@ using namespace rewriting;
 GenericSignature::LocalRequirements
 RequirementMachine::getLocalRequirements(
     Type depType,
-    TypeArrayView<GenericTypeParamType> genericParams) const {
+    ArrayRef<GenericTypeParamType *> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
@@ -158,7 +158,7 @@ RequirementMachine::getRequiredProtocols(Type depType) const {
 
 Type RequirementMachine::
 getSuperclassBound(Type depType,
-                   TypeArrayView<GenericTypeParamType> genericParams) const {
+                   ArrayRef<GenericTypeParamType *> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
@@ -198,7 +198,7 @@ bool RequirementMachine::isConcreteType(Type depType,
 /// `Self` generic parameter here.
 Type RequirementMachine::
 getConcreteType(Type depType,
-                TypeArrayView<GenericTypeParamType> genericParams,
+                ArrayRef<GenericTypeParamType *> genericParams,
                 const ProtocolDecl *proto) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             proto);
@@ -359,7 +359,7 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
 /// as well, and so on.
 Type RequirementMachine::getReducedType(
     Type type,
-    TypeArrayView<GenericTypeParamType> genericParams) const {
+    ArrayRef<GenericTypeParamType *> genericParams) const {
 
   return type.transformRec([&](Type t) -> llvm::Optional<Type> {
     if (!t->hasTypeParameter())
@@ -721,25 +721,32 @@ MutableTerm
 RequirementMachine::getReducedShapeTerm(Type type) const {
   assert(type->isParameterPack());
 
-  auto rootType = type->getRootGenericParam();
-  auto term = Context.getMutableTermForType(rootType->getCanonicalType(),
+  auto term = Context.getMutableTermForType(type->getCanonicalType(),
                                             /*proto=*/nullptr);
 
-  // Append the 'shape' symbol to the term.
+  // From a type term T, form the shape term `T.[shape]`.
   term.add(Symbol::forShape(Context));
 
+  // Compute the reduced shape term `T'.[shape]`.
   System.simplify(term);
   verify(term);
 
-  // Remove the 'shape' symbol from the term.
-  assert(term.back().getKind() == Symbol::Kind::Shape);
-  MutableTerm reducedTerm(term.begin(), term.end() - 1);
+  // Get the term T', which is the reduced shape of T.
+  if (term.size() != 2 ||
+      term[0].getKind() != Symbol::Kind::GenericParam ||
+      term[1].getKind() != Symbol::Kind::Shape) {
+    llvm::errs() << "Invalid reduced shape\n";
+    llvm::errs() << "Type: " << type << "\n";
+    llvm::errs() << "Term: " << term << "\n";
+    abort();
+  }
 
+  MutableTerm reducedTerm(term.begin(), term.end() - 1);
   return reducedTerm;
 }
 
 Type RequirementMachine::getReducedShape(Type type,
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
+                      ArrayRef<GenericTypeParamType *> genericParams) const {
   if (!type->isParameterPack())
     return Type();
 
@@ -759,7 +766,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
   // generic parameter.
   if (term.begin()->getKind() == Symbol::Kind::GenericParam) {
     auto *genericParam = term.begin()->getGenericParam();
-    TypeArrayView<GenericTypeParamType> genericParams = getGenericParams();
+    auto genericParams = getGenericParams();
     auto found = std::find_if(genericParams.begin(),
                               genericParams.end(),
                               [&](GenericTypeParamType *otherType) {

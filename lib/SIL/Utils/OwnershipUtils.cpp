@@ -22,6 +22,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -94,47 +95,53 @@ bool swift::findPointerEscape(SILValue original) {
   return false;
 }
 
+namespace swift::test {
+// Arguments:
+// - value: the value to check for escaping
+// Dumps:
+// - the value
+// - whether it has a pointer escape
+static FunctionTest OwnershipUtilsHasPointerEscape(
+    "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      auto has = findPointerEscape(value);
+      value->print(llvm::errs());
+      auto *boolString = has ? "true" : "false";
+      llvm::errs() << boolString << "\n";
+    });
+} // end namespace swift::test
+
 bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
-  // If we have an argument from a transforming terminator, we can forward
-  // guaranteed.
-  if (auto *arg = dyn_cast<SILArgument>(value))
-    if (auto *ti = arg->getSingleTerminator())
-      if (ti->mayHaveTerminatorResult())
-        return ForwardingInstruction::get(ti)->preservesOwnership();
-
-  if (auto *inst = value->getDefiningInstruction())
-    if (auto *mixin = ForwardingInstruction::get(inst))
-      return mixin->preservesOwnership() &&
-             !ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(inst);
-
+  if (auto *inst = value->getDefiningInstructionOrTerminator()) {
+    if (auto fwdOp = ForwardingOperation(inst)) {
+      return fwdOp.preservesOwnership() &&
+             !fwdOp.canForwardOwnedCompatibleValuesOnly();
+    }
+  }
   return false;
 }
 
 bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
-  if (auto *fwi = ForwardingInstruction::get(use->getUser()))
-    return fwi->preservesOwnership() &&
-           !ForwardingInstruction::canForwardOwnedCompatibleValuesOnly(
-               use->getUser());
+  if (auto fwdOp = ForwardingOperation(use->getUser()))
+    return fwdOp.preservesOwnership() &&
+           !fwdOp.canForwardOwnedCompatibleValuesOnly();
   return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   if (auto *inst = value->getDefiningInstructionOrTerminator()) {
-    if (auto *fwi = ForwardingInstruction::get(inst)) {
-      return fwi->preservesOwnership() &&
-             !ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(
-                 inst);
+    if (auto fwdOp = ForwardingOperation(inst)) {
+      return fwdOp.preservesOwnership() &&
+             !fwdOp.canForwardGuaranteedCompatibleValuesOnly();
     }
   }
   return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
-  auto *user = use->getUser();
-  if (auto *fwi = ForwardingInstruction::get(user))
-    return fwi->preservesOwnership() &&
-           !ForwardingInstruction::canForwardGuaranteedCompatibleValuesOnly(
-               user);
+  if (auto fwdOp = ForwardingOperation(use->getUser()))
+    return fwdOp.preservesOwnership() &&
+           !fwdOp.canForwardGuaranteedCompatibleValuesOnly();
   return false;
 }
 
@@ -1360,9 +1367,6 @@ ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
   if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     return ofsvi->getForwardingOwnershipKind();
 
-  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    return ofseib->getForwardingOwnershipKind();
-
   if (auto *ofmvi =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
     assert(ofmvi->getNumOperands() == 1);
@@ -1385,8 +1389,6 @@ void ForwardingOperand::setForwardingOwnershipKind(
   // new subclass of OwnershipForwardingInst is added
   if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     return ofsvi->setForwardingOwnershipKind(newKind);
-  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    return ofseib->setForwardingOwnershipKind(newKind);
   if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
     assert(ofmvi->getNumOperands() == 1);
     if (!ofmvi->getOperand(0)->getType().isTrivial(*ofmvi->getFunction())) {
@@ -1448,10 +1450,6 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
   if (auto *fInst = dyn_cast<OwnershipForwardingSingleValueInstruction>(user))
     if (fInst->getForwardingOwnershipKind() == oldKind)
       return fInst->setForwardingOwnershipKind(newKind);
-
-  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    if (ofseib->getForwardingOwnershipKind() == oldKind)
-      return ofseib->setForwardingOwnershipKind(newKind);
 
   if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
     if (ofmvi->getForwardingOwnershipKind() == oldKind) {
@@ -1699,20 +1697,16 @@ bool swift::visitForwardedGuaranteedOperands(
   if (inst->getNumRealOperands() == 0) {
     return false;
   }
-  if (ForwardingInstruction::canForwardFirstOperandOnly(inst)) {
-    visitOperand(&inst->getOperandRef(0));
-    return true;
+
+  auto fwdOp = ForwardingOperation(inst);
+  if (!fwdOp) {
+    return false;
   }
-  if (ForwardingInstruction::canForwardAllOperands(inst)) {
-    assert(inst->getNumOperands() > 0 && "checked above");
-    assert(inst->getNumOperands() == inst->getNumRealOperands() &&
-           "mixin expects all readl operands");
-    for (auto &operand : inst->getAllOperands()) {
-      visitOperand(&operand);
-    }
-    return true;
+
+  for (auto &operand : fwdOp.getForwardedOperands()) {
+    visitOperand(&operand);
   }
-  return false;
+  return true;
 }
 
 namespace {
@@ -2069,6 +2063,23 @@ bool swift::visitEnclosingDefs(SILValue value,
     .visitEnclosingDefs(value, visitor);
 }
 
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the enclosing defs
+static FunctionTest FindEnclosingDefsTest(
+    "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
+      function.dump();
+      llvm::dbgs() << "Enclosing Defs:\n";
+      visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
+        def->dump();
+        return true;
+      });
+    });
+} // end namespace swift::test
+
 bool swift::visitBorrowIntroducers(SILValue value,
                                    function_ref<bool(SILValue)> visitor) {
   if (isa<SILUndef>(value))
@@ -2076,6 +2087,23 @@ bool swift::visitBorrowIntroducers(SILValue value,
   return FindEnclosingDefs(value->getFunction())
     .visitBorrowIntroducers(value, visitor);
 }
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the borrow introducers
+static FunctionTest FindBorrowIntroducers(
+    "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
+      function.dump();
+      llvm::dbgs() << "Introducers:\n";
+      visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
+        def->dump();
+        return true;
+      });
+    });
+} // end namespace swift::test
 
 /// Return true of the lifetime of \p innerPhiVal depends on \p outerPhiVal.
 ///
@@ -2178,6 +2206,24 @@ bool swift::visitInnerAdjacentPhis(SILArgument *phi,
   }
   return true;
 }
+
+namespace swift::test {
+// Arguments:
+// - SILValue: phi
+// Dumps:
+// - function
+// - the adjacent phis
+static FunctionTest VisitInnerAdjacentPhisTest(
+    "visit-inner-adjacent-phis",
+    [](auto &function, auto &arguments, auto &test) {
+      function.dump();
+      visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
+                             [](auto *argument) -> bool {
+                               argument->dump();
+                               return true;
+                             });
+    });
+} // end namespace swift::test
 
 void swift::visitTransitiveEndBorrows(
     SILValue value,

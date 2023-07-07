@@ -31,6 +31,9 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
     auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>();
     if (SILGenName && !SILGenName->Name.empty()) {
       mangledName = SILGenName->Name.str();
+      if (SILGenName->Raw) {
+        mangledName = "\1" + mangledName;
+      }
     } else {
       Mangle::ASTMangler NewMangler;
       mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
@@ -44,6 +47,13 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   else
     formalLinkage = getDeclLinkage(gDecl);
   auto silLinkage = getSILLinkage(formalLinkage, forDef);
+
+  if (gDecl->getAttrs().hasAttribute<SILGenNameAttr>()) {
+    silLinkage = SILLinkage::DefaultForDeclaration;
+    if (! gDecl->hasInitialValue()) {
+      forDef = NotForDefinition;
+    }
+  }
 
   // Check if it is already created, and update linkage if necessary.
   if (auto gv = M.lookUpGlobalVariable(mangledName)) {

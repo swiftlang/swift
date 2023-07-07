@@ -2076,15 +2076,6 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
 }
 
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
-    const clang::FunctionDecl *clangDecl, DeclContext *dc) {
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
-  bool allowNSUIntegerAsInt =
-      shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
-  return importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
-}
-
-ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
 
@@ -3224,6 +3215,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
           importedType.isImplicitlyUnwrapped()};
 }
 
+ImportedType findOptionSetType(clang::QualType type,
+                               ClangImporter::Implementation &Impl);
+
 ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCPropertyDecl *property,
     const clang::ObjCMethodDecl *clangDecl, bool isFromSystemModule,
@@ -3247,9 +3241,13 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   DeclContext *origDC = importDeclContextOf(property,
                                             property->getDeclContext());
   assert(origDC);
+  auto fieldType = isGetter ? clangDecl->getReturnType()
+                            : clangDecl->getParamDecl(0)->getType();
 
   // Import the property type, independent of what kind of accessor this is.
-  auto importedType = importPropertyType(property, isFromSystemModule);
+  ImportedType importedType = findOptionSetType(fieldType, *this);
+  if (!importedType)
+    importedType = importPropertyType(property, isFromSystemModule);
   if (!importedType)
     return {Type(), false};
 
@@ -3430,7 +3428,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupObjCProtocolName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr))
+  if (!sema.LookupName(lookupResult, /*Scope=*/sema.TUScope))
     return Type();
 
   for (auto decl : lookupResult) {

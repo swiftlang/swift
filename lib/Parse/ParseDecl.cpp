@@ -2225,6 +2225,7 @@ llvm::Optional<MacroRole> getMacroRole(StringRef roleName) {
       .Case("member", MacroRole::Member)
       .Case("peer", MacroRole::Peer)
       .Case("conformance", MacroRole::Conformance)
+      .Case("extension", MacroRole::Extension)
       .Default(llvm::None);
 }
 
@@ -2264,8 +2265,10 @@ Parser::parseMacroRoleAttribute(
   SourceLoc rParenLoc;
   llvm::Optional<MacroRole> role;
   bool sawRole = false;
+  bool sawConformances = false;
   bool sawNames = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
+  SmallVector<TypeExpr *, 2> conformances;
   auto argumentsStatus = parseList(tok::r_paren, lParenLoc, rParenLoc,
                                    /*AllowSepAfterLast=*/false,
                                    diag::expected_rparen_expr_list,
@@ -2294,7 +2297,8 @@ Parser::parseMacroRoleAttribute(
     parseOptionalArgumentLabel(fieldName, fieldNameLoc);
 
     // If there is a field name, it better be 'names'.
-    if (!(fieldName.empty() || fieldName.is("names"))) {
+    if (!(fieldName.empty() || fieldName.is("names") ||
+          fieldName.is("conformances"))) {
       diagnose(
          fieldNameLoc, diag::macro_attribute_unknown_label, isAttached,
          fieldName);
@@ -2304,7 +2308,7 @@ Parser::parseMacroRoleAttribute(
 
     // If there is no field name and we haven't seen either names or the role,
     // this is the role.
-    if (fieldName.empty() && !sawNames && !sawRole) {
+    if (fieldName.empty() && !sawConformances && !sawNames && !sawRole) {
       // Whether we saw anything we tried to treat as a role.
       sawRole = true;
 
@@ -2313,13 +2317,18 @@ Parser::parseMacroRoleAttribute(
         : diag::macro_role_attr_expected_freestanding_kind;
       Identifier roleName;
       SourceLoc roleNameLoc;
-      if (parseIdentifier(roleName, roleNameLoc, diagKind,
-                          /*diagnoseDollarPrefix=*/true)) {
+      if (Tok.is(tok::kw_extension)) {
+        roleNameLoc = consumeToken();
+        role = MacroRole::Extension;
+      } else if (parseIdentifier(roleName, roleNameLoc, diagKind,
+                                 /*diagnoseDollarPrefix=*/true)) {
         status.setIsParseError();
         return status;
       }
 
-      role = getMacroRole(roleName.str());
+      if (!role)
+        role = getMacroRole(roleName.str());
+
       if (!role) {
         diagnose(roleNameLoc, diag::macro_role_attr_expected_kind, isAttached);
         status.setIsParseError();
@@ -2340,6 +2349,25 @@ Parser::parseMacroRoleAttribute(
         status.setIsParseError();
         return status;
       }
+
+      return status;
+    }
+
+    if (fieldName.is("conformances") ||
+        (fieldName.empty() && sawConformances && !sawNames)) {
+      if (fieldName.is("conformances") && sawConformances) {
+        diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
+                 diag::macro_attribute_duplicate_label,
+                 isAttached,
+                 "conformances");
+      }
+
+      sawConformances = true;
+
+      // Parse the introduced conformances
+      auto type = parseType();
+      auto *typeExpr = new (Context) TypeExpr(type.get());
+      conformances.push_back(typeExpr);
 
       return status;
     }
@@ -2447,7 +2475,7 @@ Parser::parseMacroRoleAttribute(
   SourceRange range(Loc, rParenLoc);
   return makeParserResult(MacroRoleAttr::create(
       Context, AtLoc, range, syntax, lParenLoc, *role, names,
-      rParenLoc, /*isImplicit*/ false));
+      conformances, rParenLoc, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
@@ -2893,6 +2921,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       ParseSymbolName = consumeIf(tok::comma);
     }
 
+    bool Raw = false;
+    if (DK == DAK_SILGenName) {
+      if (Tok.is(tok::identifier) && Tok.getText() == "raw") {
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+        Raw = true;
+      }
+    }
+
     llvm::Optional<StringRef> AsmName;
     if (ParseSymbolName) {
       if (Tok.isNot(tok::string_literal)) {
@@ -2928,7 +2965,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     if (!DiscardAttribute) {
       if (DK == DAK_SILGenName)
-        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), AtLoc,
+        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), Raw, AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,
@@ -3861,7 +3898,7 @@ ParserStatus Parser::parseDeclAttribute(
     auto attr = MacroRoleAttr::create(
         Context, AtLoc, SourceRange(AtLoc, attrLoc),
         MacroSyntax::Freestanding, SourceLoc(), MacroRole::Expression, { },
-        SourceLoc(), /*isImplicit*/ false);
+        /*conformances=*/{}, SourceLoc(), /*isImplicit*/ false);
     Attributes.add(attr);
     return makeParserSuccess();
   }
@@ -5172,7 +5209,7 @@ void Parser::recordLocalType(TypeDecl *TD) {
   if (!TD->getDeclContext()->isLocalContext())
     return;
 
-  if (!InInactiveClauseEnvironment)
+  if (!InInactiveClauseEnvironment && !InFreestandingMacroArgument)
     SF.getOutermostParentSourceFile()->LocalTypeDecls.insert(TD);
 }
 
@@ -6973,38 +7010,6 @@ void Parser::skipAnyAttribute() {
   (void)canParseCustomAttribute();
 }
 
-/// Returns a descriptive name for the given accessor/addressor kind.
-static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              bool article) {
-  switch (accessorKind) {
-  case AccessorKind::Get:
-    return article ? "a getter" : "getter";
-  case AccessorKind::Set:
-    return article ? "a setter" : "setter";
-  case AccessorKind::Address:
-    return article ? "an addressor" : "addressor";
-  case AccessorKind::MutableAddress:
-    return article ? "a mutable addressor" : "mutable addressor";
-  case AccessorKind::Read:
-    return article ? "a 'read' accessor" : "'read' accessor";
-  case AccessorKind::Modify:
-    return article ? "a 'modify' accessor" : "'modify' accessor";
-  case AccessorKind::WillSet:
-    return "'willSet'";
-  case AccessorKind::DidSet:
-    return "'didSet'";
-  case AccessorKind::Init:
-    return article ? "an init accessor" : "init accessor";
-  }
-  llvm_unreachable("bad accessor kind");  
-}
-
-static StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor,
-                                              bool article) {
-  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
-                                      article);
-}
-
 static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorKind accessorKind,
                                        bool isSubscript,
@@ -7057,15 +7062,6 @@ struct Parser::ParsedAccessors {
     for (auto accessor : Accessors)
       if (!accessor->isGetter())
         func(accessor);
-  }
-
-  /// Find the first accessor that's not an observing accessor.
-  AccessorDecl *findFirstNonObserver() {
-    for (auto accessor : Accessors) {
-      if (!accessor->isObservingAccessor())
-        return accessor;
-    }
-    return nullptr;
   }
 
   /// Find the first accessor that can be used to perform mutation.
@@ -7484,8 +7480,14 @@ void Parser::parseTopLevelAccessors(
 
   bool hadLBrace = consumeIf(tok::l_brace);
 
-  ParserStatus status;
+  // Prepopulate the field for any accessors that were already parsed parsed accessors
   ParsedAccessors accessors;
+#define ACCESSOR(ID)                                            \
+    if (auto accessor = storage->getAccessor(AccessorKind::ID)) \
+      accessors.ID = accessor;
+#include "swift/AST/AccessorKinds.def"
+
+  ParserStatus status;
   bool hasEffectfulGet = false;
   bool parsingLimitedSyntax = false;
   while (!Tok.isAny(tok::r_brace, tok::eof)) {
@@ -7757,16 +7759,10 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // The observing accessors have very specific restrictions.
   // Prefer to ignore them.
   if (WillSet || DidSet) {
-    // For now, we don't support the observing accessors on subscripts.
+    // We don't support the observing accessors on subscripts.
     if (isa<SubscriptDecl>(storage)) {
       diagnoseAndIgnoreObservers(P, *this,
                                  diag::observing_accessor_in_subscript);
-
-    // The observing accessors cannot be combined with other accessors.
-    } else if (auto nonObserver = findFirstNonObserver()) {
-      diagnoseAndIgnoreObservers(P, *this,
-                   diag::observing_accessor_conflicts_with_accessor,
-                   getAccessorNameForDiagnostic(nonObserver, /*article*/ true));
     }
   }
 
@@ -7943,7 +7939,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
       hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
     }
-    auto sf = CurDeclContext->getParentSourceFile();
+    auto sf = CurDeclContext->getOutermostParentSourceFile();
     
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
@@ -7955,7 +7951,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       setOriginalDeclarationForDifferentiableAttributes(Attributes, VD);
 
       Decls.push_back(VD);
-      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
+      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment
+          && !InFreestandingMacroArgument) {
         sf->addUnvalidatedDeclWithOpaqueResultType(VD);
       }
     });
@@ -8245,8 +8242,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
   // Let the source file track the opaque return type mapping, if any.
   if (FuncRetTy && FuncRetTy->hasOpaque() &&
-      !InInactiveClauseEnvironment) {
-    if (auto sf = CurDeclContext->getParentSourceFile()) {
+      !InInactiveClauseEnvironment && !InFreestandingMacroArgument) {
+    if (auto sf = CurDeclContext->getOutermostParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
     }
   }
@@ -9193,8 +9190,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   
   // Let the source file track the opaque return type mapping, if any.
   if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
-      !InInactiveClauseEnvironment) {
-    if (auto sf = CurDeclContext->getParentSourceFile()) {
+      !InInactiveClauseEnvironment && !InFreestandingMacroArgument) {
+    if (auto sf = CurDeclContext->getOutermostParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
     }
   }

@@ -910,11 +910,11 @@ public:
   printGenericSignature(GenericSignature genericSig, unsigned flags,
                         llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
@@ -1641,7 +1641,7 @@ void PrintAST::printGenericSignature(
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool isFirstReq = true;
@@ -1650,7 +1650,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
@@ -1692,7 +1692,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
   /// Separate the explicit generic parameters from the implicit, opaque
   /// generic parameters. We only print the former.
-  TypeArrayView<GenericTypeParamType> opaqueGenericParams;
+  ArrayRef<GenericTypeParamType *> opaqueGenericParams;
   for (unsigned index : indices(genericParams)) {
     auto gpDecl = genericParams[index]->getDecl();
     if (!gpDecl)
@@ -2852,6 +2852,26 @@ static bool usesFeatureCodeItemMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::CodeItem);
 }
 
+static bool usesFeatureExtensionMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::Extension);
+}
+
+static bool usesFeatureExtensionMacroAttr(Decl *decl) {
+  return usesFeatureExtensionMacros(decl);
+}
+
+static void suppressingFeatureExtensionMacroAttr(PrintOptions &options,
+                                                 llvm::function_ref<void()> action) {
+  bool originalPrintExtensionMacroAttrs = options.PrintExtensionMacroAttributes;
+  options.PrintExtensionMacroAttributes = false;
+  action();
+  options.PrintExtensionMacroAttributes = originalPrintExtensionMacroAttrs;
+}
+
 static bool usesFeatureAttachedMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)
@@ -3173,6 +3193,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureStrictConcurrency(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)
@@ -3438,6 +3462,10 @@ static bool usesFeatureParameterPacks(Decl *decl) {
     }
   }
 
+  return false;
+}
+
+static bool usesFeatureDeferredSendableChecking(Decl *decl) {
   return false;
 }
 
@@ -5704,7 +5732,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   }
 
   void printGenericArgs(ASTContext &ctx,
-                        TypeArrayView<GenericTypeParamType> params,
+                        ArrayRef<GenericTypeParamType *> params,
                         ArrayRef<Type> args) {
     printGenericArgs(PackType::getExpandedGenericArgs(params, args));
   }

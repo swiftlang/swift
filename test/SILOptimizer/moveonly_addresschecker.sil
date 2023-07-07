@@ -677,3 +677,94 @@ bb0:
   %21 = tuple ()
   return %21 : $()
 }
+
+struct FixedSizeQueue : ~Copyable {
+  var ptr: Builtin.Int32
+}
+
+sil @get_fixedsize_queue : $@convention(thin) () -> @owned FixedSizeQueue
+
+// CHECK-LABEL: sil [ossa] @test_return_trivial_type : $@convention(thin) (@owned FixedSizeQueue) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] : @owned $
+// CHECK:   [[ALLOC:%.*]] = alloc_stack [lexical] $FixedSizeQueue
+// CHECK:   store [[ARG]] to [init] [[ALLOC]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ALLOC]]
+// CHECK:   [[ALLOC2:%.*]] = alloc_stack $FixedSizeQueue
+// CHECK:   copy_addr [take] [[ACCESS]] to [init] [[ALLOC2]]
+// CHECK:   [[LOADED:%.*]] = load_borrow [[ALLOC2]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[LOADED]]
+// CHECK:   [[TRIVIAL_VALUE:%.*]] = struct_extract [[BORROW]]
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   end_borrow [[LOADED]]
+// CHECK:   destroy_addr [[ALLOC2]]
+// CHECK:   dealloc_stack [[ALLOC2]]
+// CHECK:   [[NEW_VALUE:%.*]] = apply {{%.*}}()
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ALLOC]]
+// CHECK:   store [[NEW_VALUE]] to [init] [[ACCESS]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   destroy_addr [[ALLOC]]
+// CHECK:   dealloc_stack [[ALLOC]]
+// CHECK:   return [[TRIVIAL_VALUE]]
+// CHECK: } // end sil function 'test_return_trivial_type'
+sil [ossa] @test_return_trivial_type : $@convention(thin) (@owned FixedSizeQueue) -> Builtin.Int32 {
+bb0(%0 : @owned $FixedSizeQueue):
+  %1 = alloc_stack [lexical] $FixedSizeQueue, var, name "self", implicit
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*FixedSizeQueue
+  store %0 to [init] %2 : $*FixedSizeQueue
+  %4 = begin_access [modify] [static] %2 : $*FixedSizeQueue
+  %5 = alloc_stack $FixedSizeQueue
+  %6 = mark_must_check [consumable_and_assignable] %5 : $*FixedSizeQueue
+  copy_addr %4 to [init] %6 : $*FixedSizeQueue
+  %8 = load [take] %6 : $*FixedSizeQueue
+  end_access %4 : $*FixedSizeQueue
+  %10 = begin_borrow %8 : $FixedSizeQueue
+  %11 = struct_extract %10 : $FixedSizeQueue, #FixedSizeQueue.ptr
+  end_borrow %10 : $FixedSizeQueue
+  destroy_value %8 : $FixedSizeQueue
+  dealloc_stack %5 : $*FixedSizeQueue
+  %21 = function_ref @get_fixedsize_queue : $@convention(thin) () -> @owned FixedSizeQueue
+  %22 = apply %21() : $@convention(thin) () -> @owned FixedSizeQueue
+  %23 = begin_access [modify] [static] %2 : $*FixedSizeQueue
+  store %22 to [assign] %23 : $*FixedSizeQueue
+  end_access %23 : $*FixedSizeQueue
+  destroy_addr %2 : $*FixedSizeQueue
+  dealloc_stack %1 : $*FixedSizeQueue
+  return %11 : $Builtin.Int32
+}
+
+// Make sure that we set the end_access as the implicit end lifetime use instead
+// of the terminator.
+// CHECK-LABEL: sil [ossa] @assignableButNotConsumableEndAccessImplicitLifetimeTest : $@convention(thin) (@guaranteed ClassContainingMoveOnly, @owned NonTrivialStruct2) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $ClassContainingMoveOnly, [[ARG1:%.*]] : @owned
+// CHECK: bb2:
+// CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr [[ARG0]]
+// CHECK-NEXT:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]]
+// CHECK-NEXT:   [[GEP1:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK-NEXT:   [[GEP2:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK-NEXT:   destroy_addr [[GEP2]]
+// CHECK-NEXT:   store [[ARG1]] to [init] [[GEP1]]
+// CHECK-NEXT:   end_access [[ACCESS]]
+// CHECK-NEXT:   br bb3
+// CHECK: } // end sil function 'assignableButNotConsumableEndAccessImplicitLifetimeTest'
+sil [ossa] @assignableButNotConsumableEndAccessImplicitLifetimeTest : $@convention(thin) (@guaranteed ClassContainingMoveOnly, @owned NonTrivialStruct2) -> () {
+bb0(%0 : @guaranteed $ClassContainingMoveOnly, %1 : @owned $NonTrivialStruct2):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $NonTrivialStruct2
+  br bb3
+
+bb2:
+  %2 = ref_element_addr %0 : $ClassContainingMoveOnly, #ClassContainingMoveOnly.value
+  %3 = begin_access [modify] [dynamic] %2 : $*NonTrivialStruct
+  %4 = mark_must_check [assignable_but_not_consumable] %3 : $*NonTrivialStruct
+  %4a = struct_element_addr %4 : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+  store %1 to [assign] %4a : $*NonTrivialStruct2
+  end_access %3 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  %9999 = tuple ()
+  return %9999 : $()
+}

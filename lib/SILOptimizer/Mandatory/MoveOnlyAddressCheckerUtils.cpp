@@ -290,6 +290,22 @@ llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
+struct RAIILLVMDebug {
+  StringRef str;
+
+  RAIILLVMDebug(StringRef str) : str(str) {
+    LLVM_DEBUG(llvm::dbgs() << "===>>> Starting " << str << '\n');
+  }
+
+  RAIILLVMDebug(StringRef str, SILInstruction *u) : str(str) {
+    LLVM_DEBUG(llvm::dbgs() << "===>>> Starting " << str << ":" << *u);
+  }
+
+  ~RAIILLVMDebug() {
+    LLVM_DEBUG(llvm::dbgs() << "===<<< Completed " << str << '\n');
+  }
+};
+
 static void insertDebugValueBefore(SILInstruction *insertPt,
                                    DebugVarCarryingInst debugVar,
                                    llvm::function_ref<SILValue ()> operand) {
@@ -384,17 +400,6 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
       }
     }
   }
-
-  // See if we have an assignable_but_not_consumable from a formal access.
-  // In this case, the value must be live at the end of the
-  // access, similar to an inout parameter.
-  if (markedAddr->getCheckKind() ==
-      MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
-    if (isa<BeginAccessInst>(operand)) {
-      return true;
-    }
-  }
-
 
   return false;
 }
@@ -501,9 +506,13 @@ struct UseState {
   /// the part of the type tree that it initializes.
   InstToBitMap initInsts;
 
+  SmallFrozenMultiMap<SILInstruction *, SILValue, 8> initToValueMultiMap;
+
   /// memInstMustReinitialize insts. Contains both insts like copy_addr/store
   /// [assign] that are reinits that we will convert to inits and true reinits.
   InstToBitMap reinitInsts;
+
+  SmallFrozenMultiMap<SILInstruction *, SILValue, 8> reinitToValueMultiMap;
 
   /// The set of drop_deinits of this mark_must_check
   SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
@@ -513,7 +522,7 @@ struct UseState {
   /// terminator user and so that we can use the set to quickly identify later
   /// while emitting diagnostics that a liveness use is a terminator user and
   /// emit a specific diagnostic message.
-  SmallSetVector<SILInstruction *, 2> inoutTermUsers;
+  SmallSetVector<SILInstruction *, 2> implicitEndOfLifetimeLivenessUses;
 
   /// We add debug_values to liveness late after we diagnose, but before we
   /// hoist destroys to ensure that we do not hoist destroys out of access
@@ -557,19 +566,29 @@ struct UseState {
     setAffectedBits(inst, range, livenessUses);
   }
 
-  void recordReinitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+  void recordReinitUse(SILInstruction *inst, SILValue value,
+                       TypeTreeLeafTypeRange range) {
+    reinitToValueMultiMap.insert(inst, value);
     setAffectedBits(inst, range, reinitInsts);
   }
 
-  void recordInitUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+  void recordInitUse(SILInstruction *inst, SILValue value,
+                     TypeTreeLeafTypeRange range) {
+    initToValueMultiMap.insert(inst, value);
     setAffectedBits(inst, range, initInsts);
   }
 
-  /// Returns true if this is a terminator instruction that although it doesn't
-  /// use our inout argument directly is used by the pass to ensure that we
-  /// reinit said argument if we consumed it in the body of the function.
-  bool isInOutTermUser(SILInstruction *inst) const {
-    return inoutTermUsers.count(inst);
+  /// Returns true if this is an instruction that is used by the pass to ensure
+  /// that we reinit said argument if we consumed it in a region of code.
+  ///
+  /// Example:
+  ///
+  /// 1. In the case of an inout argument, this will contain the terminator
+  /// instruction.
+  /// 2. In the case of a ref_element_addr or a global, this will contain the
+  /// end_access.
+  bool isImplicitEndOfLifetimeLivenessUses(SILInstruction *inst) const {
+    return implicitEndOfLifetimeLivenessUses.count(inst);
   }
 
   /// Returns true if the given instruction is within the same block as a reinit
@@ -607,9 +626,11 @@ struct UseState {
     copyInsts.clear();
     takeInsts.clear();
     initInsts.clear();
+    initToValueMultiMap.reset();
     reinitInsts.clear();
+    reinitToValueMultiMap.reset();
     dropDeinitInsts.clear();
-    inoutTermUsers.clear();
+    implicitEndOfLifetimeLivenessUses.clear();
     debugValue = nullptr;
   }
 
@@ -647,14 +668,19 @@ struct UseState {
     for (auto *inst : dropDeinitInsts) {
       llvm::dbgs() << *inst;
     }
-    llvm::dbgs() << "InOut Term Users:\n";
-    for (auto *inst : inoutTermUsers) {
+    llvm::dbgs() << "Implicit End Of Lifetime Liveness Users:\n";
+    for (auto *inst : implicitEndOfLifetimeLivenessUses) {
       llvm::dbgs() << *inst;
     }
     llvm::dbgs() << "Debug Value User:\n";
     if (debugValue) {
       llvm::dbgs() << *debugValue;
     }
+  }
+
+  void freezeMultiMaps() {
+    initToValueMultiMap.setFrozen();
+    reinitToValueMultiMap.setFrozen();
   }
 
   SmallBitVector &getOrCreateConsumingBlock(SILBasicBlock *block) {
@@ -680,16 +706,28 @@ struct UseState {
   void
   initializeLiveness(FieldSensitiveMultiDefPrunedLiveRange &prunedLiveness);
 
-  void initializeInOutTermUsers() {
-    if (!isInOutDefThatNeedsEndOfFunctionLiveness(address))
+  void initializeImplicitEndOfLifetimeLivenessUses() {
+    if (isInOutDefThatNeedsEndOfFunctionLiveness(address)) {
+      SmallVector<SILBasicBlock *, 8> exitBlocks;
+      address->getFunction()->findExitingBlocks(exitBlocks);
+      for (auto *block : exitBlocks) {
+        LLVM_DEBUG(llvm::dbgs() << "    Adding term as liveness user: "
+                                << *block->getTerminator());
+        implicitEndOfLifetimeLivenessUses.insert(block->getTerminator());
+      }
       return;
+    }
 
-    SmallVector<SILBasicBlock *, 8> exitBlocks;
-    address->getFunction()->findExitingBlocks(exitBlocks);
-    for (auto *block : exitBlocks) {
-      LLVM_DEBUG(llvm::dbgs() << "    Adding term as liveness user: "
-                              << *block->getTerminator());
-      inoutTermUsers.insert(block->getTerminator());
+    if (address->getCheckKind() ==
+        MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+      if (auto *bai = dyn_cast<BeginAccessInst>(address->getOperand())) {
+        for (auto *eai : bai->getEndAccesses()) {
+          LLVM_DEBUG(llvm::dbgs() << "    Adding end_access as implicit end of "
+                                     "lifetime liveness user: "
+                                  << *eai);
+          implicitEndOfLifetimeLivenessUses.insert(eai);
+        }
+      }
     }
   }
 
@@ -749,7 +787,7 @@ struct UseState {
     // An "inout terminator use" is an implicit liveness use of the entire
     // value. This is because we need to ensure that our inout value is
     // reinitialized along exit paths.
-    if (inoutTermUsers.count(inst))
+    if (implicitEndOfLifetimeLivenessUses.count(inst))
       return true;
 
     return false;
@@ -767,6 +805,28 @@ struct UseState {
       auto iter = reinitInsts.find(inst);
       if (iter != reinitInsts.end()) {
         if (span.intersects(iter->second))
+          return true;
+      }
+    }
+    return false;
+  }
+
+  bool isInitUse(SILInstruction *inst, const SmallBitVector &requiredBits,
+                 SmallBitVector &foundInitBits) const {
+    {
+      auto iter = initInsts.find(inst);
+      if (iter != initInsts.end()) {
+        foundInitBits = iter->second & requiredBits;
+        if (foundInitBits.any())
+          return true;
+      }
+    }
+
+    if (isReinitToInitConvertibleInst(inst)) {
+      auto iter = reinitInsts.find(inst);
+      if (iter != reinitInsts.end()) {
+        foundInitBits = iter->second & requiredBits;
+        if (foundInitBits.any())
           return true;
       }
     }
@@ -904,7 +964,8 @@ void UseState::initializeLiveness(
             llvm::dbgs()
             << "Found in/in_guaranteed/inout/inout_aliasable argument as "
                "an init... adding mark_must_check as init!\n");
-        recordInitUse(address, liveness.getTopLevelSpan());
+        // We cheat here slightly and use our address's operand.
+        recordInitUse(address, address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
         break;
       case swift::SILArgumentConvention::Indirect_Out:
@@ -935,14 +996,14 @@ void UseState::initializeLiveness(
         // later invariants that we assert upon remain true.
         LLVM_DEBUG(llvm::dbgs() << "Found move only arg closure box use... "
                                    "adding mark_must_check as init!\n");
-        recordInitUse(address, liveness.getTopLevelSpan());
+        recordInitUse(address, address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
       }
     } else if (auto *box = dyn_cast<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs() << "Found move only var allocbox use... "
                  "adding mark_must_check as init!\n");
-      recordInitUse(address, liveness.getTopLevelSpan());
+      recordInitUse(address, address, liveness.getTopLevelSpan());
       liveness.initializeDef(address, liveness.getTopLevelSpan());
     }
   }
@@ -953,7 +1014,7 @@ void UseState::initializeLiveness(
           stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found ref_element_addr use... "
                                "adding mark_must_check as init!\n");
-    recordInitUse(address, liveness.getTopLevelSpan());
+    recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
@@ -963,7 +1024,7 @@ void UseState::initializeLiveness(
           dyn_cast<GlobalAddrInst>(stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found global_addr use... "
                                "adding mark_must_check as init!\n");
-    recordInitUse(address, liveness.getTopLevelSpan());
+    recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
@@ -1064,13 +1125,11 @@ void UseState::initializeLiveness(
                liveness.print(llvm::dbgs()));
   }
 
-  // Finally, if we have an inout argument, add a liveness use of the entire
-  // value on terminators in blocks that are exits from the function. This
-  // ensures that along all paths, if our inout is not reinitialized before we
-  // exit the function, we will get an error. We also stash these users into
-  // inoutTermUser so we can quickly recognize them later and emit a better
-  // error msg.
-  for (auto *inst : inoutTermUsers) {
+  // Finally, if we have an inout argument or an access scope associated with a
+  // ref_element_addr or global_addr, add a liveness use of the entire value on
+  // the implicit end lifetime instruction. For inout this is terminators for
+  // ref_element_addr, global_addr it is the end_access instruction.
+  for (auto *inst : implicitEndOfLifetimeLivenessUses) {
     liveness.updateForUse(inst, TypeTreeLeafTypeRange(address),
                           false /*lifetime ending*/);
     LLVM_DEBUG(llvm::dbgs() << "Added liveness for inoutTermUser: " << *inst;
@@ -1477,52 +1536,51 @@ struct CopiedLoadBorrowEliminationVisitor final
 } // namespace
 
 //===----------------------------------------------------------------------===//
-//                  MARK: DestructureThroughDeinit Checking
+//                   MARK: Partial Consume/Reinit Checking
 //===----------------------------------------------------------------------===//
+
+namespace {
 
 /// When partial consumption is enabled, we only allow for destructure through
 /// deinits. When partial consumption is disabled, we error on /all/ partial
 /// consumption.
-static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
-                                TypeTreeLeafTypeRange usedBits,
-                                DiagnosticEmitter &diagnosticEmitter) {
-  LLVM_DEBUG(llvm::dbgs() << "    DestructureNeedingUse: " << *use->getUser());
+enum class IsPartialConsumeOrReinit_t {
+  IsPartialConsume,
+  IsPartialReinit,
+};
 
-  SILFunction *fn = rootAddress->getFunction();
+} // namespace
 
-  // We walk down from our ancestor to our projection, emitting an error if any
-  // of our types have a deinit.
+static std::pair<SILType, NominalTypeDecl *>
+shouldEmitPartialError(UseState &useState, SILInstruction *user,
+                       SILType useType, TypeTreeLeafTypeRange usedBits) {
+  SILFunction *fn = useState.getFunction();
+
+  // We walk down from our ancestor to our projection, emitting an error if
+  // any of our types have a deinit.
+  auto iterType = useState.address->getType();
+  if (iterType.isMoveOnlyWrapped())
+    return {SILType(), nullptr};
+
   TypeOffsetSizePair pair(usedBits);
-  auto targetType = use->get()->getType();
-  auto iterType = rootAddress->getType();
+  auto targetType = useType;
   TypeOffsetSizePair iterPair(iterType, fn);
 
-  // If our rootAddress is moveonlywrapped, then we know that it must be
-  // copyable under the hood meanign that we copy its fields rather than
-  // destructure the fields.
-  if (iterType.isMoveOnlyWrapped())
-    return;
+  LLVM_DEBUG(llvm::dbgs() << "    Iter Type: " << iterType << '\n'
+                          << "    Target Type: " << targetType << '\n');
 
-  // If we are not allowing for any partial consumption, just emit an error
-  // immediately.
-  if (!rootAddress->getModule().getASTContext().LangOpts.hasFeature(
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
           Feature::MoveOnlyPartialConsumption)) {
+    LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption disabled!\n");
     // If the types equal, just bail early.
-    if (iterType == targetType)
-      return;
-
-    // Otherwise, build up the path string and emit the error.
-    SmallString<128> pathString;
-    auto rootType = rootAddress->getType();
-    if (iterType != rootType) {
-      llvm::raw_svector_ostream os(pathString);
-      pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
+    if (iterType == targetType) {
+      LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
+                                 "without emitting error!\n");
+      return {SILType(), nullptr};
     }
 
-    diagnosticEmitter.emitCannotDestructureNominalError(
-        rootAddress, pathString, nullptr /*nominal*/, use->getUser(),
-        false /*is for deinit error*/);
-    return;
+    // Emit the error.
+    return {iterType, nullptr};
   }
 
   // Otherwise, walk the type looking for the deinit.
@@ -1537,17 +1595,7 @@ static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
         // actual projection string.
-        SmallString<128> pathString;
-        auto rootType = rootAddress->getType();
-        if (iterType != rootType) {
-          llvm::raw_svector_ostream os(pathString);
-          pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
-        }
-
-        diagnosticEmitter.emitCannotDestructureNominalError(
-            rootAddress, pathString, nom, use->getUser(),
-            true /*is for deinit error*/);
-        break;
+        return {iterType, nom};
       }
     }
 
@@ -1556,8 +1604,209 @@ static void checkForDestructure(MarkMustCheckInst *rootAddress, Operand *use,
     std::tie(iterPair, iterType) =
         *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
   }
+
+  return {SILType(), nullptr};
 }
 
+static void
+checkForPartialConsume(UseState &useState, DiagnosticEmitter &diagnosticEmitter,
+                       SILInstruction *user, SILType useType,
+                       TypeTreeLeafTypeRange usedBits,
+                       IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
+  SILFunction *fn = useState.getFunction();
+
+  // We walk down from our ancestor to our projection, emitting an error if
+  // any of our types have a deinit.
+  TypeOffsetSizePair pair(usedBits);
+  SILType errorIterType;
+  NominalTypeDecl *nom;
+  std::tie(errorIterType, nom) =
+      shouldEmitPartialError(useState, user, useType, usedBits);
+  if (!errorIterType)
+    return;
+
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
+          Feature::MoveOnlyPartialConsumption)) {
+    // Otherwise, build up the path string and emit the error.
+    SmallString<128> pathString;
+    auto rootType = useState.address->getType();
+    if (errorIterType != rootType) {
+      llvm::raw_svector_ostream os(pathString);
+      pair.constructPathString(errorIterType, {rootType, fn}, rootType, fn, os);
+    }
+
+    diagnosticEmitter.emitCannotPartiallyConsumeError(
+        useState.address, pathString, nullptr /*nominal*/, user,
+        false /*deinit only*/);
+    return;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
+
+  SmallString<128> pathString;
+  auto rootType = useState.address->getType();
+  if (errorIterType != rootType) {
+    llvm::raw_svector_ostream os(pathString);
+    pair.constructPathString(errorIterType, {rootType, fn}, rootType, fn, os);
+  }
+
+  diagnosticEmitter.emitCannotPartiallyConsumeError(
+      useState.address, pathString, nom, user, true /*deinit only*/);
+}
+
+static void
+checkForPartialConsume(UseState &useState, DiagnosticEmitter &diagnosticEmitter,
+                       Operand *op, TypeTreeLeafTypeRange usedBits,
+                       IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
+  return checkForPartialConsume(useState, diagnosticEmitter, op->getUser(),
+                                op->get()->getType(), usedBits,
+                                isPartialConsumeOrReinit);
+}
+
+static void diagnosePartialReinitError(UseState &useState,
+                                       DiagnosticEmitter &diagnosticEmitter,
+                                       SILInstruction *user, SILType errorType,
+                                       NominalTypeDecl *nom,
+                                       SILInstruction *earlierConsumingUse,
+                                       TypeTreeLeafTypeRange usedBits) {
+  SILFunction *fn = useState.getFunction();
+
+  // We walk down from our ancestor to our projection, emitting an error if
+  // any of our types have a deinit.
+  TypeOffsetSizePair pair(usedBits);
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
+          Feature::MoveOnlyPartialConsumption)) {
+    // Otherwise, build up the path string and emit the error.
+    SmallString<128> pathString;
+    auto rootType = useState.address->getType();
+    if (errorType != rootType) {
+      llvm::raw_svector_ostream os(pathString);
+      pair.constructPathString(errorType, {rootType, fn}, rootType, fn, os);
+    }
+
+    diagnosticEmitter.emitCannotPartiallyReinitError(
+        useState.address, pathString, nullptr /*nominal*/, user,
+        earlierConsumingUse, false /*deinit only*/);
+    return;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
+
+  SmallString<128> pathString;
+  auto rootType = useState.address->getType();
+  if (errorType != rootType) {
+    llvm::raw_svector_ostream os(pathString);
+    pair.constructPathString(errorType, {rootType, fn}, rootType, fn, os);
+  }
+
+  diagnosticEmitter.emitCannotPartiallyReinitError(
+      useState.address, pathString, nom, user, earlierConsumingUse,
+      true /*deinit only*/);
+}
+
+namespace {
+
+struct PartialReinitChecker {
+  UseState &useState;
+  DiagnosticEmitter &diagnosticEmitter;
+
+  PartialReinitChecker(UseState &useState, DiagnosticEmitter &diagnosticEmitter)
+      : useState(useState), diagnosticEmitter(diagnosticEmitter) {}
+
+  void
+  performPartialReinitChecking(FieldSensitiveMultiDefPrunedLiveRange &liveness);
+
+private:
+  void checkForPartialConsumeOrInitError(
+      SILInstruction *user, SILType useType, TypeTreeLeafTypeRange usedBits,
+      IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
+    ::checkForPartialConsume(useState, diagnosticEmitter, user, useType,
+                             usedBits, isPartialConsumeOrReinit);
+  }
+};
+
+} // namespace
+
+void PartialReinitChecker::performPartialReinitChecking(
+    FieldSensitiveMultiDefPrunedLiveRange &liveness) {
+  // Perform checks that rely on liveness information.
+  for (auto initToValues : useState.initToValueMultiMap.getRange()) {
+    LLVM_DEBUG(llvm::dbgs() << "Checking init: " << *initToValues.first);
+    bool emittedError = false;
+    for (SILValue value : initToValues.second) {
+      LLVM_DEBUG(llvm::dbgs() << "    Checking operand value: " << value);
+      // By computing the bits here directly, we do not need to worry about
+      // having to split contiguous ranges into separate representable SILTypes.
+      SmallBitVector neededElements(useState.getNumSubelements());
+      auto range = *TypeTreeLeafTypeRange::get(value, useState.address);
+      for (unsigned index : range.getRange()) {
+        emittedError = !liveness.findEarlierConsumingUse(
+            initToValues.first, index,
+            [&](SILInstruction *consumingInst) -> bool {
+              SILType errorType;
+              NominalTypeDecl *nom;
+              std::tie(errorType, nom) = shouldEmitPartialError(
+                  useState, initToValues.first, value->getType(),
+                  TypeTreeLeafTypeRange(index, index + 1));
+              if (!errorType)
+                return true;
+
+              diagnosePartialReinitError(
+                  useState, diagnosticEmitter, initToValues.first, errorType,
+                  nom, consumingInst, TypeTreeLeafTypeRange(index, index + 1));
+              return false;
+            });
+
+        // If we emitted an error for this index break. We only want to emit one
+        // error per value.
+        if (emittedError)
+          break;
+      }
+
+      // If we emitted an error for this value break. We only want to emit one
+      // error per instruction.
+      if (emittedError)
+        break;
+    }
+  }
+
+  for (auto reinitToValues : useState.reinitToValueMultiMap.getRange()) {
+    if (!isReinitToInitConvertibleInst(reinitToValues.first))
+      continue;
+
+    LLVM_DEBUG(llvm::dbgs() << "Checking reinit: " << *reinitToValues.first);
+    bool emittedError = false;
+    for (SILValue value : reinitToValues.second) {
+      LLVM_DEBUG(llvm::dbgs() << "    Checking operand value: " << value);
+      // By computing the bits here directly, we do not need to worry about
+      // having to split contiguous ranges into separate representable SILTypes.
+      SmallBitVector neededElements(useState.getNumSubelements());
+      auto range = *TypeTreeLeafTypeRange::get(value, useState.address);
+      for (unsigned index : range.getRange()) {
+        emittedError = !liveness.findEarlierConsumingUse(
+            reinitToValues.first, index,
+            [&](SILInstruction *consumingInst) -> bool {
+              SILType errorType;
+              NominalTypeDecl *nom;
+              std::tie(errorType, nom) = shouldEmitPartialError(
+                  useState, reinitToValues.first, value->getType(),
+                  TypeTreeLeafTypeRange(index, index + 1));
+              if (!errorType)
+                return true;
+
+              diagnosePartialReinitError(
+                  useState, diagnosticEmitter, reinitToValues.first, errorType,
+                  nom, consumingInst, TypeTreeLeafTypeRange(index, index + 1));
+              return false;
+            });
+        if (emittedError)
+          break;
+      }
+      if (emittedError)
+        break;
+    }
+  }
+}
 //===----------------------------------------------------------------------===//
 //                   MARK: GatherLexicalLifetimeUseVisitor
 //===----------------------------------------------------------------------===//
@@ -1662,7 +1911,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!leafRange)
       return false;
 
-    useState.recordInitUse(user, *leafRange);
+    useState.recordInitUse(user, op->get(), *leafRange);
     return true;
   }
 
@@ -1671,7 +1920,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
-    useState.recordReinitUse(user, *leafRange);
+    useState.recordReinitUse(user, op->get(), *leafRange);
     return true;
   }
 
@@ -1757,7 +2006,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // If we have a copy_addr, we are either going to have a take or a
     // copy... in either case, this copy_addr /is/ going to be a consuming
     // operation. Make sure to check if we semantically destructure.
-    checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+    checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
+                           IsPartialConsumeOrReinit_t::IsPartialConsume);
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -1852,11 +2102,28 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
           assert(checkKind == MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
-        } else {
-          // Otherwise, we need to emit an escaping closure error.
+          return true;
+        }
+
+        // If we have a function argument that is no_consume_or_assign and we do
+        // not have any partial apply uses, then we know that we have a use of
+        // an address only borrowed parameter that we need to
+        if (fArg &&
+            checkKind == MarkMustCheckInst::CheckKind::NoConsumeOrAssign &&
+            !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        // Finally try to emit either a global or class field error...
+        if (!moveChecker.diagnosticEmitter
+                 .emitGlobalOrClassFieldLoadedAndConsumed(markedValue)) {
+          // And otherwise if we failed emit an escaping closure error.
           moveChecker.diagnosticEmitter
               .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
         }
+
         return true;
       }
 
@@ -1927,7 +2194,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     } else {
       // Now that we know that we are going to perform a take, perform a
       // checkForDestructure.
-      checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+      checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
+                             IsPartialConsumeOrReinit_t::IsPartialConsume);
 
       // If we emitted an error diagnostic, do not transform further and instead
       // mark that we emitted an early diagnostic and return true.
@@ -1982,7 +2250,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // error.
     unsigned numDiagnostics =
         moveChecker.diagnosticEmitter.getDiagnosticCount();
-    checkForDestructure(markedValue, op, *leafRange, diagnosticEmitter);
+    checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
+                           IsPartialConsumeOrReinit_t::IsPartialConsume);
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");
@@ -2212,7 +2481,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
         if (addressUseState.isLivenessUse(&*ii, errorSpan)) {
           diagnosticEmitter.emitAddressDiagnostic(
               addressUseState.address, &*ii, errorUser, false /*is consuming*/,
-              addressUseState.isInOutTermUser(&*ii));
+              addressUseState.isImplicitEndOfLifetimeLivenessUses(&*ii));
           foundSingleBlockError = true;
           emittedDiagnostic = true;
           break;
@@ -2232,8 +2501,9 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
                   &*ii, FieldSensitivePrunedLiveness::NonLifetimeEndingUse,
                   errorSpan)) {
             diagnosticEmitter.emitAddressDiagnostic(
-                addressUseState.address, &*ii, errorUser, false /*is consuming*/,
-                addressUseState.isInOutTermUser(&*ii));
+                addressUseState.address, &*ii, errorUser,
+                false /*is consuming*/,
+                addressUseState.isImplicitEndOfLifetimeLivenessUses(&*ii));
             foundSingleBlockError = true;
             emittedDiagnostic = true;
             break;
@@ -2323,7 +2593,8 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
               diagnosticEmitter.emitAddressDiagnostic(
                   addressUseState.address, &blockInst, errorUser,
                   false /*is consuming*/,
-                  addressUseState.isInOutTermUser(&blockInst));
+                  addressUseState.isImplicitEndOfLifetimeLivenessUses(
+                      &blockInst));
               foundSingleBlockError = true;
               emittedDiagnostic = true;
               break;
@@ -2547,6 +2818,18 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
             // instruction.
             insertUndefDebugValue(insertPt);
           }
+          continue;
+        }
+
+        // If we have an implicit end of lifetime use, we do not insert a
+        // destroy_addr. Instead, we insert an undef debug value after the
+        // use. This occurs if we have an end_access associated with a
+        // global_addr or a ref_element_addr field access.
+        if (addressUseState.isImplicitEndOfLifetimeLivenessUses(inst)) {
+          LLVM_DEBUG(
+              llvm::dbgs()
+              << "    Use was an implicit end of lifetime liveness use!\n");
+          insertUndefDebugValue(inst->getNextInstruction());
           continue;
         }
 
@@ -3104,6 +3387,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // [copy] + begin_borrow for further processing. This just eliminates a case
   // that the checker doesn't need to know about.
   {
+    RAIILLVMDebug l("CopiedLoadBorrowEliminationVisitor");
+
     CopiedLoadBorrowEliminationState state(markedAddress->getFunction());
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
     if (AddressUseKind::Unknown ==
@@ -3125,12 +3410,16 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // SILGen will treat y as a separate rvalue from x and will create a temporary
   // allocation. In contrast if we have a var, we treat x like an lvalue and
   // just create GEPs appropriately.
-  if (eliminateTemporaryAllocationsFromLet(markedAddress)) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-            << "Succeeded in eliminating temporary allocations! Fn after:\n";
-        markedAddress->getFunction()->dump());
-    changed = true;
+  {
+    RAIILLVMDebug l("temporary allocations from rvalue accesses");
+
+    if (eliminateTemporaryAllocationsFromLet(markedAddress)) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+              << "Succeeded in eliminating temporary allocations! Fn after:\n";
+          markedAddress->getFunction()->dump());
+      changed = true;
+    }
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this
@@ -3139,10 +3428,16 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
                             diagnosticEmitter);
   SWIFT_DEFER { visitor.clear(); };
-  visitor.reset(markedAddress);
-  if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
-    LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
-    return false;
+
+  {
+    RAIILLVMDebug l("main use gathering visitor");
+
+    visitor.reset(markedAddress);
+    if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Failed access path visit: " << *markedAddress);
+      return false;
+    }
   }
 
   // If we found a load [copy] or copy_addr that requires multiple copies or an
@@ -3165,38 +3460,55 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // DISCUSSION: For non address only types, this is not an issue since we
   // eagerly load
 
-  addressUseState.initializeInOutTermUsers();
+  addressUseState.initializeImplicitEndOfLifetimeLivenessUses();
 
   //===---
   // Liveness Checking
   //
+
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
   FieldSensitiveMultiDefPrunedLiveRange liveness(fn, markedAddress,
                                                  &discoveredBlocks);
-  addressUseState.initializeLiveness(liveness);
 
-  // Then compute the takes that are within the cumulative boundary of
-  // liveness that we have computed. If we find any, they are the errors ones.
-  GlobalLivenessChecker emitter(addressUseState, diagnosticEmitter, liveness);
+  {
+    RAIILLVMDebug logger("liveness initialization");
 
-  // If we had any errors, we do not want to modify the SIL... just bail.
-  if (emitter.compute()) {
-    return true;
+    addressUseState.initializeLiveness(liveness);
   }
 
-  //===
-  // Final Transformation
-  //
+  // Now freeze our multimaps.
+  addressUseState.freezeMultiMaps();
 
-  // Ok, we now know that we fit our model since we did not emit errors and thus
-  // can begin the transformation.
-  SWIFT_DEFER { consumes.clear(); };
+  {
+    RAIILLVMDebug l("checking for partial reinits");
+    PartialReinitChecker checker(addressUseState, diagnosticEmitter);
+    unsigned count = diagnosticEmitter.getDiagnosticCount();
+    checker.performPartialReinitChecking(liveness);
+    if (count != diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found a partial reinit error! Ending early!\n");
+      return true;
+    }
+  }
+
+  {
+    RAIILLVMDebug l("performing global liveness checks");
+    // Then compute the takes that are within the cumulative boundary of
+    // liveness that we have computed. If we find any, they are the errors
+    // ones.
+    GlobalLivenessChecker emitter(addressUseState, diagnosticEmitter, liveness);
+
+    // If we had any errors, we do not want to modify the SIL... just bail.
+    if (emitter.compute()) {
+      return true;
+    }
+  }
 
   // First add any debug_values that we saw as liveness uses. This is important
   // since the debugger wants to see live values when we define a debug_value,
   // but we do not want to use them earlier when emitting diagnostic errors.
   if (auto *di = addressUseState.debugValue) {
-    // Move the debug_value to right before the markedAddress to ensure that we
+    // Move the debug_value to right after the markedAddress to ensure that we
     // do not actually change our liveness computation.
     //
     // NOTE: The author is not sure if this can ever happen with SILGen output,
@@ -3206,14 +3518,28 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
                           false /*lifetime ending*/);
   }
 
+  // Compute our initial boundary.
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
+  LLVM_DEBUG(llvm::dbgs() << "Initial use based boundary:\n"; boundary.dump());
+
   if (!DisableMoveOnlyAddressCheckerLifetimeExtension) {
     ExtendUnconsumedLiveness extension(addressUseState, liveness, boundary);
     extension.run();
   }
   boundary.clear();
   liveness.computeBoundary(boundary);
+
+  LLVM_DEBUG(llvm::dbgs() << "Final maximized boundary:\n"; boundary.dump());
+
+  //===
+  // Final Transformation
+  //
+
+  // Ok, we now know that we fit our model since we did not emit errors and thus
+  // can begin the transformation.
+  SWIFT_DEFER { consumes.clear(); };
+
   insertDestroysOnBoundary(markedAddress, liveness, boundary);
   checkForReinitAfterDiscard();
   rewriteUses(markedAddress, liveness, boundary);
@@ -3225,6 +3551,22 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+#ifndef NDEBUG
+static llvm::cl::opt<uint64_t> NumTopLevelToProcess(
+    "sil-move-only-address-checker-num-top-level-to-process",
+    llvm::cl::desc("Allows for bisecting on move introducer that causes an "
+                   "error. Only meant for debugging!"),
+    llvm::cl::init(UINT64_MAX));
+#endif
+
+static llvm::cl::opt<bool> DumpSILBeforeRemovingMarkMustCheck(
+    "sil-move-only-address-checker-dump-before-removing-mark-must-check",
+    llvm::cl::desc("When bisecting it is useful to dump the SIL before the "
+                   "rest of the checker removes mark_must_check. This lets one "
+                   "grab the SIL of a bad variable after all of the rest have "
+                   "been processed to work with further in sil-opt."),
+    llvm::cl::init(false));
+
 bool MoveOnlyAddressChecker::check(
     SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess) {
   assert(moveIntroducersToProcess.size() &&
@@ -3232,8 +3574,17 @@ bool MoveOnlyAddressChecker::check(
   MoveOnlyAddressCheckerPImpl pimpl(fn, diagnosticEmitter, domTree, poa,
                                     allocator);
 
+#ifndef NDEBUG
+  static uint64_t numProcessed = 0;
+#endif
   for (auto *markedValue : moveIntroducersToProcess) {
-    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
+#ifndef NDEBUG
+    ++numProcessed;
+    if (NumTopLevelToProcess <= numProcessed)
+      break;
+#endif
+    LLVM_DEBUG(llvm::dbgs()
+               << "======>>> Visiting top level: " << *markedValue);
 
     // Perform our address check.
     unsigned diagnosticEmittedByEarlierPassCount =
@@ -3254,5 +3605,10 @@ bool MoveOnlyAddressChecker::check(
     }
   }
 
+  if (DumpSILBeforeRemovingMarkMustCheck) {
+    LLVM_DEBUG(llvm::dbgs()
+                   << "Dumping SIL before removing mark must checks!\n";
+               fn->dump());
+  }
   return pimpl.changed;
 }

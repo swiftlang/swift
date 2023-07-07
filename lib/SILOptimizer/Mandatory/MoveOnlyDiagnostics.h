@@ -160,20 +160,34 @@ public:
                                           Operand *consumingUse,
                                           Operand *nonConsumingUse);
 
+  /// Emit a diagnostic for a case where we have one of the following cases:
+  ///
+  /// 1. A partial_apply formed from a borrowed address only value.
+  /// 2. A use of a captured value in a closure callee.
   void emitAddressEscapingClosureCaptureLoadedAndConsumed(
       MarkMustCheckInst *markedValue);
+
+  /// Try to emit a diagnostic for a load/consume from an
+  /// assignable_but_not_consumable access to a global or a class field. Returns
+  /// false if we did not find something we pattern matched as being either of
+  /// those cases. Returns true if we emitted a diagnostic.
+  bool emitGlobalOrClassFieldLoadedAndConsumed(MarkMustCheckInst *markedValue);
+
   void emitPromotedBoxArgumentError(MarkMustCheckInst *markedValue,
                                     SILFunctionArgument *arg);
 
-  void emitCannotDestructureDeinitNominalError(MarkMustCheckInst *markedValue,
-                                               StringRef pathString,
-                                               NominalTypeDecl *deinitedNominal,
-                                               SILInstruction *consumingUser);
-  void emitCannotDestructureNominalError(MarkMustCheckInst *markedValue,
-                                         StringRef pathString,
-                                         NominalTypeDecl *nominal,
-                                         SILInstruction *consumingUser,
-                                         bool isDueToDeinit);
+  void emitCannotPartiallyConsumeError(MarkMustCheckInst *markedValue,
+                                       StringRef pathString,
+                                       NominalTypeDecl *nominal,
+                                       SILInstruction *consumingUser,
+                                       bool dueToDeinit);
+
+  void emitCannotPartiallyReinitError(MarkMustCheckInst *markedValue,
+                                      StringRef pathString,
+                                      NominalTypeDecl *nominal,
+                                      SILInstruction *initUser,
+                                      SILInstruction *consumingUser,
+                                      bool dueToDeinit);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing

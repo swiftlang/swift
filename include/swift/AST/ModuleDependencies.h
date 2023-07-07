@@ -18,8 +18,9 @@
 #ifndef SWIFT_AST_MODULE_DEPENDENCIES_H
 #define SWIFT_AST_MODULE_DEPENDENCIES_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/LLVM.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
@@ -31,12 +32,12 @@
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/CAS/ObjectStore.h"
-#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 namespace swift {
 
@@ -733,17 +734,16 @@ using ModuleDependenciesKindRefMap =
 /// Track swift dependency
 class SwiftDependencyTracker {
 public:
-  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS,
-                         const std::vector<std::string> &CommonFiles)
-      : FS(FS.createProxyFS()), Files(CommonFiles) {}
+  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS)
+      : FS(FS.createProxyFS()) {}
 
   void startTracking();
+  void addCommonSearchPathDeps(const SearchPathOptions& Opts);
   void trackFile(const Twine &path) { (void)FS->status(path); }
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
 
 private:
   llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
-  const std::vector<std::string> &Files;
 };
 
 // MARK: SwiftDependencyScanningService
@@ -848,7 +848,7 @@ public:
     if (!CacheFS)
       return llvm::None;
 
-    return SwiftDependencyTracker(*CacheFS, CommonDependencyFiles);
+    return SwiftDependencyTracker(*CacheFS);
   }
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {

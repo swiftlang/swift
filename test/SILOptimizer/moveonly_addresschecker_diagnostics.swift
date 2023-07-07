@@ -2476,6 +2476,60 @@ public func addressOnlyGenericAccessConsumeGrandFieldArg4a<T>(_ x2: consuming Ad
     }
 }
 
+public func addressOnlyGenericBorrowingConsume<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    let _ = x // expected-note {{consumed here}}
+}
+
+public func addressOnlyGenericBorrowingConsumeField<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    let _ = x.moveOnly // expected-note {{consumed here}}
+}
+
+public func addressOnlyGenericBorrowingConsumeField2<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    let _ = x.copyable
+}
+
+public func addressOnlyGenericBorrowingConsumeGrandField<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    let _ = x.moveOnly.k // expected-note {{consumed here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x
+
+    let _ = x2.moveOnly
+}
+
+public func addressOnlyGenericLetAccessFieldTest2<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+
+    let _ = x2.moveOnly // expected-note {{consumed here}}
+    let _ = x2.moveOnly // expected-note {{consumed again here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest2a<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+
+    let _ = x2.moveOnly // expected-note {{consumed here}}
+    let _ = x2.moveOnly.k // expected-note {{consumed again here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest2b<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+
+    let _ = x2.moveOnly // expected-note {{consumed here}}
+    let _ = x2.copyable
+    let _ = x2.moveOnly.k // expected-note {{consumed again here}}
+}
+
+public func addressOnlyGenericLetAccessFieldTest3<T>(_ x: consuming AddressOnlyGeneric<T>) {
+    let x2 = x
+
+    let _ = x2.moveOnly
+    let _ = x2.copyable
+}
+
 extension AddressOnlyGeneric {
     func testNoUseSelf() { // expected-error {{'self' is borrowed and cannot be consumed}}
         let x = self // expected-note {{consumed here}}
@@ -4496,4 +4550,15 @@ public class NonFinalCopyableKlassWithMoveOnlyField {
     let moveOnlyLetStruct = NonTrivialStruct()
     var moveOnlyVarProt = AddressOnlyProtocol()
     let moveOnlyLetProt = AddressOnlyProtocol()
+}
+
+//////////////////////
+// MARK: Misc Tests //
+//////////////////////
+
+// For misc tests associated with specific radars.
+func assignableButNotConsumableEndAccessImplicitLifetimeTest(_ x: CopyableKlassWithMoveOnlyField) {
+    if boolValue {
+        x.moveOnlyVarStruct.nonTrivialStruct2 = NonTrivialStruct2()
+    }
 }

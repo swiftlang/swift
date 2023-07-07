@@ -3496,6 +3496,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(argumentLocator);
       }
 
+      // If functions are differentiable, ensure that @noDerivative is not
+      // discarded.
+      if (func1->isDifferentiable() && func2->isDifferentiable() &&
+          func1Param.isNoDerivative() && !func2Param.isNoDerivative()) {
+        return getTypeMatchFailure(argumentLocator);
+      }
+
       // FIXME: We should check value ownership too, but it's not completely
       // trivial because of inout-to-pointer conversions.
 
@@ -13584,21 +13591,41 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     }
 
     decl = overloadChoice.getDecl();
+
     auto openedOverloadTypes = getOpenedTypes(overloadLocator);
     openedTypes.append(openedOverloadTypes.begin(), openedOverloadTypes.end());
   }
 
-  auto genericContext = decl->getAsGenericContext();
-  if (!genericContext)
+  std::function<GenericParamList *(ValueDecl *)> getGenericParams =
+      [&](ValueDecl *decl) -> GenericParamList * {
+    auto genericContext = decl->getAsGenericContext();
+    if (!genericContext)
+      return nullptr;
+
+    auto genericParams = genericContext->getGenericParams();
+    if (!genericParams) {
+      // If declaration is a non-generic typealias, let's point
+      // to the underlying generic declaration.
+      if (auto *TA = dyn_cast<TypeAliasDecl>(decl)) {
+        if (auto *UGT = TA->getUnderlyingType()->getAs<AnyGenericType>())
+          return getGenericParams(UGT->getDecl());
+      }
+    }
+
+    return genericParams;
+  };
+
+  if (!decl->getAsGenericContext())
     return SolutionKind::Error;
 
-  auto genericParams = genericContext->getGenericParams();
-  if (!genericParams || genericParams->size() == 0) {
+  auto genericParams = getGenericParams(decl);
+  if (!genericParams) {
     // FIXME: Record an error here that we're ignoring the parameters.
     return SolutionKind::Solved;
   }
 
   // Map the generic parameters we have over to their opened types.
+  bool hasParameterPack = false;
   SmallVector<Type, 2> openedGenericParams;
   auto genericParamDepth = genericParams->getParams()[0]->getDepth();
   for (const auto &openedType : openedTypes) {
@@ -13620,19 +13647,38 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
 
         auto *expansion = PackExpansionType::get(patternType, shapeType);
         openedGenericParams.push_back(expansion);
+        hasParameterPack = true;
       } else {
         openedGenericParams.push_back(Type(openedType.second));
       }
     }
   }
+
+  if (openedGenericParams.empty()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    return recordFix(AllowConcreteTypeSpecialization::create(
+               *this, type1, getConstraintLocator(locator)))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
+  }
+
   assert(openedGenericParams.size() == genericParams->size());
 
   // Match the opened generic parameters to the specialized arguments.
   auto specializedArgs = type2->castTo<PackType>()->getElementTypes();
   PackMatcher matcher(openedGenericParams, specializedArgs, getASTContext(),
                       isPackExpansionType);
-  if (matcher.match())
-    return SolutionKind::Error;
+  if (matcher.match()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    auto *fix = IgnoreGenericSpecializationArityMismatch::create(
+        *this, decl, openedGenericParams.size(), specializedArgs.size(),
+        hasParameterPack, getConstraintLocator(locator));
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
 
   // Bind the opened generic parameters to the specialization arguments.
   for (const auto &pair : matcher.pairs) {
@@ -14732,7 +14778,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::AllowAssociatedValueMismatch:
-  case FixKind::GenericArgumentsMismatch: {
+  case FixKind::GenericArgumentsMismatch:
+  case FixKind::AllowConcreteTypeSpecialization:
+  case FixKind::IgnoreGenericSpecializationArityMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

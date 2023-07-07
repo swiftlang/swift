@@ -1022,8 +1022,6 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       return;
   }
 
-  decl->setAddedImplicitInitializers();
-
   // We can only inherit initializers if we have a superclass.
   if (!decl->getSuperclassDecl() || !decl->getSuperclass())
     return;
@@ -1166,10 +1164,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (decl->addedImplicitInitializers())
     return;
 
-  if (!shouldAttemptInitializerSynthesis(decl)) {
-    decl->setAddedImplicitInitializers();
+  decl->setAddedImplicitInitializers();
+
+  if (!shouldAttemptInitializerSynthesis(decl))
     return;
-  }
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);

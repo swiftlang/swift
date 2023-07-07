@@ -119,9 +119,12 @@ UPCOMING_FEATURE(DisableActorInferenceFromPropertyWrapperUsage, 401, 6)
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
-EXPERIMENTAL_FEATURE(CodeItemMacros, true)
+EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(InitAccessors, false)
+
+EXPERIMENTAL_FEATURE(ExtensionMacros, false)
+SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -210,6 +213,12 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, false)
 
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
+
+// Enable strict concurrency.
+EXPERIMENTAL_FEATURE(StrictConcurrency, true)
+
+/// Defer Sendable checking to SIL diagnostic phase.
+EXPERIMENTAL_FEATURE(DeferredSendableChecking, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -3,6 +3,10 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
 
+// String literals are not completely constant folded in SIL for ptrsize=32 which fails `deadClassInstance()`.
+// This is no problem as LLVM can complete the constant folding.
+// UNSUPPORTED: PTRSIZE=32
+
 protocol E {
   func f() -> Bool
 }

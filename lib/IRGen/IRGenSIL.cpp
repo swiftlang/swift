@@ -2987,23 +2987,6 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   setLoweredAddress(i, addr);
 }
 
-/// Returns true if \p val has no other uses than ref_element_addr or
-/// ref_tail_addr.
-static bool hasOnlyProjections(SILValue val) {
-  for (Operand *use : val->getUses()) {
-    SILInstruction *user = use->getUser();
-    if (auto *upCast = dyn_cast<UpcastInst>(user)) {
-      if (!hasOnlyProjections(upCast))
-        return false;
-      continue;
-    }
-    if (isa<RefElementAddrInst>(user) || isa<RefTailAddrInst>(user))
-      continue;
-    return false;
-  }
-  return true;
-}
-
 void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
   SILGlobalVariable *var = i->getReferencedGlobal();
   assert(var->isInitializedObject() &&
@@ -3017,7 +3000,7 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
                                                 NotForDefinition).getAddress();
   // We don't need to initialize the global object if it's never used for
   // something which can access the object header.
-  if (!hasOnlyProjections(i) && !IGM.canMakeStaticObjectsReadOnly()) {
+  if (!i->isBare() && !IGM.canMakeStaticObjectsReadOnly()) {
     auto ClassType = loweredTy.getASTType();
     llvm::Value *Metadata =
       emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata,
@@ -4408,13 +4391,10 @@ IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
 
 // FIXME: We could lower select_enum directly to LLVM select in a lot of cases.
 // For now, just emit a switch and phi nodes, like a chump.
-template <class C, class T, class B>
-static llvm::BasicBlock *
-emitBBMapForSelect(IRGenSILFunction &IGF, Explosion &resultPHI,
-                   SmallVectorImpl<std::pair<T, llvm::BasicBlock *>> &BBs,
-                   llvm::BasicBlock *&defaultBB,
-                   SelectInstBase<C, T, B> *inst) {
-
+static llvm::BasicBlock *emitBBMapForSelect(
+    IRGenSILFunction &IGF, Explosion &resultPHI,
+    SmallVectorImpl<std::pair<EnumElementDecl *, llvm::BasicBlock *>> &BBs,
+    llvm::BasicBlock *&defaultBB, SelectEnumOperation inst) {
   auto origBB = IGF.Builder.GetInsertBlock();
 
   // Set up a continuation BB and phi nodes to receive the result value.
@@ -4425,8 +4405,7 @@ emitBBMapForSelect(IRGenSILFunction &IGF, Explosion &resultPHI,
   SmallVector<llvm::Value*, 4> phis;
   auto &ti = IGF.getTypeInfo(inst->getType());
   emitPHINodesForType(IGF, inst->getType(), ti,
-                      inst->getNumCases() + inst->hasDefault(),
-                      phis);
+                      inst.getNumCases() + inst.hasDefault(), phis);
   resultPHI.add(phis);
   
   IGF.Builder.SetInsertPoint(origBB);
@@ -4440,10 +4419,10 @@ emitBBMapForSelect(IRGenSILFunction &IGF, Explosion &resultPHI,
       addIncomingExplosionToPHINodes(IGF, resultPHI.getAll(), ex);
     }
   };
-  
-  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
-    auto casePair = inst->getCase(i);
-    
+
+  for (unsigned i = 0, e = inst.getNumCases(); i < e; ++i) {
+    auto casePair = inst.getCase(i);
+
     // Create a basic block destination for this case.
     llvm::BasicBlock *destBB = IGF.createBasicBlock("");
     IGF.Builder.emitBlock(destBB);
@@ -4455,18 +4434,18 @@ emitBBMapForSelect(IRGenSILFunction &IGF, Explosion &resultPHI,
     IGF.Builder.CreateBr(contBB);
     BBs.push_back(std::make_pair(casePair.first, destBB));
   }
-  
-  if (inst->hasDefault()) {
+
+  if (inst.hasDefault()) {
     defaultBB = IGF.createBasicBlock("");
     IGF.Builder.emitBlock(defaultBB);
-    
-    addIncoming(inst->getDefaultResult());
-    
+
+    addIncoming(inst.getDefaultResult());
+
     IGF.Builder.CreateBr(contBB);
   } else {
     defaultBB = nullptr;
   }
-  
+
   IGF.Builder.emitBlock(contBB);
   
   IGF.Builder.SetInsertPoint(origBB);
@@ -4545,10 +4524,9 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
   return result;
 }
 
-template <class C, class T, class B>
 static LoweredValue getLoweredValueForSelect(IRGenSILFunction &IGF,
                                              Explosion &result,
-                                             SelectInstBase<C, T, B> *inst) {
+                                             SelectEnumOperation inst) {
   if (inst->getType().isAddress())
     // FIXME: Loses potentially better alignment info we might have.
     return LoweredValue(Address(
@@ -4558,14 +4536,14 @@ static LoweredValue getLoweredValueForSelect(IRGenSILFunction &IGF,
 }
 
 static void emitSingleEnumMemberSelectResult(IRGenSILFunction &IGF,
-                                             SelectEnumInstBase *inst,
+                                             SelectEnumOperation seo,
                                              llvm::Value *isTrue,
                                              Explosion &result) {
-  assert((inst->getNumCases() == 1 && inst->hasDefault()) ||
-         (inst->getNumCases() == 2 && !inst->hasDefault()));
-  
+  assert((seo.getNumCases() == 1 && seo.hasDefault()) ||
+         (seo.getNumCases() == 2 && !seo.hasDefault()));
+
   // Extract the true values.
-  auto trueValue = inst->getCase(0).second;
+  auto trueValue = seo.getCase(0).second;
   SmallVector<llvm::Value*, 4> TrueValues;
   if (trueValue->getType().isAddress()) {
     TrueValues.push_back(IGF.getLoweredAddress(trueValue).getAddress());
@@ -4577,7 +4555,7 @@ static void emitSingleEnumMemberSelectResult(IRGenSILFunction &IGF,
     
   // Extract the false values.
   auto falseValue =
-    inst->hasDefault() ? inst->getDefaultResult() : inst->getCase(1).second;
+      seo.hasDefault() ? seo.getDefaultResult() : seo.getCase(1).second;
   SmallVector<llvm::Value*, 4> FalseValues;
   if (falseValue->getType().isAddress()) {
     FalseValues.push_back(IGF.getLoweredAddress(falseValue).getAddress());
@@ -4605,11 +4583,10 @@ static void emitSingleEnumMemberSelectResult(IRGenSILFunction &IGF,
   }
 }
 
-
 void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
   auto &EIS = getEnumImplStrategy(IGM, inst->getEnumOperand()->getType());
+  auto seo = SelectEnumOperation(inst);
   Explosion result;
-
   if (llvm::Value *R = mapTriviallyToInt(*this, EIS, inst)) {
     result.add(R);
   } else if ((inst->getNumCases() == 1 && inst->hasDefault()) ||
@@ -4618,16 +4595,17 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
     // particularly common when testing optionals.
     Explosion value = getLoweredExplosion(inst->getEnumOperand());
     auto isTrue = EIS.emitValueCaseTest(*this, value, inst->getCase(0).first);
-    emitSingleEnumMemberSelectResult(*this, inst, isTrue, result);
+    emitSingleEnumMemberSelectResult(*this, SelectEnumOperation(inst), isTrue,
+                                     result);
   } else {
     Explosion value = getLoweredExplosion(inst->getEnumOperand());
 
     // Map the SIL dest bbs to their LLVM bbs.
     SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
     llvm::BasicBlock *defaultDest;
-    llvm::BasicBlock *contBB
-      = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
-    
+    llvm::BasicBlock *contBB =
+        emitBBMapForSelect(*this, result, dests, defaultDest, seo);
+
     // Emit the dispatch.
     EIS.emitValueSwitch(*this, value, dests, defaultDest);
 
@@ -4635,12 +4613,12 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
     // receive the result.
     Builder.SetInsertPoint(contBB);
   }
-  setLoweredValue(inst,
-                  getLoweredValueForSelect(*this, result, inst));
+  setLoweredValue(inst, getLoweredValueForSelect(*this, result, seo));
 }
 
 void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
   Address value = getLoweredAddress(inst->getEnumOperand());
+  auto seo = SelectEnumOperation(inst);
   Explosion result;
 
   if ((inst->getNumCases() == 1 && inst->hasDefault()) ||
@@ -4651,14 +4629,15 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
     auto isTrue = EIS.emitIndirectCaseTest(*this,
                                            inst->getEnumOperand()->getType(),
                                            value, inst->getCase(0).first);
-    emitSingleEnumMemberSelectResult(*this, inst, isTrue, result);
+    emitSingleEnumMemberSelectResult(*this, SelectEnumOperation(inst), isTrue,
+                                     result);
   } else {
       // Map the SIL dest bbs to their LLVM bbs.
     SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
     llvm::BasicBlock *defaultDest;
-    llvm::BasicBlock *contBB
-      = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
-    
+    llvm::BasicBlock *contBB =
+        emitBBMapForSelect(*this, result, dests, defaultDest, seo);
+
     // Emit the dispatch.
     emitSwitchAddressOnlyEnumDispatch(*this, inst->getEnumOperand()->getType(),
                                       value, dests, defaultDest);
@@ -4667,8 +4646,7 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
     Builder.SetInsertPoint(contBB);
   }
 
-  setLoweredValue(inst,
-                  getLoweredValueForSelect(*this, result, inst));
+  setLoweredValue(inst, getLoweredValueForSelect(*this, result, seo));
 }
 
 void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
@@ -4805,6 +4783,9 @@ void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
 void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
   auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
   if (ARI && StackAllocs.count(ARI)) {
+    if (ARI->isBare())
+      return;
+
     // A small peep-hole optimization: If the operand is allocated on stack and
     // there is no "significant" code between the set_deallocating and the final
     // dealloc_ref, the set_deallocating is not required.
@@ -5712,7 +5693,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
   buildTailArrays(*this, TailArrays, i);
 
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(),
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
                                              StackAllocSize, TailArrays);
   if (StackAllocSize >= 0) {
     // Remember that this alloc_ref allocates the object on the stack.

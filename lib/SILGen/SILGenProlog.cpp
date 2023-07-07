@@ -1373,8 +1373,8 @@ SILValue SILGenFunction::emitMainExecutor(SILLocation loc) {
         ctx.TheExecutorType,
         getModule().getSwiftModule());
     getMainExecutorFuncDecl->getAttrs().add(
-        new (ctx)
-            SILGenNameAttr("swift_task_getMainExecutor", /*implicit*/ true));
+        new (ctx) SILGenNameAttr("swift_task_getMainExecutor", /*raw*/ false,
+                                 /*implicit*/ true));
   }
 
   auto fn = SGM.getFunction(

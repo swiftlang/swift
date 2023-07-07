@@ -152,7 +152,7 @@ static void splitConcreteEquivalenceClasses(
     ArrayRef<Requirement> requirements,
     const ProtocolDecl *proto,
     const RequirementMachine *machine,
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     SmallVectorImpl<StructuralRequirement> &splitRequirements,
     unsigned &attempt) {
   bool debug = machine->getDebugOptions().contains(

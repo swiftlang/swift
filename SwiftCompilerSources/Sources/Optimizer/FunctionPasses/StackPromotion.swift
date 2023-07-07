@@ -46,17 +46,9 @@ let stackPromotion = FunctionPass(name: "stack-promotion") {
   var needFixStackNesting = false
   for inst in function.instructions {
     if let allocRef = inst as? AllocRefInstBase {
-      if deadEndBlocks.isDeadEnd(allocRef.parentBlock) {
-        // Don't stack promote any allocation inside a code region which ends up
-        // in a no-return block. Such allocations may missing their final release.
-        // We would insert the deallocation too early, which may result in a
-        // use-after-free problem.
-        continue
-      }
       if !context.continueWithNextSubpassRun(for: allocRef) {
         break
       }
-
       if tryPromoteAlloc(allocRef, deadEndBlocks, context) {
         needFixStackNesting = true
       }
@@ -75,9 +67,38 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   if allocRef.isObjC || allocRef.canAllocOnStack {
     return false
   }
+
   // The most important check: does the object escape the current function?
   if allocRef.isEscaping(context) {
     return false
+  }
+
+  if deadEndBlocks.isDeadEnd(allocRef.parentBlock) {
+
+    // Allocations inside a code region which ends up in a no-return block may missing their
+    // final release. Therefore we extend their lifetime indefinitely, e.g.
+    //
+    //  %k = alloc_ref $Klass
+    //  ...
+    //  unreachable  // The end of %k's lifetime
+    //
+    // There is one exception: if it's in a loop (within the dead-end region) we must not
+    // extend its lifetime. In this case we can be sure that its final release is not
+    // missing, because otherwise the object would be leaking. For example:
+    //
+    //  bb1:
+    //    %k = alloc_ref $Klass
+    //    ...                    // %k's lifetime must end somewhere here
+    //    cond_br %c, bb1, bb2
+    //  bb2:
+    //    unreachable
+    //
+    // Therefore, if the allocation is inside a loop, we can treat it like allocations in
+    // non dead-end regions.
+    if !isInLoop(block: allocRef.parentBlock, context) {
+      allocRef.setIsStackAllocatable(context)
+      return true
+    }
   }
 
   // Try to find the top most dominator block which dominates all use points.
@@ -293,3 +314,16 @@ private extension BasicBlockRange {
   }
 }
 
+private func isInLoop(block startBlock: BasicBlock, _ context: FunctionPassContext) -> Bool {
+  var worklist = BasicBlockWorklist(context)
+  defer { worklist.deinitialize() }
+
+  worklist.pushIfNotVisited(contentsOf: startBlock.successors)
+  while let block = worklist.pop() {
+    if block == startBlock {
+      return true
+    }
+    worklist.pushIfNotVisited(contentsOf: block.successors)
+  }
+  return false
+}

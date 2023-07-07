@@ -1604,7 +1604,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (clangImporterOpts.CASOpts) {
     genericSubInvocation.getClangImporterOptions().CASOpts =
         clangImporterOpts.CASOpts;
-    GenericArgs.push_back("-enable-cas");
+    GenericArgs.push_back("-cache-compile-job");
     if (!clangImporterOpts.CASOpts->CASPath.empty()) {
       GenericArgs.push_back("-cas-path");
       GenericArgs.push_back(clangImporterOpts.CASOpts->CASPath);
@@ -1669,6 +1669,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
+  SubFEOpts.StrictImplicitModuleContext =
+      LoaderOpts.strictImplicitModuleContext;
   if (!moduleCachePath.empty()) {
     genericSubInvocation.setClangModuleCachePath(moduleCachePath);
   }
@@ -1866,6 +1868,10 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   // invocation.
   CompilerInvocation subInvocation = genericSubInvocation;
 
+  // save `StrictImplicitModuleContext`
+  bool StrictImplicitModuleContext =
+      subInvocation.getFrontendOptions().StrictImplicitModuleContext;
+
   // Save the target triple from the original context.
   llvm::Triple originalTargetTriple(subInvocation.getLangOptions().Target);
 
@@ -1949,6 +1955,10 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     BuildArgs.push_back("-target");
     BuildArgs.push_back(parsedTargetTriple.str());
   }
+
+  // restore `StrictImplicitModuleContext`
+  subInvocation.getFrontendOptions().StrictImplicitModuleContext =
+      StrictImplicitModuleContext;
 
   CompilerInstance subInstance;
   SubCompilerInstanceInfo info;

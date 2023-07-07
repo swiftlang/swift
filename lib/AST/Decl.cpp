@@ -408,7 +408,25 @@ void Decl::visitAuxiliaryDecls(
   }
 
   if (visitFreestandingExpanded) {
-    if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
+    Decl *thisDecl = mutableThis;
+
+    // If this is a top-level code decl consisting of a macro expansion
+    // expression that substituted with a macro expansion declaration, use
+    // that instead.
+    if (auto *tlcd = dyn_cast<TopLevelCodeDecl>(thisDecl)) {
+      if (auto body = tlcd->getBody()) {
+        if (body->getNumElements() == 1) {
+          if (auto expr = body->getFirstElement().dyn_cast<Expr *>()) {
+            if (auto expansion = dyn_cast<MacroExpansionExpr>(expr)) {
+              if (auto substitute = expansion->getSubstituteDecl())
+                thisDecl = substitute;
+            }
+          }
+        }
+      }
+    }
+
+    if (auto *med = dyn_cast<MacroExpansionDecl>(thisDecl)) {
       if (auto bufferID = evaluateOrDefault(
               ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
         auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
@@ -1219,7 +1237,7 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
   }
 }
 
-TypeArrayView<GenericTypeParamType>
+ArrayRef<GenericTypeParamType *>
 GenericContext::getInnermostGenericParamTypes() const {
   return getGenericSignature().getInnermostGenericParams();
 }
@@ -2395,10 +2413,15 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
 static AccessStrategy
 getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   switch (storage->getWriteImpl()) {
-  case WriteImplKind::Immutable:
+  case WriteImplKind::Immutable: {
+    if (storage->hasInitAccessor())
+      return AccessStrategy::getAccessor(AccessorKind::Init,
+                                         /*dispatch=*/false);
+
     assert(isa<VarDecl>(storage) && cast<VarDecl>(storage)->isLet() &&
            "mutation of a immutable variable that isn't a let");
     return AccessStrategy::getStorage();
+  }
   case WriteImplKind::Stored:
     return AccessStrategy::getStorage();
   case WriteImplKind::StoredWithObservers:
@@ -2475,7 +2498,9 @@ getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
 }
 
 static AccessStrategy
-getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch){
+getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+  if (storage->hasInitAccessor() && !storage->getAccessor(AccessorKind::Set))
+    return AccessStrategy::getAccessor(AccessorKind::Init, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
@@ -6403,6 +6428,38 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
       ctx.evaluator, HasCircularInheritedProtocolsRequest{mutableThis}, true);
 }
 
+/// Returns a descriptive name for the given accessor/addressor kind.
+StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
+                                              bool article) {
+  switch (accessorKind) {
+  case AccessorKind::Get:
+    return article ? "a getter" : "getter";
+  case AccessorKind::Set:
+    return article ? "a setter" : "setter";
+  case AccessorKind::Address:
+    return article ? "an addressor" : "addressor";
+  case AccessorKind::MutableAddress:
+    return article ? "a mutable addressor" : "mutable addressor";
+  case AccessorKind::Read:
+    return article ? "a 'read' accessor" : "'read' accessor";
+  case AccessorKind::Modify:
+    return article ? "a 'modify' accessor" : "'modify' accessor";
+  case AccessorKind::WillSet:
+    return "'willSet'";
+  case AccessorKind::DidSet:
+    return "'didSet'";
+  case AccessorKind::Init:
+    return article ? "an init accessor" : "init accessor";
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
+StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
+                                              bool article) {
+  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
+                                      article);
+}
+
 bool AbstractStorageDecl::hasStorage() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -6470,7 +6527,8 @@ void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
   auto record = Accessors.getPointer();
   if (record) {
     for (auto accessor : accessors) {
-      (void) record->addOpaqueAccessor(accessor);
+      if (!record->getAccessor(accessor->getAccessorKind()))
+        (void) record->addOpaqueAccessor(accessor);
     }
   } else {
     record = AccessorRecord::create(getASTContext(),
@@ -6562,6 +6620,27 @@ void AbstractStorageDecl::AccessorRecord::addOpaqueAccessor(AccessorDecl *decl){
   bool isUnique = registerAccessor(decl, index);
   assert(isUnique && "adding opaque accessor that's already present");
   (void) isUnique;
+}
+
+void AbstractStorageDecl::AccessorRecord::removeAccessor(
+    AccessorDecl *accessor
+) {
+  // Remove this accessor from the list of accessors.
+  assert(getAccessor(accessor->getAccessorKind()) == accessor);
+  std::remove(getAccessorsBuffer().begin(), getAccessorsBuffer().end(),
+              accessor);
+
+  // Clear out the accessor kind -> index mapping.
+  std::memset(AccessorIndices, 0, sizeof(AccessorIndices));
+
+  // Re-add all of the remaining accessors to build up the index mapping.
+  unsigned numAccessorsLeft = NumAccessors - 1;
+  NumAccessors = numAccessorsLeft;
+  auto buffer = getAccessorsBuffer();
+  NumAccessors = 0;
+  for (auto index : range(0, numAccessorsLeft)) {
+    addOpaqueAccessor(buffer[index]);
+  }
 }
 
 /// Register that we have an accessor of the given kind.
@@ -6755,8 +6834,17 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
 
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
-  if (!isLet())
+  if (!isLet()) {
+    if (hasInitAccessor()) {
+      if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
+        if (base && ctor->getImplicitSelfDecl() != base->getDecl())
+          return supportsMutation();
+        return true;
+      }
+    }
+
     return supportsMutation();
+  }
 
   // Static 'let's are always immutable.
   if (isStatic()) {
@@ -6859,6 +6947,9 @@ bool VarDecl::isLazilyInitializedGlobal() const {
     return false;
 
   if (isDebuggerVar())
+    return false;
+
+  if (getAttrs().hasAttribute<SILGenNameAttr>())
     return false;
 
   // Top-level global variables in the main source file and in the REPL are not
@@ -10359,7 +10450,7 @@ std::vector<MacroRole> swift::getAllMacroRoles() {
   return {
       MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
       MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
-      MacroRole::Conformance,     MacroRole::CodeItem,
+      MacroRole::Conformance,     MacroRole::CodeItem,    MacroRole::Extension,
   };
 }
 
@@ -10388,6 +10479,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::CodeItem:
     return "codeItem";
+
+  case MacroRole::Extension:
+    return "extension";
   }
 }
 
@@ -10447,7 +10541,8 @@ static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::MemberAttribute |
                                         MacroRole::Member |
                                         MacroRole::Peer |
-                                        MacroRole::Conformance);
+                                        MacroRole::Conformance |
+                                        MacroRole::Extension);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
@@ -10477,12 +10572,53 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
     return true;
   case MacroRole::CodeItem:
     return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
+  case MacroRole::Extension:
+    return ctx.LangOpts.hasFeature(Feature::ExtensionMacros);
   }
 }
 
 void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
   auto macroRef = unexpandedMacro.macroRef;
   auto *baseDecl = unexpandedMacro.baseDecl;
+
+  // If the macro itself is a macro expansion expression, it should come with
+  // a top-level code declaration that we can use for resolution. For such
+  // cases, resolve the macro to determine whether it is a declaration or
+  // code-item macro, meaning that it can produce declarations. In such cases,
+  // expand the macro and use its substituted declaration (a MacroExpansionDecl)
+  // instead.
+  if (auto freestanding = macroRef.dyn_cast<FreestandingMacroExpansion *>()) {
+    if (auto expr = dyn_cast<MacroExpansionExpr>(freestanding)) {
+      bool replacedWithDecl = false;
+      if (auto tlcd = dyn_cast_or_null<TopLevelCodeDecl>(baseDecl)) {
+        ASTContext &ctx = tlcd->getASTContext();
+        if (auto macro = evaluateOrDefault(
+                ctx.evaluator,
+                ResolveMacroRequest{macroRef, tlcd->getDeclContext()},
+                nullptr)) {
+          auto macroDecl = cast<MacroDecl>(macro.getDecl());
+          auto roles = macroDecl->getMacroRoles();
+          if (roles.contains(MacroRole::Declaration) ||
+              roles.contains(MacroRole::CodeItem)) {
+            (void)evaluateOrDefault(ctx.evaluator,
+                                    ExpandMacroExpansionExprRequest{expr},
+                                    llvm::None);
+            if (auto substituted = expr->getSubstituteDecl()) {
+              macroRef = substituted;
+              baseDecl = substituted;
+              replacedWithDecl = true;
+            }
+          }
+        }
+      }
+
+      // If we didn't end up replacing the macro expansion expression with
+      // a declaration, we're done.
+      if (!replacedWithDecl)
+        return;
+    }
+  }
+
   if (!macroRef || !baseDecl)
     return;
   auto *module = getModuleContext();
@@ -10493,9 +10629,12 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
         : auxiliaryDecl->getInnermostDeclContext()->getParentSourceFile();
     // We only visit auxiliary decls that are macro expansions associated with
     // this macro reference.
-    if (auto *med = macroRef.dyn_cast<MacroExpansionDecl *>()) {
-     if (med != sf->getMacroExpansion().dyn_cast<Decl *>())
-       return;
+    if (auto *med = macroRef.dyn_cast<FreestandingMacroExpansion *>()) {
+      auto medAsDecl = dyn_cast<MacroExpansionDecl>(med);
+      auto medAsExpr = dyn_cast<MacroExpansionExpr>(med);
+      if ((!medAsDecl || medAsDecl != sf->getMacroExpansion().dyn_cast<Decl *>()) &&
+          (!medAsExpr || medAsExpr != sf->getMacroExpansion().dyn_cast<Expr *>()))
+        return;
     } else if (auto *attr = macroRef.dyn_cast<CustomAttr *>()) {
      if (attr != sf->getAttachedMacroAttribute())
        return;
@@ -10675,6 +10814,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Member:
   case MacroRole::Peer:
   case MacroRole::CodeItem:
+  case MacroRole::Extension:
     names.push_back(MacroDecl::getUniqueNamePlaceholder(getASTContext()));
     break;
 
@@ -10682,6 +10822,43 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Conformance:
   case MacroRole::MemberAttribute:
     break;
+  }
+}
+
+void MacroDecl::getIntroducedConformances(
+    NominalTypeDecl *attachedTo,
+    SmallVectorImpl<ProtocolDecl *> &conformances) const {
+  auto *attr = getMacroRoleAttr(MacroRole::Extension);
+  if (!attr)
+    return;
+
+  auto &ctx = getASTContext();
+  auto constraintTypes = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveExtensionMacroConformances{attr, this},
+      {});
+
+  for (auto constraint : constraintTypes) {
+    assert(constraint->isConstraintType());
+
+    std::function<void(Type)> addConstraint =
+        [&](Type constraint) -> void {
+          if (auto *proto = constraint->getAs<ParameterizedProtocolType>()) {
+            conformances.push_back(proto->getProtocol());
+            return;
+          } else if (auto *proto = constraint->getAs<ProtocolType>()) {
+            conformances.push_back(proto->getDecl());
+            return;
+          }
+
+          auto *composition =
+              constraint->castTo<ProtocolCompositionType>();
+          for (auto constraint : composition->getMembers()) {
+            addConstraint(constraint);
+          }
+        };
+
+    addConstraint(constraint);
   }
 }
 
@@ -10870,6 +11047,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return origDC;

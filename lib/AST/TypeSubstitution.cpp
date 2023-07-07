@@ -55,7 +55,13 @@ QueryTypeSubstitutionMapOrIdentity::operator()(SubstitutableType *type) const {
   auto known = substitutions.find(key);
   if (known != substitutions.end() && known->second)
     return known->second;
-  
+
+  if (isa<PackArchetypeType>(type) ||
+      (isa<GenericTypeParamType>(type) &&
+       cast<GenericTypeParamType>(type)->isParameterPack())) {
+    return PackType::getSingletonPackExpansion(type);
+  }
+
   return type;
 }
 
@@ -1037,8 +1043,8 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
-        typeDecl->getDeclContext()->getParentSourceFile() ==
-        dc->getParentSourceFile())
+        typeDecl->getDeclContext()->getOutermostParentSourceFile() ==
+        dc->getOutermostParentSourceFile())
       return true;
 
     return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;

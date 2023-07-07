@@ -4376,7 +4376,7 @@ GenericTypeParamType *GenericTypeParamType::get(bool isParameterPack,
   return result;
 }
 
-TypeArrayView<GenericTypeParamType>
+ArrayRef<GenericTypeParamType *>
 GenericFunctionType::getGenericParams() const {
   return Signature.getGenericParams();
 }
@@ -5071,7 +5071,7 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
 }
 
 void GenericSignatureImpl::Profile(llvm::FoldingSetNodeID &ID,
-                              TypeArrayView<GenericTypeParamType> genericParams,
+                              ArrayRef<GenericTypeParamType *> genericParams,
                               ArrayRef<Requirement> requirements) {
   for (auto p : genericParams)
     ID.AddPointer(p);
@@ -5086,19 +5086,8 @@ void GenericSignatureImpl::Profile(llvm::FoldingSetNodeID &ID,
   }
 }
 
-GenericSignature 
-GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
-                      ArrayRef<Requirement> requirements,
-                      bool isKnownCanonical) {
-  SmallVector<Type, 4> paramTypes;
-  for (auto param : params)
-    paramTypes.push_back(param);
-  auto paramsView = TypeArrayView<GenericTypeParamType>(paramTypes);
-  return get(paramsView, requirements, isKnownCanonical);
-}
-
 GenericSignature
-GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
+GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                       ArrayRef<Requirement> requirements,
                       bool isKnownCanonical) {
   assert(!params.empty());
@@ -5128,7 +5117,8 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
 
   // Allocate and construct the new signature.
   size_t bytes =
-      GenericSignatureImpl::template totalSizeToAlloc<Type, Requirement>(
+      GenericSignatureImpl::template totalSizeToAlloc<
+        GenericTypeParamType *, Requirement>(
           params.size(), requirements.size());
   void *mem = ctx.Allocate(bytes, alignof(GenericSignatureImpl));
   auto *newSig =

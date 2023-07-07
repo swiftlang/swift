@@ -3035,6 +3035,7 @@ private:
     WrongType,
     WrongWritability,
     WrongRequiredAttr,
+    WrongForeignErrorConvention,
 
     Match,
     MatchWithExplicitObjCName,
@@ -3336,6 +3337,11 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
+    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req))
+      if (reqAFD->getForeignErrorConvention() !=
+              cast<AbstractFunctionDecl>(cand)->getForeignErrorConvention())
+        return MatchOutcome::WrongForeignErrorConvention;
+
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
       return MatchOutcome::MatchWithExplicitObjCName;
@@ -3437,6 +3443,49 @@ private:
       else
         diag.fixItRemove(cand->getAttrs().getAttribute<RequiredAttr>()
                              ->getLocation());
+      return;
+    }
+
+    case MatchOutcome::WrongForeignErrorConvention: {
+      auto reqConv = cast<AbstractFunctionDecl>(req)->getForeignErrorConvention();
+      auto candConv = cast<AbstractFunctionDecl>(cand)->getForeignErrorConvention();
+
+      if (reqConv && !candConv)
+        diagnose(cand,
+                 diag::objc_implementation_candidate_has_error_convention,
+                 cand->getDescriptiveKind(), cand);
+      else if (!reqConv && candConv)
+        diagnose(cand,
+                 diag::objc_implementation_candidate_lacks_error_convention,
+                 cand->getDescriptiveKind(), cand);
+      else if (reqConv->getKind() != candConv->getKind())
+        diagnose(cand,
+                 diag::objc_implementation_mismatched_error_convention_kind,
+                 cand->getDescriptiveKind(), cand, candConv->getKind(),
+                 reqConv->getKind());
+      else if (reqConv->getErrorParameterIndex()
+                  != candConv->getErrorParameterIndex())
+        diagnose(cand,
+                 diag::objc_implementation_mismatched_error_convention_index,
+                 cand->getDescriptiveKind(), cand,
+                 candConv->getErrorParameterIndex() + 1,
+                 reqConv->getErrorParameterIndex() + 1);
+      else if (reqConv->isErrorParameterReplacedWithVoid()
+                  != candConv->isErrorParameterReplacedWithVoid())
+        diagnose(cand,
+                 diag::objc_implementation_mismatched_error_convention_void_param,
+                 cand->getDescriptiveKind(), cand,
+                 candConv->isErrorParameterReplacedWithVoid());
+      else if (reqConv->isErrorOwned() != candConv->isErrorOwned())
+        diagnose(cand,
+                 diag::objc_implementation_mismatched_error_convention_ownership,
+                 cand->getDescriptiveKind(), cand, candConv->isErrorOwned());
+      else
+        // Catch-all; probably shouldn't happen.
+        diagnose(cand,
+                 diag::objc_implementation_mismatched_error_convention_other,
+                 cand->getDescriptiveKind(), cand);
+
       return;
     }
     }
