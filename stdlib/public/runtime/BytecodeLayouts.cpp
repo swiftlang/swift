@@ -659,6 +659,11 @@ extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
   return 0;
 }
 
+extern "C" void swift_singletonEnum_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  return;
+}
+
 template <typename T>
 static inline T handleSinglePayloadEnumSimpleTag(
     LayoutStringReader &reader, uint8_t *addr,

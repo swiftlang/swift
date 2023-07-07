@@ -670,6 +670,22 @@ func testResilientMultiPayloadEnumGenericInjectTag() {
 
 testResilientMultiPayloadEnumGenericInjectTag()
 
+@inline(never)
+func matchResilientSingletonEnumTag(_ x: ResilientSingletonEnum) -> Int {
+    return switch x {
+    case .nonEmpty: 0
+    }
+}
+
+func testResilientSingletonEnumGenericInjectTag() {
+    let x = ResilientSingletonEnum.nonEmpty(SimpleClass(x: 23))
+
+    // CHECK: Enum case: 0
+    print("Enum case: \(matchResilientSingletonEnumTag(x))")
+}
+
+testResilientSingletonEnumGenericInjectTag()
+
 #if os(macOS)
 
 import Foundation

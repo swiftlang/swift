@@ -940,7 +940,7 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
        !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry))) {
     return nullptr;
   } else if (typeLayoutEntry->isSingleton()) {
-    return nullptr;
+    return IGM.getSingletonEnumDestructiveInjectEnumTagFn();
   } else if (!typeLayoutEntry->isFixedSize(IGM)) {
     if (typeLayoutEntry->isMultiPayloadEnum()) {
       return IGM.getMultiPayloadEnumGenericDestructiveInjectEnumTagFn();
