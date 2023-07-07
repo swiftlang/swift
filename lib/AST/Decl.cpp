@@ -9541,15 +9541,27 @@ void AccessorDecl::printUserFacingName(raw_ostream &out) const {
 
 ArrayRef<VarDecl *> AccessorDecl::getInitializedProperties() const {
   assert(isInitAccessor());
+
   if (auto *SR = getAttrs().getAttribute<StorageRestrictionsAttr>())
     return SR->getInitializesProperties(const_cast<AccessorDecl *>(this));
+
+  // Fallback to old effect style declaration.
+  if (auto *initAttr = getAttrs().getAttribute<InitializesAttr>())
+    return initAttr->getPropertyDecls(const_cast<AccessorDecl *>(this));
+
   return {};
 }
 
 ArrayRef<VarDecl *> AccessorDecl::getAccessedProperties() const {
   assert(isInitAccessor());
+
   if (auto *SR = getAttrs().getAttribute<StorageRestrictionsAttr>())
     return SR->getAccessesProperties(const_cast<AccessorDecl *>(this));
+
+  // Fallback to old effect style declaration.
+  if (auto *accessAttr = getAttrs().getAttribute<AccessesAttr>())
+    return accessAttr->getPropertyDecls(const_cast<AccessorDecl *>(this));
+
   return {};
 }
 

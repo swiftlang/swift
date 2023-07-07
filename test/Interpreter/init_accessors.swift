@@ -538,3 +538,25 @@ test_init_accessors_without_setters()
 // CHECK: test-without-setter1: 42
 // CHECK-NEXT: test-without-setter2: [1, 2, 3]
 // CHECK-NEXT: test-without-setter3: ["a", "b", "c"]
+
+func test_effects_are_still_supported() {
+  struct Test {
+    var _a: Int
+    var _b: Int
+
+    var a: Int {
+      init(initialValue) initializes(_a) accesses(_b) {
+        _a = initialValue
+        _b = 0
+      }
+
+      get { _a }
+    }
+  }
+
+  let test = Test(_b: 1, a: 42)
+  print("effects-support-test: \(test)")
+}
+
+test_effects_are_still_supported()
+// CHEKC: effects-support-test: Test(_a: 42, b: 0)
