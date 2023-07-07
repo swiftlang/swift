@@ -960,7 +960,7 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
          (tzCount % toCount != 0))) {
       return nullptr;
     } else {
-      return nullptr;
+      return IGM.getEnumSimpleDestructiveInjectEnumTagFn();
     }
   }
 }
