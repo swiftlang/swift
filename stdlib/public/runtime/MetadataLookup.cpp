@@ -19,6 +19,7 @@
 #include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/RemoteInspection/Records.h"
@@ -1504,6 +1505,9 @@ private:
   /// Ownership information related to the metadata we are trying to lookup.
   TypeReferenceOwnership ReferenceOwnership;
 
+  /// Stack of shape pack/current index pairs.
+  std::vector<std::pair<MetadataPackPointer, size_t>> ActivePackExpansions;
+
 public:
   using BuiltType = MetadataOrPack;
 
@@ -1611,8 +1615,7 @@ public:
         swift_getTypeByMangledName(MetadataState::Complete,
                                    mangledName, allGenericArgsVec.data(),
         [&substitutions](unsigned depth, unsigned index) {
-          // FIXME: Variadic generics
-          return substitutions.getMetadata(depth, index).getMetadataOrNull();
+          return substitutions.getMetadata(depth, index).Ptr;
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -1858,9 +1861,26 @@ public:
   BuiltType
   createGenericTypeParameterType(unsigned depth, unsigned index) const {
     // Use the callback, when provided.
-    // FIXME: variadic-generics
-    if (substGenericParameter)
-      return BuiltType(substGenericParameter(depth, index));
+    if (substGenericParameter) {
+      BuiltType substType(substGenericParameter(depth, index));
+
+      // If we're in the middle of a pack expansion, return the correct element
+      // from the substituted pack type.
+      if (!ActivePackExpansions.empty()) {
+        size_t index = ActivePackExpansions.back().second;
+        if (substType.isMetadataPack()) {
+          auto substPack = substType.getMetadataPack();
+          if (index >= substPack.getNumElements()) {
+            swift::fatalError(0, "Pack index %zu exceeds pack length %zu\n",
+                              index, substPack.getNumElements());
+          }
+
+          return BuiltType(substPack.getElements()[index]);
+        }
+      }
+
+      return substType;
+    }
 
     return BuiltType();
   }
@@ -1933,7 +1953,7 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createTupleType(llvm::ArrayRef<BuiltType> elements,
-                  std::string labels) const {
+                  llvm::ArrayRef<StringRef> labels) const {
     for (auto element : elements) {
       if (!element.isMetadata()) {
         return TYPE_LOOKUP_ERROR_FMT("Tried to build a tuple type where "
@@ -1941,14 +1961,32 @@ public:
       }
     }
 
+    std::string labelStr;
+    for (unsigned i : indices(labels)) {
+      auto label = labels[i];
+      if (label.empty()) {
+        if (!labelStr.empty())
+          labelStr += ' ';
+        continue;
+      }
+
+      // Add spaces to terminate all the previous labels if this
+      // is the first we've seen.
+      if (labelStr.empty()) labelStr.append(i, ' ');
+
+      // Add the label and its terminator.
+      labelStr += label;
+      labelStr += ' ';
+    }
+
     auto flags = TupleTypeFlags().withNumElements(elements.size());
-    if (!labels.empty())
+    if (!labelStr.empty())
       flags = flags.withNonConstantLabels(true);
     return BuiltType(
         swift_getTupleTypeMetadata(
           MetadataState::Abstract, flags,
           reinterpret_cast<const Metadata * const *>(elements.data()),
-          labels.empty() ? nullptr : labels.c_str(),
+          labelStr.empty() ? nullptr : labelStr.c_str(),
           /*proposedWitnesses=*/nullptr));
   }
 
@@ -1972,10 +2010,35 @@ public:
     return TYPE_LOOKUP_ERROR_FMT("Lowered SILPackType cannot be demangled");
   }
 
-  TypeLookupErrorOr<BuiltType>
-  createPackExpansionType(BuiltType patternType, BuiltType countType) const {
-    // FIXME: Runtime support for variadic generics.
-    return BuiltType();
+  size_t beginPackExpansion(BuiltType countType) {
+    if (!countType.isMetadataPack()) {
+      swift::fatalError(0, "Pack expansion count type should be a pack\n");
+    }
+
+    auto pack = countType.getMetadataPack();
+    ActivePackExpansions.emplace_back(pack, /*index=*/0);
+
+    return pack.getNumElements();
+  }
+
+  void advancePackExpansion(size_t index) {
+    if (ActivePackExpansions.empty()) {
+      swift::fatalError(0, "advancePackExpansion() without beginPackExpansion()\n");
+    }
+
+    ActivePackExpansions.back().second = index;
+  }
+
+  BuiltType createExpandedPackElement(BuiltType patternType) {
+    return patternType;
+  }
+
+  void endPackExpansion() {
+    if (ActivePackExpansions.empty()) {
+      swift::fatalError(0, "endPackExpansion() without beginPackExpansion()\n");
+    }
+
+    ActivePackExpansions.pop_back();
   }
 
   TypeLookupErrorOr<BuiltType> createDependentMemberType(StringRef name,
@@ -2219,8 +2282,7 @@ swift_getTypeByMangledNameInEnvironment(
     MetadataState::Complete, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2252,8 +2314,7 @@ swift_getTypeByMangledNameInEnvironmentInMetadataState(
     (MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2284,8 +2345,7 @@ swift_getTypeByMangledNameInContext(
     MetadataState::Complete, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2317,8 +2377,7 @@ swift_getTypeByMangledNameInContextInMetadataState(
     (MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -2504,8 +2563,7 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
       demangler,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
-        // FIXME: Variadic generics
-        return substFn.getMetadata(depth, index).getMetadataOrNull();
+        return substFn.getMetadata(depth, index).Ptr;
       },
       /*SubstDependentWitnessTableFn=*/
       [&substFn](const Metadata *type, unsigned index) {
@@ -2546,8 +2604,7 @@ swift_func_getParameterTypeInfo(
       demangler,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
-        // FIXME: Variadic generics
-        return substFn.getMetadata(depth, index).getMetadataOrNull();
+        return substFn.getMetadata(depth, index).Ptr;
       },
       /*SubstDependentWitnessTableFn=*/
       [&substFn](const Metadata *type, unsigned index) {
@@ -2590,8 +2647,7 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
   auto error = _checkGenericRequirements(
       genericEnv->getGenericRequirements(), witnessTables,
       [&substFn](unsigned depth, unsigned index) {
-        // FIXME: Variadic generics
-        return substFn.getMetadata(depth, index).getMetadataOrNull();
+        return substFn.getMetadata(depth, index).Ptr;
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
@@ -2625,8 +2681,7 @@ swift_getOpaqueTypeMetadata(MetadataRequest request,
   return swift_getTypeByMangledName(request.getState(),
                                     mangledName, arguments,
     [&substitutions](unsigned depth, unsigned index) {
-      // FIXME: Variadic generics
-      return substitutions.getMetadata(depth, index).getMetadataOrNull();
+      return substitutions.getMetadata(depth, index).Ptr;
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
@@ -3068,8 +3123,7 @@ static void _gatherWrittenGenericArgs(
             req.getMangledTypeName(),
             (const void * const *)allGenericArgs.data(),
             [&substitutions](unsigned depth, unsigned index) {
-              // FIXME: Variadic generics
-              return substitutions.getMetadata(depth, index).getMetadataOrNull();
+              return substitutions.getMetadata(depth, index).Ptr;
             },
             [&substitutions](const Metadata *type, unsigned index) {
               return substitutions.getWitnessTable(type, index);
