@@ -1714,6 +1714,10 @@ ResolveExtensionMacroConformances::evaluate(Evaluator &evaluator,
 
       typeExpr->setType(MetatypeType::get(resolved));
       protocols.push_back(resolved);
+    } else {
+      // If there's no type repr, we already have a resolved instance
+      // type, e.g. because the type expr was deserialized.
+      protocols.push_back(typeExpr->getInstanceType());
     }
   }
 

@@ -1195,6 +1195,30 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro {
 
 }
 
+extension ObservableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): Observable {
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct ObservablePropertyMacro: AccessorMacro {
   public static func expansion(
     of node: AttributeSyntax,
