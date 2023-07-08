@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
 import OptimizerBridging
-import Parse
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {

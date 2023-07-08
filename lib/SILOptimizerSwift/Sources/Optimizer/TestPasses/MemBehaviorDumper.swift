@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// Prints the memory behavior of relevant instructions in relation to address values of the function.
 let memBehaviorDumper = FunctionPass(name: "dump-mem-behavior") {
   (function: Function, context: FunctionPassContext) in

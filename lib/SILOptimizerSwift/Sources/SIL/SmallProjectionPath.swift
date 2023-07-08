@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Basic
-
 /// A small and very efficient representation of a projection path.
 ///
 /// A `SmallProjectionPath` can be parsed and printed in SIL syntax and parsed from Swift

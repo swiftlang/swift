@@ -28,7 +28,6 @@
 // %l = load %s                               the access
 // ```
 //===----------------------------------------------------------------------===//
-import SIL
 
 /// AccessBase describes the base address of a memory access (e.g. of a `load` or `store``).
 /// The "base address" is defined as the address which is obtained from the access address by

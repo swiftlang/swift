@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import OptimizerBridging
-import SIL
 
 struct AliasAnalysis {
   let bridged: BridgedAliasAnalysis

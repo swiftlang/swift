@@ -65,8 +65,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 extension ProjectedValue {
 
   /// Returns true if the projected value escapes.

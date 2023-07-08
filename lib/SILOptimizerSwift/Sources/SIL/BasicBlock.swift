@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Basic
 import SILBridging
 
 @_semantics("arc.immortal")

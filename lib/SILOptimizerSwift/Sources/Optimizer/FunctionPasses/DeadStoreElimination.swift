@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// Eliminates dead store instructions.
 ///
 /// A store is dead if after the store has occurred:

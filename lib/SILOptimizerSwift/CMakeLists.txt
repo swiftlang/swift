@@ -23,6 +23,7 @@ add_pure_swift_host_library(swiftSILOptimizerSwift STATIC
   Sources/Optimizer/FunctionPasses/CleanupDebugSteps.swift
   Sources/Optimizer/FunctionPasses/ComputeEscapeEffects.swift
   Sources/Optimizer/FunctionPasses/ComputeSideEffects.swift
+  Sources/Optimizer/FunctionPasses/DeadStoreElimination.swift
   Sources/Optimizer/FunctionPasses/InitializeStaticGlobals.swift
   Sources/Optimizer/FunctionPasses/ObjectOutliner.swift
   Sources/Optimizer/FunctionPasses/ObjCBridgingOptimization.swift

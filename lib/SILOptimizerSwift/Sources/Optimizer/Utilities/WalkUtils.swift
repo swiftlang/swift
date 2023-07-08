@@ -30,8 +30,6 @@
 // just be a SmallProjectionPath. For details see `WalkingPath`.
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// Result returned by the walker functions
 enum WalkResult {
   /// Continue the walk
