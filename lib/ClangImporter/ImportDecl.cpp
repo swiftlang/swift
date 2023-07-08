@@ -3922,17 +3922,6 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto dc = Impl.importDeclContextOf(
           decl, importedName.getEffectiveContext());
-
-#ifndef NDEBUG
-      if (dc == nullptr) {
-        llvm::dbgs() << "No decl context!\n";
-        llvm::dbgs() << "Decl: " << importedName.getDeclName().getBaseIdentifier().str() << "\n";
-        llvm::dbgs() << "Decl: "; decl->dump();
-        llvm::dbgs() << "Efective ctx: "; importedName.getEffectiveContext().DC->dumpAsDecl();
-        llvm::dbgs() << "Decl ctx: "; decl->getDeclContext()->dumpAsDecl();
-        llvm_unreachable("");
-      }
-#endif
       
       SmallVector<GenericTypeParamDecl *, 4> genericParams;
       for (auto &param : *decl->getTemplateParameters()) {

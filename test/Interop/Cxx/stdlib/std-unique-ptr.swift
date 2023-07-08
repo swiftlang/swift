@@ -21,12 +21,10 @@ StdUniquePtrTestSuite.test("int") {
 StdUniquePtrTestSuite.test("array") {
   var u = makeArray()
   expectEqual(u[0], 1)
-// Over consume:
-//  expectEqual(u[1], 2)
-//  expectEqual(u[2], 3)
-// Crash:
-//  u[0] = 10
-//  expectEqual(u[0], 10)
+  expectEqual(u[1], 2)
+  expectEqual(u[2], 3)
+  u[0] = 10
+  expectEqual(u[0], 10)
 }
 
 StdUniquePtrTestSuite.test("custom dtor") {
