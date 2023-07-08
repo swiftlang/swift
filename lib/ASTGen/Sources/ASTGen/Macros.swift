@@ -867,7 +867,7 @@ func expandAttachedMacroIPC(
   }
 
   let conformanceListSyntax: PluginMessage.Syntax?
-  if (qualifiedType.isEmpty) {
+  if (conformanceList.isEmpty) {
     conformanceListSyntax = nil
   } else {
     let placeholderDecl: DeclSyntax =
