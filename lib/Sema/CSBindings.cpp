@@ -2297,6 +2297,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       if (TypeVar->getImpl().getGenericParameter())
         return false;
 
+      // Don't penalize solutions if we couldn't determine the type of the code
+      // completion token. We still want to examine the surrounding types in
+      // that case.
+      if (TypeVar->getImpl().isCodeCompletionToken())
+        return false;
+
       // Don't penalize solutions with holes due to missing arguments after the
       // code completion position.
       auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
@@ -2315,7 +2321,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     }
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.
-    cs.increaseScore(SK_Hole);
+    cs.increaseScore(SK_Hole, srcLocator);
 
     if (auto fix = fixForHole(cs)) {
       if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))

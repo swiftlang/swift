@@ -848,6 +848,61 @@ namespace {
 
 namespace {
 
+// Collect any variable references whose types involve type variables,
+// because there will be a dependency on those type variables once we have
+// generated constraints for the closure/tap body. This includes references
+// to other closure params such as in `{ x in { x }}` where the inner
+// closure is dependent on the outer closure's param type, as well as
+// cases like `for i in x where bar({ i })` where there's a dependency on
+// the type variable for the pattern `i`.
+struct VarRefCollector : public ASTWalker {
+  ConstraintSystem &cs;
+  llvm::SmallPtrSet<TypeVariableType *, 4> varRefs;
+
+  VarRefCollector(ConstraintSystem &cs) : cs(cs) {}
+
+  bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    // Retrieve type variables from references to var decls.
+    if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
+        if (auto varType = cs.getTypeIfAvailable(varDecl)) {
+          varType->getTypeVariables(varRefs);
+        }
+      }
+    }
+
+    // FIXME: We can see UnresolvedDeclRefExprs here because we have
+    // not yet run preCheckExpression() on the entire closure body
+    // yet.
+    //
+    // We could consider pre-checking more eagerly.
+    if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+      auto name = declRef->getName();
+      auto loc = declRef->getLoc();
+      if (name.isSimpleName() && loc.isValid()) {
+        auto *varDecl =
+            dyn_cast_or_null<VarDecl>(ASTScope::lookupSingleLocalDecl(
+                cs.DC->getParentSourceFile(), name.getFullName(), loc));
+        if (varDecl)
+          if (auto varType = cs.getTypeIfAvailable(varDecl))
+            varType->getTypeVariables(varRefs);
+      }
+    }
+
+    return Action::Continue(expr);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+  }
+};
+
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
@@ -1236,15 +1291,38 @@ namespace {
           return nullptr;
         }
 
-        auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
+        auto interpolationTV =
+            CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+        auto interpolationType =
+            DependentMemberType::get(tv, associatedTypeDecl);
+
+        CS.addConstraint(ConstraintKind::Equal, interpolationTV,
+                         interpolationType, locator);
 
         auto appendingExprType = CS.getType(appendingExpr);
         auto appendingLocator = CS.getConstraintLocator(appendingExpr);
 
-        // Must be Conversion; if it's Equal, then in semi-rare cases, the 
+        SmallVector<TypeVariableType *, 2> referencedVars;
+
+        if (auto *tap = getAsExpr<TapExpr>(appendingExpr)) {
+          // Collect all of the variable references that appear
+          // in the tap body, otherwise tap expression is going
+          // to get disconnected from the context.
+          if (auto *body = tap->getBody()) {
+            VarRefCollector refCollector(CS);
+
+            body->walk(refCollector);
+
+            referencedVars.append(refCollector.varRefs.begin(),
+                                  refCollector.varRefs.end());
+          }
+        }
+
+        // Must be Conversion; if it's Equal, then in semi-rare cases, the
         // interpolation temporary variable cannot be @lvalue.
-        CS.addConstraint(ConstraintKind::Conversion, appendingExprType,
-                         interpolationTV, appendingLocator);
+        CS.addUnsolvedConstraint(Constraint::create(
+            CS, ConstraintKind::Conversion, appendingExprType, interpolationTV,
+            appendingLocator, referencedVars));
       }
 
       return tv;
@@ -2883,68 +2961,14 @@ namespace {
       auto *locator = CS.getConstraintLocator(closure);
       auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-      // Collect any variable references whose types involve type variables,
-      // because there will be a dependency on those type variables once we have
-      // generated constraints for the closure body. This includes references
-      // to other closure params such as in `{ x in { x }}` where the inner
-      // closure is dependent on the outer closure's param type, as well as
-      // cases like `for i in x where bar({ i })` where there's a dependency on
-      // the type variable for the pattern `i`.
-      struct CollectVarRefs : public ASTWalker {
-        ConstraintSystem &cs;
-        llvm::SmallPtrSet<TypeVariableType *, 4> varRefs;
-
-        CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
-
-        bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
-        MacroWalking getMacroWalkingBehavior() const override {
-          return MacroWalking::Arguments;
-        }
-
-        PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-          // Retrieve type variables from references to var decls.
-          if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
-            if (auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
-              if (auto varType = cs.getTypeIfAvailable(varDecl)) {
-                varType->getTypeVariables(varRefs);
-              }
-            }
-          }
-
-          // FIXME: We can see UnresolvedDeclRefExprs here because we have
-          // not yet run preCheckExpression() on the entire closure body
-          // yet.
-          //
-          // We could consider pre-checking more eagerly.
-          if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-            auto name = declRef->getName();
-            auto loc = declRef->getLoc();
-            if (name.isSimpleName() && loc.isValid()) {
-              auto *varDecl = dyn_cast_or_null<VarDecl>(
-                ASTScope::lookupSingleLocalDecl(cs.DC->getParentSourceFile(),
-                                                name.getFullName(), loc));
-              if (varDecl)
-                if (auto varType = cs.getTypeIfAvailable(varDecl))
-                  varType->getTypeVariables(varRefs);
-            }
-          }
-
-          return Action::Continue(expr);
-        }
-
-        PreWalkAction walkToDeclPre(Decl *D) override {
-          return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
-        }
-      } collectVarRefs(CS);
-
+      VarRefCollector refCollector(CS);
       // Walk the capture list if this closure has one,  because it could
       // reference declarations from the outer closure.
       if (auto *captureList =
               getAsExpr<CaptureListExpr>(CS.getParentExpr(closure))) {
-        captureList->walk(collectVarRefs);
+        captureList->walk(refCollector);
       } else {
-        closure->walk(collectVarRefs);
+        closure->walk(refCollector);
       }
 
       auto inferredType = inferClosureType(closure);
@@ -2952,7 +2976,7 @@ namespace {
         return Type();
 
       SmallVector<TypeVariableType *, 4> referencedVars{
-          collectVarRefs.varRefs.begin(), collectVarRefs.varRefs.end()};
+          refCollector.varRefs.begin(), refCollector.varRefs.end()};
 
       CS.addUnsolvedConstraint(
           Constraint::create(CS, ConstraintKind::FallbackType, closureType,
