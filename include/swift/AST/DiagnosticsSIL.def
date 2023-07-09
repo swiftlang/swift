@@ -342,6 +342,8 @@ ERROR(performance_callee_unavailable,none,
       "called function is not available in this module and can have unpredictable performance", ())
 ERROR(bad_attr_on_non_const_global,none,
       "global variable must be a compile-time constant to use %0 attribute", (StringRef))
+ERROR(global_must_be_compile_time_const,none,
+      "global variable must be a compile-time constant", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
