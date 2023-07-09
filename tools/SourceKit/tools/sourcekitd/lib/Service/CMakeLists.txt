@@ -9,4 +9,4 @@ target_link_libraries(sourcekitdService PRIVATE
   swiftBasic
   SourceKitSupport
   SourceKitSwiftLang
-  swiftCompilerModules)
+  swiftSILOptimizerSwift)

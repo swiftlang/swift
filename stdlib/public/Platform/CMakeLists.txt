@@ -41,36 +41,6 @@ set(swiftDarwin_common_options
       LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
       DEPENDS ${darwin_depends})
 
-
-if(${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING" AND
-   ${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
-
-  set(swiftDarwin_common_bootstrapping_options
-      ${swiftDarwin_common_options}
-      SHARED
-      IS_STDLIB
-      SDK ${SWIFT_HOST_VARIANT_SDK}
-      ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-      INSTALL_IN_COMPONENT "never_install")
-
-  set(b0_deps swiftCore-bootstrapping0)
-  set(b1_deps swiftCore-bootstrapping1)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(b0_deps ${b0_deps} swiftSwiftOnoneSupport-bootstrapping0)
-    set(b1_deps ${b1_deps} swiftSwiftOnoneSupport-bootstrapping1)
-  endif()
-
-  add_swift_target_library_single(swiftDarwin-bootstrapping0 swiftDarwin
-      ${swiftDarwin_common_bootstrapping_options}
-      FILE_DEPENDS ${b0_deps}
-      BOOTSTRAPPING 0)
-
-  add_swift_target_library_single(swiftDarwin-bootstrapping1 swiftDarwin
-      ${swiftDarwin_common_bootstrapping_options}
-      FILE_DEPENDS ${b1_deps}
-      BOOTSTRAPPING 1)
-endif()
-
 add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
     ${swiftDarwin_common_options}
     TARGET_SDKS "${swiftDarwin_target_sdks}"

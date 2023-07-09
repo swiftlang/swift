@@ -442,16 +442,6 @@ function(_add_host_variant_link_flags target)
 endfunction()
 
 function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
-  if(NOT BOOTSTRAPPING_MODE)
-    if (SWIFT_SWIFT_PARSER)
-      set(ASRLF_BOOTSTRAPPING_MODE "HOSTTOOLS")
-    else()
-      return()
-    endif()
-  else()
-    set(ASRLF_BOOTSTRAPPING_MODE ${BOOTSTRAPPING_MODE})
-  endif()
-
   # RPATH where Swift runtime can be found.
   set(swift_runtime_rpath)
 
@@ -459,66 +449,16 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
     set(sdk_dir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift")
 
-    # If we found a swift compiler and are going to use swift code in swift
-    # host side tools but link with clang, add the appropriate -L paths so we
-    # find all of the necessary swift libraries on Darwin.
-    if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-      # Add in the toolchain directory so we can grab compatibility libraries
-      get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
-      target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
+    # Add in the toolchain directory so we can grab compatibility libraries
+    get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+    get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+    target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
 
-      # Add the SDK directory for the host platform.
-      target_link_directories(${target} PRIVATE "${sdk_dir}")
+    # Add the SDK directory for the host platform.
+    target_link_directories(${target} PRIVATE "${sdk_dir}")
 
-      # Include the abi stable system stdlib in our rpath.
-      set(swift_runtime_rpath "/usr/lib/swift")
-
-    elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
-
-      # Intentionally don't add the lib dir of the cross-compiled compiler, so that
-      # the stdlib is not picked up from there, but from the SDK.
-      # This requires to explicitly add all the needed compatibility libraries. We
-      # can take them from the current build.
-      target_link_libraries(${target} PUBLIC HostCompatibilityLibs)
-
-      # Add the SDK directory for the host platform.
-      target_link_directories(${target} PRIVATE "${sdk_dir}")
-
-      # A backup in case the toolchain doesn't have one of the compatibility libraries.
-      target_link_directories(${target} PRIVATE
-        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-      # Include the abi stable system stdlib in our rpath.
-      set(swift_runtime_rpath "/usr/lib/swift")
-
-    elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-      # Add the SDK directory for the host platform.
-      target_link_directories(${target} PRIVATE "${sdk_dir}")
-
-      # A backup in case the toolchain doesn't have one of the compatibility libraries.
-      target_link_directories(${target} PRIVATE
-        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-      # Include the abi stable system stdlib in our rpath.
-      set(swift_runtime_rpath "/usr/lib/swift")
-
-    elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
-      # At build time link against the built swift libraries from the
-      # previous bootstrapping stage.
-      get_bootstrapping_swift_lib_dir(bs_lib_dir "${bootstrapping}")
-      target_link_directories(${target} PRIVATE ${bs_lib_dir})
-
-      # Required to pick up the built libswiftCompatibility<n>.a libraries
-      target_link_directories(${target} PRIVATE
-        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-      # At runtime link against the built swift libraries from the current
-      # bootstrapping stage.
-      set(swift_runtime_rpath "@loader_path/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-    else()
-      message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
-    endif()
+    # Include the abi stable system stdlib in our rpath.
+    set(swift_runtime_rpath "/usr/lib/swift")
 
     # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
     # to the linker command line.
@@ -538,72 +478,22 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-    if(${ASRLF_BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and run time, link against the swift libraries in the
-      # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    # At build time and run time, link against the swift libraries in the
+    # installed host toolchain.
+    get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+    get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+    set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
-      target_link_libraries(${target} PRIVATE ${swiftrt})
-      target_link_libraries(${target} PRIVATE "swiftCore")
+    target_link_libraries(${target} PRIVATE ${swiftrt})
+    target_link_libraries(${target} PRIVATE "swiftCore")
 
-      target_link_directories(${target} PRIVATE ${host_lib_dir})
-      if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-        set(swift_runtime_rpath "${host_lib_dir}")
-      else()
-        set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-      endif()
-
-    elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
-      # At build time link against the built swift libraries from the
-      # previous bootstrapping stage.
-      if (NOT "${bootstrapping}" STREQUAL "0")
-        get_bootstrapping_swift_lib_dir(bs_lib_dir "${bootstrapping}")
-        target_link_directories(${target} PRIVATE ${bs_lib_dir})
-        target_link_libraries(${target} PRIVATE ${swiftrt})
-        target_link_libraries(${target} PRIVATE "swiftCore")
-      endif()
-
-      # At runtime link against the built swift libraries from the current
-      # bootstrapping stage.
-      set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-    elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-      message(FATAL_ERROR "BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
-    else()
-      message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
-    endif()
+    target_link_directories(${target} PRIVATE ${host_lib_dir})
+    set(swift_runtime_rpath "${host_lib_dir}")
   endif()
 
   if(SWIFT_SWIFT_PARSER)
     # Make sure we can find the early SwiftSyntax libraries.
     target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
-
-    # For the "end step" of bootstrapping configurations, we need to be
-    # able to fall back to the SDK directory for libswiftCore et al.
-    if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
-      if (NOT "${bootstrapping}" STREQUAL "1")
-        if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
-          target_link_directories(${target} PRIVATE "${sdk_dir}")
-
-          # Include the abi stable system stdlib in our rpath.
-          set(swift_runtime_rpath "/usr/lib/swift")
-
-          # Add in the toolchain directory so we can grab compatibility libraries
-          get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-          get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
-          target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
-        else()
-          get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-          get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-          set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-          target_link_directories(${target} PRIVATE ${host_lib_dir})
-
-          set(swift_runtime_rpath "${host_lib_dir}")
-        endif()
-      endif()
-    endif()
   endif()
 
   set_property(TARGET ${target} PROPERTY BUILD_WITH_INSTALL_RPATH YES)

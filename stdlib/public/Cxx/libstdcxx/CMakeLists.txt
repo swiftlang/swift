@@ -81,38 +81,6 @@ foreach(sdk ${SWIFT_SDKS})
         DESTINATION "lib/swift_static/${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
         COMPONENT sdk-overlay)
   endif()
-
-  if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
-    foreach(bootstrapping "0" "1")
-      get_bootstrapping_path(bootstrapping_dir ${module_dir} ${bootstrapping})
-      set(libstdcxx_modulemap_out_bootstrapping "${bootstrapping_dir}/libstdcxx.modulemap")
-      set(libstdcxx_header_out_bootstrapping "${bootstrapping_dir}/libstdcxx.h")
-
-      add_custom_command_target(unused_var
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" "${bootstrapping_dir}"
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy_if_different"
-          "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_modulemap}" "${libstdcxx_modulemap_out_bootstrapping}"
-
-          CUSTOM_TARGET_NAME "copy-libstdcxx-modulemap-bootstrapping${bootstrapping}"
-          OUTPUT "${libstdcxx_modulemap_out_bootstrapping}"
-          DEPENDS ${libstdcxx_modulemap}
-          COMMENT "Copying libstdcxx modulemap to resources for bootstrapping${bootstrapping}")
-
-      add_custom_command_target(unused_var
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" "${bootstrapping_dir}"
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy_if_different"
-          "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_header}" "${libstdcxx_header_out_bootstrapping}"
-
-          CUSTOM_TARGET_NAME "copy-libstdcxx-header-bootstrapping${bootstrapping}"
-          OUTPUT "${libstdcxx_header_out_bootstrapping}"
-          DEPENDS ${libstdcxx_header}
-          COMMENT "Copying libstdcxx header to resources for bootstrapping${bootstrapping}")
-    endforeach()
-  endif()
 endforeach()
 add_custom_target(libstdcxx-modulemap DEPENDS ${libstdcxx_modulemap_target_list})
 set_property(TARGET libstdcxx-modulemap PROPERTY FOLDER "Miscellaneous")
