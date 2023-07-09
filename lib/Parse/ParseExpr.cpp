@@ -1491,9 +1491,20 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         return Result;
       }
 
-      if (CodeCompletionCallbacks && Result.isNonNull()) {
+      // FIXME: We should be able to remove the InBindingPattern checks once
+      // apple/swift#64280 is merged.
+      if (CodeCompletionCallbacks && Result.isNonNull() &&
+          InBindingPattern != PatternBindingState::ImplicitlyImmutable &&
+          InBindingPattern != PatternBindingState::InVar &&
+          InBindingPattern != PatternBindingState::InLet) {
+        // Don't do postfix completions when in a binding pattern. It doesn't
+        // make sense to offer completions eg. in
+        // if let myVar#^COMPLETE^# = someOptional {}
         bool hasSpace = Tok.getLoc() != getEndOfPreviousLoc();
-        CodeCompletionCallbacks->completePostfixExpr(Result.get(), hasSpace);
+        auto CCExpr =
+            new (Context) CodeCompletionExpr(Result.get(), Tok.getLoc());
+        CodeCompletionCallbacks->completePostfixExpr(CCExpr, hasSpace);
+        Result = makeParserResult(Result, CCExpr);
       }
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);

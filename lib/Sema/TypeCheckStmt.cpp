@@ -2586,19 +2586,23 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto optBody = TypeChecker::applyResultBuilderBodyTransform(
           func, builderType,
           /*ClosuresInResultBuilderDontParticipateInInference=*/
-              ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
-      if (optBody && *optBody) {
+          ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
+      if ((ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) || (ctx.SolutionCallback && ctx.SolutionCallback->gotCallback())) {
+        // We already informed the completion callback of solutions found by
+        // type checking the entire result builder from
+        // applyResultBuilderBodyTransform. No need to typecheck the requested
+        // AST node individually anymore.
+        return false;
+      }
+      if (!ctx.CompletionCallback && !ctx.SolutionCallback && optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
         return false;
       }
-      // FIXME: We failed to apply the result builder transform. Fall back to
-      // just type checking the node that contains the code completion token.
-      // This may be missing some context from the result builder but in
-      // practice it often contains sufficient information to provide a decent
-      // level of code completion that's better than providing nothing at all.
-      // The proper solution would be to only partially type check the result
-      // builder so that this fall back would not be necessary.
+      // We did not find a solution while applying the result builder, possibly
+      // because the result builder contained an invalid element and thus the
+      // transform couldn't be applied. Perform code completion pretending there
+      // was no result builder to recover.
     } else if (func->hasSingleExpressionBody() &&
                 func->getResultInterfaceType()->isVoid()) {
        // The function returns void.  We don't need an explicit return, no matter

@@ -134,8 +134,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    bool shouldWalkIntoTapExpression() override { return false; }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
@@ -1482,8 +1480,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    bool shouldWalkIntoTapExpression() override { return false; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -1773,8 +1769,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
-    bool shouldWalkIntoTapExpression() override { return false; }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -4245,8 +4239,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    bool shouldWalkIntoTapExpression() override { return false; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -4375,8 +4367,6 @@ public:
   }
 
   bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
-  bool shouldWalkIntoTapExpression() override { return false; }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
@@ -5240,8 +5230,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    bool shouldWalkIntoTapExpression() override { return false; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -5320,8 +5308,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
-    bool shouldWalkIntoTapExpression() override { return false; }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
@@ -5617,8 +5603,6 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
       return false;
     }
 
-    bool shouldWalkIntoTapExpression() override { return false; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -5777,8 +5761,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
-
-    bool shouldWalkIntoTapExpression() override { return false; }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
