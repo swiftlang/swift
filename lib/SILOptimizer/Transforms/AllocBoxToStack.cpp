@@ -1047,9 +1047,9 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     ClonedFn = Cloner.getCloned();
     pass.T->addFunctionToPassManagerWorklist(ClonedFn, F);
 
-    // Set the moveonly ignore flag so we do not emit an error on the original
-    // function even though it is still around.
-    F->addSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS);
+    // Set the moveonly delete-if-unused flag so we do not emit an error on the
+    // original once we promote all its current uses.
+    F->addSemanticsAttr(semantics::MOVEONLY_DELETE_IF_UNUSED);
 
     // If any of our promoted callee arg indices were originally noncopyable let
     // boxes, convert them from having escaping to having non-escaping
