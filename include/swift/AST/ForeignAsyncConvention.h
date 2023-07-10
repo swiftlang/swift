@@ -46,8 +46,8 @@ public:
 
     Info(
         unsigned completionHandlerParamIndex,
-        Optional<unsigned> completionHandlerErrorParamIndex,
-        Optional<unsigned> completionHandlerFlagParamIndex,
+        llvm::Optional<unsigned> completionHandlerErrorParamIndex,
+        llvm::Optional<unsigned> completionHandlerFlagParamIndex,
         bool completionHandlerFlagIsErrorOnZero)
       : CompletionHandlerParamIndex(completionHandlerParamIndex),
         CompletionHandlerErrorParamIndexPlusOneOrZero(
@@ -73,9 +73,9 @@ public:
     /// provided error will be thrown by the async function. If a
     /// \c completionHandlerFlagParamIndex is also specified, the
     /// value of that flag instead indicates whether an error should be raised.
-    Optional<unsigned> completionHandlerErrorParamIndex() const {
+    llvm::Optional<unsigned> completionHandlerErrorParamIndex() const {
       if (CompletionHandlerErrorParamIndexPlusOneOrZero == 0)
-        return None;
+        return llvm::None;
 
       return CompletionHandlerErrorParamIndexPlusOneOrZero - 1;
     }
@@ -87,9 +87,9 @@ public:
     /// operation completed with an error. The \c completionHandlerFlagIsErrorOnZero
     /// value indicates whether this argument being zero indicates an error, or
     /// whether being nonzero indicates an error.
-    Optional<unsigned> completionHandlerFlagParamIndex() const {
+    llvm::Optional<unsigned> completionHandlerFlagParamIndex() const {
       if (CompletionHandlerFlagParamIndexPlusOneWithPolarityOrZero == 0)
-        return None;
+        return llvm::None;
 
       return (CompletionHandlerFlagParamIndexPlusOneWithPolarityOrZero - 1)
         & 0x7FFFFFFFu;
@@ -128,8 +128,8 @@ public:
 
   ForeignAsyncConvention(CanType completionHandlerType,
                          unsigned completionHandlerParamIndex,
-                         Optional<unsigned> completionHandlerErrorParamIndex,
-                         Optional<unsigned> completionHandlerFlagParamIndex,
+                         llvm::Optional<unsigned> completionHandlerErrorParamIndex,
+                         llvm::Optional<unsigned> completionHandlerFlagParamIndex,
                          bool completionHandlerFlagIsErrorOnZero)
       : CompletionHandlerType(completionHandlerType),
         TheInfo(completionHandlerParamIndex, completionHandlerErrorParamIndex,
@@ -153,7 +153,7 @@ public:
   /// provided error will be thrown by the async function. If a
   /// \c completionHandlerFlagParamIndex is also specified, the
   /// value of that flag instead indicates whether an error should be raised.
-  Optional<unsigned> completionHandlerErrorParamIndex() const {
+  llvm::Optional<unsigned> completionHandlerErrorParamIndex() const {
     return TheInfo.completionHandlerErrorParamIndex();
   }
   
@@ -164,7 +164,7 @@ public:
   /// operation completed with an error. The \c completionHandlerFlagIsErrorOnZero
   /// value indicates whether this argument being zero indicates an error, or
   /// whether being nonzero indicates an error.
-  Optional<unsigned> completionHandlerFlagParamIndex() const {
+  llvm::Optional<unsigned> completionHandlerFlagParamIndex() const {
     return TheInfo.completionHandlerFlagParamIndex();
   }
   

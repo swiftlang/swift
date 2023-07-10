@@ -203,11 +203,11 @@ private:
 
   /// Overrides parallelism level and \c BatchSizeLimit, sets exact
   /// count of batches, if in batch-mode.
-  const Optional<unsigned> BatchCount;
+  const llvm::Optional<unsigned> BatchCount;
 
   /// Overrides maximum batch size, if in batch-mode and not overridden
   /// by \c BatchCount.
-  const Optional<unsigned> BatchSizeLimit;
+  const llvm::Optional<unsigned> BatchSizeLimit;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -287,8 +287,8 @@ public:
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
-              Optional<unsigned> BatchCount = None,
-              Optional<unsigned> BatchSizeLimit = None,
+              llvm::Optional<unsigned> BatchCount = llvm::None,
+              llvm::Optional<unsigned> BatchSizeLimit = llvm::None,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
@@ -430,11 +430,11 @@ public:
     return LastBuildTime;
   }
 
-  Optional<unsigned> getBatchCount() const {
+  llvm::Optional<unsigned> getBatchCount() const {
     return BatchCount;
   }
 
-  Optional<unsigned> getBatchSizeLimit() const {
+  llvm::Optional<unsigned> getBatchSizeLimit() const {
     return BatchSizeLimit;
   }
 

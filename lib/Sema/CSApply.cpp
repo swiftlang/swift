@@ -169,7 +169,7 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
       locator, lookThroughApply,
       [&](Expr *expr) -> Type { return getType(expr); },
       [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
-      [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+      [&](ConstraintLocator *locator) -> llvm::Optional<SelectedOverload> {
         return getOverloadChoiceIfAvailable(locator);
       });
 }
@@ -348,7 +348,7 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     Solution &solution;
-    Optional<SyntacticElementTarget> target;
+    llvm::Optional<SyntacticElementTarget> target;
     bool SuppressDiagnostics;
 
     /// Coerce the given tuple to another tuple type.
@@ -470,7 +470,7 @@ namespace {
     // Returns None if the AST does not contain enough information to recover
     // substitutions; this is different from an Optional(SubstitutionMap()),
     // indicating a valid call to a non-generic operator.
-    Optional<SubstitutionMap>
+    llvm::Optional<SubstitutionMap>
     getOperatorSubstitutions(ValueDecl *witness, Type refType) {
       // We have to recover substitutions in this hacky way because
       // the AST does not retain enough information to devirtualize
@@ -482,7 +482,7 @@ namespace {
       if (gft == nullptr) {
         if (refType->isEqual(witnessType))
           return SubstitutionMap();
-        return None;
+        return llvm::None;
       }
 
       auto sig = gft->getGenericSignature();
@@ -521,7 +521,7 @@ namespace {
       // witness method call in this rare case; SIL mandatory optimizations
       // will likely devirtualize it anyway.
       if (!substType)
-        return None;
+        return llvm::None;
 
       return SubstitutionMap::get(sig,
                                   QueryTypeSubstitutionMap{subs},
@@ -2537,7 +2537,7 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 Optional<SyntacticElementTarget> target,
+                 llvm::Optional<SyntacticElementTarget> target,
                  bool suppressDiagnostics)
         : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
           solution(solution), target(target),
@@ -2943,7 +2943,7 @@ namespace {
             MacroRole::Expression, /*isImplicit=*/true, expandedType);
         expansion->setMacroRef(macroRef);
         (void)evaluateOrDefault(
-            ctx.evaluator, ExpandMacroExpansionExprRequest{expansion}, None);
+            ctx.evaluator, ExpandMacroExpansionExprRequest{expansion}, llvm::None);
         if (expansion->getRewritten()) {
           cs.cacheExprTypes(expansion);
           return expansion;
@@ -5443,7 +5443,7 @@ namespace {
           llvm::none_of(makeArrayRef(ExprStack).drop_back(1),
                        [](Expr *E) { return isa<MacroExpansionExpr>(E); })) {
         (void)evaluateOrDefault(cs.getASTContext().evaluator,
-                                ExpandMacroExpansionExprRequest{E}, None);
+                                ExpandMacroExpansionExprRequest{E}, llvm::None);
       }
 
       cs.cacheExprTypes(E);
@@ -6605,7 +6605,7 @@ bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
       return true;
     }
 
-    if (Optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
+    if (llvm::Optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
       peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
       return true;
     }
@@ -6825,7 +6825,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (cs.getConstraintLocator(locator)->isForContextualType() && contextTy &&
         contextTy->hasPlaceholder()) {
       bool hadError = TypeChecker::diagnoseInvalidFunctionType(
-          fnTy, expr->getLoc(), None, dc, None);
+          fnTy, expr->getLoc(), llvm::None, dc, llvm::None);
       if (hadError)
         return nullptr;
     }
@@ -8333,7 +8333,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   ReferencedActor actorRef = ReferencedActor(
       actor, isPotentiallyIsolated, ReferencedActor::NonIsolatedContext);
   auto refResult = ActorReferenceResult::forReference(
-      ref, context->getLoc(), referenceDC, None, actorRef);
+      ref, context->getLoc(), referenceDC, llvm::None, actorRef);
   switch (refResult) {
   case ActorReferenceResult::ExitsActorToNonisolated:
   case ActorReferenceResult::SameConcurrencyDomain:
@@ -8696,7 +8696,7 @@ namespace {
     rewritePattern(Pattern *pattern, DeclContext *DC);
 
     /// Rewrite the target, producing a new target.
-    Optional<SyntacticElementTarget>
+    llvm::Optional<SyntacticElementTarget>
     rewriteTarget(SyntacticElementTarget target);
 
     AutoClosureExpr *rewriteClosure(ClosureExpr *closure) {
@@ -8963,13 +8963,13 @@ static Pattern *rewriteExprPattern(const SyntacticElementTarget &matchTarget,
 /// Attempt to rewrite either an ExprPattern, or a pattern that was solved as
 /// an ExprPattern, e.g an EnumElementPattern that could not refer to an enum
 /// case.
-static Optional<Pattern *>
+static llvm::Optional<Pattern *>
 tryRewriteExprPattern(Pattern *P, Solution &solution, Type patternTy,
                       RewriteTargetFn rewriteTarget) {
   // See if we have a match expression target.
   auto matchTarget = solution.getTargetFor(P);
   if (!matchTarget)
-    return None;
+    return llvm::None;
 
   return rewriteExprPattern(*matchTarget, patternTy, rewriteTarget);
 }
@@ -8999,7 +8999,7 @@ NullablePtr<Pattern> ExprWalker::rewritePattern(Pattern *pattern,
 /// Apply the given solution to the initialization target.
 ///
 /// \returns the resulting initialization expression.
-static Optional<SyntacticElementTarget>
+static llvm::Optional<SyntacticElementTarget>
 applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
                               Expr *initializer,
                               RewriteTargetFn rewriteTarget) {
@@ -9023,7 +9023,7 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
       target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
   initializer = solution.coerceToType(initializer, initType, locator);
   if (!initializer)
-    return None;
+    return llvm::None;
 
   SyntacticElementTarget resultTarget = target;
   resultTarget.setExpr(initializer);
@@ -9063,7 +9063,7 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
   }
 
   if (finalPatternType->hasDependentMember())
-    return None;
+    return llvm::None;
 
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
 
@@ -9077,7 +9077,7 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
           contextualPattern, finalPatternType, options, tryRewritePattern)) {
     resultTarget.setPattern(coercedPattern);
   } else {
-    return None;
+    return llvm::None;
   }
 
   // For an async let, wrap the initializer appropriately to make it a child
@@ -9117,9 +9117,9 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
 /// Apply the given solution to the for-each statement target.
 ///
 /// \returns the resulting initialization expression.
-static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
+static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
     Solution &solution, SyntacticElementTarget target,
-    llvm::function_ref<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+    llvm::function_ref<llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
         rewriteTarget) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
@@ -9146,7 +9146,7 @@ static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
 
     auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
     if (!rewrittenTarget)
-      return None;
+      return llvm::None;
 
     // Set type-checked initializer and mark it as such.
     {
@@ -9163,7 +9163,7 @@ static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
 
     auto rewrittenTarget = rewriteTarget(nextTarget);
     if (!rewrittenTarget)
-      return None;
+      return llvm::None;
 
     Expr *nextCall = rewrittenTarget->getAsExpr();
     // Wrap a call to `next()` into `try await` since `AsyncIteratorProtocol`
@@ -9231,7 +9231,7 @@ static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
         contextualPattern, forEachStmtInfo.initType, options,
         tryRewritePattern);
     if (!coercedPattern)
-      return None;
+      return llvm::None;
 
     stmt->setPattern(coercedPattern);
     resultTarget.setPattern(coercedPattern);
@@ -9243,12 +9243,12 @@ static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
 
     auto rewrittenTarget = rewriteTarget(whereTarget);
     if (!rewrittenTarget)
-      return None;
+      return llvm::None;
 
     stmt->setWhere(rewrittenTarget->getAsExpr());
   }
 
-  // Convert that Optional<Element> value to the type of the pattern.
+  // Convert that llvm::Optional<Element> value to the type of the pattern.
   auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
   Type nextResultType = OptionalType::get(forEachStmtInfo.elementType);
   if (!optPatternType->isEqual(nextResultType)) {
@@ -9261,7 +9261,7 @@ static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
             convertElementExpr, dc,
             /*contextualInfo=*/{forEachStmtInfo.initType, CTP_CoerceOperand})
             .isNull()) {
-      return None;
+      return llvm::None;
     }
     elementExpr->setIsPlaceholder(false);
     stmt->setElementExpr(elementExpr);
@@ -9291,7 +9291,7 @@ static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
   return resultTarget;
 }
 
-Optional<SyntacticElementTarget>
+llvm::Optional<SyntacticElementTarget>
 ExprWalker::rewriteTarget(SyntacticElementTarget target) {
   // Rewriting the target might abort in case one of visit methods returns
   // nullptr. In this case, no more walkToExprPost calls are issues and thus
@@ -9311,7 +9311,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
   if (auto expr = target.getAsExpr()) {
     Expr *rewrittenExpr = expr->walk(*this);
     if (!rewrittenExpr)
-      return None;
+      return llvm::None;
 
     /// Handle special cases for expressions.
     switch (target.getExprContextualTypePurpose()) {
@@ -9320,7 +9320,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
           solution, target, rewrittenExpr,
           [&](auto target) { return rewriteTarget(target); });
       if (!initResultTarget)
-        return None;
+        return llvm::None;
 
       result = *initResultTarget;
       break;
@@ -9371,7 +9371,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget) {
           info->setInvalid();
-          return None;
+          return llvm::None;
         }
 
         auto rewrittenExpr = resolvedTarget->getAsExpr();
@@ -9385,7 +9385,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
         auto target = *cs.getTargetFor(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
-          return None;
+          return llvm::None;
 
         condElement.setBoolean(resolvedTarget->getAsExpr());
         continue;
@@ -9395,7 +9395,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
         auto target = *cs.getTargetFor(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
-          return None;
+          return llvm::None;
 
         condElement.setInitializer(resolvedTarget->getAsExpr());
         condElement.setPattern(resolvedTarget->getInitializationPattern());
@@ -9411,7 +9411,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
     auto pattern = rewritePattern(info.pattern, target.getDeclContext());
     if (!pattern)
-      return None;
+      return llvm::None;
 
     (*caseLabelItem)->setPattern(pattern.get(), /*resolved=*/true);
 
@@ -9420,7 +9420,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       auto target = *cs.getTargetFor(guardExpr);
       auto resultTarget = rewriteTarget(target);
       if (!resultTarget)
-        return None;
+        return llvm::None;
 
       (*caseLabelItem)->setGuardExpr(resultTarget->getAsExpr());
     }
@@ -9438,7 +9438,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       // Rewrite the target.
       auto resultTarget = rewriteTarget(knownTarget);
       if (!resultTarget)
-        return None;
+        return llvm::None;
 
       auto *pattern = resultTarget->getInitializationPattern();
       // Record that the pattern has been fully validated,
@@ -9493,7 +9493,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       return resultTarget;
     }
 
-    return None;
+    return llvm::None;
   } else if (auto *forEach = target.getAsForEachStmt()) {
     auto forEachResultTarget = applySolutionToForEachStmt(
         solution, target, [&](SyntacticElementTarget target) {
@@ -9506,13 +9506,13 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
           return resultTarget;
         });
     if (!forEachResultTarget)
-      return None;
+      return llvm::None;
 
     result = *forEachResultTarget;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))
-      return None;
+      return llvm::None;
 
     result.setFunctionBody(fn.getBody());
   }
@@ -9587,7 +9587,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     }
 
     if (!resultExpr)
-      return None;
+      return llvm::None;
 
     // For an @autoclosure default parameter type, add the autoclosure
     // conversion.
@@ -9636,7 +9636,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Optional<SyntacticElementTarget>
+llvm::Optional<SyntacticElementTarget>
 ConstraintSystem::applySolution(Solution &solution,
                                 SyntacticElementTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
@@ -9644,7 +9644,7 @@ ConstraintSystem::applySolution(Solution &solution,
   unsigned numResolvableFixes = 0;
   if (!solution.Fixes.empty()) {
     if (shouldSuppressDiagnostics())
-      return None;
+      return llvm::None;
 
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
     bool canApplySolution = true;
@@ -9660,12 +9660,12 @@ ConstraintSystem::applySolution(Solution &solution,
     if (!canApplySolution) {
       // If we already diagnosed any errors via fixes, that's it.
       if (diagnosedErrorsViaFixes)
-        return None;
+        return llvm::None;
 
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
       diagnoseFailureFor(target);
-      return None;
+      return llvm::None;
     }
   }
 
@@ -9676,7 +9676,7 @@ ConstraintSystem::applySolution(Solution &solution,
     const auto &score = solution.getFixedScore();
     if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
       maybeProduceFallbackDiagnostic(target);
-      return None;
+      return llvm::None;
     }
   }
 
@@ -9684,7 +9684,7 @@ ConstraintSystem::applySolution(Solution &solution,
   ExprWalker walker(rewriter);
   auto resultTarget = walker.rewriteTarget(target);
   if (!resultTarget)
-    return None;
+    return llvm::None;
 
   auto needsPostProcessing = walker.hasDelayedTasks();
   
@@ -9695,7 +9695,7 @@ ConstraintSystem::applySolution(Solution &solution,
 
   // If any of them failed to type check, bail.
   if (hadError)
-    return None;
+    return llvm::None;
   
   if (isDebugMode()) {
     // If we had partially type-checked expressions, lets print
@@ -9717,7 +9717,7 @@ ConstraintSystem::applySolution(Solution &solution,
 Expr *
 Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, None, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, llvm::None, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;
@@ -9791,7 +9791,7 @@ SolutionResult SolutionResult::forAmbiguous(
   return result;
 }
 
-SolutionResult SolutionResult::forTooComplex(Optional<SourceRange> affected) {
+SolutionResult SolutionResult::forTooComplex(llvm::Optional<SourceRange> affected) {
   SolutionResult result(Kind::TooComplex);
   result.TooComplexAt = affected;
   return result;

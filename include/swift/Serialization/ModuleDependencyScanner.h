@@ -42,7 +42,7 @@ namespace swift {
       /// Location where pre-built moduels are to be built into.
       std::string moduleCachePath;
     public:
-      Optional<ModuleDependencyInfo> dependencies;
+      llvm::Optional<ModuleDependencyInfo> dependencies;
 
       ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
                               Identifier moduleName,

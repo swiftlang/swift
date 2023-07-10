@@ -97,7 +97,7 @@ class Witness {
     /// The derivative generic signature, when the requirement is a derivative
     /// function.
     GenericSignature derivativeGenSig;
-    Optional<ActorIsolation> enterIsolation;
+    llvm::Optional<ActorIsolation> enterIsolation;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -127,7 +127,7 @@ public:
   /// Deserialized witnesses do not have a witness thunk signature.
   static Witness forDeserialized(ValueDecl *decl,
                                  SubstitutionMap substitutions,
-                                 Optional<ActorIsolation> enterIsolation) {
+                                 llvm::Optional<ActorIsolation> enterIsolation) {
     // TODO: It's probably a good idea to have a separate 'deserialized' bit.
     return Witness(
         decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature(),
@@ -156,7 +156,7 @@ public:
           GenericSignature witnessThunkSig,
           SubstitutionMap reqToWitnessThunkSigSubs,
           GenericSignature derivativeGenSig,
-          Optional<ActorIsolation> enterIsolation);
+          llvm::Optional<ActorIsolation> enterIsolation);
 
   /// Retrieve the witness declaration reference, which includes the
   /// substitutions needed to use the witness from the witness thunk signature
@@ -202,11 +202,11 @@ public:
     return GenericSignature();
   }
 
-  Optional<ActorIsolation> getEnterIsolation() const {
+  llvm::Optional<ActorIsolation> getEnterIsolation() const {
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
       return storedWitness->enterIsolation;
 
-    return None;
+    return llvm::None;
   }
 
   /// Retrieve a copy of the witness with an actor isolation that the

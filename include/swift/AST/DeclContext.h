@@ -32,6 +32,7 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <type_traits>
@@ -988,7 +989,7 @@ public:
 
   /// Return a hash of all tokens in the body for dependency analysis, if
   /// available.
-  Optional<Fingerprint> getBodyFingerprint() const;
+  llvm::Optional<Fingerprint> getBodyFingerprint() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

@@ -627,10 +627,10 @@ public:
 
   /// Return the reference ownership of this type if it is a reference storage
   /// type. Otherwise, return None.
-  Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
+  llvm::Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
     auto type = getASTType()->getAs<ReferenceStorageType>();
     if (!type)
-      return None;
+      return llvm::None;
     return type->getOwnership();
   }
 
@@ -660,12 +660,12 @@ public:
   SILType subst(Lowering::TypeConverter &tc, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                SubstOptions options = None) const;
+                SubstOptions options = llvm::None) const;
 
   SILType subst(SILModule &M, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                SubstOptions options = None) const;
+                SubstOptions options = llvm::None) const;
 
   SILType subst(Lowering::TypeConverter &tc,
                 InFlightSubstitution &IFS,

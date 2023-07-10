@@ -430,7 +430,7 @@ class PackExpansionResultPlan : public ResultPlan {
 public:
   PackExpansionResultPlan(ResultPlanBuilder &builder,
                           SILValue packAddr,
-                          Optional<ArrayRef<Initialization*>> inits,
+                          llvm::Optional<ArrayRef<Initialization*>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
@@ -602,7 +602,7 @@ public:
           builder.build(nullptr, origEltType, substEltTypes[0]));
       } else {
         origEltPlans.push_back(
-          builder.buildForPackExpansion(None, origEltType, substEltTypes));
+          builder.buildForPackExpansion(llvm::None, origEltType, substEltTypes));
       }
     });
   }
@@ -1013,7 +1013,7 @@ public:
     // Create the appropriate pointer type.
     lvalue = LValue::forAddress(SGFAccessKind::ReadWrite,
                                 ManagedValue::forLValue(errorTemp),
-                                /*TODO: enforcement*/ None,
+                                /*TODO: enforcement*/ llvm::None,
                                 AbstractionPattern(errorType), errorType);
   }
 
@@ -1040,7 +1040,7 @@ public:
     return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
   }
 
-  Optional<std::pair<ManagedValue, ManagedValue>>
+  llvm::Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
     SILGenFunction::PointerAccessInfo pointerInfo = {
       unwrappedPtrType, ptrKind, SGFAccessKind::ReadWrite
@@ -1200,7 +1200,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 }
 
 ResultPlanPtr ResultPlanBuilder::
-    buildForPackExpansion(Optional<ArrayRef<Initialization*>> inits,
+    buildForPackExpansion(llvm::Optional<ArrayRef<Initialization*>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substTypes) {
   assert(!inits || inits->size() == substTypes.size());

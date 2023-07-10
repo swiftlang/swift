@@ -39,6 +39,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Optional.h"
 
 /// In case there's a bug in the ASTScope lookup system, suggest that the user
 /// try disabling it.
@@ -152,7 +153,7 @@ private:
   /// Child scopes, sorted by source range.
   Children storedChildren;
 
-  mutable Optional<CharSourceRange> cachedCharSourceRange;
+  mutable llvm::Optional<CharSourceRange> cachedCharSourceRange;
 
 #pragma mark - constructor / destructor
 public:
@@ -922,11 +923,11 @@ public:
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
   const bool isLocalBinding;
-  Optional<SourceLoc> endLoc;
+  llvm::Optional<SourceLoc> endLoc;
 
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        bool isLocalBinding, Optional<SourceLoc> endLoc)
+                        bool isLocalBinding, llvm::Optional<SourceLoc> endLoc)
       : AbstractPatternEntryScope(pbDecl, entryIndex),
         isLocalBinding(isLocalBinding), endLoc(endLoc) {}
   virtual ~PatternEntryDeclScope() {}

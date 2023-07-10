@@ -207,7 +207,7 @@ void ModuleFile::outputDiagnosticInfo(llvm::raw_ostream &os) const {
   Core->outputDiagnosticInfo(os);
 }
 
-static Optional<swift::AccessorKind>
+static llvm::Optional<swift::AccessorKind>
 getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
 #define ACCESSOR(ID) \
@@ -215,12 +215,12 @@ getActualAccessorKind(uint8_t raw) {
 #include "swift/AST/AccessorKinds.def"
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static Optional<swift::DefaultArgumentKind>
+static llvm::Optional<swift::DefaultArgumentKind>
 getActualDefaultArgKind(uint8_t raw) {
   switch (static_cast<serialization::DefaultArgumentKind>(raw)) {
 #define CASE(X) \
@@ -243,10 +243,10 @@ getActualDefaultArgKind(uint8_t raw) {
   CASE(StoredProperty)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
-static Optional<StableSerializationPath::ExternalPath::ComponentKind>
+static llvm::Optional<StableSerializationPath::ExternalPath::ComponentKind>
 getActualClangDeclPathComponentKind(uint64_t raw) {
   switch (static_cast<serialization::ClangDeclPathComponentKind>(raw)) {
 #define CASE(ID) \
@@ -261,7 +261,7 @@ getActualClangDeclPathComponentKind(uint64_t raw) {
   CASE(ObjCProtocol)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 ParameterList *ModuleFile::readParameterList() {
@@ -936,7 +936,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
 
 /// Translate from the requirement kind to the Serialization enum
 /// values, which are guaranteed to be stable.
-static Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
+static llvm::Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
 #define CASE(KIND)                   \
   case GenericRequirementKind::KIND: \
     return RequirementKind::KIND;
@@ -950,12 +950,12 @@ static Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
   }
 #undef CASE
 
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the requirement kind to the Serialization enum
 /// values, which are guaranteed to be stable.
-static Optional<LayoutConstraintKind>
+static llvm::Optional<LayoutConstraintKind>
 getActualLayoutConstraintKind(uint64_t rawKind) {
 #define CASE(KIND)                     \
   case LayoutRequirementKind::KIND:    \
@@ -973,7 +973,7 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   }
 #undef CASE
 
-  return None;
+  return llvm::None;
 }
 
 void ModuleFile::deserializeGenericRequirements(
@@ -1511,7 +1511,7 @@ bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   return false;
 }
 
-static Optional<swift::CtorInitializerKind>
+static llvm::Optional<swift::CtorInitializerKind>
 getActualCtorInitializerKind(uint8_t raw) {
   switch (serialization::CtorInitializerKind(raw)) {
 #define CASE(NAME) \
@@ -1523,7 +1523,7 @@ getActualCtorInitializerKind(uint8_t raw) {
   CASE(ConvenienceFactory)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 static bool isReExportedToModule(const ValueDecl *value,
@@ -1551,7 +1551,7 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
                          bool inProtocolExt, bool importedFromClang,
                          bool isStatic,
-                         Optional<swift::CtorInitializerKind> ctorInit,
+                         llvm::Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
   if (expectedTy)
@@ -1720,7 +1720,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
-                 importedFromClang, isStatic, None, values);
+                 importedFromClang, isStatic, llvm::None, values);
     break;
   }
       
@@ -1804,14 +1804,14 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, None, None, None);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, llvm::None, llvm::None, llvm::None);
         result = getIdentifier(IID);
         break;
       }
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None,
-                                             None);
+        XRefValuePathPieceLayout::readRecord(scratch, llvm::None, IID, llvm::None, llvm::None,
+                                             llvm::None);
         result = getIdentifier(IID);
         break;
       }
@@ -1905,7 +1905,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
         bool hadAMatchBeforeFiltering = !values.empty();
         filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
-                     importedFromClang, isStatic, None, values);
+                     importedFromClang, isStatic, llvm::None, values);
 
         strScratch.clear();
         if (!values.empty()) {
@@ -2000,7 +2000,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           SmallVector<ValueDecl *, 1> singleValueBuffer{nestedType};
           filterValues(/*expectedTy*/Type(), extensionModule, genericSig,
                        /*isType*/true, inProtocolExt, importedFromClang,
-                       /*isStatic*/false, /*ctorInit*/None, singleValueBuffer);
+                       /*isStatic*/false, /*ctorInit*/llvm::None, singleValueBuffer);
           if (!singleValueBuffer.empty()) {
             values.assign({nestedType});
             ++NumNestedTypeShortcuts;
@@ -2018,7 +2018,7 @@ giveUpFastPath:
       TypeID TID = 0;
       DeclBaseName memberName;
       Identifier privateDiscriminator;
-      Optional<swift::CtorInitializerKind> ctorInit;
+      llvm::Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool inProtocolExt = false;
       bool importedFromClang = false;
@@ -2135,7 +2135,7 @@ giveUpFastPath:
 
     case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
       uint8_t rawKind;
-      XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, None,
+      XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, llvm::None,
                                                         rawKind);
       if (values.empty())
         break;
@@ -2266,7 +2266,7 @@ giveUpFastPath:
       fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
 
-    Optional<PrettyStackTraceModuleFile> traceMsg;
+    llvm::Optional<PrettyStackTraceModuleFile> traceMsg;
     if (M != getAssociatedModule()) {
       traceMsg.emplace("If you're seeing a crash here, check that your SDK "
                          "and dependencies match the versions used to build",
@@ -2456,7 +2456,7 @@ Expected<DeclContext *> ModuleFile::getDeclContextChecked(DeclContextID DCID) {
   if (!DCID)
     return FileContext;
 
-  if (Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
+  if (llvm::Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
     return getLocalDeclContext(contextID.value());
 
   auto deserialized = getDeclChecked(DCID.getAsDeclID().value());
@@ -2534,7 +2534,7 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
+static llvm::Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   switch (assoc) {
   case serialization::Associativity::LeftAssociative:
     return swift::Associativity::Left;
@@ -2543,11 +2543,11 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   case serialization::Associativity::NonAssociative:
     return swift::Associativity::None;
   default:
-    return None;
+    return llvm::None;
   }
 }
 
-static Optional<swift::StaticSpellingKind>
+static llvm::Optional<swift::StaticSpellingKind>
 getActualStaticSpellingKind(uint8_t raw) {
   switch (serialization::StaticSpellingKind(raw)) {
   case serialization::StaticSpellingKind::None:
@@ -2557,7 +2557,7 @@ getActualStaticSpellingKind(uint8_t raw) {
   case serialization::StaticSpellingKind::KeywordClass:
     return swift::StaticSpellingKind::KeywordClass;
   }
-  return None;
+  return llvm::None;
 }
 
 static bool isDeclAttrRecord(unsigned ID) {
@@ -2569,7 +2569,7 @@ static bool isDeclAttrRecord(unsigned ID) {
   }
 }
 
-static Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
+static llvm::Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
   switch (serialization::AccessLevel(raw)) {
 #define CASE(NAME) \
   case serialization::AccessLevel::NAME: \
@@ -2582,10 +2582,10 @@ static Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
   CASE(Open)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::SelfAccessKind>
+static llvm::Optional<swift::SelfAccessKind>
 getActualSelfAccessKind(uint8_t raw) {
   switch (serialization::SelfAccessKind(raw)) {
   case serialization::SelfAccessKind::NonMutating:
@@ -2599,12 +2599,12 @@ getActualSelfAccessKind(uint8_t raw) {
   case serialization::SelfAccessKind::Borrowing:
     return swift::SelfAccessKind::Borrowing;
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization VarDeclSpecifier enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static Optional<swift::ParamDecl::Specifier>
+static llvm::Optional<swift::ParamDecl::Specifier>
 getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   switch (raw) {
 #define CASE(ID) \
@@ -2618,10 +2618,10 @@ getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   CASE(LegacyOwned)
   }
 #undef CASE
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::VarDecl::Introducer>
+static llvm::Optional<swift::VarDecl::Introducer>
 getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
   switch (raw) {
 #define CASE(ID) \
@@ -2632,10 +2632,10 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
   CASE(InOut)
   }
 #undef CASE
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::OpaqueReadOwnership>
+static llvm::Optional<swift::OpaqueReadOwnership>
 getActualOpaqueReadOwnership(unsigned rawKind) {
   switch (serialization::OpaqueReadOwnership(rawKind)) {
 #define CASE(KIND)                               \
@@ -2646,10 +2646,10 @@ getActualOpaqueReadOwnership(unsigned rawKind) {
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::ReadImplKind>
+static llvm::Optional<swift::ReadImplKind>
 getActualReadImplKind(unsigned rawKind) {
   switch (serialization::ReadImplKind(rawKind)) {
 #define CASE(KIND)                        \
@@ -2662,10 +2662,10 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Read)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::WriteImplKind>
+static llvm::Optional<swift::WriteImplKind>
 getActualWriteImplKind(unsigned rawKind) {
   switch (serialization::WriteImplKind(rawKind)) {
 #define CASE(KIND)                         \
@@ -2680,10 +2680,10 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(Modify)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::ReadWriteImplKind>
+static llvm::Optional<swift::ReadWriteImplKind>
 getActualReadWriteImplKind(unsigned rawKind) {
   switch (serialization::ReadWriteImplKind(rawKind)) {
 #define CASE(KIND)                             \
@@ -2698,12 +2698,12 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(InheritedWithDidSet)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization DifferentiabilityKind enumerators, which
 /// are guaranteed to be stable, to the AST ones.
-static Optional<swift::AutoDiffDerivativeFunctionKind>
+static llvm::Optional<swift::AutoDiffDerivativeFunctionKind>
 getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
   switch (serialization::AutoDiffDerivativeFunctionKind(raw)) {
 #define CASE(ID)                                                               \
@@ -2713,7 +2713,7 @@ getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
   CASE(VJP)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the Serialization differentiability kind enum values to the
@@ -2721,7 +2721,7 @@ getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static Optional<swift::DifferentiabilityKind>
+static llvm::Optional<swift::DifferentiabilityKind>
 getActualDifferentiabilityKind(uint8_t diffKind) {
   switch (diffKind) {
 #define CASE(THE_DK) \
@@ -2734,11 +2734,11 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
   CASE(Linear)
 #undef CASE
   default:
-    return None;
+    return llvm::None;
   }
 }
 
-static Optional<swift::MacroRole>
+static llvm::Optional<swift::MacroRole>
 getActualMacroRole(uint8_t context) {
   switch (context) {
 #define CASE(THE_DK) \
@@ -2755,10 +2755,10 @@ getActualMacroRole(uint8_t context) {
   CASE(Extension)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
-static Optional<swift::MacroIntroducedDeclNameKind>
+static llvm::Optional<swift::MacroIntroducedDeclNameKind>
 getActualMacroIntroducedDeclNameKind(uint8_t context) {
   switch (context) {
 #define CASE(THE_DK) \
@@ -2771,7 +2771,7 @@ getActualMacroIntroducedDeclNameKind(uint8_t context) {
   CASE(Arbitrary)
 #undef CASE
   default:
-    return None;
+    return llvm::None;
   }
 }
 
@@ -3157,7 +3157,7 @@ public:
       return declOrOffset;
 
     auto theStruct = MF.createDecl<StructDecl>(SourceLoc(), name, SourceLoc(),
-                                               None, genericParams, DC);
+                                               llvm::None, genericParams, DC);
     declOrOffset = theStruct;
 
     // Read the generic environment.
@@ -3215,7 +3215,7 @@ public:
     DeclName name(ctx, DeclBaseName::createConstructor(), argNames);
     PrettySupplementalDeclNameTrace trace(name);
 
-    Optional<swift::CtorInitializerKind> initKind =
+    llvm::Optional<swift::CtorInitializerKind> initKind =
         getActualCtorInitializerKind(storedInitKind);
 
     DeclDeserializationError::Flags errorFlags;
@@ -4108,7 +4108,7 @@ public:
 
     auto proto = MF.createDecl<ProtocolDecl>(
         DC, SourceLoc(), SourceLoc(), name,
-        ArrayRef<PrimaryAssociatedTypeName>(), None,
+        ArrayRef<PrimaryAssociatedTypeName>(), llvm::None,
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
@@ -4320,7 +4320,7 @@ public:
       return declOrOffset;
 
     auto theClass = MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(),
-                                             None, genericParams, DC,
+                                             llvm::None, genericParams, DC,
                                              isExplicitActorDecl);
     declOrOffset = theClass;
 
@@ -4397,7 +4397,7 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(), None,
+    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(), llvm::None,
                                            genericParams, DC);
 
     declOrOffset = theEnum;
@@ -4852,7 +4852,7 @@ public:
 
     // Record definition
     if (builtinID) {
-      Optional<BuiltinMacroKind> builtinKind;
+      llvm::Optional<BuiltinMacroKind> builtinKind;
       switch (builtinID) {
       case 1:
         builtinKind = BuiltinMacroKind::ExternalMacro;
@@ -5259,7 +5259,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           pieces.push_back(MF.getIdentifier(pieceID));
 
         if (numArgs == 0)
-          Attr = ObjCAttr::create(ctx, None, isImplicitName);
+          Attr = ObjCAttr::create(ctx, llvm::None, isImplicitName);
         else
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
                                   isImplicitName);
@@ -5494,7 +5494,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             scratch, isImplicit, origNameId, hasAccessorKind, rawAccessorKind,
             origDeclId, rawDerivativeKind, parameters);
 
-        Optional<AccessorKind> accessorKind = None;
+        llvm::Optional<AccessorKind> accessorKind = llvm::None;
         if (hasAccessorKind) {
           auto maybeAccessorKind = getActualAccessorKind(rawAccessorKind);
           if (!maybeAccessorKind)
@@ -5532,7 +5532,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             scratch, isImplicit, origNameId, origDeclId, parameters);
 
         DeclNameRefWithLoc origName{
-            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), None};
+            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), llvm::None};
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
@@ -5598,7 +5598,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::DocumentationDeclAttrLayout::readRecord(
             scratch, isImplicit, CategoryID, hasVisibility, visibilityID);
         StringRef CategoryText = MF.getIdentifierText(CategoryID);
-        Optional<swift::AccessLevel> realVisibility = None;
+        llvm::Optional<swift::AccessLevel> realVisibility = llvm::None;
         if (hasVisibility)
           realVisibility = getActualAccessLevel(visibilityID);
         Attr = new (ctx) DocumentationAttr(CategoryText, realVisibility, isImplicit);
@@ -5844,7 +5844,7 @@ DeclDeserializer::getDeclCheckedImpl(
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static Optional<swift::FunctionType::Representation>
+static llvm::Optional<swift::FunctionType::Representation>
 getActualFunctionTypeRepresentation(uint8_t rep) {
   switch (rep) {
 #define CASE(THE_CC) \
@@ -5856,7 +5856,7 @@ getActualFunctionTypeRepresentation(uint8_t rep) {
   CASE(CFunctionPointer)
 #undef CASE
   default:
-    return None;
+    return llvm::None;
   }
 }
 
@@ -5865,7 +5865,7 @@ getActualFunctionTypeRepresentation(uint8_t rep) {
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static Optional<swift::SILFunctionType::Representation>
+static llvm::Optional<swift::SILFunctionType::Representation>
 getActualSILFunctionTypeRepresentation(uint8_t rep) {
   switch (rep) {
 #define CASE(THE_CC) \
@@ -5881,7 +5881,7 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   CASE(CXXMethod)
 #undef CASE
   default:
-    return None;
+    return llvm::None;
   }
 }
 
@@ -5890,7 +5890,7 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static Optional<swift::SILCoroutineKind>
+static llvm::Optional<swift::SILCoroutineKind>
 getActualSILCoroutineKind(uint8_t rep) {
   switch (rep) {
 #define CASE(KIND) \
@@ -5901,13 +5901,13 @@ getActualSILCoroutineKind(uint8_t rep) {
   CASE(YieldMany)
 #undef CASE
   default:
-    return None;
+    return llvm::None;
   }
 }
 
 /// Translate from the serialization ReferenceOwnership enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static Optional<swift::ReferenceOwnership>
+static llvm::Optional<swift::ReferenceOwnership>
 getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   switch (raw) {
   case serialization::ReferenceOwnership::Strong:
@@ -5917,13 +5917,13 @@ getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
     return swift::ReferenceOwnership::Name;
 #include "swift/AST/ReferenceStorage.def"
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization ParameterConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static
-Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
+llvm::Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   switch (serialization::ParameterConvention(raw)) {
 #define CASE(ID) \
   case serialization::ParameterConvention::ID: \
@@ -5942,12 +5942,12 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Pack_Owned)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization SILParameterDifferentiability enumerators,
 /// which are guaranteed to be stable, to the AST ones.
-static Optional<swift::SILParameterDifferentiability>
+static llvm::Optional<swift::SILParameterDifferentiability>
 getActualSILParameterDifferentiability(uint8_t raw) {
   switch (serialization::SILParameterDifferentiability(raw)) {
 #define CASE(ID)                                                               \
@@ -5957,13 +5957,13 @@ getActualSILParameterDifferentiability(uint8_t raw) {
   CASE(NotDifferentiable)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization ResultConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static
-Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
+llvm::Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   switch (serialization::ResultConvention(raw)) {
 #define CASE(ID) \
   case serialization::ResultConvention::ID: return swift::ResultConvention::ID;
@@ -5975,12 +5975,12 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   CASE(Pack)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 /// Translate from the serialization SILResultDifferentiability enumerators,
 /// which are guaranteed to be stable, to the AST ones.
-static Optional<swift::SILResultDifferentiability>
+static llvm::Optional<swift::SILResultDifferentiability>
 getActualSILResultDifferentiability(uint8_t raw) {
   switch (serialization::SILResultDifferentiability(raw)) {
 #define CASE(ID)                                                               \
@@ -5990,7 +5990,7 @@ getActualSILResultDifferentiability(uint8_t raw) {
     CASE(NotDifferentiable)
 #undef CASE
   }
-  return None;
+  return llvm::None;
 }
 
 Type ModuleFile::getType(TypeID TID) {
@@ -6893,7 +6893,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   }
 
   // Process the error result.
-  Optional<SILResultInfo> errorResult;
+  llvm::Optional<SILResultInfo> errorResult;
   if (hasErrorResult) {
     auto typeID = variableData[nextVariableDataIndex++];
     auto rawConvention = variableData[nextVariableDataIndex++];
@@ -7755,7 +7755,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     }
 
     // Determine whether we need to enter the actor isolation of the witness.
-    Optional<ActorIsolation> enterIsolation;
+    llvm::Optional<ActorIsolation> enterIsolation;
     if (*rawIDIter++) {
       enterIsolation = getActorIsolation(witness);
     }
@@ -7819,7 +7819,7 @@ void ModuleFile::loadPrimaryAssociatedTypes(const ProtocolDecl *decl,
   readPrimaryAssociatedTypes(assocTypes, DeclTypeCursor);
 }
 
-static Optional<ForeignErrorConvention::Kind>
+static llvm::Optional<ForeignErrorConvention::Kind>
 decodeRawStableForeignErrorConventionKind(uint8_t kind) {
   switch (kind) {
   case static_cast<uint8_t>(ForeignErrorConventionKind::ZeroResult):
@@ -7833,11 +7833,11 @@ decodeRawStableForeignErrorConventionKind(uint8_t kind) {
   case static_cast<uint8_t>(ForeignErrorConventionKind::NonNilError):
     return ForeignErrorConvention::NonNilError;
   default:
-    return None;
+    return llvm::None;
   }
 }
 
-Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
+llvm::Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -7847,18 +7847,18 @@ Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   llvm::BitstreamEntry next =
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
-    return None;
+    return llvm::None;
 
   unsigned recKind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch, &blobData));
   if (recKind != INLINABLE_BODY_TEXT)
-    return None;
+    return llvm::None;
 
   restoreOffset.reset();
   return blobData;
 }
 
-Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
+llvm::Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -7868,7 +7868,7 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
   llvm::BitstreamEntry next =
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
-    return None;
+    return llvm::None;
 
   unsigned recKind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
@@ -7878,7 +7878,7 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
     break;
 
   default:
-    return None;
+    return llvm::None;
   }
 
   uint8_t rawKind;
@@ -7898,7 +7898,7 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
     kind = *optKind;
   else {
     diagnoseAndConsumeFatal();
-    return None;
+    return llvm::None;
   }
 
   Type errorParameterType = getType(errorParameterTypeID);
@@ -7946,7 +7946,7 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
   llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
 
-Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
+llvm::Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -7956,7 +7956,7 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
   llvm::BitstreamEntry next =
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
-    return None;
+    return llvm::None;
 
   unsigned recKind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
@@ -7966,7 +7966,7 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
     break;
 
   default:
-    return None;
+    return llvm::None;
   }
 
   TypeID completionHandlerTypeID;
@@ -7987,10 +7987,10 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
     canCompletionHandlerType = completionHandlerType->getCanonicalType();
 
   // Decode the error and flag parameters.
-  Optional<unsigned> completionHandlerErrorParamIndex;
+  llvm::Optional<unsigned> completionHandlerErrorParamIndex;
   if (rawErrorParameterIndex > 0)
     completionHandlerErrorParamIndex = rawErrorParameterIndex - 1;
-  Optional<unsigned> completionHandlerErrorFlagParamIndex;
+  llvm::Optional<unsigned> completionHandlerErrorFlagParamIndex;
   if (rawErrorFlagParameterIndex > 0)
     completionHandlerErrorFlagParamIndex = rawErrorFlagParameterIndex - 1;
 

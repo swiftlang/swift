@@ -98,7 +98,7 @@ private:
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     IsSerialized_t IsSerialized,
                     StringRef mangledName, SILType loweredType,
-                    Optional<SILLocation> loc, VarDecl *decl);
+                    llvm::Optional<SILLocation> loc, VarDecl *decl);
   
 public:
   static void registerBridgedMetatype(SwiftMetatype metatype) {
@@ -108,7 +108,7 @@ public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    IsSerialized_t IsSerialized,
                                    StringRef MangledName, SILType LoweredType,
-                                   Optional<SILLocation> Loc = None,
+                                   llvm::Optional<SILLocation> Loc = llvm::None,
                                    VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();

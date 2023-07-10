@@ -24,6 +24,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/None.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <utility>
@@ -97,7 +98,7 @@ struct UnexpectedClangTypeError {
   const Kind errorKind;
   const clang::Type *type;
 
-  static Optional<UnexpectedClangTypeError> checkClangType(
+  static llvm::Optional<UnexpectedClangTypeError> checkClangType(
     SILFunctionTypeRepresentation fnRep, const clang::Type *type,
     bool expectNonnullForCOrBlock, bool expectCanonical);
 
@@ -229,7 +230,7 @@ convertRepresentation(FunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled FunctionTypeRepresentation!");
 }
 
-inline Optional<FunctionTypeRepresentation>
+inline llvm::Optional<FunctionTypeRepresentation>
 convertRepresentation(SILFunctionTypeRepresentation rep) {
   switch (rep) {
   case SILFunctionTypeRepresentation::Thick:
@@ -245,7 +246,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
-    return None;
+    return llvm::None;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation!");
 }
@@ -942,7 +943,7 @@ public:
     return builder.getFuncAttrKey();
   }
 
-  Optional<UnexpectedClangTypeError> checkClangType() const;
+  llvm::Optional<UnexpectedClangTypeError> checkClangType() const;
 };
 
 /// Helper function to obtain the useClangTypes parameter for checking equality

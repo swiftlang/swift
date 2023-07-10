@@ -31,7 +31,7 @@ public:
   struct Node;
 
   struct Entry {
-    Optional<ValueType> Value;
+    llvm::Optional<ValueType> Value;
     Node *Children = nullptr;
   };
 
@@ -74,7 +74,7 @@ public:
   /// this is actually an invariant violation, but we can produce a better
   /// assertion further up the stack.
   template<typename Iter>
-  Optional<ValueType> insert(Iter begin, Iter end, ValueType value) {
+  llvm::Optional<ValueType> insert(Iter begin, Iter end, ValueType value) {
     assert(begin != end);
     auto *node = &Root;
 
@@ -101,12 +101,12 @@ public:
   /// depending on whether the Kind template parameter was bound to
   /// MatchKind::Shortest or MatchKind::Longest.
   template<typename Iter>
-  Optional<ValueType>
+  llvm::Optional<ValueType>
   find(Iter begin, Iter end) const {
     assert(begin != end);
     auto *node = &Root;
 
-    Optional<ValueType> bestMatch = None;
+    llvm::Optional<ValueType> bestMatch = llvm::None;
 
     while (true) {
       auto found = node->Entries.find(*begin);

@@ -142,13 +142,13 @@ bool Deserializer::readMetadata() {
 static llvm::Optional<NodeKind> getNodeKind(unsigned nodeKind) {
   if (nodeKind < unsigned(NodeKind::kindCount))
     return NodeKind(nodeKind);
-  return None;
+  return llvm::None;
 }
 
 static llvm::Optional<DeclAspect> getDeclAspect(unsigned declAspect) {
   if (declAspect < unsigned(DeclAspect::aspectCount))
     return DeclAspect(declAspect);
-  return None;
+  return llvm::None;
 }
 
 bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
@@ -290,7 +290,7 @@ llvm::Optional<std::string> Deserializer::getIdentifier(unsigned n) {
 
   --n;
   if (n >= Identifiers.size())
-    return None;
+    return llvm::None;
 
   return Identifiers[n];
 }

@@ -963,7 +963,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                             ValueWitness index, FixedPacking packing,
                             CanType abstractType, SILType concreteType,
                             const TypeInfo &concreteTI,
-                            const Optional<BoundGenericTypeCharacteristics>
+                            const llvm::Optional<BoundGenericTypeCharacteristics>
                                 boundGenericCharacteristics = llvm::None) {
   auto addFunction = [&](llvm::Constant *fn) {
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
@@ -1177,7 +1177,7 @@ static llvm::StructType *getValueWitnessTableType(IRGenModule &IGM,
 static void addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
                               FixedPacking packing, CanType abstractType,
                               SILType concreteType, const TypeInfo &concreteTI,
-                              const Optional<BoundGenericTypeCharacteristics>
+                              const llvm::Optional<BoundGenericTypeCharacteristics>
                                   boundGenericCharacteristics = llvm::None) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
@@ -1204,7 +1204,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              ConstantStructBuilder &B,
                                              CanType abstractType,
                                              bool &canBeConstant) {
-  Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
+  llvm::Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
   if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
     CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 

@@ -754,7 +754,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     } else {
       contextBuffer = B.createAllocBox(loc,
                                        contextStorageTy.castTo<SILBoxType>(),
-                                       /*debug variable*/ None,
+                                       /*debug variable*/ llvm::None,
                                        /*dynamic lifetime*/ false,
                                        /*reflection*/ true);
       contextProj = B.createProjectBox(loc, contextBuffer, 0);

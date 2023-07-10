@@ -130,7 +130,7 @@ struct CommonSwiftTextualModuleDependencyDetails {
   const std::vector<std::string> extraPCMArgs;
 
   /// Bridging header file, if there is one.
-  Optional<std::string> bridgingHeaderFile;
+  llvm::Optional<std::string> bridgingHeaderFile;
 
   /// Source files on which the bridging header depends.
   std::vector<std::string> bridgingSourceFiles;
@@ -566,7 +566,7 @@ public:
   void addModuleDependency(ModuleDependencyID dependencyID);
 
   /// Get the bridging header.
-  Optional<std::string> getBridgingHeader() const;
+  llvm::Optional<std::string> getBridgingHeader() const;
 
   /// Add a bridging header to a Swift module's dependencies.
   void addBridgingHeader(StringRef bridgingHeader);
@@ -621,8 +621,9 @@ class SwiftDependencyScanningService {
 
   /// The persistent Clang dependency scanner service
   clang::tooling::dependencies::DependencyScanningService ClangScanningService;
+
   /// The global file system cache.
-  Optional<
+  llvm::Optional<
       clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
       SharedFilesystemCache;
 
@@ -694,7 +695,7 @@ private:
 
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
-                     Optional<ModuleDependencyKind> kind,
+                     llvm::Optional<ModuleDependencyKind> kind,
                      StringRef scanContextHash) const;
 
   /// Return a pointer to the cache state of the specified context hash.
@@ -704,9 +705,9 @@ private:
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  Optional<const ModuleDependencyInfo*>
+  llvm::Optional<const ModuleDependencyInfo*>
   findDependency(StringRef moduleName,
-                 Optional<ModuleDependencyKind> kind,
+                 llvm::Optional<ModuleDependencyKind> kind,
                  StringRef scanContextHash) const;
 
   /// Record dependencies for the given module.
@@ -763,7 +764,7 @@ public:
 public:
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
-                     Optional<ModuleDependencyKind> kind) const;
+                     llvm::Optional<ModuleDependencyKind> kind) const;
 
   /// Produce a reference to the Clang scanner tool associated with this cache
   clang::tooling::dependencies::DependencyScanningTool& getClangScannerTool() {
@@ -776,9 +777,9 @@ public:
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  Optional<const ModuleDependencyInfo*>
+  llvm::Optional<const ModuleDependencyInfo*>
   findDependency(StringRef moduleName,
-                 Optional<ModuleDependencyKind> kind) const;
+                 llvm::Optional<ModuleDependencyKind> kind) const;
 
   /// Record dependencies for the given module.
   void recordDependency(StringRef moduleName,

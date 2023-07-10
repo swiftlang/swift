@@ -493,7 +493,7 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   std::string declStringWithoutFunc;
   {
     llvm::raw_string_ostream out(declStringWithoutFunc);
-    printResultBuilderBuildFunction(builder, componentType, function, None,
+    printResultBuilderBuildFunction(builder, componentType, function, llvm::None,
                                     out);
   }
   Builder.addTextChunk(declStringWithoutFunc);

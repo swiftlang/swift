@@ -149,7 +149,7 @@ static Type increasePackElementLevelImpl(
     Type type, unsigned level, unsigned outerLevel) {
   assert(level > 0);
 
-  return type.transformRec([&](TypeBase *t) -> Optional<Type> {
+  return type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
     if (auto *elementType = dyn_cast<PackElementType>(t)) {
       if (elementType->getLevel() >= outerLevel) {
         elementType = PackElementType::get(elementType->getPackType(),
@@ -173,7 +173,7 @@ static Type increasePackElementLevelImpl(
       return Type(t);
     }
 
-    return None;
+    return llvm::None;
   });
 }
 
@@ -455,7 +455,7 @@ static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
   // Build an array of formal element types, but be lazy about it:
   // use the original array unless we see an element type that doesn't
   // work as a legal formal type.
-  Optional<SmallVector<CanType, 4>> formalEltTypes;
+  llvm::Optional<SmallVector<CanType, 4>> formalEltTypes;
   for (auto i : indices(loweredEltTypes)) {
     auto loweredEltType = loweredEltTypes[i];
     bool isLegal = loweredEltType->isLegalFormalType();

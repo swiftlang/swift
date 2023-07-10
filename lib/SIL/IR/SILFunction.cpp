@@ -95,7 +95,7 @@ void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
 SILFunction *
 SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     CanSILFunctionType loweredType,
-                    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
+                    GenericEnvironment *genericEnv, llvm::Optional<SILLocation> loc,
                     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
                     IsDynamicallyReplaceable_t isDynamic,

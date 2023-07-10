@@ -513,7 +513,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
                                 StringRef libraryName,
                                 bool forceLoad) {
-      Optional<llvm::VersionTuple> compatibilityVersion;
+      llvm::Optional<llvm::VersionTuple> compatibilityVersion;
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
@@ -2381,7 +2381,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
 /// Get or create an LLVM global variable with these linkage rules.
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
-    Alignment alignment, DebugTypeInfo DbgTy, Optional<SILLocation> DebugLoc,
+    Alignment alignment, DebugTypeInfo DbgTy, llvm::Optional<SILLocation> DebugLoc,
     StringRef DebugName) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
@@ -2676,7 +2676,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       }
     } else {
       StringRef name;
-      Optional<SILLocation> loc;
+      llvm::Optional<SILLocation> loc;
       if (var->getDecl()) {
         // Use the VarDecl for more accurate debugging information.
         loc = var->getDecl();
@@ -3648,7 +3648,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     return getElementBitCast(existing, defaultType);
 
   const LazyConstantInitializer *lazyInitializer = nullptr;
-  Optional<ConstantInitBuilder> lazyBuilder;
+  llvm::Optional<ConstantInitBuilder> lazyBuilder;
   if (definition.isLazy()) {
     lazyInitializer = definition.getLazy();
     lazyBuilder.emplace(*this);
@@ -5086,7 +5086,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     }
   }
 
-  Optional<LinkEntity> entity;
+  llvm::Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
   switch (canonicality) {
@@ -5404,7 +5404,7 @@ llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.
-Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
+llvm::Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                             ClassDecl *cd,
                             bool isDestroyer,
                             bool isForeign,
@@ -5420,7 +5420,7 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
     return getAddrOfSILFunction(silFn, forDefinition);
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Returns the address of a value-witness function.

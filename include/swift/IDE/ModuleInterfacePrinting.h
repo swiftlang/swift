@@ -48,7 +48,7 @@ using ModuleTraversalOptions = OptionSet<ModuleTraversal>;
 
 void collectModuleGroups(ModuleDecl *M, SmallVectorImpl<StringRef> &Into);
 
-Optional<StringRef>
+llvm::Optional<StringRef>
 findGroupNameForUSR(ModuleDecl *M, StringRef USR);
 
 bool printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,

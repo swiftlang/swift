@@ -158,7 +158,7 @@ public:
   /// Validate the well-formedness of this data structure.
   void validate() const {
 #ifndef NDEBUG
-    if (Root) validateNode(Root, None, None);
+    if (Root) validateNode(Root, llvm::None, llvm::None);
 #endif
   }
 
@@ -369,8 +369,8 @@ private:
   /// (and those of its children) fall (non-inclusively) between
   /// lowerBound and upperBound-1.
   static void validateNode(Node *node,
-                           Optional<K> lowerBound,
-                           Optional<K> upperBound) {
+                           llvm::Optional<K> lowerBound,
+                           llvm::Optional<K> upperBound) {
     // The node cannot have an empty key range.
     assert(Traits::precedes(node->Begin, node->End));
 

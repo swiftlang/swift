@@ -144,14 +144,14 @@ protected:
 
   /// Retrieve overload choice resolved for a given locator
   /// by the constraint solver.
-  Optional<SelectedOverload>
+  llvm::Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return S.getOverloadChoiceIfAvailable(locator);
   }
 
   /// Retrieve overload choice resolved for a callee for the anchor
   /// of a given locator.
-  Optional<SelectedOverload>
+  llvm::Optional<SelectedOverload>
   getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
   }
@@ -176,7 +176,7 @@ protected:
     return S.getConstraintLocator(baseLocator, element);
   }
 
-  Optional<FunctionArgApplyInfo>
+  llvm::Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     return S.getFunctionArgApplyInfo(locator);
   }
@@ -610,10 +610,10 @@ private:
   /// \returns The base subexpression that looks immutable (or that can't be
   /// analyzed any further) along with an OverloadChoice extracted from it if we
   /// could.
-  std::pair<Expr *, Optional<OverloadChoice>>
+  std::pair<Expr *, llvm::Optional<OverloadChoice>>
   resolveImmutableBase(Expr *expr) const;
 
-  std::pair<Expr *, Optional<OverloadChoice>>
+  std::pair<Expr *, llvm::Optional<OverloadChoice>>
   resolveImmutableBase(const Expr *expr) const {
     return resolveImmutableBase(const_cast<Expr *>(expr));
   }
@@ -623,7 +623,7 @@ private:
 
   /// Retrieve an member reference associated with given member
   /// looking through dynamic member lookup on the way.
-  Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
+  llvm::Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
@@ -732,7 +732,7 @@ private:
 protected:
   ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
-  static Optional<Diag<Type, Type>>
+  static llvm::Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 
 protected:
@@ -883,7 +883,7 @@ private:
 
   void emitNoteForMismatch(int mismatchPosition);
 
-  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+  llvm::Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
   BoundGenericType *getActual() const {
@@ -1478,7 +1478,7 @@ private:
 
   /// Gather information associated with expression that represents
   /// a call - function and argument list.
-  Optional<std::pair<Expr *, ArgumentList *>> getCallInfo(ASTNode anchor) const;
+  llvm::Optional<std::pair<Expr *, ArgumentList *>> getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`
@@ -2405,7 +2405,7 @@ public:
   bool diagnoseAsNote() override;
 
 protected:
-  Optional<Diag<Type, Type>> getDiagnostic() const;
+  llvm::Optional<Diag<Type, Type>> getDiagnostic() const;
 
   virtual void fixIt(InFlightDiagnostic &diagnostic) const = 0;
 };

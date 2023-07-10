@@ -53,7 +53,7 @@ public:
   llvm::sys::ProcessInfo PI;
 
   Task(const char *ExecPath, ArrayRef<const char *> Args,
-       ArrayRef<const char *> Env = None, void *Context = nullptr,
+       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr,
        bool SeparateErrors = false)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
         SeparateErrors(SeparateErrors) {}
@@ -69,8 +69,8 @@ bool Task::execute() {
   Argv.append(Args.begin(), Args.end());
   Argv.push_back(nullptr);
 
-  Optional<ArrayRef<StringRef>> Envp =
-      Env.empty() ? decltype(Envp)(None)
+  llvm::Optional<ArrayRef<StringRef>> Envp =
+      Env.empty() ? decltype(Envp)(llvm::None)
                   : decltype(Envp)(llvm::toStringRefArray(Env.data()));
 
   if (llvm::sys::fs::createTemporaryFile("stdout", "tmp", StdoutPath))
@@ -83,8 +83,8 @@ bool Task::execute() {
     llvm::sys::RemoveFileOnSignal(StderrPath);
   }
 
-  Optional<StringRef> Redirects[] = {
-      None,
+  llvm::Optional<StringRef> Redirects[] = {
+      llvm::None,
       StringRef{StdoutPath},
       StringRef{SeparateErrors ? StderrPath : StdoutPath},
   };

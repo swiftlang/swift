@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <string>
@@ -342,13 +343,13 @@ struct OmissionTypeName {
 
   /// Construct a type name.
   OmissionTypeName(StringRef name = StringRef(),
-                   OmissionTypeOptions options = None,
+                   OmissionTypeOptions options = llvm::None,
                    StringRef collectionElement = StringRef())
     : Name(name), CollectionElement(collectionElement),
       Options(options) { }
 
   /// Construct a type name.
-  OmissionTypeName(const char * name, OmissionTypeOptions options = None,
+  OmissionTypeName(const char * name, OmissionTypeOptions options = llvm::None,
                    StringRef collectionElement = StringRef())
     : Name(name), CollectionElement(collectionElement),
       Options(options) { }
@@ -462,12 +463,12 @@ bool omitNeedlessWords(StringRef &baseName,
                        bool returnsSelf,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
-                       Optional<unsigned> completionHandlerIndex,
-                       Optional<StringRef> completionHandlerName,
+                       llvm::Optional<unsigned> completionHandlerIndex,
+                       llvm::Optional<StringRef> completionHandlerName,
                        StringScratchSpace &scratch);
 
 /// If the name has a completion-handler suffix, strip off that suffix.
-Optional<StringRef> stripWithCompletionHandlerSuffix(StringRef name);
+llvm::Optional<StringRef> stripWithCompletionHandlerSuffix(StringRef name);
 
 /// Represents a string that can be efficiently retrieved either as a StringRef
 /// or as a null-terminated C string.

@@ -183,7 +183,7 @@ void AvailableValues::dump() const { print(llvm::dbgs(), nullptr); }
 struct borrowtodestructure::Implementation {
   BorrowToDestructureTransform &interface;
 
-  Optional<AvailableValueStore> blockToAvailableValues;
+  llvm::Optional<AvailableValueStore> blockToAvailableValues;
 
   /// The liveness that we use for all borrows or for individual switch_enum
   /// arguments.
@@ -462,7 +462,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
     // First loop through our uses and handle any consuming twice errors. We
     // also setup usedBits to check for non-consuming uses that may overlap.
     Operand *badOperand = nullptr;
-    Optional<TypeTreeLeafTypeRange> badRange;
+    llvm::Optional<TypeTreeLeafTypeRange> badRange;
     for (auto *use : instRangePair.second) {
       if (!use->isConsuming())
         continue;
@@ -596,7 +596,7 @@ void Implementation::checkDestructureUsesOnBoundary() const {
 
 #ifndef NDEBUG
 static void dumpSmallestTypeAvailable(
-    SmallVectorImpl<Optional<std::pair<TypeOffsetSizePair, SILType>>>
+    SmallVectorImpl<llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>>
         &smallestTypeAvailable) {
   LLVM_DEBUG(llvm::dbgs() << "            Dumping smallest type available!\n");
   for (auto pair : llvm::enumerate(smallestTypeAvailable)) {
@@ -690,11 +690,11 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
         : targetBlockRPO(*pofi->getRPONumber(block)), pe(block->pred_end()),
           pofi(pofi) {}
 
-    Optional<SILBasicBlock *> operator()(SILBasicBlock *predBlock) const {
+    llvm::Optional<SILBasicBlock *> operator()(SILBasicBlock *predBlock) const {
       // If our predecessor block has a larger RPO number than our target block,
       // then their edge must be a backedge.
       if (targetBlockRPO < *pofi->getRPONumber(predBlock))
-        return None;
+        return llvm::None;
       return predBlock;
     }
   };
@@ -726,7 +726,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
   LLVM_DEBUG(llvm::dbgs() << "        Computing smallest type available for "
                              "available values for block bb"
                           << block->getDebugID() << '\n');
-  SmallVector<Optional<std::pair<TypeOffsetSizePair, SILType>>, 8>
+  SmallVector<llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>, 8>
       smallestTypeAvailable;
   {
     auto pi = predsSkippingBackEdges.begin();
@@ -753,7 +753,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
               {{TypeOffsetSizePair(predAvailableValues[i], getRootValue()),
                 predAvailableValues[i]->getType()}});
         else
-          smallestTypeAvailable.emplace_back(None);
+          smallestTypeAvailable.emplace_back(llvm::None);
       }
       LLVM_DEBUG(llvm::dbgs() << "        Finished computing initial smallest "
                                  "type available for block bb"
@@ -775,7 +775,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
           continue;
 
         if (!predAvailableValues[i]) {
-          smallestTypeAvailable[i] = None;
+          smallestTypeAvailable[i] = llvm::None;
           continue;
         }
 

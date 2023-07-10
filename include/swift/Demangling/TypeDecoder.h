@@ -20,6 +20,7 @@
 
 #include "TypeLookupError.h"
 #include "swift/Basic/LLVM.h"
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementKind.h"
@@ -32,6 +33,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include <vector>
 
 namespace swift {
@@ -145,7 +148,7 @@ public:
     if (conventionString == "@pack_inout")
       return ConventionType::Pack_Inout;
 
-    return None;
+    return llvm::None;
   }
 
   static llvm::Optional<DifferentiabilityType>
@@ -154,7 +157,7 @@ public:
       return DifferentiabilityType::DifferentiableOrNotApplicable;
     if (string == "@noDerivative")
       return DifferentiabilityType::NotDifferentiable;
-    return None;
+    return llvm::None;
   }
 
   ImplFunctionParam(BuiltType type, ImplParameterConvention convention,
@@ -211,7 +214,7 @@ public:
     if (conventionString == "@pack_out")
       return ConventionType::Pack;
 
-    return None;
+    return llvm::None;
   }
 
   static llvm::Optional<DifferentiabilityType>
@@ -220,7 +223,7 @@ public:
       return DifferentiabilityType::DifferentiableOrNotApplicable;
     if (string == "@noDerivative")
       return DifferentiabilityType::NotDifferentiable;
-    return None;
+    return llvm::None;
   }
 
   ImplFunctionResult(
@@ -347,21 +350,21 @@ static inline llvm::Optional<StringRef>
 getObjCClassOrProtocolName(NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
-    return None;
+    return llvm::None;
 
   if (node->getNumChildren() != 2)
-    return None;
+    return llvm::None;
 
   // Check whether we have the __ObjC module.
   auto moduleNode = node->getChild(0);
   if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
       moduleNode->getText() != MANGLING_MODULE_OBJC)
-    return None;
+    return llvm::None;
 
   // Check whether we have an identifier.
   auto nameNode = node->getChild(1);
   if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return None;
+    return llvm::None;
 
   return nameNode->getText();
 }
@@ -425,7 +428,7 @@ void decodeRequirement(NodePointer node,
               .Case("T", LayoutConstraintKind::Trivial)
               .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
               .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
-              .Default(None);
+              .Default(llvm::None);
 
       if (!kind)
         return;
@@ -1651,7 +1654,7 @@ private:
     auto decodeParam =
         [&](NodePointer paramNode) -> llvm::Optional<TypeLookupError> {
       if (paramNode->getKind() != NodeKind::TupleElement)
-        return None;
+        return llvm::None;
 
       FunctionParam<BuiltType> param;
       for (const auto &child : *paramNode) {
@@ -1678,7 +1681,7 @@ private:
         }
       }
 
-      return None;
+      return llvm::None;
     };
 
     // Expand a single level of tuple.
@@ -1690,7 +1693,7 @@ private:
           return *optError;
       }
 
-      return None;
+      return llvm::None;
     }
 
     // Otherwise, handle the type as a single argument.
@@ -1699,7 +1702,7 @@ private:
     if (optError)
       return *optError;
 
-    return None;
+    return llvm::None;
   }
 };
 

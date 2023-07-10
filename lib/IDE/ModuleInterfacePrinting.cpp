@@ -53,8 +53,8 @@ public:
       ClangLoader(ClangLoader) {}
 
 private:
-  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override;
-  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override;
+  void printDeclPre(const Decl *D, llvm::Optional<BracketOptions> Bracket) override;
+  void printDeclPost(const Decl *D, llvm::Optional<BracketOptions> Bracket) override;
   void avoidPrintDeclPost(const Decl *D) override;
   // Forwarding implementations.
 
@@ -85,14 +85,14 @@ private:
   }
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     TypeOrExtensionDecl Target,
-                                    Optional<BracketOptions> Bracket) override {
+                                    llvm::Optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPre(ED, Target, Bracket);
   }
 
   void
   printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                 TypeOrExtensionDecl Target,
-                                Optional<BracketOptions> Bracket) override {
+                                llvm::Optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPost(ED, Target, Bracket);
   }
 
@@ -219,14 +219,14 @@ static bool extensionHasClangNode(ExtensionDecl *ext) {
   return static_cast<bool>(swift::ide::extensionGetClangNode(ext));
 }
 
-Optional<StringRef>
+llvm::Optional<StringRef>
 swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
   for (auto File : M->getTopLevelModule()->getFiles()) {
     if (auto Name = File->getGroupNameByUSR(USR)) {
       return Name;
     }
   }
-  return None;
+  return llvm::None;
 }
 
 /// Prints a single decl using the \p Printer and \p Options provided. If
@@ -950,7 +950,7 @@ void ClangCommentPrinter::avoidPrintDeclPost(const Decl *D) {
 }
 
 void ClangCommentPrinter::printDeclPre(const Decl *D,
-                                       Optional<BracketOptions> Bracket) {
+                                       llvm::Optional<BracketOptions> Bracket) {
   // Skip parameters, since we do not gracefully handle nested declarations on a
   // single line.
   // FIXME: we should fix that, since it also affects struct members, etc.
@@ -968,7 +968,7 @@ void ClangCommentPrinter::printDeclPre(const Decl *D,
 }
 
 void ClangCommentPrinter::printDeclPost(const Decl *D,
-                                        Optional<BracketOptions> Bracket) {
+                                        llvm::Optional<BracketOptions> Bracket) {
   OtherPrinter.printDeclPost(D, Bracket);
 
   // Skip parameters; see printDeclPre().

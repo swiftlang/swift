@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/ManglingUtils.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/None.h"
 
 using namespace swift;
 using namespace Mangle;

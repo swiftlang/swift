@@ -176,7 +176,7 @@ SourceLoc Stmt::getEndLoc() const {
 }
 
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
-                     SourceLoc rbloc, Optional<bool> implicit)
+                     SourceLoc rbloc, llvm::Optional<bool> implicit)
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
     LBLoc(lbloc), RBLoc(rbloc)
 {
@@ -193,7 +193,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ASTNode> elts, SourceLoc rbloc,
-                             Optional<bool> implicit) {
+                             llvm::Optional<bool> implicit) {
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
@@ -354,7 +354,7 @@ SourceLoc ReturnStmt::getEndLoc() const {
 
 YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
                              SourceLoc lpLoc, ArrayRef<Expr*> yields,
-                             SourceLoc rpLoc, Optional<bool> implicit) {
+                             SourceLoc rpLoc, llvm::Optional<bool> implicit) {
   void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
                               alignof(YieldStmt));
   return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc, implicit);
@@ -435,7 +435,7 @@ Expr *ForEachStmt::getTypeCheckedSequence() const {
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
-                                 Optional<bool> implicit) {
+                                 llvm::Optional<bool> implicit) {
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
@@ -620,7 +620,7 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
 }
 
 IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-               Stmt *Else, Optional<bool> implicit, ASTContext &Ctx)
+               Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx)
   : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else,
            implicit) {
 }
@@ -659,7 +659,7 @@ bool IfStmt::isSyntacticallyExhaustive() const {
 }
 
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
-                     Optional<bool> implicit, ASTContext &Ctx)
+                     llvm::Optional<bool> implicit, ASTContext &Ctx)
   : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
     
 }
@@ -686,8 +686,8 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
                    BraceStmt *body,
-                   Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
-                   Optional<bool> implicit,
+                   llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
+                   llvm::Optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
       UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
@@ -724,8 +724,8 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
                            ArrayRef<CaseLabelItem> caseLabelItems,
                            SourceLoc unknownAttrLoc, SourceLoc colonLoc,
                            BraceStmt *body,
-                           Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
-                           Optional<bool> implicit,
+                           llvm::Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
+                           llvm::Optional<bool> implicit,
                            NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(

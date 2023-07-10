@@ -167,7 +167,7 @@ enum class KnownFoundationEntity {
 
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
-Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+llvm::Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
 /// Retrieve the Swift name for the given Foundation entity, where
 /// "NS" prefix stripping will apply under omit-needless-words.
@@ -337,7 +337,7 @@ public:
   unsigned NumTypoCorrections = 0;
 
   /// Cached mapping from types to their associated tangent spaces.
-  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+  llvm::DenseMap<Type, llvm::Optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// A cache of derivative function types per configuration.
   llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
@@ -798,7 +798,7 @@ public:
   /// SIL analog of \c ASTContext::getClangFunctionType .
   const clang::Type *
   getCanonicalClangFunctionType(
-    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    ArrayRef<SILParameterInfo> params, llvm::Optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep);
 
   /// Instantiates "Impl.Converter" if needed, then translate Swift generic
@@ -1020,22 +1020,22 @@ public:
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
-  Optional<const ModuleDependencyInfo*> getModuleDependencies(
+  llvm::Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
       bool optionalDependencyLookup = false,
       bool isTestableImport = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = llvm::None);
 
   /// Retrieve the module dependencies for the Clang module with the given name.
-  Optional<const ModuleDependencyInfo*> getClangModuleDependencies(
+  llvm::Optional<const ModuleDependencyInfo*> getClangModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<const ModuleDependencyInfo*> getSwiftModuleDependencies(
+  llvm::Optional<const ModuleDependencyInfo*> getSwiftModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
@@ -1496,7 +1496,7 @@ public:
 private:
   friend Decl;
 
-  Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  llvm::Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
   void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
 
   friend TypeBase;

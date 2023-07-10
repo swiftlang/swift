@@ -89,8 +89,6 @@ namespace SourceKit {
   using llvm::SmallVector;
   using llvm::SmallVectorImpl;
   using llvm::SaveAndRestore;
-  using llvm::Optional;
-  using llvm::None;
 
   // Reference counting.
   using llvm::IntrusiveRefCntPtr;

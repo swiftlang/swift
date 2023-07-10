@@ -37,16 +37,16 @@ class TypeRepr;
 /// the given expanded type.
 ///
 /// \returns Expansion buffer ID if expansion succeeded, \p None if failed.
-Optional<unsigned> expandMacroExpr(MacroExpansionExpr *mee);
+llvm::Optional<unsigned> expandMacroExpr(MacroExpansionExpr *mee);
 
 /// Expands the given macro expansion declaration.
 ///
 /// \returns Expansion buffer ID if expansion succeeded, \p None if failed.
-Optional<unsigned> expandFreestandingMacro(MacroExpansionDecl *med);
+llvm::Optional<unsigned> expandFreestandingMacro(MacroExpansionDecl *med);
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.
-Optional<unsigned> expandAccessors(
+llvm::Optional<unsigned> expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 );
 
@@ -54,28 +54,28 @@ Optional<unsigned> expandAccessors(
 /// on the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-Optional<unsigned>
+llvm::Optional<unsigned>
 expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
 
 /// Expand the synthesized members for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-Optional<unsigned>
+llvm::Optional<unsigned>
 expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
 /// Expand the peer declarations for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+llvm::Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
 /// Expand the extensions for the given declaration based on
 /// the custom attribute that references the given macro. Extensions
 /// can be produced by either conformance macros or extension macros.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
-Optional<unsigned> expandExtensions(CustomAttr *attr,
+llvm::Optional<unsigned> expandExtensions(CustomAttr *attr,
                                     MacroDecl *macro,
                                     MacroRole role,
                                     NominalTypeDecl *nominal);

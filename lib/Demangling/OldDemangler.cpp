@@ -21,6 +21,7 @@
 #include "swift/Strings.h"
 #include "swift/Demangling/Punycode.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/None.h"
 #include <functional>
 #include <vector>
 #include <cstdio>

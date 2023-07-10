@@ -409,7 +409,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
     // The requirement signature for the actual protocol that the result
     // was kicked off with.
-    Optional<RequirementSignature> result;
+    llvm::Optional<RequirementSignature> result;
 
     if (debug) {
       llvm::dbgs() << "\nRequirement signatures:\n";

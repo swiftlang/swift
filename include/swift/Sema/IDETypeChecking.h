@@ -124,7 +124,7 @@ namespace swift {
 
   /// Return the type of an expression parsed during code completion, or
   /// None on error.
-  Optional<Type> getTypeOfCompletionContextExpr(
+  llvm::Optional<Type> getTypeOfCompletionContextExpr(
                    ASTContext &Ctx,
                    DeclContext *DC,
                    CompletionTypeCheckKind kind,
@@ -323,7 +323,7 @@ namespace swift {
   void printResultBuilderBuildFunction(
       NominalTypeDecl *builder, Type componentType,
       ResultBuilderBuildFunction function,
-      Optional<std::string> stubIndent, llvm::raw_ostream &out);
+      llvm::Optional<std::string> stubIndent, llvm::raw_ostream &out);
 
   /// Compute the insertion location, indentation string, and component type
   /// for a Fix-It that adds a new build* function to a result builder.
