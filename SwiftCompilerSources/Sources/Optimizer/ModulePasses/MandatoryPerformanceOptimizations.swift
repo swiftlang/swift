@@ -49,8 +49,13 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
   }
 }
 
+fileprivate struct PathFunctionTuple: Hashable {
+  var path: SmallProjectionPath
+  var function: Function
+}
+
 private func optimize(function: Function, _ context: FunctionPassContext) {
-  var alreadyInlinedFunctions: [SmallProjectionPath:Set<Function>] = [:]
+  var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
   
   var changed = true
   while changed {
@@ -79,7 +84,7 @@ private func optimize(function: Function, _ context: FunctionPassContext) {
   }
 }
 
-private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout [SmallProjectionPath:Set<Function>],
+private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
                                    _ context: FunctionPassContext, _ simplifyCtxt: SimplifyContext) {
   if simplifyCtxt.tryDevirtualize(apply: apply, isMandatory: true) != nil {
     return
@@ -116,7 +121,7 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
   }
 }
 
-private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout [SmallProjectionPath:Set<Function>]) -> Bool {
+private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
   if callee.isTransparent {
     return true
   }
@@ -134,8 +139,7 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
       global.mustBeInitializedStatically,
       let applyInst = apply as? ApplyInst,
       let projectionPath = applyInst.isStored(to: global),
-      !alreadyInlinedFunctions[projectionPath, default: Set()].contains(callee) {
-    alreadyInlinedFunctions[projectionPath, default: Set()].insert(callee)
+      alreadyInlinedFunctions.insert(PathFunctionTuple(path: projectionPath, function: callee)).inserted {
     return true
   }
   return false
@@ -174,7 +178,7 @@ private extension Value {
     var singleUseValue: any Value = self
     var path = SmallProjectionPath()
     while true {
-      guard let use = singleUseValue.uses.singleUse else {
+      guard let use = singleUseValue.uses.singleNonDebugUse else {
         return nil
       }
       
@@ -185,8 +189,8 @@ private extension Value {
       case is TupleInst:
         path = path.push(.tupleField, index: use.index)
         break
-      case is EnumInst:
-        path = path.push(.enumCase, index: use.index)
+      case let ei as EnumInst:
+        path = path.push(.enumCase, index: ei.caseIndex)
         break
       case let si as StoreInst:
         guard let storeDestination = si.destination as? GlobalAddrInst else {
@@ -199,7 +203,7 @@ private extension Value {
         
         return path
       default:
-        break
+        return nil
       }
 
       guard let nextInstruction = use.instruction as? SingleValueInstruction else {
