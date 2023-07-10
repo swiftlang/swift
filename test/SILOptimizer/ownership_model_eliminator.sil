@@ -411,3 +411,18 @@ bb0(%0 : @guaranteed $C, %1 : $*C):
   return %t : $()
 }
 
+// CHECK-LABEL: sil @test_partial_apply_on_stack_copy_value :
+// CHECK: apply
+// CHECK: dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_partial_apply_on_stack_copy_value'
+sil [ossa] @test_partial_apply_on_stack_copy_value: $@convention(thin) (@guaranteed C, @inout C) -> () {
+bb0(%0 : @guaranteed $C, %1 : $*C):
+  %f1 = function_ref @closure1: $@convention(thin) (@guaranteed C, @inout_aliasable C) -> ()
+  %pa1 = partial_apply [callee_guaranteed] [on_stack] %f1(%0, %1) : $@convention(thin) (@guaranteed C, @inout_aliasable C) -> ()
+  %copy = copy_value %pa1 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %pa1 : $@noescape @callee_guaranteed () -> ()
+  apply undef(%copy) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %copy : $@noescape @callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
