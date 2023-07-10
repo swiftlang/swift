@@ -52,3 +52,16 @@ func foo(_ arg: String, _ consumingArg: consuming String, _ borrowingArg: borrow
     inout getterStructVarFieldX = varStruct.sGetter // expected-error {{inout bindings must be bound to an lvalue}}
     inout modifyStructVarFieldX = varStruct.sModify
 }
+
+// Make sure that we get never used to diagnostics, but not never written to diagnostics.
+func neverWrittenMutatedDiagnostics() {
+    var x = "123"
+    x = "223"
+    do {
+        inout x2 = x // expected-warning {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
+    }
+    do {
+        inout x2 = x
+        let _ = x2
+    }
+}
