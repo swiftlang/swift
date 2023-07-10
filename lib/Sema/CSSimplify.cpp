@@ -4430,6 +4430,13 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    if (flags.contains(TMF_BindingTypeVariable))
+      return resolveKeyPath(typeVar, type, locator)
+                 ? getTypeMatchSuccess()
+                 : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -6688,6 +6695,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Merge the equivalence classes corresponding to these two variables.
         mergeEquivalenceClasses(rep1, rep2, /*updateWorkList=*/true);
         return getTypeMatchSuccess();
+      }
+
+      // If type variable represents a key path value type, defer binding it to
+      // contextual type in diagnostic mode. We want it to be bound from the
+      // last key path component to help with diagnostics.
+      if (shouldAttemptFixes()) {
+        if (typeVar1 && typeVar1->getImpl().isKeyPathValue() &&
+            !flags.contains(TMF_BindingTypeVariable))
+          return formUnsolvedResult();
       }
 
       assert((type1->is<TypeVariableType>() != type2->is<TypeVariableType>()) &&

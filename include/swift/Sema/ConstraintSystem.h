@@ -486,6 +486,10 @@ public:
   /// a type of a key path expression.
   bool isKeyPathType() const;
 
+  /// Determine whether this type variable represents a value type of a key path
+  /// expression.
+  bool isKeyPathValue() const;
+
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
