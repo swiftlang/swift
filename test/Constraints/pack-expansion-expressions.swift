@@ -617,3 +617,47 @@ do {
     _ = { (repeat test(x: each x)) }()
   }
 }
+
+// https://github.com/apple/swift/issues/66393
+do {
+  struct S<each T> {
+    var property: (repeat each T) -> Void { // expected-note 4 {{'property' declared here}}
+      get {}
+    }
+
+    func method(_: repeat each T) {} // expected-note 4 {{'method' declared here}}
+  }
+  S<Int, Bool>().method((5, true))
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+
+  S<Int, Bool>().method((5, true, 6))
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+
+  S<Int, Bool>().property((5, true))
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+
+  S<Int, Bool>().property((5, true, 6))
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+
+  func foo<each U>(u: repeat each U) {
+    S<repeat each U>().property((3, 4, 5))
+    // expected-error@-1 {{value pack expansion at parameter #0 expects 1 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+
+    // FIXME: The count of 'repeat each U' is not statically known, but error suggests that it is 1.
+    S<repeat each U>().method((3, 4, 5))
+    // expected-error@-1 {{value pack expansion at parameter #0 expects 1 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+    // FIXME: Bad diagnostics
+    // expected-error@-3 {{pack expansion requires that 'each U' and '_' have the same shape}}
+    // expected-error@-4 {{pack expansion requires that 'each U' and '_.RawValue' have the same shape}}
+
+    // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
+    S<(Int, Int), repeat each U>().method((3, 4))
+    // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+    // FIXME: Duplicate diagnostics
+    // expected-error@-3 2 {{pack expansion requires that 'each U' and '' have the same shape}}
+
+    // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
+    S<(Int, Int), repeat each U>().property((3, 4))
+    // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  }
+}
