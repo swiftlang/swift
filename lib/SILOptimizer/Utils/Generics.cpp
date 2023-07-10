@@ -26,6 +26,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -2494,7 +2495,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     auto *pai = cast<PartialApplyInst>(applySite);
     // Let go of borrows introduced for stack closures.
     if (pai->isOnStack() && pai->getFunction()->hasOwnership()) {
-      pai->visitOnStackLifetimeEnds([&](Operand *op) -> bool {
+      visitOnStackLifetimeEnds(pai, [&](Operand *op) -> bool {
         SILBuilderWithScope argBuilder(op->getUser()->getNextInstruction());
         cleanupCallArguments(argBuilder, loc, arguments, argsNeedingEndBorrow);
         return true;

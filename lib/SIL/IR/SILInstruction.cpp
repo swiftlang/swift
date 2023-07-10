@@ -1708,46 +1708,6 @@ bool SILInstruction::maySuspend() const {
   return false;
 }
 
-static bool visitRecursivelyLifetimeEndingUses(
-  SILValue i,
-  bool &noUsers,
-  llvm::function_ref<bool(Operand *)> func)
-{
-  for (Operand *use : i->getConsumingUses()) {
-    noUsers = false;
-    if (isa<DestroyValueInst>(use->getUser())) {
-      if (!func(use)) {
-        return false;
-      }
-      continue;
-    }
-    
-    // There shouldn't be any dead-end consumptions of a nonescaping
-    // partial_apply that don't forward it along, aside from destroy_value.
-    assert(use->getUser()->hasResults()
-           && use->getUser()->getNumResults() == 1);
-    if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
-                                            noUsers, func)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool
-PartialApplyInst::visitOnStackLifetimeEnds(
-                             llvm::function_ref<bool (Operand *)> func) const {
-  assert(getFunction()->hasOwnership()
-         && isOnStack()
-         && "only meaningful for OSSA stack closures");
-  bool noUsers = true;
-
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
-    return false;
-  }
-  return !noUsers;
-}
-
 PartialApplyInst *
 DestroyValueInst::getNonescapingClosureAllocation() const {
   SILValue operand = getOperand();

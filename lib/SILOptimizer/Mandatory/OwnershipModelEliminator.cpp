@@ -690,7 +690,7 @@ static bool stripOwnership(SILFunction &func) {
       }
       lifetimeEnds.push_back(
           std::make_pair(pai, SmallVector<SILInstruction *>()));
-      pai->visitOnStackLifetimeEnds([&](Operand *op) {
+      visitOnStackLifetimeEnds(pai, [&](Operand *op) {
         lifetimeEnds.back().second.push_back(op->getUser());
         return true;
       });

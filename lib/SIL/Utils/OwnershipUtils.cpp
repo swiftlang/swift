@@ -703,7 +703,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     // The closure's borrow lifetimes end when the closure itself ends its
     // lifetime. That may happen transitively through conversions that forward
     // ownership of the closure.
-    return user->visitOnStackLifetimeEnds(func);
+    return visitOnStackLifetimeEnds(user, func);
   }
   case BorrowingOperandKind::BeginAsyncLet: {
     auto user = cast<BuiltinInst>(op->getUser());
@@ -2333,4 +2333,61 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   // (3) Escaping matches?  (Expensive check, saved for last.)
   auto moveHasEscape = findPointerEscape(mvi);
   return moveHasEscape == originalHasEscape;
+}
+
+static bool
+visitRecursivelyLifetimeEndingUses(SILValue i, bool &noUsers,
+                                   llvm::function_ref<bool(Operand *)> func,
+                                   bool visitLifetimeEndsOfCopies) {
+  for (Operand *use : i->getUses()) {
+    noUsers = false;
+    // For copy_value uses, visit lifetime ends.
+    if (isa<CopyValueInst>(use->getUser())) {
+      if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
+                                              noUsers, func,
+                                              visitLifetimeEndsOfCopies)) {
+        return false;
+      }
+      continue;
+    }
+    // Skip all other non lifetime ending uses
+    if (!use->isLifetimeEnding()) {
+      continue;
+    }
+    if (isa<DestroyValueInst>(use->getUser())) {
+      if (!func(use)) {
+        return false;
+      }
+      continue;
+    }
+    if (auto *move = dyn_cast<MoveValueInst>(use->getUser())) {
+      if (!visitRecursivelyLifetimeEndingUses(move, noUsers, func,
+                                              visitLifetimeEndsOfCopies)) {
+        return false;
+      }
+      continue;
+    }
+    auto fwdOp = ForwardingOperand(use);
+    if (!visitRecursivelyLifetimeEndingUses(fwdOp.getSingleForwardedValue(),
+                                            noUsers, func,
+                                            visitLifetimeEndsOfCopies)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool swift::visitOnStackLifetimeEnds(PartialApplyInst *pai,
+                                     llvm::function_ref<bool(Operand *)> func,
+                                     bool visitLifetimeEndsOfCopies) {
+  assert(pai->getFunction()->hasOwnership() && pai->isOnStack() &&
+         "only meaningful on stack closures in OSSA");
+
+  bool noUsers = true;
+  if (!visitRecursivelyLifetimeEndingUses(pai, noUsers, func,
+                                          visitLifetimeEndsOfCopies)) {
+    return false;
+  }
+  return !noUsers;
 }

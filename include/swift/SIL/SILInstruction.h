@@ -2964,9 +2964,6 @@ public:
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
-  
-  /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
-  bool visitOnStackLifetimeEnds(llvm::function_ref<bool (Operand*)> func) const;
 };
 
 class EndApplyInst;

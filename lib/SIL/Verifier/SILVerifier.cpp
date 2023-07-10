@@ -2059,6 +2059,29 @@ public:
       require(isSwiftRefcounted(PAI->getArguments().front()->getType()),
               "partial_apply context argument must be swift-refcounted");
     }
+
+    // Verify a partial_apply [on_stack] is consumed via destroy_value
+    // directly or via forwarding operations.
+    if (PAI->isOnStack() && PAI->getFunction()->hasOwnership()) {
+      SmallVector<Operand *, 4> worklist(PAI->getConsumingUses());
+      while (!worklist.empty()) {
+        auto *consumingUse = worklist.pop_back_val();
+        auto *consumingUser = consumingUse->getUser();
+        if (isa<DestroyValueInst>(consumingUser)) {
+          continue;
+        }
+        if (auto *move = dyn_cast<MoveValueInst>(consumingUser)) {
+          worklist.append(move->getConsumingUses().begin(),
+                          move->getConsumingUses().end());
+          continue;
+        }
+        auto fwdOp = ForwardingOperand(consumingUse);
+        auto result = fwdOp.getSingleForwardedValue();
+        assert(result);
+        worklist.append(result->getConsumingUses().begin(),
+                        result->getConsumingUses().end());
+      }
+    }
   }
 
   void checkBuiltinInst(BuiltinInst *BI) {
