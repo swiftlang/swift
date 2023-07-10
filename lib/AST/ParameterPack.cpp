@@ -100,21 +100,16 @@ void TypeBase::walkPackReferences(
 
 void TypeBase::getTypeParameterPacks(
     SmallVectorImpl<Type> &rootParameterPacks) {
-  llvm::SmallSetVector<Type, 2> rootParameterPackSet;
-
   walkPackReferences([&](Type t) {
     if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
       if (paramTy->isParameterPack())
-        rootParameterPackSet.insert(paramTy);
+        rootParameterPacks.push_back(paramTy);
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      rootParameterPackSet.insert(archetypeTy->getRoot());
+      rootParameterPacks.push_back(archetypeTy->getRoot());
     }
 
     return false;
   });
-
-  rootParameterPacks.append(rootParameterPackSet.begin(),
-                            rootParameterPackSet.end());
 }
 
 bool GenericTypeParamType::isParameterPack() const {
