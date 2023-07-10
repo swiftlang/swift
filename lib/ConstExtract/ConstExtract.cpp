@@ -811,79 +811,41 @@ void writeAttrInformation(llvm::json::OStream &JSON,
   });
 }
 
-void writeParameterizedProtocolSameTypeRequirements(
-    llvm::json::OStream &JSON,
-    const ParameterizedProtocolType &ParameterizedProtoTy) {
-  auto Protocol = ParameterizedProtoTy.getProtocol();
-  auto ProtocolTy = ParameterizedProtoTy.getBaseType();
-  auto Requirements = Protocol->getProtocolRequirements();
-  auto ParameterTypeNames = Protocol->getPrimaryAssociatedTypeNames();
-  auto ProtocolArguments = ParameterizedProtoTy.getArgs();
-  llvm::dbgs() << Requirements.size() << "\n";
-  assert(ProtocolArguments.size() >= ParameterTypeNames.size());
-
-  for (size_t i = 0; i < ProtocolArguments.size(); ++i) {
-    auto ProtocolArgumentTy = ProtocolArguments[i];
-    std::string ArgumentName = ParameterTypeNames.size() > i
-                                   ? ParameterTypeNames[i].first.str().str()
-                                   : "unknown";
-
-    JSON.object([&] {
-      auto QualifiedTypeAliasName = toFullyQualifiedProtocolNameString(
-                                        *ParameterizedProtoTy.getProtocol()) +
-                                    "." + ArgumentName;
-      JSON.attribute("typeAliasName", QualifiedTypeAliasName);
-      JSON.attribute("substitutedTypeName",
-                     toFullyQualifiedTypeNameString(ProtocolArgumentTy));
-      JSON.attribute("substitutedMangledTypeName",
-                     toMangledTypeNameString(ProtocolArgumentTy));
-    });
-  }
-}
-
-void writeOpaqueTypeProtocolCompositionSameTypeRequirements(
-    llvm::json::OStream &JSON,
-    const ProtocolCompositionType &ProtocolCompositionTy) {
-  for (auto CompositionMemberProto : ProtocolCompositionTy.getMembers()) {
-    if (auto ParameterizedProtoTy =
-            CompositionMemberProto->getAs<ParameterizedProtocolType>()) {
-      writeParameterizedProtocolSameTypeRequirements(JSON,
-                                                     *ParameterizedProtoTy);
-    }
-  }
-}
-
 void writeSubstitutedOpaqueTypeAliasDetails(
     llvm::json::OStream &JSON, const OpaqueTypeArchetypeType &OpaqueTy) {
+  auto Signature = OpaqueTy.getDecl()->getOpaqueInterfaceGenericSignature();
+
   JSON.attributeArray("opaqueTypeProtocolRequirements", [&] {
-    auto ConformsToProtocols = OpaqueTy.getConformsTo();
-    for (auto Proto : ConformsToProtocols) {
-      JSON.value(toFullyQualifiedProtocolNameString(*Proto));
+    for (const auto Requirement : Signature.getRequirements()) {
+      // Ignore requirements whose subject type is that of the owner decl
+      if (!Requirement.getFirstType()->isEqual(OpaqueTy.getInterfaceType()))
+        continue;
+      if (Requirement.getKind() == RequirementKind::Conformance)
+        JSON.value(
+            toFullyQualifiedProtocolNameString(*Requirement.getProtocolDecl()));
     }
   });
+
   JSON.attributeArray("opaqueTypeSameTypeRequirements", [&] {
-    auto GenericSig = OpaqueTy.getDecl()
-                          ->getNamingDecl()
-                          ->getInnermostDeclContext()
-                          ->getGenericSignatureOfContext();
-    auto ConstraintTy = OpaqueTy.getExistentialType();
-    if (auto existential = ConstraintTy->getAs<ExistentialType>())
-      ConstraintTy = existential->getConstraintType();
-
-    // Opaque archetype substitutions are always canonical, so
-    // re-sugar the constraint type using the owning
-    // declaration's generic parameter names.
-    if (GenericSig)
-      ConstraintTy = GenericSig->getSugaredType(ConstraintTy);
-
-    if (auto ParameterizedProtoTy =
-            ConstraintTy->getAs<ParameterizedProtocolType>()) {
-      writeParameterizedProtocolSameTypeRequirements(JSON,
-                                                     *ParameterizedProtoTy);
-    } else if (auto ProtocolCompositionTy =
-                   ConstraintTy->getAs<ProtocolCompositionType>()) {
-      writeOpaqueTypeProtocolCompositionSameTypeRequirements(
-          JSON, *ProtocolCompositionTy);
+    for (const auto Requirement : Signature.getRequirements()) {
+      if (Requirement.getKind() == RequirementKind::SameType) {
+        auto TypeAliasType = Requirement.getFirstType();
+        auto TypeWitness = Requirement.getSecondType();
+        JSON.object([&] {
+          auto TypeAliasName = toFullyQualifiedTypeNameString(TypeAliasType);
+          if (auto DependentMemberTy =
+                  TypeAliasType->getAs<DependentMemberType>())
+            if (const auto *Assoc = DependentMemberTy->getAssocType())
+              TypeAliasName =
+                  toFullyQualifiedProtocolNameString(*Assoc->getProtocol()) +
+                  "." + DependentMemberTy->getName().str().str();
+          JSON.attribute("typeAliasName", TypeAliasName);
+          JSON.attribute("substitutedTypeName",
+                         toFullyQualifiedTypeNameString(TypeWitness));
+          JSON.attribute("substitutedMangledTypeName",
+                         toMangledTypeNameString(TypeWitness));
+        });
+      }
     }
   });
 }
