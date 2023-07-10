@@ -673,7 +673,7 @@ static bool stripOwnership(SILFunction &func) {
   if (func.isExternalDeclaration())
     return false;
 
-  llvm::DenseMap<PartialApplyInst *, SmallVector<SILInstruction *>>
+  SmallVector<std::pair<PartialApplyInst *, SmallVector<SILInstruction *>>>
       lifetimeEnds;
 
   // Nonescaping closures are represented ultimately as trivial pointers to
@@ -688,8 +688,10 @@ static bool stripOwnership(SILFunction &func) {
       if (!pai || !pai->isOnStack()) {
         continue;
       }
+      lifetimeEnds.push_back(
+          std::make_pair(pai, SmallVector<SILInstruction *>()));
       pai->visitOnStackLifetimeEnds([&](Operand *op) {
-        lifetimeEnds[pai].push_back(op->getUser());
+        lifetimeEnds.back().second.push_back(op->getUser());
         return true;
       });
     }
