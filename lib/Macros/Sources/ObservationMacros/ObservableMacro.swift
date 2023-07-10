@@ -71,7 +71,7 @@ public struct ObservableMacro {
   static var ignoredAttribute: AttributeSyntax {
     AttributeSyntax(
       leadingTrivia: .space,
-      atSign: .atSignToken(),
+      atSignToken: .atSignToken(),
       attributeName: SimpleTypeIdentifierSyntax(name: .identifier(ignoredMacroName)),
       trailingTrivia: .space
     )
@@ -180,7 +180,7 @@ extension VariableDeclSyntax {
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
       modifiers: modifiers?.privatePrefixed(prefix) ?? ModifierListSyntax(keyword: .private),
-      bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
+      bindingKeyword: TokenSyntax(bindingKeyword.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
       bindings: bindings.privatePrefixed(prefix),
       trailingTrivia: trailingTrivia
     )
