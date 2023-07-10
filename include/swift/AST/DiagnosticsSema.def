@@ -7477,5 +7477,14 @@ NOTE(out_of_order_access_in_init_accessor,none,
      "is called before %1 is initialized",
      (Identifier, Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: Reference Bindings Errors
+//------------------------------------------------------------------------------
+
+ERROR(referencebindings_binding_must_have_initial_value,none,
+      "%0 bindings must have an initial value", (StringRef))
+ERROR(referencebindings_binding_must_be_to_lvalue,none,
+      "%0 bindings must be bound to an lvalue", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
