@@ -209,13 +209,13 @@ void autodiff::getFunctionSemanticResults(
 
   bool addNonWrts = resultTypes.empty();
 
-  // Collect wrt `inout` parameters as semantic results
-  // As an extention, collect all (including non-wrt) inouts as results for
-  // functions returning void.
+  // Collect wrt semantic result (`inout`) parameters as
+  // semantic results As an extention, collect all (including non-wrt) inouts as
+  // results for functions returning void.
   auto collectSemanticResults = [&](const AnyFunctionType *functionType,
                                     unsigned curryOffset = 0) {
     for (auto paramAndIndex : enumerate(functionType->getParams())) {
-      if (!paramAndIndex.value().isInOut())
+      if (!paramAndIndex.value().isAutoDiffSemanticResult())
         continue;
 
       unsigned idx = paramAndIndex.index() + curryOffset;

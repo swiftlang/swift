@@ -246,16 +246,17 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   return s;
 }
 
-/// A semantic function result type: either a formal function result type or
-/// an `inout` parameter type. Used in derivative function type calculation.
+/// A semantic function result type: either a formal function result type or a
+/// semantic resul (an `inout`) parameter type. Used in derivative function type
+/// calculation.
 struct AutoDiffSemanticFunctionResultType {
   Type type;
   unsigned index : 30;
-  bool isInout : 1;
+  bool isSemanticResultParameter : 1;
   bool isWrtParam : 1;
 
-  AutoDiffSemanticFunctionResultType(Type t, unsigned idx, bool inout, bool wrt)
-    : type(t), index(idx), isInout(inout), isWrtParam(wrt) { }
+  AutoDiffSemanticFunctionResultType(Type t, unsigned idx, bool param, bool wrt)
+    : type(t), index(idx), isSemanticResultParameter(param), isWrtParam(wrt) { }
 };
 
 /// Key for caching SIL derivative function types.

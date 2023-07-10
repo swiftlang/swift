@@ -5577,9 +5577,9 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
         this, DerivativeFunctionTypeError::Kind::NonDifferentiableResult,
         std::make_pair(originalResultType, unsigned(originalResult.index)));
 
-    if (!originalResult.isInout)
+    if (!originalResult.isSemanticResultParameter)
       resultTanTypes.push_back(resultTan->getType());
-    else if (originalResult.isInout && !originalResult.isWrtParam)
+    else if (originalResult.isSemanticResultParameter && !originalResult.isWrtParam)
       inoutTanTypes.push_back(resultTan->getType());
   }
 
@@ -5656,7 +5656,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // - Original: `(T0, inout T1, ...) -> R`
     // - Pullback: `(R.Tan, inout T1.Tan) -> (T0.Tan, ...)`
     SmallVector<TupleTypeElt, 4> pullbackResults;
-    SmallVector<AnyFunctionType::Param, 2> inoutParams;
+    SmallVector<AnyFunctionType::Param, 2> semanticResultParams;
     for (auto i : range(diffParams.size())) {
       auto diffParam = diffParams[i];
       auto paramType = diffParam.getPlainType();
@@ -5669,10 +5669,10 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
                 NonDifferentiableDifferentiabilityParameter,
             std::make_pair(paramType, i));
 
-      if (diffParam.isInOut()) {
+      if (diffParam.isAutoDiffSemanticResult()) {
         if (paramType->isVoid())
           continue;
-        inoutParams.push_back(diffParam);
+        semanticResultParams.push_back(diffParam);
         continue;
       }
       pullbackResults.emplace_back(paramTan->getType());
@@ -5693,15 +5693,15 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       pullbackParams.push_back(AnyFunctionType::Param(
           resultTanType, Identifier(), flags));
     }
-    // Then append inout parameters.
-    for (auto i : range(inoutParams.size())) {
-      auto inoutParam = inoutParams[i];
-      auto inoutParamType = inoutParam.getPlainType();
-      auto inoutParamTan =
-          inoutParamType->getAutoDiffTangentSpace(lookupConformance);
+    // Then append semantic result parameters.
+    for (auto i : range(semanticResultParams.size())) {
+      auto semanticResultParam = semanticResultParams[i];
+      auto semanticResultParamType = semanticResultParam.getPlainType();
+      auto semanticResultParamTan =
+          semanticResultParamType->getAutoDiffTangentSpace(lookupConformance);
       auto flags = ParameterTypeFlags().withInOut(true);
       pullbackParams.push_back(AnyFunctionType::Param(
-          inoutParamTan->getType(), Identifier(), flags));
+          semanticResultParamTan->getType(), Identifier(), flags));
     }
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
@@ -5709,6 +5709,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     break;
   }
   }
+
   assert(linearMapType && "Expected linear map type");
   return linearMapType;
 }
