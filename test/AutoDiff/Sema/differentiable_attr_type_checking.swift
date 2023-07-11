@@ -18,13 +18,13 @@ let globalConst: Float = 1
 var globalVar: Float = 1
 
 func testLocalVariables() {
-  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  // expected-error @+1 {{getter for 'getter' has no parameters to differentiate with respect to}}
   @differentiable(reverse)
   var getter: Float {
     return 1
   }
 
-  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  // expected-error @+1 {{getter for 'getterSetter' has no parameters to differentiate with respect to}}
   @differentiable(reverse)
   var getterSetter: Float {
     get { return 1 }

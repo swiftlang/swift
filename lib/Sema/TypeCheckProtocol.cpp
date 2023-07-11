@@ -2827,9 +2827,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     diags
         .diagnose(
             witness,
-            diag::
-                protocol_witness_missing_differentiable_attr_invalid_context,
-            reqDiffAttrString, req->getName(), conformance->getType(),
+            diag::protocol_witness_missing_differentiable_attr_invalid_context,
+            reqDiffAttrString, req, conformance->getType(),
             conformance->getProtocol()->getDeclaredInterfaceType())
         .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
     break;

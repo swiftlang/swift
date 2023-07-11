@@ -3857,16 +3857,6 @@ ERROR(differentiable_attr_duplicate,none,
       "duplicate '@differentiable' attribute with same parameters", ())
 NOTE(differentiable_attr_duplicate_note,none,
      "other attribute declared here", ())
-ERROR(differentiable_attr_function_not_same_type_context,none,
-      "%0 is not defined in the current type context", (DeclNameRef))
-ERROR(differentiable_attr_derivative_not_function,none,
-      "registered derivative %0 must be a 'func' declaration", (DeclNameRef))
-ERROR(differentiable_attr_class_derivative_not_final,none,
-      "class member derivative must be final", ())
-ERROR(differentiable_attr_invalid_access,none,
-      "derivative function %0 is required to either be public or "
-      "'@usableFromInline' because the original function %1 is public or "
-      "'@usableFromInline'", (DeclNameRef, DeclName))
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
@@ -3880,7 +3870,7 @@ ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 ERROR(differentiable_attr_where_clause_for_nongeneric_original,none,
       "'where' clause is valid only when original function is generic %0",
-      (DeclName))
+      (const ValueDecl *))
 ERROR(differentiable_attr_layout_req_unsupported,none,
       "'@differentiable' attribute does not yet support layout requirements",
       ())
@@ -3890,7 +3880,7 @@ NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
      "candidate is missing explicit '%0' attribute to satisfy requirement %1 "
      "(in protocol %3); explicit attribute is necessary because candidate is "
      "declared in a different type context or file than the conformance of %2 "
-     "to %3", (StringRef, DeclName, Type, Type))
+     "to %3", (StringRef, const ValueDecl *, Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
@@ -3908,11 +3898,12 @@ ERROR(derivative_attr_result_value_not_differentiable,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
       "tuple; first element type %0 must conform to 'Differentiable'", (Type))
 ERROR(derivative_attr_result_func_type_mismatch,none,
-      "function result's %0 type does not match %1", (Identifier, DeclName))
+      "function result's %0 type does not match %1",
+      (Identifier, const ValueDecl *))
 NOTE(derivative_attr_result_func_type_mismatch_note,none,
      "%0 does not have expected type %1", (Identifier, Type))
 NOTE(derivative_attr_result_func_original_note,none,
-     "%0 defined here", (DeclName))
+     "%0 defined here", (const ValueDecl *))
 ERROR(derivative_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
 ERROR(derivative_attr_original_stored_property_unsupported,none,
@@ -3934,7 +3925,7 @@ NOTE(derivative_attr_protocol_requirement_unsupported,none,
      "cannot yet register derivative default implementation for protocol "
      "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
-      "a derivative already exists for %0", (DeclName))
+      "a derivative already exists for %0", (const ValueDecl *))
 NOTE(derivative_attr_duplicate_note,none,
      "other attribute declared here", ())
 ERROR(derivative_attr_access_level_mismatch,none,
@@ -3943,8 +3934,8 @@ ERROR(derivative_attr_access_level_mismatch,none,
       "%select{private|fileprivate|internal|package|public|open}3, "
       "but original function %0 is "
       "%select{private|fileprivate|internal|package|public|open}1",
-      (/*original*/ DeclName, /*original*/ AccessLevel,
-       /*derivative*/ DeclName, /*derivative*/ AccessLevel))
+      (/*original*/ const ValueDecl *, /*original*/ AccessLevel,
+       /*derivative*/ const ValueDecl *, /*derivative*/ AccessLevel))
 NOTE(derivative_attr_fix_access,none,
      "mark the derivative function as "
      "'%select{private|fileprivate|internal|package|@usableFromInline|@usableFromInline}0' "
@@ -3952,22 +3943,20 @@ NOTE(derivative_attr_fix_access,none,
 ERROR(derivative_attr_static_method_mismatch_original,none,
       "unexpected derivative function declaration; "
       "%0 requires the derivative function %1 to be %select{an instance|a 'static'}2 method",
-      (/*original*/DeclName, /*derivative*/ DeclName,
+      (/*original*/const ValueDecl *, /*derivative*/ const ValueDecl *,
        /*originalIsStatic*/bool))
 NOTE(derivative_attr_static_method_mismatch_original_note,none,
       "original function %0 is %select{an instance|a 'static'}1 method",
-      (/*original*/ DeclName, /*originalIsStatic*/bool))
+      (/*original*/ const ValueDecl *, /*originalIsStatic*/bool))
 NOTE(derivative_attr_static_method_mismatch_fix,none,
       "make derivative function %0 %select{an instance|a 'static'}1 method",
-      (/*derivative*/ DeclName, /*mustBeStatic*/bool))
+      (/*derivative*/ const ValueDecl *, /*mustBeStatic*/bool))
 
 // @transpose
 ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
       "cannot transpose with respect to original %select{result|parameter}1 "
       "'%0' that does not conform to 'Differentiable' and satisfy "
       "'%0 == %0.TangentVector'", (StringRef, /*isParameter*/ bool))
-ERROR(transpose_attr_overload_not_found,none,
-      "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(transpose_attr_cannot_use_named_wrt_params,none,
       "cannot use named 'wrt' parameters in '@transpose(of:)' attribute, found "
       "%0", (Identifier))
@@ -3980,14 +3969,14 @@ NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
 ERROR(transpose_attr_static_method_mismatch_original,none,
       "unexpected transpose function declaration; "
       "%0 requires the transpose function %1 to be %select{an instance|a 'static'}2 method",
-      (/*original*/DeclName, /*transpose*/ DeclName,
+      (/*original*/const ValueDecl *, /*transpose*/ const ValueDecl *,
        /*originalIsStatic*/bool))
 NOTE(transpose_attr_static_method_mismatch_original_note,none,
       "original function %0 is %select{an instance|a 'static'}1 method",
-      (/*original*/ DeclName, /*originalIsStatic*/bool))
+      (/*original*/ const ValueDecl *, /*originalIsStatic*/bool))
 NOTE(transpose_attr_static_method_mismatch_fix,none,
       "make transpose function %0 %select{an instance|a 'static'}1 method",
-      (/*transpose*/ DeclName, /*mustBeStatic*/bool))
+      (/*transpose*/ const ValueDecl *, /*mustBeStatic*/bool))
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_original_decl_ambiguous,none,
@@ -4019,7 +4008,8 @@ ERROR(autodiff_attr_opaque_result_type_unsupported,none,
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
-      "%0 has no parameters to differentiate with respect to", (DeclName))
+      "%0 has no parameters to differentiate with respect to",
+      (const ValueDecl *))
 ERROR(diff_params_clause_param_name_unknown,none,
       "unknown parameter name %0", (Identifier))
 ERROR(diff_params_clause_self_instance_method_only,none,

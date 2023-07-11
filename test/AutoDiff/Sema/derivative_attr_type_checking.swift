@@ -504,7 +504,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (1, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript()'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript)
   func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
@@ -521,7 +521,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (1, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript(float:)'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript(float:), wrt: self)
   func vjpSubscriptLabeled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
@@ -538,7 +538,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (x, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript(_:)'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript(_:), wrt: self)
   func vjpSubscriptGeneric<U: Differentiable>(x: U) -> (value: U, pullback: (U.TangentVector) -> TangentVector)   {
@@ -619,7 +619,7 @@ extension Class where T: Differentiable {
     return (1, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript()'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript)
   func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {

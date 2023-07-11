@@ -4855,8 +4855,7 @@ static IndexSubset *computeDifferentiabilityParameters(
     // If function is not an instance method, diagnose immediately.
     if (!isInstanceMethod) {
       diags
-          .diagnose(attrLoc, diag::diff_function_no_parameters,
-                    function->getName())
+          .diagnose(attrLoc, diag::diff_function_no_parameters, function)
           .highlight(function->getSignatureSourceRange());
       return nullptr;
     }
@@ -4870,8 +4869,7 @@ static IndexSubset *computeDifferentiabilityParameters(
         selfType = function->mapTypeIntoContext(selfType);
       if (!conformsToDifferentiable(selfType, module)) {
         diags
-            .diagnose(attrLoc, diag::diff_function_no_parameters,
-                      function->getName())
+            .diagnose(attrLoc, diag::diff_function_no_parameters, function)
             .highlight(function->getSignatureSourceRange());
         return nullptr;
       }
@@ -5447,7 +5445,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
           .diagnose(
               attr->getLocation(),
               diag::differentiable_attr_where_clause_for_nongeneric_original,
-              original->getName())
+              original)
           .highlight(whereClause->getSourceRange());
       attr->setInvalid();
       return true;
@@ -6061,16 +6059,15 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     diags
         .diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
                   diag::derivative_attr_static_method_mismatch_original,
-                  originalAFD->getName(), derivative->getName(),
-                  derivativeMustBeStatic)
+                  originalAFD, derivative, derivativeMustBeStatic)
         .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diags.diagnose(originalAFD->getNameLoc(),
                    diag::derivative_attr_static_method_mismatch_original_note,
-                   originalAFD->getName(), derivativeMustBeStatic);
+                   originalAFD, derivativeMustBeStatic);
     auto fixItDiag =
         diags.diagnose(derivative->getStartLoc(),
                        diag::derivative_attr_static_method_mismatch_fix,
-                       derivative->getName(), derivativeMustBeStatic);
+                       derivative, derivativeMustBeStatic);
     if (derivativeMustBeStatic) {
       fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
     } else {
@@ -6098,8 +6095,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
         derivative->getFormalAccessScope().accessLevelForDiagnostics();
     diags.diagnose(originalName.Loc,
                    diag::derivative_attr_access_level_mismatch,
-                   originalAFD->getName(), originalAccess,
-                   derivative->getName(), derivativeAccess);
+                   originalAFD, originalAccess,
+                   derivative, derivativeAccess);
     auto fixItDiag =
         derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
     // If original access is public, suggest adding `@usableFromInline` to
@@ -6207,7 +6204,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     // Emit differential/pullback type mismatch error on attribute.
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_result_func_type_mismatch,
-                   funcResultElt.getName(), originalAFD->getName());
+                   funcResultElt.getName(), originalAFD);
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
@@ -6222,7 +6219,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     if (originalAFD->getLoc().isValid())
       diags.diagnose(originalAFD->getLoc(),
                      diag::derivative_attr_result_func_original_note,
-                     originalAFD->getName());
+                     originalAFD);
     return true;
   }
 
@@ -6233,7 +6230,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   if (derivativeAttrs.size() > 1) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_original_already_has_derivative,
-                   originalAFD->getName());
+                   originalAFD);
     for (auto *duplicateAttr : derivativeAttrs) {
       if (duplicateAttr == attr)
         continue;
@@ -6595,15 +6592,14 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     bool transposeMustBeStatic = !transpose->isStatic();
     diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
              diag::transpose_attr_static_method_mismatch_original,
-             originalAFD->getName(), transpose->getName(),
-             transposeMustBeStatic)
+             originalAFD, transpose, transposeMustBeStatic)
         .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diagnose(originalAFD->getNameLoc(),
              diag::transpose_attr_static_method_mismatch_original_note,
-             originalAFD->getName(), transposeMustBeStatic);
+             originalAFD, transposeMustBeStatic);
     auto fixItDiag = diagnose(transpose->getStartLoc(),
                               diag::transpose_attr_static_method_mismatch_fix,
-                              transpose->getName(), transposeMustBeStatic);
+                              transpose, transposeMustBeStatic);
     if (transposeMustBeStatic) {
       fixItDiag.fixItInsert(transpose->getStartLoc(), "static ");
     } else {
