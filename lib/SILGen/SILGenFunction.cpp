@@ -1754,3 +1754,73 @@ ParamDecl *SILGenFunction::isMappedToInitAccessorArgument(VarDecl *property) {
 
   return arg->second;
 }
+
+std::pair<SILValue, CanSILFunctionType>
+SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
+                                        ManagedValue base,
+                                        SubstitutionMap substitutions) {
+  auto setterFRef = [&]() -> SILValue {
+    auto setterInfo = getConstantInfo(getTypeExpansionContext(), setter);
+    if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
+      // Emit a thunk we might have to bridge arguments.
+      auto foreignSetterThunk = setter.asForeign(false);
+      return emitDynamicMethodRef(
+                 loc, foreignSetterThunk,
+                 SGM.Types
+                     .getConstantInfo(getTypeExpansionContext(),
+                                      foreignSetterThunk)
+                     .SILFnType)
+          .getValue();
+    }
+
+    return emitGlobalFunctionRef(loc, setter, setterInfo);
+  }();
+
+  auto getSetterType = [&](SILValue setterFRef) {
+    CanSILFunctionType setterTy =
+        setterFRef->getType().castTo<SILFunctionType>();
+    return setterTy->substGenericArgs(SGM.M, substitutions,
+                                      getTypeExpansionContext());
+  };
+
+  auto setterTy = getSetterType(setterFRef);
+  SILFunctionConventions setterConv(setterTy, SGM.M);
+
+  // Emit captures for the setter
+  SmallVector<SILValue, 4> capturedArgs;
+  auto captureInfo = SGM.Types.getLoweredLocalCaptures(setter);
+  if (!captureInfo.getCaptures().empty()) {
+    SmallVector<ManagedValue, 4> captures;
+    emitCaptures(loc, setter, CaptureEmission::AssignByWrapper, captures);
+
+    for (auto capture : captures)
+      capturedArgs.push_back(capture.forward(*this));
+  } else {
+    assert(base);
+
+    SILValue capturedBase;
+    unsigned argIdx = setterConv.getNumSILArguments() - 1;
+
+    if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+      capturedBase = base.getValue();
+    } else if (base.getType().isAddress() &&
+               base.getType().getObjectType() ==
+                   setterConv.getSILArgumentType(argIdx,
+                                                 getTypeExpansionContext())) {
+      // If the base is a reference and the setter expects a value, emit a
+      // load. This pattern is emitted for property wrappers with a
+      // nonmutating setter, for example.
+      capturedBase = B.createTrivialLoadOr(loc, base.getValue(),
+                                           LoadOwnershipQualifier::Copy);
+    } else {
+      capturedBase = base.copy(*this, loc).forward(*this);
+    }
+
+    capturedArgs.push_back(capturedBase);
+  }
+
+  PartialApplyInst *setterPAI =
+      B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
+                           ParameterConvention::Direct_Guaranteed);
+  return {emitManagedRValueWithCleanup(setterPAI).getValue(), setterTy};
+}
