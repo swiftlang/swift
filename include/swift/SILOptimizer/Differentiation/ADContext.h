@@ -217,7 +217,8 @@ public:
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
       IndexSubset *resultIndices, SILValue original,
-      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions = llvm::None);
+      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions =
+          llvm::None);
 
   /// Creates a `linear_function` instruction using the given builder
   /// and arguments. Erase the newly created instruction from the processed set,

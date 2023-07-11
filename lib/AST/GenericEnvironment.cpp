@@ -320,8 +320,8 @@ void GenericEnvironment::addMapping(GenericParamKey key,
   getContextTypes()[index] = contextType;
 }
 
-llvm::Optional<Type> GenericEnvironment::getMappingIfPresent(
-                                                    GenericParamKey key) const {
+llvm::Optional<Type>
+GenericEnvironment::getMappingIfPresent(GenericParamKey key) const {
   // Find the index into the parallel arrays of generic parameters and
   // context types.
   auto genericParams = getGenericParams();

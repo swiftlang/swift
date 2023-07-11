@@ -62,9 +62,10 @@ forEachDependencyUntilTrue(CompilerInstance &CI,
 }
 
 /// Collect hash codes of the dependencies into \c Map.
-static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                                        llvm::Optional<unsigned> excludeBufferID,
-                                        llvm::StringMap<llvm::hash_code> &Map) {
+static void
+cacheDependencyHashIfNeeded(CompilerInstance &CI,
+                            llvm::Optional<unsigned> excludeBufferID,
+                            llvm::StringMap<llvm::hash_code> &Map) {
   auto &FS = CI.getFileSystem();
   forEachDependencyUntilTrue(CI, excludeBufferID, [&](StringRef filename) {
     if (Map.count(filename))

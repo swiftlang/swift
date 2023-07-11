@@ -56,11 +56,10 @@ bool Argument::isConst() const {
   return ArgExpr->isSemanticallyConstExpr();
 }
 
-ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
-                                   ArrayRef<Argument> args, SourceLoc rParenLoc,
-                                   llvm::Optional<unsigned> firstTrailingClosureIndex,
-                                   bool isImplicit, ArgumentList *originalArgs,
-                                   AllocationArena arena) {
+ArgumentList *ArgumentList::create(
+    ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
+    SourceLoc rParenLoc, llvm::Optional<unsigned> firstTrailingClosureIndex,
+    bool isImplicit, ArgumentList *originalArgs, AllocationArena arena) {
   SmallVector<Expr *, 4> exprs;
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
@@ -222,8 +221,8 @@ ArgumentList::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const {
   return scratch;
 }
 
-llvm::Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
-                                                  bool allowSemantic) const {
+llvm::Optional<unsigned>
+ArgumentList::findArgumentExpr(Expr *expr, bool allowSemantic) const {
   if (allowSemantic)
     expr = expr->getSemanticsProvidingExpr();
   for (auto idx : indices(*this)) {

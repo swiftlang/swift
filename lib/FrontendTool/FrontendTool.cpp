@@ -2122,13 +2122,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
       std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
-        configurationFileBuffers.size());
+          configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
               llvm::Optional<PrettyStackTraceFileContents> &trace) {
-    trace.emplace(*buffer);
-  });
+             trace.emplace(*buffer);
+           });
 
   // Setting DWARF Version depend on platform
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();

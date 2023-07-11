@@ -352,7 +352,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   auto genericSig = getGenericSignature();
 
   auto getSignatureConformance =
-      [&](Type type, ProtocolDecl *proto) -> llvm::Optional<ProtocolConformanceRef> {
+      [&](Type type,
+          ProtocolDecl *proto) -> llvm::Optional<ProtocolConformanceRef> {
     unsigned index = 0;
     for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance) {

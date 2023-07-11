@@ -1633,9 +1633,8 @@ StringRef DeclAttribute::getAttrName() const {
 ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
                    llvm::Optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
-  : DeclAttribute(DAK_ObjC, atLoc, baseRange, /*Implicit=*/false),
-    NameData(nullptr)
-{
+    : DeclAttribute(DAK_ObjC, atLoc, baseRange, /*Implicit=*/false),
+      NameData(nullptr) {
   if (name) {
     // Store the name.
     assert(name->getNumSelectorPieces() == nameLocs.size());
@@ -1662,8 +1661,8 @@ ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
 
 ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
-  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), llvm::None,
-                            SourceRange(), { });
+  return new (Ctx)
+      ObjCAttr(AtLoc, SourceRange(ObjCLoc), llvm::None, SourceRange(), {});
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {

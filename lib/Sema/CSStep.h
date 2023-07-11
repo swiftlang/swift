@@ -221,7 +221,9 @@ protected:
 
   Score getCurrentScore() const { return CS.CurrentScore; }
 
-  llvm::Optional<Score> getBestScore() const { return CS.solverState->BestScore; }
+  llvm::Optional<Score> getBestScore() const {
+    return CS.solverState->BestScore;
+  }
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
     CS.filterSolutions(solutions, minimize);
@@ -514,7 +516,8 @@ protected:
   /// being attempted, helps to rewind state of the
   /// constraint system back to original before attempting
   /// next binding, if any.
-  llvm::Optional<std::pair<std::unique_ptr<Scope>, typename P::Element>> ActiveChoice;
+  llvm::Optional<std::pair<std::unique_ptr<Scope>, typename P::Element>>
+      ActiveChoice;
 
   BindingStep(ConstraintSystem &cs, P producer,
               SmallVectorImpl<Solution> &solutions)
@@ -794,7 +797,8 @@ private:
   };
 
   // Figure out which of the solutions has the smallest score.
-  static llvm::Optional<Score> getBestScore(SmallVectorImpl<Solution> &solutions) {
+  static llvm::Optional<Score>
+  getBestScore(SmallVectorImpl<Solution> &solutions) {
     if (solutions.empty())
       return None;
 

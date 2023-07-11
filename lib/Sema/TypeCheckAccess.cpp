@@ -267,7 +267,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       // Downgrade the error to a warning in this case for source compatibility.
       llvm::Optional<AccessScope> typeReprAccessScope =
           TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                                 checkUsableFromInline).Scope;
+                                                 checkUsableFromInline)
+              .Scope;
       assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
       if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
           contextAccessScope.isChildOf(*typeReprAccessScope)) {
@@ -1904,8 +1905,8 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
   ExportContext Where;
 
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
-                 ExportabilityReason reason=ExportabilityReason::General,
-                 DeclAvailabilityFlags flags=llvm::None) {
+                 ExportabilityReason reason = ExportabilityReason::General,
+                 DeclAvailabilityFlags flags = llvm::None) {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;

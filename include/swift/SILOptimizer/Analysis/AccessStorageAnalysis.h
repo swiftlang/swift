@@ -146,7 +146,9 @@ public:
     return storageAccessSet.empty() && !unidentifiedAccess;
   }
 
-  bool hasUnidentifiedAccess() const { return unidentifiedAccess != llvm::None; }
+  bool hasUnidentifiedAccess() const {
+    return unidentifiedAccess != llvm::None;
+  }
 
   /// Return true if the analysis has determined all accesses of otherStorage
   /// have the [no_nested_conflict] flag set.

@@ -923,9 +923,8 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
 llvm::Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<Decl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           GlobalActorAttributeRequest{mutableThis},
-                           llvm::None);
+  return evaluateOrDefault(
+      ctx.evaluator, GlobalActorAttributeRequest{mutableThis}, llvm::None);
 }
 
 bool Decl::preconcurrency() const {
@@ -2960,8 +2959,9 @@ unsigned ValueDecl::getLocalDiscriminator() const {
   if (LocalDiscriminator == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        (getLoc().isValid() &&
-        getModuleContext()->getSourceFileContainingLocation(getLoc())
-          ->getFulfilledMacroRole() != llvm::None))) {
+        getModuleContext()
+                ->getSourceFileContainingLocation(getLoc())
+                ->getFulfilledMacroRole() != llvm::None))) {
     auto discriminator = ctx.getNextDiscriminator(getDeclContext());
     ctx.setMaxAssignedDiscriminator(getDeclContext(), discriminator + 1);
     const_cast<ValueDecl *>(this)->LocalDiscriminator = discriminator;
@@ -3638,8 +3638,8 @@ void ValueDecl::setInterfaceType(Type type) {
                                         std::move(type));
 }
 
-llvm::Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
-                                              bool skipIsObjCResolution) const {
+llvm::Optional<ObjCSelector>
+ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func->getObjCSelector(DeclName(), skipIsObjCResolution);
 
@@ -4354,12 +4354,9 @@ static bool canResultTypeHaveCovariantGenericParameterResult(Type resultTy) {
 /// \param position The current position in terms of variance.
 /// \param skipParamIndex The index of the parameter that shall be skipped.
 static GenericParameterReferenceInfo findGenericParameterReferencesInFunction(
-    CanGenericSignature genericSig,
-    GenericTypeParamType *genericParam,
-    const AnyFunctionType *fnType,
-    TypePosition position,
-    bool treatNonResultCovarianceAsInvariant,
-    bool canBeCovariantResult,
+    CanGenericSignature genericSig, GenericTypeParamType *genericParam,
+    const AnyFunctionType *fnType, TypePosition position,
+    bool treatNonResultCovarianceAsInvariant, bool canBeCovariantResult,
     llvm::Optional<unsigned> skipParamIndex) {
   // If there are no type parameters, we're done.
   if (!isa<GenericFunctionType>(fnType) && !fnType->hasTypeParameter())
@@ -4597,11 +4594,12 @@ findGenericParameterReferences(CanGenericSignature genericSig,
   return GenericParameterReferenceInfo::forAssocTypeRef(position);
 }
 
-GenericParameterReferenceInfo swift::findGenericParameterReferences(
-    const ValueDecl *value, CanGenericSignature sig,
-    GenericTypeParamType *genericParam,
-    bool treatNonResultCovarianceAsInvariant,
-    llvm::Optional<unsigned> skipParamIndex)  {
+GenericParameterReferenceInfo
+swift::findGenericParameterReferences(const ValueDecl *value,
+                                      CanGenericSignature sig,
+                                      GenericTypeParamType *genericParam,
+                                      bool treatNonResultCovarianceAsInvariant,
+                                      llvm::Optional<unsigned> skipParamIndex) {
   assert(isa<TypeDecl>(value) == false);
   assert(sig->getGenericParamOrdinal(genericParam) <
          sig.getGenericParams().size());
@@ -4649,8 +4647,9 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
       GenericSignature());
 
   auto genericParam = sig.getGenericParams().front();
-  return findGenericParameterReferences(
-      this, sig, genericParam, treatNonResultCovariantSelfAsInvariant, llvm::None);
+  return findGenericParameterReferences(this, sig, genericParam,
+                                        treatNonResultCovariantSelfAsInvariant,
+                                        llvm::None);
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
@@ -6266,23 +6265,24 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 
 ArrayRef<StructuralRequirement>
 ProtocolDecl::getStructuralRequirements() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-               StructuralRequirementsRequest { const_cast<ProtocolDecl *>(this) },
-               {});
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      StructuralRequirementsRequest{const_cast<ProtocolDecl *>(this)}, {});
 }
 
 ArrayRef<Requirement>
 ProtocolDecl::getTypeAliasRequirements() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-               TypeAliasRequirementsRequest { const_cast<ProtocolDecl *>(this) },
-               {});
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      TypeAliasRequirementsRequest{const_cast<ProtocolDecl *>(this)}, {});
 }
 
 ArrayRef<ProtocolDecl *>
 ProtocolDecl::getProtocolDependencies() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-               ProtocolDependenciesRequest { const_cast<ProtocolDecl *>(this) },
-               llvm::None);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      ProtocolDependenciesRequest{const_cast<ProtocolDecl *>(this)},
+      llvm::None);
 }
 
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
@@ -6362,10 +6362,10 @@ void ProtocolDecl::computeKnownProtocolKind() const {
 }
 
 llvm::Optional<KnownDerivableProtocolKind>
-    ProtocolDecl::getKnownDerivableProtocolKind() const {
+ProtocolDecl::getKnownDerivableProtocolKind() const {
   const auto knownKind = getKnownProtocolKind();
   if (!knownKind)
-      return llvm::None;
+    return llvm::None;
 
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
@@ -6400,7 +6400,8 @@ llvm::Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::DistributedActor;
   case KnownProtocolKind::DistributedActorSystem:
     return KnownDerivableProtocolKind::DistributedActorSystem;
-  default: return llvm::None;
+  default:
+    return llvm::None;
   }
 }
 
@@ -7543,9 +7544,7 @@ VarDecl::getPropertyWrapperMutability() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator,
-      PropertyWrapperMutabilityRequest{mutableThis},
-      llvm::None);
+      ctx.evaluator, PropertyWrapperMutabilityRequest{mutableThis}, llvm::None);
 }
 
 llvm::Optional<PropertyWrapperSynthesizedPropertyKind>
@@ -7747,17 +7746,15 @@ clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
   return clang::PointerAuthQualifier();
 }
 
-ParamDecl::ParamDecl(SourceLoc specifierLoc,
-                     SourceLoc argumentNameLoc, Identifier argumentName,
-                     SourceLoc parameterNameLoc, Identifier parameterName,
-                     DeclContext *dc)
+ParamDecl::ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+                     Identifier argumentName, SourceLoc parameterNameLoc,
+                     Identifier parameterName, DeclContext *dc)
     : VarDecl(DeclKind::Param,
-              /*IsStatic*/ false,
-              VarDecl::Introducer::Let, parameterNameLoc, parameterName, dc,
-              StorageIsNotMutable),
+              /*IsStatic*/ false, VarDecl::Introducer::Let, parameterNameLoc,
+              parameterName, dc, StorageIsNotMutable),
       ArgumentNameAndFlags(argumentName, llvm::None),
-      ParameterNameLoc(parameterNameLoc),
-      ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
+      ParameterNameLoc(parameterNameLoc), ArgumentNameLoc(argumentNameLoc),
+      SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.OwnershipSpecifier = 0;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
@@ -7972,7 +7969,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
-llvm::Optional<Initializer *> ParamDecl::getCachedDefaultArgumentInitContext() const {
+llvm::Optional<Initializer *>
+ParamDecl::getCachedDefaultArgumentInitContext() const {
   if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
     if (auto *init = defaultInfo->InitContextAndIsTypeChecked.getPointer())
       return init;
@@ -8624,7 +8622,8 @@ static bool isPotentialCompletionHandler(const ParamDecl *param) {
          !paramType->isNoEscape() && !param->isAutoClosure();
 }
 
-llvm::Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
+llvm::Optional<unsigned>
+AbstractFunctionDecl::findPotentialCompletionHandlerParam(
     const AbstractFunctionDecl *asyncAlternative) const {
   const ParameterList *params = getParameters();
   if (params->size() == 0)
@@ -8965,10 +8964,10 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
   }
 
   // The number of selector pieces we'll have.
-  llvm::Optional<ForeignAsyncConvention> asyncConvention
-    = getForeignAsyncConvention();
-  llvm::Optional<ForeignErrorConvention> errorConvention
-    = getForeignErrorConvention();
+  llvm::Optional<ForeignAsyncConvention> asyncConvention =
+      getForeignAsyncConvention();
+  llvm::Optional<ForeignErrorConvention> errorConvention =
+      getForeignErrorConvention();
   unsigned numSelectorPieces
     = argNames.size() + (asyncConvention.has_value() ? 1 : 0)
     + (errorConvention.has_value() ? 1 : 0);
@@ -9174,8 +9173,8 @@ GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
   return genericParamType->getDecl();
 }
 
-llvm::Optional<unsigned> OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
-    TypeRepr *repr) const {
+llvm::Optional<unsigned>
+OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
   auto opaqueReprs = getOpaqueReturnTypeReprs();
@@ -10339,7 +10338,6 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
 SourceLoc swift::extractNearestSourceLoc(TypeOrExtensionDecl container) {
   return extractNearestSourceLoc(container.Decl);
 }
-
 
 llvm::Optional<BodyAndFingerprint>
 ParseAbstractFunctionBodyRequest::getCachedResult() const {

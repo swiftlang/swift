@@ -372,8 +372,8 @@ public:
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
-  static llvm::Optional<AvailabilityContext> annotatedAvailableRange(const Decl *D,
-                                                               ASTContext &C);
+  static llvm::Optional<AvailabilityContext>
+  annotatedAvailableRange(const Decl *D, ASTContext &C);
 
   static AvailabilityContext
     annotatedAvailableRangeForAttr(const SpecializeAttr* attr, ASTContext &ctx);

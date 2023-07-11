@@ -60,9 +60,11 @@ void ClangTypeInfo::dump(llvm::raw_ostream &os,
 
 // MARK: - UnexpectedClangTypeError
 
-llvm::Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
-  SILFunctionTypeRepresentation silRep,
-  const clang::Type *type, bool expectNonnullForCOrBlock, bool expectCanonical) {
+llvm::Optional<UnexpectedClangTypeError>
+UnexpectedClangTypeError::checkClangType(SILFunctionTypeRepresentation silRep,
+                                         const clang::Type *type,
+                                         bool expectNonnullForCOrBlock,
+                                         bool expectCanonical) {
 #ifdef NDEBUG
   return llvm::None;
 #else

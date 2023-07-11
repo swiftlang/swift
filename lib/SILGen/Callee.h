@@ -36,21 +36,23 @@ private:
 public:
   CalleeTypeInfo() = default;
 
-  CalleeTypeInfo(CanSILFunctionType substFnType,
-                 AbstractionPattern origResultType, CanType substResultType,
-                 const llvm::Optional<ForeignErrorConvention> &foreignError,
-                 const llvm::Optional<ForeignAsyncConvention> &foreignAsync,
-                 ImportAsMemberStatus foreignSelf,
-                 llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
+  CalleeTypeInfo(
+      CanSILFunctionType substFnType, AbstractionPattern origResultType,
+      CanType substResultType,
+      const llvm::Optional<ForeignErrorConvention> &foreignError,
+      const llvm::Optional<ForeignAsyncConvention> &foreignAsync,
+      ImportAsMemberStatus foreignSelf,
+      llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
       : origFormalType(llvm::None), substFnType(substFnType),
         origResultType(origResultType),
         substResultType(substResultType), foreign{foreignSelf, foreignError,
                                                   foreignAsync},
         overrideRep(overrideRep) {}
 
-  CalleeTypeInfo(CanSILFunctionType substFnType,
-                 AbstractionPattern origResultType, CanType substResultType,
-                 llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
+  CalleeTypeInfo(
+      CanSILFunctionType substFnType, AbstractionPattern origResultType,
+      CanType substResultType,
+      llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
       : origFormalType(llvm::None), substFnType(substFnType),
         origResultType(origResultType), substResultType(substResultType),
         foreign(), overrideRep(overrideRep) {}

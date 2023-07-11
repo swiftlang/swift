@@ -58,7 +58,8 @@ llvm::Optional<PlatformKind> swift::platformFromString(StringRef Name) {
       .Default(llvm::Optional<PlatformKind>());
 }
 
-llvm::Optional<StringRef> swift::closestCorrectedPlatformString(StringRef candidate) {
+llvm::Optional<StringRef>
+swift::closestCorrectedPlatformString(StringRef candidate) {
   auto lowerCasedCandidate = candidate.lower();
   auto lowerCasedCandidateRef = StringRef(lowerCasedCandidate);
   auto minDistance = std::numeric_limits<unsigned int>::max();

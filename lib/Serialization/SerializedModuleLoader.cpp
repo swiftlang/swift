@@ -89,7 +89,7 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
 llvm::Optional<bool> forEachModuleSearchPath(
     const ASTContext &Ctx,
     llvm::function_ref<llvm::Optional<bool>(StringRef, ModuleSearchPathKind,
-                                      bool isSystem)>
+                                            bool isSystem)>
         callback) {
   for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =
@@ -764,8 +764,8 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
 }
 
 LoadedFile *SerializedModuleLoaderBase::loadAST(
-    ModuleDecl &M, llvm::Optional<SourceLoc> diagLoc, StringRef moduleInterfacePath,
-    StringRef moduleInterfaceSourcePath,
+    ModuleDecl &M, llvm::Optional<SourceLoc> diagLoc,
+    StringRef moduleInterfacePath, StringRef moduleInterfaceSourcePath,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
@@ -1647,7 +1647,6 @@ llvm::Optional<StringRef>
 SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
   return File.getGroupNameForDecl(D);
 }
-
 
 llvm::Optional<StringRef>
 SerializedASTFile::getSourceFileNameForDecl(const Decl *D) const {

@@ -78,10 +78,10 @@ inline static llvm::Optional<CompileJobAction::InputInfo::Status>
 getInfoStatusForIdentifier(StringRef Identifier) {
   using InputStatus = CompileJobAction::InputInfo::Status;
   return llvm::StringSwitch<llvm::Optional<InputStatus>>(Identifier)
-    .Case("", InputStatus::UpToDate)
-    .Case("!dirty", InputStatus::NeedsCascadingBuild)
-    .Case("!private", InputStatus::NeedsNonCascadingBuild)
-    .Default(llvm::None);
+      .Case("", InputStatus::UpToDate)
+      .Case("!dirty", InputStatus::NeedsCascadingBuild)
+      .Case("!private", InputStatus::NeedsNonCascadingBuild)
+      .Default(llvm::None);
 }
 
 } // end namespace compilation_record

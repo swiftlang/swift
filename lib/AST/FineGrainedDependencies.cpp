@@ -114,7 +114,8 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    const DependencyKey &interfaceKey, llvm::Optional<Fingerprint> fingerprint) {
+    const DependencyKey &interfaceKey,
+    llvm::Optional<Fingerprint> fingerprint) {
 
   // Optimization for whole-file users:
   if (interfaceKey.getKind() == NodeKind::sourceFileProvide &&

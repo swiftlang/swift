@@ -151,7 +151,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   SmallVector<NominalTypeDecl *> ReceiverTypes;
   bool IsDynamic = false;
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef = llvm::None;
+  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
+      llvm::None;
   if (Expr *BaseE = getBase(ExprStack)) {
     if (isDynamicRef(BaseE, D)) {
       IsDynamic = true;

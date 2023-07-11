@@ -308,7 +308,8 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
 void RewriteSystem::addRules(
     std::vector<Rule> &&importedRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-    std::vector<std::tuple<MutableTerm, MutableTerm, llvm::Optional<unsigned>>> &&requirementRules) {
+    std::vector<std::tuple<MutableTerm, MutableTerm, llvm::Optional<unsigned>>>
+        &&requirementRules) {
   unsigned ruleCount = Rules.size();
 
   if (ruleCount == 0) {

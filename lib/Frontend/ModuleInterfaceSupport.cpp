@@ -425,7 +425,8 @@ class InheritedProtocolCollector {
 
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
-  getAvailabilityAttrs(const Decl *D, llvm::Optional<AvailableAttrList> &cache) {
+  getAvailabilityAttrs(const Decl *D,
+                       llvm::Optional<AvailableAttrList> &cache) {
     if (cache.has_value())
       return cache.value();
 

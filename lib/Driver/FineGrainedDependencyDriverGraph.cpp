@@ -116,7 +116,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSwiftModuleBuffer(
       "loading fine-grained dependency graph from swiftmodule",
       buffer.getBufferIdentifier());
 
-   llvm::Optional<SourceFileDepGraph> sourceFileDepGraph =
+  llvm::Optional<SourceFileDepGraph> sourceFileDepGraph =
       SourceFileDepGraph::loadFromSwiftModuleBuffer(buffer);
   if (!sourceFileDepGraph)
     return llvm::None;
@@ -625,7 +625,8 @@ void ModuleDepGraph::verifyNodeIsInRightEntryInNodeMap(
     const ModuleDepGraphNode *const n) const {
   const DependencyKey &nodeKey = n->getKey();
   const llvm::Optional<std::string> swiftDeps =
-      swiftDepsString.empty() ? llvm::None : llvm::Optional<std::string>(swiftDepsString);
+      swiftDepsString.empty() ? llvm::None
+                              : llvm::Optional<std::string>(swiftDepsString);
   (void)nodeKey;
   (void)swiftDeps;
   assert(n->getSwiftDeps() == swiftDeps ||

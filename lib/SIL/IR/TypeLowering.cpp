@@ -2752,19 +2752,19 @@ bool TypeConverter::visitAggregateLeaves(
   llvm::SmallVector<
       std::tuple<CanType, AbstractionPattern, ValueDecl *, unsigned>, 16>
       worklist;
-  auto insertIntoWorklist = [&visited,
-                             &worklist](CanType substTy,
-                                        AbstractionPattern origTy,
-                                        ValueDecl *field,
-                                        llvm::Optional<unsigned> maybeIndex) -> bool {
+  auto insertIntoWorklist =
+      [&visited, &worklist](CanType substTy, AbstractionPattern origTy,
+                            ValueDecl *field,
+                            llvm::Optional<unsigned> maybeIndex) -> bool {
     unsigned index = maybeIndex.value_or(UINT_MAX);
     if (!visited.insert({substTy, field, index}).second)
       return false;
     worklist.push_back({substTy, origTy, field, index});
     return true;
   };
-  auto popFromWorklist = [&worklist]()
-      -> std::tuple<CanType, AbstractionPattern, ValueDecl *, llvm::Optional<unsigned>> {
+  auto popFromWorklist =
+      [&worklist]() -> std::tuple<CanType, AbstractionPattern, ValueDecl *,
+                                  llvm::Optional<unsigned>> {
     CanType ty;
     AbstractionPattern origTy = AbstractionPattern::getOpaque();
     ValueDecl *field;
@@ -3004,7 +3004,8 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
               .build();
 
       return ::getNativeSILFunctionType(TC, forExpansion, origType, substFnType,
-                                        silExtInfo, llvm::None, llvm::None, llvm::None, {});
+                                        silExtInfo, llvm::None, llvm::None,
+                                        llvm::None, {});
     }
 
     // Ignore dynamic self types.

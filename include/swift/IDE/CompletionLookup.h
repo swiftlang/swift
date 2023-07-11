@@ -313,8 +313,9 @@ public:
   void collectImportedModules(llvm::StringSet<> &directImportedModules,
                               llvm::StringSet<> &allImportedModules);
 
-  void addModuleName(ModuleDecl *MD,
-                     llvm::Optional<ContextualNotRecommendedReason> R = llvm::None);
+  void
+  addModuleName(ModuleDecl *MD,
+                llvm::Optional<ContextualNotRecommendedReason> R = llvm::None);
 
   void addImportModuleNames();
 
@@ -412,8 +413,8 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
                           DynamicLookupInfo dynamicLookupInfo,
-                          llvm::Optional<Type> BaseType, llvm::Optional<Type> Result,
-                          bool IsOnType = true,
+                          llvm::Optional<Type> BaseType,
+                          llvm::Optional<Type> Result, bool IsOnType = true,
                           Identifier addName = Identifier());
 
   void addConstructorCallsForType(Type type, Identifier name,
@@ -587,7 +588,8 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    llvm::Optional<DeclKind> DK, StringRef Name);
+                                    llvm::Optional<DeclKind> DK,
+                                    StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, llvm::Optional<DeclKind> DK);
 

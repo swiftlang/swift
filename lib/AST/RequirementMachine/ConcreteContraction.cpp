@@ -200,7 +200,8 @@ class ConcreteContraction {
     Other
   };
 
-  llvm::Optional<Type> substTypeParameterRec(Type type, Position position) const;
+  llvm::Optional<Type> substTypeParameterRec(Type type,
+                                             Position position) const;
   Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;
@@ -233,8 +234,8 @@ public:
 /// to be some subclass of SomeClass which does conform to Sequence;
 /// this is perfectly valid, and we cannot substitute the 'T.Element'
 /// requirement. In this case, this method returns None.
-llvm::Optional<Type> ConcreteContraction::substTypeParameterRec(
-    Type type, Position position) const {
+llvm::Optional<Type>
+ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
   // If we have a superclass (T : C) or same-type requirement (T == C),
   // don't substitute T, since then we end up with 'C == C' or 'C : C',
@@ -356,13 +357,12 @@ Type ConcreteContraction::substTypeParameter(
 
 /// Substitute all type parameters occurring in structural positions of \p type.
 Type ConcreteContraction::substType(Type type) const {
-  return type.transformRec(
-      [&](Type type) -> llvm::Optional<Type> {
-        if (!type->isTypeParameter())
-          return llvm::None;
+  return type.transformRec([&](Type type) -> llvm::Optional<Type> {
+    if (!type->isTypeParameter())
+      return llvm::None;
 
-        return substTypeParameter(type, Position::Other);
-      });
+    return substTypeParameter(type, Position::Other);
+  });
 }
 
 /// Substitute all type parameters occurring in the given requirement.

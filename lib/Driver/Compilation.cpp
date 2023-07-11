@@ -768,7 +768,8 @@ namespace driver {
 
     TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
                                        StringRef Output, StringRef Errors,
-                                       void *Context, llvm::Optional<int> Signal,
+                                       void *Context,
+                                       llvm::Optional<int> Signal,
                                        TaskProcessInformation ProcInfo) {
       const Job *SignalledCmd = (const Job *)Context;
 

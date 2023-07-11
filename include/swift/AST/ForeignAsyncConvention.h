@@ -44,21 +44,21 @@ public:
       : CompletionHandlerParamIndex(0),
         CompletionHandlerErrorParamIndexPlusOneOrZero(0) { }
 
-    Info(
-        unsigned completionHandlerParamIndex,
-        llvm::Optional<unsigned> completionHandlerErrorParamIndex,
-        llvm::Optional<unsigned> completionHandlerFlagParamIndex,
-        bool completionHandlerFlagIsErrorOnZero)
-      : CompletionHandlerParamIndex(completionHandlerParamIndex),
-        CompletionHandlerErrorParamIndexPlusOneOrZero(
-            completionHandlerErrorParamIndex
-              ? *completionHandlerErrorParamIndex + 1
-              : 0),
-        CompletionHandlerFlagParamIndexPlusOneWithPolarityOrZero(
-            completionHandlerFlagParamIndex
-              ? (*completionHandlerFlagParamIndex | ((unsigned)completionHandlerFlagIsErrorOnZero << 31)) + 1
-              : 0)
-        {}
+    Info(unsigned completionHandlerParamIndex,
+         llvm::Optional<unsigned> completionHandlerErrorParamIndex,
+         llvm::Optional<unsigned> completionHandlerFlagParamIndex,
+         bool completionHandlerFlagIsErrorOnZero)
+        : CompletionHandlerParamIndex(completionHandlerParamIndex),
+          CompletionHandlerErrorParamIndexPlusOneOrZero(
+              completionHandlerErrorParamIndex
+                  ? *completionHandlerErrorParamIndex + 1
+                  : 0),
+          CompletionHandlerFlagParamIndexPlusOneWithPolarityOrZero(
+              completionHandlerFlagParamIndex
+                  ? (*completionHandlerFlagParamIndex |
+                     ((unsigned)completionHandlerFlagIsErrorOnZero << 31)) +
+                        1
+                  : 0) {}
 
     /// Retrieve the index of the completion handler argument in the method's
     /// parameter list.
@@ -94,7 +94,7 @@ public:
       return (CompletionHandlerFlagParamIndexPlusOneWithPolarityOrZero - 1)
         & 0x7FFFFFFFu;
     }
-    
+
     /// Indicates the polarity of the error flag parameter to the completion handler.
     ///
     /// It is only valid to call this if \c completionHandlerFlagParamIndex returns
@@ -126,16 +126,15 @@ public:
 public:
   ForeignAsyncConvention() : TheInfo() { }
 
-  ForeignAsyncConvention(CanType completionHandlerType,
-                         unsigned completionHandlerParamIndex,
-                         llvm::Optional<unsigned> completionHandlerErrorParamIndex,
-                         llvm::Optional<unsigned> completionHandlerFlagParamIndex,
-                         bool completionHandlerFlagIsErrorOnZero)
+  ForeignAsyncConvention(
+      CanType completionHandlerType, unsigned completionHandlerParamIndex,
+      llvm::Optional<unsigned> completionHandlerErrorParamIndex,
+      llvm::Optional<unsigned> completionHandlerFlagParamIndex,
+      bool completionHandlerFlagIsErrorOnZero)
       : CompletionHandlerType(completionHandlerType),
         TheInfo(completionHandlerParamIndex, completionHandlerErrorParamIndex,
                 completionHandlerFlagParamIndex,
-                completionHandlerFlagIsErrorOnZero)
-  { }
+                completionHandlerFlagIsErrorOnZero) {}
 
   /// Retrieve the type of the completion handler parameter.
   CanType completionHandlerType() const { return CompletionHandlerType; }
@@ -156,7 +155,7 @@ public:
   llvm::Optional<unsigned> completionHandlerErrorParamIndex() const {
     return TheInfo.completionHandlerErrorParamIndex();
   }
-  
+
   /// Retrieve the index of the error flag parameter in the completion handler's
   /// parameter list, if any.
   ///
@@ -167,7 +166,7 @@ public:
   llvm::Optional<unsigned> completionHandlerFlagParamIndex() const {
     return TheInfo.completionHandlerFlagParamIndex();
   }
-  
+
   /// Indicates the polarity of the error flag parameter to the completion handler.
   ///
   /// It is only valid to call this if \c completionHandlerFlagParamIndex returns

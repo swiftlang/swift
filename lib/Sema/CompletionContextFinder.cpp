@@ -97,7 +97,8 @@ size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
   return ComponentIndex;
 }
 
-llvm::Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
+llvm::Optional<Fallback>
+CompletionContextFinder::getFallbackCompletionExpr() const {
   if (!hasCompletionExpr()) {
     // Creating a fallback expression only makes sense if we are completing in
     // an expression, not when we're completing in a key path.

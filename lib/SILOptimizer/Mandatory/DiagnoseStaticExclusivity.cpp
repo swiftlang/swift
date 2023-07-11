@@ -631,7 +631,7 @@ static llvm::cl::opt<bool> ShouldAssertOnFailure(
 /// would conflict, returns the first recorded access it would conflict
 /// with. Otherwise, returns llvm::None.
 static llvm::Optional<RecordedAccess>
-shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
+shouldReportAccess(const AccessInfo &Info, swift::SILAccessKind Kind,
                    const IndexTrieNode *SubPath) {
   if (Info.alreadyHadConflict())
     return llvm::None;

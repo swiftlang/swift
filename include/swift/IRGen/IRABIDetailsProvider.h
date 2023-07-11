@@ -295,7 +295,8 @@ public:
       assert(kind == Kind::IndirectVTableStaticOffset);
       return offset;
     }
-    llvm::Optional<PointerAuthDiscriminator> getPointerAuthDiscriminator() const {
+    llvm::Optional<PointerAuthDiscriminator>
+    getPointerAuthDiscriminator() const {
       assert(kind == Kind::IndirectVTableStaticOffset ||
              kind == Kind::IndirectVTableRelativeOffset);
       return discriminator;
@@ -320,8 +321,9 @@ public:
     }
 
   private:
-    MethodDispatchInfo(Kind kind, size_t offset, std::string symbolName = "",
-                       llvm::Optional<PointerAuthDiscriminator> discriminator = llvm::None)
+    MethodDispatchInfo(
+        Kind kind, size_t offset, std::string symbolName = "",
+        llvm::Optional<PointerAuthDiscriminator> discriminator = llvm::None)
         : kind(kind), offset(offset), symbolName(symbolName),
           discriminator(discriminator) {}
 

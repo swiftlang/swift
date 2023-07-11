@@ -305,11 +305,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.isRuntimeAccessibleFunction())
     isRuntimeAccessible = IsRuntimeAccessible;
 
-  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, llvm::None,
-                                IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
-                                IsDistributed, isRuntimeAccessible,
-                                IsNotExactSelfClass, IsNotThunk,
-                                constant.getSubclassScope(), inlineStrategy);
+  auto *F = SILFunction::create(
+      mod, linkage, name, constantType, nullptr, llvm::None, IsNotBare, IsTrans,
+      IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
+      IsNotExactSelfClass, IsNotThunk, constant.getSubclassScope(),
+      inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   if (constant.isGlobal())

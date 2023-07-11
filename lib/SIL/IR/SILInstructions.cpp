@@ -227,7 +227,8 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
 
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
-                               SILFunction &F, llvm::Optional<SILDebugVariable> Var,
+                               SILFunction &F,
+                               llvm::Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime, bool isLexical,
                                bool usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
@@ -607,13 +608,11 @@ BeginApplyInst::BeginApplyInst(SILDebugLocation loc, SILValue callee,
   assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
 
-BeginApplyInst *
-BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
-                       SubstitutionMap subs, ArrayRef<SILValue> args,
-                       ApplyOptions options,
-                       llvm::Optional<SILModuleConventions> moduleConventions,
-                       SILFunction &F,
-                  const GenericSpecializationInformation *specializationInfo) {
+BeginApplyInst *BeginApplyInst::create(
+    SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
+    ArrayRef<SILValue> args, ApplyOptions options,
+    llvm::Optional<SILModuleConventions> moduleConventions, SILFunction &F,
+    const GenericSpecializationInformation *specializationInfo) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       F.getModule(), subs, F.getTypeExpansionContext());
   auto substCalleeType = substCalleeSILType.castTo<SILFunctionType>();
@@ -880,14 +879,15 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
 DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
     NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
-    ValueOwnershipKind forwardingOwnershipKind, llvm::Optional<SILType> extracteeType)
+    ValueOwnershipKind forwardingOwnershipKind,
+    llvm::Optional<SILType> extracteeType)
     : UnaryInstructionBase(debugLoc, function,
                            extracteeType
                                ? *extracteeType
                                : getExtracteeType(function, extractee, module),
                            forwardingOwnershipKind),
-      Extractee(extractee), HasExplicitExtracteeType(extracteeType.has_value()) {
-}
+      Extractee(extractee),
+      HasExplicitExtracteeType(extracteeType.has_value()) {}
 
 SILType LinearFunctionExtractInst::
 getExtracteeType(
@@ -2032,8 +2032,8 @@ SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
 SelectEnumInst *SelectEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
     ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
-    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount,
-    ValueOwnershipKind forwardingOwnership) {
+    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnership) {
   return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
                                           CaseValues, M, CaseCounts,
                                           DefaultCount, forwardingOwnership);
@@ -2095,7 +2095,7 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
     return nullptr;
 
   // Try to find a single literal "true" case.
-  llvm::Optional<EnumElementDecl*> TrueElement;
+  llvm::Optional<EnumElementDecl *> TrueElement;
   for (unsigned i = 0, e = getNumCases(); i < e; ++i) {
     auto casePair = getCase(i);
     if (auto intLit = dyn_cast<IntegerLiteralInst>(casePair.second)) {
@@ -2104,7 +2104,7 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
           TrueElement = casePair.first;
         else
           // Use Optional(nullptr) to represent more than one.
-          TrueElement = llvm::Optional<EnumElementDecl*>(nullptr);
+          TrueElement = llvm::Optional<EnumElementDecl *>(nullptr);
       }
     }
   }
@@ -2120,7 +2120,7 @@ SWITCH_ENUM_INST *SwitchEnumInstBase<BaseTy>::createSwitchEnum(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
     SILFunction &F, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-    ProfileCounter DefaultCount, RestTys &&... restArgs) {
+    ProfileCounter DefaultCount, RestTys &&...restArgs) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.

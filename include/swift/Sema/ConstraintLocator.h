@@ -1389,7 +1389,8 @@ public:
     // Next, check the constraint locator itself.
     if (auto locator = previous.dyn_cast<ConstraintLocator *>()) {
       auto path = locator->getPath();
-      if (path.empty()) return llvm::None;
+      if (path.empty())
+        return llvm::None;
       return path.back();
     }
 

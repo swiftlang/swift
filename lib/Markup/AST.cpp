@@ -15,10 +15,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/Markup/Markup.h"
 #include "swift/Markup/AST.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/Markup/Markup.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 
 using namespace swift;
 using namespace markup;
@@ -216,8 +216,7 @@ Strong *Strong::create(MarkupContext &MC,
 
 ParamField::ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children)
     : PrivateExtension(ASTNodeKind::ParamField), NumChildren(Children.size()),
-      Name(Name),
-      Parts(llvm::None) {
+      Name(Name), Parts(llvm::None) {
   std::uninitialized_copy(Children.begin(), Children.end(),
                           getTrailingObjects<MarkupASTNode *>());
 }

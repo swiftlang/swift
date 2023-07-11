@@ -780,8 +780,7 @@ namespace {
     SILDefaultWitnessTable *DefaultWitnesses;
 
     llvm::Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
-      NumRequirementsInSignature,
-      NumRequirements;
+        NumRequirementsInSignature, NumRequirements;
 
     bool Resilient;
 
@@ -1183,7 +1182,7 @@ namespace {
 
     StringRef UserFacingName;
     llvm::Optional<TypeImportInfo<std::string>> ImportInfo;
-    
+
     using super::IGM;
     using super::B;
     using super::asImpl;
@@ -4243,7 +4242,8 @@ namespace {
     const ClassLayout &FieldLayout;
 
     llvm::Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
-      ClassRODataOffset, MetaclassObjectOffset, MetaclassRODataOffset;
+        ClassRODataOffset, MetaclassObjectOffset, MetaclassRODataOffset;
+
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 ConstantStructBuilder &B,
@@ -5429,9 +5429,8 @@ void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
 
 // Enums
 
-static llvm::Optional<Size> getConstantPayloadSize(IRGenModule &IGM,
-                                             EnumDecl *enumDecl,
-                                             CanType enumTy) {
+static llvm::Optional<Size>
+getConstantPayloadSize(IRGenModule &IGM, EnumDecl *enumDecl, CanType enumTy) {
   auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
   if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
     return llvm::None;
@@ -5444,7 +5443,7 @@ static llvm::Optional<Size> getConstantPayloadSize(IRGenModule &IGM,
 }
 
 static llvm::Optional<Size> getConstantPayloadSize(IRGenModule &IGM,
-                                             EnumDecl *enumDecl) {
+                                                   EnumDecl *enumDecl) {
   auto enumTy = enumDecl->getDeclaredTypeInContext()->getCanonicalType();
   return getConstantPayloadSize(IGM, enumDecl, enumTy);
 }
@@ -6585,8 +6584,8 @@ void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
 bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                                              const SILVTable *vtable,
                                              SILDeclRef method) {
-  llvm::Optional<SILVTable::Entry> entry
-    = vtable->getEntry(IGM.getSILModule(), method);
+  llvm::Optional<SILVTable::Entry> entry =
+      vtable->getEntry(IGM.getSILModule(), method);
   LLVM_DEBUG(llvm::dbgs() << "looking at vtable:\n";
              vtable->print(llvm::dbgs()));
   if (!entry) {

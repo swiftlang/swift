@@ -29,10 +29,10 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/ADT/Optional.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -150,7 +150,8 @@ Alignment IRGenModule::getAsyncContextAlignment() const {
 
 llvm::Optional<Size>
 FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
-  if (!isSpecial()) return llvm::None;
+  if (!isSpecial())
+    return llvm::None;
 
   auto headerSize = getAsyncContextHeaderSize(IGM);
   headerSize = headerSize.roundUpToAlignment(IGM.getPointerAlignment());

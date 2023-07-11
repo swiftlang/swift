@@ -235,7 +235,7 @@ namespace {
     }
 
     llvm::Optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
-                                               VarDecl *field) const {
+                                                     VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
         return llvm::None;
@@ -533,7 +533,9 @@ namespace {
       destroy(IGF, src, T, isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return llvm::None; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return llvm::None;
+    }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return llvm::None;
     }
@@ -849,7 +851,9 @@ namespace {
                                                          isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return llvm::None; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return llvm::None;
+    }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return llvm::None;
     }
@@ -1548,8 +1552,8 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
 }
 
 llvm::Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                      SILType baseType,
-                                                      VarDecl *field) {
+                                                            SILType baseType,
+                                                            VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
 }
 

@@ -354,9 +354,7 @@ inline bool isNumeric(llvm::StringRef S) {
   return false;
 }
 
-inline bool isNull(llvm::StringRef S) {
-  return S.equals("null");
-}
+inline bool isNull(llvm::StringRef S) { return S.equals("null"); }
 
 inline bool isBool(llvm::StringRef S) {
   return S.equals("true") || S.equals("false");
@@ -462,13 +460,13 @@ public:
   }
 
   template <typename T>
-  void mapRequired(llvm::StringRef Key, T& Val) {
+  void mapRequired(llvm::StringRef Key, T &Val) {
     this->processKey(Key, Val, true);
   }
 
   template <typename T>
-  typename std::enable_if<has_ArrayTraits<T>::value,void>::type
-  mapOptional(llvm::StringRef Key, T& Val) {
+  typename std::enable_if<has_ArrayTraits<T>::value, void>::type
+  mapOptional(llvm::StringRef Key, T &Val) {
     // omit key/value instead of outputting empty array
     if (this->canElideEmptyArray() && !(Val.begin() != Val.end()))
       return;
@@ -481,20 +479,21 @@ public:
   }
 
   template <typename T>
-  typename std::enable_if<!has_ArrayTraits<T>::value,void>::type
-  mapOptional(llvm::StringRef Key, T& Val) {
+  typename std::enable_if<!has_ArrayTraits<T>::value, void>::type
+  mapOptional(llvm::StringRef Key, T &Val) {
     this->processKey(Key, Val, false);
   }
 
   template <typename T>
-  void mapOptional(llvm::StringRef Key, T& Val, const T& Default) {
+  void mapOptional(llvm::StringRef Key, T &Val, const T &Default) {
     this->processKeyWithDefault(Key, Val, Default, false);
   }
 
 private:
   template <typename T>
   void processKeyWithDefault(llvm::StringRef Key, llvm::Optional<T> &Val,
-                             const llvm::Optional<T> &DefaultValue, bool Required) {
+                             const llvm::Optional<T> &DefaultValue,
+                             bool Required) {
     assert(!DefaultValue.has_value() &&
            "Optional<T> shouldn't have a value!");
     void *SaveInfo;
@@ -558,7 +557,7 @@ struct ScalarReferenceTraits<bool> {
   static bool mustQuote(llvm::StringRef) { return false; }
 };
 
-template<>
+template <>
 struct ScalarReferenceTraits<llvm::StringRef> {
   static llvm::StringRef stringRef(const llvm::StringRef &);
   static bool mustQuote(llvm::StringRef S) { return true; }

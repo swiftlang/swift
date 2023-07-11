@@ -5897,15 +5897,10 @@ emitOpenExistentialInSelfConformance(SILGenFunction &SGF, SILLocation loc,
 }
 
 void SILGenFunction::emitProtocolWitness(
-    AbstractionPattern reqtOrigTy,
-    CanAnyFunctionType reqtSubstTy,
-    SILDeclRef requirement,
-    SubstitutionMap reqtSubs,
-    SILDeclRef witness,
-    SubstitutionMap witnessSubs,
-    IsFreeFunctionWitness_t isFree,
-    bool isSelfConformance,
-    llvm::Optional<ActorIsolation> enterIsolation) {
+    AbstractionPattern reqtOrigTy, CanAnyFunctionType reqtSubstTy,
+    SILDeclRef requirement, SubstitutionMap reqtSubs, SILDeclRef witness,
+    SubstitutionMap witnessSubs, IsFreeFunctionWitness_t isFree,
+    bool isSelfConformance, llvm::Optional<ActorIsolation> enterIsolation) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);

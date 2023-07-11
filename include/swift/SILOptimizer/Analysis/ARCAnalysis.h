@@ -88,17 +88,18 @@ bool mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
 llvm::Optional<SILBasicBlock::iterator>
-valueHasARCUsesInInstructionRange(SILValue Op,
-                                  SILBasicBlock::iterator Start,
+valueHasARCUsesInInstructionRange(SILValue Op, SILBasicBlock::iterator Start,
                                   SILBasicBlock::iterator End,
                                   AliasAnalysis *AA);
 
 /// If \p Op has arc uses in the instruction range [Start, End), return the last
 /// use of such instruction. Otherwise return None. We assume that Start and End
 /// are both in the same basic block.
-llvm::Optional<SILBasicBlock::iterator> valueHasARCUsesInReverseInstructionRange(
-    SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
-    AliasAnalysis *AA);
+llvm::Optional<SILBasicBlock::iterator>
+valueHasARCUsesInReverseInstructionRange(SILValue Op,
+                                         SILBasicBlock::iterator Start,
+                                         SILBasicBlock::iterator End,
+                                         AliasAnalysis *AA);
 
 /// If \p Op has instructions in the instruction range (Start, End] which may
 /// decrement it, return the first such instruction. Returns None
@@ -233,7 +234,8 @@ private:
     /// set.
     ///
     /// *NOTE* This returns none if we did not find any releases.
-    llvm::Optional<ArrayRef<SILInstruction *>> getPartiallyPostDomReleases() const {
+    llvm::Optional<ArrayRef<SILInstruction *>>
+    getPartiallyPostDomReleases() const {
       if (releases.empty() || !foundSomeButNotAllReleases())
         return llvm::None;
       return ArrayRef<SILInstruction *>(releases);

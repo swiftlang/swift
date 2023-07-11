@@ -589,8 +589,8 @@ void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   Kind = CompletionKind::ReturnStmtExpr;
 }
 
-void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
-                                                    llvm::Optional<unsigned> index) {
+void CodeCompletionCallbacksImpl::completeYieldStmt(
+    CodeCompletionExpr *E, llvm::Optional<unsigned> index) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   // TODO: use a different completion kind when completing without an index
@@ -715,8 +715,9 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     }
     return false;
   };
-  auto isTopLevelOnlyDeclIntroducer = [](CodeCompletionKeywordKind Kind,
-                                         llvm::Optional<DeclAttrKind> DAK) -> bool {
+  auto isTopLevelOnlyDeclIntroducer =
+      [](CodeCompletionKeywordKind Kind,
+         llvm::Optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
     case CodeCompletionKeywordKind::kw_operator:
     case CodeCompletionKeywordKind::kw_precedencegroup:

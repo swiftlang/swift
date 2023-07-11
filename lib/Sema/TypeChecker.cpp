@@ -598,10 +598,9 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
   return type->getCanonicalType() == tanSpace->getCanonicalType();
 }
 
-bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
-                                              llvm::Optional<FunctionTypeRepr *>repr,
-                                              DeclContext *dc,
-                                              llvm::Optional<TypeResolutionStage> stage) {
+bool TypeChecker::diagnoseInvalidFunctionType(
+    FunctionType *fnTy, SourceLoc loc, llvm::Optional<FunctionTypeRepr *> repr,
+    DeclContext *dc, llvm::Optional<TypeResolutionStage> stage) {
   // Some of the below checks trigger cycles if we don't have a generic
   // signature yet; we'll run the checks again in
   // TypeResolutionStage::Interface.

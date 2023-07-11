@@ -253,11 +253,10 @@ private:
                           Symbol lhsProperty, unsigned lhsRuleID,
                           Symbol rhsProperty, unsigned rhsRuleID);
 
-  void unifyConcreteTypes(Term key,
-                          llvm::Optional<Symbol> &bestProperty,
-                          llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &
-                              existingRules,
-                          Symbol property, unsigned ruleID);
+  void unifyConcreteTypes(
+      Term key, llvm::Optional<Symbol> &bestProperty,
+      llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
+      Symbol property, unsigned ruleID);
 
   void recordSuperclassRelation(Term key,
                                 Symbol superclassType,

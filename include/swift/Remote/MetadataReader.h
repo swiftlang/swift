@@ -543,7 +543,8 @@ public:
   llvm::Optional<MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
-    if (!meta) return llvm::None;
+    if (!meta)
+      return llvm::None;
 
     return meta->getKind();
   }
@@ -1668,9 +1669,9 @@ public:
       if (classIndex == 0) {
         return llvm::None;
 
-      // If the index is out of range, it's an error; but check for an
-      // update first.  (This will also trigger the first time because
-      // we initialize LastIndexedClassesCount to 0).
+        // If the index is out of range, it's an error; but check for an
+        // update first.  (This will also trigger the first time because
+        // we initialize LastIndexedClassesCount to 0).
       } else if (classIndex >= LastIndexedClassesCount) {
         StoredPointer count;
         if (!Reader->readInteger(RemoteAddress(IndexedClassesCountPointer),
@@ -1841,7 +1842,7 @@ public:
     auto generics = descriptor->getGenericContext();
     if (!generics)
       return llvm::None;
-    
+
     auto offsetToGenericArgs = readGenericArgsOffset(Meta, descriptor);
     if (!offsetToGenericArgs)
       return llvm::None;

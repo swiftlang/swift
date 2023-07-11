@@ -905,10 +905,8 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
 static llvm::Optional<PropertyWrapperLValueness>
 getPropertyWrapperLValueness(VarDecl *var) {
   auto &ctx = var->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator,
-      PropertyWrapperLValuenessRequest{var},
-      llvm::None);
+  return evaluateOrDefault(ctx.evaluator, PropertyWrapperLValuenessRequest{var},
+                           llvm::None);
 }
 
 /// Build a reference to the storage of a declaration. Returns nullptr if there
@@ -2894,8 +2892,7 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
 }
 
 llvm::Optional<PropertyWrapperMutability>
-PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
-                                           VarDecl *var) const {
+PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *originalVar = var;
   unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
   bool isProjectedValue = false;
@@ -2929,7 +2926,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
   if (firstWrapper.*varMember == nullptr)
     return llvm::None;
-  
+
   PropertyWrapperMutability result;
   
   result.Getter = getGetterMutatingness(firstWrapper.*varMember);
@@ -2946,7 +2943,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
       return llvm::None;
-    
+
     PropertyWrapperMutability nextResult;
     nextResult.Getter =
                     result.composeWith(getGetterMutatingness(wrapper.valueVar));
@@ -2972,8 +2969,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
 }
 
 llvm::Optional<PropertyWrapperLValueness>
-PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
-                                           VarDecl *var) const {
+PropertyWrapperLValuenessRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *VD = var;
   unsigned numWrappers = var->getAttachedPropertyWrappers().size();
   bool isProjectedValue = false;

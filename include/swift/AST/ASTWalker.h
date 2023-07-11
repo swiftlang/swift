@@ -53,13 +53,12 @@ struct ReferenceMetaData {
   /// When non-none, this is a custom attribute reference.
   llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef;
 
-  ReferenceMetaData(
-      SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
-      bool isImplicit = false,
-      llvm::Optional<std::pair<const CustomAttr *, Decl *>> customAttrRef
-        = llvm::None
-  ) : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit),
-      CustomAttrRef(customAttrRef) {}
+  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+                    bool isImplicit = false,
+                    llvm::Optional<std::pair<const CustomAttr *, Decl *>>
+                        customAttrRef = llvm::None)
+      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit),
+        CustomAttrRef(customAttrRef) {}
 };
 
 /// Specifies how the initialization expression of a \c lazy variable should be

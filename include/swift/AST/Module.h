@@ -31,10 +31,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 #include <set>
@@ -523,7 +523,8 @@ private:
 
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
-  llvm::Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
+  llvm::Optional<std::pair<ModuleDecl *, Identifier>>
+      declaringModuleAndBystander;
 
   /// If this module is an underscored cross import overlay, gets the underlying
   /// module that declared it (which may itself be a cross-import overlay),

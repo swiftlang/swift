@@ -133,7 +133,7 @@ class BestMatchMatcher : public NodeMatcher {
     return MatchedRight.count(R) == 0 && CanMatch(L, R);
   }
 
-  llvm::Optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector& Candidates) {
+  llvm::Optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector &Candidates) {
     llvm::Optional<NodePtr> Best;
     for (auto Can : Candidates) {
       if (!internalCanMatch(Pin, Can))
@@ -1796,7 +1796,7 @@ public:
   }
 };
 
-static llvm::Optional<uint8_t> findSelfIndex(SDKNode* Node) {
+static llvm::Optional<uint8_t> findSelfIndex(SDKNode *Node) {
   if (auto func = dyn_cast<SDKNodeDeclAbstractFunc>(Node)) {
     return func->getSelfIndexOptional();
   } else if (auto vd = dyn_cast<SDKNodeDeclVar>(Node)) {
@@ -1826,13 +1826,16 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // index, old printed name)
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(),
-        rightParent->getKind() == SDKNodeKind::Root ?
-          StringRef() : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
-        right->getPrintedName(), findSelfIndex(right), llvm::None,
-        leftParent->getKind() == SDKNodeKind::Root ?
-          StringRef() : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
-        left->getPrintedName()
-    };
+        rightParent->getKind() == SDKNodeKind::Root
+            ? StringRef()
+            : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        right->getPrintedName(),
+        findSelfIndex(right),
+        llvm::None,
+        leftParent->getKind() == SDKNodeKind::Root
+            ? StringRef()
+            : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        left->getPrintedName()};
     out.emplace_back(item);
     Detector.workOn(left, right);
   }

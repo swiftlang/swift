@@ -404,7 +404,7 @@ public:
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    llvm::Optional<RequirementEnvironment> env = llvm::None)
-    : Witness(witness), Kind(kind), WitnessType(), ReqEnv(std::move(env)) {
+      : Witness(witness), Kind(kind), WitnessType(), ReqEnv(std::move(env)) {
     assert(!hasWitnessType() && "Should have witness type");
   }
 
@@ -416,17 +416,14 @@ struct RequirementMatch {
     assert(hasUnmetAttribute() && "Should have unmet attribute");
   }
 
-  RequirementMatch(ValueDecl *witness, MatchKind kind,
-                   Type witnessType,
+  RequirementMatch(ValueDecl *witness, MatchKind kind, Type witnessType,
                    llvm::Optional<RequirementEnvironment> env = llvm::None,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {},
                    GenericSignature derivativeGenSig = GenericSignature())
-    : Witness(witness), Kind(kind), WitnessType(witnessType),
-      ReqEnv(std::move(env)),
-      OptionalAdjustments(optionalAdjustments.begin(),
-                          optionalAdjustments.end()),
-      DerivativeGenSig(derivativeGenSig)
-  {
+      : Witness(witness), Kind(kind), WitnessType(witnessType),
+        ReqEnv(std::move(env)), OptionalAdjustments(optionalAdjustments.begin(),
+                                                    optionalAdjustments.end()),
+        DerivativeGenSig(derivativeGenSig) {
     assert(hasWitnessType() == !witnessType.isNull() &&
            "Should (or should not) have witness type");
   }
@@ -617,7 +614,8 @@ protected:
 
   RequirementEnvironmentCache ReqEnvironmentCache;
 
-  llvm::Optional<std::pair<AccessScope, bool>> RequiredAccessScopeAndUsableFromInline;
+  llvm::Optional<std::pair<AccessScope, bool>>
+      RequiredAccessScopeAndUsableFromInline;
 
   WitnessChecker(ASTContext &ctx, ProtocolDecl *proto, Type adoptee,
                  DeclContext *dc);
@@ -783,8 +781,8 @@ private:
   /// \returns the isolation that needs to be enforced to invoke the witness
   /// from the requirement, used when entering an actor-isolated synchronous
   /// witness from an asynchronous requirement.
-  llvm::Optional<ActorIsolation>
-  checkActorIsolation(ValueDecl *requirement, ValueDecl *witness);
+  llvm::Optional<ActorIsolation> checkActorIsolation(ValueDecl *requirement,
+                                                     ValueDecl *witness);
 
   /// Record a type witness.
   ///
@@ -1234,15 +1232,13 @@ public:
 ///
 /// \returns the result of performing the match.
 RequirementMatch matchWitness(
-             DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             llvm::function_ref<
-                     std::tuple<llvm::Optional<RequirementMatch>, Type, Type>(void)>
-               setup,
-             llvm::function_ref<llvm::Optional<RequirementMatch>(Type, Type)>
-               matchTypes,
-             llvm::function_ref<
-                     RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > finalize);
+    DeclContext *dc, ValueDecl *req, ValueDecl *witness,
+    llvm::function_ref<
+        std::tuple<llvm::Optional<RequirementMatch>, Type, Type>(void)>
+        setup,
+    llvm::function_ref<llvm::Optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
+        finalize);
 
 RequirementMatch
 matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,

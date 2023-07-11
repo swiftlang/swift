@@ -73,7 +73,7 @@ public:
   /// Returns the old value if the trie already had an entry for this key;
   /// this is actually an invariant violation, but we can produce a better
   /// assertion further up the stack.
-  template<typename Iter>
+  template <typename Iter>
   llvm::Optional<ValueType> insert(Iter begin, Iter end, ValueType value) {
     assert(begin != end);
     auto *node = &Root;
@@ -100,9 +100,8 @@ public:
   /// Find the shortest or longest prefix of the range given by [begin,end),
   /// depending on whether the Kind template parameter was bound to
   /// MatchKind::Shortest or MatchKind::Longest.
-  template<typename Iter>
-  llvm::Optional<ValueType>
-  find(Iter begin, Iter end) const {
+  template <typename Iter>
+  llvm::Optional<ValueType> find(Iter begin, Iter end) const {
     assert(begin != end);
     auto *node = &Root;
 

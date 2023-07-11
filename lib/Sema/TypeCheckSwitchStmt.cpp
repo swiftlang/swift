@@ -445,10 +445,10 @@ namespace {
       // remaining calls to minus before the computation times out.
       // Returns None if the computation "timed out".
       llvm::Optional<Space> minus(const Space &other, const DeclContext *DC,
-                            unsigned *minusCount) const {
+                                  unsigned *minusCount) const {
         if (minusCount && (*minusCount)-- == 0)
           return llvm::None;
-        
+
         if (this->isEmpty()) {
           return Space();
         }
@@ -1499,8 +1499,8 @@ namespace {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
           // FIXME: Compound names.
-          return Space::forConstructor(item->getType(),
-                                       VP->getName().getBaseIdentifier(), llvm::None);
+          return Space::forConstructor(
+              item->getType(), VP->getName().getBaseIdentifier(), llvm::None);
         }
 
         SmallVector<Space, 4> conArgSpace;

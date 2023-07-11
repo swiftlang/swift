@@ -422,7 +422,8 @@ public:
     : SGF(SGF), PatternMatchStmt(S),
       CompletionHandler(completionHandler) {}
 
-  llvm::Optional<SILLocation> getSubjectLocationOverride(SILLocation loc) const {
+  llvm::Optional<SILLocation>
+  getSubjectLocationOverride(SILLocation loc) const {
     if (auto *Switch = dyn_cast<SwitchStmt>(PatternMatchStmt))
       if (!Switch->isImplicit())
         return SILLocation(Switch->getSubjectExpr());
@@ -954,7 +955,7 @@ static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
   }
   return row - firstRow;
 }
-    
+
 /// Select the "necessary column", Maranget's term for the column
 /// most likely to give an optimal decision tree.
 ///
@@ -1752,7 +1753,8 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
         assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
       },
       // Failure block: branch out to the continuation block.
-      [&](llvm::Optional<ManagedValue> mv) { (*innerFailure)(loc); }, rows[0].Count);
+      [&](llvm::Optional<ManagedValue> mv) { (*innerFailure)(loc); },
+      rows[0].Count);
 }
 
 namespace {

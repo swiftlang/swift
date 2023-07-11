@@ -13,10 +13,10 @@
 #include "swift/Basic/FileSystem.h"
 
 #include "clang/Basic/FileManager.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -95,7 +95,8 @@ tryToOpenTemporaryFile(llvm::Optional<llvm::raw_fd_ostream> &openedStream,
   // Then because some tools glob for build artifacts (such as clang's own
   // GlobalModuleIndex.cpp), also append .tmp.
   llvm::SmallString<128> tempPath;
-  const llvm::StringRef outputExtension = llvm::sys::path::extension(outputPath);
+  const llvm::StringRef outputExtension =
+      llvm::sys::path::extension(outputPath);
   tempPath = outputPath.drop_back(outputExtension.size());
   tempPath += "-%%%%%%%%";
   tempPath += outputExtension;

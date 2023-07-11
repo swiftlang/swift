@@ -91,9 +91,9 @@ protected:
 
   /// Add an external dependency node to the graph. If the provided fingerprint
   /// is not \c None, it is added to the def key.
-  void addAnExternalDependency(const DependencyKey &def,
-                               const DependencyKey &use,
-                               llvm::Optional<Fingerprint> dependencyFingerprint);
+  void
+  addAnExternalDependency(const DependencyKey &def, const DependencyKey &use,
+                          llvm::Optional<Fingerprint> dependencyFingerprint);
 
   static llvm::Optional<Fingerprint>
   getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {

@@ -109,7 +109,8 @@ llvm::Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
 
 StringRef
 CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
-  llvm::Optional<unsigned> Idx = getFirstTextChunkIndex(includeLeadingPunctuation);
+  llvm::Optional<unsigned> Idx =
+      getFirstTextChunkIndex(includeLeadingPunctuation);
   if (Idx.has_value())
     return getChunks()[*Idx].getText();
   return StringRef();

@@ -36,10 +36,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Optional.h"
 
 /// In case there's a bug in the ASTScope lookup system, suggest that the user
 /// try disabling it.

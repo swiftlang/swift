@@ -544,8 +544,7 @@ void PropertyMap::unifyConcreteTypes(Term key,
 ///
 /// Used by addSuperclassProperty() and addConcreteTypeProperty().
 void PropertyMap::unifyConcreteTypes(
-    Term key,
-    llvm::Optional<Symbol> &bestProperty,
+    Term key, llvm::Optional<Symbol> &bestProperty,
     llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
     Symbol property, unsigned ruleID) {
   // Unify this rule with all other concrete type rules we've seen so far,

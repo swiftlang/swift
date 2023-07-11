@@ -96,14 +96,12 @@ static bool isInSystemModule(const DeclContext *D) {
   return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
-static FuncDecl *createFuncOrAccessor(ClangImporter::Implementation &impl,
-                                      SourceLoc funcLoc,
-                                      llvm::Optional<AccessorInfo> accessorInfo,
-                                      DeclName name, SourceLoc nameLoc,
-                                      GenericParamList *genericParams,
-                                      ParameterList *bodyParams, Type resultTy,
-                                      bool async, bool throws, DeclContext *dc,
-                                      ClangNode clangNode) {
+static FuncDecl *
+createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
+                     llvm::Optional<AccessorInfo> accessorInfo, DeclName name,
+                     SourceLoc nameLoc, GenericParamList *genericParams,
+                     ParameterList *bodyParams, Type resultTy, bool async,
+                     bool throws, DeclContext *dc, ClangNode clangNode) {
   FuncDecl *decl;
   if (accessorInfo) {
     decl = AccessorDecl::create(
@@ -1596,8 +1594,8 @@ namespace {
           return nullptr;
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
-        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
-          AccessLevel::Public, Loc, name, Loc, llvm::None, nullptr, dc);
+        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+            decl, AccessLevel::Public, Loc, name, Loc, llvm::None, nullptr, dc);
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -1645,7 +1643,8 @@ namespace {
             (errorCodeProto =
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
-          errorWrapper = new (C) StructDecl(loc, name, loc, llvm::None, nullptr, dc);
+          errorWrapper =
+              new (C) StructDecl(loc, name, loc, llvm::None, nullptr, dc);
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FrozenAttr(/*IsImplicit*/true));
@@ -1713,7 +1712,8 @@ namespace {
         // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
             decl, AccessLevel::Public, loc, enumName,
-            Impl.importSourceLoc(decl->getLocation()), llvm::None, nullptr, enumDC);
+            Impl.importSourceLoc(decl->getLocation()), llvm::None, nullptr,
+            enumDC);
         enumDecl->setHasFixedRawValues();
 
         // Annotate as 'frozen' if appropriate.
@@ -3102,11 +3102,12 @@ namespace {
       return result;
     }
 
-    ParameterList *getNonSelfParamList(
-        DeclContext *dc, const clang::FunctionDecl *decl,
-        llvm::Optional<unsigned> selfIdx, ArrayRef<Identifier> argNames,
-        bool allowNSUIntegerAsInt, bool isAccessor,
-        ArrayRef<GenericTypeParamDecl *> genericParams) {
+    ParameterList *
+    getNonSelfParamList(DeclContext *dc, const clang::FunctionDecl *decl,
+                        llvm::Optional<unsigned> selfIdx,
+                        ArrayRef<Identifier> argNames,
+                        bool allowNSUIntegerAsInt, bool isAccessor,
+                        ArrayRef<GenericTypeParamDecl *> genericParams) {
       if (bool(selfIdx)) {
         assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
                (*selfIdx < decl->getNumParams()) && "where's self?");
@@ -3127,10 +3128,10 @@ namespace {
           argNames, genericParams, /*resultType=*/nullptr);
     }
 
-    Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
-                                    DeclName name, DeclContext *dc,
-                                    CtorInitializerKind initKind,
-                                    llvm::Optional<ImportedName> correctSwiftName);
+    Decl *
+    importGlobalAsInitializer(const clang::FunctionDecl *decl, DeclName name,
+                              DeclContext *dc, CtorInitializerKind initKind,
+                              llvm::Optional<ImportedName> correctSwiftName);
 
     /// Create an implicit property given the imported name of one of
     /// the accessors.
@@ -3204,7 +3205,8 @@ namespace {
         return property->getParsedAccessor(AccessorKind::Set);
       }
 
-      return importFunctionDecl(decl, importedName, correctSwiftName, llvm::None);
+      return importFunctionDecl(decl, importedName, correctSwiftName,
+                                llvm::None);
     }
 
     Decl *importFunctionDecl(
@@ -3857,7 +3859,8 @@ namespace {
           Impl.SwiftContext, loc, genericParams, loc);
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-        decl, AccessLevel::Public, loc, name, loc, llvm::None, genericParamList, dc);
+          decl, AccessLevel::Public, loc, name, loc, llvm::None,
+          genericParamList, dc);
 
       auto attr = AvailableAttr::createPlatformAgnostic(
           Impl.SwiftContext, "Un-specialized class templates are not currently "
@@ -4037,14 +4040,15 @@ namespace {
     }
 
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
-                              DeclContext *dc,
-                              llvm::Optional<AccessorInfo> accessorInfo) {
+                               DeclContext *dc,
+                               llvm::Optional<AccessorInfo> accessorInfo) {
       return importObjCMethodDecl(decl, dc, false, accessorInfo);
     }
 
   private:
-    static bool isAcceptableResultOrNull(Decl *fn,
-                                         llvm::Optional<AccessorInfo> accessorInfo) {
+    static bool
+    isAcceptableResultOrNull(Decl *fn,
+                             llvm::Optional<AccessorInfo> accessorInfo) {
       if (nullptr == fn)
         return true;
 
@@ -4132,9 +4136,8 @@ namespace {
     }
 
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
-                              DeclContext *dc,
-                              bool forceClassMethod,
-                              llvm::Optional<AccessorInfo> accessorInfo) {
+                               DeclContext *dc, bool forceClassMethod,
+                               llvm::Optional<AccessorInfo> accessorInfo) {
       // If we have an init method, import it as an initializer.
       if (isInitMethod(decl)) {
         // Cannot import initializers as accessors.
@@ -4217,12 +4220,11 @@ namespace {
       return result;
     }
 
-    Decl *importNonInitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
-                                      DeclContext *dc,
-                                      ImportedName importedName,
-                                      ObjCSelector selector,
-                                      bool forceClassMethod,
-                                      llvm::Optional<AccessorInfo> accessorInfo) {
+    Decl *
+    importNonInitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
+                                DeclContext *dc, ImportedName importedName,
+                                ObjCSelector selector, bool forceClassMethod,
+                                llvm::Optional<AccessorInfo> accessorInfo) {
       assert(dc->isTypeContext() && "Method in non-type context?");
       assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
              "Clang method in Swift context?");
@@ -4417,8 +4419,8 @@ namespace {
           // method, do so and mark the result as an alternate
           // declaration.
           if (auto imported = importObjCMethodDecl(decl, dc,
-                                                  /*forceClassMethod=*/true,
-                                                  /*accessor*/llvm::None))
+                                                   /*forceClassMethod=*/true,
+                                                   /*accessor*/ llvm::None))
             Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
       }
@@ -4440,8 +4442,7 @@ namespace {
     /// NSArray(capacity: 1024)
     /// \endcode
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
-                                       const DeclContext *dc,
-                                       bool implicit,
+                                       const DeclContext *dc, bool implicit,
                                        llvm::Optional<CtorInitializerKind> kind,
                                        bool required);
 
@@ -4813,7 +4814,7 @@ namespace {
             auto result = Impl.createDeclWithClangNode<ProtocolDecl>(
                 decl, AccessLevel::Public,
                 Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
-                                          /*allowForwardDeclaration=*/true),
+                                           /*allowForwardDeclaration=*/true),
                 Impl.importSourceLoc(decl->getBeginLoc()),
                 Impl.importSourceLoc(decl->getLocation()), name,
                 ArrayRef<PrimaryAssociatedTypeName>(), llvm::None,
@@ -4897,12 +4898,10 @@ namespace {
                                           /*allowForwardDeclaration=*/true);
         }
 
-        auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                        AccessLevel::Public,
-                                                        SourceLoc(), name,
-                                                        SourceLoc(), llvm::None,
-                                                        nullptr, dc,
-                                                        /*isActor*/false);
+        auto result = Impl.createDeclWithClangNode<ClassDecl>(
+            decl, AccessLevel::Public, SourceLoc(), name, SourceLoc(),
+            llvm::None, nullptr, dc,
+            /*isActor*/ false);
         if (cacheResult)
           Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
@@ -5015,7 +5014,7 @@ namespace {
       auto result = Impl.createDeclWithClangNode<ClassDecl>(
           decl, access, Impl.importSourceLoc(decl->getBeginLoc()), name,
           Impl.importSourceLoc(decl->getLocation()), llvm::None, nullptr, dc,
-          /*isActor*/false);
+          /*isActor*/ false);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
@@ -5476,8 +5475,8 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   // TODO: try to find a non-mutable type to use as the superclass.
 
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
-      decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), llvm::None,
-      nullptr, dc, /*isActor*/false);
+      decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(),
+      llvm::None, nullptr, dc, /*isActor*/ false);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setHasMissingVTableEntries(false);
@@ -5949,9 +5948,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 }
 
 Decl *SwiftDeclConverter::importGlobalAsInitializer(
-    const clang::FunctionDecl *decl,
-    DeclName name,
-    DeclContext *dc,
+    const clang::FunctionDecl *decl, DeclName name, DeclContext *dc,
     CtorInitializerKind initKind,
     llvm::Optional<ImportedName> correctSwiftName) {
   // TODO: Should this be an error? How can this come up?
@@ -6026,7 +6023,6 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     markAsVariant(result, *correctSwiftName);
   return result;
 }
-
 
 /// Create an implicit property given the imported name of one of
 /// the accessors.
@@ -6244,8 +6240,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 }
 
 ConstructorDecl *SwiftDeclConverter::importConstructor(
-    const clang::ObjCMethodDecl *objcMethod, const DeclContext *dc, bool implicit,
-    llvm::Optional<CtorInitializerKind> kind, bool required) {
+    const clang::ObjCMethodDecl *objcMethod, const DeclContext *dc,
+    bool implicit, llvm::Optional<CtorInitializerKind> kind, bool required) {
   // Only methods in the 'init' family can become constructors.
   assert(isInitMethod(objcMethod) && "Not a real init method");
 
@@ -7564,8 +7560,7 @@ void SwiftDeclConverter::importInheritedConstructors(
 }
 
 llvm::Optional<Decl *> ClangImporter::Implementation::importDeclCached(
-    const clang::NamedDecl *ClangDecl,
-    ImportNameVersion version,
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
     bool UseCanonical) {
   auto Known = ImportedDecls.find(
     { UseCanonical? ClangDecl->getCanonicalDecl(): ClangDecl, version });
@@ -7697,8 +7692,8 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   if (known != ClangSwiftAttrSourceFiles.end())
     return *known->second;
 
-  auto sourceFile = new (SwiftContext) SourceFile(
-      module, SourceFileKind::Library, llvm::None);
+  auto sourceFile = new (SwiftContext)
+      SourceFile(module, SourceFileKind::Library, llvm::None);
   ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
   return *sourceFile;
 }
@@ -8013,22 +8008,22 @@ void ClangImporter::Implementation::importAttributes(
         continue;
 
       auto platformK =
-        llvm::StringSwitch<llvm::Optional<PlatformKind>>(Platform)
-          .Case("ios", PlatformKind::iOS)
-          .Case("macos", PlatformKind::macOS)
-          .Case("maccatalyst", PlatformKind::macCatalyst)
-          .Case("tvos", PlatformKind::tvOS)
-          .Case("watchos", PlatformKind::watchOS)
-          .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
-          .Case("maccatalyst_app_extension",
-                PlatformKind::macCatalystApplicationExtension)
-          .Case("macos_app_extension",
-                PlatformKind::macOSApplicationExtension)
-          .Case("tvos_app_extension",
-                PlatformKind::tvOSApplicationExtension)
-          .Case("watchos_app_extension",
-                PlatformKind::watchOSApplicationExtension)
-          .Default(llvm::None);
+          llvm::StringSwitch<llvm::Optional<PlatformKind>>(Platform)
+              .Case("ios", PlatformKind::iOS)
+              .Case("macos", PlatformKind::macOS)
+              .Case("maccatalyst", PlatformKind::macCatalyst)
+              .Case("tvos", PlatformKind::tvOS)
+              .Case("watchos", PlatformKind::watchOS)
+              .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
+              .Case("maccatalyst_app_extension",
+                    PlatformKind::macCatalystApplicationExtension)
+              .Case("macos_app_extension",
+                    PlatformKind::macOSApplicationExtension)
+              .Case("tvos_app_extension",
+                    PlatformKind::tvOSApplicationExtension)
+              .Case("watchos_app_extension",
+                    PlatformKind::watchOSApplicationExtension)
+              .Default(llvm::None);
       if (!platformK)
         continue;
 
@@ -8521,7 +8516,8 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   SwiftDeclConverter converter(*this, version);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    result = converter.importObjCMethodDecl(method, dc, /*accessor*/llvm::None);
+    result =
+        converter.importObjCMethodDecl(method, dc, /*accessor*/ llvm::None);
   } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
     result = converter.importObjCPropertyDecl(prop, dc);
   } else {
@@ -9210,7 +9206,8 @@ void ClangImporter::Implementation::loadAllConformances(
 }
 
 llvm::Optional<MappedTypeNameKind>
-ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
+ClangImporter::Implementation::getSpecialTypedefKind(
+    clang::TypedefNameDecl *decl) {
   auto iter = SpecialTypedefNames.find(decl->getCanonicalDecl());
   if (iter == SpecialTypedefNames.end())
     return llvm::None;

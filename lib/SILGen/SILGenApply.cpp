@@ -275,8 +275,8 @@ static void convertOwnershipConventionsGivenParamInfos(
   llvm::transform(indices(params), std::back_inserter(outVar),
                   [&](unsigned i) -> ManagedValue {
                     return convertOwnershipConventionGivenParamInfo(
-                        SGF, params[i], llvm::None /*orig param*/, values[i], loc,
-                        isForCoroutine);
+                        SGF, params[i], llvm::None /*orig param*/, values[i],
+                        loc, isForCoroutine);
                   });
 }
 
@@ -3239,8 +3239,9 @@ public:
         DelayedArguments(delayedArgs) {}
 
   // origParamType is a parameter type.
-  void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
-                     llvm::Optional<AnyFunctionType::Param> param = llvm::None) {
+  void
+  emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
+                llvm::Optional<AnyFunctionType::Param> param = llvm::None) {
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
     if (arg.isDelayedDefaultArg()) {
@@ -3711,9 +3712,10 @@ private:
                         origParamType, claimedParams);
   }
 
-  void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
-                  AbstractionPattern origParamType, SILParameterInfo param,
-                  llvm::Optional<AnyFunctionType::Param> origParam = llvm::None) {
+  void
+  emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
+             AbstractionPattern origParamType, SILParameterInfo param,
+             llvm::Optional<AnyFunctionType::Param> origParam = llvm::None) {
     ManagedValue value;
     auto loc = arg.getLocation();
 
@@ -4695,8 +4697,7 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitActorHopTarget(llvm::None),
-        implicitlyThrows(false) {}
+        implicitActorHopTarget(llvm::None), implicitlyThrows(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -4736,8 +4737,8 @@ public:
   /// Sets a flag that indicates whether this call be treated as being 
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
-  void setImplicitlyAsync(
-      llvm::Optional<ActorIsolation> implicitActorHopTarget) {
+  void
+  setImplicitlyAsync(llvm::Optional<ActorIsolation> implicitActorHopTarget) {
     this->implicitActorHopTarget = implicitActorHopTarget;
   }
 
@@ -5387,12 +5388,10 @@ public:
 /// result does need to be turned back into something matching a
 /// formal type.
 RValue SILGenFunction::emitApply(
-    ResultPlanPtr &&resultPlan,
-    ArgumentScope &&argScope, SILLocation loc,
-    ManagedValue fn, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args,
-    const CalleeTypeInfo &calleeTypeInfo,
-    ApplyOptions options, SGFContext evalContext,
+    ResultPlanPtr &&resultPlan, ArgumentScope &&argScope, SILLocation loc,
+    ManagedValue fn, SubstitutionMap subs, ArrayRef<ManagedValue> args,
+    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
+    SGFContext evalContext,
     llvm::Optional<ActorIsolation> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
 
@@ -6491,9 +6490,9 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     // FIXME: this assumes that there's never meaningful reabstraction of self
     // arguments.
     return ArgumentSource(
-        loc, LValue::forAddress(SGFAccessKind::ReadWrite, base, llvm::None,
-                                AbstractionPattern(baseFormalType),
-                                baseFormalType));
+        loc,
+        LValue::forAddress(SGFAccessKind::ReadWrite, base, llvm::None,
+                           AbstractionPattern(baseFormalType), baseFormalType));
   }
 
   // Otherwise, we have a value that we can forward without any additional
@@ -6694,13 +6693,9 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor,
 
 /// Emit a call to a getter.
 RValue SILGenFunction::emitGetAccessor(
-    SILLocation loc, SILDeclRef get,
-    SubstitutionMap substitutions,
-    ArgumentSource &&selfValue, bool isSuper,
-    bool isDirectUse,
-    PreparedArguments &&subscriptIndices,
-    SGFContext c,
-    bool isOnSelfParameter,
+    SILLocation loc, SILDeclRef get, SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
+    PreparedArguments &&subscriptIndices, SGFContext c, bool isOnSelfParameter,
     llvm::Optional<ActorIsolation> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
@@ -7260,9 +7255,9 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
       indexValues.push_back(std::move(rVal).getScalarValue());
     }
 
-    auto resultRV = emitMonomorphicApply(loc, result, indexValues,
-                                         foreignMethodTy.getResult(), valueTy,
-                                         ApplyOptions(), llvm::None, llvm::None);
+    auto resultRV = emitMonomorphicApply(
+        loc, result, indexValues, foreignMethodTy.getResult(), valueTy,
+        ApplyOptions(), llvm::None, llvm::None);
 
     // Package up the result in an optional.
     emitInjectOptionalValueInto(loc, {loc, std::move(resultRV)}, optTemp,

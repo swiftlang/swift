@@ -3873,7 +3873,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   if (shouldStoreClangType(representation) && !clangFnType) {
     assert(results.size() <= 1 && yields.size() == 0 &&
            "C functions and blocks have at most 1 result and 0 yields.");
-    auto result = results.empty() ? llvm::Optional<SILResultInfo>() : results[0];
+    auto result =
+        results.empty() ? llvm::Optional<SILResultInfo>() : results[0];
     clangFnType = getASTContext().getCanonicalClangFunctionType(params, result,
                                                                 representation);
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
@@ -3961,11 +3962,11 @@ SILParameterInfo TypeResolver::resolveSILParameter(
                           differentiability);
 }
 
-bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
-                                          TypeResolutionOptions options,
-                                          SmallVectorImpl<SILYieldInfo> &yields,
-                              SmallVectorImpl<SILResultInfo> &ordinaryResults,
-                                       llvm::Optional<SILResultInfo> &errorResult) {
+bool TypeResolver::resolveSingleSILResult(
+    TypeRepr *repr, TypeResolutionOptions options,
+    SmallVectorImpl<SILYieldInfo> &yields,
+    SmallVectorImpl<SILResultInfo> &ordinaryResults,
+    llvm::Optional<SILResultInfo> &errorResult) {
   Type type;
   auto convention = DefaultResultConvention;
   bool isErrorResult = false;
@@ -4063,11 +4064,11 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   return false;
 }
 
-bool TypeResolver::resolveSILResults(TypeRepr *repr,
-                                     TypeResolutionOptions options,
-                                SmallVectorImpl<SILYieldInfo> &yields,
-                                SmallVectorImpl<SILResultInfo> &ordinaryResults,
-                                llvm::Optional<SILResultInfo> &errorResult) {
+bool TypeResolver::resolveSILResults(
+    TypeRepr *repr, TypeResolutionOptions options,
+    SmallVectorImpl<SILYieldInfo> &yields,
+    SmallVectorImpl<SILResultInfo> &ordinaryResults,
+    llvm::Optional<SILResultInfo> &errorResult) {
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
     // If any of the elements have a label, or an explicit missing label (_:),
     // resolve the entire result type as a single tuple type.
@@ -4955,7 +4956,7 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   }
 
   llvm::Optional<MetatypeRepresentation> storedRepr;
-  
+
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
   // in resolveAttributedType.
@@ -4967,9 +4968,9 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   return buildMetatypeType(repr, ty, storedRepr);
 }
 
-NeverNullType
-TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
-                                llvm::Optional<MetatypeRepresentation> storedRepr) {
+NeverNullType TypeResolver::buildMetatypeType(
+    MetatypeTypeRepr *repr, Type instanceType,
+    llvm::Optional<MetatypeRepresentation> storedRepr) {
   // If the instance type is an existential metatype, figure out if
   // the syntax is of the form '(any <protocol metatype>).Type'. In
   // this case, type resolution should produce the static metatype
@@ -5013,7 +5014,7 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   }
 
   llvm::Optional<MetatypeRepresentation> storedRepr;
-  
+
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
   // in resolveAttributedType.
@@ -5025,9 +5026,9 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   return buildProtocolType(repr, ty, storedRepr);
 }
 
-NeverNullType
-TypeResolver::buildProtocolType(ProtocolTypeRepr *repr, Type instanceType,
-                                llvm::Optional<MetatypeRepresentation> storedRepr) {
+NeverNullType TypeResolver::buildProtocolType(
+    ProtocolTypeRepr *repr, Type instanceType,
+    llvm::Optional<MetatypeRepresentation> storedRepr) {
   if (!instanceType->isAnyExistentialType()) {
     diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential,
              instanceType);

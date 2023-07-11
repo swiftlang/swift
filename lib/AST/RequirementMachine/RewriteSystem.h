@@ -132,12 +132,13 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops,
-                  ArrayRef<const ProtocolDecl *> protos,
-                  std::vector<StructuralRequirement> &&writtenRequirements,
-                  std::vector<Rule> &&importedRules,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::tuple<MutableTerm, MutableTerm, llvm::Optional<unsigned>>> &&requirementRules);
+  void initialize(
+      bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+      std::vector<StructuralRequirement> &&writtenRequirements,
+      std::vector<Rule> &&importedRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+      std::vector<std::tuple<MutableTerm, MutableTerm,
+                             llvm::Optional<unsigned>>> &&requirementRules);
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
@@ -185,15 +186,17 @@ public:
   bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
                        llvm::Optional<unsigned> requirementID);
 
-  void addRules(std::vector<Rule> &&importedRules,
-                std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                std::vector<std::tuple<MutableTerm, MutableTerm, llvm::Optional<unsigned>>> &&requirementRules);
+  void addRules(
+      std::vector<Rule> &&importedRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+      std::vector<std::tuple<MutableTerm, MutableTerm,
+                             llvm::Optional<unsigned>>> &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  llvm::Optional<unsigned>
-  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
-                        RewritePath *path=nullptr);
+  llvm::Optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
+                                                 const PropertyMap *map,
+                                                 RewritePath *path = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -306,10 +309,9 @@ private:
 public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
-  bool
-  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
-                        llvm::Optional<unsigned> &lhsDifferenceID,
-                        llvm::Optional<unsigned> &rhsDifferenceID);
+  bool computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
+                             llvm::Optional<unsigned> &lhsDifferenceID,
+                             llvm::Optional<unsigned> &rhsDifferenceID);
 
   const TypeDifference &getTypeDifference(unsigned index) const;
 

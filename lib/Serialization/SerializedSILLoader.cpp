@@ -63,8 +63,9 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
   return retVal;
 }
 
-SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
-                                                    llvm::Optional<SILLinkage> Linkage) {
+SILFunction *
+SerializedSILLoader::lookupSILFunction(StringRef Name,
+                                       llvm::Optional<SILLinkage> Linkage) {
   for (auto &Des : LoadedSILSections) {
     if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
@@ -98,7 +99,6 @@ bool SerializedSILLoader::hasSILFunction(StringRef Name,
   }
   return retVal;
 }
-
 
 SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
   Mangle::ASTMangler mangler;

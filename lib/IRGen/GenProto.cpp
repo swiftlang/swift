@@ -3577,14 +3577,13 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
-  auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
-                                SILCoroutineKind::None,
-                                /*callee*/ ParameterConvention::Direct_Unowned,
-                                /*params*/ {}, /*yields*/ {},
-                                /*results*/ {}, /*error*/ llvm::None,
-                                /*pattern subs*/ SubstitutionMap(),
-                                /*invocation subs*/ SubstitutionMap(),
-                                IGM.Context);
+  auto fnType = SILFunctionType::get(
+      generics, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
+      /*callee*/ ParameterConvention::Direct_Unowned,
+      /*params*/ {}, /*yields*/ {},
+      /*results*/ {}, /*error*/ llvm::None,
+      /*pattern subs*/ SubstitutionMap(),
+      /*invocation subs*/ SubstitutionMap(), IGM.Context);
 
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);

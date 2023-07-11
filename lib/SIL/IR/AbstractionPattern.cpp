@@ -125,8 +125,8 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
 
 AbstractionPattern::EncodedForeignInfo
 AbstractionPattern::EncodedForeignInfo::encode(
-                         const llvm::Optional<ForeignErrorConvention> &foreignError,
-                         const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
+    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
   // Foreign async convention takes precedence.
   if (foreignAsync.has_value()) {
     return EncodedForeignInfo(EncodedForeignInfo::Async,
@@ -144,20 +144,18 @@ AbstractionPattern::EncodedForeignInfo::encode(
   }
 }
 
-AbstractionPattern
-AbstractionPattern::getObjCMethod(CanType origType,
-                                  const clang::ObjCMethodDecl *method,
-                         const llvm::Optional<ForeignErrorConvention> &foreignError,
-                         const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
+AbstractionPattern AbstractionPattern::getObjCMethod(
+    CanType origType, const clang::ObjCMethodDecl *method,
+    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
   auto errorInfo = EncodedForeignInfo::encode(foreignError, foreignAsync);
   return getObjCMethod(origType, method, errorInfo);
 }
 
-AbstractionPattern
-AbstractionPattern::getCurriedObjCMethod(CanType origType,
-                                         const clang::ObjCMethodDecl *method,
-                         const llvm::Optional<ForeignErrorConvention> &foreignError,
-                         const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
+AbstractionPattern AbstractionPattern::getCurriedObjCMethod(
+    CanType origType, const clang::ObjCMethodDecl *method,
+    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
   auto errorInfo = EncodedForeignInfo::encode(foreignError, foreignAsync);
   return getCurriedObjCMethod(origType, method, errorInfo);
 }
@@ -487,8 +485,10 @@ bool AbstractionPattern::doesTupleVanish() const {
 
 llvm::Optional<AbstractionPattern>
 AbstractionPattern::getVanishingTupleElementPatternType() const {
-  if (!isTuple()) return llvm::None;
-  if (!GenericSubs) return llvm::None;
+  if (!isTuple())
+    return llvm::None;
+  if (!GenericSubs)
+    return llvm::None;
 
   // Substitution causes tuples to vanish when substituting the elements
   // produces a singleton tuple and it didn't start that way.
@@ -505,7 +505,8 @@ AbstractionPattern::getVanishingTupleElementPatternType() const {
     // singleton.  If this is the second such candidate, of course, it's
     // not a singleton.
     if (!eltType.isPackExpansion()) {
-      if (singletonEltType) return llvm::None;
+      if (singletonEltType)
+        return llvm::None;
       singletonEltType = eltType;
 
     // Otherwise, check what the expansion shape expands to.
@@ -2378,7 +2379,7 @@ public:
     
     auto newResultTy = visit(func.getResult(),
                              pattern.getFunctionResultType());
-    
+
     llvm::Optional<FunctionType::ExtInfo> extInfo;
     if (func->hasExtInfo())
       extInfo = func->getExtInfo();

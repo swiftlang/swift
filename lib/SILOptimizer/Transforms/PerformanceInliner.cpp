@@ -651,7 +651,8 @@ static bool isInlineAlwaysCallSite(SILFunction *Callee, int numCallerBlocks) {
 /// It returns false if a function should not be inlined.
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
-static llvm::Optional<bool> shouldInlineGeneric(FullApplySite AI, int numCallerBlocks) {
+static llvm::Optional<bool> shouldInlineGeneric(FullApplySite AI,
+                                                int numCallerBlocks) {
   assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 

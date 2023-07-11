@@ -959,12 +959,12 @@ valueWitnessRequiresCopyability(ValueWitness index) {
 
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
-static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
-                            ValueWitness index, FixedPacking packing,
-                            CanType abstractType, SILType concreteType,
-                            const TypeInfo &concreteTI,
-                            const llvm::Optional<BoundGenericTypeCharacteristics>
-                                boundGenericCharacteristics = llvm::None) {
+static void
+addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
+                FixedPacking packing, CanType abstractType,
+                SILType concreteType, const TypeInfo &concreteTI,
+                const llvm::Optional<BoundGenericTypeCharacteristics>
+                    boundGenericCharacteristics = llvm::None) {
   auto addFunction = [&](llvm::Constant *fn) {
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
@@ -1174,11 +1174,12 @@ static llvm::StructType *getValueWitnessTableType(IRGenModule &IGM,
 }
 
 /// Collect the value witnesses for a particular type.
-static void addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
-                              FixedPacking packing, CanType abstractType,
-                              SILType concreteType, const TypeInfo &concreteTI,
-                              const llvm::Optional<BoundGenericTypeCharacteristics>
-                                  boundGenericCharacteristics = llvm::None) {
+static void
+addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
+                  FixedPacking packing, CanType abstractType,
+                  SILType concreteType, const TypeInfo &concreteTI,
+                  const llvm::Optional<BoundGenericTypeCharacteristics>
+                      boundGenericCharacteristics = llvm::None) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
                     concreteType, concreteTI, boundGenericCharacteristics);

@@ -101,7 +101,7 @@ public:
       : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
 
   static llvm::Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
-                                      SILBuilder *Builder) {
+                                            SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
       return llvm::None;

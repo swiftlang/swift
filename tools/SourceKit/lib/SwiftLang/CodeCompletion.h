@@ -106,7 +106,9 @@ public:
   bool hasCustomKind() const { return opaqueCustomKind; }
   void *getCustomKind() const { return opaqueCustomKind; }
   StringRef getDescription() const { return description; }
-  llvm::Optional<uint8_t> getModuleImportDepth() const { return moduleImportDepth; }
+  llvm::Optional<uint8_t> getModuleImportDepth() const {
+    return moduleImportDepth;
+  }
 
   /// A popularity factory in the range [-1, 1]. The higher the value, the more
   /// 'popular' this result is.  0 indicates unknown.

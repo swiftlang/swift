@@ -782,7 +782,8 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 
     // Gather all potential outer uses before rewriting any to avoid scanning
     // any basic block more than once.
-    llvm::Optional<OuterUsers> outerUsers = FindBorrowScopeUses(*this).findUses();
+    llvm::Optional<OuterUsers> outerUsers =
+        FindBorrowScopeUses(*this).findUses();
     if (!outerUsers)
       return false;
 

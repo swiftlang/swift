@@ -1780,7 +1780,7 @@ swift::dependencies::performBatchModuleScan(
             FEOpts.SerializeModuleInterfaceDependencyHashes,
             FEOpts.shouldTrackSystemDependencies(),
             RequireOSSAModules_t(instance.getSILOptions()));
-        llvm::Optional<const ModuleDependencyInfo*> rootDeps;
+        llvm::Optional<const ModuleDependencyInfo *> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's
@@ -1848,7 +1848,7 @@ swift::dependencies::performBatchModulePrescan(
             FEOpts.SerializeModuleInterfaceDependencyHashes,
             FEOpts.shouldTrackSystemDependencies(),
             RequireOSSAModules_t(instance.getSILOptions()));
-        llvm::Optional<const ModuleDependencyInfo*> rootDeps;
+        llvm::Optional<const ModuleDependencyInfo *> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's

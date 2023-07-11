@@ -1029,8 +1029,8 @@ public:
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
   llvm::Optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
-                                    Version version,
-                                    bool UseCanonicalDecl = true);
+                                          Version version,
+                                          bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
@@ -1079,7 +1079,8 @@ public:
                                    const ClassDecl *classDecl,
                                    SmallVectorImpl<Decl *> &newMembers);
   void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
-                                     DeclContext *dc, llvm::Optional<DeclBaseName> name,
+                                     DeclContext *dc,
+                                     llvm::Optional<DeclBaseName> name,
                                      SmallVectorImpl<Decl *> &members);
 
   /// Utility function for building simple generic signatures.
@@ -1294,14 +1295,14 @@ public:
   ///          indicates if the Optional is implicitly unwrapped. If
   ///          the type cannot be represented in Swift, then the type
   ///          field will be null.
-  ImportedType
-  importType(clang::QualType type, ImportTypeKind kind,
-             llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
-             bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
-             ImportTypeAttrs attrs,
-             OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-             bool resugarNSErrorPointer = true,
-             llvm::Optional<unsigned> completionHandlerErrorParamIndex = llvm::None);
+  ImportedType importType(
+      clang::QualType type, ImportTypeKind kind,
+      llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
+      bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
+      ImportTypeAttrs attrs,
+      OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
+      bool resugarNSErrorPointer = true,
+      llvm::Optional<unsigned> completionHandlerErrorParamIndex = llvm::None);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1470,17 +1471,14 @@ public:
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
-  ImportedType
-  importMethodParamsAndReturnType(const DeclContext *dc,
-                                  const clang::ObjCMethodDecl *clangDecl,
-                                  ArrayRef<const clang::ParmVarDecl *> params,
-                                  bool isVariadic,
-                                  bool isFromSystemModule,
-                                  ParameterList **bodyParams,
-                                  importer::ImportedName importedName,
-                                  llvm::Optional<ForeignAsyncConvention> &asyncConv,
-                                  llvm::Optional<ForeignErrorConvention> &errorConv,
-                                  SpecialMethodKind kind);
+  ImportedType importMethodParamsAndReturnType(
+      const DeclContext *dc, const clang::ObjCMethodDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool isFromSystemModule, ParameterList **bodyParams,
+      importer::ImportedName importedName,
+      llvm::Optional<ForeignAsyncConvention> &asyncConv,
+      llvm::Optional<ForeignErrorConvention> &errorConv,
+      SpecialMethodKind kind);
 
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.
@@ -1920,9 +1918,9 @@ static inline Type applyToFunctionType(
   return type;
 }
 
-inline llvm::Optional<const clang::EnumDecl *> findAnonymousEnumForTypedef(
-    const ASTContext &ctx,
-    const clang::TypedefType *typedefType) {
+inline llvm::Optional<const clang::EnumDecl *>
+findAnonymousEnumForTypedef(const ASTContext &ctx,
+                            const clang::TypedefType *typedefType) {
   auto *typedefDecl = typedefType->getDecl();
   auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(typedefDecl->getOwningModule());
 

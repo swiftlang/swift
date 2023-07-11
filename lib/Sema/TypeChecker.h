@@ -235,8 +235,8 @@ private:
   Kind Knd;
   llvm::Optional<RequirementFailureInfo> ReqFailureInfo;
 
-  CheckGenericArgumentsResult(Kind Knd,
-                              llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
+  CheckGenericArgumentsResult(
+      Kind Knd, llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
       : Knd(Knd), ReqFailureInfo(ReqFailureInfo) {}
 
 public:
@@ -653,7 +653,7 @@ bool typeCheckForCodeCompletion(
 ///
 /// Returns the type of the last component of the key-path.
 llvm::Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                    bool requireResultType = false);
+                                          bool requireResultType = false);
 
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
@@ -750,8 +750,8 @@ NullablePtr<Pattern> trySimplifyExprPattern(ExprPattern *EP, Type patternTy);
 /// \returns the coerced pattern, or nullptr if the coercion failed.
 Pattern *coercePatternToType(
     ContextualPattern pattern, Type type, TypeResolutionOptions options,
-    llvm::function_ref<llvm::Optional<Pattern *>(Pattern *, Type)> tryRewritePattern =
-        [](Pattern *, Type) { return llvm::None; });
+    llvm::function_ref<llvm::Optional<Pattern *>(Pattern *, Type)>
+        tryRewritePattern = [](Pattern *, Type) { return llvm::None; });
 
 bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
 
@@ -1305,7 +1305,7 @@ bool isDifferentiable(Type type, bool tangentVectorEqualsSelf, DeclContext *dc,
 /// Emits diagnostics if the given function type's parameter/result types are
 /// not compatible with the ext info. Returns whether an error was diagnosed.
 bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
-                                 llvm::Optional<FunctionTypeRepr *>repr,
+                                 llvm::Optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  llvm::Optional<TypeResolutionStage> stage);
 

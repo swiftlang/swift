@@ -651,8 +651,7 @@ private:
   /// Helper for `getAdjointBuffer`.
   AllocStackInst *createFunctionLocalAllocation(
       SILType type, SILLocation loc, bool zeroInitialize = false,
-      llvm::Optional<SILDebugVariable> varInfo = llvm::None)
-  {
+      llvm::Optional<SILDebugVariable> varInfo = llvm::None) {
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
     // allocations exist yet.

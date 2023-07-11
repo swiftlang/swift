@@ -771,7 +771,8 @@ swift::ide::NameKind SwiftLangSupport::getNameKindForUID(SourceKit::UIdent Id) {
   return swift::ide::NameKind::Swift;
 }
 
-llvm::Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
+llvm::Optional<UIdent>
+SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
   // Check special-case names first.
   switch (Attr->getKind()) {
     case DAK_IBAction: {

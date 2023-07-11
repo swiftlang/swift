@@ -415,10 +415,10 @@ const TypeDifference &RewriteSystem::getTypeDifference(unsigned index) const {
 ///
 /// See the comment at the top of TypeDifference in TypeDifference.h for a
 /// description of the actual transformations.
-bool
-RewriteSystem::computeTypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
-                                     llvm::Optional<unsigned> &lhsDifferenceID,
-                                     llvm::Optional<unsigned> &rhsDifferenceID) {
+bool RewriteSystem::computeTypeDifference(
+    Term baseTerm, Symbol lhs, Symbol rhs,
+    llvm::Optional<unsigned> &lhsDifferenceID,
+    llvm::Optional<unsigned> &rhsDifferenceID) {
   assert(lhs.getKind() == rhs.getKind());
 
   lhsDifferenceID = llvm::None;

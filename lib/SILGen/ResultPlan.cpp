@@ -428,9 +428,8 @@ class PackExpansionResultPlan : public ResultPlan {
   SmallVector<ResultPlanPtr, 4> ComponentPlans;
 
 public:
-  PackExpansionResultPlan(ResultPlanBuilder &builder,
-                          SILValue packAddr,
-                          llvm::Optional<ArrayRef<Initialization*>> inits,
+  PackExpansionResultPlan(ResultPlanBuilder &builder, SILValue packAddr,
+                          llvm::Optional<ArrayRef<Initialization *>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
@@ -601,8 +600,8 @@ public:
         origEltPlans.push_back(
           builder.build(nullptr, origEltType, substEltTypes[0]));
       } else {
-        origEltPlans.push_back(
-          builder.buildForPackExpansion(llvm::None, origEltType, substEltTypes));
+        origEltPlans.push_back(builder.buildForPackExpansion(
+            llvm::None, origEltType, substEltTypes));
       }
     });
   }
@@ -1199,10 +1198,9 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
       calleeTypeInfo.getOverrideRep()));
 }
 
-ResultPlanPtr ResultPlanBuilder::
-    buildForPackExpansion(llvm::Optional<ArrayRef<Initialization*>> inits,
-                          AbstractionPattern origExpansionType,
-                          CanTupleEltTypeArrayRef substTypes) {
+ResultPlanPtr ResultPlanBuilder::buildForPackExpansion(
+    llvm::Optional<ArrayRef<Initialization *>> inits,
+    AbstractionPattern origExpansionType, CanTupleEltTypeArrayRef substTypes) {
   assert(!inits || inits->size() == substTypes.size());
 
   // Pack expansions in the original result type always turn into

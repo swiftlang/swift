@@ -614,7 +614,7 @@ class Classification {
 
   ConditionalEffectKind AsyncKind = ConditionalEffectKind::None;
   llvm::Optional<PotentialEffectReason> AsyncReason;
-  
+
   void print(raw_ostream &out) const {
     out << "{ IsInvalid = " << IsInvalid
         << ", ThrowKind = ";
@@ -729,8 +729,10 @@ public:
 class ApplyClassifier {
   /// The key to this cache is a local function decl or closure. The value
   /// is None when an error detected was detected.
-  llvm::DenseMap<AnyFunctionRef, llvm::Optional<ConditionalEffectKind>> ThrowsCache;
-  llvm::DenseMap<AnyFunctionRef, llvm::Optional<ConditionalEffectKind>> AsyncCache;
+  llvm::DenseMap<AnyFunctionRef, llvm::Optional<ConditionalEffectKind>>
+      ThrowsCache;
+  llvm::DenseMap<AnyFunctionRef, llvm::Optional<ConditionalEffectKind>>
+      AsyncCache;
 
 public:
   DeclContext *RethrowsDC = nullptr;
@@ -1198,8 +1200,8 @@ private:
   };
 
   llvm::Optional<ConditionalEffectKind>
-  classifyFunctionBodyImpl(AnyFunctionRef key, BraceStmt *body,
-                           bool allowNone, EffectKind kind) {
+  classifyFunctionBodyImpl(AnyFunctionRef key, BraceStmt *body, bool allowNone,
+                           EffectKind kind) {
     auto &Cache = (kind == EffectKind::Throws
                    ? ThrowsCache
                    : AsyncCache);
@@ -1434,8 +1436,8 @@ private:
 
   explicit Context(bool handlesErrors, bool handlesAsync,
                    llvm::Optional<AnyFunctionRef> function)
-    : TheKind(Kind::PotentiallyHandled), Function(function),
-      HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) { }
+      : TheKind(Kind::PotentiallyHandled), Function(function),
+        HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) {}
 
 public:
   bool shouldDiagnoseErrorOnTry() const {
@@ -1900,8 +1902,9 @@ public:
   }
   /// I did not want to add 'await' as a PotentialEffectReason, since it's
   /// not actually an effect. So, we have this odd boolean hanging around.
-  unsigned effectReasonToIndex(llvm::Optional<PotentialEffectReason> maybeReason,
-                               bool forAwait = false) {
+  unsigned
+  effectReasonToIndex(llvm::Optional<PotentialEffectReason> maybeReason,
+                      bool forAwait = false) {
     // while not actually an effect, in some instances we diagnose the
     // appearance of an await within a non-async context.
     if (forAwait)
@@ -1969,9 +1972,10 @@ public:
   }
 
   /// providing a \c kind helps tailor the emitted message.
-  void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
-                                  llvm::Optional<PotentialEffectReason> maybeReason,
-                                  bool forAwait = false) {
+  void
+  diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
+                             llvm::Optional<PotentialEffectReason> maybeReason,
+                             bool forAwait = false) {
     if (node.isImplicit())
       return;
 
@@ -2150,12 +2154,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   public:
     ContextScope(CheckEffectsCoverage &self, llvm::Optional<Context> newContext)
-      : Self(self), OldContext(self.CurContext),
-        OldRethrowsDC(self.RethrowsDC),
-        OldReasyncDC(self.ReasyncDC),
-        OldFlags(self.Flags),
-        OldMaxThrowingKind(self.MaxThrowingKind),
-        OldAwaitLoc(self.CurContext.awaitLoc) {
+        : Self(self), OldContext(self.CurContext),
+          OldRethrowsDC(self.RethrowsDC), OldReasyncDC(self.ReasyncDC),
+          OldFlags(self.Flags), OldMaxThrowingKind(self.MaxThrowingKind),
+          OldAwaitLoc(self.CurContext.awaitLoc) {
       if (newContext) self.CurContext = *newContext;
     }
 
@@ -2737,7 +2739,7 @@ private:
         diagnoseRedundantAwait(E);
       } else {
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, llvm::None,
-                                              /*forAwait=*/ true);
+                                              /*forAwait=*/true);
       }
     }
 

@@ -19,8 +19,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {

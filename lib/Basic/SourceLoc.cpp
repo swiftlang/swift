@@ -399,9 +399,8 @@ bool SourceManager::hasGeneratedSourceInfo(unsigned bufferID) {
   return GeneratedSourceInfos.count(bufferID);
 }
 
-llvm::Optional<GeneratedSourceInfo> SourceManager::getGeneratedSourceInfo(
-    unsigned bufferID
-) const {
+llvm::Optional<GeneratedSourceInfo>
+SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   auto known = GeneratedSourceInfos.find(bufferID);
   if (known == GeneratedSourceInfos.end())
     return llvm::None;

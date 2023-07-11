@@ -286,9 +286,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   if (res != Status::Valid) return res;
 
   if (Core->Bits.HasEntryPoint) {
-    FileContext->getParentModule()->registerEntryPointFile(FileContext,
-                                                           SourceLoc(),
-                                                           llvm::None);
+    FileContext->getParentModule()->registerEntryPointFile(
+        FileContext, SourceLoc(), llvm::None);
   }
 
   return status;
@@ -561,7 +560,8 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
               SourceLoc(), NL_QualifiedDefault, Decls);
-          llvm::Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
+          llvm::Optional<ImportKind> FoundKind =
+              ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.has_value() &&
                  "deserialized imports should not be ambiguous");
           Kind = *FoundKind;
@@ -1264,7 +1264,6 @@ llvm::Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
   return getGroupNameById(Triple.value().Group);
 }
 
-
 llvm::Optional<StringRef>
 ModuleFile::getSourceFileNameForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
@@ -1326,8 +1325,7 @@ ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   return cachePtr->Info;
 }
 
-llvm::Optional<StringRef>
-ModuleFile::getGroupNameByUSR(StringRef USR) const {
+llvm::Optional<StringRef> ModuleFile::getGroupNameByUSR(StringRef USR) const {
   if (auto Comment = getCommentForDeclByUSR(USR)) {
     return getGroupNameById(Comment.value().Group);
   }

@@ -975,10 +975,10 @@ private:
     return true;
   }
 
-  Type getForeignResultType(AbstractFunctionDecl *AFD,
-                            AnyFunctionType *methodTy,
-                            llvm::Optional<ForeignAsyncConvention> asyncConvention,
-                            llvm::Optional<ForeignErrorConvention> errorConvention) {
+  Type
+  getForeignResultType(AbstractFunctionDecl *AFD, AnyFunctionType *methodTy,
+                       llvm::Optional<ForeignAsyncConvention> asyncConvention,
+                       llvm::Optional<ForeignErrorConvention> errorConvention) {
     // A foreign error convention can affect the result type as seen in
     // Objective-C.
     if (errorConvention) {
@@ -1402,10 +1402,10 @@ private:
   // Print out the function signature for a @_cdecl function.
   void printAbstractFunctionAsCFunction(FuncDecl *FD) {
     printDocumentationComment(FD);
-    llvm::Optional<ForeignAsyncConvention> asyncConvention
-      = FD->getForeignAsyncConvention();
-    llvm::Optional<ForeignErrorConvention> errorConvention
-      = FD->getForeignErrorConvention();
+    llvm::Optional<ForeignAsyncConvention> asyncConvention =
+        FD->getForeignAsyncConvention();
+    llvm::Optional<ForeignErrorConvention> errorConvention =
+        FD->getForeignErrorConvention();
     assert(!FD->getGenericSignature() &&
            "top-level generic functions not supported here");
     auto funcTy = FD->getInterfaceType()->castTo<FunctionType>();
@@ -1492,7 +1492,8 @@ private:
   // Print out the extern C Swift ABI function signature.
   llvm::Optional<FunctionSwiftABIInformation>
   printSwiftABIFunctionSignatureAsCxxFunction(
-      AbstractFunctionDecl *FD, llvm::Optional<FunctionType *> givenFuncType = llvm::None,
+      AbstractFunctionDecl *FD,
+      llvm::Optional<FunctionType *> givenFuncType = llvm::None,
       llvm::Optional<NominalTypeDecl *> selfTypeDeclContext = llvm::None) {
     assert(outputLang == OutputLanguageMode::Cxx);
     llvm::Optional<ForeignAsyncConvention> asyncConvention =
@@ -2254,7 +2255,8 @@ private:
     os << " */";
   }
 
-  void visitErrorType(ErrorType *Ty, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitErrorType(ErrorType *Ty,
+                      llvm::Optional<OptionalTypeKind> optionalKind) {
     os << "/* error */id";
   }
 
@@ -2303,7 +2305,7 @@ private:
   }
 
   void visitTypeAliasType(TypeAliasType *aliasTy,
-                               llvm::Optional<OptionalTypeKind> optionalKind) {
+                          llvm::Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     auto genericArgs = aliasTy->getDirectGenericArgs();
 
@@ -2389,8 +2391,9 @@ private:
 
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
-  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
-                                 llvm::Optional<OptionalTypeKind> optionalKind) {
+  bool
+  printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+                            llvm::Optional<OptionalTypeKind> optionalKind) {
     auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
 
     if (bgsTy->isUnmanaged()) {
@@ -2423,8 +2426,9 @@ private:
     return true;
   }
 
-  void visitBoundGenericStructType(BoundGenericStructType *BGT,
-                                   llvm::Optional<OptionalTypeKind> optionalKind) {
+  void
+  visitBoundGenericStructType(BoundGenericStructType *BGT,
+                              llvm::Optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
                               optionalKind))
@@ -2442,14 +2446,15 @@ private:
 
   void printGenericArgs(ArrayRef<Type> genericArgs) {
     os << '<';
-    interleave(genericArgs,
-               [this](Type t) { print(t, llvm::None); },
-               [this] { os << ", "; });
+    interleave(
+        genericArgs, [this](Type t) { print(t, llvm::None); },
+        [this] { os << ", "; });
     os << '>';
   }
 
-  void visitBoundGenericClassType(BoundGenericClassType *BGT,
-                                  llvm::Optional<OptionalTypeKind> optionalKind) {
+  void
+  visitBoundGenericClassType(BoundGenericClassType *BGT,
+                             llvm::Optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
     auto CD = BGT->getClassOrBoundGenericClass();
     if (!CD->isObjC())
@@ -2484,7 +2489,8 @@ private:
       visitType(BGT, optionalKind);
   }
 
-  void visitEnumType(EnumType *ET, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitEnumType(EnumType *ET,
+                     llvm::Optional<OptionalTypeKind> optionalKind) {
     const EnumDecl *ED = ET->getDecl();
 
     // Handle bridged types.
@@ -2495,7 +2501,8 @@ private:
     os << getNameForObjC(ED);
   }
 
-  void visitClassType(ClassType *CT, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitClassType(ClassType *CT,
+                      llvm::Optional<OptionalTypeKind> optionalKind) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
     assert(CD->isObjC());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
@@ -2555,8 +2562,9 @@ private:
     visitExistentialType(PT, optionalKind, /*isMetatype=*/false);
   }
 
-  void visitProtocolCompositionType(ProtocolCompositionType *PCT,
-                                    llvm::Optional<OptionalTypeKind> optionalKind) {
+  void
+  visitProtocolCompositionType(ProtocolCompositionType *PCT,
+                               llvm::Optional<OptionalTypeKind> optionalKind) {
     visitExistentialType(PCT, optionalKind, /*isMetatype=*/false);
   }
 
@@ -2565,8 +2573,9 @@ private:
     visitPart(ET->getConstraintType(), optionalKind);
   }
 
-  void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
-                                    llvm::Optional<OptionalTypeKind> optionalKind) {
+  void
+  visitExistentialMetatypeType(ExistentialMetatypeType *MT,
+                               llvm::Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
     visitExistentialType(instanceTy, optionalKind, /*isMetatype=*/true);
   }
@@ -2584,8 +2593,9 @@ private:
     }
   }
 
-  void visitGenericTypeParamType(GenericTypeParamType *type,
-                                 llvm::Optional<OptionalTypeKind> optionalKind) {
+  void
+  visitGenericTypeParamType(GenericTypeParamType *type,
+                            llvm::Optional<OptionalTypeKind> optionalKind) {
     const GenericTypeParamDecl *decl = type->getDecl();
     assert(decl && "can't print canonicalized GenericTypeParamType");
 
@@ -2670,25 +2680,30 @@ private:
     os << ")";
   }
 
-  void visitTupleType(TupleType *TT, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitTupleType(TupleType *TT,
+                      llvm::Optional<OptionalTypeKind> optionalKind) {
     assert(TT->getNumElements() == 0);
     os << "void";
   }
 
-  void visitPackType(PackType *PT, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitPackType(PackType *PT,
+                     llvm::Optional<OptionalTypeKind> optionalKind) {
     assert(PT->getNumElements() == 0);
     os << "void";
   }
 
-  void visitPackExpansionType(PackExpansionType *PET, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitPackExpansionType(PackExpansionType *PET,
+                              llvm::Optional<OptionalTypeKind> optionalKind) {
     os << "void";
   }
 
-  void visitPackElementType(PackElementType *PET, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitPackElementType(PackElementType *PET,
+                            llvm::Optional<OptionalTypeKind> optionalKind) {
     llvm_unreachable("Not implemented");
   }
 
-  void visitParenType(ParenType *PT, llvm::Optional<OptionalTypeKind> optionalKind) {
+  void visitParenType(ParenType *PT,
+                      llvm::Optional<OptionalTypeKind> optionalKind) {
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
@@ -2703,8 +2718,9 @@ private:
     os << "instancetype";
   }
 
-  void visitReferenceStorageType(ReferenceStorageType *RST,
-                                 llvm::Optional<OptionalTypeKind> optionalKind) {
+  void
+  visitReferenceStorageType(ReferenceStorageType *RST,
+                            llvm::Optional<OptionalTypeKind> optionalKind) {
     visitPart(RST->getReferentType(), optionalKind);
   }
 

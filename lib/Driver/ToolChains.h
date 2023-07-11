@@ -80,7 +80,7 @@ protected:
   
   /// Retrieve the target SDK version for the given target triple.
   llvm::Optional<llvm::VersionTuple>
-  getTargetSDKVersion(const llvm::Triple &triple) const ;
+  getTargetSDKVersion(const llvm::Triple &triple) const;
 
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated
@@ -91,8 +91,8 @@ protected:
 
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple,
-         const llvm::Optional<llvm::Triple> &TargetVariant) :
-      ToolChain(D, Triple), TargetVariant(TargetVariant) {}
+         const llvm::Optional<llvm::Triple> &TargetVariant)
+      : ToolChain(D, Triple), TargetVariant(TargetVariant) {}
 
   ~Darwin() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,

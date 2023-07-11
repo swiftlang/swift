@@ -2010,7 +2010,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
   }
 }
 
-static AccessorDecl *getAsCoroutineAccessor(llvm::Optional<SILDeclRef> constant) {
+static AccessorDecl *
+getAsCoroutineAccessor(llvm::Optional<SILDeclRef> constant) {
   if (!constant || !constant->hasDecl())
     return nullptr;;
 
@@ -2121,7 +2122,8 @@ static CanSILFunctionType getSILFunctionType(
     AbstractionPattern origType, CanAnyFunctionType substFnInterfaceType,
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
     const ForeignInfo &foreignInfo, llvm::Optional<SILDeclRef> origConstant,
-    llvm::Optional<SILDeclRef> constant, llvm::Optional<SubstitutionMap> reqtSubs,
+    llvm::Optional<SILDeclRef> constant,
+    llvm::Optional<SubstitutionMap> reqtSubs,
     ProtocolConformanceRef witnessMethodConformance) {
   // Find the generic parameters.
   CanGenericSignature genericSig =
@@ -2654,7 +2656,8 @@ static CanSILFunctionType getNativeSILFunctionType(
     TypeConverter &TC, TypeExpansionContext context,
     AbstractionPattern origType, CanAnyFunctionType substInterfaceType,
     SILExtInfoBuilder extInfoBuilder, llvm::Optional<SILDeclRef> origConstant,
-    llvm::Optional<SILDeclRef> constant, llvm::Optional<SubstitutionMap> reqtSubs,
+    llvm::Optional<SILDeclRef> constant,
+    llvm::Optional<SubstitutionMap> reqtSubs,
     ProtocolConformanceRef witnessMethodConformance) {
   assert(bool(origConstant) == bool(constant));
   auto getSILFunctionTypeForConventions =
@@ -2730,7 +2733,8 @@ CanSILFunctionType swift::getNativeSILFunctionType(
     TypeConverter &TC, TypeExpansionContext context,
     AbstractionPattern origType, CanAnyFunctionType substType,
     SILExtInfo silExtInfo, llvm::Optional<SILDeclRef> origConstant,
-    llvm::Optional<SILDeclRef> substConstant, llvm::Optional<SubstitutionMap> reqtSubs,
+    llvm::Optional<SILDeclRef> substConstant,
+    llvm::Optional<SubstitutionMap> reqtSubs,
     ProtocolConformanceRef witnessMethodConformance) {
 
   return ::getNativeSILFunctionType(
@@ -2978,14 +2982,10 @@ buildThunkSignature(SILFunction *fn,
 
 /// Build the type of a function transformation thunk.
 CanSILFunctionType swift::buildSILFunctionThunkType(
-    SILFunction *fn,
-    CanSILFunctionType &sourceType,
-    CanSILFunctionType &expectedType,
-    CanType &inputSubstType,
-    CanType &outputSubstType,
-    GenericEnvironment *&genericEnv,
-    SubstitutionMap &interfaceSubs,
-    CanType &dynamicSelfType,
+    SILFunction *fn, CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType, CanType &inputSubstType,
+    CanType &outputSubstType, GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs, CanType &dynamicSelfType,
     bool withoutActuallyEscaping,
     llvm::Optional<DifferentiationThunkKind> differentiationThunkKind) {
   // We shouldn't be thunking generic types here, and substituted function types
@@ -3173,7 +3173,6 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
       interfaceResults, interfaceErrorResult,
       expectedType->getPatternSubstitutions(), SubstitutionMap(),
       fn->getASTContext());
-
 }
 
 //===----------------------------------------------------------------------===//
@@ -3624,10 +3623,10 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
       bool isMutating =
           TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
       auto conventions = CXXMethodConventions(method, isMutating);
-      return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
-                                substInterfaceType, extInfoBuilder, conventions,
-                                foreignInfo, constant, constant, llvm::None,
-                                ProtocolConformanceRef());
+      return getSILFunctionType(TC, TypeExpansionContext::minimal(),
+                                origPattern, substInterfaceType, extInfoBuilder,
+                                conventions, foreignInfo, constant, constant,
+                                llvm::None, ProtocolConformanceRef());
     }
   }
 

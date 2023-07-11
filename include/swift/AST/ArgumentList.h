@@ -20,8 +20,8 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -221,8 +221,9 @@ public:
   /// \param arena The arena to allocate the ArgumentList in.
   static ArgumentList *
   create(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-         SourceLoc rParenLoc, llvm::Optional<unsigned> firstTrailingClosureIndex,
-         bool isImplicit, ArgumentList *originalArgs = nullptr,
+         SourceLoc rParenLoc,
+         llvm::Optional<unsigned> firstTrailingClosureIndex, bool isImplicit,
+         ArgumentList *originalArgs = nullptr,
          AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new explicit parsed ArgumentList.
@@ -255,17 +256,17 @@ public:
   /// \param rParenLoc The location of the closing ')'. Note that for a
   /// subscript argument list, this will be for the closing ']'.
   /// \param arena The arena to allocate the ArgumentList in.
-  static ArgumentList *
-  createImplicit(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-                 SourceLoc rParenLoc,
-                 llvm::Optional<unsigned> firstTrailingClosureIndex = llvm::None,
-                 AllocationArena arena = AllocationArena::Permanent);
+  static ArgumentList *createImplicit(
+      ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
+      SourceLoc rParenLoc,
+      llvm::Optional<unsigned> firstTrailingClosureIndex = llvm::None,
+      AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a set of \p args.
-  static ArgumentList *
-  createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
-                 llvm::Optional<unsigned> firstTrailingClosureIndex = llvm::None,
-                 AllocationArena arena = AllocationArena::Permanent);
+  static ArgumentList *createImplicit(
+      ASTContext &ctx, ArrayRef<Argument> args,
+      llvm::Optional<unsigned> firstTrailingClosureIndex = llvm::None,
+      AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a single labeled argument
   /// expression.
@@ -527,7 +528,7 @@ public:
   /// will match against semantic sub-expressions, but that may be disabled by
   /// passing \c false for \c allowSemantic.
   llvm::Optional<unsigned> findArgumentExpr(Expr *expr,
-                                      bool allowSemantic = true) const;
+                                            bool allowSemantic = true) const;
 
   /// Creates a TupleExpr or ParenExpr that holds the argument exprs. A
   /// ParenExpr will be returned for a single argument, otherwise a TupleExpr.

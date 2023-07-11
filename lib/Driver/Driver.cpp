@@ -779,9 +779,7 @@ getDriverBatchSeed(llvm::opt::InputArgList &ArgList,
 }
 
 static llvm::Optional<unsigned>
-getDriverBatchCount(llvm::opt::InputArgList &ArgList,
-                    DiagnosticEngine &Diags)
-{
+getDriverBatchCount(llvm::opt::InputArgList &ArgList, DiagnosticEngine &Diags) {
   if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_count)) {
     unsigned Count = 0;
     if (StringRef(A->getValue()).getAsInteger(10, Count)) {
@@ -879,8 +877,7 @@ computeContinueBuildingAfterErrors(const bool BatchMode,
 
 static llvm::Optional<unsigned>
 getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
-                        DiagnosticEngine &Diags)
-{
+                        DiagnosticEngine &Diags) {
   if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_size_limit)) {
     unsigned Limit = 0;
     if (StringRef(A->getValue()).getAsInteger(10, Limit)) {
@@ -952,8 +949,8 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  llvm::Optional<OutputFileMap> OFM = buildOutputFileMap(
-      *TranslatedArgList, workingDirectory);
+  llvm::Optional<OutputFileMap> OFM =
+      buildOutputFileMap(*TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1030,7 +1027,7 @@ Driver::buildCompilation(const ToolChain &TC,
     const llvm::Optional<unsigned> DriverBatchCount =
         getDriverBatchCount(*ArgList, Diags);
     const llvm::Optional<unsigned> DriverBatchSizeLimit =
-      getDriverBatchSizeLimit(*ArgList, Diags);
+        getDriverBatchSizeLimit(*ArgList, Diags);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
     const bool ShowDriverTimeCompilation =
         ArgList->hasArg(options::OPT_driver_time_compilation);
@@ -1834,7 +1831,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   if (TC.getTriple().isOSWindows()) {
     if (const Arg *A = Args.getLastArg(options::OPT_libc)) {
       OI.RuntimeVariant =
-          llvm::StringSwitch<llvm::Optional<OutputInfo::MSVCRuntime>>(A->getValue())
+          llvm::StringSwitch<llvm::Optional<OutputInfo::MSVCRuntime>>(
+              A->getValue())
               .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
                      OutputInfo::MSVCRuntime::MultiThreadedDLL)
               .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
@@ -3220,13 +3218,11 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C,
   }
 }
 
-static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
-                                                const TypeToPathMap *OutputMap,
-                                                StringRef workingDirectory,
-                                                CommandOutput *Output,
-                                                file_types::ID fileID,
-                                                bool shouldUseProjectFolder = false,
-                                                llvm::Optional<options::ID> optId = llvm::None) {
+static void chooseModuleAuxiliaryOutputFilePath(
+    Compilation &C, const TypeToPathMap *OutputMap, StringRef workingDirectory,
+    CommandOutput *Output, file_types::ID fileID,
+    bool shouldUseProjectFolder = false,
+    llvm::Optional<options::ID> optId = llvm::None) {
   if (hasExistingAdditionalOutput(*Output, fileID))
     return;
   // Honor driver option for this path if it's given

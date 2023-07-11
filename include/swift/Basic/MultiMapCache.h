@@ -31,11 +31,11 @@ namespace swift {
 ///
 /// For an example of a subclass implementation see:
 /// unittests/Basic/MultiMapCacheTest.cpp.
-template <typename KeyTy, typename ValueTy,
-          typename MapTy =
-              llvm::DenseMap<KeyTy, llvm::Optional<std::tuple<unsigned, unsigned>>>,
-          typename VectorTy = std::vector<ValueTy>,
-          typename VectorTyImpl = VectorTy>
+template <
+    typename KeyTy, typename ValueTy,
+    typename MapTy =
+        llvm::DenseMap<KeyTy, llvm::Optional<std::tuple<unsigned, unsigned>>>,
+    typename VectorTy = std::vector<ValueTy>, typename VectorTyImpl = VectorTy>
 class MultiMapCache {
   std::function<bool(const KeyTy &, VectorTyImpl &)> function;
   MapTy valueToDataOffsetIndexMap;
@@ -91,10 +91,11 @@ public:
 };
 
 template <typename KeyTy, typename ValueTy>
-using SmallMultiMapCache = MultiMapCache<
-    KeyTy, ValueTy,
-    llvm::SmallDenseMap<KeyTy, llvm::Optional<std::tuple<unsigned, unsigned>>, 8>,
-    SmallVector<ValueTy, 32>, SmallVectorImpl<ValueTy>>;
+using SmallMultiMapCache =
+    MultiMapCache<KeyTy, ValueTy,
+                  llvm::SmallDenseMap<
+                      KeyTy, llvm::Optional<std::tuple<unsigned, unsigned>>, 8>,
+                  SmallVector<ValueTy, 32>, SmallVectorImpl<ValueTy>>;
 
 } // namespace swift
 

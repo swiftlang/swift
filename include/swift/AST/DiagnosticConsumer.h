@@ -21,9 +21,9 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/Support/SourceMgr.h"
 
 namespace swift {
   class DiagnosticArgument;

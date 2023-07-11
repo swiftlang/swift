@@ -792,7 +792,7 @@ void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
                           attr->getAttrName());
 }
 
-static llvm::Optional<Diag<bool,Type>>
+static llvm::Optional<Diag<bool, Type>>
 isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
   if (type->isObjCExistentialType() || type->isAny())
     return llvm::None; // @objc existential types are okay
@@ -832,7 +832,6 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
   // No other types are permitted.
   return diag::iboutlet_nonobject_type;
 }
-
 
 void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
@@ -2573,7 +2572,8 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   }
 
   auto where = ExportContext::forDeclSignature(D);
-  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, llvm::None);
+  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
+                           llvm::None);
 
   if (mainFunction->hasAsync() &&
       context.LangOpts.isConcurrencyModelTaskToThread() &&
@@ -3308,14 +3308,13 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::resolveContextualType(
-        typeEraserRepr, PD, llvm::None,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
+    return TypeResolution::resolveContextualType(typeEraserRepr, PD, llvm::None,
+                                                 // Unbound generics and
+                                                 // placeholders are not allowed
+                                                 // within this attribute.
+                                                 /*unboundTyOpener*/ nullptr,
+                                                 /*placeholderHandler*/ nullptr,
+                                                 /*packElementOpener*/ nullptr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -4969,8 +4968,9 @@ enum class AbstractFunctionDeclLookupErrorKind {
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
-    const llvm::function_ref<llvm::Optional<AbstractFunctionDeclLookupErrorKind>(
-        AbstractFunctionDecl *)> &isValidCandidate,
+    const llvm::function_ref<
+        llvm::Optional<AbstractFunctionDeclLookupErrorKind>(
+            AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
   assert(lookupContext);
   auto &ctx = lookupContext->getASTContext();

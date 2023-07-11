@@ -845,7 +845,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     auto result = makeParserResult(
       YieldStmt::create(Context, yieldLoc, SourceLoc(), cce, SourceLoc()));
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeYieldStmt(cce, /*index=*/ llvm::None);
+      CodeCompletionCallbacks->completeYieldStmt(cce, /*index=*/llvm::None);
     }
     result.setHasCodeCompletionAndIsError();
     consumeToken();
@@ -2232,11 +2232,11 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
   }
 
   return makeParserResult(
-      status, CaseStmt::create(Context, CaseParentKind::DoCatch, catchLoc,
-                               caseLabelItems,
-                               /*UnknownAttrLoc*/ SourceLoc(),
-                               bodyResult.get()->getStartLoc(),
-                               bodyResult.get(), caseBodyDecls, llvm::None, nullptr));
+      status,
+      CaseStmt::create(
+          Context, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
+          /*UnknownAttrLoc*/ SourceLoc(), bodyResult.get()->getStartLoc(),
+          bodyResult.get(), caseBodyDecls, llvm::None, nullptr));
 }
 
 static bool isStmtForCStyle(Parser &P) {
@@ -2743,8 +2743,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   return makeParserResult(
       Status,
       CaseStmt::create(Context, CaseParentKind::Switch, CaseLoc, CaseLabelItems,
-                       UnknownAttrLoc, ColonLoc, Body, CaseBodyDecls, llvm::None,
-                       FallthroughFinder::findFallthrough(Body)));
+                       UnknownAttrLoc, ColonLoc, Body, CaseBodyDecls,
+                       llvm::None, FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:

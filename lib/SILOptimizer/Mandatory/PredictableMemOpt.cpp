@@ -1546,19 +1546,20 @@ void AvailableValueDataflowContext::updateAvailableValues(
   if (auto *LI = dyn_cast<LoadInst>(Inst)) {
     // First see if this is a load inst that we are tracking.
     if (LoadTakeUses.count(LI)) {
-      updateAvailableValuesHelper(TheMemory, LI, LI->getOperand(), RequiredElts,
-                                  Result, ConflictingValues,
-                                  /*default*/
-                                  [](unsigned) -> llvm::Optional<AvailableValue> {
-                                    // We never initialize values. We only
-                                    // want to invalidate.
-                                    return llvm::None;
-                                  },
-                                  /*isSafe*/
-                                  [](AvailableValue &, unsigned) -> bool {
-                                    // Always assume values conflict.
-                                    return false;
-                                  });
+      updateAvailableValuesHelper(
+          TheMemory, LI, LI->getOperand(), RequiredElts, Result,
+          ConflictingValues,
+          /*default*/
+          [](unsigned) -> llvm::Optional<AvailableValue> {
+            // We never initialize values. We only
+            // want to invalidate.
+            return llvm::None;
+          },
+          /*isSafe*/
+          [](AvailableValue &, unsigned) -> bool {
+            // Always assume values conflict.
+            return false;
+          });
       return;
     }
   }
@@ -1596,19 +1597,20 @@ void AvailableValueDataflowContext::updateAvailableValues(
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
     // If we have a load take use, we must be tracking a store of CAI.
     if (LoadTakeUses.count(CAI)) {
-      updateAvailableValuesHelper(TheMemory, CAI, CAI->getSrc(), RequiredElts,
-                                  Result, ConflictingValues,
-                                  /*default*/
-                                  [](unsigned) -> llvm::Optional<AvailableValue> {
-                                    // We never give values default initialized
-                                    // values. We only want to invalidate.
-                                    return llvm::None;
-                                  },
-                                  /*isSafe*/
-                                  [](AvailableValue &, unsigned) -> bool {
-                                    // Always assume values conflict.
-                                    return false;
-                                  });
+      updateAvailableValuesHelper(
+          TheMemory, CAI, CAI->getSrc(), RequiredElts, Result,
+          ConflictingValues,
+          /*default*/
+          [](unsigned) -> llvm::Optional<AvailableValue> {
+            // We never give values default initialized
+            // values. We only want to invalidate.
+            return llvm::None;
+          },
+          /*isSafe*/
+          [](AvailableValue &, unsigned) -> bool {
+            // Always assume values conflict.
+            return false;
+          });
       return;
     }
 
@@ -1990,7 +1992,8 @@ private:
 
 } // end anonymous namespace
 
-llvm::Optional<std::pair<SILType, unsigned>> AllocOptimize::computeAvailableValues(
+llvm::Optional<std::pair<SILType, unsigned>>
+AllocOptimize::computeAvailableValues(
     SILValue SrcAddr, SILInstruction *Inst,
     SmallVectorImpl<AvailableValue> &AvailableValues) {
   // If the box has escaped at this instruction, we can't safely promote the

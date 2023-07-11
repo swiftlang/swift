@@ -102,9 +102,14 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
   checkComments();
 
   // handle any unresolved locs past the end of the last AST node or comment
-  std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(), {
-    ASTWalker::ParentTy(), CharSourceRange(), {}, llvm::None, LabelRangeType::None,
-    /*isActice*/true, /*isInSelector*/false});
+  std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(),
+                                     {ASTWalker::ParentTy(),
+                                      CharSourceRange(),
+                                      {},
+                                      llvm::None,
+                                      LabelRangeType::None,
+                                      /*isActice*/ true,
+                                      /*isInSelector*/ false});
   ResolvedLocs.insert(ResolvedLocs.end(), Remaining.begin(), Remaining.end());
 
   // return in the original order
@@ -243,7 +248,8 @@ ASTWalker::PreWalkAction NameMatcher::walkToDeclPre(Decl *D) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
                LabelRanges, llvm::None);
   } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
-    tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::NoncollapsibleParam,
+    tryResolve(ASTWalker::ParentTy(D), D->getLoc(),
+               LabelRangeType::NoncollapsibleParam,
                getLabelRanges(SD->getIndices(), getSourceMgr()), llvm::None);
   } else if (EnumElementDecl *EED = dyn_cast<EnumElementDecl>(D)) {
     if (auto *ParamList = EED->getParameterList()) {
@@ -534,8 +540,13 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
   while (!isDone() && getSourceMgr().isBeforeInBuffer(nextLoc(), Start)) {
     if (!checkComments()) {
       LocsToResolve.pop_back();
-      ResolvedLocs.push_back({ASTWalker::ParentTy(), CharSourceRange(), {},
-        llvm::None, LabelRangeType::None, isActive(), isInSelector()});
+      ResolvedLocs.push_back({ASTWalker::ParentTy(),
+                              CharSourceRange(),
+                              {},
+                              llvm::None,
+                              LabelRangeType::None,
+                              isActive(),
+                              isInSelector()});
     }
   }
 }
@@ -627,7 +638,8 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc) {
   assert(!isDone());
-  return tryResolve(Node, NameLoc, LabelRangeType::None, llvm::None, llvm::None);
+  return tryResolve(Node, NameLoc, LabelRangeType::None, llvm::None,
+                    llvm::None);
 }
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
@@ -660,8 +672,13 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
                                       Range.getByteLength() - 1);
       if (NewRange.getStart() == Next.Loc) {
         LocsToResolve.pop_back();
-        ResolvedLocs.push_back({Node, NewRange, {}, llvm::None, LabelRangeType::None,
-          isActive(), isInSelector()});
+        ResolvedLocs.push_back({Node,
+                                NewRange,
+                                {},
+                                llvm::None,
+                                LabelRangeType::None,
+                                isActive(),
+                                isInSelector()});
         WasResolved = true;
       }
     }

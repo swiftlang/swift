@@ -22,22 +22,16 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   assert(mappedTypeNames.empty() && "expected empty type map");
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                         \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-    CLANG_REPR,                                                                \
-    llvm::Optional<StringRef>(CLANG_REPR),                                           \
-    llvm::Optional<StringRef>(CLANG_REPR),                                           \
-    NEEDS_NULLABILITY                                                          \
-  }
+      CLANG_REPR, llvm::Optional<StringRef>(CLANG_REPR),                       \
+      llvm::Optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY}
 #define MAP_C(SWIFT_NAME, OBJC_REPR, C_REPR, NEEDS_NULLABILITY)                \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-    OBJC_REPR,                                                                 \
-    llvm::Optional<StringRef>(C_REPR),                                               \
-    llvm::Optional<StringRef>(C_REPR),                                               \
-    NEEDS_NULLABILITY                                                          \
-  }
+      OBJC_REPR, llvm::Optional<StringRef>(C_REPR),                            \
+      llvm::Optional<StringRef>(C_REPR), NEEDS_NULLABILITY}
 #define MAP_CXX(SWIFT_NAME, OBJC_REPR, C_REPR, CXX_REPR, NEEDS_NULLABILITY)    \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, llvm::Optional<StringRef>(C_REPR), llvm::Optional<StringRef>(CXX_REPR),   \
-      NEEDS_NULLABILITY}
+      OBJC_REPR, llvm::Optional<StringRef>(C_REPR),                            \
+      llvm::Optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY}
 
   MAP(CBool, "bool", false);
 
@@ -95,11 +89,11 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   mappedTypeNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}] = {
       "Boolean", llvm::None, llvm::None, false};
 
-  mappedTypeNames[{ctx.Id_CoreGraphics, ctx.Id_CGFloat}] = {"CGFloat", llvm::None,
-                                                            llvm::None, false};
+  mappedTypeNames[{ctx.Id_CoreGraphics, ctx.Id_CGFloat}] = {
+      "CGFloat", llvm::None, llvm::None, false};
 
-  mappedTypeNames[{ctx.Id_CoreFoundation, ctx.Id_CGFloat}] = {"CGFloat", llvm::None,
-                                                              llvm::None, false};
+  mappedTypeNames[{ctx.Id_CoreFoundation, ctx.Id_CGFloat}] = {
+      "CGFloat", llvm::None, llvm::None, false};
 
   // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \

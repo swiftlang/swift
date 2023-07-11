@@ -820,7 +820,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     auto abstractionPattern = Lowering::AbstractionPattern::getOpaque();
     auto abstractTy = F->getLoweredType(abstractionPattern, ConcreteType);
     if (abstractTy != concreteSILType)
-       return llvm::None;
+      return llvm::None;
 
     SoleCEI.ConcreteValue =
       Builder.createUncheckedAddrCast(

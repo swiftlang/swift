@@ -180,6 +180,7 @@ class SDKContext {
   std::vector<BreakingAttributeInfo> BreakingAttrs;
   // The common version of two ABI/API descriptors under comparison.
   llvm::Optional<uint8_t> CommonVersion;
+
 public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
@@ -586,11 +587,11 @@ public:
     return InheritsConvenienceInitializers;
   };
 
-  llvm::Optional<SDKNodeDeclType*> getSuperclass() const;
+  llvm::Optional<SDKNodeDeclType *> getSuperclass() const;
 
   /// Finding the node through all children, including the inherited ones,
   /// whose printed name matches with the given name.
-  llvm::Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const;
+  llvm::Optional<SDKNodeDecl *> lookupChildByPrintedName(StringRef Name) const;
   SDKNodeType *getRawValueType() const;
   bool isConformingTo(KnownProtocolKind Kind) const;
   void jsonize(json::Output &out) override;

@@ -281,10 +281,8 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
 ///
 /// Otherwise returns an index which can be passed to
 /// RewriteSystem::getTypeDifference().
-llvm::Optional<unsigned>
-RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
-                                     const PropertyMap *map,
-                                     RewritePath *path) {
+llvm::Optional<unsigned> RewriteSystem::simplifySubstitutions(
+    Term baseTerm, Symbol symbol, const PropertyMap *map, RewritePath *path) {
   assert(symbol.hasSubstitutions());
 
   // Fast path if the type is fully concrete.

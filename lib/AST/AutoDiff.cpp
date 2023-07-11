@@ -22,9 +22,10 @@ using namespace swift;
 
 AutoDiffDerivativeFunctionKind::AutoDiffDerivativeFunctionKind(
     StringRef string) {
-  llvm::Optional<innerty> result = llvm::StringSwitch<llvm::Optional<innerty>>(string)
-                                 .Case("jvp", JVP)
-                                 .Case("vjp", VJP);
+  llvm::Optional<innerty> result =
+      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
 }
@@ -44,10 +45,11 @@ NormalDifferentiableFunctionTypeComponent::
 
 NormalDifferentiableFunctionTypeComponent::
     NormalDifferentiableFunctionTypeComponent(StringRef string) {
-  llvm::Optional<innerty> result = llvm::StringSwitch<llvm::Optional<innerty>>(string)
-                                 .Case("original", Original)
-                                 .Case("jvp", JVP)
-                                 .Case("vjp", VJP);
+  llvm::Optional<innerty> result =
+      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
 }
@@ -67,19 +69,21 @@ NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
 
 LinearDifferentiableFunctionTypeComponent::
     LinearDifferentiableFunctionTypeComponent(StringRef string) {
-  llvm::Optional<innerty> result = llvm::StringSwitch<llvm::Optional<innerty>>(string)
-                                 .Case("original", Original)
-                                 .Case("transpose", Transpose);
+  llvm::Optional<innerty> result =
+      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("transpose", Transpose);
   assert(result && "Invalid string");
   rawValue = *result;
 }
 
 DifferentiabilityWitnessFunctionKind::DifferentiabilityWitnessFunctionKind(
     StringRef string) {
-  llvm::Optional<innerty> result = llvm::StringSwitch<llvm::Optional<innerty>>(string)
-                                 .Case("jvp", JVP)
-                                 .Case("vjp", VJP)
-                                 .Case("transpose", Transpose);
+  llvm::Optional<innerty> result =
+      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP)
+          .Case("transpose", Transpose);
   assert(result && "Invalid string");
   rawValue = *result;
 }

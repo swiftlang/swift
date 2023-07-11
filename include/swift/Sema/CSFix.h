@@ -1648,14 +1648,16 @@ class AllowTupleTypeMismatch final : public ContextualMismatch {
   llvm::Optional<unsigned> Index;
 
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator, llvm::Optional<unsigned> index)
+                         ConstraintLocator *locator,
+                         llvm::Optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
-                           locator), Index(index) {}
+                           locator),
+        Index(index) {}
 
 public:
-  static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
-                                        Type rhs, ConstraintLocator *locator,
-                                        llvm::Optional<unsigned> index = llvm::None);
+  static AllowTupleTypeMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator,
+         llvm::Optional<unsigned> index = llvm::None);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTupleTypeMismatch;
@@ -3432,10 +3434,11 @@ public:
                  openedExistentials,
              ConstraintLocatorBuilder locator);
 
-  static bool isRequired(ConstraintSystem &cs, Type resultTy,
-                         llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
-                             findExistentialType,
-                         ConstraintLocatorBuilder locator);
+  static bool
+  isRequired(ConstraintSystem &cs, Type resultTy,
+             llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
+                 findExistentialType,
+             ConstraintLocatorBuilder locator);
 
   static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
                                                 Type resultTy,

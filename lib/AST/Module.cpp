@@ -2165,7 +2165,7 @@ Fingerprint SourceFile::getInterfaceHash() const {
   auto *mutableThis = const_cast<SourceFile *>(this);
   llvm::Optional<StableHasher> interfaceHasher =
       evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
-              .InterfaceHasher;
+          .InterfaceHasher;
   return Fingerprint{StableHasher{interfaceHasher.value()}.finalize()};
 }
 
@@ -2548,8 +2548,9 @@ NominalTypeDecl *ModuleDecl::getMainTypeDecl() const {
   return nominalType;
 }
 
-bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
-                                        llvm::Optional<ArtificialMainKind> kind) {
+bool ModuleDecl::registerEntryPointFile(
+    FileUnit *file, SourceLoc diagLoc,
+    llvm::Optional<ArtificialMainKind> kind) {
   if (!EntryPointInfo.hasEntryPoint()) {
     EntryPointInfo.setEntryPointFile(file);
     return false;

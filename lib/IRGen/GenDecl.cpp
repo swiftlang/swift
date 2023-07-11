@@ -511,8 +511,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // harmless aside from code size.
   if (!IRGen.Opts.UseJIT) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
-                                StringRef libraryName,
-                                bool forceLoad) {
+                                StringRef libraryName, bool forceLoad) {
       llvm::Optional<llvm::VersionTuple> compatibilityVersion;
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
@@ -536,7 +535,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                        forceLoad));
     };
 
-    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
+#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
       addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
     #include "swift/Frontend/BackDeploymentLibs.def"
   }
@@ -2381,8 +2380,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
 /// Get or create an LLVM global variable with these linkage rules.
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
-    Alignment alignment, DebugTypeInfo DbgTy, llvm::Optional<SILLocation> DebugLoc,
-    StringRef DebugName) {
+    Alignment alignment, DebugTypeInfo DbgTy,
+    llvm::Optional<SILLocation> DebugLoc, StringRef DebugName) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -5404,11 +5403,10 @@ llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.
-llvm::Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
-                            ClassDecl *cd,
-                            bool isDestroyer,
-                            bool isForeign,
-                            ForDefinition_t forDefinition) {
+llvm::Optional<llvm::Function *>
+IRGenModule::getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer,
+                                      bool isForeign,
+                                      ForDefinition_t forDefinition) {
   auto silRef = SILDeclRef(cd,
                            isDestroyer
                            ? SILDeclRef::Kind::IVarDestroyer

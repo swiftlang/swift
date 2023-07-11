@@ -90,15 +90,14 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
 /// object, using the appropriate witness for the
 /// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
 static llvm::Optional<ManagedValue>
-emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
-                             SILLocation loc,
-                             ManagedValue swiftValue,
-                             CanType swiftValueType,
+emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
+                             ManagedValue swiftValue, CanType swiftValueType,
                              CanType bridgedType,
                              ProtocolConformance *conformance) {
   // Find the _bridgeToObjectiveC requirement.
   auto requirement = SGF.SGM.getBridgeToObjectiveCRequirement(loc);
-  if (!requirement) return llvm::None;
+  if (!requirement)
+    return llvm::None;
 
   // Retrieve the _bridgeToObjectiveC witness.
   auto witness = conformance->getWitnessDecl(requirement);
@@ -106,7 +105,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
 
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
-  if (!objcTypeReq) return llvm::None;
+  if (!objcTypeReq)
+    return llvm::None;
 
   Type objcType = conformance->getTypeWitness(objcTypeReq);
 
@@ -178,19 +178,19 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
 /// value, using the appropriate witness for the
 /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC requirement.
 static llvm::Optional<ManagedValue>
-emitBridgeObjectiveCToNative(SILGenFunction &SGF,
-                             SILLocation loc,
-                             ManagedValue objcValue,
-                             CanType bridgedType,
+emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
+                             ManagedValue objcValue, CanType bridgedType,
                              ProtocolConformance *conformance) {
   // Find the _unconditionallyBridgeFromObjectiveC requirement.
   auto requirement =
     SGF.SGM.getUnconditionallyBridgeFromObjectiveCRequirement(loc);
-  if (!requirement) return llvm::None;
+  if (!requirement)
+    return llvm::None;
 
   // Find the _ObjectiveCType requirement.
   auto objcTypeRequirement = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
-  if (!objcTypeRequirement) return llvm::None;
+  if (!objcTypeRequirement)
+    return llvm::None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
   auto witness = conformance->getWitnessDeclRef(requirement);
@@ -474,12 +474,11 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
 
   // Call the native function.
   SGFContext C(canEmitIntoInit ? init.get() : nullptr);
-  ManagedValue result = SGF.emitMonomorphicApply(loc, fn, args,
-                                                 formalNativeResultType,
-                                                 formalNativeResultType,
-                                                 ApplyOptions(),
-                                                 llvm::None, llvm::None, C)
-    .getAsSingleValue(SGF, loc);
+  ManagedValue result =
+      SGF.emitMonomorphicApply(loc, fn, args, formalNativeResultType,
+                               formalNativeResultType, ApplyOptions(),
+                               llvm::None, llvm::None, C)
+          .getAsSingleValue(SGF, loc);
 
   // Bridge the result back to ObjC.
   if (!canEmitIntoInit) {
@@ -915,14 +914,13 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
                 : nullptr;
 
   // Call the block.
-  ManagedValue result = SGF.emitMonomorphicApply(loc, block, args,
-                           formalBlockTy.getResult(),
-                           formalResultType,
-                           ApplyOptions(),
-                           /*override CC*/ SILFunctionTypeRepresentation::Block,
-                           /*foreign error*/ llvm::None,
-                           SGFContext(init.get()))
-    .getAsSingleValue(SGF, loc);
+  ManagedValue result =
+      SGF.emitMonomorphicApply(
+             loc, block, args, formalBlockTy.getResult(), formalResultType,
+             ApplyOptions(),
+             /*override CC*/ SILFunctionTypeRepresentation::Block,
+             /*foreign error*/ llvm::None, SGFContext(init.get()))
+          .getAsSingleValue(SGF, loc);
 
   SILValue r;
 
@@ -1319,16 +1317,14 @@ static CanAnyFunctionType substGenericArgs(CanAnyFunctionType fnType,
 }
 
 /// Bridge argument types and adjust retain count conventions for an ObjC thunk.
-static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
-                                               SILLocation loc,
-                                               SILDeclRef thunk,
-                                               SmallVectorImpl<SILValue> &args,
-                                               SILValue &foreignErrorSlot,
-                                               SILValue &foreignAsyncSlot,
-                              llvm::Optional<ForeignErrorConvention> &foreignError,
-                              llvm::Optional<ForeignAsyncConvention> &foreignAsync,
-                                               CanType &nativeFormalResultTy,
-                                               CanType &bridgedFormalResultTy) {
+static SILFunctionType *
+emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
+                       SmallVectorImpl<SILValue> &args,
+                       SILValue &foreignErrorSlot, SILValue &foreignAsyncSlot,
+                       llvm::Optional<ForeignErrorConvention> &foreignError,
+                       llvm::Optional<ForeignAsyncConvention> &foreignAsync,
+                       CanType &nativeFormalResultTy,
+                       CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
 
   auto subs = SGF.F.getForwardingSubstitutionMap();
@@ -2299,8 +2295,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ArgumentScope argScope(*this, fd);
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
-                  ManagedValue::forUnmanaged(fn), subs, args,
-                  calleeTypeInfo, ApplyOptions(), context, llvm::None)
+                  ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
+                  ApplyOptions(), context, llvm::None)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

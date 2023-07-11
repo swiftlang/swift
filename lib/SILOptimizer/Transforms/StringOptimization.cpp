@@ -304,7 +304,8 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
-  llvm::Optional<int> isQualifiedOpt = getIntConstant(typeNameCall->getArgument(1));
+  llvm::Optional<int> isQualifiedOpt =
+      getIntConstant(typeNameCall->getArgument(1));
   if (!isQualifiedOpt)
     return false;
   bool isQualified = isQualifiedOpt.value();
@@ -641,7 +642,7 @@ llvm::Optional<int> StringOptimization::getIntConstant(SILValue value) {
   auto *boolOrIntStruct = dyn_cast<StructInst>(value);
   if (!boolOrIntStruct || boolOrIntStruct->getNumOperands() != 1)
     return llvm::None;
-    
+
   auto *literal = dyn_cast<IntegerLiteralInst>(boolOrIntStruct->getOperand(0));
   if (!literal || literal->getValue().getActiveBits() > 64)
     return llvm::None;

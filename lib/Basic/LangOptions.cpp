@@ -22,9 +22,9 @@
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 #include <limits.h>
 
@@ -499,7 +499,7 @@ llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-                   .Default(llvm::None);
+      .Default(llvm::None);
 }
 
 llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
@@ -508,7 +508,7 @@ llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-                   .Default(llvm::None);
+      .Default(llvm::None);
 }
 
 llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
@@ -517,7 +517,8 @@ llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
-  default: return llvm::None;
+  default:
+    return llvm::None;
   }
 }
 

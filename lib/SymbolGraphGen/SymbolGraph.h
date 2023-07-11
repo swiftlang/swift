@@ -42,12 +42,12 @@ struct SymbolGraph {
    The module whose types were extended in `M`.
    */
   llvm::Optional<ModuleDecl *> ExtendedModule;
-  
+
   /**
    The module declaring `M`, if `M` is a cross-import overlay.
    */
   llvm::Optional<ModuleDecl *> DeclaringModule;
-  
+
   /**
    The modules that must be imported alongside `DeclaringModule` for `M` to be imported, if `M` is a cross-import overlay.
    */
@@ -80,7 +80,8 @@ struct SymbolGraph {
   bool IsForSingleNode;
 
   SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
-              llvm::Optional<ModuleDecl *> ExtendedModule, markup::MarkupContext &Ctx,
+              llvm::Optional<ModuleDecl *> ExtendedModule,
+              markup::MarkupContext &Ctx,
               llvm::Optional<llvm::VersionTuple> ModuleVersion = llvm::None,
               bool IsForSingleNode = false);
 

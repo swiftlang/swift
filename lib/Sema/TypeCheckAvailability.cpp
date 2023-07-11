@@ -40,11 +40,10 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-ExportContext::ExportContext(DeclContext *DC,
-                             AvailabilityContext runningOSVersion,
-                             FragileFunctionKind kind,
-                             bool spi, bool exported, bool implicit, bool deprecated,
-                             llvm::Optional<PlatformKind> unavailablePlatformKind)
+ExportContext::ExportContext(
+    DeclContext *DC, AvailabilityContext runningOSVersion,
+    FragileFunctionKind kind, bool spi, bool exported, bool implicit,
+    bool deprecated, llvm::Optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
@@ -179,9 +178,9 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   }
 }
 
-static void computeExportContextBits(ASTContext &Ctx, Decl *D,
-                                     bool *spi, bool *implicit, bool *deprecated,
-                                     llvm::Optional<PlatformKind> *unavailablePlatformKind) {
+static void computeExportContextBits(
+    ASTContext &Ctx, Decl *D, bool *spi, bool *implicit, bool *deprecated,
+    llvm::Optional<PlatformKind> *unavailablePlatformKind) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
@@ -298,7 +297,8 @@ bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
 }
 
-llvm::Optional<ExportabilityReason> ExportContext::getExportabilityReason() const {
+llvm::Optional<ExportabilityReason>
+ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return llvm::None;
@@ -953,7 +953,8 @@ private:
   /// of optional version ranges, the first for the true branch and the second
   /// for the false branch. A value of None for a given branch indicates that
   /// the branch does not introduce a new refinement.
-  std::pair<llvm::Optional<AvailabilityContext>, llvm::Optional<AvailabilityContext>>
+  std::pair<llvm::Optional<AvailabilityContext>,
+            llvm::Optional<AvailabilityContext>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
 
     // Any refinement contexts introduced in the statement condition
@@ -1105,7 +1106,6 @@ private:
       ++NestedCount;
     }
 
-
     llvm::Optional<AvailabilityContext> FalseRefinement = llvm::None;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
@@ -1120,15 +1120,15 @@ private:
       FalseRefinement = FalseFlow;
     }
 
-    auto makeResult =
-        [isUnavailability](llvm::Optional<AvailabilityContext> TrueRefinement,
-                           llvm::Optional<AvailabilityContext> FalseRefinement) {
-          if (isUnavailability.has_value() && isUnavailability.value()) {
-            // If this is an unavailability check, invert the result.
-            return std::make_pair(FalseRefinement, TrueRefinement);
-          }
-          return std::make_pair(TrueRefinement, FalseRefinement);
-        };
+    auto makeResult = [isUnavailability](
+                          llvm::Optional<AvailabilityContext> TrueRefinement,
+                          llvm::Optional<AvailabilityContext> FalseRefinement) {
+      if (isUnavailability.has_value() && isUnavailability.value()) {
+        // If this is an unavailability check, invert the result.
+        return std::make_pair(FalseRefinement, TrueRefinement);
+      }
+      return std::make_pair(TrueRefinement, FalseRefinement);
+    };
 
     if (NestedCount == 0)
       return makeResult(llvm::None, FalseRefinement);
@@ -1428,7 +1428,9 @@ public:
 
   /// Returns the innermost node containing the target range that matches
   /// the predicate.
-  llvm::Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
+  llvm::Optional<ASTNode> getInnermostMatchingNode() {
+    return InnermostMatchingNode;
+  }
 
   MacroWalking getMacroWalkingBehavior() const override {
     // This is SourceRange based finder. 'SM.rangeContains()' fails anyway when
@@ -1734,12 +1736,10 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// \param FoundTypeLevelDecl returns a type-level declaration (a
 /// a nominal type, an extension, or a global function) for which an
 /// @available attribute would fix the unavailable reference.
-static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
-                                       const SourceManager &SM,
-                                       llvm::Optional<ASTNode> &FoundVersionCheckNode,
-                                       const Decl *&FoundMemberLevelDecl,
-                                       const Decl *&FoundTypeLevelDecl) {
+static void findAvailabilityFixItNodes(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+    const SourceManager &SM, llvm::Optional<ASTNode> &FoundVersionCheckNode,
+    const Decl *&FoundMemberLevelDecl, const Decl *&FoundTypeLevelDecl) {
   FoundVersionCheckNode = llvm::None;
   FoundMemberLevelDecl = nullptr;
   FoundTypeLevelDecl = nullptr;
@@ -2675,7 +2675,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   SmallString<32> newNameBuf;
   llvm::Optional<ReplacementDeclKind> replacementDeclKind =
-    describeRename(Context, Attr, /*decl*/nullptr, newNameBuf);
+      describeRename(Context, Attr, /*decl*/ nullptr, newNameBuf);
   StringRef newName = replacementDeclKind ? newNameBuf.str() : Attr->Rename;
 
   if (!Attr->Message.empty()) {
@@ -2782,33 +2782,32 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
   }
 
   ExportContext where = ExportContext::forDeclSignature(override);
-  diagnoseExplicitUnavailability(base, override->getLoc(), where,
-                                 /*Flags*/ llvm::None,
-                                 [&](InFlightDiagnostic &diag) {
-    ParsedDeclName parsedName = parseDeclName(attr->Rename);
-    if (!parsedName || parsedName.isPropertyAccessor() ||
-        parsedName.isMember() || parsedName.isOperator()) {
-      return;
-    }
+  diagnoseExplicitUnavailability(
+      base, override->getLoc(), where,
+      /*Flags*/ llvm::None, [&](InFlightDiagnostic &diag) {
+        ParsedDeclName parsedName = parseDeclName(attr->Rename);
+        if (!parsedName || parsedName.isPropertyAccessor() ||
+            parsedName.isMember() || parsedName.isOperator()) {
+          return;
+        }
 
-    // Only initializers should be named 'init'.
-    if (isa<ConstructorDecl>(override) ^
-        (parsedName.BaseName == "init")) {
-      return;
-    }
+        // Only initializers should be named 'init'.
+        if (isa<ConstructorDecl>(override) ^ (parsedName.BaseName == "init")) {
+          return;
+        }
 
-    if (!parsedName.IsFunctionName) {
-      diag.fixItReplace(override->getNameLoc(), parsedName.BaseName);
-      return;
-    }
+        if (!parsedName.IsFunctionName) {
+          diag.fixItReplace(override->getNameLoc(), parsedName.BaseName);
+          return;
+        }
 
-    DeclName newName = parsedName.formDeclName(ctx);
-    size_t numArgs = override->getName().getArgumentNames().size();
-    if (!newName || newName.getArgumentNames().size() != numArgs)
-      return;
+        DeclName newName = parsedName.formDeclName(ctx);
+        size_t numArgs = override->getName().getArgumentNames().size();
+        if (!newName || newName.getArgumentNames().size() != numArgs)
+          return;
 
-    fixDeclarationName(diag, override, newName);
-  });
+        fixDeclarationName(diag, override, newName);
+      });
 }
 
 /// Emit a diagnostic for references to declarations that have been
@@ -3336,9 +3335,10 @@ public:
     return Action::SkipChildren(S);
   }
 
-  bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
-                                   const Expr *call = nullptr,
-                                   DeclAvailabilityFlags flags = llvm::None) const;
+  bool
+  diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
+                              const Expr *call = nullptr,
+                              DeclAvailabilityFlags flags = llvm::None) const;
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,

@@ -520,7 +520,8 @@ class SourceMappingRegion {
 
 public:
   SourceMappingRegion(ASTNode Node, llvm::Optional<CounterExpr> Counter,
-                      llvm::Optional<SourceLoc> StartLoc, llvm::Optional<SourceLoc> EndLoc)
+                      llvm::Optional<SourceLoc> StartLoc,
+                      llvm::Optional<SourceLoc> EndLoc)
       : Node(Node), Counter(std::move(Counter)), StartLoc(StartLoc),
         EndLoc(EndLoc) {
     assert((!StartLoc || StartLoc->isValid()) &&
@@ -918,7 +919,8 @@ private:
   }
 
   /// Adjust the count for control flow when exiting a scope.
-  void adjustForNonLocalExits(ASTNode Scope, llvm::Optional<CounterExpr> ControlFlowAdjust) {
+  void adjustForNonLocalExits(ASTNode Scope,
+                              llvm::Optional<CounterExpr> ControlFlowAdjust) {
     if (Parent.getAsDecl())
       return;
 

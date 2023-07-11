@@ -1448,8 +1448,7 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
     std::max((Alignment::int_type)1, minimumAlignment));
   for (auto *entry : entries) {
     if (!entry->fixedAlignment(IGM)) {
-      return *(_fixedAlignment =
-                   llvm::Optional<Alignment>(llvm::None));
+      return *(_fixedAlignment = llvm::Optional<Alignment>(llvm::None));
     }
     currentAlignment = std::max(currentAlignment, *entry->fixedAlignment(IGM));
   }
@@ -2272,8 +2271,7 @@ EnumTypeLayoutEntry::fixedAlignment(IRGenModule &IGM) const {
   for (auto payload : cases) {
     auto caseAlign = payload->fixedAlignment(IGM);
     if (!caseAlign) {
-      return *(_fixedAlignment =
-                   llvm::Optional<Alignment>(llvm::None));
+      return *(_fixedAlignment = llvm::Optional<Alignment>(llvm::None));
     }
     maxAlign = std::max(*caseAlign, maxAlign);
   }

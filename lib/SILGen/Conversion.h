@@ -227,8 +227,7 @@ public:
 };
 
 llvm::Optional<ConversionPeepholeHint>
-canPeepholeConversions(SILGenFunction &SGF,
-                       const Conversion &outerConversion,
+canPeepholeConversions(SILGenFunction &SGF, const Conversion &outerConversion,
                        const Conversion &innerConversion);
 
 /// An initialization where we ultimately want to apply a conversion to

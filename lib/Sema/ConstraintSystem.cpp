@@ -759,8 +759,8 @@ static void extendDepthMap(
   expr->walk(traversal);
 }
 
-llvm::Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
-    Expr *expr) {
+llvm::Optional<std::pair<unsigned, Expr *>>
+ConstraintSystem::getExprDepthAndParent(Expr *expr) {
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
     extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
@@ -1154,7 +1154,8 @@ FunctionType *ConstraintSystem::openFunctionType(
   return funcType->castTo<FunctionType>();
 }
 
-llvm::Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
+llvm::Optional<std::pair<Type, Type>>
+ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {
       auto genericArgs = boundStruct->getGenericArgs();
@@ -2107,91 +2108,92 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
   std::function<Type(Type, TypePosition)> transformFn;
   transformFn = [&](Type type, TypePosition initialPos) -> Type {
     return type.transformWithPosition(
-        initialPos, [&](TypeBase *t, TypePosition currPos) -> llvm::Optional<Type> {
-      if (!t->hasTypeParameter()) {
-        return Type(t);
-      }
-
-      if (t->is<MetatypeType>()) {
-        const auto instanceTy = t->getMetatypeInstanceType();
-        ++metatypeDepth;
-        const auto erasedTy = transformFn(instanceTy, currPos);
-        --metatypeDepth;
-
-        if (instanceTy.getPointer() == erasedTy.getPointer()) {
-          return Type(t);
-        }
-
-        return Type(ExistentialMetatypeType::get(erasedTy));
-      }
-
-      // Opaque types whose substitutions involve this type parameter are
-      // erased to their upper bound.
-      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
-        for (auto replacementType :
-                 opaque->getSubstitutions().getReplacementTypes()) {
-          if (hasErasedGenericParameter(replacementType)) {
-            Type interfaceType = opaque->getInterfaceType();
-            auto genericSig =
-                opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-            return genericSig->getNonDependentUpperBounds(interfaceType);
+        initialPos,
+        [&](TypeBase *t, TypePosition currPos) -> llvm::Optional<Type> {
+          if (!t->hasTypeParameter()) {
+            return Type(t);
           }
-        }
-      }
 
-      if (!t->isTypeParameter()) {
-        // Recurse.
-        return llvm::None;
-      }
+          if (t->is<MetatypeType>()) {
+            const auto instanceTy = t->getMetatypeInstanceType();
+            ++metatypeDepth;
+            const auto erasedTy = transformFn(instanceTy, currPos);
+            --metatypeDepth;
 
-      if (t->getRootGenericParam()->getDepth() > 0) {
-        return Type(t);
-      }
+            if (instanceTy.getPointer() == erasedTy.getPointer()) {
+              return Type(t);
+            }
 
-      // If the type parameter is beyond the domain of the existential generic
-      // signature, ignore it.
-      if (!existentialSig->isValidTypeParameter(t)) {
-        return Type(t);
-      }
+            return Type(ExistentialMetatypeType::get(erasedTy));
+          }
 
-      // If the type parameter is bound to a concrete type, recurse into it.
-      if (const auto concreteTy = existentialSig->getConcreteType(t)) {
-        const auto erasedTy = transformFn(concreteTy, currPos);
-        if (erasedTy.getPointer() == concreteTy.getPointer()) {
-          // Don't return the concrete type if we haven't type-erased anything
-          // inside it, or else we might inadvertently transform a normal
-          // metatype into an existential one.
-          return Type(t);
-        }
+          // Opaque types whose substitutions involve this type parameter are
+          // erased to their upper bound.
+          if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
+            for (auto replacementType :
+                 opaque->getSubstitutions().getReplacementTypes()) {
+              if (hasErasedGenericParameter(replacementType)) {
+                Type interfaceType = opaque->getInterfaceType();
+                auto genericSig =
+                    opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+                return genericSig->getNonDependentUpperBounds(interfaceType);
+              }
+            }
+          }
 
-        return erasedTy;
-      }
+          if (!t->isTypeParameter()) {
+            // Recurse.
+            return llvm::None;
+          }
 
-      switch (currPos) {
-      case TypePosition::Covariant:
-        break;
+          if (t->getRootGenericParam()->getDepth() > 0) {
+            return Type(t);
+          }
 
-      case TypePosition::Contravariant:
-      case TypePosition::Invariant:
-        return Type(t);
-      }
+          // If the type parameter is beyond the domain of the existential
+          // generic signature, ignore it.
+          if (!existentialSig->isValidTypeParameter(t)) {
+            return Type(t);
+          }
 
-      Type erasedTy;
+          // If the type parameter is bound to a concrete type, recurse into it.
+          if (const auto concreteTy = existentialSig->getConcreteType(t)) {
+            const auto erasedTy = transformFn(concreteTy, currPos);
+            if (erasedTy.getPointer() == concreteTy.getPointer()) {
+              // Don't return the concrete type if we haven't type-erased
+              // anything inside it, or else we might inadvertently transform a
+              // normal metatype into an existential one.
+              return Type(t);
+            }
 
-      // The upper bounds of 'Self' is the existential base type.
-      if (t->is<GenericTypeParamType>()) {
-        erasedTy = baseTy;
-      } else {
-        erasedTy = existentialSig->getNonDependentUpperBounds(t);
-      }
+            return erasedTy;
+          }
 
-      if (metatypeDepth) {
-        if (const auto existential = erasedTy->getAs<ExistentialType>())
-          return existential->getConstraintType();
-      }
+          switch (currPos) {
+          case TypePosition::Covariant:
+            break;
 
-      return erasedTy;
-    });
+          case TypePosition::Contravariant:
+          case TypePosition::Invariant:
+            return Type(t);
+          }
+
+          Type erasedTy;
+
+          // The upper bounds of 'Self' is the existential base type.
+          if (t->is<GenericTypeParamType>()) {
+            erasedTy = baseTy;
+          } else {
+            erasedTy = existentialSig->getNonDependentUpperBounds(t);
+          }
+
+          if (metatypeDepth) {
+            if (const auto existential = erasedTy->getAs<ExistentialType>())
+              return existential->getConstraintType();
+          }
+
+          return erasedTy;
+        });
   };
   return transformFn(refTy, outermostPosition);
 }
@@ -2336,7 +2338,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
         AddExplicitExistentialCoercion::isRequired(
             *this, nonErasedResultTy,
             [&](TypeVariableType *typeVar) {
-              return openedTypeVar == typeVar ? baseObjTy : llvm::Optional<Type>();
+              return openedTypeVar == typeVar ? baseObjTy
+                                              : llvm::Optional<Type>();
             },
             locator) &&
         !contextualTy) {
@@ -7055,8 +7058,8 @@ SourceRange constraints::getSourceRange(ASTNode anchor) {
   return anchor.getSourceRange();
 }
 
-static llvm::Optional<Requirement> getRequirement(ConstraintSystem &cs,
-                                            ConstraintLocator *reqLocator) {
+static llvm::Optional<Requirement>
+getRequirement(ConstraintSystem &cs, ConstraintLocator *reqLocator) {
   ArrayRef<LocatorPathElt> path = reqLocator->getPath();
 
   // If we have something like ... -> type req # -> pack element #, we're

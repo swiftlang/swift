@@ -21,9 +21,9 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
@@ -155,7 +155,8 @@ public:
     if (iter == map.end())
       return llvm::None;
     auto iter2 = iter->second.find(k2);
-    return iter2 == iter->second.end() ? llvm::None : llvm::Optional<Value>(iter2->second);
+    return iter2 == iter->second.end() ? llvm::None
+                                       : llvm::Optional<Value>(iter2->second);
   }
 
   NullablePtr<const InnerMap> find(const Key1 &k1) const {
@@ -259,7 +260,9 @@ public:
     assert(assertConsistent(v, map2.find(k2, k1)));
     return v;
   }
-  llvm::Optional<Value> find(const Key2 &k2, Key1 &k1) const { return find(k1, k2); }
+  llvm::Optional<Value> find(const Key2 &k2, Key1 &k1) const {
+    return find(k1, k2);
+  }
 
   /// Return the submap for a given Key1. May create one, after the fashion of
   /// the standard library.
@@ -668,7 +671,9 @@ public:
     this->key = key;
   }
 
-  const llvm::Optional<Fingerprint> getFingerprint() const { return fingerprint; }
+  const llvm::Optional<Fingerprint> getFingerprint() const {
+    return fingerprint;
+  }
   /// When driver reads a SourceFileDepGraphNode, it may be a node that was
   /// created to represent a name-lookup (a.k.a a "depend") in the frontend. In
   /// that case, the node represents an entity that resides in some other file
@@ -724,7 +729,8 @@ public:
   SourceFileDepGraphNode() : DepGraphNode() {}
 
   /// Used by the frontend to build nodes.
-  SourceFileDepGraphNode(DependencyKey key, llvm::Optional<Fingerprint> fingerprint,
+  SourceFileDepGraphNode(DependencyKey key,
+                         llvm::Optional<Fingerprint> fingerprint,
                          bool isProvides)
       : DepGraphNode(key, fingerprint), isProvides(isProvides) {
     assert(key.verify());
@@ -857,8 +863,9 @@ public:
   /// The frontend creates a pair of nodes for every tracked Decl and the source
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
-  findExistingNodePairOrCreateAndAddIfNew(const DependencyKey &interfaceKey,
-                                          llvm::Optional<Fingerprint> fingerprint);
+  findExistingNodePairOrCreateAndAddIfNew(
+      const DependencyKey &interfaceKey,
+      llvm::Optional<Fingerprint> fingerprint);
 
   NullablePtr<SourceFileDepGraphNode>
   findExistingNode(const DependencyKey &key);
@@ -883,7 +890,8 @@ public:
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
-  llvm::Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &);
+  llvm::Optional<SourceFileDepGraph> static loadFromBuffer(
+      llvm::MemoryBuffer &);
   llvm::Optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
       llvm::MemoryBuffer &);
 

@@ -133,7 +133,8 @@ public:
   /// Called before printing of a declaration.
   ///
   /// Callers should use callPrintDeclPre().
-  virtual void printDeclPre(const Decl *D, llvm::Optional<BracketOptions> Bracket) {}
+  virtual void printDeclPre(const Decl *D,
+                            llvm::Optional<BracketOptions> Bracket) {}
   /// Called before printing at the point which would be considered the location
   /// of the declaration (normally the name of the declaration).
   ///
@@ -147,7 +148,8 @@ public:
   /// Called after finishing printing of a declaration.
   ///
   /// Callers should use callPrintDeclPost().
-  virtual void printDeclPost(const Decl *D, llvm::Optional<BracketOptions> Bracket) {}
+  virtual void printDeclPost(const Decl *D,
+                             llvm::Optional<BracketOptions> Bracket) {}
 
   /// Called before printing the result type of the declaration. Printer can
   /// replace \p TL to customize the input.
@@ -174,15 +176,15 @@ public:
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
 
   /// Called before printing a synthesized extension.
-  virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                            TypeOrExtensionDecl NTD,
-                                            llvm::Optional<BracketOptions> Bracket) {}
+  virtual void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED, TypeOrExtensionDecl NTD,
+                               llvm::Optional<BracketOptions> Bracket) {}
 
   /// Called after printing a synthesized extension.
-  virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                             TypeOrExtensionDecl TargetDecl,
-                                             llvm::Optional<BracketOptions> Bracket) {
-  }
+  virtual void
+  printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                TypeOrExtensionDecl TargetDecl,
+                                llvm::Optional<BracketOptions> Bracket) {}
 
   /// Called before printing a structured entity.
   ///
@@ -307,7 +309,8 @@ public:
   void callPrintDeclPre(const Decl *D, llvm::Optional<BracketOptions> Bracket);
 
   /// Make a callback to printDeclPost(), performing any necessary bookkeeping.
-  void callPrintDeclPost(const Decl *D, llvm::Optional<BracketOptions> Bracket) {
+  void callPrintDeclPost(const Decl *D,
+                         llvm::Optional<BracketOptions> Bracket) {
     printDeclPost(D, Bracket);
   }
 

@@ -550,7 +550,7 @@ StringRef SDKNodeTypeWitness::getWitnessedTypeName() const {
     getName()) + "." + getName()).str());
 }
 
-llvm::Optional<SDKNodeDeclType*> SDKNodeDeclType::getSuperclass() const {
+llvm::Optional<SDKNodeDeclType *> SDKNodeDeclType::getSuperclass() const {
   if (SuperclassUsr.empty())
     return llvm::None;
   auto Descendants = getRootNode()->getDescendantsByUsr(SuperclassUsr);
@@ -562,7 +562,7 @@ llvm::Optional<SDKNodeDeclType*> SDKNodeDeclType::getSuperclass() const {
 
 /// Finding the node through all children, including the inherited ones,
 /// whose printed name matches with the given name.
-llvm::Optional<SDKNodeDecl*>
+llvm::Optional<SDKNodeDecl *>
 SDKNodeDeclType::lookupChildByPrintedName(StringRef Name) const {
   for (auto C : getChildren()) {
     if (C->getPrintedName() == Name)
@@ -618,7 +618,7 @@ static llvm::Optional<KeyKind> parseKeyKind(StringRef Content) {
   return llvm::StringSwitch<llvm::Optional<KeyKind>>(Content)
 #define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
 #include "swift/IDE/DigesterEnums.def"
-    .Default(llvm::None);
+      .Default(llvm::None);
 }
 
 static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
@@ -752,10 +752,10 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       }
       case KeyKind::KK_declKind: {
         auto dKind = llvm::StringSwitch<llvm::Optional<DeclKind>>(
-          GetScalarString(Pair.getValue()))
-  #define DECL(X, PARENT) .Case(#X, DeclKind::X)
+                         GetScalarString(Pair.getValue()))
+#define DECL(X, PARENT) .Case(#X, DeclKind::X)
   #include "swift/AST/DeclNodes.def"
-        .Default(llvm::None);
+                         .Default(llvm::None);
         if (dKind)
           Info.DKind = *dKind;
         else
@@ -848,7 +848,8 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
 }
 
 // Return whether a decl has been moved in/out to an extension
-static llvm::Optional<bool> isFromExtensionChanged(const SDKNode &L, const SDKNode &R) {
+static llvm::Optional<bool> isFromExtensionChanged(const SDKNode &L,
+                                                   const SDKNode &R) {
   assert(L.getKind() == R.getKind());
   // Version 8 starts to include whether a decl is from an extension.
   if (L.getJsonFormatVersion() + R.getJsonFormatVersion() < 2 * 8) {
@@ -1262,9 +1263,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf, bool
   return printGenericSignature(Ctx, Conf->getConditionalRequirements(), Canonical);
 }
 
-static llvm::Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
-                                               ValueDecl *VD,
-                                        llvm::function_ref<bool(Decl*)> Check) {
+static llvm::Optional<uint8_t>
+getSimilarMemberCount(NominalTypeDecl *NTD, ValueDecl *VD,
+                      llvm::function_ref<bool(Decl *)> Check) {
   if (!Check(VD))
     return llvm::None;
   auto Members = NTD->getMembers();

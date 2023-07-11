@@ -204,7 +204,7 @@ struct SubElementOffset {
   /// \returns None if we didn't know how to compute sub-element for this
   /// projection.
   static llvm::Optional<SubElementOffset> compute(SILValue projectionFromRoot,
-                                            SILValue root) {
+                                                  SILValue root) {
     assert(projectionFromRoot->getType().getCategory() ==
                root->getType().getCategory() &&
            "projectionFromRoot and root must both be objects or address.");
@@ -223,8 +223,8 @@ struct SubElementOffset {
 private:
   static llvm::Optional<SubElementOffset>
   computeForAddress(SILValue projectionFromRoot, SILValue rootAddress);
-  static llvm::Optional<SubElementOffset> computeForValue(SILValue projectionFromRoot,
-                                                    SILValue rootValue);
+  static llvm::Optional<SubElementOffset>
+  computeForValue(SILValue projectionFromRoot, SILValue rootValue);
 };
 
 /// Given a type T, this is the number of leaf field types in T's type tree. A
@@ -296,7 +296,7 @@ struct TypeTreeLeafTypeRange {
   /// \returns None if we are unable to understand the path in between \p
   /// projectedAddress and \p rootAddress.
   static llvm::Optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
-                                             SILValue rootValue) {
+                                                   SILValue rootValue) {
     auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
     if (!startEltOffset)
       return llvm::None;
@@ -731,7 +731,8 @@ public:
         return;
 
       assert(ranges.empty());
-      llvm::Optional<std::pair<unsigned, IsInterestingUser>> current = llvm::None;
+      llvm::Optional<std::pair<unsigned, IsInterestingUser>> current =
+          llvm::None;
       for (unsigned bit = 0, size = liveBits.size(); bit < size; ++bit) {
         auto interesting = isInterestingUser(bit);
         if (!current) {

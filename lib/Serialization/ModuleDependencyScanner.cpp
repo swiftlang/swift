@@ -240,7 +240,8 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
   return *Result;
 }
 
-llvm::Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDependencies(
+llvm::Optional<const ModuleDependencyInfo *>
+SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate, bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');

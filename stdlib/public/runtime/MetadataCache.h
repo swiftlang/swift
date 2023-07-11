@@ -20,9 +20,9 @@
 #include "swift/shims/Visibility.h"
 
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include <condition_variable>
 #include <thread>
@@ -300,7 +300,8 @@ public:
   template <class KeyType, class... ArgTys>
   llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
     EntryType *entry = Storage.find(key);
-    if (!entry) return llvm::None;
+    if (!entry)
+      return llvm::None;
     return entry->await(Storage.getConcurrency(),
                         std::forward<ArgTys>(args)...);
   }

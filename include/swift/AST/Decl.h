@@ -946,7 +946,8 @@ public:
   /// Returns the introduced OS version in the given platform kind specified
   /// by @available attribute.
   /// This function won't consider the parent context to get the information.
-  llvm::Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
+  llvm::Optional<llvm::VersionTuple>
+  getIntroducedOSVersion(PlatformKind Kind) const;
 
   /// Returns the OS version in which the decl became ABI as specified by the
   /// `@backDeployed` attribute.
@@ -1409,7 +1410,8 @@ public:
   ///
   /// If the list is non-homogeneous, or if there is more than one decl that
   /// cannot be overloaded, returns None.
-  static llvm::Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
+  static llvm::Optional<ImportKind>
+  findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ImportKind getImportKind() const {
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
@@ -2596,8 +2598,8 @@ public:
   /// entities (classes, protocols, properties), this operation will
   /// return a zero-parameter selector with the appropriate name in its
   /// first slot.
-  llvm::Optional<ObjCSelector> getObjCRuntimeName(
-                                    bool skipIsObjCResolution = false) const;
+  llvm::Optional<ObjCSelector>
+  getObjCRuntimeName(bool skipIsObjCResolution = false) const;
 
   /// Determine whether the given declaration can infer @objc, or the
   /// Objective-C name, if used to satisfy the given requirement.
@@ -3138,8 +3140,7 @@ public:
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
-  llvm::Optional<unsigned> getAnonymousOpaqueParamOrdinal(
-      TypeRepr *repr) const;
+  llvm::Optional<unsigned> getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -3175,7 +3176,7 @@ public:
   llvm::Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
     return UniqueUnderlyingType;
   }
-  
+
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
@@ -5016,11 +5017,12 @@ public:
 
     if (Bits.ProtocolDecl.KnownProtocol == 1)
       return llvm::None;
-    
+
     return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
 
-  llvm::Optional<KnownDerivableProtocolKind> getKnownDerivableProtocolKind() const;
+  llvm::Optional<KnownDerivableProtocolKind>
+  getKnownDerivableProtocolKind() const;
 
   /// Check whether this protocol is of a specific, known protocol kind.
   bool isSpecificProtocol(KnownProtocolKind kind) const {
@@ -5994,7 +5996,7 @@ public:
   /// Retrieve information about the mutability of the composed
   /// property wrappers.
   llvm::Optional<PropertyWrapperMutability>
-      getPropertyWrapperMutability() const;
+  getPropertyWrapperMutability() const;
 
   /// Returns whether this property is the backing storage property or a storage
   /// wrapper for wrapper instance's projectedValue. If this property is
@@ -6062,7 +6064,8 @@ public:
   /// \param kind If not \c None, only returns the original property when
   /// \c this property is the specified synthesized property.
   VarDecl *getOriginalWrappedProperty(
-      llvm::Optional<PropertyWrapperSynthesizedPropertyKind> kind = llvm::None) const;
+      llvm::Optional<PropertyWrapperSynthesizedPropertyKind> kind =
+          llvm::None) const;
 
   /// Set the property that wraps to this property as it's backing
   /// property.
@@ -7020,7 +7023,8 @@ public:
   void setBodyToBeReparsed(SourceRange bodyRange);
 
   /// Provide the parsed body for the function.
-  void setBodyParsed(BraceStmt *S, llvm::Optional<Fingerprint> fp = llvm::None) {
+  void setBodyParsed(BraceStmt *S,
+                     llvm::Optional<Fingerprint> fp = llvm::None) {
     setBody(S, BodyKind::Parsed);
     BodyAndFP.setFingerprint(fp);
   }
@@ -7168,7 +7172,8 @@ public:
 
   /// Retrieve the fingerprint of the body including the local type members and
   /// the local function bodies.
-  llvm::Optional<Fingerprint> getBodyFingerprintIncludingLocalTypeMembers() const;
+  llvm::Optional<Fingerprint>
+  getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
   ///
@@ -8715,11 +8720,11 @@ public:
 ///
 /// \param skipParamIndex If the value is a function or subscript declaration,
 /// specifies the index of the parameter that shall be skipped.
-GenericParameterReferenceInfo findGenericParameterReferences(
-    const ValueDecl *value,
-    CanGenericSignature sig, GenericTypeParamType *genericParam,
-    bool treatNonResultCovarianceAsInvariant,
-    llvm::Optional<unsigned> skipParamIndex);
+GenericParameterReferenceInfo
+findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
+                               GenericTypeParamType *genericParam,
+                               bool treatNonResultCovarianceAsInvariant,
+                               llvm::Optional<unsigned> skipParamIndex);
 
 inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
                                             const DeclRefExpr *base) const {

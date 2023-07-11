@@ -823,9 +823,9 @@ void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
   }
 }
 
-void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID moduleID,
-                                 llvm::Optional<std::string> contextHash,
-                                 const ModuleDependencyInfo &dependencyInfo) {
+void ModuleDependenciesCacheSerializer::writeModuleInfo(
+    ModuleDependencyID moduleID, llvm::Optional<std::string> contextHash,
+    const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
   auto contextHashStrID = contextHash.has_value() ? getIdentifier(contextHash.value()) : 0;
 

@@ -1421,7 +1421,7 @@ private:
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;
-  llvm::Optional<llvm::InlineAsm*> ObjCRetainAutoreleasedReturnValueMarker;
+  llvm::Optional<llvm::InlineAsm *> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
   llvm::AttributeList AllocAttrs;
 
@@ -1440,8 +1440,8 @@ private:                                                                       \
   llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable llvm::Optional<SpareBitVector> HeapPointerSpareBits;
-  
-//--- Generic ---------------------------------------------------------------
+
+  //--- Generic ---------------------------------------------------------------
 public:
   llvm::Constant *getFixLifetimeFn();
 
@@ -1574,10 +1574,9 @@ public:
   llvm::Constant *
   getAddrOfEffectiveValueWitnessTable(CanType concreteType,
                                       ConstantInit init = ConstantInit());
-  llvm::Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
-                                                     bool isDestroyer,
-                                                     bool isForeign,
-                                                     ForDefinition_t forDefinition);
+  llvm::Optional<llvm::Function *>
+  getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer, bool isForeign,
+                           ForDefinition_t forDefinition);
 
   void setVCallVisibility(llvm::GlobalVariable *var,
                           llvm::GlobalObject::VCallVisibility visibility,

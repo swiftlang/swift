@@ -114,7 +114,8 @@ public:
       const ModuleDecl *moduleContext, Type resultTy,
       const ParameterList *params, bool hasThrows = false,
       const AnyFunctionType *funcType = nullptr, bool isStaticMethod = false,
-      llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo = llvm::None);
+      llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo =
+          llvm::None);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.

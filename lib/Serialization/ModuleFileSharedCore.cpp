@@ -1022,7 +1022,8 @@ bool ModuleFileSharedCore::readCommentBlock(llvm::BitstreamCursor &cursor) {
   return false;
 }
 
-static llvm::Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
+static llvm::Optional<swift::LibraryKind>
+getActualLibraryKind(unsigned rawKind) {
   auto stableKind = static_cast<serialization::LibraryKind>(rawKind);
   if (stableKind != rawKind)
     return llvm::None;

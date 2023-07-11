@@ -509,7 +509,8 @@ static Type substType(Type derivedType, unsigned level,
 
     if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
       auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
-      if (eltTys.size() == 1) return eltTys[0];
+      if (eltTys.size() == 1)
+        return eltTys[0];
       return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
     }
 
@@ -575,8 +576,8 @@ static Type substType(Type derivedType, unsigned level,
       if (IFS.shouldSubstituteOpaqueArchetypes() &&
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
-        return llvm::None; // Recursively process the substitutions of the opaque type
-                     // archetype.
+        return llvm::None; // Recursively process the substitutions of the
+                           // opaque type archetype.
       return known;
     }
 
@@ -928,7 +929,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 // Replacing opaque result archetypes with their underlying types
 //===----------------------------------------------------------------------===//
 
-static llvm::Optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType*>>
+static llvm::Optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType *>>
 getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
   auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType.getPointer());
   if (!archetype)

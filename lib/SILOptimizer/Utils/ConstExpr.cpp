@@ -252,7 +252,8 @@ public:
   ///
   ///   Second element is None, if the evaluation is successful.
   ///   Otherwise, is an unknown symbolic value that contains the error.
-  std::pair<llvm::Optional<SILBasicBlock::iterator>, llvm::Optional<SymbolicValue>>
+  std::pair<llvm::Optional<SILBasicBlock::iterator>,
+            llvm::Optional<SymbolicValue>>
   evaluateInstructionAndGetNext(
       SILBasicBlock::iterator instI,
       SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks);
@@ -1877,7 +1878,8 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                     UnknownReason::UnsupportedInstruction);
 }
 
-std::pair<llvm::Optional<SILBasicBlock::iterator>, llvm::Optional<SymbolicValue>>
+std::pair<llvm::Optional<SILBasicBlock::iterator>,
+          llvm::Optional<SymbolicValue>>
 ConstExprFunctionState::evaluateInstructionAndGetNext(
     SILBasicBlock::iterator instI,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks) {
@@ -1994,7 +1996,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
         inst->getModule().getSwiftModule(), sourceType, targetType);
     if (castResult == DynamicCastFeasibility::MaySucceed) {
       return {llvm::None, getUnknown(evaluator, inst->asSILNode(),
-                               UnknownReason::UnknownCastResult)};
+                                     UnknownReason::UnknownCastResult)};
     }
     // Determine the basic block to jump to.
     SILBasicBlock *resultBB =
@@ -2016,7 +2018,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
                           << "\n");
 
   return {llvm::None, getUnknown(evaluator, inst->asSILNode(),
-                           UnknownReason::UnsupportedInstruction)};
+                                 UnknownReason::UnsupportedInstruction)};
 }
 
 /// Evaluate a call to the specified function as if it were a constant
@@ -2155,7 +2157,8 @@ ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
 
 ConstExprStepEvaluator::~ConstExprStepEvaluator() { delete internalState; }
 
-std::pair<llvm::Optional<SILBasicBlock::iterator>, llvm::Optional<SymbolicValue>>
+std::pair<llvm::Optional<SILBasicBlock::iterator>,
+          llvm::Optional<SymbolicValue>>
 ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI) {
   // Reset `stepsEvaluated` to zero.
   stepsEvaluated = 0;
@@ -2222,7 +2225,8 @@ void ConstExprStepEvaluator::setMutableAddressesToUnknown(
   }
 }
 
-std::pair<llvm::Optional<SILBasicBlock::iterator>, llvm::Optional<SymbolicValue>>
+std::pair<llvm::Optional<SILBasicBlock::iterator>,
+          llvm::Optional<SymbolicValue>>
 ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
     SILBasicBlock::iterator instI) {
   SILInstruction *inst = &(*instI);
@@ -2263,7 +2267,8 @@ bool swift::isFailStopError(SymbolicValue errorVal) {
   }
 }
 
-std::pair<llvm::Optional<SILBasicBlock::iterator>, llvm::Optional<SymbolicValue>>
+std::pair<llvm::Optional<SILBasicBlock::iterator>,
+          llvm::Optional<SymbolicValue>>
 ConstExprStepEvaluator::tryEvaluateOrElseMakeEffectsNonConstant(
     SILBasicBlock::iterator instI) {
   auto evaluateResult = evaluate(instI);

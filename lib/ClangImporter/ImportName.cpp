@@ -472,11 +472,13 @@ StringRef importer::stripNotification(StringRef name) {
 static llvm::Optional<unsigned>
 matchFactoryAsInitName(const clang::ObjCMethodDecl *method) {
   // Only class methods can be mapped to initializers in this way.
-  if (!method->isClassMethod()) return llvm::None;
+  if (!method->isClassMethod())
+    return llvm::None;
 
   // Said class methods must be in an actual class.
   auto objcClass = method->getClassInterface();
-  if (!objcClass) return llvm::None;
+  if (!objcClass)
+    return llvm::None;
 
   // See if we can match the class name to the beginning of the first
   // selector piece.
@@ -511,7 +513,8 @@ determineFactoryInitializerKind(const clang::ObjCMethodDecl *method) {
   if (auto objcPtr = method->getReturnType()
                        ->getAs<clang::ObjCObjectPointerType>()) {
     auto objcClass = method->getClassInterface();
-    if (!objcClass) return llvm::None;
+    if (!objcClass)
+      return llvm::None;
 
     if (objcPtr->getInterfaceDecl() != objcClass) {
       // FIXME: Could allow a subclass here, but the rest of the compiler
@@ -600,7 +603,8 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
 static llvm::Optional<AnySwiftNameAttr>
 findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 #ifndef NDEBUG
-  if (llvm::Optional<const clang::Decl *> def = getDefinitionForClangTypeDecl(decl)) {
+  if (llvm::Optional<const clang::Decl *> def =
+          getDefinitionForClangTypeDecl(decl)) {
     assert((*def == nullptr || *def == decl) &&
            "swift_name should only appear on the definition");
   }
@@ -715,11 +719,13 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   // The remainder of this function emulates the limited form of swift_name
   // supported in Swift 2.
   auto attr = decl->getAttr<clang::SwiftNameAttr>();
-  if (!attr) return llvm::None;
+  if (!attr)
+    return llvm::None;
 
   // API notes produce attributes with no source location; ignore them because
   // they weren't used for naming in Swift 2.
-  if (attr->getLocation().isInvalid()) return llvm::None;
+  if (attr->getLocation().isInvalid())
+    return llvm::None;
 
   // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are
@@ -768,8 +774,8 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
   return FactoryAsInitKind::Infer;
 }
 
-llvm::Optional<CtorInitializerKind> determineCtorInitializerKind(
-    const clang::ObjCMethodDecl *method) {
+llvm::Optional<CtorInitializerKind>
+determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   const clang::ObjCInterfaceDecl *interface = method->getClassInterface();
 
   if (isInitMethod(method)) {
@@ -845,9 +851,10 @@ static bool omitNeedlessWordsInFunctionName(
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
     const clang::DeclContext *dc, const SmallBitVector &nonNullArgs,
-    llvm::Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
-    llvm::Optional<unsigned> completionHandlerIndex,
-    llvm::Optional<StringRef> completionHandlerName, NameImporter &nameImporter) {
+    llvm::Optional<unsigned> errorParamIndex, bool returnsSelf,
+    bool isInstanceMethod, llvm::Optional<unsigned> completionHandlerIndex,
+    llvm::Optional<StringRef> completionHandlerName,
+    NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
@@ -1106,11 +1113,12 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   return false;
 }
 
-llvm::Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
-    const clang::ObjCMethodDecl *clangDecl, StringRef &baseName,
-    SmallVectorImpl<StringRef> &paramNames,
-    ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
-    bool hasCustomName) {
+llvm::Optional<ForeignErrorConvention::Info>
+NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
+                                  StringRef &baseName,
+                                  SmallVectorImpl<StringRef> &paramNames,
+                                  ArrayRef<const clang::ParmVarDecl *> params,
+                                  bool isInitializer, bool hasCustomName) {
   // If the declaration name isn't parallel to the actual parameter
   // list (e.g. if the method has C-style parameter declarations),
   // don't try to apply error conventions.
@@ -1132,7 +1140,8 @@ llvm::Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
     auto errorKind =
       classifyMethodErrorHandling(clangDecl,
                                   getResultOptionality(clangDecl));
-    if (!errorKind) return llvm::None;
+    if (!errorKind)
+      return llvm::None;
 
     // Consider adjusting the imported declaration name to remove the
     // parameter.
@@ -1175,9 +1184,9 @@ llvm::Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
       if (index == 0 && suffixToStrip.empty()) {
         return llvm::None;
 
-      // If there was a conflict stripping an error suffix, adjust the
-      // name but don't change the base name.  This avoids creating a
-      // spurious _: () argument.
+        // If there was a conflict stripping an error suffix, adjust the
+        // name but don't change the base name.  This avoids creating a
+        // spurious _: () argument.
       } else if (index == 0 && !suffixToStrip.empty()) {
         suffixToStrip = {};
         baseName = origBaseName;
@@ -1241,13 +1250,10 @@ static bool isNullableNSErrorType(
   return true;
 }
 
-llvm::Optional<ForeignAsyncConvention::Info>
-NameImporter::considerAsyncImport(
-    const clang::ObjCMethodDecl *clangDecl,
-    StringRef baseName,
+llvm::Optional<ForeignAsyncConvention::Info> NameImporter::considerAsyncImport(
+    const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
     SmallVectorImpl<StringRef> &paramNames,
-    ArrayRef<const clang::ParmVarDecl *> params,
-    bool isInitializer,
+    ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
     llvm::Optional<unsigned> explicitCompletionHandlerParamIndex,
     CustomAsyncName customName,
     llvm::Optional<unsigned> completionHandlerFlagParamIndex,
@@ -1319,8 +1325,8 @@ NameImporter::considerAsyncImport(
   // Used for returns once we've determined that the method cannot be
   // imported as async, even though it has what looks like a completion handler
   // parameter.
-  auto notAsync = [&](const char *reason) ->
-      llvm::Optional<ForeignAsyncConvention::Info> {
+  auto notAsync =
+      [&](const char *reason) -> llvm::Optional<ForeignAsyncConvention::Info> {
 #ifdef ASYNC_IMPORT_DEBUG
     llvm::errs() << "*** failed async import: " << reason << "\n";
     clangDecl->dump(llvm::errs());
@@ -2372,18 +2378,19 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           baseName, argumentNames, params, method->getReturnType(),
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
-              ? llvm::Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
+              ? llvm::Optional<unsigned>(
+                    result.getErrorInfo()->ErrorParameterIndex)
               : llvm::None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
           result.getAsyncInfo().transform(
-            [](const ForeignAsyncConvention::Info &info) {
-              return info.completionHandlerParamIndex();
-            }),
+              [](const ForeignAsyncConvention::Info &info) {
+                return info.completionHandlerParamIndex();
+              }),
           result.getAsyncInfo().transform(
-            [&](const ForeignAsyncConvention::Info &info) {
-              return method->getDeclName().getObjCSelector().getNameForSlot(
-                                            info.completionHandlerParamIndex());
-            }),
+              [&](const ForeignAsyncConvention::Info &info) {
+                return method->getDeclName().getObjCSelector().getNameForSlot(
+                    info.completionHandlerParamIndex());
+              }),
           *this);
     }
 

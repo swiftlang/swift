@@ -753,7 +753,8 @@ bool SameShapeExpansionFailure::diagnoseAsError() {
   return true;
 }
 
-llvm::Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
+llvm::Optional<Diag<Type, Type>>
+GenericArgumentsMismatchFailure::getDiagnosticFor(
     ContextualTypePurpose context) {
   switch (context) {
   case CTP_Initialization:
@@ -2417,7 +2418,8 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
           locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
 
       auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
-      return memberRef ? llvm::Optional<OverloadChoice>(memberRef->choice) : llvm::None;
+      return memberRef ? llvm::Optional<OverloadChoice>(memberRef->choice)
+                       : llvm::None;
     }
 
     // If this is a string based dynamic lookup, there is no member declaration.

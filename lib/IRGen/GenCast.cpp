@@ -530,14 +530,10 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
 
 
 /// Emit a checked cast to a protocol or protocol composition.
-void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
-                                  llvm::Value *value,
-                                  SILType srcType,
-                                  SILType destType,
-                                  CheckedCastMode mode,
-                                  llvm::Optional<MetatypeRepresentation> metatypeKind,
-                                  GenericSignature fnSig,
-                                  Explosion &ex) {
+void irgen::emitScalarExistentialDowncast(
+    IRGenFunction &IGF, llvm::Value *value, SILType srcType, SILType destType,
+    CheckedCastMode mode, llvm::Optional<MetatypeRepresentation> metatypeKind,
+    GenericSignature fnSig, Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
@@ -1017,9 +1013,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     Explosion outRes;
     emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
                                   targetLoweredType, mode,
-                                  /*not a metatype*/ llvm::None,
-                                  fnSig,
-                                  outRes);
+                                  /*not a metatype*/ llvm::None, fnSig, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }

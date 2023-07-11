@@ -639,7 +639,8 @@ struct RenameInfo {
 };
 
 static llvm::Optional<RefactorAvailabilityInfo>
-renameAvailabilityInfo(const ValueDecl *VD, llvm::Optional<RenameRefInfo> RefInfo) {
+renameAvailabilityInfo(const ValueDecl *VD,
+                       llvm::Optional<RenameRefInfo> RefInfo) {
   RefactorAvailableKind AvailKind = RefactorAvailableKind::Available;
   if (getRelatedSystemDecl(VD)) {
     AvailKind = RefactorAvailableKind::Unavailable_system_symbol;
@@ -721,7 +722,8 @@ renameAvailabilityInfo(const ValueDecl *VD, llvm::Optional<RenameRefInfo> RefInf
 /// Given a cursor, return the decl and its rename availability. \c None if
 /// the cursor did not resolve to a decl or it resolved to a decl that we do
 /// not allow renaming on.
-static llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
+static llvm::Optional<RenameInfo>
+getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
   auto valueCursor = dyn_cast<ResolvedValueRefCursorInfo>(cursorInfo);
   if (!valueCursor)
     return llvm::None;
@@ -739,7 +741,8 @@ static llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo
                valueCursor->isKeywordArgument()};
   }
 
-  llvm::Optional<RefactorAvailabilityInfo> info = renameAvailabilityInfo(VD, refInfo);
+  llvm::Optional<RefactorAvailabilityInfo> info =
+      renameAvailabilityInfo(VD, refInfo);
   if (!info)
     return llvm::None;
 
@@ -798,8 +801,8 @@ private:
     return true;
   }
 
-  llvm::Optional<RenameLoc> indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
-                                             StringRef NewName);
+  llvm::Optional<RenameLoc>
+  indexSymbolToRenameLoc(const index::IndexSymbol &symbol, StringRef NewName);
 
 private:
   StringRef USR;
@@ -990,10 +993,9 @@ static void analyzeRenameScope(ValueDecl *VD,
   Scopes.push_back(Scope);
 }
 
-static llvm::Optional<RenameRangeCollector> localRenames(SourceFile *SF,
-                                                   SourceLoc startLoc,
-                                                   StringRef preferredName,
-                                                   DiagnosticEngine &diags) {
+static llvm::Optional<RenameRangeCollector>
+localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
+             DiagnosticEngine &diags) {
   auto cursorInfo =
       evaluateOrDefault(SF->getASTContext().evaluator,
                         CursorInfoRequest{CursorInfoOwner(SF, startLoc)},
@@ -1356,7 +1358,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   UnresolvedLoc UnresoledName{NameLoc, true};
 
   NameMatcher Matcher(*Instance->getPrimarySourceFile());
-  auto Resolved = Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
+  auto Resolved =
+      Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
   RenameLoc RenameConfig = {
@@ -1728,27 +1731,25 @@ bool RefactoringActionExtractExprBase::performChange() {
   EndOffset = DeclBuffer.size();
   OS << TyBuffer.str() <<  " = " << RangeInfo.ContentRange.str() << "\n";
 
-  NoteRegion DeclNameRegion{
-    RefactoringRangeKind::BaseName,
-    /*StartLine=*/1, /*StartColumn=*/StartOffset + 1,
-    /*EndLine=*/1, /*EndColumn=*/EndOffset + 1,
-    /*ArgIndex*/llvm::None
-  };
+  NoteRegion DeclNameRegion{RefactoringRangeKind::BaseName,
+                            /*StartLine=*/1,
+                            /*StartColumn=*/StartOffset + 1,
+                            /*EndLine=*/1,
+                            /*EndColumn=*/EndOffset + 1,
+                            /*ArgIndex*/ llvm::None};
 
   // Perform code change.
   EditConsumer.accept(SM, InsertLoc, DeclBuffer.str(), {DeclNameRegion});
 
   // Replace all occurrences of the extracted expression.
   for (auto *E : AllExpressions) {
-    EditConsumer.accept(SM,
-      Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange()),
-      PreferredName,
-      {{
-        RefactoringRangeKind::BaseName,
-        /*StartLine=*/1, /*StartColumn-*/1, /*EndLine=*/1,
-        /*EndColumn=*/static_cast<unsigned int>(PreferredName.size() + 1),
-        /*ArgIndex*/llvm::None
-      }});
+    EditConsumer.accept(
+        SM, Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange()),
+        PreferredName,
+        {{RefactoringRangeKind::BaseName,
+          /*StartLine=*/1, /*StartColumn-*/ 1, /*EndLine=*/1,
+          /*EndColumn=*/static_cast<unsigned int>(PreferredName.size() + 1),
+          /*ArgIndex*/ llvm::None}});
   }
   return false;
 }
@@ -8616,8 +8617,9 @@ bool RefactoringActionAddAsyncWrapper::performChange() {
 
 /// Retrieve the macro expansion buffer for the given macro expansion
 /// expression.
-static llvm::Optional<unsigned> getMacroExpansionBuffer(
-    SourceManager &sourceMgr, MacroExpansionExpr *expansion) {
+static llvm::Optional<unsigned>
+getMacroExpansionBuffer(SourceManager &sourceMgr,
+                        MacroExpansionExpr *expansion) {
   return evaluateOrDefault(
       expansion->getDeclContext()->getASTContext().evaluator,
       ExpandMacroExpansionExprRequest{expansion}, {});

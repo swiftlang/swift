@@ -809,7 +809,8 @@ makeBoundGenericType(NominalTypeDecl *decl,
 
 template <class T>
 static BuiltinFunctionBuilder::MetatypeGenerator<T>
-makeMetatype(const T &object, llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
+makeMetatype(const T &object,
+             llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
   return { object, repr };
 }
 

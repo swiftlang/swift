@@ -348,7 +348,8 @@ size_t camel_case::findWord(StringRef string, StringRef word) {
 
 /// Skip a type suffix that can be dropped.
 static llvm::Optional<StringRef> skipTypeSuffix(StringRef typeName) {
-  if (typeName.empty()) return llvm::None;
+  if (typeName.empty())
+    return llvm::None;
 
   auto lastWord = camel_case::getLastWord(typeName);
 
@@ -1212,18 +1213,14 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
   return false;
 }
 
-bool swift::omitNeedlessWords(StringRef &baseName,
-                              MutableArrayRef<StringRef> argNames,
-                              StringRef firstParamName,
-                              OmissionTypeName givenResultType,
-                              OmissionTypeName contextType,
-                              ArrayRef<OmissionTypeName> paramTypes,
-                              bool returnsSelf,
-                              bool isProperty,
-                              const InheritedNameSet *allPropertyNames,
-                              llvm::Optional<unsigned> completionHandlerIndex,
-                              llvm::Optional<StringRef> completionHandlerName,
-                              StringScratchSpace &scratch) {
+bool swift::omitNeedlessWords(
+    StringRef &baseName, MutableArrayRef<StringRef> argNames,
+    StringRef firstParamName, OmissionTypeName givenResultType,
+    OmissionTypeName contextType, ArrayRef<OmissionTypeName> paramTypes,
+    bool returnsSelf, bool isProperty, const InheritedNameSet *allPropertyNames,
+    llvm::Optional<unsigned> completionHandlerIndex,
+    llvm::Optional<StringRef> completionHandlerName,
+    StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
 
@@ -1370,7 +1367,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   return lowercaseAcronymsForReturn();
 }
 
-llvm::Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
+llvm::Optional<StringRef>
+swift::stripWithCompletionHandlerSuffix(StringRef name) {
   if (name.endswith("WithCompletionHandler")) {
     return name.drop_back(strlen("WithCompletionHandler"));
   }

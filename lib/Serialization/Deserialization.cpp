@@ -207,8 +207,7 @@ void ModuleFile::outputDiagnosticInfo(llvm::raw_ostream &os) const {
   Core->outputDiagnosticInfo(os);
 }
 
-static llvm::Optional<swift::AccessorKind>
-getActualAccessorKind(uint8_t raw) {
+static llvm::Optional<swift::AccessorKind> getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
 #define ACCESSOR(ID) \
   case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
@@ -936,7 +935,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
 
 /// Translate from the requirement kind to the Serialization enum
 /// values, which are guaranteed to be stable.
-static llvm::Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
+static llvm::Optional<RequirementKind>
+getActualRequirementKind(uint64_t rawKind) {
 #define CASE(KIND)                   \
   case GenericRequirementKind::KIND: \
     return RequirementKind::KIND;
@@ -1804,14 +1804,15 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, llvm::None, llvm::None, llvm::None);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, llvm::None,
+                                            llvm::None, llvm::None);
         result = getIdentifier(IID);
         break;
       }
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, llvm::None, IID, llvm::None, llvm::None,
-                                             llvm::None);
+        XRefValuePathPieceLayout::readRecord(
+            scratch, llvm::None, IID, llvm::None, llvm::None, llvm::None);
         result = getIdentifier(IID);
         break;
       }
@@ -1998,9 +1999,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
         if (nestedType) {
           SmallVector<ValueDecl *, 1> singleValueBuffer{nestedType};
-          filterValues(/*expectedTy*/Type(), extensionModule, genericSig,
-                       /*isType*/true, inProtocolExt, importedFromClang,
-                       /*isStatic*/false, /*ctorInit*/llvm::None, singleValueBuffer);
+          filterValues(/*expectedTy*/ Type(), extensionModule, genericSig,
+                       /*isType*/ true, inProtocolExt, importedFromClang,
+                       /*isStatic*/ false, /*ctorInit*/ llvm::None,
+                       singleValueBuffer);
           if (!singleValueBuffer.empty()) {
             values.assign({nestedType});
             ++NumNestedTypeShortcuts;
@@ -2456,7 +2458,8 @@ Expected<DeclContext *> ModuleFile::getDeclContextChecked(DeclContextID DCID) {
   if (!DCID)
     return FileContext;
 
-  if (llvm::Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
+  if (llvm::Optional<LocalDeclContextID> contextID =
+          DCID.getAsLocalDeclContextID())
     return getLocalDeclContext(contextID.value());
 
   auto deserialized = getDeclChecked(DCID.getAsDeclID().value());
@@ -2534,7 +2537,8 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static llvm::Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
+static llvm::Optional<swift::Associativity>
+getActualAssociativity(uint8_t assoc) {
   switch (assoc) {
   case serialization::Associativity::LeftAssociative:
     return swift::Associativity::Left;
@@ -2738,8 +2742,7 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
   }
 }
 
-static llvm::Optional<swift::MacroRole>
-getActualMacroRole(uint8_t context) {
+static llvm::Optional<swift::MacroRole> getActualMacroRole(uint8_t context) {
   switch (context) {
 #define CASE(THE_DK) \
   case (uint8_t)serialization::MacroRole::THE_DK: \
@@ -4319,9 +4322,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass = MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(),
-                                             llvm::None, genericParams, DC,
-                                             isExplicitActorDecl);
+    auto theClass =
+        MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(), llvm::None,
+                                 genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
     theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -4397,8 +4400,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(), llvm::None,
-                                           genericParams, DC);
+    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
+                                           llvm::None, genericParams, DC);
 
     declOrOffset = theEnum;
 
@@ -5531,8 +5534,8 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::TransposeDeclAttrLayout::readRecord(
             scratch, isImplicit, origNameId, origDeclId, parameters);
 
-        DeclNameRefWithLoc origName{
-            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), llvm::None};
+        DeclNameRefWithLoc origName{DeclNameRef(MF.getDeclBaseName(origNameId)),
+                                    DeclNameLoc(), llvm::None};
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
@@ -5922,8 +5925,8 @@ getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
 
 /// Translate from the serialization ParameterConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
-static
-llvm::Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
+static llvm::Optional<swift::ParameterConvention>
+getActualParameterConvention(uint8_t raw) {
   switch (serialization::ParameterConvention(raw)) {
 #define CASE(ID) \
   case serialization::ParameterConvention::ID: \
@@ -5962,8 +5965,8 @@ getActualSILParameterDifferentiability(uint8_t raw) {
 
 /// Translate from the serialization ResultConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
-static
-llvm::Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
+static llvm::Optional<swift::ResultConvention>
+getActualResultConvention(uint8_t raw) {
   switch (serialization::ResultConvention(raw)) {
 #define CASE(ID) \
   case serialization::ResultConvention::ID: return swift::ResultConvention::ID;
@@ -7858,7 +7861,8 @@ llvm::Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   return blobData;
 }
 
-llvm::Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
+llvm::Optional<ForeignErrorConvention>
+ModuleFile::maybeReadForeignErrorConvention() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -7946,7 +7950,8 @@ llvm::Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConventi
   llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
 
-llvm::Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
+llvm::Optional<ForeignAsyncConvention>
+ModuleFile::maybeReadForeignAsyncConvention() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;

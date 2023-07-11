@@ -175,11 +175,10 @@ SourceLoc Stmt::getEndLoc() const {
   llvm_unreachable("statement type not handled!");
 }
 
-BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
-                     SourceLoc rbloc, llvm::Optional<bool> implicit)
-  : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
-    LBLoc(lbloc), RBLoc(rbloc)
-{
+BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
+                     llvm::Optional<bool> implicit)
+    : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
+      LBLoc(lbloc), RBLoc(rbloc) {
   Bits.BraceStmt.NumElements = elts.size();
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
@@ -353,7 +352,7 @@ SourceLoc ReturnStmt::getEndLoc() const {
 }
 
 YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
-                             SourceLoc lpLoc, ArrayRef<Expr*> yields,
+                             SourceLoc lpLoc, ArrayRef<Expr *> yields,
                              SourceLoc rpLoc, llvm::Optional<bool> implicit) {
   void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
                               alignof(YieldStmt));
@@ -621,9 +620,8 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
 
 IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
                Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx)
-  : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else,
-           implicit) {
-}
+    : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
+             Else, implicit) {}
 
 ArrayRef<Stmt *> IfStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
   assert(scratch.empty());
@@ -660,11 +658,7 @@ bool IfStmt::isSyntacticallyExhaustive() const {
 
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
                      llvm::Optional<bool> implicit, ASTContext &Ctx)
-  : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
-    
-}
-  
-
+    : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {}
 
 SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
@@ -719,14 +713,13 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   }
 }
 
-CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
-                           SourceLoc caseLoc,
-                           ArrayRef<CaseLabelItem> caseLabelItems,
-                           SourceLoc unknownAttrLoc, SourceLoc colonLoc,
-                           BraceStmt *body,
-                           llvm::Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
-                           llvm::Optional<bool> implicit,
-                           NullablePtr<FallthroughStmt> fallthroughStmt) {
+CaseStmt *
+CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
+                 ArrayRef<CaseLabelItem> caseLabelItems,
+                 SourceLoc unknownAttrLoc, SourceLoc colonLoc, BraceStmt *body,
+                 llvm::Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
+                 llvm::Optional<bool> implicit,
+                 NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
                        fallthroughStmt.isNonNull(), caseLabelItems.size()),

@@ -566,7 +566,7 @@ namespace {
     BridgingConversion() : SubExpr(nullptr) {}
     BridgingConversion(Expr *sub, llvm::Optional<Conversion::KindTy> kind,
                        unsigned depth)
-      : SubExpr(sub), Kind(kind), MaxOptionalDepth(depth) {
+        : SubExpr(sub), Kind(kind), MaxOptionalDepth(depth) {
       assert(!kind || Conversion::isBridgingKind(*kind));
     }
 
@@ -643,9 +643,10 @@ static BridgingConversion getBridgingConversion(Expr *E) {
   // If we peeked through an opening, and we didn't recognize a specific
   // pattern above involving the opaque value, make sure we use the opening
   // as the final expression instead of accidentally look through it.
-  if (open) return { open, llvm::None, 0 };
+  if (open)
+    return {open, llvm::None, 0};
 
-  return { E, llvm::None, 0 };
+  return {E, llvm::None, 0};
 }
 
 /// If the given expression represents a bridging conversion, emit it with
@@ -2537,8 +2538,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
                captures);
 
-  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, captures, calleeTypeInfo, ApplyOptions(), C, llvm::None);
+  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
+                   captures, calleeTypeInfo, ApplyOptions(), C, llvm::None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2560,8 +2561,8 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions(), C, llvm::None);
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
+                   {}, calleeTypeInfo, ApplyOptions(), C, llvm::None);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -3022,14 +3023,11 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                         ParameterConvention::Direct_Unowned});
     
     SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
-    
-    return SILFunctionType::get(genericSig,
-      SILFunctionType::ExtInfo::getThin(),
-      SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned,
-      params, {}, result, llvm::None,
-      SubstitutionMap(), SubstitutionMap(),
-      SGM.getASTContext());
+
+    return SILFunctionType::get(
+        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, params, {}, result, llvm::None,
+        SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
   }();
   
   // Find the function and see if we already created it.
@@ -3205,14 +3203,11 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     if (!indexes.empty())
       params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
-    
-    return SILFunctionType::get(genericSig,
-      SILFunctionType::ExtInfo::getThin(),
-      SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned,
-      params, {}, {}, llvm::None,
-      SubstitutionMap(), SubstitutionMap(),
-      SGM.getASTContext());
+
+    return SILFunctionType::get(
+        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, params, {}, {}, llvm::None,
+        SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
   }();
   
   // Mangle the name of the thunk to see if we already created it.
@@ -3289,9 +3284,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   } else {
     auto baseOrig = ManagedValue::forLValue(baseArg);
     lv = LValue::forAddress(SGFAccessKind::ReadWrite, baseOrig, llvm::None,
-                            AbstractionPattern::getOpaque(),
-                            baseType);
-    
+                            AbstractionPattern::getOpaque(), baseType);
+
     // Open an existential lvalue, if necessary.
     if (baseType->isAnyExistentialType()) {
       auto opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
@@ -3404,15 +3398,12 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     SmallVector<SILResultInfo, 1> results;
     results.push_back({boolTy, ResultConvention::Unowned});
-    
-    auto signature = SILFunctionType::get(genericSig,
-      SILFunctionType::ExtInfo::getThin(),
-      SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned,
-      params, /*yields*/ {}, results, llvm::None,
-      SubstitutionMap(), SubstitutionMap(),
-      C);
-    
+
+    auto signature = SILFunctionType::get(
+        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
+        llvm::None, SubstitutionMap(), SubstitutionMap(), C);
+
     // Mangle the name of the thunk to see if we already created it.
     auto name = Mangle::ASTMangler()
       .mangleKeyPathEqualsHelper(indexTypes, genericSig, expansion);
@@ -3489,12 +3480,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                                     equatable);
       auto equalsSubstTy = equalsTy.castTo<SILFunctionType>()->substGenericArgs(
           SGM.M, equatableSub, TypeExpansionContext(subSGF.F));
-      auto equalsInfo = CalleeTypeInfo(equalsSubstTy,
-                                       AbstractionPattern(boolTy), boolTy,
-                                       llvm::None,
-                                       llvm::None,
-                                       ImportAsMemberStatus());
-      
+      auto equalsInfo =
+          CalleeTypeInfo(equalsSubstTy, AbstractionPattern(boolTy), boolTy,
+                         llvm::None, llvm::None, ImportAsMemberStatus());
+
       Scope branchScope(subSGF, loc);
       
       SILValue lhsEltAddr = lhsAddr;
@@ -3529,13 +3518,13 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         auto equalsResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        isEqual = subSGF
-          .emitApply(std::move(equalsResultPlan), std::move(argScope),
-                     loc, ManagedValue::forUnmanaged(equalsWitness),
-                     equatableSub,
-                     {lhsArg, rhsArg, metatyValue},
-                     equalsInfo, ApplyOptions(), SGFContext(), llvm::None)
-          .getUnmanagedSingleValue(subSGF, loc);
+        isEqual =
+            subSGF
+                .emitApply(std::move(equalsResultPlan), std::move(argScope),
+                           loc, ManagedValue::forUnmanaged(equalsWitness),
+                           equatableSub, {lhsArg, rhsArg, metatyValue},
+                           equalsInfo, ApplyOptions(), SGFContext(), llvm::None)
+                .getUnmanagedSingleValue(subSGF, loc);
       }
       
       branchScope.pop();
@@ -3581,14 +3570,12 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     SmallVector<SILResultInfo, 1> results;
     results.push_back({intTy, ResultConvention::Unowned});
-    
-    auto signature = SILFunctionType::get(genericSig,
-      SILFunctionType::ExtInfo::getThin(),
-      SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned,
-      params, /*yields*/ {}, results, llvm::None,
-      SubstitutionMap(), SubstitutionMap(), C);
-    
+
+    auto signature = SILFunctionType::get(
+        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
+        llvm::None, SubstitutionMap(), SubstitutionMap(), C);
+
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
     
@@ -4800,10 +4787,11 @@ namespace {
 
     /// A flattened list of l-values.
     SmallVectorImpl<llvm::Optional<LValue>> &Results;
+
   public:
     TupleLValueEmitter(SILGenFunction &SGF, SGFAccessKind accessKind,
                        SmallVectorImpl<llvm::Optional<LValue>> &results)
-      : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
+        : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
 
     // If the destination is a tuple, recursively destructure.
     void visitTupleExpr(TupleExpr *E) {
@@ -4841,7 +4829,7 @@ namespace {
   public:
     TupleLValueAssigner(SILGenFunction &SGF, SILLocation assignLoc,
                         SmallVectorImpl<llvm::Optional<LValue>> &destLVs)
-      : SGF(SGF), AssignLoc(assignLoc), DestLVQueue(destLVs) {}
+        : SGF(SGF), AssignLoc(assignLoc), DestLVQueue(destLVs) {}
 
     /// Top-level entrypoint.
     void emit(CanType destType, RValue &&src) {
@@ -4983,7 +4971,7 @@ namespace {
   public:
     PatternLValueEmitter(SILGenFunction &SGF, SGFAccessKind accessKind,
                          SmallVectorImpl<llvm::Optional<LValue>> &results)
-      : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
+        : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
 
 #define USE_SUBPATTERN(Kind) \
     Type visit##Kind##Pattern(Kind##Pattern *pattern) { \

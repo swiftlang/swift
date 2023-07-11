@@ -212,10 +212,9 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-SILDebugLocation
-SILGenFunction::getSILDebugLocation(SILBuilder &B, SILLocation Loc,
-                                    llvm::Optional<SILLocation> CurDebugLocOverride,
-                                    bool ForMetaInstruction) {
+SILDebugLocation SILGenFunction::getSILDebugLocation(
+    SILBuilder &B, SILLocation Loc,
+    llvm::Optional<SILLocation> CurDebugLocOverride, bool ForMetaInstruction) {
   const SILDebugScope *Scope = B.getCurrentDebugScope();
   if (!Scope)
     Scope = F.getDebugScope();
@@ -377,12 +376,13 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
     SILGenFunctionBuilder B(SGM);
     auto &ASTContext = SGM.M.getASTContext();
     auto ExtInfo = SILFunctionType::ExtInfo::getThin();
-    auto FunctionType = SILFunctionType::get(
-        nullptr, ExtInfo, SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, /*Params*/ {},
-        /*yields*/
-        {},
-        /*Results*/ {}, llvm::None, SubstitutionMap(), SubstitutionMap(), ASTContext);
+    auto FunctionType =
+        SILFunctionType::get(nullptr, ExtInfo, SILCoroutineKind::None,
+                             ParameterConvention::Direct_Unowned, /*Params*/ {},
+                             /*yields*/
+                             {},
+                             /*Results*/ {}, llvm::None, SubstitutionMap(),
+                             SubstitutionMap(), ASTContext);
     StringRef MacroName = ASTContext.getIdentifier(Macro.Name).str();
     RegularLocation MacroLoc(Macro.SLoc);
     // Use the ExpansionLoc as the location so IRGenDebugInfo can extract the
@@ -1151,8 +1151,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto NSStringFromClassType = SILFunctionType::get(
         nullptr, extInfo, SILCoroutineKind::None, paramConvention, params,
-        /*yields*/ {}, resultInfos, /*error result*/ llvm::None, SubstitutionMap(),
-        SubstitutionMap(), ctx);
+        /*yields*/ {}, resultInfos, /*error result*/ llvm::None,
+        SubstitutionMap(), SubstitutionMap(), ctx);
 
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,

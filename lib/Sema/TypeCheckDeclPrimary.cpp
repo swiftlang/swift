@@ -989,8 +989,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   return std::make_tuple<>();
 }
 
-static llvm::Optional<unsigned>
-getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+static llvm::Optional<unsigned> getParamIndex(const ParameterList *paramList,
+                                              const ParamDecl *decl) {
   ArrayRef<ParamDecl *> params = paramList->getArray();
   for (unsigned i = 0; i < params.size(); ++i) {
     if (params[i] == decl) return i;
@@ -1268,8 +1268,8 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
-static llvm::Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
-                                                           Pattern *pattern) {
+static llvm::Optional<std::string>
+buildDefaultInitializerString(DeclContext *dc, Pattern *pattern) {
   switch (pattern->getKind()) {
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #define PATTERN(Id, Parent)
@@ -1512,7 +1512,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       }
 
       auto varLoc = vars[0]->getLoc();
-      
+
       llvm::Optional<InFlightDiagnostic> diag;
       switch (vars.size()) {
       case 1:
@@ -1640,7 +1640,7 @@ template <typename Attr>
 static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
                             llvm::Optional<bool> expected,
                             SmallVectorImpl<DeclAttribute *> &removedAttrs,
-                            llvm::function_ref<Attr*()> willCreate) {
+                            llvm::function_ref<Attr *()> willCreate) {
   if (!expected) return;
 
   auto attr = VD->getAttrs().getAttribute<Attr>();
@@ -3795,7 +3795,7 @@ void TypeChecker::typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked) {
 
 void TypeChecker::checkParameterList(ParameterList *params,
                                      DeclContext *owner) {
-  llvm::Optional<ParamDecl*> firstIsolatedParam;
+  llvm::Optional<ParamDecl *> firstIsolatedParam;
   bool diagnosedDuplicateIsolatedParam = false;
   for (auto param: *params) {
     checkDeclAttributes(param);

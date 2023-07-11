@@ -188,7 +188,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
   if (!Files.empty() && !hasAnyPrimaryFiles) {
     llvm::Optional<std::vector<std::string>> userSuppliedNamesOrErr =
         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
-          Args, Diags, options::OPT_o, options::OPT_output_filelist);
+            Args, Diags, options::OPT_o, options::OPT_output_filelist);
     if (userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1)
       result.setIsSingleThreadedWMO(true);
   }

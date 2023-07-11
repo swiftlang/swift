@@ -274,9 +274,9 @@ namespace swift {
     }
 
     template <typename T>
-    bool
-    parseSILQualifier(llvm::Optional<T> &result,
-                      llvm::function_ref<llvm::Optional<T>(StringRef)> parseName);
+    bool parseSILQualifier(
+        llvm::Optional<T> &result,
+        llvm::function_ref<llvm::Optional<T>(StringRef)> parseName);
 
     bool parseVerbatim(StringRef identifier);
 
@@ -335,7 +335,8 @@ namespace swift {
       return false;
     }
 
-    llvm::Optional<StringRef> parseOptionalAttribute(ArrayRef<StringRef> expected) {
+    llvm::Optional<StringRef>
+    parseOptionalAttribute(ArrayRef<StringRef> expected) {
       // We parse here @ <identifier>.
       if (P.Tok.getKind() != tok::at_sign)
         return llvm::None;
@@ -829,12 +830,12 @@ static bool parseSILLinkage(llvm::Optional<SILLinkage> &Result, Parser &P) {
 
   // Then use a string switch to try and parse the identifier.
   Result = llvm::StringSwitch<llvm::Optional<SILLinkage>>(P.Tok.getText())
-    .Case("non_abi", SILLinkage::PublicNonABI)
-    .Case("hidden", SILLinkage::Hidden)
-    .Case("shared", SILLinkage::Shared)
-    .Case("public_external", SILLinkage::PublicExternal)
-    .Case("hidden_external", SILLinkage::HiddenExternal)
-    .Default(llvm::None);
+               .Case("non_abi", SILLinkage::PublicNonABI)
+               .Case("hidden", SILLinkage::Hidden)
+               .Case("shared", SILLinkage::Shared)
+               .Case("public_external", SILLinkage::PublicExternal)
+               .Case("hidden_external", SILLinkage::HiddenExternal)
+               .Default(llvm::None);
 
   // If we succeed, consume the token.
   if (Result) {
@@ -924,7 +925,8 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 //   return true;
 template <typename T>
 bool SILParser::parseSILQualifier(
-    llvm::Optional<T> &result, llvm::function_ref<llvm::Optional<T>(StringRef)> parseName) {
+    llvm::Optional<T> &result,
+    llvm::function_ref<llvm::Optional<T>(StringRef)> parseName) {
   auto loc = P.Tok.getLoc();
   StringRef Str;
   // If we do not parse '[' ... ']',
@@ -1554,13 +1556,13 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
 
 static llvm::Optional<AccessorKind> getAccessorKind(StringRef ident) {
   return llvm::StringSwitch<llvm::Optional<AccessorKind>>(ident)
-           .Case("getter", AccessorKind::Get)
-           .Case("setter", AccessorKind::Set)
-           .Case("addressor", AccessorKind::Address)
-           .Case("mutableAddressor", AccessorKind::MutableAddress)
-           .Case("read", AccessorKind::Read)
-           .Case("modify", AccessorKind::Modify)
-           .Default(llvm::None);
+      .Case("getter", AccessorKind::Get)
+      .Case("setter", AccessorKind::Set)
+      .Case("addressor", AccessorKind::Address)
+      .Case("mutableAddressor", AccessorKind::MutableAddress)
+      .Case("read", AccessorKind::Read)
+      .Case("modify", AccessorKind::Modify)
+      .Default(llvm::None);
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
@@ -1781,12 +1783,13 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
 }
 
 /// Look up whether the given string corresponds to a SIL opcode.
-static llvm::Optional<SILInstructionKind> getOpcodeByName(StringRef OpcodeName) {
+static llvm::Optional<SILInstructionKind>
+getOpcodeByName(StringRef OpcodeName) {
   return llvm::StringSwitch<llvm::Optional<SILInstructionKind>>(OpcodeName)
-  #define FULL_INST(Id, TextualName, Parent, MemBehavior, MayRelease) \
-    .Case(#TextualName, SILInstructionKind::Id)
-  #include "swift/SIL/SILNodes.def"
-    .Default(llvm::None);
+#define FULL_INST(Id, TextualName, Parent, MemBehavior, MayRelease)            \
+  .Case(#TextualName, SILInstructionKind::Id)
+#include "swift/SIL/SILNodes.def"
+      .Default(llvm::None);
 }
 
 /// getInstructionKind - This method maps the string form of a SIL instruction
@@ -5947,8 +5950,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
 
       if (Opcode == SILInstructionKind::SwitchEnumInst) {
-        ResultVal = B.createSwitchEnum(InstLoc, Val, DefaultBB, CaseBBs, llvm::None,
-                                       ProfileCounter(), forwardingOwnership);
+        ResultVal =
+            B.createSwitchEnum(InstLoc, Val, DefaultBB, CaseBBs, llvm::None,
+                               ProfileCounter(), forwardingOwnership);
       } else
         ResultVal = B.createSwitchEnumAddr(InstLoc, Val, DefaultBB, CaseBBs);
       break;
@@ -6341,7 +6345,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                    diag::sil_inst_autodiff_expected_function_type_operand);
         return true;
       }
-      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions = llvm::None;
+      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions =
+          llvm::None;
       // Parse an optional operand list
       //   `with_derivative { <operand> , <operand> }`.
       if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
@@ -7303,8 +7308,9 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
 /// will still incorrectly diagnose this as an "invalid redeclaration" and give
 /// all but the first declaration an error type.
 static llvm::Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
-                                            SILLinkage GlobalLinkage,
-                                            SILType GlobalType, Parser &P) {
+                                                  SILLinkage GlobalLinkage,
+                                                  SILType GlobalType,
+                                                  Parser &P) {
   // Create a set of DemangleOptions to produce the global variable's
   // identifier, which is used as a search key in the declaration context.
   Demangle::DemangleOptions demangleOpts;

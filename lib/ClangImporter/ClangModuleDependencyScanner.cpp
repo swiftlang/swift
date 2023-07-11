@@ -73,8 +73,7 @@ static void addSearchPathInvocationArguments(
 
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
-    ASTContext &ctx,
-    llvm::Optional<StringRef> sourceFileName = llvm::None) {
+    ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
   std::vector<std::string> commandLineArgs =
       ClangImporter::getClangArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
@@ -226,9 +225,11 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
   return workingDir;
 }
 
-llvm::Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
-    StringRef moduleName, ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &delegate, bool isTestableImport) {
+llvm::Optional<const ModuleDependencyInfo *>
+ClangImporter::getModuleDependencies(StringRef moduleName,
+                                     ModuleDependenciesCache &cache,
+                                     InterfaceSubContextDelegate &delegate,
+                                     bool isTestableImport) {
   auto &ctx = Impl.SwiftContext;
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =

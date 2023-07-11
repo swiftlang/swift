@@ -96,7 +96,8 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   /// worklist.
   void drainVisitedSinceLastMutationIntoWorklist() {
     while (!visitedSinceLastMutation.empty()) {
-      llvm::Optional<SILValue> nextValue = visitedSinceLastMutation.pop_back_val();
+      llvm::Optional<SILValue> nextValue =
+          visitedSinceLastMutation.pop_back_val();
       if (!nextValue.has_value()) {
         continue;
       }

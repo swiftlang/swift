@@ -112,10 +112,9 @@ class ExportContext {
   unsigned Platform : 8;
   unsigned Reason : 3;
 
-  ExportContext(DeclContext *DC,
-                AvailabilityContext runningOSVersion,
-                FragileFunctionKind kind,
-                bool spi, bool exported, bool implicit, bool deprecated,
+  ExportContext(DeclContext *DC, AvailabilityContext runningOSVersion,
+                FragileFunctionKind kind, bool spi, bool exported,
+                bool implicit, bool deprecated,
                 llvm::Optional<PlatformKind> unavailablePlatformKind);
 
 public:

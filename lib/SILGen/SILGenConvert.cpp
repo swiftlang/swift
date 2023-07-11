@@ -1529,7 +1529,8 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
         outerConversion.getKind() == Conversion::ForceAndBridgeToObjC;
       if (forced) {
         sourceType = sourceType.getOptionalObjectType();
-        if (!sourceType) return llvm::None;
+        if (!sourceType)
+          return llvm::None;
         intermediateType = intermediateType.getOptionalObjectType();
         assert(intermediateType);
       }
@@ -1603,4 +1604,3 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
   }
   llvm_unreachable("bad kind");
 }
-

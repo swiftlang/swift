@@ -55,7 +55,8 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-llvm::Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
+llvm::Optional<SILBasicBlock::iterator>
+swift::getInsertAfterPoint(SILValue val) {
   if (auto *inst = val->getDefiningInstruction()) {
     return std::next(inst->getIterator());
   }

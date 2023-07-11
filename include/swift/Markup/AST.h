@@ -40,7 +40,8 @@ struct CommentParts {
   llvm::Optional<const swift::markup::ReturnsField *> ReturnsField;
   llvm::Optional<const swift::markup::ThrowsField *> ThrowsField;
   llvm::SmallSetVector<StringRef, 8> Tags;
-  llvm::Optional<const swift::markup::LocalizationKeyField *> LocalizationKeyField;
+  llvm::Optional<const swift::markup::LocalizationKeyField *>
+      LocalizationKeyField;
 
   bool isEmpty() const {
     return !Brief.has_value() &&
@@ -561,10 +562,9 @@ class Image final : public InlineContent,
         ArrayRef<MarkupASTNode *> Children);
 
 public:
-  static Image *create(MarkupContext &MC,
-                      StringRef Destination,
-                      llvm::Optional<StringRef> Title,
-                      ArrayRef<MarkupASTNode *> Children);
+  static Image *create(MarkupContext &MC, StringRef Destination,
+                       llvm::Optional<StringRef> Title,
+                       ArrayRef<MarkupASTNode *> Children);
 
   StringRef getDestination() const { return Destination; }
 

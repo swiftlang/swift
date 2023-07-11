@@ -136,7 +136,9 @@ public:
   }
 
   virtual llvm::Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) const { return llvm::None; }
+  loadFingerprint(const IterableDeclContext *IDC) const {
+    return llvm::None;
+  }
 
 protected:
   /// Look up an operator declaration. Do not call directly, use
@@ -162,8 +164,7 @@ public:
   /// This function is an implementation detail for comment serialization.
   /// If you just want to get a comment attached to a decl, use
   /// \c Decl::getRawComment() or \c Decl::getSemanticBriefComment().
-  virtual llvm::Optional<CommentInfo>
-  getCommentForDecl(const Decl *D) const {
+  virtual llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const {
     return llvm::None;
   }
 
@@ -171,8 +172,7 @@ public:
   /// loaded. Otherwise, returns \c false.
   virtual bool hasLoadedSwiftDoc() const { return false; }
 
-  virtual llvm::Optional<StringRef>
-  getGroupNameForDecl(const Decl *D) const {
+  virtual llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const {
     return llvm::None;
   }
 
@@ -181,13 +181,11 @@ public:
     return llvm::None;
   }
 
-  virtual llvm::Optional<unsigned>
-  getSourceOrderForDecl(const Decl *D) const {
+  virtual llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const {
     return llvm::None;
   }
 
-  virtual llvm::Optional<StringRef>
-  getGroupNameByUSR(StringRef USR) const {
+  virtual llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const {
     return llvm::None;
   }
 

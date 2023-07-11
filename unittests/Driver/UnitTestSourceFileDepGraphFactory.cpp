@@ -56,7 +56,7 @@ void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
     return;
   auto fingerprintString = s.split(fingerprintSeparator).second.str();
   const llvm::Optional<Fingerprint> fingerprint =
-    swift::mockFingerprintFromString(fingerprintString);
+      swift::mockFingerprintFromString(fingerprintString);
 
   AbstractSourceFileDepGraphFactory::addADefinedDecl(key.value(),
                                                      fingerprint);
@@ -97,8 +97,10 @@ bool UnitTestSourceFileDepGraphFactory::isADefinedDecl(StringRef s) {
   return s.find(defUseSeparator) == StringRef::npos;
 }
 
-llvm::Optional<DependencyKey> UnitTestSourceFileDepGraphFactory::parseADefinedDecl(
-    StringRef s, const NodeKind kind, const DeclAspect aspect) {
+llvm::Optional<DependencyKey>
+UnitTestSourceFileDepGraphFactory::parseADefinedDecl(StringRef s,
+                                                     const NodeKind kind,
+                                                     const DeclAspect aspect) {
   static const char *privatePrefix = "#";
 
   s.consume_front(privatePrefix);

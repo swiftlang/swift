@@ -98,9 +98,10 @@ struct ResultPlanBuilder {
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
                               CanType substType);
-  ResultPlanPtr buildForPackExpansion(llvm::Optional<ArrayRef<Initialization*>> inits,
-                                      AbstractionPattern origExpansionType,
-                                      CanTupleEltTypeArrayRef substTypes);
+  ResultPlanPtr
+  buildForPackExpansion(llvm::Optional<ArrayRef<Initialization *>> inits,
+                        AbstractionPattern origExpansionType,
+                        CanTupleEltTypeArrayRef substTypes);
   ResultPlanPtr buildPackExpansionIntoPack(SILValue packAddr,
                                            CanPackType formalPackType,
                                            unsigned componentIndex,

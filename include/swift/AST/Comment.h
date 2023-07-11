@@ -53,11 +53,11 @@ public:
     return Parts.Brief;
   }
 
-  llvm::Optional<const swift::markup::ReturnsField * >getReturnsField() const {
+  llvm::Optional<const swift::markup::ReturnsField *> getReturnsField() const {
     return Parts.ReturnsField;
   }
 
-  llvm::Optional<const swift::markup::ThrowsField*> getThrowsField() const {
+  llvm::Optional<const swift::markup::ThrowsField *> getThrowsField() const {
     return Parts.ThrowsField;
   }
 

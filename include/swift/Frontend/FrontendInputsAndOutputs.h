@@ -190,6 +190,7 @@ private:
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs,
       ArrayRef<std::string> outputFilesForIndexUnits = llvm::None);
+
 public:
   unsigned countOfInputsProducingMainOutputs() const;
 

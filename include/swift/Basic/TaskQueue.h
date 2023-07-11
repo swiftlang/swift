@@ -91,7 +91,8 @@ public:
                          uint64_t maxrss)
       : OSPid(Pid), ProcessUsage(ResourceUsage(utime, stime, maxrss)) {}
 
-  TaskProcessInformation(ProcessId Pid) : OSPid(Pid), ProcessUsage(llvm::None) {}
+  TaskProcessInformation(ProcessId Pid)
+      : OSPid(Pid), ProcessUsage(llvm::None) {}
 
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
   TaskProcessInformation(ProcessId Pid, struct rusage Usage);
@@ -175,7 +176,8 @@ public:
   /// should proceed
   using TaskSignalledCallback = std::function<TaskFinishedResponse(
       ProcessId Pid, StringRef ErrorMsg, StringRef Output, StringRef Errors,
-      void *Context, llvm::Optional<int> Signal, TaskProcessInformation ProcInfo)>;
+      void *Context, llvm::Optional<int> Signal,
+      TaskProcessInformation ProcInfo)>;
 #pragma clang diagnostic pop
 
   /// Indicates whether TaskQueue supports buffering output on the

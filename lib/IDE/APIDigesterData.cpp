@@ -66,12 +66,12 @@ raw_ostream &swift::ide::api::operator<<(raw_ostream &Out, const DeclKind Value)
   return Out << getDeclKindStrRaw(Value);
 }
 
-llvm::Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {
+llvm::Optional<SDKNodeKind>
+swift::ide::api::parseSDKNodeKind(StringRef Content) {
   return llvm::StringSwitch<llvm::Optional<SDKNodeKind>>(Content)
 #define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
-    .Default(llvm::None)
-  ;
+      .Default(llvm::None);
 }
 
 NodeAnnotation swift::ide::api::parseSDKNodeAnnotation(StringRef Content) {

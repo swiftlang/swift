@@ -96,7 +96,8 @@ private:
 
   llvm::Optional<StringRef> consumeIfIdentifier() {
     StringRef ident;
-    return consumeIfIdentifier(ident) ? llvm::Optional<StringRef>(ident) : llvm::None;
+    return consumeIfIdentifier(ident) ? llvm::Optional<StringRef>(ident)
+                                      : llvm::None;
   }
 
   /***************************************************************************/

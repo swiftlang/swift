@@ -274,7 +274,8 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
         return OmissionTypeName(className, llvm::None, "Object");
 
       return OmissionTypeName(
-          className, llvm::None, getClangTypeNameForOmission(ctx, typeArgs[0]).Name);
+          className, llvm::None,
+          getClangTypeNameForOmission(ctx, typeArgs[0]).Name);
     }
 
     // Objective-C "id" type.

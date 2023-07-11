@@ -65,8 +65,8 @@ public:
   /// \param buffers If present, buffers read in the processing of the frontend
   /// inputs will be saved here. These should only be used for debugging
   /// purposes.
-  llvm::Optional<FrontendInputsAndOutputs> convert(
-      SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
+  llvm::Optional<FrontendInputsAndOutputs>
+  convert(SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
 
 private:
   bool enforceFilelistExclusion();
