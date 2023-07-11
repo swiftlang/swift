@@ -1477,78 +1477,6 @@ namespace {
 
       return Mval;
     }
-
-    std::pair<SILValue, CanSILFunctionType>
-    applySetterToBase(SILGenFunction &SGF, SILLocation loc, SILDeclRef setter,
-                      ManagedValue base) const {
-      auto setterFRef = [&]() -> SILValue {
-        auto setterInfo =
-            SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
-        if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
-          // Emit a thunk we might have to bridge arguments.
-          auto foreignSetterThunk = setter.asForeign(false);
-          return SGF
-              .emitDynamicMethodRef(
-                  loc, foreignSetterThunk,
-                  SGF.SGM.Types
-                      .getConstantInfo(SGF.getTypeExpansionContext(),
-                                       foreignSetterThunk)
-                      .SILFnType)
-              .getValue();
-        }
-
-        return SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
-      }();
-
-      auto getSetterType = [&](SILValue setterFRef) {
-        CanSILFunctionType setterTy =
-            setterFRef->getType().castTo<SILFunctionType>();
-        return setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
-                                          SGF.getTypeExpansionContext());
-      };
-
-      auto setterTy = getSetterType(setterFRef);
-      SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
-
-      // Emit captures for the setter
-      SmallVector<SILValue, 4> capturedArgs;
-      auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(setter);
-      if (!captureInfo.getCaptures().empty()) {
-        SmallVector<ManagedValue, 4> captures;
-        SGF.emitCaptures(loc, setter, CaptureEmission::AssignByWrapper,
-                         captures);
-
-        for (auto capture : captures)
-          capturedArgs.push_back(capture.forward(SGF));
-      } else {
-        assert(base);
-
-        SILValue capturedBase;
-        unsigned argIdx = setterConv.getNumSILArguments() - 1;
-
-        if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
-          capturedBase = base.getValue();
-        } else if (base.getType().isAddress() &&
-                   base.getType().getObjectType() ==
-                       setterConv.getSILArgumentType(
-                           argIdx, SGF.getTypeExpansionContext())) {
-          // If the base is a reference and the setter expects a value, emit a
-          // load. This pattern is emitted for property wrappers with a
-          // nonmutating setter, for example.
-          capturedBase = SGF.B.createTrivialLoadOr(
-              loc, base.getValue(), LoadOwnershipQualifier::Copy);
-        } else {
-          capturedBase = base.copy(SGF, loc).forward(SGF);
-        }
-
-        capturedArgs.push_back(capturedBase);
-      }
-
-      PartialApplyInst *setterPAI =
-          SGF.B.createPartialApply(loc, setterFRef, Substitutions, capturedArgs,
-                                   ParameterConvention::Direct_Guaranteed);
-      return {SGF.emitManagedRValueWithCleanup(setterPAI).getValue(), setterTy};
-    }
   };
 
   class InitAccessorComponent
@@ -1593,8 +1521,8 @@ namespace {
       CanSILFunctionType setterTy;
 
       if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
-        std::tie(setterFRef, setterTy) =
-            applySetterToBase(SGF, loc, SILDeclRef(setter), base);
+        std::tie(setterFRef, setterTy) = SGF.emitApplyOfSetterToBase(
+            loc, SILDeclRef(setter), base, Substitutions);
       } else {
         setterFRef = SILUndef::get(initFRef->getType(), SGF.F);
         setterTy = initFRef->getType().castTo<SILFunctionType>();
@@ -1897,7 +1825,7 @@ namespace {
         SILValue setterFn;
         CanSILFunctionType setterTy;
         std::tie(setterFn, setterTy) =
-            applySetterToBase(SGF, loc, Accessor, base);
+            SGF.emitApplyOfSetterToBase(loc, Accessor, base, Substitutions);
 
         // Create the assign_by_wrapper with the initializer and setter.
 
