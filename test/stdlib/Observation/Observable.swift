@@ -1,6 +1,9 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
+
+// Run this test via the swift-plugin-server
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -external-plugin-path -Xfrontend %swift-host-lib-dir/plugins#%swift-plugin-server)
 
 // Asserts is required for '-enable-experimental-feature InitAccessors'.
 // REQUIRES: asserts
@@ -18,29 +21,6 @@ func _blackHole<T>(_ value: T) { }
 
 @Observable
 class ContainsNothing { }
-
-@Observable
-struct Structure {
-  var field: Int = 0
-}
-
-@Observable
-struct MemberwiseInitializers {
-  var field: Int
-}
-
-func validateMemberwiseInitializers() {
-  _ = MemberwiseInitializers(field: 3)
-}
-
-@Observable
-struct DefiniteInitialization {
-  var field: Int
-
-  init(field: Int) {
-    self.field = field
-  }
-}
 
 @Observable
 class ContainsWeak {
@@ -84,6 +64,31 @@ struct NonObservableContainer {
   @Observable
   class ObservableContents {
     var field: Int = 3
+  }
+}
+
+@Observable
+final class SendableClass: Sendable {
+  var field: Int = 3
+}
+
+@Observable
+class CodableClass: Codable {
+  var field: Int = 3
+}
+
+@Observable
+final class HashableClass {
+  var field: Int = 3
+}
+
+extension HashableClass: Hashable {
+  static func == (lhs: HashableClass, rhs: HashableClass) -> Bool {
+    lhs.field == rhs.field
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(field)
   }
 }
 
@@ -154,9 +159,6 @@ class IsolatedInstance {
 }
 
 @Observable
-struct StructHasExistingConformance: Observable { }
-
-@Observable
 class ClassHasExistingConformance: Observable { }
 
 protocol Intermediary: Observable { }
@@ -201,23 +203,6 @@ struct Validator {
       expectEqual(changed.state, true)
       changed.state = false
       test.firstName = "c"
-      expectEqual(changed.state, false)
-    }
-
-    suite.test("tracking structure changes") {
-      let changed = CapturedState(state: false)
-      
-      var test = Structure()
-      withObservationTracking {
-        _blackHole(test.field)
-      } onChange: {
-        changed.state = true
-      }
-      
-      test.field = 4
-      expectEqual(changed.state, true)
-      changed.state = false
-      test.field = 5
       expectEqual(changed.state, false)
     }
 
