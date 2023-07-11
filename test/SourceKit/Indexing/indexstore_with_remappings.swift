@@ -11,7 +11,7 @@ class Foo {
 
 // CHECK: indexstore_with_remappings.o-{{.*}}
 // CHECK: module-name: indexstoremodule
-// CHECK: main-path: REMAPPED_SRC_ROOT/indexstore_with_remappings.swift
-// CHECK: out-file: REMAPPED_OUT_DIR/indexstore_with_remappings.o
+// CHECK: main-path: REMAPPED_SRC_ROOT{{/|\\}}indexstore_with_remappings.swift
+// CHECK: out-file: REMAPPED_OUT_DIR{{/|\\}}indexstore_with_remappings.o
 // CHECK: is-debug: 1
 // CHECK: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
