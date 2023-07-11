@@ -18,7 +18,6 @@
 #include "swift/Immediate/Immediate.h"
 #include "ImmediateImpl.h"
 
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
@@ -28,17 +27,19 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/Orc/DebugUtils.h"
+#include "llvm/ExecutionEngine/Orc/EPCIndirectionUtils.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ObjectTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/TargetProcess/TargetExecutionUtils.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Support/Path.h"
 
 #define DEBUG_TYPE "swift-immediate"
 
@@ -254,77 +255,275 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
   return false;
 }
 
-static llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
-createJIT(const IRGenOptions &IRGenOpts, ASTContext &Ctx) {
-  llvm::TargetOptions TargetOpt;
-  std::string CPU;
-  std::string Triple;
-  std::vector<std::string> Features;
-  std::tie(TargetOpt, CPU, Features, Triple) =
-      getIRTargetOptions(IRGenOpts, Ctx);
-  auto JTMB = llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
-                  .setRelocationModel(llvm::Reloc::PIC_)
-                  .setOptions(std::move(TargetOpt))
-                  .setCPU(std::move(CPU))
-                  .addFeatures(Features)
-                  .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
-  return llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(JTMB).create();
+/// The suffix appended to function bodies when creating lazy reexports
+const std::string ManglingSuffix = "$impl";
+
+/// Mangle a function for a lazy reexport
+std::string mangleFunctionBody(const StringRef Unmangled) {
+  return Unmangled.str() + ManglingSuffix;
 }
 
+/// Whether a function name is mangled to be a lazy reexport
+bool isMangled(const StringRef Symbol) {
+  return Symbol.endswith(ManglingSuffix);
+}
+
+/// Demangle a lazy reexport
+StringRef demangleFunctionBody(const StringRef Mangled) {
+  return Mangled.drop_back(ManglingSuffix.size());
+}
+
+class SILMaterializationUnit;
+
+/// Wraps an LLJIT instance, adds lazy compilation.
+class SwiftJIT {
+public:
+  SwiftJIT(const SwiftJIT &) = delete;
+  SwiftJIT(SwiftJIT &&) = delete;
+  SwiftJIT &operator=(const SwiftJIT &) = delete;
+  SwiftJIT &operator=(SwiftJIT &&) = delete;
+
+  /// Attempt to create and initialize a new `SwiftJIT` with lazy compilation
+  /// enabled and an attached generator to search for symbols defined in the
+  /// current process.
+  static llvm::Expected<std::unique_ptr<SwiftJIT>>
+  Create(const IRGenOptions &IRGenOpts, ASTContext &Ctx) {
+    llvm::TargetOptions TargetOpt;
+    std::string CPU;
+    std::string Triple;
+    std::vector<std::string> Features;
+    std::tie(TargetOpt, CPU, Features, Triple) =
+        getIRTargetOptions(IRGenOpts, Ctx);
+    auto JTMB = llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
+                    .setRelocationModel(llvm::Reloc::PIC_)
+                    .setOptions(std::move(TargetOpt))
+                    .setCPU(std::move(CPU))
+                    .addFeatures(Features)
+                    .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+
+    auto J =
+        getLLJITBuilder().setJITTargetMachineBuilder(std::move(JTMB)).create();
+    if (!J)
+      return J.takeError();
+
+    // Create generator to resolve symbols defined in current process
+    auto G = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+        (*J)->getDataLayout().getGlobalPrefix());
+    if (!G)
+      return G.takeError();
+    (*J)->getMainJITDylib().addGenerator(std::move(*G));
+
+    auto EPCIU = llvm::orc::EPCIndirectionUtils::Create(
+        (*J)->getExecutionSession().getExecutorProcessControl());
+    if (!EPCIU)
+      return EPCIU.takeError();
+
+    (*EPCIU)->createLazyCallThroughManager(
+        (*J)->getExecutionSession(),
+        llvm::pointerToJITTargetAddress(&handleLazyCompilationFailure));
+
+    if (auto Err = setUpInProcessLCTMReentryViaEPCIU(**EPCIU))
+      return std::move(Err);
+    return std::unique_ptr<SwiftJIT>(
+        new SwiftJIT(std::move(*J), std::move(*EPCIU)));
+  }
+
+  ~SwiftJIT() {
+    if (auto Err = EPCIU->cleanup())
+      J->getExecutionSession().reportError(std::move(Err));
+  }
+
+  llvm::orc::JITDylib &getMainJITDylib() { return J->getMainJITDylib(); }
+
+  /// Register a the materialization unit `MU` with the `JITDylib``JD` and
+  /// create lazy reexports for all functions defined in the interface of `MU`
+  llvm::Error addSwift(llvm::orc::JITDylib &JD,
+                       std::unique_ptr<SILMaterializationUnit> MU);
+
+  llvm::Error initialize(llvm::orc::JITDylib &JD) { return J->initialize(JD); }
+
+  llvm::Error deinitialize(llvm::orc::JITDylib &JD) {
+    return J->deinitialize(JD);
+  }
+
+  llvm::Expected<llvm::orc::ExecutorAddr> lookup(llvm::StringRef Name) {
+    return J->lookup(Name);
+  }
+
+  llvm::Expected<llvm::orc::ExecutorAddr>
+  lookupLinkerMangled(llvm::StringRef Name) {
+    return J->lookupLinkerMangled(Name);
+  }
+
+  // TODO: Replace with ExecutionSession::intern + a proper (TBD-based?)
+  // interface generator for Swift.
+  llvm::orc::SymbolStringPtr mangleAndIntern(StringRef Name) {
+    return J->mangleAndIntern(Name);
+  }
+
+  llvm::orc::IRCompileLayer &getIRCompileLayer() {
+    return J->getIRCompileLayer();
+  }
+
+  llvm::orc::ObjectTransformLayer &getObjTransformLayer() {
+    return J->getObjTransformLayer();
+  }
+
+private:
+  /// Creates a `LLJITTargetBuilder` and configures its `ObjectLinkingLayer`
+  static llvm::orc::LLJITBuilder getLLJITBuilder() {
+    using ObjLayer = llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>>;
+    return std::move(llvm::orc::LLJITBuilder().setObjectLinkingLayerCreator(
+        [&](auto &ES, const auto &TargetTriple) -> ObjLayer {
+          auto MemMgr = llvm::jitlink::InProcessMemoryManager::Create();
+          if (!MemMgr)
+            return MemMgr.takeError();
+          return std::make_unique<llvm::orc::ObjectLinkingLayer>(
+              ES, std::move(*MemMgr));
+        }));
+  }
+
+  /// An ORC layer to rename the names of function bodies to support lazy
+  /// reexports
+  class SwiftJITPlugin : public llvm::orc::ObjectLinkingLayer::Plugin {
+  public:
+    void
+    modifyPassConfig(llvm::orc::MaterializationResponsibility &MR,
+                     llvm::jitlink::LinkGraph &G,
+                     llvm::jitlink::PassConfiguration &PassConfig) override {
+      PassConfig.PrePrunePasses.push_back([&](llvm::jitlink::LinkGraph &G) {
+        return renameFunctionBodies(MR, G);
+      });
+    };
+
+    llvm::Error
+    notifyFailed(llvm::orc::MaterializationResponsibility &MR) override {
+      return llvm::Error::success();
+    }
+
+    llvm::Error notifyRemovingResources(llvm::orc::ResourceKey K) override {
+      return llvm::Error::success();
+    }
+
+    void notifyTransferringResources(llvm::orc::ResourceKey DstKey,
+                                     llvm::orc::ResourceKey SrcKey) override {}
+
+  private:
+    static llvm::Error
+    renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
+                         llvm::jitlink::LinkGraph &G) {
+
+      using namespace llvm;
+      using namespace llvm::orc;
+
+      llvm::DenseSet<StringRef> ToRename;
+      for (auto &KV : MR.getSymbols()) {
+        const auto &Name = *KV.first;
+        if (isMangled(Name))
+          // All mangled functions we are responsible for
+          // materializing must be mangled at the object level
+          ToRename.insert(demangleFunctionBody(Name));
+      }
+      for (auto &Sec : G.sections()) {
+        // Skip non-executable sections.
+        if ((Sec.getMemProt() & llvm::orc::MemProt::Exec) ==
+            llvm::orc::MemProt::None)
+          continue;
+
+        for (auto *Sym : Sec.symbols()) {
+
+          // Skip all anonymous and non-callables.
+          if (!Sym->hasName() || !Sym->isCallable())
+            continue;
+
+          if (ToRename.count(Sym->getName())) {
+            // FIXME: Get rid of the temporary when Swift's llvm-project is
+            // updated to LLVM 17.
+            auto NewName = G.allocateString(mangleFunctionBody(Sym->getName()));
+            Sym->setName({NewName.data(), NewName.size()});
+          }
+        }
+      }
+
+      return Error::success();
+    }
+  };
+
+  static void handleLazyCompilationFailure() {
+    llvm::errs() << "Lazy compilation error\n";
+    exit(1);
+  }
+
+  SwiftJIT(std::unique_ptr<llvm::orc::LLJIT> J,
+           std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU)
+      : J(std::move(J)), EPCIU(std::move(EPCIU)),
+        LCTM(this->EPCIU->getLazyCallThroughManager()),
+        ISM(this->EPCIU->createIndirectStubsManager()) {
+
+    static_cast<llvm::orc::ObjectLinkingLayer &>(this->J->getObjLinkingLayer())
+        .addPlugin(std::make_unique<SwiftJITPlugin>());
+  }
+
+  std::unique_ptr<llvm::orc::LLJIT> J;
+  std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU;
+  llvm::orc::LazyCallThroughManager &LCTM;
+  std::unique_ptr<llvm::orc::IndirectStubsManager> ISM;
+};
+
+/// Lazily materializes an entire SIL module
 class SILMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
-  SILMaterializationUnit(llvm::orc::LLJIT &JIT, CompilerInstance &CI,
+  SILMaterializationUnit(SwiftJIT &JIT, const CompilerInstance &CI,
                          const IRGenOptions &IRGenOpts,
                          std::unique_ptr<SILModule> SM)
-      : MaterializationUnit(getInterface(JIT, SM->getSwiftModule())), JIT(JIT),
-        CI(CI), IRGenOpts(IRGenOpts), SM(std::move(SM)) {}
+      : MaterializationUnit(getInterface(JIT, CI)), JIT(JIT), CI(CI),
+        IRGenOpts(IRGenOpts), SM(std::move(SM)) {}
 
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> R) override {
+
     // TODO: Use OptimizedIRRequest for this.
-    ASTContext &Context = CI.getASTContext();
+    const auto &Context = CI.getASTContext();
     auto *swiftModule = CI.getMainModule();
     const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
     const auto &TBDOpts = CI.getInvocation().getTBDGenOptions();
+
+    // Lower the SIL module to LLVM IR
     auto GenModule = performIRGeneration(
         swiftModule, IRGenOpts, TBDOpts, std::move(SM),
         swiftModule->getName().str(), PSPs, ArrayRef<std::string>());
+
     if (Context.hadError()) {
       R->failMaterialization();
       return;
     }
+
     assert(GenModule && "Emitted no diagnostics but IR generation failed?");
     auto *Module = GenModule.getModule();
+
+    // Run LLVM passes on the resulting module
     performLLVM(IRGenOpts, Context.Diags, /*diagMutex*/ nullptr,
                 /*hash*/ nullptr, Module, GenModule.getTargetMachine(),
                 CI.getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename,
                 CI.getOutputBackend(), Context.Stats);
 
-    switch (IRGenOpts.DumpJIT) {
-    case JITDebugArtifact::None:
-      break;
-    case JITDebugArtifact::LLVMIR:
-      DumpLLVMIR(*Module);
-      break;
-    case JITDebugArtifact::Object:
-      JIT.getObjTransformLayer().setTransform(llvm::orc::DumpObjects());
-      break;
-    }
-
+    // Dump IR if requested
     LLVM_DEBUG(llvm::dbgs() << "Module to be executed:\n"; Module->dump());
+    dumpJIT(*Module);
 
-    auto globals = Module->global_objects();
+    // Now we must register all other public symbols defined by
+    // the module with the JIT
     llvm::orc::SymbolFlagsMap Symbols;
-    for (auto itr = globals.begin(); itr != globals.end(); itr++) {
-      auto &global = *itr;
-      if (global.hasLocalLinkage() || global.isDeclaration() ||
-          global.hasAppendingLinkage())
-        continue;
-      auto name = JIT.mangleAndIntern(global.getName());
-      if (!R->getSymbols().count(name)) {
-        Symbols[name] = llvm::JITSymbolFlags::fromGlobalValue(global);
-      }
+    // Register all global objects, including global
+    // variables and functions
+    for (const auto &Global : Module->global_objects()) {
+      addGlobal(Symbols, Global);
     }
+    // Register all global aliases
+    for (const auto &Global : Module->aliases()) {
+      addGlobal(Symbols, Global);
+    }
+    // Register the symbols we have discovered with the JIT
     if (auto Err = R->defineMaterializing(Symbols)) {
       logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     }
@@ -332,26 +531,82 @@ public:
     JIT.getIRCompileLayer().emit(std::move(R), std::move(TSM));
   }
 
-  StringRef getName() const override { return "SwiftMU"; }
+  StringRef getName() const override { return "SILMaterializationUnit"; }
 
 private:
+  /// Dump the contents of `Module` if requested
+  void dumpJIT(const llvm::Module &Module) {
+    switch (IRGenOpts.DumpJIT) {
+    case JITDebugArtifact::None:
+      break;
+    case JITDebugArtifact::LLVMIR:
+      DumpLLVMIR(Module);
+      break;
+    case JITDebugArtifact::Object:
+      JIT.getObjTransformLayer().setTransform(llvm::orc::DumpObjects());
+      break;
+    }
+  }
+
+  /// All global value `Global` to `Symbols` if it is a public definition
+  void addGlobal(llvm::orc::SymbolFlagsMap &Symbols,
+                 const llvm::GlobalValue &Global) {
+    // Ignore all symbols that will not appear in symbol table
+    if (Global.hasLocalLinkage() || Global.isDeclaration() ||
+        Global.hasAppendingLinkage())
+      return;
+    auto Name = Global.getName();
+    // The entry point is already registered up front with the
+    // interface, so ignore it as well
+    if (Name == CI.getASTContext().getEntryPointFunctionName())
+      return;
+    auto MangledName = JIT.mangleAndIntern(Name);
+    // Register this symbol with the proper flags
+    Symbols[MangledName] = llvm::JITSymbolFlags::fromGlobalValue(Global);
+  }
+
   void discard(const llvm::orc::JITDylib &JD,
                const llvm::orc::SymbolStringPtr &Sym) override {}
 
-  static MaterializationUnit::Interface getInterface(llvm::orc::LLJIT &JIT,
-                                                     ModuleDecl *SwiftModule) {
-    // FIXME: Register symbols with the correct flags
-    llvm::orc::SymbolFlagsMap Symbols{
-        {JIT.mangleAndIntern("main"),
-         llvm::JITSymbolFlags::Callable | llvm::JITSymbolFlags::Exported}};
+  /// Get the public interface of the main module, which for a script just
+  /// comprises the entry point
+  static MaterializationUnit::Interface
+  getInterface(SwiftJIT &JIT, const CompilerInstance &CI) {
+    const auto &EntryPoint = CI.getASTContext().getEntryPointFunctionName();
+    auto MangledEntryPoint =
+        JIT.mangleAndIntern(mangleFunctionBody(EntryPoint));
+    auto Flags =
+        llvm::JITSymbolFlags::Callable | llvm::JITSymbolFlags::Exported;
+    llvm::orc::SymbolFlagsMap Symbols{{MangledEntryPoint, Flags}};
     return {std::move(Symbols), nullptr};
   }
-  std::unique_ptr<llvm::TargetMachine> Target;
-  llvm::orc::LLJIT &JIT;
-  CompilerInstance &CI;
+
+  SwiftJIT &JIT;
+  const CompilerInstance &CI;
   const IRGenOptions &IRGenOpts;
   std::unique_ptr<SILModule> SM;
 };
+
+llvm::Error SwiftJIT::addSwift(llvm::orc::JITDylib &JD,
+                               std::unique_ptr<SILMaterializationUnit> MU) {
+  // Create stub map.
+  llvm::orc::SymbolAliasMap Stubs;
+  for (auto &[Name, Flags] : MU->getSymbols()) {
+    if (isMangled(*Name)) {
+      // Create a stub for mangled functions
+      auto OriginalName = demangleFunctionBody(*Name);
+      Stubs.insert(
+          {J->getExecutionSession().intern(OriginalName), {Name, Flags}});
+    }
+  }
+  assert(ISM.get() && "No ISM?");
+
+  if (!Stubs.empty())
+    if (auto Err = JD.define(lazyReexports(LCTM, *ISM, JD, std::move(Stubs))))
+      return Err;
+
+  return JD.define(std::move(MU));
+}
 
 int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                           const IRGenOptions &IRGenOpts,
@@ -414,26 +669,18 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   if (autolinkImportedModules(swiftModule, IRGenOpts))
     return -1;
 
-  auto JIT = createJIT(IRGenOpts, swiftModule->getASTContext());
+  auto JIT = SwiftJIT::Create(IRGenOpts, swiftModule->getASTContext());
   if (auto Err = JIT.takeError()) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return -1;
   }
-  if (auto G = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-          (*JIT)->getDataLayout().getGlobalPrefix()))
-    (*JIT)->getMainJITDylib().addGenerator(std::move(*G));
-  else {
-    logAllUnhandledErrors(G.takeError(), llvm::errs(), "");
-    return -1;
-  }
+
   auto MU = std::make_unique<SILMaterializationUnit>(**JIT, CI, IRGenOpts,
                                                      std::move(SM));
-  if (auto Err = (*JIT)->getMainJITDylib().define(std::move(MU))) {
+  if (auto Err = (*JIT)->addSwift((*JIT)->getMainJITDylib(), std::move(MU))) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return -1;
   }
-
-  using MainFnTy = int(*)(int, char*[]);
 
   LLVM_DEBUG(llvm::dbgs() << "Running static constructors\n");
   if (auto Err = (*JIT)->initialize((*JIT)->getMainJITDylib())) {
@@ -441,14 +688,14 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
     return -1;
   }
 
-  MainFnTy JITMain = nullptr;
-  auto mangled = (*JIT)->mangleAndIntern("main");
-  if (auto MainFnOrErr = (*JIT)->lookupLinkerMangled(*mangled))
-    JITMain = llvm::jitTargetAddressToFunction<MainFnTy>(MainFnOrErr->getValue());
-  else {
-    logAllUnhandledErrors(MainFnOrErr.takeError(), llvm::errs(), "");
+  auto MainSym = (*JIT)->lookup("main");
+  if (!MainSym) {
+    llvm::logAllUnhandledErrors(MainSym.takeError(), llvm::errs(), "");
     return -1;
   }
+
+  using MainFnTy = int (*)(int, char *[]);
+  auto JITMain = MainSym->toPtr<MainFnTy>();
 
   LLVM_DEBUG(llvm::dbgs() << "Running main\n");
   int Result = llvm::orc::runAsMain(JITMain, CmdLine);
