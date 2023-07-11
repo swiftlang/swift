@@ -43,17 +43,17 @@
 // RUN: echo "[{" > %/t/map.json
 // RUN: echo "\"moduleName\": \"A\"," >> %/t/map.json
 // RUN: echo "\"modulePath\": \"A.swiftmodule\"," >> %/t/map.json
-// RUN: echo -n "\"moduleCacheKey\": \"" >> %/t/map.json
+// RUN: echo -n "\"moduleCacheKey\": " >> %/t/map.json
 // RUN: cat %t/A.key >> %/t/map.json
-// RUN: echo "\"," >> %/t/map.json
+// RUN: echo "," >> %/t/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/map.json
 // RUN: echo "}," >> %/t/map.json
 // RUN: echo "{" >> %/t/map.json
 // RUN: echo "\"moduleName\": \"B\"," >> %/t/map.json
 // RUN: echo "\"modulePath\": \"B.swiftmodule\"," >> %/t/map.json
-// RUN: echo -n "\"moduleCacheKey\": \"" >> %/t/map.json
+// RUN: echo -n "\"moduleCacheKey\": " >> %/t/map.json
 // RUN: cat %t/B.key >> %/t/map.json
-// RUN: echo "\"," >> %/t/map.json
+// RUN: echo "," >> %/t/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/map.json
 // RUN: echo "}," >> %/t/map.json
 // RUN: echo "{" >> %/t/map.json
