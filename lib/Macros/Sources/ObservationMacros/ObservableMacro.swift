@@ -312,7 +312,8 @@ public struct ObservationTrackedMacro: AccessorMacro {
 
     let initAccessor: AccessorDeclSyntax =
       """
-      init(initialValue) initializes(_\(identifier)) {
+      @storageRestrictions(initializes: _\(identifier))
+      init(initialValue) {
         _\(identifier) = initialValue
       }
       """

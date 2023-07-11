@@ -7457,6 +7457,9 @@ ERROR(init_accessor_initializes_attribute_on_other_declaration,none,
 ERROR(init_accessor_accesses_attribute_on_other_declaration,none,
       "accesses(...) attribute could only be used with init accessors",
       ())
+ERROR(storage_restrictions_attribute_not_on_init_accessor,none,
+      "@storageRestrictions attribute could only be used with init accessors",
+      ())
 ERROR(init_accessor_property_both_init_and_accessed,none,
       "property %0 cannot be both initialized and accessed",
       (DeclName))
