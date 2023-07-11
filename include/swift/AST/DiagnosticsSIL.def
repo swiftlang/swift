@@ -856,5 +856,12 @@ NOTE(sil_referencebinding_inout_binding_here, none,
       "inout binding here",
       ())
 
+// Warnings arising from the flow-sensitive checking of Sendability of
+// non-Sendable values
+WARNING(consumed_value_used, none,
+        "Non-Sendable value consumed, then used at this site; could yield race with another thread", ())
+WARNING(arg_region_consumed, none,
+        "This application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
