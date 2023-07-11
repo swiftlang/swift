@@ -296,6 +296,7 @@ public:
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitInitializesAttr(InitializesAttr *attr);
   void visitAccessesAttr(AccessesAttr *attr);
+  void visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
 
@@ -3585,6 +3586,24 @@ void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
                  diag::init_accessor_property_both_init_and_accessed,
                  property->getName());
       }
+    }
+  }
+}
+
+void AttributeChecker::visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr) {
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
+    diagnose(attr->getLocation(),
+             diag::storage_restrictions_attribute_not_on_init_accessor);
+    return;
+  }
+
+  auto initializesProperties = attr->getInitializesProperties(accessor);
+  for (auto *property : attr->getAccessesProperties(accessor)) {
+    if (llvm::is_contained(initializesProperties, property)) {
+      diagnose(attr->getLocation(),
+               diag::init_accessor_property_both_init_and_accessed,
+               property->getName());
     }
   }
 }

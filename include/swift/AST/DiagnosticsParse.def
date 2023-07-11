@@ -2128,5 +2128,17 @@ ERROR(init_accessor_is_not_on_property,none,
       "init accessors could only be associated with properties",
       ())
 
+ERROR(missing_storage_restrictions_attr_label,none,
+      "missing label in @storageRestrictions attribute", ())
+
+ERROR(invalid_storage_restrictions_attr_label,none,
+      "unexpected label %0 in @storageRestrictions attribute", (Identifier))
+
+ERROR(duplicate_storage_restrictions_attr_label,none,
+      "duplicate label %0 in @storageRestrictions attribute", (Identifier))
+
+ERROR(storage_restrictions_attr_expected_name,none,
+      "expected property name in @storageRestrictions list", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
