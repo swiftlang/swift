@@ -465,6 +465,44 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     }
   }
 
+  // 'any' followed by another identifier is an existential type.
+  if (Tok.isContextualKeyword("any") &&
+      peekToken().is(tok::identifier) &&
+      !peekToken().isAtStartOfLine()) {
+    ParserResult<TypeRepr> ty = parseType();
+    auto *typeExpr = new (Context) TypeExpr(ty.get());
+    return makeParserResult(typeExpr);
+  }
+
+  // 'repeat' as an expression prefix is a pack expansion expression.
+  if (Tok.is(tok::kw_repeat)) {
+    SourceLoc repeatLoc = consumeToken();
+    auto patternExpr = parseExprImpl(
+        diag::expected_expr_after_repeat, isExprBasic);
+    if (patternExpr.isNull())
+      return patternExpr;
+
+    auto *expansion =
+        PackExpansionExpr::create(Context, repeatLoc, patternExpr.get(),
+                                  /*genericEnv*/ nullptr);
+    return makeParserResult(expansion);
+  }
+
+  // 'each' followed by another identifier is a pack element expr.
+  if (Tok.isContextualKeyword("each") &&
+      peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                        tok::code_complete) &&
+      !peekToken().isAtStartOfLine()) {
+    SourceLoc loc = consumeToken();
+    ParserResult<Expr> ref =
+        parseExprSequenceElement(diag::expected_expr_after_each, isExprBasic);
+    if (ref.isNull())
+      return ref;
+
+    auto *packRef = PackElementExpr::create(Context, loc, ref.get());
+    return makeParserResult(packRef);
+  }
+
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
   llvm::Optional<Token> trySuffix;
@@ -545,19 +583,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   // First check to see if we have the start of a regex literal `/.../`.
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
-
-  // 'repeat' as an expression prefix is a pack expansion expression.
-  if (Tok.is(tok::kw_repeat)) {
-    SourceLoc repeatLoc = consumeToken();
-    auto patternExpr = parseExpr(Message);
-    if (patternExpr.isNull())
-      return patternExpr;
-
-    auto *expansion =
-        PackExpansionExpr::create(Context, repeatLoc, patternExpr.get(),
-                                  /*genericEnv*/ nullptr);
-    return makeParserResult(expansion);
-  }
 
   // Try parse an 'if' or 'switch' as an expression. Note we do this here in
   // parseExprUnary as we don't allow postfix syntax to hang off such
@@ -1713,28 +1738,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
           InBindingPattern.getIntroducer().value_or(VarDecl::Introducer::Let);
       auto pattern = createBindingFromPattern(loc, name, introducer);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-    }
-
-    // 'any' followed by another identifier is an existential type.
-    if (Tok.isContextualKeyword("any") &&
-        peekToken().is(tok::identifier) &&
-        !peekToken().isAtStartOfLine()) {
-      ParserResult<TypeRepr> ty = parseType();
-      auto *typeExpr = new (Context) TypeExpr(ty.get());
-      return makeParserResult(typeExpr);
-    }
-
-    // 'each' followed by another identifier is a pack element expr.
-    if (Tok.isContextualKeyword("each") &&
-        peekToken().is(tok::identifier) &&
-        !peekToken().isAtStartOfLine()) {
-      SourceLoc loc = consumeToken();
-      ParserResult<Expr> ref = parseExpr(ID);
-      if (ref.isNull())
-        return ref;
-
-      auto *packRef = PackElementExpr::create(Context, loc, ref.get());
-      return makeParserResult(packRef);
     }
 
     LLVM_FALLTHROUGH;
