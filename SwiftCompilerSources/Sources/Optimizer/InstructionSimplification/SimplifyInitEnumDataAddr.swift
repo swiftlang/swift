@@ -43,7 +43,7 @@ extension InitEnumDataAddrInst : OnoneSimplifyable {
 
       let builder = Builder(before: store, context)
       let enumInst = builder.createEnum(caseIndex: self.caseIndex, payload: store.source, enumType: self.enum.type.objectType)
-      let storeOwnership = StoreInst.Ownership(for: self.enum.type, in: parentFunction, initialize: true)
+      let storeOwnership = StoreInst.StoreOwnership(for: self.enum.type, in: parentFunction, initialize: true)
       builder.createStore(source: enumInst, destination: self.enum, ownership: storeOwnership)
       context.erase(instruction: store)
       context.erase(instruction: inject)

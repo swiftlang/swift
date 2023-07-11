@@ -154,7 +154,7 @@ private extension StoreInst {
       for idx in 0..<type.getNominalFields(in: parentFunction).count {
         let srcField = builder.createStructExtract(struct: source, fieldIndex: idx)
         let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
-        builder.createStore(source: srcField, destination: destFieldAddr, ownership: destinationOwnership)
+        builder.createStore(source: srcField, destination: destFieldAddr, ownership: storeOwnership)
       }
       context.erase(instruction: self)
     } else if type.isTuple {
@@ -162,14 +162,14 @@ private extension StoreInst {
       for idx in 0..<type.tupleElements.count {
         let srcField = builder.createTupleExtract(tuple: source, elementIndex: idx)
         let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
-        builder.createStore(source: srcField, destination: destFieldAddr, ownership: destinationOwnership)
+        builder.createStore(source: srcField, destination: destFieldAddr, ownership: storeOwnership)
       }
       context.erase(instruction: self)
     }
   }
 
   var hasValidOwnershipForDeadStoreElimination: Bool {
-    switch destinationOwnership {
+    switch storeOwnership {
     case .unqualified, .trivial:
       return true
     case .initialize, .assign:
