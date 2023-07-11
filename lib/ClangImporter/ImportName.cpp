@@ -2378,7 +2378,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
               ? llvm::Optional<unsigned>(
-                    result.getErrorInfo()->ErrorParameterIndex)
+                    static_cast<unsigned int>(result.getErrorInfo()->ErrorParameterIndex))
               : llvm::None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
           result.getAsyncInfo().transform(
