@@ -135,7 +135,15 @@ option(SWIFT_STDLIB_BUILD_PRIVATE
        TRUE)
 
 option(SWIFT_STDLIB_HAS_DLADDR
-       "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
+       "Build stdlib assuming the runtime environment provides the dladdr API."
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_DLSYM
+       "Build stdlib assuming the runtime environment provides the dlsym API."
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_FILESYSTEM
+       "Build stdlib assuming the runtime environment has a filesystem."
        TRUE)
 
 option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
