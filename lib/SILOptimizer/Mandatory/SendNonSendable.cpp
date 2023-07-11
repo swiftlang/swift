@@ -472,7 +472,7 @@ public:
       return translateSILApply(instruction);
     }
 
-    // Treat tuple desturction as a series of individual assignments
+    // Treat tuple destruction as a series of individual assignments
     if (auto destructTupleInst = dyn_cast<DestructureTupleInst>(instruction)) {
       std::vector<PartitionOp> translated;
       for (SILValue result : destructTupleInst->getResults())
@@ -486,9 +486,28 @@ public:
       return translateSILRequire(returnInst->getOperand());
     }
 
+    if (isa<ClassMethodInst,
+            DeallocBoxInst,
+            DebugValueInst,
+            DestroyAddrInst,
+            DestroyValueInst,
+            EndAccessInst,
+            EndBorrowInst,
+            EndLifetimeInst,
+            HopToExecutorInst,
+            MetatypeInst,
+            DeallocStackInst>(instruction)) {
+      //ignored instructions
+      return {};
+    }
+
     LLVM_DEBUG(
-        llvm::dbgs() << "WARN: unhandled instruction kind "
-                     << getSILInstructionName(instruction->getKind());
+        llvm::errs().changeColor(llvm::raw_ostream::MAGENTA, true);
+        llvm::errs() << "warning: ";
+        llvm::errs().resetColor();
+        llvm::errs() << "unhandled instruction kind "
+                     << getSILInstructionName(instruction->getKind())
+                     << "\n";
     );
 
     return {};
@@ -594,12 +613,26 @@ class BlockPartitionState {
     for (auto &partitionOp : blockPartitionOps) {
       workingPartition.apply(partitionOp, handleFailure,
                              translator.getNonConsumables(),
-                             handleConsumeNonConsumable,
-                             /*reviveAfterFailure=*/ false);
+                             handleConsumeNonConsumable);
     }
   }
 
 public:
+  // run the passed action on each partitionOp in this block. Action should
+  // return true iff iteration should continue
+  void forEachPartitionOp(llvm::function_ref<bool (const PartitionOp&)> action) const {
+    for (const PartitionOp &partitionOp : blockPartitionOps)
+      if (!action(partitionOp)) break;
+  }
+
+  const Partition& getEntryPartition() const {
+    return entryPartition;
+  }
+
+  const Partition& getExitPartition() const {
+    return exitPartition;
+  }
+
   void dump() LLVM_ATTRIBUTE_USED {
     LLVM_DEBUG(
         llvm::dbgs() << SEP_STR
@@ -633,6 +666,352 @@ public:
   }
 };
 
+enum class LocalConsumedReasonKind {
+  LocalConsumeInst,
+  LocalNonConsumeInst,
+  NonLocal
+};
+
+// Why was a value consumed, without looking across blocks?
+// kind == LocalConsumeInst: a consume instruction in this block
+// kind == LocalNonConsumeInst: an instruction besides a consume instruction
+//                              in this block
+// kind == NonLocal: an instruction outside this block
+struct LocalConsumedReason {
+  LocalConsumedReasonKind kind;
+  llvm::Optional<PartitionOp> localInst;
+
+  static LocalConsumedReason ConsumeInst(PartitionOp localInst) {
+    assert(localInst.getKind() == PartitionOpKind::Consume);
+    return LocalConsumedReason(LocalConsumedReasonKind::LocalConsumeInst, localInst);
+  }
+
+  static LocalConsumedReason NonConsumeInst() {
+    return LocalConsumedReason(LocalConsumedReasonKind::LocalNonConsumeInst);
+  }
+
+  static LocalConsumedReason NonLocal() {
+    return LocalConsumedReason(LocalConsumedReasonKind::NonLocal);
+  }
+
+  // 0-ary constructor only used in maps, where it's immediately overridden
+  LocalConsumedReason() : kind(LocalConsumedReasonKind::NonLocal) {}
+
+private:
+  LocalConsumedReason(LocalConsumedReasonKind kind,
+                 llvm::Optional<PartitionOp> localInst = {})
+      : kind(kind), localInst(localInst) {}
+};
+
+// This class captures all available information about why a value's region was
+// consumed. In particular, it contains a map `consumeOps` whose keys are
+// "distances" and whose values are Consume PartitionOps that cause the target
+// region to be consumed. Distances are (roughly) the number of times
+// two different predecessor blocks had to have their exit partitions joined
+// together to actually cause the target region to be consumed. If a Consume
+// op only causes a target access to be invalid because of merging/joining
+// that spans many different blocks worth of control flow, it is less likely
+// to be informative, so distance is used as a heuristic to choose which
+// access sites to display in diagnostics given a racy consumption.
+class ConsumedReason {
+  std::map<unsigned, std::vector<PartitionOp>> consumeOps;
+
+  friend class ConsumeRequireAccumulator;
+
+  // used only in asserts
+  bool containsOp(const PartitionOp& op) {
+    for (auto [_, vec] : consumeOps)
+      for (auto vecOp : vec)
+        if (op == vecOp)
+          return true;
+    return false;
+  }
+
+public:
+  // a ConsumedReason is valid if it contains at least one consume instruction
+  bool isValid() {
+    for (auto [_, vec] : consumeOps)
+      if (!vec.empty())
+        return true;
+    return false;
+  }
+
+  ConsumedReason() {}
+
+  ConsumedReason(LocalConsumedReason localReason) {
+    assert(localReason.kind == LocalConsumedReasonKind::LocalConsumeInst);
+    consumeOps[0] = {localReason.localInst.value()};
+  }
+
+  void addConsumeOp(PartitionOp consumeOp, unsigned distance) {
+    assert(consumeOp.getKind() == PartitionOpKind::Consume);
+    assert(!containsOp(consumeOp));
+    consumeOps[distance].push_back(consumeOp);
+  }
+
+  // merge in another consumedReason, adding the specified distane to all its ops
+  void addOtherReasonAtDistance(const ConsumedReason &otherReason, unsigned distance) {
+    for (auto &[otherDistance, otherConsumeOpsAtDistance] : otherReason.consumeOps)
+      for (auto otherConsumeOp : otherConsumeOpsAtDistance)
+        addConsumeOp(otherConsumeOp, distance + otherDistance);
+  }
+};
+
+// This class is the "inverse" of a ConsumedReason: instead of associating
+// accessing PartitionOps with their consumption sites, it associates
+// consumption site Consume PartitionOps with the corresponding accesses.
+// It is built up by repeatedly calling accumulateConsumedReason on
+// ConsumedReasons, which "inverts" the contents of that reason and adds it to
+// this class's tracking. Instead of a two-level map, we store a set that
+// join together distances and access partitionOps so that we can use the
+// ordering by lowest diagnostics for prioritized output
+class ConsumeRequireAccumulator {
+  struct PartitionOpAtDistance {
+    PartitionOp partitionOp;
+    unsigned distance;
+
+    PartitionOpAtDistance(PartitionOp partitionOp, unsigned distance)
+        : partitionOp(partitionOp), distance(distance) {}
+
+    bool operator<(const PartitionOpAtDistance& other) const {
+      if (distance != other.distance)
+        return distance < other.distance;
+      return partitionOp < other.partitionOp;
+    }
+  };
+
+  // map consumptions to sets of requirements for that consumption, ordered so
+  // that requirements at a smaller distance from the consumption come first
+  std::map<PartitionOp, std::set<PartitionOpAtDistance>>
+      requirementsForConsumptions;
+
+public:
+  ConsumeRequireAccumulator() {}
+
+  void accumulateConsumedReason(PartitionOp requireOp, const ConsumedReason &consumedReason) {
+    for (auto [distance, consumeOps] : consumedReason.consumeOps)
+      for (auto consumeOp : consumeOps)
+        requirementsForConsumptions[consumeOp].insert({requireOp, distance});
+  }
+
+  // for each consumption in this ConsumeRequireAccumulator, call the passed
+  // processConsumeOp closure on it, followed immediately by calling the passed
+  // processRequireOp closure on the top `numRequiresPerConsume` operations
+  // that access ("require") the region consumed. Sorting is by lowest distance
+  // first, then arbitrarily. This is used for final diagnostic output.
+  void forEachConsumeRequire(
+      unsigned numRequiresPerConsume,
+      llvm::function_ref<void(const PartitionOp& consumeOp, unsigned numProcessed, unsigned numSkipped)>
+          processConsumeOp,
+      llvm::function_ref<void(const PartitionOp& requireOp)>
+          processRequireOp) const {
+    for (auto [consumeOp, requireOps] : requirementsForConsumptions) {
+      unsigned numProcessed = std::min({requireOps.size(), (unsigned long) numRequiresPerConsume});
+      processConsumeOp(consumeOp, numProcessed, requireOps.size() - numProcessed);
+      unsigned numRequiresToProcess = numRequiresPerConsume;
+      for (auto [requireOp, _] : requireOps) {
+        // ensures at most numRequiresPerConsume requires are processed per consume
+        if (numRequiresToProcess-- == 0) break;
+        processRequireOp(requireOp);
+      }
+    }
+  }
+};
+
+// A RaceTracer is used to accumulate the facts that the main phase of
+// PartitionAnalysis generates - that certain values were required at certain
+// points but were in consumed regions and thus should yield diagnostics -
+// and traces those facts to the Consume operations that could have been
+// responsible.
+class RaceTracer {
+  const BasicBlockData<BlockPartitionState>& blockStates;
+
+  std::map<std::pair<SILBasicBlock *, unsigned>, ConsumedReason>
+      consumedAtEntryReasons;
+
+  // caches the reasons why consumedVals were consumed at the exit to basic blocks
+  std::map<std::pair<SILBasicBlock *, unsigned>, LocalConsumedReason>
+      consumedAtExitReasons;
+
+  ConsumeRequireAccumulator accumulator;
+
+  ConsumedReason findConsumedAtOpReason(unsigned consumedVal, PartitionOp op) {
+    ConsumedReason consumedReason;
+    findAndAddConsumedReasons(op.getSourceInst(true)->getParent(), consumedVal,
+                              consumedReason, 0, op);
+    return consumedReason;
+  }
+
+  void findAndAddConsumedReasons(
+      SILBasicBlock * SILBlock, unsigned consumedVal,
+      ConsumedReason &consumedReason, unsigned distance,
+      llvm::Optional<PartitionOp> targetOp = {}) {
+    assert(blockStates[SILBlock].getExitPartition().isConsumed(consumedVal));
+    LocalConsumedReason localReason
+        = findLocalConsumedReason(SILBlock, consumedVal, targetOp);
+    switch (localReason.kind) {
+    case LocalConsumedReasonKind::LocalConsumeInst:
+      // there is a local consume in the pred block
+      consumedReason.addConsumeOp(localReason.localInst.value(), distance);
+      break;
+    case LocalConsumedReasonKind::LocalNonConsumeInst:
+      // ignore this case, that instruction will initiate its own search
+      // for a consume op
+      break;
+    case LocalConsumedReasonKind::NonLocal:
+      consumedReason.addOtherReasonAtDistance(
+          // recursive call
+          findConsumedAtEntryReason(SILBlock, consumedVal), distance);
+    }
+  }
+
+  // find the reason why a value was consumed at entry to a block
+  const ConsumedReason &findConsumedAtEntryReason(
+      SILBasicBlock *SILBlock, unsigned consumedVal) {
+    const BlockPartitionState &block = blockStates[SILBlock];
+    assert(block.getEntryPartition().isConsumed(consumedVal));
+
+    // check the cache
+    if (consumedAtEntryReasons.count({SILBlock, consumedVal}))
+      return consumedAtEntryReasons.at({SILBlock, consumedVal});
+
+    // enter a dummy value in the cache to prevent circular call dependencies
+    consumedAtEntryReasons[{SILBlock, consumedVal}] = ConsumedReason();
+
+    auto entryTracks = [&](unsigned val) {
+      return block.getEntryPartition().isTracked(val);
+    };
+
+    // this gets populated with all the tracked values at entry to this block
+    // that are consumed at the exit to some predecessor block, associated
+    // with the blocks that consume them
+    std::map<unsigned, std::vector<SILBasicBlock *>> consumedInSomePred;
+    for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
+      for (unsigned consumedVal
+          : blockStates[pred].getExitPartition().getConsumedVals())
+        if (entryTracks(consumedVal))
+          consumedInSomePred[consumedVal].push_back(pred);
+
+    // this gets populated with all the multi-edges between values tracked
+    // at entry to this block that will be merged because of common regionality
+    // in the exit partition of some predecessor. It is not transitively closed
+    // because we want to count how many steps transitive merges require
+    std::map<unsigned, std::set<unsigned>> singleStepJoins;
+    for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
+      for (std::vector<unsigned> region
+          : blockStates[pred].getExitPartition().getNonConsumedRegions()) {
+        for (unsigned fst : region) for (unsigned snd : region)
+            if (fst != snd && entryTracks(fst) && entryTracks(snd))
+              singleStepJoins[fst].insert(snd);
+      }
+
+    // this gets populated with the distance, in terms of single step joins,
+    // from the target consumedVal to other values that will get merged with it
+    // because of the join at entry to this basic block
+    std::map<unsigned, unsigned> distancesFromTarget;
+
+    //perform BFS
+    std::deque<std::pair<unsigned, unsigned>> processValues;
+    processValues.push_back({consumedVal, 0});
+    while (!processValues.empty()) {
+      auto [currentTarget, currentDistance] = processValues.front();
+      processValues.pop_front();
+      distancesFromTarget[currentTarget] = currentDistance;
+      for (unsigned nextTarget : singleStepJoins[currentTarget])
+        if (!distancesFromTarget.count(nextTarget))
+          processValues.push_back({nextTarget, currentDistance + 1});
+    }
+
+    ConsumedReason consumedReason;
+
+    for (auto [predVal, distanceFromTarget] : distancesFromTarget) {
+      for (SILBasicBlock *predBlock : consumedInSomePred[predVal]) {
+        // one reason that our target consumedVal is consumed is that
+        // predConsumedVal was consumed at exit of predBlock, and
+        // distanceFromTarget merges had to be performed to make that
+        // be a reason. Use this to build a ConsumedReason for consumedVal.
+        findAndAddConsumedReasons(predBlock, predVal, consumedReason, distanceFromTarget);
+      }
+    }
+
+    consumedAtEntryReasons[{SILBlock, consumedVal}] = std::move(consumedReason);
+
+    return consumedAtEntryReasons[{SILBlock, consumedVal}];
+  }
+
+  LocalConsumedReason findLocalConsumedReason(
+      SILBasicBlock * SILBlock, unsigned consumedVal,
+      llvm::Optional<PartitionOp> targetOp = {}) {
+    // if this is a query for consumption reason at block exit, check the cache
+    if (!targetOp && consumedAtExitReasons.count({SILBlock, consumedVal}))
+      return consumedAtExitReasons.at({SILBlock, consumedVal});
+
+    const BlockPartitionState &block = blockStates[SILBlock];
+
+    // if targetOp is null, we're checking why the value is consumed at exit,
+    // so assert that it's actually consumed at exit
+    assert(targetOp || block.getExitPartition().isConsumed(consumedVal));
+
+    llvm::Optional<LocalConsumedReason> consumedReason;
+
+    Partition workingPartition = block.getEntryPartition();
+
+    // we're looking for a local reason, so if the value is consumed at entry,
+    // revive it for the sake of this search
+    if (workingPartition.isConsumed(consumedVal))
+      workingPartition.apply(PartitionOp::AssignFresh(consumedVal));
+
+    block.forEachPartitionOp([&](const PartitionOp& partitionOp) {
+      if (targetOp && targetOp == partitionOp)
+        return false; //break
+      workingPartition.apply(partitionOp);
+      if (workingPartition.isConsumed(consumedVal) && !consumedReason) {
+        // this partitionOp consumes the target value
+        if (partitionOp.getKind() == PartitionOpKind::Consume)
+          consumedReason = LocalConsumedReason::ConsumeInst(partitionOp);
+        else
+          // a merge or assignment invalidated this, but that will be a separate
+          // failure to diagnose, so we don't worry about it here
+          consumedReason = LocalConsumedReason::NonConsumeInst();
+      }
+      if (!workingPartition.isConsumed(consumedVal) && consumedReason)
+        // value is no longer consumed - e.g. reassigned or assigned fresh
+        consumedReason = llvm::None;
+
+      // continue walking block
+      return true;
+    });
+
+    // if we failed to find a local consume reason, but the value was consumed
+    // at entry to the block, then the reason is "NonLocal"
+    if (!consumedReason && block.getEntryPartition().isConsumed(consumedVal))
+      consumedReason = LocalConsumedReason::NonLocal();
+
+    // if consumedReason is none, then consumedVal was not actually consumed
+    assert(consumedReason);
+
+    // if this is a query for consumption reason at block exit, update the cache
+    if (!targetOp)
+      return consumedAtExitReasons[std::pair{SILBlock, consumedVal}]
+                 = consumedReason.value();
+
+    return consumedReason.value();
+  }
+
+public:
+  RaceTracer(const BasicBlockData<BlockPartitionState>& blockStates)
+      : blockStates(blockStates) {}
+
+  void traceUseOfConsumedValue(PartitionOp use, unsigned consumedVal) {
+    accumulator.accumulateConsumedReason(
+        use, findConsumedAtOpReason(consumedVal, use));
+  }
+
+  const ConsumeRequireAccumulator &getAccumulator() {
+    return accumulator;
+  }
+};
+
 
 // Instances of PartitionAnalysis perform the region-based Sendable checking.
 // Internally, a PartitionOpTranslator is stored to perform the translation from
@@ -641,9 +1020,16 @@ public:
 // the flow equations.
 class PartitionAnalysis {
   PartitionOpTranslator translator;
+
   BasicBlockData<BlockPartitionState> blockStates;
+
+  RaceTracer raceTracer;
+
   SILFunction *function;
+
   bool solved;
+
+  const static int NUM_REQUIREMENTS_TO_DIAGNOSE = 5;
 
   // The constructor initializes each block in the function by compiling it
   // to PartitionOps, then seeds the solve method by setting `needsUpdate` to
@@ -654,6 +1040,7 @@ class PartitionAnalysis {
                     [this](SILBasicBlock *block) {
                       return BlockPartitionState(block, translator);
                     }),
+        raceTracer(blockStates),
         function(fn),
         solved(false) {
     // initialize the entry block as needing an update, and having a partition
@@ -743,9 +1130,7 @@ class PartitionAnalysis {
 
   // used for generating informative diagnostics
   Expr *getExprForPartitionOp(const PartitionOp& op) {
-    SILInstruction *sourceInstr = op.getSourceInst();
-    assert(sourceInstr && "PartitionOps used in PartitionAnalysis should "
-                          "always have been generated with a sourceInst");
+    SILInstruction *sourceInstr = op.getSourceInst(true);
     Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
     assert(expr && "PartitionOp's source location should correspond to"
                    "an AST node");
@@ -757,14 +1142,24 @@ class PartitionAnalysis {
   // fixpoint state
   void diagnose() {
     assert(solved && "diagnose should not be called before solve");
+
+    //llvm::dbgs() << function->getName() << "\n";
+    RaceTracer tracer = blockStates;
+
     for (auto [_, blockState] : blockStates) {
       blockState.diagnoseFailures(
           /*handleFailure=*/
           [&](const PartitionOp& partitionOp, unsigned consumedVal) {
+            raceTracer.traceUseOfConsumedValue(partitionOp, consumedVal);
+            /*
+             * This handles diagnosing accesses to consumed values at the site
+             * of access instead of the site of consumption, as this is less
+             * useful it will likely be eliminated, but leaving it for now
             auto expr = getExprForPartitionOp(partitionOp);
             if (hasBeenEmitted(expr)) return;
             function->getASTContext().Diags.diagnose(
                 expr->getLoc(), diag::consumed_value_used);
+                */
           },
           /*handleConsumeNonConsumable=*/
           [&](const PartitionOp& partitionOp, unsigned consumedVal) {
@@ -773,6 +1168,23 @@ class PartitionAnalysis {
                 expr->getLoc(), diag::arg_region_consumed);
           });
     }
+
+    raceTracer.getAccumulator().forEachConsumeRequire(
+        NUM_REQUIREMENTS_TO_DIAGNOSE,
+        /*diagnoseConsume=*/
+        [&](const PartitionOp& consumeOp,
+            unsigned numDisplayed, unsigned numHidden) {
+          auto expr = getExprForPartitionOp(consumeOp);
+          function->getASTContext().Diags.diagnose(
+              expr->getLoc(), diag::consumption_yields_race,
+              numDisplayed, numDisplayed != 1, numHidden > 0, numHidden);
+        },
+        /*diagnoseRequire=*/
+        [&](const PartitionOp& requireOp) {
+          auto expr = getExprForPartitionOp(requireOp);
+          function->getASTContext().Diags.diagnose(
+              expr->getLoc(), diag::possible_racy_access_site);
+        });
   }
 
 public:

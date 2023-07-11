@@ -81,7 +81,22 @@ public:
     return PartitionOp(PartitionOpKind::Require, tgt, sourceInst);
   }
 
-  SILInstruction *getSourceInst() const {
+  bool operator==(const PartitionOp& other) const = default;
+  // implemented for insertion into std::map
+  bool operator<(const PartitionOp& other) const {
+    if (OpKind != other.OpKind)
+      return OpKind < other.OpKind;
+    return sourceInst < other.sourceInst;
+  }
+
+  PartitionOpKind getKind() const {
+    return OpKind;
+  }
+
+  SILInstruction *getSourceInst(bool assertNonNull = false) const {
+    assert(!assertNonNull || sourceInst
+                             && "PartitionOps should be assigned SILInstruction"
+                                    " sources when used for the core analysis");
     return sourceInst;
   }
 
@@ -196,7 +211,7 @@ private:
       return;
     canonical = true;
 
-    std::map<signed, unsigned> relabel;
+    std::map<unsigned, unsigned> relabel;
 
     // relies on in-order traversal of labels
     for (auto &[i, label] : labels) {
@@ -268,6 +283,14 @@ public:
     return fst.labels == snd.labels;
   }
 
+  bool isTracked(unsigned val) const {
+    return labels.count(val);
+  }
+
+  bool isConsumed(unsigned val) const {
+    return isTracked(val) && labels.at(val) < 0;
+  }
+
   // quadratic time - Construct the partition corresponding to the join of the
   // two passed partitions; the join labels each index labelled by both operands
   // and two indices are in the same region of the join iff they are in the same
@@ -320,16 +343,8 @@ public:
           nonconsumables = {},
 
       llvm::function_ref<void(const PartitionOp&, unsigned)>
-      handleConsumeNonConsumable = [](const PartitionOp&, unsigned) {},
-
-      bool reviveAfterFailure = false
+      handleConsumeNonConsumable = [](const PartitionOp&, unsigned) {}
   ) {
-    auto handleFailureAndRevive =
-        [&](const PartitionOp& partitionOp, unsigned consumedVal) {
-          if (reviveAfterFailure)
-            horizontalUpdate(labels, consumedVal, fresh_label++);
-          handleFailure(partitionOp, consumedVal);
-        };
     switch (op.OpKind) {
     case PartitionOpKind::Assign:
       assert(op.OpArgs.size() == 2 &&
@@ -337,8 +352,8 @@ public:
       assert(labels.count(op.OpArgs[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
       // if assigning to a missing region, handle the failure
-      if (labels[op.OpArgs[1]] < 0)
-        handleFailureAndRevive(op, op.OpArgs[1]);
+      if (isConsumed(op.OpArgs[1]))
+        handleFailure(op, op.OpArgs[1]);
 
       labels[op.OpArgs[0]] = labels[op.OpArgs[1]];
 
@@ -361,8 +376,8 @@ public:
              "Consume PartitionOp's argument should already be tracked");
 
       // if attempting to consume a consumed region, handle the failure
-      if (labels[op.OpArgs[0]] < 0)
-        handleFailureAndRevive(op, op.OpArgs[0]);
+      if (isConsumed(op.OpArgs[0]))
+        handleFailure(op, op.OpArgs[0]);
 
       // mark region as consumed
       horizontalUpdate(labels, op.OpArgs[0], -1);
@@ -387,10 +402,10 @@ public:
              "Merge PartitionOp's arguments should already be tracked");
 
       // if attempting to merge a consumed region, handle the failure
-      if (labels[op.OpArgs[0]] < 0)
-        handleFailureAndRevive(op, op.OpArgs[0]);
-      if (labels[op.OpArgs[1]] < 0)
-        handleFailureAndRevive(op, op.OpArgs[1]);
+      if (isConsumed(op.OpArgs[0]))
+        handleFailure(op, op.OpArgs[0]);
+      if (isConsumed(op.OpArgs[1]))
+        handleFailure(op, op.OpArgs[1]);
 
       merge(op.OpArgs[0], op.OpArgs[1]);
       break;
@@ -399,11 +414,38 @@ public:
              "Require PartitionOp should be passed 1 argument");
       assert(labels.count(op.OpArgs[0]) &&
              "Require PartitionOp's argument should already be tracked");
-      if (labels[op.OpArgs[0]] < 0)
-        handleFailureAndRevive(op, op.OpArgs[0]);
+      if (isConsumed(op.OpArgs[0]))
+        handleFailure(op, op.OpArgs[0]);
     }
 
     assert(is_canonical_correct());
+  }
+
+  // return a vector of the consumed values in this partition
+  std::vector<unsigned> getConsumedVals() const {
+    // for effeciency, this could return an iterator not a vector
+    std::vector<unsigned> consumedVals;
+    for (auto [i, _] : labels)
+      if (isConsumed(i))
+        consumedVals.push_back(i);
+    return consumedVals;
+  }
+
+  // return a vector of the non-consumed regions in this partition, each
+  // represented as a vector of values
+  std::vector<std::vector<unsigned>> getNonConsumedRegions() const {
+    // for effeciency, this could return an iterator not a vector
+    std::map<signed, std::vector<unsigned>> buckets;
+
+    for (auto [i, label] : labels)
+      buckets[label].push_back(i);
+
+    std::vector<std::vector<unsigned>> doubleVec;
+
+    for (auto [_, bucket] : buckets)
+      doubleVec.push_back(bucket);
+
+    return doubleVec;
   }
 
   void dump_labels() const LLVM_ATTRIBUTE_USED {
@@ -419,9 +461,8 @@ public:
   void dump() LLVM_ATTRIBUTE_USED {
     std::map<signed, std::vector<unsigned>> buckets;
 
-    for (auto [i, label] : labels) {
+    for (auto [i, label] : labels)
       buckets[label].push_back(i);
-    }
 
     llvm::dbgs() << "[";
     for (auto [label, indices] : buckets) {
@@ -432,9 +473,9 @@ public:
       }
       llvm::dbgs() << (label < 0 ? "}" : ")");
     }
-    llvm::dbgs() << "]";
+    llvm::dbgs() << "]\n";
   }
 };
 }
 
-#endif
+#endif // SWIFT_PARTITIONUTILS_H
