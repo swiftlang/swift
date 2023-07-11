@@ -599,7 +599,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   SILValue HeapBox = ABI;
-  Optional<MarkUninitializedInst::Kind> Kind;
+  llvm::Optional<MarkUninitializedInst::Kind> Kind;
   if (HeapBox->hasOneUse()) {
     auto *User = HeapBox->getSingleUse()->getUser();
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {

@@ -25,10 +25,11 @@
 #include "swift/Config.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
@@ -159,10 +160,10 @@ namespace swift {
     llvm::Optional<llvm::Triple> ClangTarget;
 
     /// The SDK version, if known.
-    Optional<llvm::VersionTuple> SDKVersion;
+    llvm::Optional<llvm::VersionTuple> SDKVersion;
 
     /// The target variant SDK version, if known.
-    Optional<llvm::VersionTuple> VariantSDKVersion;
+    llvm::Optional<llvm::VersionTuple> VariantSDKVersion;
 
     /// The SDK canonical name, if known.
     std::string SDKName;
@@ -225,7 +226,7 @@ namespace swift {
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
-    Optional<DiagnosticBehavior> RequireExplicitAvailability = None;
+    llvm::Optional<DiagnosticBehavior> RequireExplicitAvailability = llvm::None;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.

@@ -1078,13 +1078,15 @@ llvm::Optional<unsigned>
 swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
                               llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
-  if (depth >= paramCounts.size()) return None;
+  if (depth >= paramCounts.size())
+    return llvm::None;
 
   // Compute the flat index.
   unsigned flatIndex = index + (depth == 0 ? 0 : paramCounts[depth - 1]);
 
   // Out-of-bounds index.
-  if (flatIndex >= paramCounts[depth]) return None;
+  if (flatIndex >= paramCounts[depth])
+    return llvm::None;
 
   return flatIndex;
 }
@@ -1401,7 +1403,8 @@ llvm::Optional<const ProtocolRequirement *>
 findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
-  if (!associatedTypeNamesPtr) return None;
+  if (!associatedTypeNamesPtr)
+    return llvm::None;
 
   // Look through the list of associated type names.
   StringRef associatedTypeNames(associatedTypeNamesPtr);
@@ -1420,7 +1423,8 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
     associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
   }
 
-  if (!found) return None;
+  if (!found)
+    return llvm::None;
 
   // We have a match on the Nth associated type; go find the Nth associated
   // type requirement.
@@ -1794,9 +1798,10 @@ public:
     return BuiltType();
   }
 
-  TypeLookupErrorOr<BuiltType> createMetatypeType(
-      BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+  TypeLookupErrorOr<BuiltType>
+  createMetatypeType(BuiltType instance,
+                     llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
+                         llvm::None) const {
     if (!instance.isMetadata())
       return TYPE_LOOKUP_ERROR_FMT("Tried to build a metatype from a pack");
     return BuiltType(swift_getMetatypeMetadata(instance.getMetadata()));
@@ -1804,7 +1809,8 @@ public:
 
   TypeLookupErrorOr<BuiltType> createExistentialMetatypeType(
       BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
+          llvm::None) const {
     if (!instance.isMetadata()) {
       return TYPE_LOOKUP_ERROR_FMT("Tried to build an existential metatype "
                                    "from a pack");
@@ -3013,13 +3019,13 @@ demangleToGenericParamRef(StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
   if (!node)
-    return None;
+    return llvm::None;
 
   // Find the flat index that the right-hand side refers to.
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
   if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return None;
+    return llvm::None;
 
   return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
                                        node->getChild(1)->getIndex());

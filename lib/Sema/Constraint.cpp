@@ -1055,7 +1055,7 @@ Constraint *Constraint::createConjunction(
 
 Constraint *Constraint::createApplicableFunction(
     ConstraintSystem &cs, Type argumentFnType, Type calleeType,
-    Optional<TrailingClosureMatching> trailingClosureMatching,
+    llvm::Optional<TrailingClosureMatching> trailingClosureMatching,
     ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
@@ -1112,11 +1112,12 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
   return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);
 }
 
-Optional<TrailingClosureMatching>
+llvm::Optional<TrailingClosureMatching>
 Constraint::getTrailingClosureMatching() const {
   assert(Kind == ConstraintKind::ApplicableFunction);
   switch (trailingClosureMatching) {
-  case 0: return None;
+  case 0:
+    return llvm::None;
   case 1: return TrailingClosureMatching::Forward;
   case 2: return TrailingClosureMatching::Backward;
   }

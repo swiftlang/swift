@@ -445,7 +445,7 @@ struct UseState {
   using InstToBitMap =
       llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
 
-  Optional<unsigned> cachedNumSubelements;
+  llvm::Optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
   ///
@@ -2384,7 +2384,7 @@ namespace {
 
 using InstLeafTypePair = std::pair<SILInstruction *, TypeTreeLeafTypeRange>;
 using InstOptionalLeafTypePair =
-    std::pair<SILInstruction *, Optional<TypeTreeLeafTypeRange>>;
+    std::pair<SILInstruction *, llvm::Optional<TypeTreeLeafTypeRange>>;
 
 /// Post process the found liveness and emit errors if needed. TODO: Better
 /// name.

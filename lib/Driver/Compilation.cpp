@@ -116,8 +116,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
-                         Optional<unsigned> BatchCount,
-                         Optional<unsigned> BatchSizeLimit,
+                         llvm::Optional<unsigned> BatchCount,
+                         llvm::Optional<unsigned> BatchSizeLimit,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
@@ -768,7 +768,8 @@ namespace driver {
 
     TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
                                        StringRef Output, StringRef Errors,
-                                       void *Context, Optional<int> Signal,
+                                       void *Context,
+                                       llvm::Optional<int> Signal,
                                        TaskProcessInformation ProcInfo) {
       const Job *SignalledCmd = (const Job *)Context;
 
@@ -901,7 +902,7 @@ namespace driver {
           mergeModulesJob = cmd;
         }
 
-        const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
+        const llvm::Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
             computeShouldInitiallyScheduleJobAndDependents(cmd);
         if (!shouldSchedAndIsCascading)
           return getEveryCompileJob(); // Load error, just run them all
@@ -933,12 +934,12 @@ namespace driver {
     /// Return whether \p Cmd should be scheduled when using dependencies, and if
     /// the job is cascading. Or if there was a dependency-read error, return
     /// \c None to indicate don't-know.
-    Optional<std::pair<bool, bool>>
+    llvm::Optional<std::pair<bool, bool>>
     computeShouldInitiallyScheduleJobAndDependents(const Job *Cmd) {
       auto CondAndHasDepsIfNoError =
           loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
-        return None; // swiftdeps read error, abandon dependencies
+        return llvm::None; // swiftdeps read error, abandon dependencies
 
       Job::Condition Cond;
       bool HasDependenciesFileName;
@@ -955,7 +956,7 @@ namespace driver {
 
     /// Returns job condition, and whether a dependency file was specified.
     /// But returns None if there was a dependency read error.
-    Optional<std::pair<Job::Condition, bool>>
+    llvm::Optional<std::pair<Job::Condition, bool>>
     loadDependenciesAndComputeCondition(const Job *const Cmd) {
       // merge-modules Jobs do not have .swiftdeps files associated with them,
       // however, their compilation condition is computed as a function of their
@@ -982,7 +983,7 @@ namespace driver {
           loadDepGraphFromPath(Cmd, DependenciesFile);
       if (depGraphLoadError) {
         dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
-        return None;
+        return llvm::None;
       }
       return std::make_pair(Cmd->getCondition(), true);
     }

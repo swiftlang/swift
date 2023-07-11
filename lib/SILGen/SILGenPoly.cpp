@@ -749,7 +749,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // If we're emitting to memory, project out this element in the
     // destination buffer, then wrap that in an Initialization to
     // track the cleanup.
-    Optional<TemporaryInitialization> outputEltTemp;
+    llvm::Optional<TemporaryInitialization> outputEltTemp;
     if (outputAddr) {
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
@@ -4267,7 +4267,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
 
     // Set up the context into which to emit the outer result.
     SGFContext outerResultCtxt;
-    Optional<TemporaryInitialization> outerResultInit;
+    llvm::Optional<TemporaryInitialization> outerResultInit;
     SILType outerResultTy;
     if (outerIsIndirect) {
       outerResultTy = op.OuterResultAddr->getType();
@@ -5661,7 +5661,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   // Collect the arguments to the implementation.
   SmallVector<SILValue, 8> args;
 
-  Optional<ResultPlanner> resultPlanner;
+  llvm::Optional<ResultPlanner> resultPlanner;
 
   if (coroutineKind == SILCoroutineKind::None) {
     // First, indirect results.
@@ -5897,15 +5897,10 @@ emitOpenExistentialInSelfConformance(SILGenFunction &SGF, SILLocation loc,
 }
 
 void SILGenFunction::emitProtocolWitness(
-    AbstractionPattern reqtOrigTy,
-    CanAnyFunctionType reqtSubstTy,
-    SILDeclRef requirement,
-    SubstitutionMap reqtSubs,
-    SILDeclRef witness,
-    SubstitutionMap witnessSubs,
-    IsFreeFunctionWitness_t isFree,
-    bool isSelfConformance,
-    Optional<ActorIsolation> enterIsolation) {
+    AbstractionPattern reqtOrigTy, CanAnyFunctionType reqtSubstTy,
+    SILDeclRef requirement, SubstitutionMap reqtSubs, SILDeclRef witness,
+    SubstitutionMap witnessSubs, IsFreeFunctionWitness_t isFree,
+    bool isSelfConformance, llvm::Optional<ActorIsolation> enterIsolation) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -5930,7 +5925,7 @@ void SILGenFunction::emitProtocolWitness(
   if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
-    Optional<ManagedValue> actorSelf;
+    llvm::Optional<ManagedValue> actorSelf;
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
@@ -6048,7 +6043,7 @@ void SILGenFunction::emitProtocolWitness(
   // Collect the arguments.
   SmallVector<SILValue, 8> args;
 
-  Optional<ResultPlanner> resultPlanner;
+  llvm::Optional<ResultPlanner> resultPlanner;
   if (coroutineKind == SILCoroutineKind::None) {
     //   - indirect results
     resultPlanner.emplace(*this, loc);

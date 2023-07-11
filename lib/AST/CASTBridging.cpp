@@ -200,7 +200,7 @@ void *SwiftFunctionCallExpr_create(void *ctx, void *fn, void *args) {
                            TE->getElement(i));
   }
   auto *argList = ArgumentList::create(Context, TE->getLParenLoc(), arguments,
-                                       TE->getRParenLoc(), None,
+                                       TE->getRParenLoc(), llvm::None,
                                        /*isImplicit*/ false);
   return CallExpr::create(Context, static_cast<Expr *>(fn), argList,
                           /*implicit*/ false);
@@ -276,9 +276,9 @@ void *SingleValueStmtExpr_createWithWrappedBranches(void *_ctx, void *S,
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then,
                     void *_Nullable elseLoc, void *_Nullable elseStmt) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context)
-      IfStmt(getSourceLocFromPointer(ifLoc), (Expr *)cond, (Stmt *)then,
-             getSourceLocFromPointer(elseLoc), (Stmt *)elseStmt, None, Context);
+  return new (Context) IfStmt(getSourceLocFromPointer(ifLoc), (Expr *)cond,
+                              (Stmt *)then, getSourceLocFromPointer(elseLoc),
+                              (Stmt *)elseStmt, llvm::None, Context);
 }
 
 void *ReturnStmt_create(void *ctx, void *loc, void *_Nullable expr) {

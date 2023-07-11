@@ -431,21 +431,19 @@ private:
   /// None -> Not yet computed
   /// Optional(None) -> Not fixed size
   /// Optional(Size) -> Fixed Size
-  mutable llvm::Optional<llvm::Optional<Size>> _fixedSize =
-      None;
+  mutable llvm::Optional<llvm::Optional<Size>> _fixedSize = llvm::None;
   /// Memoize the value of fixedAlignment()
   /// None -> Not yet computed
   /// Optional(None) -> Not fixed Alignment
   /// Optional(Alignment) -> Fixed Alignment
   mutable llvm::Optional<llvm::Optional<Alignment>> _fixedAlignment =
-      None;
+      llvm::None;
 
   /// Memoize the value of fixedXICount()
   /// None -> Not yet computed
   /// Optional(None) -> Not fixed xi count
   /// Optional(Count) -> Fixed XICount
-  mutable llvm::Optional<llvm::Optional<uint32_t>> _fixedXICount =
-      None;
+  mutable llvm::Optional<llvm::Optional<uint32_t>> _fixedXICount = llvm::None;
 
   llvm::Value *withExtraInhabitantProvidingEntry(
       IRGenFunction &IGF, Address addr, llvm::Type *returnType,
@@ -562,21 +560,19 @@ private:
   /// None -> Not yet computed
   /// Optional(None) -> Not fixed size
   /// Optional(Size) -> Fixed Size
-  mutable llvm::Optional<llvm::Optional<Size>> _fixedSize =
-      None;
+  mutable llvm::Optional<llvm::Optional<Size>> _fixedSize = llvm::None;
   /// Memoize the value of fixedAlignment()
   /// None -> Not yet computed
   /// Optional(None) -> Not fixed Alignment
   /// Optional(Alignment) -> Fixed Alignment
   mutable llvm::Optional<llvm::Optional<Alignment>> _fixedAlignment =
-      None;
+      llvm::None;
 
   /// Memoize the value of fixedXICount()
   /// None -> Not yet computed
   /// Optional(None) -> Not fixed xi count
   /// Optional(Count) -> Fixed XICount
-  mutable llvm::Optional<llvm::Optional<uint32_t>> _fixedXICount =
-      None;
+  mutable llvm::Optional<llvm::Optional<uint32_t>> _fixedXICount = llvm::None;
 
   llvm::Value *maxPayloadSize(IRGenFunction &IGF) const;
   llvm::BasicBlock *testSinglePayloadEnumContainsPayload(IRGenFunction &IGF,

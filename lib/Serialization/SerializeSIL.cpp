@@ -498,7 +498,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       numAttrs++;
     });
 
-  Optional<llvm::VersionTuple> available;
+  llvm::Optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
   if (!availability.isAlwaysAvailable()) {
     available = availability.getOSVersion().getLowerEndpoint();

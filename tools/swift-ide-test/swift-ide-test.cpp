@@ -888,8 +888,8 @@ struct CompletionTestToken {
   SmallVector<StringRef, 1> CheckPrefixes;
   StringRef Skip;
   StringRef Xfail;
-  Optional<bool> IncludeKeywords = None;
-  Optional<bool> IncludeComments = None;
+  llvm::Optional<bool> IncludeKeywords = llvm::None;
+  llvm::Optional<bool> IncludeComments = llvm::None;
 
   CompletionTestToken(unsigned Line, unsigned Column, unsigned Offset)
       : Line(Line), Column(Column), Offset(Offset){};
@@ -1484,7 +1484,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     // If `-code-completion-token` is specified, test only that token.
     // TODO: Multiple tokens.
     StringRef TargetTokName = options::CodeCompletionToken;
-    Optional<CompletionTestToken> FoundTok;
+    llvm::Optional<CompletionTestToken> FoundTok;
     for (auto Tok : CCTokens) {
       if (Tok.Name == TargetTokName) {
         FoundTok = Tok;
@@ -1668,7 +1668,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
       int result =
           llvm::sys::ExecuteAndWait(options::FileCheckPath, FileCheckArgs,
-                                    /*Env=*/None,
+                                    /*Env=*/llvm::None,
                                     /*Redirects=*/{},
                                     /*SecondsToWait=*/0,
                                     /*MemoryLimit=*/0,
@@ -1763,7 +1763,8 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
   auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
                                ctx, importInfo);
-  auto *SF = new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ None);
+  auto *SF =
+      new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ llvm::None);
   M->addFile(*SF);
   performImportResolution(*SF);
 
@@ -2788,7 +2789,8 @@ class AnnotatingPrinter : public StreamPrinter {
 public:
   using StreamPrinter::StreamPrinter;
 
-  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
+  void printDeclPre(const Decl *D,
+                    llvm::Optional<BracketOptions> Bracket) override {
     StringRef HasDefault = "";
     if (isa<ProtocolDecl>(D)) {
       InProtocol = true;
@@ -2813,7 +2815,8 @@ public:
   void printDeclNameOrSignatureEndLoc(const Decl *D) override {
     OS << "</loc>";
   }
-  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
+  void printDeclPost(const Decl *D,
+                     llvm::Optional<BracketOptions> Bracket) override {
     if (isa<ProtocolDecl>(D)) {
       InProtocol = false;
     }
@@ -2821,25 +2824,24 @@ public:
   }
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
     if (D)
-      printDeclPre(D, None);
+      printDeclPre(D, llvm::None);
   }
   void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
     if (D)
-      printDeclPost(D, None);
+      printDeclPost(D, llvm::None);
   }
 
-  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    TypeOrExtensionDecl Target,
-                                    Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPre(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      llvm::Optional<BracketOptions> Bracket) override {
     if (Bracket.has_value() && !Bracket.value().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
 
-  void
-  printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                TypeOrExtensionDecl Target,
-                                Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPost(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      llvm::Optional<BracketOptions> Bracket) override {
     if (Bracket.has_value() && !Bracket.value().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";

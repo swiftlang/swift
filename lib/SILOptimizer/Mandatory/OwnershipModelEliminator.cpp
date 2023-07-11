@@ -405,7 +405,7 @@ static void injectDebugPoison(DestroyValueInst *destroy) {
     const SILDebugScope *scope = debugVal->getDebugScope();
     auto loc = debugVal->getLoc();
 
-    Optional<SILDebugVariable> varInfo = debugVal->getVarInfo();
+    llvm::Optional<SILDebugVariable> varInfo = debugVal->getVarInfo();
     if (!varInfo)
       continue;
 

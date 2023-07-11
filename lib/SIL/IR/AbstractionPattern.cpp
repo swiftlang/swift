@@ -125,8 +125,8 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
 
 AbstractionPattern::EncodedForeignInfo
 AbstractionPattern::EncodedForeignInfo::encode(
-                         const Optional<ForeignErrorConvention> &foreignError,
-                         const Optional<ForeignAsyncConvention> &foreignAsync) {
+    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
   // Foreign async convention takes precedence.
   if (foreignAsync.has_value()) {
     return EncodedForeignInfo(EncodedForeignInfo::Async,
@@ -144,20 +144,18 @@ AbstractionPattern::EncodedForeignInfo::encode(
   }
 }
 
-AbstractionPattern
-AbstractionPattern::getObjCMethod(CanType origType,
-                                  const clang::ObjCMethodDecl *method,
-                         const Optional<ForeignErrorConvention> &foreignError,
-                         const Optional<ForeignAsyncConvention> &foreignAsync) {
+AbstractionPattern AbstractionPattern::getObjCMethod(
+    CanType origType, const clang::ObjCMethodDecl *method,
+    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
   auto errorInfo = EncodedForeignInfo::encode(foreignError, foreignAsync);
   return getObjCMethod(origType, method, errorInfo);
 }
 
-AbstractionPattern
-AbstractionPattern::getCurriedObjCMethod(CanType origType,
-                                         const clang::ObjCMethodDecl *method,
-                         const Optional<ForeignErrorConvention> &foreignError,
-                         const Optional<ForeignAsyncConvention> &foreignAsync) {
+AbstractionPattern AbstractionPattern::getCurriedObjCMethod(
+    CanType origType, const clang::ObjCMethodDecl *method,
+    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    const llvm::Optional<ForeignAsyncConvention> &foreignAsync) {
   auto errorInfo = EncodedForeignInfo::encode(foreignError, foreignAsync);
   return getCurriedObjCMethod(origType, method, errorInfo);
 }
@@ -485,10 +483,12 @@ bool AbstractionPattern::doesTupleVanish() const {
   return getVanishingTupleElementPatternType().hasValue();
 }
 
-Optional<AbstractionPattern>
+llvm::Optional<AbstractionPattern>
 AbstractionPattern::getVanishingTupleElementPatternType() const {
-  if (!isTuple()) return None;
-  if (!GenericSubs) return None;
+  if (!isTuple())
+    return llvm::None;
+  if (!GenericSubs)
+    return llvm::None;
 
   // Substitution causes tuples to vanish when substituting the elements
   // produces a singleton tuple and it didn't start that way.
@@ -496,7 +496,7 @@ AbstractionPattern::getVanishingTupleElementPatternType() const {
   auto numOrigElts = getNumTupleElements();
 
   // Track whether we've found a single element.
-  Optional<AbstractionPattern> singletonEltType;
+  llvm::Optional<AbstractionPattern> singletonEltType;
   bool hadOrigExpansion = false;
   for (auto index : range(numOrigElts)) {
     auto eltType = getTupleElementType(index);
@@ -505,7 +505,8 @@ AbstractionPattern::getVanishingTupleElementPatternType() const {
     // singleton.  If this is the second such candidate, of course, it's
     // not a singleton.
     if (!eltType.isPackExpansion()) {
-      if (singletonEltType) return None;
+      if (singletonEltType)
+        return llvm::None;
       singletonEltType = eltType;
 
     // Otherwise, check what the expansion shape expands to.
@@ -521,14 +522,14 @@ AbstractionPattern::getVanishingTupleElementPatternType() const {
       // won't have a singleton tuple.  If it expands to a single scalar
       // element, this is a singleton candidate.
       if (expansionCount > 1) {
-        return None;
+        return llvm::None;
       } else if (expansionCount == 1) {
         auto substExpansion =
           dyn_cast<PackExpansionType>(substShape.getElementType(0));
         if (substExpansion)
-          return None;
+          return llvm::None;
         if (singletonEltType)
-          return None;
+          return llvm::None;
         singletonEltType = eltType.getPackExpansionPatternType();
       }
     }
@@ -538,7 +539,7 @@ AbstractionPattern::getVanishingTupleElementPatternType() const {
   // a singleton element, that's the index we want to return.
   if (singletonEltType && !(numOrigElts == 1 && !hadOrigExpansion))
     return singletonEltType;
-  return None;
+  return llvm::None;
 }
 
 void AbstractionPattern::forEachTupleElement(CanType substType,
@@ -2378,8 +2379,8 @@ public:
     
     auto newResultTy = visit(func.getResult(),
                              pattern.getFunctionResultType());
-    
-    Optional<FunctionType::ExtInfo> extInfo;
+
+    llvm::Optional<FunctionType::ExtInfo> extInfo;
     if (func->hasExtInfo())
       extInfo = func->getExtInfo();
     

@@ -103,16 +103,12 @@ namespace {
           const_cast<clang::Module *>(imported));
     }
 
-    void InclusionDirective(clang::SourceLocation HashLoc,
-                            const clang::Token &IncludeTok,
-                            StringRef FileName,
-                            bool IsAngled,
-                            clang::CharSourceRange FilenameRange,
-                            Optional<clang::FileEntryRef> File,
-                            StringRef SearchPath,
-                            StringRef RelativePath,
-                            const clang::Module *Imported,
-                            clang::SrcMgr::CharacteristicKind FileType) override {
+    void InclusionDirective(
+        clang::SourceLocation HashLoc, const clang::Token &IncludeTok,
+        StringRef FileName, bool IsAngled, clang::CharSourceRange FilenameRange,
+        llvm::Optional<clang::FileEntryRef> File, StringRef SearchPath,
+        StringRef RelativePath, const clang::Module *Imported,
+        clang::SrcMgr::CharacteristicKind FileType) override {
       handleImport(Imported);
     }
 
@@ -282,15 +278,12 @@ private:
   }
 
   void InclusionDirective(clang::SourceLocation HashLoc,
-                          const clang::Token &IncludeTok,
-                          StringRef FileName,
-                          bool IsAngled,
-                          clang::CharSourceRange FilenameRange,
-                          Optional<clang::FileEntryRef> File,
-                          StringRef SearchPath,
-                          StringRef RelativePath,
+                          const clang::Token &IncludeTok, StringRef FileName,
+                          bool IsAngled, clang::CharSourceRange FilenameRange,
+                          llvm::Optional<clang::FileEntryRef> File,
+                          StringRef SearchPath, StringRef RelativePath,
                           const clang::Module *Imported,
-                          clang::SrcMgr::CharacteristicKind FileType) override{
+                          clang::SrcMgr::CharacteristicKind FileType) override {
     if (!Imported) {
       if (File)
         Impl.BridgeHeaderFiles.insert(*File);
@@ -925,7 +918,7 @@ std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
       Impl.Instance->getPCHContainerReader(), Impl.Instance->getDiagnostics());
 }
 
-Optional<std::string>
+llvm::Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
   if (isPCHFilenameExtension(ImporterOptions.BridgingHeader)) {
@@ -937,7 +930,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   const auto &BridgingHeader = ImporterOptions.BridgingHeader;
   const auto &PCHOutputDir = ImporterOptions.PrecompiledHeaderOutputDir;
   if (SwiftPCHHash.empty() || BridgingHeader.empty() || PCHOutputDir.empty()) {
-    return None;
+    return llvm::None;
   }
 
   SmallString<256> PCHBasename { llvm::sys::path::filename(BridgingHeader) };
@@ -952,15 +945,14 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.str().str();
 }
 
-
-Optional<std::string>
+llvm::Optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
   if (!PCHFilename.has_value()) {
-    return None;
+    return llvm::None;
   }
   if (!isExplicit && !ImporterOptions.PCHDisableValidation &&
       !canReadPCH(PCHFilename.value())) {
@@ -969,12 +961,12 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
     if (EC) {
       llvm::errs() << "failed to create directory '" << parentDir << "': "
         << EC.message();
-      return None;
+      return llvm::None;
     }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
                                         PCHFilename.value());
     if (FailedToEmit) {
-      return None;
+      return llvm::None;
     }
   }
 
@@ -1574,7 +1566,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
   // If we've made it to here, this is some header other than the bridging
   // header, which means we can no longer rely on one file's modification time
   // to invalidate code completion caches. :-(
-  Impl.setSinglePCHImport(None);
+  Impl.setSinglePCHImport(llvm::None);
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
     cachedContents = cachedContents.drop_back();
@@ -2275,7 +2267,7 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
     bool isAsync) const {
   assert(!version.empty() && "Must provide version when deprecated");
   unsigned major = version.getMajor();
-  Optional<unsigned> minor = version.getMinor();
+  llvm::Optional<unsigned> minor = version.getMinor();
 
   switch (platformKind) {
   case PlatformKind::none:
@@ -3031,7 +3023,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      Optional<clang::FileEntryRef> LocRef =
+      llvm::Optional<clang::FileEntryRef> LocRef =
           ClangSM.getFileEntryRefForID(ClangSM.getFileID(ClangLoc));
       if (!LocRef || *LocRef != File)
         return false;
@@ -3761,7 +3753,7 @@ std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
-Optional<Decl *>
+llvm::Optional<Decl *>
 ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
@@ -3839,13 +3831,13 @@ StringRef ClangModuleUnit::getModuleDefiningPath() const {
   return clangSourceMgr.getFilename(clangModule->DefinitionLoc);
 }
 
-Optional<clang::ASTSourceDescriptor>
+llvm::Optional<clang::ASTSourceDescriptor>
 ClangModuleUnit::getASTSourceDescriptor() const {
   if (clangModule) {
     assert(ASTSourceDescriptor.getModuleOrNull() == clangModule);
     return ASTSourceDescriptor;
   }
-  return None;
+  return llvm::None;
 }
 
 bool ClangModuleUnit::hasClangModule(ModuleDecl *M) {

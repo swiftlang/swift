@@ -4720,7 +4720,7 @@ public:
     uint8_t hasExpandedDefinition = 0;
     IdentifierID externalModuleNameID = 0;
     IdentifierID externalMacroTypeNameID = 0;
-    Optional<ExpandedMacroDefinition> expandedDef;
+    llvm::Optional<ExpandedMacroDefinition> expandedDef;
     auto def = macro->getDefinition();
     switch (def.kind) {
       case MacroDefinition::Kind::Invalid:
@@ -6288,7 +6288,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
-  Optional<DeclID> entryPointClassID;
+  llvm::Optional<DeclID> entryPointClassID;
   SmallVector<DeclID, 16> orderedTopLevelDecls;
 
   ArrayRef<const FileUnit *> files;

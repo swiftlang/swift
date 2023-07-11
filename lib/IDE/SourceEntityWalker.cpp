@@ -39,7 +39,7 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
   llvm::SmallPtrSet<Expr *, 16> ExprsToSkip;
-  Optional<AccessKind> OpAccess;
+  llvm::Optional<AccessKind> OpAccess;
 
 public:
   explicit SemaAnnotator(SourceEntityWalker &SEWalker)
@@ -175,7 +175,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
           auto Continue = passReference(
               assocTypeDecl, assocTypeDecl->getDeclaredInterfaceType(),
               DeclNameLoc(loc),
-              ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+              ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None));
           if (!Continue)
             return Action::Stop();
         }
@@ -216,8 +216,9 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
     if (auto *macro =
             dyn_cast_or_null<MacroDecl>(MD->getMacroRef().getDecl())) {
       auto macroRefType = macro->getDeclaredInterfaceType();
-      if (!passReference(macro, macroRefType, MD->getMacroNameLoc(),
-                         ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+      if (!passReference(
+              macro, macroRefType, MD->getMacroNameLoc(),
+              ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
         return Action::Stop();
     }
   }
@@ -419,7 +420,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     {
       // This could be made more accurate if the member is nonmutating,
       // or whatever.
-      Optional<AccessKind> NewOpAccess;
+      llvm::Optional<AccessKind> NewOpAccess;
       if (OpAccess) {
         if (*OpAccess == AccessKind::Write)
           NewOpAccess = AccessKind::ReadWrite;
@@ -427,8 +428,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
           NewOpAccess = OpAccess;
       }
 
-      llvm::SaveAndRestore<Optional<AccessKind>>
-        C(this->OpAccess, NewOpAccess);
+      llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                         NewOpAccess);
 
       // Visit in source order.
       if (!MRE->getBase()->walk(*this))
@@ -523,8 +524,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We already visited the children.
     return doSkipChildren();
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
-    llvm::SaveAndRestore<Optional<AccessKind>>
-      C(this->OpAccess, AccessKind::ReadWrite);
+    llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                       AccessKind::ReadWrite);
 
     if (!IOE->getSubExpr()->walk(*this))
       return Action::Stop();
@@ -532,8 +533,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We already visited the children.
     return doSkipChildren();
   } else if (auto LE = dyn_cast<LoadExpr>(E)) {
-    llvm::SaveAndRestore<Optional<AccessKind>>
-      C(this->OpAccess, AccessKind::Read);
+    llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                       AccessKind::Read);
 
     if (!LE->getSubExpr()->walk(*this))
       return Action::Stop();
@@ -542,8 +543,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return doSkipChildren();
   } else if (auto AE = dyn_cast<AssignExpr>(E)) {
     {
-      llvm::SaveAndRestore<Optional<AccessKind>>
-        C(this->OpAccess, AccessKind::Write);
+      llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
+                                                         AccessKind::Write);
 
       if (AE->getDest() && !AE->getDest()->walk(*this))
         return Action::Stop();
@@ -614,7 +615,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       auto macroRefType = macroDecl->getDeclaredInterfaceType();
       if (!passReference(
               macroDecl, macroRefType, ME->getMacroNameLoc(),
-              ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+              ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
         return Action::Stop();
     }
   }
@@ -644,9 +645,9 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
         auto Continue = passReference(ModD, {ident, IdT->getLoc()});
         return Action::StopIf(!Continue);
       }
-      auto Continue =
-          passReference(VD, Type(), IdT->getNameLoc(),
-                        ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+      auto Continue = passReference(
+          VD, Type(), IdT->getNameLoc(),
+          ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None));
       return Action::StopIf(!Continue);
     }
   } else if (auto FT = dyn_cast<FixedTypeRepr>(T)) {
@@ -655,7 +656,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
       VD = DT->getSelfType()->getAnyGeneric();
 
     if (VD) {
-      auto Data = ReferenceMetaData(SemaReferenceKind::TypeRef, None);
+      auto Data = ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None);
       Data.isImplicitCtorType = true;
       auto Continue = passReference(VD, FT->getType(), FT->getLoc(),
                                     FT->getSourceRange(), Data);
@@ -686,7 +687,7 @@ SemaAnnotator::walkToPatternPre(Pattern *P) {
     Type T = EP->hasType() ? EP->getType() : Type();
     auto Continue = passReference(
         Element, T, DeclNameLoc(EP->getLoc()),
-        ReferenceMetaData(SemaReferenceKind::EnumElementRef, None));
+        ReferenceMetaData(SemaReferenceKind::EnumElementRef, llvm::None));
     return Action::StopIf(!Continue, P);
   }
 
@@ -786,8 +787,9 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
   if (Decls.size() == 1) {
     // FIXME: ImportDecl should store a DeclNameLoc.
     // FIXME: Handle overloaded funcs too by passing a reference for each?
-    if (!passReference(Decls.front(), Type(), DeclNameLoc(Import->getEndLoc()),
-        ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+    if (!passReference(
+            Decls.front(), Type(), DeclNameLoc(Import->getEndLoc()),
+            ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
       return false;
   }
 

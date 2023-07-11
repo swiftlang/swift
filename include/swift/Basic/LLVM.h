@@ -25,6 +25,7 @@
 // None.h includes an enumerator that is desired & cannot be forward declared
 // without a definition of NoneType.
 #include "llvm/ADT/None.h"
+
 #if defined(__clang_major__) && __clang_major__ < 6
 // Add this header as a workaround to prevent `too few template arguments for
 // class template 'SmallVector'` on the buggy Clang 5 compiler (it doesn't

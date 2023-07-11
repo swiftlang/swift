@@ -249,7 +249,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       auto outputModulePath = getIdentifier(outputPathFileID);
       if (!outputModulePath)
          llvm::report_fatal_error("Bad .swiftmodule output path");
-      Optional<std::string> optionalSwiftInterfaceFile;
+      llvm::Optional<std::string> optionalSwiftInterfaceFile;
       if (interfaceFileID != 0) {
         auto swiftInterfaceFile = getIdentifier(interfaceFileID);
         if (!swiftInterfaceFile)
@@ -553,7 +553,7 @@ llvm::Optional<std::string> ModuleDependenciesCacheDeserializer::getIdentifier(u
 
   --n;
   if (n >= Identifiers.size())
-    return None;
+    return llvm::None;
 
   return Identifiers[n];
 }
@@ -564,7 +564,7 @@ llvm::Optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::ge
 
   --n;
   if (n >= ArraysOfIdentifierIDs.size())
-    return None;
+    return llvm::None;
 
   auto &identifierIDs = ArraysOfIdentifierIDs[n];
 
@@ -609,7 +609,7 @@ llvm::Optional<std::vector<ModuleDependencyID>> ModuleDependenciesCacheDeseriali
     return result;
   }
 
-  return None;
+  return llvm::None;
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
@@ -734,7 +734,7 @@ class ModuleDependenciesCacheSerializer {
   void writeArraysOfIdentifiers();
 
   void writeModuleInfo(ModuleDependencyID moduleID,
-                       Optional<std::string> contextHash,
+                       llvm::Optional<std::string> contextHash,
                        const ModuleDependencyInfo &dependencyInfo);
 
 public:
@@ -823,9 +823,9 @@ void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
   }
 }
 
-void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID moduleID,
-                                 Optional<std::string> contextHash,
-                                 const ModuleDependencyInfo &dependencyInfo) {
+void ModuleDependenciesCacheSerializer::writeModuleInfo(
+    ModuleDependencyID moduleID, llvm::Optional<std::string> contextHash,
+    const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
   auto contextHashStrID = contextHash.has_value() ? getIdentifier(contextHash.value()) : 0;
 

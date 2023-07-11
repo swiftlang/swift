@@ -506,7 +506,7 @@ public:
   }
 
   /// Determine the impact of this fix on the solution score, if any.
-  Optional<ScoreKind> impact() const;
+  llvm::Optional<ScoreKind> impact() const;
 
   virtual std::string getName() const = 0;
 
@@ -1645,17 +1645,19 @@ class AllowTupleTypeMismatch final : public ContextualMismatch {
   /// If this is an element mismatch, \c Index is the element index where the
   /// type mismatch occurred. If this is an arity or label mismatch, \c Index
   /// will be \c None.
-  Optional<unsigned> Index;
+  llvm::Optional<unsigned> Index;
 
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator, Optional<unsigned> index)
+                         ConstraintLocator *locator,
+                         llvm::Optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
-                           locator), Index(index) {}
+                           locator),
+        Index(index) {}
 
 public:
-  static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
-                                        Type rhs, ConstraintLocator *locator,
-                                        Optional<unsigned> index = None);
+  static AllowTupleTypeMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator,
+         llvm::Optional<unsigned> index = llvm::None);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTupleTypeMismatch;
@@ -3432,10 +3434,11 @@ public:
                  openedExistentials,
              ConstraintLocatorBuilder locator);
 
-  static bool isRequired(ConstraintSystem &cs, Type resultTy,
-                         llvm::function_ref<Optional<Type>(TypeVariableType *)>
-                             findExistentialType,
-                         ConstraintLocatorBuilder locator);
+  static bool
+  isRequired(ConstraintSystem &cs, Type resultTy,
+             llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
+                 findExistentialType,
+             ConstraintLocatorBuilder locator);
 
   static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
                                                 Type resultTy,

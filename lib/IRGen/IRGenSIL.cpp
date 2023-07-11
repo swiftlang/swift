@@ -991,11 +991,11 @@ public:
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
-  llvm::Value *emitShadowCopyIfNeeded(llvm::Value *Storage,
-                                      const SILDebugScope *Scope,
-                                      SILDebugVariable VarInfo,
-                                      bool IsAnonymous, bool WasMoved,
-                                      llvm::Optional<Alignment> Align = None) {
+  llvm::Value *
+  emitShadowCopyIfNeeded(llvm::Value *Storage, const SILDebugScope *Scope,
+                         SILDebugVariable VarInfo, bool IsAnonymous,
+                         bool WasMoved,
+                         llvm::Optional<Alignment> Align = llvm::None) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -3323,7 +3323,7 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
 
   // Check for a negative capacity, which is invalid.
   auto capacity = IGF.getLoweredSingletonExplosion(vCapacity);
-  Optional<int64_t> capacityValue;
+  llvm::Optional<int64_t> capacityValue;
   if (auto capacityConst = dyn_cast<llvm::ConstantInt>(capacity)) {
     capacityValue = capacityConst->getSExtValue();
     if (*capacityValue < 0) {
@@ -3334,7 +3334,7 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
   // Check for a negative stride, which should never occur because the caller
   // should always be using MemoryLayout<T>.stride to produce this value.
   auto stride = IGF.getLoweredSingletonExplosion(vStride);
-  Optional<int64_t> strideValue;
+  llvm::Optional<int64_t> strideValue;
   if (auto strideConst = dyn_cast<llvm::ConstantInt>(stride)) {
     strideValue = strideConst->getSExtValue();
     if (*strideValue < 0) {
@@ -3482,7 +3482,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   // If the callee is a differentiable function, we extract the original
   // function because we want to call the original function.
-  Optional<LoweredValue> diffCalleeOrigFnLV;
+  llvm::Optional<LoweredValue> diffCalleeOrigFnLV;
   if (site.getOrigCalleeType()->isDifferentiable()) {
     auto diffFnExplosion = getLoweredExplosion(site.getCallee());
     Explosion origFnExplosion;
@@ -3529,7 +3529,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   // Allocate space for the coroutine buffer.
-  Optional<Address> coroutineBuffer;
+  llvm::Optional<Address> coroutineBuffer;
   switch (origCalleeType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
@@ -4003,9 +4003,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
         auto errorType =
             cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
         nativeResultsStorage.push_back(llvm::ConstantPointerNull::get(errorType));
-        return emitAsyncReturn(
-            IGF, asyncLayout, fnType,
-            Optional<llvm::ArrayRef<llvm::Value *>>(nativeResultsStorage));
+        return emitAsyncReturn(IGF, asyncLayout, fnType,
+                               llvm::Optional<llvm::ArrayRef<llvm::Value *>>(
+                                   nativeResultsStorage));
       }
 
       return emitAsyncReturn(IGF, asyncLayout, fnType, llvm::None);
@@ -6846,7 +6846,7 @@ void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
-  Optional<StackAddress> dynamicArgsBuf;
+  llvm::Optional<StackAddress> dynamicArgsBuf;
   llvm::Value *args;
   if (!I->getSubstitutions().empty() || !I->getAllOperands().empty()) {
     auto sig = I->getPattern()->getGenericSignature();
