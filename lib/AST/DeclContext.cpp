@@ -471,14 +471,11 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       }
 
       auto effectiveAccess =
-        VD->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
-      auto formalAccess =
-        VD->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/false);
+          VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                   /*treatUsableFromInlineAsPublic=*/true);
       if (effectiveAccess.isPublic()) {
         return {FragileFunctionKind::DefaultArgument,
-                !formalAccess.isPublic()};
+                /*allowUsableFromInline=*/true};
       }
 
       return {FragileFunctionKind::None,
