@@ -310,6 +310,35 @@ static llvm::Error resolveExplicitModuleInputs(
   if (auto ID = resolvingDepInfo.getClangIncludeTree())
     includeTrees.push_back(*ID);
 
+  auto addBridgingHeaderDeps =
+      [&](const ModuleDependencyInfo &depInfo) -> llvm::Error {
+    auto sourceDepDetails = depInfo.getAsSwiftSourceModule();
+    if (!sourceDepDetails)
+      return llvm::Error::success();
+
+    if (sourceDepDetails->textualModuleDetails
+            .CASBridgingHeaderIncludeTreeRootID.empty()) {
+      if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles.empty()) {
+        if (auto tracker =
+                cache.getScanService().createSwiftDependencyTracker()) {
+          tracker->startTracking();
+          for (auto &file :
+               sourceDepDetails->textualModuleDetails.bridgingSourceFiles)
+            tracker->trackFile(file);
+          auto bridgeRoot = tracker->createTreeFromDependencies();
+          if (!bridgeRoot)
+            return bridgeRoot.takeError();
+          rootIDs.push_back(bridgeRoot->getID().toString());
+        }
+      }
+    } else
+      includeTrees.push_back(sourceDepDetails->textualModuleDetails
+                                 .CASBridgingHeaderIncludeTreeRootID);
+    return llvm::Error::success();
+  };
+  if (auto E = addBridgingHeaderDeps(resolvingDepInfo))
+    return E;
+
   std::vector<std::string> commandLine = resolvingDepInfo.getCommandline();
   for (const auto &depModuleID : dependencies) {
     const auto optionalDepInfo =
@@ -386,27 +415,8 @@ static llvm::Error resolveExplicitModuleInputs(
         includeTrees.push_back(*ID);
     } break;
     case swift::ModuleDependencyKind::SwiftSource: {
-      auto sourceDepDetails = depInfo->getAsSwiftSourceModule();
-      assert(sourceDepDetails && "Expected source dependency");
-      if (sourceDepDetails->textualModuleDetails
-              .CASBridgingHeaderIncludeTreeRootID.empty()) {
-        if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles
-                 .empty()) {
-          if (auto tracker =
-                  cache.getScanService().createSwiftDependencyTracker()) {
-            tracker->startTracking();
-            for (auto &file :
-                 sourceDepDetails->textualModuleDetails.bridgingSourceFiles)
-              tracker->trackFile(file);
-            auto bridgeRoot = tracker->createTreeFromDependencies();
-            if (!bridgeRoot)
-              return bridgeRoot.takeError();
-            rootIDs.push_back(bridgeRoot->getID().toString());
-          }
-        }
-      } else
-        includeTrees.push_back(sourceDepDetails->textualModuleDetails
-                                   .CASBridgingHeaderIncludeTreeRootID);
+      if (auto E = addBridgingHeaderDeps(*depInfo))
+        return E;
       break;
     }
     default:
