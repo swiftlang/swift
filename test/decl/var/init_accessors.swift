@@ -86,12 +86,16 @@ func test_invalid_refs_in_init_attrs() {
       // expected-error@-2 {{find type 'b' in scope}}
       // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
       init(initialValue) {}
+
+      get { 0 }
     }
 
     var y: String {
       @storageRestrictions(initializes: test)
       // expected-error@-1 {{ambiguous reference to member 'test'}}
       init(initialValue) {}
+
+      get { "" }
     }
 
     func test(_: Int) {} // expected-note {{'test' declared here}}
@@ -110,6 +114,8 @@ func test_assignment_to_let_properties() {
         self.x = initialValue // Ok
         self.y = 42 // expected-error {{cannot assign to property: 'y' is a 'let' constant}}
       }
+
+      get { x }
     }
 
     var point: (Int, Int) {
@@ -157,6 +163,8 @@ func test_duplicate_and_computed_lazy_properties() {
       // expected-error@-2 {{init accessor cannot refer to property 'b'; init accessors can refer only to stored properties}}
       // expected-error@-3 {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
       init(initialValue) {}
+
+      get { _a }
     }
 
     var b: Int {
@@ -475,11 +483,15 @@ func test_default_arguments_are_analyzed() {
   struct Test {
     var pair: (Int, Int) = (0, 1) { // Ok
       init {}
+
+      get { (0, 1) }
     }
 
     var other: (Int, String) = ("", 42) {
       // expected-error@-1 {{cannot convert value of type '(String, Int)' to specified type '(Int, String)'}}
       init(initialValue) {}
+
+      get { (0, "") }
     }
 
     var otherPair = (0, 1) {
@@ -558,36 +570,47 @@ func test_invalid_storage_restrictions() {
       @storageRestrictions()
       // expected-error@-1 {{missing label in @storageRestrictions attribute}}
       init {}
+
+      get { _a }
     }
 
     var b: Int {
       @storageRestrictions(initializes:)
       // expected-error@-1 {{expected property name in @storageRestrictions list}}
       init {}
+
+      get { _b }
     }
 
     var c: Int {
       @storageRestrictions(initializes: a, initializes: b)
       // expected-error@-1 {{duplicate label 'initializes' in @storageRestrictions attribute}}
       init {}
+
+      get { 0 }
     }
 
     var d: Int {
       @storageRestrictions(accesses: a, accesses: c)
       // expected-error@-1 {{duplicate label 'accesses' in @storageRestrictions attribute}}
       init {}
+
+      get { 0 }
     }
 
     var e: Int {
       @storageRestrictions(initialize: a, b, accesses: c, d)
       // expected-error@-1 {{unexpected label 'initialize' in @storageRestrictions attribute}}
       init {}
+
+      get { 0 }
     }
 
     var f: Int {
       @storageRestrictions(initializes: _a, accesses: _b, _a)
       // expected-error@-1 {{property '_a' cannot be both initialized and accessed}}
       init {}
+      // expected-error@-1 {{variable with an init accessor must also have a getter}}
     }
 
     var g: Int {
