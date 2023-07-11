@@ -3515,8 +3515,8 @@ public:
   /// Preconditions:
   /// - Parameters corresponding to parameter indices must conform to
   ///   `Differentiable`.
-  /// - There is one semantic function result type: either the formal original
-  ///   result or an `inout` parameter. It must conform to `Differentiable`.
+  /// - There are semantic function result type: either the formal original
+  ///   result or a "wrt" semantic result parameter.
   ///
   /// Differential typing rules: takes "wrt" parameter derivatives and returns a
   /// "wrt" result derivative.
@@ -3524,10 +3524,7 @@ public:
   /// - Case 1: original function has no `inout` parameters.
   ///   - Original:     `(T0, T1, ...) -> R`
   ///   - Differential: `(T0.Tan, T1.Tan, ...) -> R.Tan`
-  /// - Case 2: original function has a non-wrt `inout` parameter.
-  ///   - Original:     `(T0, inout T1, ...) -> Void`
-  ///   - Differential: `(T0.Tan, ...) -> T1.Tan`
-  /// - Case 3: original function has a wrt `inout` parameter.
+  /// - Case 2: original function has a wrt `inout` parameter.
   ///   - Original:     `(T0, inout T1, ...) -> Void`
   ///   - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
   ///
@@ -3537,10 +3534,7 @@ public:
   /// - Case 1: original function has no `inout` parameters.
   ///   - Original: `(T0, T1, ...) -> R`
   ///   - Pullback: `R.Tan -> (T0.Tan, T1.Tan, ...)`
-  /// - Case 2: original function has a non-wrt `inout` parameter.
-  ///   - Original: `(T0, inout T1, ...) -> Void`
-  ///   - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
-  /// - Case 3: original function has a wrt `inout` parameter.
+  /// - Case 2: original function has a wrt `inout` parameter.
   ///   - Original: `(T0, inout T1, ...) -> Void`
   ///   - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
   ///

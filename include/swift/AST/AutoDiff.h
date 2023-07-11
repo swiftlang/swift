@@ -253,10 +253,9 @@ struct AutoDiffSemanticFunctionResultType {
   Type type;
   unsigned index : 30;
   bool isSemanticResultParameter : 1;
-  bool isWrtParam : 1;
 
-  AutoDiffSemanticFunctionResultType(Type t, unsigned idx, bool param, bool wrt)
-    : type(t), index(idx), isSemanticResultParameter(param), isWrtParam(wrt) { }
+  AutoDiffSemanticFunctionResultType(Type t, unsigned idx, bool param)
+    : type(t), index(idx), isSemanticResultParameter(param) { }
 };
 
 /// Key for caching SIL derivative function types.

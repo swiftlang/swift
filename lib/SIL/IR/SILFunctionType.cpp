@@ -253,11 +253,8 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
     //    cases, so supporting it is a non-goal.
     //
     // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
-    // parameters are not treated as differentiability results, unless the
-    // original function has no formal results, in which case all `inout`
-    // parameters are treated as differentiability results.
-    if (resultIndices.empty() ||
-        resultParamAndIndex.value().getDifferentiability() !=
+    // parameters are not treated as differentiability results.
+    if (resultParamAndIndex.value().getDifferentiability() !=
         SILParameterDifferentiability::NotDifferentiable)
       resultIndices.push_back(getNumResults() + resultParamAndIndex.index());
 
