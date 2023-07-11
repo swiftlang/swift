@@ -13,33 +13,33 @@
 @_spi(SwiftUI)
 public struct ObservationTracking {
   struct Entry: @unchecked Sendable {
-    let registerTracking: @Sendable (Set<AnyKeyPath>, @Sendable @escaping () -> Void) -> Int
-    let cancel: @Sendable (Int) -> Void
-    var properties = Set<AnyKeyPath>()
+    let context: ObservationRegistrar.Context
     
-    init(_ context: ObservationRegistrar.Context) {
-      registerTracking = { properties, observer in
-        context.registerTracking(for: properties, observer: observer)
-      }
-      cancel = { id in
-        context.cancel(id)
-      }
+    var properties: Set<AnyKeyPath>
+    
+    init(_ context: ObservationRegistrar.Context, properties: Set<AnyKeyPath> = []) {
+      self.context = context
+      self.properties = properties
     }
     
     func addObserver(_ changed: @Sendable @escaping () -> Void) -> Int {
-      return registerTracking(properties, changed)
+      return context.registerTracking(for: properties, observer: changed)
+    }
+    
+    func addObserver(_ changed: @Sendable @escaping (Any) -> Void) -> Int {
+      return context.registerComputedValues(for: properties, observer: changed)
     }
     
     func removeObserver(_ token: Int) {
-      cancel(token)
+      context.cancel(token)
     }
     
     mutating func insert(_ keyPath: AnyKeyPath) {
       properties.insert(keyPath)
     }
     
-    mutating func formUnion(_ properties: Set<AnyKeyPath>) {
-      self.properties.formUnion(properties)
+    func union(_ entry: Entry) -> Entry {
+      Entry(context, properties: properties.union(entry.properties))
     }
   }
   
@@ -57,8 +57,8 @@ public struct ObservationTracking {
     }
     
     internal mutating func merge(_ other: _AccessList) {
-      for (identifier, entry) in other.entries {
-        entries[identifier, default: entry].formUnion(entry.properties)
+      entries.merge(other.entries) { existing, entry in
+        existing.union(entry)
       }
     }
   }
