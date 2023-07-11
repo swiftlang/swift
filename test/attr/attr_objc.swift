@@ -364,7 +364,7 @@ protocol subject_containerObjCProtocol1 {
 @objc // access-note-move{{subject_containerObjCProtocol2}}
 protocol subject_containerObjCProtocol2 {
   init(a: Int)
-  // expected-note@-1 {{'init' previously declared here}}
+  // expected-note@-1 {{'init(a:)' previously declared here}}
 
   @objc // FIXME: Access notes can't distinguish between init(a:) overloads
   init(a: Double)

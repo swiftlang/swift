@@ -2642,7 +2642,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
       if (redeclSame)
         Ctx.Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
-                           originalDecl->getBaseName());
+                           originalDecl);
       else
         Ctx.Diags.diagnose(originalDecl, diag::objc_declared_here,
                            origDiagInfo.first, origDiagInfo.second);

@@ -459,9 +459,8 @@ static void diagnoseDuplicateDecls(T &&decls) {
       auto *other = found.first->second;
 
       current->getASTContext().Diags.diagnoseWithNotes(
-        current->diagnose(diag::invalid_redecl,
-                          current->getName()), [&]() {
-        other->diagnose(diag::invalid_redecl_prev, other->getName());
+        current->diagnose(diag::invalid_redecl, current), [&]() {
+        other->diagnose(diag::invalid_redecl_prev, other);
       });
 
       // Mark the decl as invalid. This is needed to avoid emitting a
@@ -760,9 +759,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                 
                 if (optionalRedecl && currIsIUO != otherIsIUO) {
                   ctx.Diags.diagnoseWithNotes(
-                    current->diagnose(diag::invalid_redecl,
-                                      current->getName()), [&]() {
-                    other->diagnose(diag::invalid_redecl_prev, other->getName());
+                    current->diagnose(diag::invalid_redecl, current), [&]() {
+                    other->diagnose(diag::invalid_redecl_prev, other);
                   });
                   current->diagnose(diag::invalid_redecl_by_optionality_note,
                                     otherIsIUO, currIsIUO);
@@ -869,9 +867,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       // If this isn't a redeclaration in the current version of Swift, but
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
-        current->diagnose(diag::invalid_redecl_swift5_warning,
-                          current->getName());
-        other->diagnose(diag::invalid_redecl_prev, other->getName());
+        current->diagnose(diag::invalid_redecl_swift5_warning, current);
+        other->diagnose(diag::invalid_redecl_prev, other);
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -881,8 +878,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           // checker should have already taken care of emitting a more
           // productive diagnostic.
           if (!other->getOverriddenDecl())
-            current->diagnose(diag::invalid_redecl_init,
-                              current->getName(),
+            current->diagnose(diag::invalid_redecl_init, current,
                               otherInit->isMemberwiseInitializer());
         } else if (current->isImplicit() || other->isImplicit()) {
           // If both declarations are implicit, we do not diagnose anything
@@ -937,7 +933,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
             }
             declToDiagnose->diagnose(diag::invalid_redecl_implicit,
                                      current->getDescriptiveKind(),
-                                     isProtocolRequirement, other->getName());
+                                     isProtocolRequirement, other);
 
             // Emit a specialized note if the one of the declarations is
             // the backing storage property ('_foo') or projected value
@@ -965,7 +961,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
             if (varToDiagnose) {
               assert(declToDiagnose);
               varToDiagnose->diagnose(
-                  diag::invalid_redecl_implicit_wrapper, varToDiagnose->getName(),
+                  diag::invalid_redecl_implicit_wrapper, varToDiagnose,
                   kind == PropertyWrapperSynthesizedPropertyKind::Backing);
             }
 
@@ -973,9 +969,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           }
         } else {
           ctx.Diags.diagnoseWithNotes(
-            current->diagnose(diag::invalid_redecl,
-                              current->getName()), [&]() {
-            other->diagnose(diag::invalid_redecl_prev, other->getName());
+            current->diagnose(diag::invalid_redecl, current), [&]() {
+            other->diagnose(diag::invalid_redecl_prev, other);
           });
 
           current->setInvalid();

@@ -588,7 +588,7 @@ static void checkLabeledStmtShadowing(
       ctx.Diags.diagnose(
           ls->getLabelInfo().Loc, diag::label_shadowed, name);
       ctx.Diags.diagnose(
-          prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev, name);
+          prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev_name, name);
     }
   }
 }

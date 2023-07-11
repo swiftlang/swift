@@ -525,18 +525,16 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       auto *existingParamDecl = found->second;
 
       if (existingParamDecl->getDeclContext() == dc) {
-        genericParamDecl->diagnose(
-            diag::invalid_redecl,
-            genericParamDecl->getName());
+        genericParamDecl->diagnose(diag::invalid_redecl, genericParamDecl);
       } else {
         genericParamDecl->diagnose(
             diag::shadowed_generic_param,
-            genericParamDecl->getName()).warnUntilSwiftVersion(6);
+            genericParamDecl).warnUntilSwiftVersion(6);
       }
 
       if (existingParamDecl->getLoc()) {
         existingParamDecl->diagnose(diag::invalid_redecl_prev,
-                                    existingParamDecl->getName());
+                                    existingParamDecl);
       }
 
       continue;

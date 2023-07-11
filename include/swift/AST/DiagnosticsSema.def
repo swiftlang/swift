@@ -956,24 +956,26 @@ NOTE(invalid_redecl_by_optionality_note,none,
       "%select{implicitly unwrapped |}0optional parameter is of "
       "same type as %select{implicitly unwrapped |}1optional parameter",
       (bool, bool))
-ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+ERROR(invalid_redecl,none,"invalid redeclaration of %0", (const ValueDecl *))
 ERROR(invalid_redecl_init,none,
       "invalid redeclaration of synthesized %select{|memberwise }1%0",
-      (DeclName, bool))
+      (const ValueDecl *, bool))
 ERROR(invalid_redecl_implicit,none,
       "invalid redeclaration of synthesized "
       "%select{%0|implementation for protocol requirement}1 %2",
-      (DescriptiveDeclKind, bool, DeclName))
+      (DescriptiveDeclKind, bool, const ValueDecl *))
 WARNING(invalid_redecl_swift5_warning,Deprecation,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
-        (DeclName))
+        (const ValueDecl *))
 
 NOTE(invalid_redecl_prev,none,
+     "%0 previously declared here", (const ValueDecl *))
+NOTE(invalid_redecl_prev_name,none,
      "%0 previously declared here", (DeclName))
 NOTE(invalid_redecl_implicit_wrapper,none,
      "%0 synthesized for property wrapper "
      "%select{projected value|backing storage}1",
-     (DeclName, bool))
+     (const ValueDecl *, bool))
 
 ERROR(protocol_extension_in_where_clause,none,
       "%0 was defined in extension of protocol %1 and cannot be referenced "
