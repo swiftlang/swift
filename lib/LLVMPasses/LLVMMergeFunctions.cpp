@@ -1092,9 +1092,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   LLVM_DEBUG(dbgs() << "  Merge into " << NewFunction->getName() << '\n');
 
   // Move the body of FirstF into the NewFunction.
-  NewFunction->getBasicBlockList().splice(NewFunction->begin(),
-                                          FirstF->getBasicBlockList());
-
+  NewFunction->splice(NewFunction->begin(), FirstF);
   auto NewArgIter = NewFunction->arg_begin();
   for (Argument &OrigArg : FirstF->args()) {
     Argument &NewArg = *NewArgIter++;

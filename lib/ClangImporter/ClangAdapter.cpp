@@ -457,10 +457,10 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
     case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
     case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
       return OmissionTypeName();
 
     // OpenMP types that don't have Swift equivalents.
@@ -749,11 +749,9 @@ bool importer::isUnavailableInSwift(
 
 OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
-  auto &clangCtx = param->getASTContext();
-
   // If nullability is available on the type, use it.
   clang::QualType paramTy = param->getType();
-  if (auto nullability = paramTy->getNullability(clangCtx)) {
+  if (auto nullability = paramTy->getNullability()) {
     return translateNullability(*nullability);
   }
 

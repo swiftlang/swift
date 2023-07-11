@@ -363,14 +363,14 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
         continue;
     }
 
-    auto offset =
+    Size offset =
         Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-    auto alignment = IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+    llvm::Align alignment = IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
 
     // Load metadata describing argument value from argument types buffer.
     auto typeLoc = IGF.emitAddressAtOffset(
         argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
-        Alignment(alignment), "arg_type_loc");
+        Alignment(alignment.value()), "arg_type_loc");
 
     auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 

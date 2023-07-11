@@ -28,7 +28,7 @@ void IRBuilder::emitBlock(llvm::BasicBlock *BB) {
   assert(ClearedIP == nullptr);
   llvm::BasicBlock *CurBB = GetInsertBlock();
   assert(CurBB && "current insertion point is invalid");
-  CurBB->getParent()->getBasicBlockList().insertAfter(CurBB->getIterator(), BB);
+  CurBB->getParent()->insert(CurBB->getIterator(), BB);
   IRBuilderBase::SetInsertPoint(BB);
 }
 

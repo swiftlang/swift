@@ -7311,7 +7311,7 @@ llvm::Value *irgen::emitGatherBits(IRGenFunction &IGF,
     result = result ? B.CreateOr(result, part) : part;
 
     // Update the offset and remaining mask.
-    usedBits += partMask.countPopulation();
+    usedBits += partMask.popcount();
   }
   return result;
 }
@@ -7357,7 +7357,7 @@ llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
   // example we could take into account the packedLowBit.
   auto unknownBits = std::min(sourceTy->getBitWidth(), bitSize);
   bool needMask = !(mask.isShiftedMask() &&
-                    mask.countPopulation() >= unknownBits);
+                    mask.popcount() >= unknownBits);
 
   // Shift each set of contiguous set bits into position and
   // accumulate them into the result.
@@ -7388,7 +7388,7 @@ llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
     result = result ? builder.CreateOr(result, part) : part;
 
     // Update the offset and remaining mask.
-    usedBits += partMask.countPopulation();
+    usedBits += partMask.popcount();
   }
   return result;
 }
@@ -7397,7 +7397,7 @@ llvm::Value *irgen::emitScatterBits(IRGenModule &IGM,
 llvm::APInt irgen::gatherBits(const llvm::APInt &mask,
                               const llvm::APInt &value) {
   assert(mask.getBitWidth() == value.getBitWidth());
-  llvm::APInt result = llvm::APInt(mask.countPopulation(), 0);
+  llvm::APInt result = llvm::APInt(mask.popcount(), 0);
   unsigned j = 0;
   for (unsigned i = 0; i < mask.getBitWidth(); ++i) {
     if (!mask[i]) {

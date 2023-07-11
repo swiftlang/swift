@@ -366,10 +366,10 @@ namespace {
       case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
         return Type();
 
       // OpenMP types that don't have Swift equivalents.
@@ -1669,7 +1669,7 @@ ImportedType ClangImporter::Implementation::importType(
 
   // If nullability is provided as part of the type, that overrides
   // optionality provided externally.
-  if (auto nullability = type->getNullability(clangContext)) {
+  if (auto nullability = type->getNullability()) {
     bool stripNonResultOptionality =
         importKind == ImportTypeKind::CompletionHandlerResultParameter;
     
