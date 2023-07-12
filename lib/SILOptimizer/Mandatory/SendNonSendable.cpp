@@ -5,6 +5,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -61,11 +62,38 @@ class PartitionOpTranslator {
   llvm::DenseMap<const SILNode *, unsigned> nodeIDMap;
   unsigned nextNodeID = 0;
 
-  // projectionMap captures "projections" of addresses like begin_borrow
-  // and begin_access
-  llvm::DenseMap<SILValue, SILValue> projectionMap;
+  AccessStorage getAccessStorageFromAddr(SILValue val) {
+    assert(val->getType().isAddress());
+    auto accessStorage = AccessStorage::compute(val);
+    if (accessStorage) {
+      if (auto initExistential = dyn_cast_or_null<InitExistentialAddrInst>(
+          accessStorage.getRoot().getDefiningInstruction()))
+        // look through these because AccessStorage does not
+        return getAccessStorageFromAddr(initExistential->getOperand());
+    }
+    return accessStorage;
+  }
+
+  bool isUniquelyIdentified(SILValue val) {
+    if (!val->getType().isAddress())
+      return false;
+    if (auto accessStorage = getAccessStorageFromAddr(val)) {
+      return accessStorage.isUniquelyIdentified();
+    }
+    return false;
+  }
+
+  SILValue simplifyVal(SILValue val) {
+    if (!val->getType().isAddress())
+      return getUnderlyingObject(val);
+    if (auto accessStorage = getAccessStorageFromAddr(val)) {
+      return accessStorage.getRoot();
+    }
+    return val;
+  }
 
   bool nodeHasID(SILValue value) {
+    value = simplifyVal(value);
     assert(isNonSendable(value) &&
            "only non-Sendable values should be entered in the map");
     return nodeIDMap.count(value);
@@ -73,6 +101,7 @@ class PartitionOpTranslator {
 
   // lookup the internally assigned unique ID of a SILValue, or create one
   unsigned lookupNodeID(SILValue value) {
+    value = simplifyVal(value);
     assert(isNonSendable(value) &&
            "only non-Sendable values should be entered in the map");
     if (nodeIDMap.count(value)) {
@@ -80,22 +109,6 @@ class PartitionOpTranslator {
     }
     nodeIDMap[value] = nextNodeID;
     return nextNodeID++;
-  }
-
-  // note the fact that `tgt` is a projection of `src`, arising from SIL
-  // instructions such as `tgt = begin_borrow src`. This yields "write-through"
-  // semantics: `store x to tgt` will then have the same effects as
-  // `store x to src`.
-  void addProjection(SILValue tgt, SILValue src) {
-    projectionMap[tgt] = src;
-  }
-
-  // lookup `val` to see if it is the target of a projection
-  llvm::Optional<SILValue> getProjection(SILValue val) {
-    if (projectionMap.count(val)) {
-      return projectionMap[val];
-    }
-    return {};
   }
 
   // check the passed type for sendability, special casing the type used for
@@ -116,6 +129,7 @@ class PartitionOpTranslator {
   // to be functions or class methods because these can safely be treated as
   // Sendable despite not having true Sendable type
   bool isNonSendable(SILValue value) {
+    value = simplifyVal(value);
     SILInstruction *defInst = value.getDefiningInstruction();
     if (defInst && isa<ClassMethodInst, FunctionRefInst>(defInst)) {
       // though these values are technically non-Sendable, we can safely
@@ -135,37 +149,46 @@ class PartitionOpTranslator {
   // The following section of functions create fresh PartitionOps referencing
   // the current value of currentInstruction for ease of programming.
 
-  PartitionOp AssignFresh(SILValue value) {
-    return PartitionOp::AssignFresh(lookupNodeID(value),
-        currentInstruction);
+  std::vector<PartitionOp> AssignFresh(SILValue value) {
+    return {PartitionOp::AssignFresh(lookupNodeID(value),
+        currentInstruction)};
   }
 
-  PartitionOp Assign(SILValue tgt, SILValue src) {
+  std::vector<PartitionOp> Assign(SILValue tgt, SILValue src) {
     assert(nodeHasID(src) &&
            "source value of assignment should already have been encountered");
-    return PartitionOp::Assign(lookupNodeID(tgt), lookupNodeID(src),
-        currentInstruction);
+
+    if (lookupNodeID(tgt) == lookupNodeID(src))
+      return {}; //noop
+
+    return {PartitionOp::Assign(lookupNodeID(tgt), lookupNodeID(src),
+                                currentInstruction)};
   }
 
-  PartitionOp Consume(SILValue value) {
+  std::vector<PartitionOp> Consume(SILValue value) {
     assert(nodeHasID(value) &&
            "consumed value should already have been encountered");
-    return PartitionOp::Consume(lookupNodeID(value),
-                                currentInstruction);
+
+    return {PartitionOp::Consume(lookupNodeID(value),
+                                currentInstruction)};
   }
 
-  PartitionOp Merge(SILValue fst, SILValue snd) {
+  std::vector<PartitionOp> Merge(SILValue fst, SILValue snd) {
     assert(nodeHasID(fst) && nodeHasID(snd) &&
            "merged values should already have been encountered");
-    return PartitionOp::Merge(lookupNodeID(fst), lookupNodeID(snd),
-                              currentInstruction);
+
+    if (lookupNodeID(fst) == lookupNodeID(snd))
+      return {}; //noop
+
+    return {PartitionOp::Merge(lookupNodeID(fst), lookupNodeID(snd),
+                              currentInstruction)};
   }
 
-  PartitionOp Require(SILValue value) {
+  std::vector<PartitionOp> Require(SILValue value) {
     assert(nodeHasID(value) &&
            "required value should already have been encountered");
-    return PartitionOp::Require(lookupNodeID(value),
-                                currentInstruction);
+    return {PartitionOp::Require(lookupNodeID(value),
+                                currentInstruction)};
   }
   // ===========================================================================
 
@@ -233,17 +256,20 @@ public:
     bool nonSendableResult = isNonSendable(applyInst->getResult(0));
 
     std::vector<PartitionOp> translated;
+    auto add_to_translation = [&](std::vector<PartitionOp> ops) {
+      for (auto op : ops) translated.push_back(op);
+    };
 
     if (SILApplyCrossesIsolation(applyInst)) {
       // for calls that cross isolation domains, consume all operands
       for (SILValue operand : nonSendableOperands)
-        translated.push_back(Consume(operand));
+        add_to_translation(Consume(operand));
 
       if (nonSendableResult) {
         // returning non-Sendable values from a cross isolation call will always
         // be an error, but doesn't need to be diagnosed here, so let's pretend
         // it gets a fresh region
-        translated.push_back(AssignFresh(applyInst->getResult(0)));
+        add_to_translation(AssignFresh(applyInst->getResult(0)));
       }
       return translated;
     }
@@ -254,83 +280,73 @@ public:
     if (nonSendableOperands.empty()) {
       // if no operands, a non-Sendable result gets a fresh region
       if (nonSendableResult) {
-        translated.push_back(AssignFresh(applyInst->getResult(0)));
+        add_to_translation(AssignFresh(applyInst->getResult(0)));
       }
       return translated;
     }
 
     if (nonSendableOperands.size() == 1) {
       // only one operand, so no merges required; just a `Require`
-      translated.push_back(Require(nonSendableOperands.front()));
+      add_to_translation(Require(nonSendableOperands.front()));
     } else {
       // merge all operands
       for (unsigned i = 1; i < nonSendableOperands.size(); i++) {
-        translated.push_back(Merge(nonSendableOperands.at(i-1),
+        add_to_translation(Merge(nonSendableOperands.at(i-1),
                                    nonSendableOperands.at(i)));
       }
     }
 
     // if the result is non-Sendable, assign it to the region of the operands
     if (nonSendableResult) {
-      translated.push_back(
+      add_to_translation(
           Assign(applyInst->getResult(0), nonSendableOperands.front()));
     }
 
     return translated;
   }
 
-  std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src,
-                                              bool projecting = false) {
+  std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
     // no work to be done if assignment is to a Sendable target
     if (!isNonSendable(tgt))
       return {};
 
     if (isNonSendable(src)) {
-      // non-Sendable source and target of assignment
-
-      std::vector<PartitionOp> ops = {};
-      if (auto projected = getProjection(tgt))
-        ops = translateSILAssign(projected.value(), src);
-
-      //perform the assignment itself
-      ops.push_back(Assign(tgt, src));
-
-      // transfer any projections of the source to the target;
-      if (auto src_projected = getProjection(src))
-        addProjection(tgt, src_projected.value());
-
-      // add a projection if requested by the call
-      if (projecting)
-        addProjection(tgt, src);
-
-      return ops;
+      // non-Sendable source and target of assignment, so just perform the assign
+      return Assign(tgt, src);
     }
 
     // a non-Sendable value is extracted from a Sendable value,
     // seems to only occur when performing unchecked casts like
     // `unchecked_ref_cast`
-    return {AssignFresh(tgt)};
+    return AssignFresh(tgt);
   }
 
   // If the passed SILValue is NonSendable, then create a fresh region for it,
   // otherwise do nothing.
   std::vector<PartitionOp> translateSILAssignFresh(SILValue fresh) {
     if (isNonSendable(fresh)) {
-      return { AssignFresh(fresh)};
+      return AssignFresh(fresh);
     }
     return {};
   }
 
   std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
     if (isNonSendable(fst) && isNonSendable(snd)) {
-      return {Merge(fst, snd)};
+      return Merge(fst, snd);
     }
     return {};
   }
 
+  std::vector<PartitionOp> translateSILStore(SILValue tgt, SILValue src) {
+    if (isUniquelyIdentified(tgt)) {
+      return translateSILAssign(tgt, src);
+    }
+    return translateSILMerge(tgt, src);
+  }
+
   std::vector<PartitionOp> translateSILRequire(SILValue val) {
     if (isNonSendable(val)) {
-      return {Require(val)};
+      return Require(val);
     }
     return {};
   }
@@ -359,10 +375,13 @@ public:
     // (e.g. CopyValueInst, LoadInst, IndexAddrInst) or because the operand
     // is unusable once the result is defined (e.g. the unchecked casts)
     if (isa<AddressToPointerInst,
+            BeginAccessInst,
+            BeginBorrowInst,
             CopyValueInst,
             ConvertEscapeToNoEscapeInst,
             ConvertFunctionInst,
             IndexAddrInst,
+            InitExistentialAddrInst,
             LoadInst,
             LoadBorrowInst,
             LoadWeakInst,
@@ -378,28 +397,14 @@ public:
           instruction->getOperand(0));
     }
 
-    // The following instructions are treated as projecting assignments -
-    // this means that stores and other writes to their result need to be
-    // written through to their operand. So far, all instances in which this is
-    // necessary are shallow and temporary - meaning the projection eventually
-    // goes out of scope, and the projection can't itself be projected.
-    if (isa<BeginAccessInst,
-            BeginBorrowInst,
-            InitExistentialAddrInst>(instruction)) {
-      return translateSILAssign(
-          instruction->getResult(0),
-          instruction->getOperand(0),
-          /*projecting=*/ true);
-    }
-
     // The following instructions are treated as non-projecting assignments,
     // but between their two operands instead of their operand and result.
     if (isa<CopyAddrInst,
-        ExplicitCopyAddrInst,
+            ExplicitCopyAddrInst,
             StoreInst,
             StoreBorrowInst,
             StoreWeakInst>(instruction)) {
-      return translateSILAssign(
+      return translateSILStore(
           instruction->getOperand(1),
           instruction->getOperand(0));
     }

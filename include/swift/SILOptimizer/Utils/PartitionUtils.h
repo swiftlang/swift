@@ -88,19 +88,19 @@ public:
   void dump() const LLVM_ATTRIBUTE_USED {
     switch (OpKind) {
     case PartitionOpKind::Assign:
-      llvm::dbgs() << "assign %" << OpArgs[0] << " = %" << OpArgs[1] << "\n";
+      llvm::dbgs() << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::AssignFresh:
-      llvm::dbgs() << "assign_fresh %" << OpArgs[0] << "\n";
+      llvm::dbgs() << "assign_fresh %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Consume:
-      llvm::dbgs() << "consume %" << OpArgs[0] << "\n";
+      llvm::dbgs() << "consume %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Merge:
-      llvm::dbgs() << "merge %" << OpArgs[0] << " with %" << OpArgs[1] << "\n";
+      llvm::dbgs() << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::Require:
-      llvm::dbgs() << "require %" << OpArgs[0] << "\n";
+      llvm::dbgs() << "require %%" << OpArgs[0] << "\n";
       break;
     }
   }
@@ -406,9 +406,7 @@ public:
       }
       llvm::dbgs() << (label < 0 ? "}" : ")");
     }
-    llvm::dbgs() << "] | ";
-
-    dump_labels();
+    llvm::dbgs() << "]";
   }
 };
 }
