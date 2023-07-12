@@ -815,9 +815,9 @@ public:
   void emitInitAccessor(AccessorDecl *accessor);
 
   /// Generates code to emit the given setter reference to the given base value.
-  std::pair<SILValue, CanSILFunctionType>
-  emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter, ManagedValue base,
-                          SubstitutionMap substitutions);
+  SILValue emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
+                                   ManagedValue base,
+                                   SubstitutionMap substitutions);
 
   /// Generates code to destroy the instance variables of a class.
   ///

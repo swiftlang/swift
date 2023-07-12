@@ -1755,7 +1755,7 @@ ParamDecl *SILGenFunction::isMappedToInitAccessorArgument(VarDecl *property) {
   return arg->second;
 }
 
-std::pair<SILValue, CanSILFunctionType>
+SILValue
 SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
                                         ManagedValue base,
                                         SubstitutionMap substitutions) {
@@ -1783,8 +1783,7 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
                                       getTypeExpansionContext());
   };
 
-  auto setterTy = getSetterType(setterFRef);
-  SILFunctionConventions setterConv(setterTy, SGM.M);
+  SILFunctionConventions setterConv(getSetterType(setterFRef), SGM.M);
 
   // Emit captures for the setter
   SmallVector<SILValue, 4> capturedArgs;
@@ -1822,5 +1821,5 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
   PartialApplyInst *setterPAI =
       B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
                            ParameterConvention::Direct_Guaranteed);
-  return {emitManagedRValueWithCleanup(setterPAI).getValue(), setterTy};
+  return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
