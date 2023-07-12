@@ -18,6 +18,7 @@ extension InitEnumDataAddrInst : OnoneSimplifyable {
     // Optimize the sequence
     // ```
     //   %1 = init_enum_data_addr %enum_addr, #someCaseWithPayload
+    //   ...
     //   store %payload to %1
     //   inject_enum_addr %enum_addr, #someCaseWithPayload
     // ```
@@ -26,18 +27,16 @@ extension InitEnumDataAddrInst : OnoneSimplifyable {
     //   %1 = enum  $E, #someCaseWithPayload, %payload
     //   store %1 to %enum_addr
     // ```
-    // This sequence of three instructions must appear in consecutive order.
+    // This store and inject instructions must appear in consecutive order.
     // But usually this is the case, because it's generated this way by SILGen.
+    // We also check that between the init and the store, no instruction writes to memory.
     //
-    if let nextInst = self.next,
-       let store = nextInst as? StoreInst,
+    if let store = self.uses.singleUse?.instruction as? StoreInst,
        store.destination == self,
-       let singleUse = self.uses.singleUse,
-       singleUse.instruction == store,
-       let nextAfterStore = store.next,
-       let inject = nextAfterStore as? InjectEnumAddrInst,
+       let inject = store.next as? InjectEnumAddrInst,
        inject.enum == self.enum,
-       inject.enum.type.isLoadable(in: parentFunction) {
+       inject.enum.type.isLoadable(in: parentFunction),
+       !anyInstructionMayWriteToMemory(between: self, and: store) {
 
       assert(self.caseIndex == inject.caseIndex, "mismatching case indices when creating an enum")
 
@@ -50,4 +49,20 @@ extension InitEnumDataAddrInst : OnoneSimplifyable {
       context.erase(instruction: self)
     }
   }
+}
+
+// Returns false if `first` and `last` are in the same basic block and no instructions between them write to memory. True otherwise.
+private func anyInstructionMayWriteToMemory(between first: Instruction, and last: Instruction) -> Bool {
+  var nextInstruction = first.next
+  while let i = nextInstruction {
+    if i == last {
+      return false
+    }
+    if i.mayWriteToMemory {
+      return true
+    }
+    nextInstruction = i.next
+  }
+  // End of basic block, and we did not find `last`
+  return true
 }
