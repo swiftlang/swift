@@ -127,6 +127,7 @@ public:
 
     bool isValid() const { return Kind != WitnessKind::Invalid; }
 
+    SWIFT_IMPORT_UNSAFE
     const MethodWitness &getMethodWitness() const {
       assert(Kind == WitnessKind::Method);
       return Method;

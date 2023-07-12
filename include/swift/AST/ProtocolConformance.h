@@ -341,7 +341,11 @@ public:
 ///   self-conformance) or
 /// - the type's conformance is declared within the runtime (a builtin
 ///   conformance).
-class RootProtocolConformance : public ProtocolConformance {
+class
+  __attribute__((swift_attr("import_as_ref")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+RootProtocolConformance : public ProtocolConformance {
 protected:
   RootProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : ProtocolConformance(kind, conformingType) {}
@@ -808,6 +812,7 @@ SpecializedProtocolConformance : public ProtocolConformance,
 public:
   /// Get the generic conformance from which this conformance was derived,
   /// if there is one.
+  SWIFT_IMPORT_UNSAFE
   RootProtocolConformance *getGenericConformance() const {
     return GenericConformance;
   }

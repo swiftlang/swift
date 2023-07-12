@@ -22,11 +22,40 @@ let devirtualizeWitnessTables = ModulePass(name: "devirtualize-witness-tables") 
         guard let initExistentialInst = inst as? InitExistentialAddrInst else { continue }
         for conformance in initExistentialInst.conformances {
           guard conformance.isConcrete() else { continue }
-          guard let spec = conformance.getConcrete().getAsSpecializedProtocolConformance() else { continue }
-          guard let foundTable = moduleContext.lookUpWitnessTable(spec) else { continue }
-          for entry in foundTable.entries.compactMap { $0.methodFunction } {
-            moduleContext.specialize(function: entry, withSubstitutions: spec.getSubstitutionMap())
+          guard let specProtocolConformance = conformance.getConcrete().getAsSpecializedProtocolConformance() else { continue }
+
+          if moduleContext.lookUpWitnessTable(specProtocolConformance) != nil { continue }
+          guard let root = specProtocolConformance.getGenericConformance() else { continue }
+
+          guard let foundTable = moduleContext.lookUpWitnessTable(root) else { continue }
+
+// Better implementation that takes three minutes to type check before crashing the compiler 🧚
+//          let newEntries = foundTable.entries
+//            .compactMap {
+//              guard let fn = $0.methodFunction else { return nil }
+//              guard let spec = moduleContext.specialize(function: fn, withSubstitutions: specProtocolConformance.getSubstitutionMap()) else { return nil }
+//
+//              return swift.SILWitnessTable.MethodWitness(
+//                Requirement: $0.bridged.entry.getMethodWitness().pointee.Requirement,
+//                Witness: spec.bridged.getFunction())
+//            }
+//            .map(swift.SILWitnessTable.Entry.init)
+//            .map(WitnessTable.Entry.init)
+
+          var newEntries = [WitnessTable.Entry]()
+          for entry in foundTable.entries {
+            guard entry.kind == .Method,
+                  let fn = entry.methodFunction else { continue }
+            guard let spec = moduleContext.specialize(function: fn, withSubstitutions: specProtocolConformance.getSubstitutionMap()) else { continue }
+            
+            let newWitnessFn = swift.SILWitnessTable.MethodWitness(
+                Requirement: entry.bridged.entry.getMethodWitness().pointee.Requirement,
+                Witness: spec.bridged.getFunction())
+            let newWitness = swift.SILWitnessTable.Entry(newWitnessFn)
+            newEntries.append(WitnessTable.Entry(newWitness))
           }
+
+          WitnessTable.create(moduleContext._bridged, specProtocolConformance, newEntries)
         }
       }
     }

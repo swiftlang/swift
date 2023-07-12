@@ -418,7 +418,13 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedWitnessTable lookUpWitnessTable(swift::SpecializedProtocolConformance *conf) const {
     swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return {mod->lookUpWitnessTable(conf->getGenericConformance())};
+    return {mod->lookUpWitnessTable(conf)};
+  }
+  
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedWitnessTable lookUpWitnessTable(swift::RootProtocolConformance *conf) const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return {mod->lookUpWitnessTable(conf)};
   }
 
   SWIFT_IMPORT_UNSAFE
@@ -487,6 +493,11 @@ struct BridgedPassContext {
   }
 
   bool enableSimplificationFor(BridgedInstruction inst) const;
+
+  SWIFT_IMPORT_UNSAFE
+  void *getSILModuleOpaque() const {
+    return invocation->getPassManager()->getModule();
+  }
 };
 
 //===----------------------------------------------------------------------===//

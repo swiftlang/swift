@@ -117,7 +117,11 @@ struct ModulePassContext : Context, CustomStringConvertible {
   func lookUpWitnessTable(_ conf: swift.SpecializedProtocolConformance) -> WitnessTable? {
     _bridged.lookUpWitnessTable(conf).witnessTable
   }
-  
+
+  func lookUpWitnessTable(_ conf: swift.RootProtocolConformance) -> WitnessTable? {
+    _bridged.lookUpWitnessTable(conf).witnessTable
+  }
+
   func specialize(function: Function, withSubstitutions subst: swift.SubstitutionMap) -> Function? {
     _bridged.specializeFunction(function.bridged, subst).function
   }
