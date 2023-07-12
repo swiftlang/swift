@@ -302,6 +302,10 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
         auto *ptr = emitConstantValue(IGM, args[0]).claimNextConstant();
         return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
       }
+      case BuiltinValueKind::IntToPtr: {
+        auto *num = emitConstantValue(IGM, args[0]).claimNextConstant();
+        return llvm::ConstantExpr::getIntToPtr(num, IGM.Int8PtrTy);
+      }
       case BuiltinValueKind::ZExtOrBitCast: {
         auto *val = emitConstantValue(IGM, args[0]).claimNextConstant();
         return llvm::ConstantExpr::getZExtOrBitCast(val,
