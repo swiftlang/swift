@@ -1823,3 +1823,42 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
                            ParameterConvention::Direct_Guaranteed);
   return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
+
+void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
+                                      VarDecl *field, ManagedValue newValue,
+                                      SubstitutionMap substitutions) {
+  auto fieldTy = field->getValueInterfaceType();
+  if (!substitutions.empty())
+    fieldTy = fieldTy.subst(substitutions);
+
+  // Emit the init accessor function partially applied to the base.
+  SILValue initFRef = emitGlobalFunctionRef(
+      loc, getAccessorDeclRef(field->getOpaqueAccessor(AccessorKind::Init)));
+  if (!substitutions.empty()) {
+    // If there are substitutions we need to emit partial apply to
+    // apply substitutions to the init accessor reference type.
+    auto initTy =
+        initFRef->getType().castTo<SILFunctionType>()->substGenericArgs(
+            SGM.M, substitutions, getTypeExpansionContext());
+
+    SILFunctionConventions setterConv(initTy, SGM.M);
+
+    // Emit partial apply without argument to produce a substituted
+    // init accessor reference.
+    PartialApplyInst *initPAI =
+        B.createPartialApply(loc, initFRef, substitutions, ArrayRef<SILValue>(),
+                             ParameterConvention::Direct_Guaranteed);
+    initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
+  }
+
+  SILValue setterFRef;
+  if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
+    setterFRef = emitApplyOfSetterToBase(loc, SILDeclRef(setter), selfValue,
+                                         substitutions);
+  } else {
+    setterFRef = SILUndef::get(initFRef->getType(), F);
+  }
+
+  B.createAssignOrInit(loc, selfValue.getValue(), newValue.forward(*this),
+                       initFRef, setterFRef, AssignOrInitInst::Unknown);
+}
