@@ -141,6 +141,9 @@ public:
   /// Clang Include Trees.
   std::vector<std::string> ClangIncludeTrees;
 
+  /// CacheKey for input file.
+  std::string InputFileKey;
+
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
   unsigned BadFileDescriptorRetryCount = 0;

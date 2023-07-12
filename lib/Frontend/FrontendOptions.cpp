@@ -229,7 +229,6 @@ bool FrontendOptions::supportCompilationCaching(ActionType action) {
   case ActionType::DumpInterfaceHash:
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
-  case ActionType::TypecheckModuleFromInterface:
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
   case ActionType::DumpAST:
@@ -241,6 +240,7 @@ bool FrontendOptions::supportCompilationCaching(ActionType action) {
   case ActionType::Immediate:
   case ActionType::DumpTypeInfo:
     return false;
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::CompileModuleFromInterface:
   case ActionType::EmitPCH:
   case ActionType::EmitPCM:
