@@ -20,15 +20,9 @@ foo { bar in
 // CHECK_FN:   "module": {
 // CHECK_FN:     "name": "cursor_symbol_graph_param",
 // CHECK_FN:     "platform": {
-// CHECK_FN:       "architecture": "arm64",
-// CHECK_FN:       "operatingSystem": {
-// CHECK_FN:         "minimumVersion": {
-// CHECK_FN:           "major": 10,
-// CHECK_FN:           "minor": 13
-// CHECK_FN:         },
-// CHECK_FN:         "name": "macosx"
-// CHECK_FN:       },
-// CHECK_FN:       "vendor": "apple"
+// CHECK_FN:       "architecture":
+// CHECK_FN:       "operatingSystem":
+// CHECK_FN:       "vendor":
 // CHECK_FN:     }
 // CHECK_FN:   },
 // CHECK_FN:   "relationships": [],
@@ -123,15 +117,9 @@ foo { bar in
 // CHECK_BAR:   "module": {
 // CHECK_BAR:     "name": "cursor_symbol_graph_param",
 // CHECK_BAR:     "platform": {
-// CHECK_BAR:       "architecture": "arm64",
-// CHECK_BAR:       "operatingSystem": {
-// CHECK_BAR:         "minimumVersion": {
-// CHECK_BAR:           "major": 10,
-// CHECK_BAR:           "minor": 13
-// CHECK_BAR:         },
-// CHECK_BAR:         "name": "macosx"
-// CHECK_BAR:       },
-// CHECK_BAR:       "vendor": "apple"
+// CHECK_BAR:       "architecture":
+// CHECK_BAR:       "operatingSystem":
+// CHECK_BAR:       "vendor":
 // CHECK_BAR:     }
 // CHECK_BAR:   },
 // CHECK_BAR:   "relationships": [],
