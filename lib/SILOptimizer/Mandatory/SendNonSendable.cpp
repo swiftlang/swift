@@ -13,11 +13,12 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
+#define DEBUG_TYPE "send-non-sendable"
+
 using namespace swift;
 
 namespace {
 
-static const bool DEBUG = false;
 static const char *SEP_STR = "╾──────────────────────────────╼\n";
 
 // SILApplyCrossesIsolation determines if a SIL instruction is an isolation
@@ -429,16 +430,16 @@ public:
   // transformations to the non-Sendable partition that it induces.
   // it accomplished this by sequentially calling translateSILInstruction
   std::vector<PartitionOp> translateSILBasicBlock(SILBasicBlock *basicBlock) {
-    if (DEBUG) {
-      llvm::dbgs() << SEP_STR
-                   << "Compiling basic block for function "
-                   << basicBlock->getFunction()->getName()
-                   << ": ";
-      basicBlock->dumpID();
-      llvm::dbgs() << SEP_STR;
-      basicBlock->dump();
-      llvm::dbgs() << SEP_STR << "Results:\n";
-    }
+    LLVM_DEBUG(
+        llvm::dbgs() << SEP_STR
+                     << "Compiling basic block for function "
+                     << basicBlock->getFunction()->getName()
+                     << ": ";
+        basicBlock->dumpID();
+        llvm::dbgs() << SEP_STR;
+        basicBlock->dump();
+        llvm::dbgs() << SEP_STR << "Results:\n";
+    );
 
     //translate each SIL instruction to a PartitionOp, if necessary
     std::vector<PartitionOp> partitionOps;
@@ -447,11 +448,11 @@ public:
       for (PartitionOp &op : ops) {
         partitionOps.push_back(op);
 
-        if (DEBUG) {
-          instruction.dump();
-          llvm::dbgs() << " └───╼ ";
-          op.dump();
-        }
+        LLVM_DEBUG(
+            instruction.dump();
+            llvm::dbgs() << " └───╼ ";
+            op.dump();
+        );
       }
     }
 
@@ -527,33 +528,35 @@ class BlockPartitionState {
 
 public:
   void dump() LLVM_ATTRIBUTE_USED {
-    llvm::dbgs() << SEP_STR
-                 << "BlockPartitionState[reached="
-                 << reached
-                 << ", needsUpdate="
-                 << needsUpdate
-                 << "]\nid: ";
-    basicBlock->dumpID();
-    llvm::dbgs() << "entry partition: ";
-    entryPartition.dump();
-    llvm::dbgs() << "exit partition: ";
-    exitPartition.dump();
-    llvm::dbgs() << "instructions:\n┌──────────╼\n";
-    for (PartitionOp op : blockPartitionOps) {
-      llvm::dbgs() << "│ ";
-      op.dump();
-    }
-    llvm::dbgs() << "└──────────╼\nSuccs:\n";
-    for (auto succ : basicBlock->getSuccessorBlocks()) {
-      llvm::dbgs() << "→";
-      succ->dumpID();
-    }
-    llvm::dbgs() << "Preds:\n";
-    for (auto pred : basicBlock->getPredecessorBlocks()) {
-      llvm::dbgs() << "←";
-      pred->dumpID();
-    }
-    llvm::dbgs()<< SEP_STR;
+    LLVM_DEBUG(
+        llvm::dbgs() << SEP_STR
+                     << "BlockPartitionState[reached="
+                     << reached
+                     << ", needsUpdate="
+                     << needsUpdate
+                     << "]\nid: ";
+        basicBlock->dumpID();
+        llvm::dbgs() << "entry partition: ";
+        entryPartition.dump();
+        llvm::dbgs() << "exit partition: ";
+        exitPartition.dump();
+        llvm::dbgs() << "instructions:\n┌──────────╼\n";
+        for (PartitionOp op : blockPartitionOps) {
+          llvm::dbgs() << "│ ";
+          op.dump();
+        }
+        llvm::dbgs() << "└──────────╼\nSuccs:\n";
+        for (auto succ : basicBlock->getSuccessorBlocks()) {
+          llvm::dbgs() << "→";
+          succ->dumpID();
+        }
+        llvm::dbgs() << "Preds:\n";
+        for (auto pred : basicBlock->getPredecessorBlocks()) {
+          llvm::dbgs() << "←";
+          pred->dumpID();
+        }
+        llvm::dbgs()<< SEP_STR;
+    );
   }
 };
 
@@ -712,10 +715,10 @@ public:
   static void performForFunction(SILFunction *function) {
     auto analysis = PartitionAnalysis(function);
     analysis.solve();
-    if (DEBUG) {
-      llvm::dbgs() << "SOLVED: ";
-      analysis.dump();
-    }
+    LLVM_DEBUG(
+        llvm::dbgs() << "SOLVED: ";
+        analysis.dump();
+    );
     analysis.diagnose();
   }
 };
