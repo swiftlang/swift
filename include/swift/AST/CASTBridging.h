@@ -14,7 +14,6 @@
 #define SWIFT_C_AST_ASTBRIDGING_H
 
 #include "swift/Basic/CBasicBridging.h"
-#include "swift/Basic/Compiler.h"
 
 // NOTE: DO NOT #include any stdlib headers here. e.g. <stdint.h>. Those are
 // part of "Darwin"/"Glibc" module, so when a Swift file imports this header,
@@ -35,6 +34,7 @@
 #define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 #define SWIFT_END_NULLABILITY_ANNOTATIONS
 #define _Nullable
+#define _Nonnull
 #endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
@@ -240,25 +240,25 @@ extern "C" {
 ///
 /// \returns a diagnostic instance that can be extended with additional
 /// information and then must be finished via \c SwiftDiagnostic_finish.
-__attribute__((swift_name("BridgedDiagnosticEngine.diagnose(self:severity:location:message:)")))
+SWIFT_BRIDGING_NAME(BridgedDiagnosticEngine.diagnose(self:severity:location:message:))
 BridgedDiagnostic Diagnostic_create(BridgedDiagnosticEngine cDiags,
                                     BridgedDiagnosticSeverity severity,
                                     BridgedSourceLoc cLoc, BridgedString cText);
 
 /// Highlight a source range as part of the diagnostic.
-__attribute__((swift_name("BridgedDiagnostic.highlight(self:startLoc:endLoc:)")))
+SWIFT_BRIDGING_NAME(BridgedDiagnostic.highlight(self:startLoc:endLoc:))
 void Diagnostic_highlight(BridgedDiagnostic cDiag, BridgedSourceLoc cStartLoc,
                           BridgedSourceLoc cEndLoc);
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
-__attribute__((swift_name("BridgedDiagnostic.fixItReplace(self:startLoc:endLoc:replaceText:)")))
+SWIFT_BRIDGING_NAME(BridgedDiagnostic.fixItReplace(self:startLoc:endLoc:replaceText:))
 void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
                              BridgedSourceLoc cStartLoc,
                              BridgedSourceLoc cEndLoc,
                              BridgedString cReplaceText);
 
 /// Finish the given diagnostic and emit it.
-__attribute__((swift_name("BridgedDiagnostic.finish(self:)")))
+SWIFT_BRIDGING_NAME(BridgedDiagnostic.finish(self:))
 void Diagnostic_finish(BridgedDiagnostic cDiag);
 
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,

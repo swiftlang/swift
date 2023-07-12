@@ -37,6 +37,12 @@
 #define _Nonnull
 #endif
 
+#if __has_attribute(swift_name)
+#define SWIFT_BRIDGING_NAME(_name) __attribute__((swift_name(#_name)))
+#else
+#define SWIFT_BRIDGING_NAME(_name)
+#endif
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
