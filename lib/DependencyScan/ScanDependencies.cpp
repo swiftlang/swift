@@ -1061,8 +1061,11 @@ static void writeJSON(llvm::raw_ostream &out,
       bool hasOverlayDependencies =
           swiftTextualDeps->swift_overlay_module_dependencies &&
           swiftTextualDeps->swift_overlay_module_dependencies->count > 0;
+      bool commaAfterBridgingHeaderPath = hasOverlayDependencies;
+      bool commaAfterExtraPcmArgs =
+          hasBridgingHeaderPath || commaAfterBridgingHeaderPath;
       bool commaAfterFramework =
-          swiftTextualDeps->extra_pcm_args->count != 0 || hasBridgingHeaderPath;
+          swiftTextualDeps->extra_pcm_args->count != 0 || commaAfterExtraPcmArgs;
 
       if (swiftTextualDeps->cas_fs_root_id.length != 0) {
         writeJSONSingleField(out, "casFSRootID",
@@ -1090,7 +1093,7 @@ static void writeJSON(llvm::raw_ostream &out,
           out << "\n";
         }
         out.indent(5 * 2);
-        out << (hasBridgingHeaderPath ? "],\n" : "]\n");
+        out << (commaAfterExtraPcmArgs ? "],\n" : "]\n");
       }
       /// Bridging header and its source file dependencies, if any.
       if (hasBridgingHeaderPath) {
@@ -1126,7 +1129,7 @@ static void writeJSON(llvm::raw_ostream &out,
         out.indent(6 * 2);
         out << "]\n";
         out.indent(5 * 2);
-        out << (hasOverlayDependencies ? "},\n" : "}\n");
+        out << (commaAfterBridgingHeaderPath ? "},\n" : "}\n");
       }
       if (hasOverlayDependencies) {
         writeDependencies(out, swiftTextualDeps->swift_overlay_module_dependencies,
