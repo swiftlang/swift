@@ -1526,24 +1526,10 @@ namespace {
     void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
              ManagedValue base) &&
         override {
-      auto *field = cast<VarDecl>(Storage);
-      // Emit the init accessor function partially applied to the base.
-      SILValue initFRef =
-          emitPartialInitAccessorReference(SGF, loc, getAccessorDecl());
-
-      SILValue setterFRef;
-      if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
-        setterFRef = SGF.emitApplyOfSetterToBase(loc, SILDeclRef(setter), base,
-                                                 Substitutions);
-      } else {
-        setterFRef = SILUndef::get(initFRef->getType(), SGF.F);
-      }
-
+      VarDecl *field = cast<VarDecl>(Storage);
       auto Mval =
           emitValue(SGF, loc, field, std::move(value), AccessorKind::Init);
-
-      SGF.B.createAssignOrInit(loc, base.getValue(), Mval.forward(SGF),
-                               initFRef, setterFRef, AssignOrInitInst::Unknown);
+      SGF.emitAssignOrInit(loc, base, field, Mval, Substitutions);
     }
 
     RValue get(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -1570,33 +1556,6 @@ namespace {
       return AccessStorage{Storage, IsSuper,
                            Indices.isNull() ? nullptr : &Indices,
                            ArgListForDiagnostics};
-    }
-
-  private:
-    SILValue emitPartialInitAccessorReference(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              AccessorDecl *initAccessor) {
-      assert(initAccessor->isInitAccessor());
-      auto initConstant = SGF.getAccessorDeclRef(initAccessor);
-      SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
-
-      // If there are no substitutions there is no need to emit partial
-      // apply.
-      if (Substitutions.empty())
-        return initFRef;
-
-      CanSILFunctionType initTy =
-          initFRef->getType().castTo<SILFunctionType>()->substGenericArgs(
-              SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
-
-      SILFunctionConventions setterConv(initTy, SGF.SGM.M);
-
-      // Emit partial apply without argument to produce a substituted
-      // init accessor reference.
-      PartialApplyInst *initPAI = SGF.B.createPartialApply(
-          loc, initFRef, Substitutions, ArrayRef<SILValue>(),
-          ParameterConvention::Direct_Guaranteed);
-      return SGF.emitManagedRValueWithCleanup(initPAI).getValue();
     }
   };
 

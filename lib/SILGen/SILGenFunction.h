@@ -819,6 +819,17 @@ public:
                                    ManagedValue base,
                                    SubstitutionMap substitutions);
 
+  /// Emit `assign_or_init` instruction that is going to either initialize
+  /// or assign the given value to the given field.
+  ///
+  /// \param loc The location to use for the instruction.
+  /// \param selfValue The 'self' value.
+  /// \param field The field to assign or initialize.
+  /// \param newValue the value to assign/initialize the field with.
+  /// \param substitutions The substitutions to apply to initializer and setter.
+  void emitAssignOrInit(SILLocation loc, ManagedValue selfValue, VarDecl *field,
+                        ManagedValue newValue, SubstitutionMap substitutions);
+
   /// Generates code to destroy the instance variables of a class.
   ///
   /// \param selfValue The 'self' value.
