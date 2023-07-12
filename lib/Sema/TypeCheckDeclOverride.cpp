@@ -1581,6 +1581,7 @@ namespace  {
     UNINTERESTING_ATTR(RestatedObjCConformance)
     UNINTERESTING_ATTR(Initializes)
     UNINTERESTING_ATTR(Accesses)
+    UNINTERESTING_ATTR(StorageRestrictions)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)

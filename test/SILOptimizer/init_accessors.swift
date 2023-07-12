@@ -33,7 +33,8 @@ struct TestInit {
     // CHECK-NEXT: [[FULL_ELT_1:%.*]] = tuple_element_addr [[FULL_ACCESS]] : $*(Int, Int), 1
     // CHECK-NEXT: store [[Y_VAL]] to [trivial] [[FULL_ELT_1]] : $*Int
     // CHECK-NEXT: end_access [[FULL_ACCESS]] : $*(Int, Int)
-    init(initialValue) initializes(y, full) accesses(x) {
+    @storageRestrictions(initializes: y, full, accesses: x)
+    init(initialValue) {
       self.y = initialValue.1
       self.full = (self.x, self.y)
     }
@@ -63,7 +64,8 @@ struct TestSetter {
   var y: Int
 
   var point: (Int, Int) {
-    init(initialValue) accesses(x, y) {
+    @storageRestrictions(accesses: x, y)
+    init(initialValue) {
     }
 
     get { (x, y) }
@@ -86,7 +88,8 @@ struct TestInitThenSetter {
   var y: Int
 
   var point: (Int, Int) {
-    init(initialValue) initializes(x, y) {
+    @storageRestrictions(initializes: x, y)
+    init(initialValue) {
       self.x = initialValue.0
       self.y = initialValue.1
     }
@@ -119,7 +122,8 @@ struct TestPartialInt {
   var y: Int
 
   var pointX: Int {
-    init(newValue) initializes(x) {
+    @storageRestrictions(initializes: x)
+    init(newValue) {
       self.x = newValue
     }
 
@@ -128,7 +132,8 @@ struct TestPartialInt {
   }
 
   var pointY: Int {
-    init(newValue) initializes(y) {
+    @storageRestrictions(initializes: y)
+    init(newValue) {
       self.y = newValue
     }
 
@@ -174,7 +179,8 @@ struct TestNoInitAndInit {
   var y: Int
 
   var pointX: Int {
-    init(initalValue) accesses(x) {
+    @storageRestrictions(accesses: x)
+    init(initalValue) {
     }
 
     get { x }
@@ -182,7 +188,8 @@ struct TestNoInitAndInit {
   }
 
   var pointY: Int {
-    init(initialValue) initializes(y) {
+    @storageRestrictions(initializes: y)
+    init(initialValue) {
       self.y = initialValue
     }
 
@@ -232,7 +239,8 @@ class TestClass {
     // CHECK-NEXT: [[Y_ELT_1:%.*]] = tuple_element_addr [[Y_ACCESS]] : $*(Int, Array<String>), 1
     // CHECK-NEXT: store [[Y_VAL_1]] to [init] [[Y_ELT_1]] : $*Array<String>
     // CHECK-NEXT: end_access [[Y_ACCESS]] : $*(Int, Array<String>)
-    init(initialValue) initializes(x, y) {
+    @storageRestrictions(initializes: x, y)
+    init(initialValue) {
       x = initialValue.0
       y = initialValue.1
     }
@@ -246,8 +254,7 @@ class TestClass {
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors9TestClassC1x1yACSi_Si_SaySSGttcfc : $@convention(method) (Int, Int, @owned Array<String>, @owned TestClass) -> @owned TestClass
   // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors9TestClassC4dataSi_Si_SaySSGttvi : $@convention(thin) (Int, Int, @owned Array<String>) -> (@out Int, @out (Int, Array<String>))
-  // CHECK: [[SELF_VALUE:%.*]] = copy_value %3 : $TestClass
-  // CHECK: [[SELF_REF:%.*]] = begin_borrow [[SELF_VALUE]] : $TestClass
+  // CHECK: [[SELF_REF:%.*]] = begin_borrow [[SELF_VALUE:%.*]] : $TestClass
   // CHECK: [[X_REF:%.*]] = ref_element_addr [[SELF_REF]] : $TestClass, #TestClass.x
   // CHECK-NEXT: [[Y_REF:%.*]] = ref_element_addr [[SELF_REF]] : $TestClass, #TestClass.y
   //
@@ -281,7 +288,8 @@ struct TestGeneric<T, U> {
   // CHECK-NEXT: copy_addr [[C_ACCESS]] to [init] [[C_AS_ANY]] : $*U
   // CHECK-NEXT: end_access [[C_ACCESS]] : $*U
   var data: (T, T) {
-    init(initialValue) initializes(a, b) accesses(c) {
+    @storageRestrictions(initializes: a, b, accesses: c)
+    init(initialValue) {
       a = initialValue.0
       b = initialValue.1
       print(c)
@@ -294,11 +302,12 @@ struct TestGeneric<T, U> {
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors11TestGenericV1a1b1cACyxq_Gx_xq_tcfC : $@convention(method) <T, U> (@in T, @in T, @in U, @thin TestGeneric<T, U>.Type) -> @out TestGeneric<T, U>
   //
   // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors11TestGenericV4datax_xtvi : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout τ_0_1) -> (@out τ_0_0, @out τ_0_0)
-  // CHECK: {{.*}} = apply [[INIT_ACCESSOR]]<T, U>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout τ_0_1) -> (@out τ_0_0, @out τ_0_0)
+  // CHECK-NEXT: [[SUBST_INIT_ACCESSOR:%.*]] = partial_apply [callee_guaranteed] [[INIT_ACCESSOR]]<T, U>() : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout τ_0_1) -> (@out τ_0_0, @out τ_0_0)
+  // CHECK: {{.*}} = apply [[SUBST_INIT_ACCESSOR]]({{.*}}) : $@callee_guaranteed (@in T, @in T, @inout U) -> (@out T, @out T)
   //
   // CHECK: [[SETTER:%.*]] = function_ref @$s14init_accessors11TestGenericV4datax_xtvs : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
   // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER]]<T, U>([[SELF_VALUE:%.*]]) : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
-  // CHECK: %55 = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (@in T, @in T) -> ()
+  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (@in T, @in T) -> ()
   // CHECK-NEXT: end_access [[SELF_VALUE]] : $*TestGeneric<T, U>
   init(a: T, b: T, c: U) {
     self.c = c
@@ -315,7 +324,8 @@ func test_local_with_memberwise() {
     var b: String
 
     var pair: (Int, String) {
-      init(initialValue) initializes(a, b) {
+      @storageRestrictions(initializes: a, b)
+      init(initialValue) {
         a = initialValue.0
         b = initialValue.1
       }
@@ -347,7 +357,8 @@ func test_local_with_memberwise() {
     var _c: C
 
     var a: T {
-      init(initialValue) initializes(_a) {
+      @storageRestrictions(initializes: _a)
+      init(initialValue) {
         _a = initialValue
       }
 
@@ -356,7 +367,8 @@ func test_local_with_memberwise() {
     }
 
     var pair: (String, C) {
-      init(initialValue) initializes(_b, _c) accesses(_a) {
+      @storageRestrictions(initializes: _b, _c, accesses: _a)
+      init(initialValue) {
         _b = initialValue.0
         _c = initialValue.1
         _c.append(_a)
@@ -389,7 +401,8 @@ func test_assignments() {
     var _b: Int
 
     var a: Int {
-      init(initialValue) initializes(_a) {
+      @storageRestrictions(initializes: _a)
+      init(initialValue) {
         self._a = initialValue
       }
       get { _a }
@@ -397,7 +410,8 @@ func test_assignments() {
     }
 
     var pair: (Int, Int) {
-      init(initialValue) initializes(_a, _b) {
+      @storageRestrictions(initializes: _a, _b)
+      init(initialValue) {
         _a = initialValue.0
         _b = initialValue.1
       }

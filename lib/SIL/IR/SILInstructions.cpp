@@ -1252,11 +1252,12 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
-AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Src,
-                                   SILValue Initializer, SILValue Setter,
-                                   AssignOrInitInst::Mode Mode)
-    : InstructionBase<SILInstructionKind::AssignOrInitInst, NonValueInstruction>(Loc),
-      Operands(this, Src, Initializer, Setter) {
+AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Self,
+                                   SILValue Src, SILValue Initializer,
+                                   SILValue Setter, AssignOrInitInst::Mode Mode)
+    : InstructionBase<SILInstructionKind::AssignOrInitInst,
+                      NonValueInstruction>(Loc),
+      Operands(this, Self, Src, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
@@ -1282,34 +1283,39 @@ bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {
   return Assignments.test(propertyIdx);
 }
 
+StringRef AssignOrInitInst::getPropertyName() const {
+  auto *accessor = getReferencedInitAccessor();
+  assert(accessor);
+  return cast<VarDecl>(accessor->getStorage())->getNameStr();
+}
+
 AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
-  auto *initRef = cast<FunctionRefInst>(getInitializer());
-  auto *accessorRef = initRef->getReferencedFunctionOrNull();
-  assert(accessorRef);
-  return dyn_cast_or_null<AccessorDecl>(accessorRef->getDeclContext());
+  SILValue initRef = getInitializer();
+  SILFunction *accessorFn = nullptr;
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(initRef)) {
+    accessorFn = PAI->getReferencedFunctionOrNull();
+  } else {
+    accessorFn = cast<FunctionRefInst>(initRef)->getReferencedFunctionOrNull();
+  }
+
+  assert(accessorFn);
+  return dyn_cast_or_null<AccessorDecl>(accessorFn->getDeclContext());
 }
 
 unsigned AssignOrInitInst::getNumInitializedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor()) {
-    auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>();
-    return initAttr ? initAttr->getNumProperties() : 0;
-  }
-  return 0;
+  return getInitializedProperties().size();
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor()) {
-    if (auto *initAttr = accessor->getAttrs().getAttribute<InitializesAttr>())
-      return initAttr->getPropertyDecls(accessor);
-  }
+  if (auto *accessor = getReferencedInitAccessor())
+    return accessor->getInitializedProperties();
   return {};
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor()) {
-    if (auto *accessAttr = accessor->getAttrs().getAttribute<AccessesAttr>())
-      return accessAttr->getPropertyDecls(accessor);
-  }
+  if (auto *accessor = getReferencedInitAccessor())
+    return accessor->getAccessedProperties();
   return {};
 }
 
