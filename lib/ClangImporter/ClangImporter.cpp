@@ -5707,8 +5707,9 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-Type ClangImporter::importFunctionReturnType(
-    const clang::FunctionDecl *clangDecl, DeclContext *dc) {
+llvm::Optional<Type>
+ClangImporter::importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+                                        DeclContext *dc) {
   bool isInSystemModule =
       cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
   bool allowNSUIntegerAsInt =
@@ -5717,7 +5718,7 @@ Type ClangImporter::importFunctionReturnType(
           Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
               .getType())
     return imported;
-  return dc->getASTContext().getNeverType();
+  return {};
 }
 
 Type ClangImporter::importVarDeclType(
