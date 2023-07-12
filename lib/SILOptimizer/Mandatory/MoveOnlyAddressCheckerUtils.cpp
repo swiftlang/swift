@@ -1504,19 +1504,30 @@ struct CopiedLoadBorrowEliminationVisitor final
         // We can only hit this if our load_borrow was copied.
         llvm_unreachable("We should never hit this");
 
-      case OperandOwnership::GuaranteedForwarding:
+      case OperandOwnership::GuaranteedForwarding: {
+        SmallVector<SILValue, 8> forwardedValues;
+        auto *fn = nextUse->getUser()->getFunction();
+        ForwardingOperand(nextUse).visitForwardedValues([&](SILValue value) {
+          if (value->getType().isTrivial(fn))
+            return true;
+          forwardedValues.push_back(value);
+          return true;
+        });
+
+        // If we do not have any forwarded values, just continue.
+        if (forwardedValues.empty())
+          continue;
+
+        while (!forwardedValues.empty()) {
+          for (auto *use : forwardedValues.pop_back_val()->getUses())
+            useWorklist.push_back(use);
+        }
+
         // If we have a switch_enum, we always need to convert it to a load
         // [copy] since we need to destructure through it.
         shouldConvertToLoadCopy |= isa<SwitchEnumInst>(nextUse->getUser());
-
-        ForwardingOperand(nextUse).visitForwardedValues([&](SILValue value) {
-          for (auto *use : value->getUses()) {
-            useWorklist.push_back(use);
-          }
-          return true;
-        });
         continue;
-
+      }
       case OperandOwnership::Borrow:
         LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
         // Look through borrows.

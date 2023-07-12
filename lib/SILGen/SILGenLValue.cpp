@@ -2877,6 +2877,116 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
                                                       value);
 }
 
+static CanType getBaseFormalType(Expr *baseExpr) {
+  return baseExpr->getType()->getWithoutSpecifierType()->getCanonicalType();
+}
+
+class LLVM_LIBRARY_VISIBILITY SILGenBorrowedBaseVisitor
+    : public Lowering::ExprVisitor<SILGenBorrowedBaseVisitor, LValue,
+                                   SGFAccessKind, LValueOptions> {
+public:
+  SILGenLValue &SGL;
+  SILGenFunction &SGF;
+
+  SILGenBorrowedBaseVisitor(SILGenLValue &SGL, SILGenFunction &SGF)
+      : SGL(SGL), SGF(SGF) {}
+
+  /// Returns the subexpr
+  static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
+    if (auto *le = dyn_cast<LoadExpr>(e))
+      return le->getType()->isPureMoveOnly();
+    if (auto *m = dyn_cast<MemberRefExpr>(e)) {
+      // If our m is a pure noncopyable type or our base is, we need to perform
+      // a noncopyable base borrow.
+      //
+      // DISCUSSION: We can have a noncopyable member_ref_expr with a copyable
+      // base if the noncopyable member_ref_expr is from a computed method. In
+      // such a case, we want to ensure that we wrap things the right way.
+      return m->getType()->isPureMoveOnly() ||
+             m->getBase()->getType()->isPureMoveOnly();
+    }
+    return false;
+  }
+
+  LValue visitExpr(Expr *e, SGFAccessKind accessKind, LValueOptions options) {
+    e->dump(llvm::errs());
+    llvm::report_fatal_error("Unimplemented node!");
+  }
+
+  LValue visitMemberRefExpr(MemberRefExpr *e, SGFAccessKind accessKind,
+                            LValueOptions options) {
+    // If we have a member_ref_expr, we create a component that will when we
+    // evaluate the lvalue,
+    VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
+
+    assert(!e->getType()->is<LValueType>());
+
+    auto accessSemantics = e->getAccessSemantics();
+    AccessStrategy strategy = var->getAccessStrategy(
+        accessSemantics, getFormalAccessKind(accessKind),
+        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion());
+
+    auto baseFormalType = getBaseFormalType(e->getBase());
+    LValue lv = visit(
+        e->getBase(),
+        getBaseAccessKind(SGF.SGM, var, accessKind, strategy, baseFormalType),
+        getBaseOptions(options, strategy));
+    llvm::Optional<ActorIsolation> actorIso;
+    if (e->isImplicitlyAsync())
+      actorIso = getActorIsolation(var);
+    lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
+                             options, e->isSuper(), accessKind, strategy,
+                             getSubstFormalRValueType(e),
+                             false /*is on self parameter*/, actorIso);
+    return lv;
+  }
+
+  ManagedValue emitImmediateBaseValue(Expr *e) {
+    // We are going to immediately use this base value, so we want to borrow it.
+    ManagedValue mv =
+        SGF.emitRValueAsSingleValue(e, SGFContext::AllowImmediatePlusZero);
+    if (mv.isPlusZeroRValueOrTrivial())
+      return mv;
+
+    // Any temporaries needed to materialize the lvalue must be destroyed when
+    // at the end of the lvalue's formal evaluation scope.
+    // e.g. for foo(self.bar)
+    //   %self = load [copy] %ptr_self
+    //   %rvalue = barGetter(%self)
+    //   destroy_value %self // self must be released before calling foo.
+    //   foo(%rvalue)
+    SILValue value = mv.forward(SGF);
+    return SGF.emitFormalAccessManagedRValueWithCleanup(CleanupLocation(e),
+                                                        value);
+  }
+
+  LValue visitDeclRefExpr(DeclRefExpr *e, SGFAccessKind accessKind,
+                          LValueOptions options) {
+    if (accessKind == SGFAccessKind::BorrowedObjectRead) {
+      auto rv = emitImmediateBaseValue(e);
+      CanType formalType = getSubstFormalRValueType(e);
+      auto typeData = getValueTypeData(accessKind, formalType, rv.getValue());
+      LValue lv;
+      lv.add<ValueComponent>(rv, llvm::None, typeData, /*isRValue=*/true);
+      return lv;
+    }
+
+    return SGL.visitDeclRefExpr(e, accessKind, options);
+  }
+
+  LValue visitLoadExpr(LoadExpr *e, SGFAccessKind accessKind,
+                       LValueOptions options) {
+    // TODO: orig abstraction pattern.
+    LValue lv = SGL.visitRec(e->getSubExpr(),
+                             SGFAccessKind::BorrowedAddressRead, options);
+    CanType formalType = getSubstFormalRValueType(e);
+    LValueTypeData typeData{accessKind, AbstractionPattern(formalType),
+                            formalType, lv.getTypeOfRValue().getASTType()};
+    lv.add<BorrowValueComponent>(typeData);
+    return lv;
+  }
+};
+
 LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
                               LValueOptions options, AbstractionPattern orig) {
   // First see if we have an lvalue type. If we do, then quickly handle that and
@@ -2889,19 +2999,14 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // a `borrow x` operator, the operator is used on the base here), we want to
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
-  
-  if (e->getType()->isPureMoveOnly()) {
-    if (auto load = dyn_cast<LoadExpr>(e)) {
-      LValue lv = visitRec(load->getSubExpr(), SGFAccessKind::BorrowedAddressRead,
-                               options, orig);
-      CanType formalType = getSubstFormalRValueType(e);
-      LValueTypeData typeData{accessKind, AbstractionPattern(formalType),
-                              formalType, lv.getTypeOfRValue().getASTType()};
-      lv.add<BorrowValueComponent>(typeData);
-      return lv;
-    }
+  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e)) {
+    SILGenBorrowedBaseVisitor visitor(*this, SGF);
+    auto accessKind = SGFAccessKind::BorrowedObjectRead;
+    if (e->getType()->is<LValueType>())
+      accessKind = SGFAccessKind::BorrowedAddressRead;
+    return visitor.visit(e, accessKind, options);
   }
-  
+
   // Otherwise we have a non-lvalue type (references, values, metatypes,
   // etc). These act as the root of a logical lvalue. Compute the root value,
   // wrap it in a ValueComponent, and return it for our caller.
@@ -3552,10 +3657,6 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
   }
   }
   llvm_unreachable("bad access strategy");
-}
-
-static CanType getBaseFormalType(Expr *baseExpr) {
-  return baseExpr->getType()->getWithoutSpecifierType()->getCanonicalType();
 }
 
 bool isCallToReplacedInDynamicReplacement(SILGenFunction &SGF,

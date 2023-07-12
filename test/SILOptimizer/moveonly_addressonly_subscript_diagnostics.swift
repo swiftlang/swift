@@ -87,7 +87,6 @@ public func testSubscriptGetOnlyThroughParentClass_BaseLoadable_ResultAddressOnl
     m.testerParent.tester[0].nonMutatingFunc()
     // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
 }
 
 // MARK: Getter + Setter.
@@ -178,7 +177,6 @@ public func testSubscriptGetSetThroughParentClass_BaseLoadable_ResultAddressOnly
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
@@ -272,7 +270,6 @@ public func testSubscriptReadModifyThroughParentClass_BaseLoadable_ResultAddress
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
@@ -359,7 +356,6 @@ public func testSubscriptGetModifyThroughParentClass_BaseLoadable_ResultAddressO
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
