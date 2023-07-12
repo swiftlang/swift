@@ -1443,8 +1443,23 @@ namespace {
     }
 
     ManagedValue emitValue(SILGenFunction &SGF, SILLocation loc, VarDecl *field,
-                           Type fieldType, ArgumentSource &&value,
-                           CanSILFunctionType accessorTy) {
+                           ArgumentSource &&value, AccessorKind accessorKind) {
+      auto accessorInfo = SGF.getConstantInfo(
+          SGF.getTypeExpansionContext(),
+          SILDeclRef(field->getOpaqueAccessor(accessorKind)));
+
+      auto fieldTy = field->getValueInterfaceType();
+      auto accessorTy = SGF.SGM.Types
+                            .getLoweredType(accessorInfo.SILFnType,
+                                            SGF.getTypeExpansionContext())
+                            .castTo<SILFunctionType>();
+
+      if (!Substitutions.empty()) {
+        fieldTy = fieldTy.subst(Substitutions);
+        accessorTy = accessorTy->substGenericArgs(
+            SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
+      }
+
       SILFunctionConventions accessorConv(accessorTy, SGF.SGM.M);
 
       // FIXME: This should use CallEmission instead of doing everything
@@ -1458,19 +1473,23 @@ namespace {
         loweredSubstArgType =
             SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
       }
+
       auto loweredSubstParamTy = SILType::getPrimitiveType(
           param.getArgumentType(SGF.SGM.M, accessorTy,
                                 SGF.getTypeExpansionContext()),
           loweredSubstArgType.getCategory());
+
       // Handle reabstraction differences.
       if (Mval.getType() != loweredSubstParamTy) {
         Mval = SGF.emitSubstToOrigValue(
             loc, Mval, SGF.SGM.Types.getAbstractionPattern(field),
-            fieldType->getCanonicalType());
+            fieldTy->getCanonicalType());
       }
 
+      auto newValueArgIdx = accessorConv.getNumIndirectSILResults();
       // If we need the argument in memory, materialize an address.
-      if (accessorConv.getSILArgumentConvention(0).isIndirectConvention() &&
+      if (accessorConv.getSILArgumentConvention(newValueArgIdx)
+              .isIndirectConvention() &&
           !Mval.getType().isAddress()) {
         Mval = Mval.materialize(SGF, loc);
       }
@@ -1507,29 +1526,21 @@ namespace {
     void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
              ManagedValue base) &&
         override {
-      VarDecl *field = cast<VarDecl>(Storage);
-      auto fieldType = field->getValueInterfaceType();
-      if (!Substitutions.empty()) {
-        fieldType = fieldType.subst(Substitutions);
-      }
-
+      auto *field = cast<VarDecl>(Storage);
       // Emit the init accessor function partially applied to the base.
       SILValue initFRef =
           emitPartialInitAccessorReference(SGF, loc, getAccessorDecl());
 
       SILValue setterFRef;
-      CanSILFunctionType setterTy;
-
       if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
-        std::tie(setterFRef, setterTy) = SGF.emitApplyOfSetterToBase(
-            loc, SILDeclRef(setter), base, Substitutions);
+        setterFRef = SGF.emitApplyOfSetterToBase(loc, SILDeclRef(setter), base,
+                                                 Substitutions);
       } else {
         setterFRef = SILUndef::get(initFRef->getType(), SGF.F);
-        setterTy = initFRef->getType().castTo<SILFunctionType>();
       }
 
       auto Mval =
-          emitValue(SGF, loc, field, fieldType, std::move(value), setterTy);
+          emitValue(SGF, loc, field, std::move(value), AccessorKind::Init);
 
       SGF.B.createAssignOrInit(loc, base.getValue(), Mval.forward(SGF),
                                initFRef, setterFRef, AssignOrInitInst::Unknown);
@@ -1822,15 +1833,13 @@ namespace {
         ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
 
         // Create the allocating setter function. It captures the base address.
-        SILValue setterFn;
-        CanSILFunctionType setterTy;
-        std::tie(setterFn, setterTy) =
+        SILValue setterFn =
             SGF.emitApplyOfSetterToBase(loc, Accessor, base, Substitutions);
 
         // Create the assign_by_wrapper with the initializer and setter.
 
         auto Mval =
-            emitValue(SGF, loc, field, FieldType, std::move(value), setterTy);
+            emitValue(SGF, loc, field, std::move(value), AccessorKind::Set);
 
         SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
                                     initFn.getValue(), setterFn,
