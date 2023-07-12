@@ -930,6 +930,9 @@ NOTE(modularization_issue_related_modules,none,
      "the %select{declaration|type}0 %1 moved between related modules; "
      "clang preprocessor macros may affect headers shared between these modules",
      (bool, DeclName))
+NOTE(interface_block_listed_broken,none,
+     "textual interface for %0 is blocklisted as broken; "
+     "interface verification errors are downgraded to warnings", (StringRef))
 
 NOTE(modularization_issue_side_effect_extension_error,none,
      "could not deserialize extension",
