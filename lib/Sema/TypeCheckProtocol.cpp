@@ -3310,14 +3310,10 @@ public:
     auto proto = conformance->getProtocol();
     ASTContext &ctx = proto->getASTContext();
 
-    auto diagID = diag::witness_not_usable_from_inline;
-    if (!ctx.isSwiftVersionAtLeast(5))
-      diagID = diag::witness_not_usable_from_inline_warn;
-
     SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-    ctx.Diags.diagnose(diagLoc, diagID,
-                       witness,
-                       proto->getName());
+    ctx.Diags.diagnose(diagLoc, diag::witness_not_usable_from_inline, witness,
+                       proto)
+      .warnUntilSwiftVersion(5);
     emitDeclaredHereIfNeeded(ctx.Diags, diagLoc, witness);
   }
 };

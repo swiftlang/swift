@@ -2637,11 +2637,7 @@ ERROR(type_witness_not_accessible_type,none,
 ERROR(witness_not_usable_from_inline,none,
       "%kind0 must be declared '@usableFromInline' "
       "because it matches a requirement in protocol %1",
-      (const ValueDecl *, Identifier))
-WARNING(witness_not_usable_from_inline_warn,none,
-        "%kind0 should be declared '@usableFromInline' "
-        "because it matches a requirement in protocol %1",
-        (const ValueDecl *, Identifier))
+      (const ValueDecl *, const ProtocolDecl *))
 ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
