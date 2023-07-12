@@ -20,6 +20,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -1101,7 +1102,31 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
       // borrows its captures, and we don't need to adjust capture lifetimes.
       if (!PAI->isOnStack()) {
         if (PAFrontier.empty()) {
-          ValueLifetimeAnalysis VLA(PAI, PAI->getUses());
+          SmallVector<SILInstruction *, 8> users;
+          InstructionWorklist worklist(PAI->getFunction());
+          worklist.push(PAI);
+          while (auto *inst = worklist.pop()) {
+            auto *svi = cast<SingleValueInstruction>(inst);
+            for (auto *use : svi->getUses()) {
+              auto *user = use->getUser();
+              SingleValueInstruction *svi;
+              // A copy_value produces a value with a new lifetime on which the
+              // captured alloc_box's lifetime depends.  If the transformation
+              // were only to create a destroy_value of the alloc_box (and to
+              // rewrite the closure not to consume it), the alloc_box would be
+              // kept alive by the copy_value.  The transformation does more,
+              // however: it rewrites the alloc_box as an alloc_stack, creating
+              // the alloc_stack/dealloc_stack instructions where the alloc_box/
+              // destroy_value instructions are respectively.  The copy_value
+              // can't keep the alloc_stack alive.
+              if ((svi = dyn_cast<CopyValueInst>(user)) ||
+                  (svi = dyn_cast<MoveValueInst>(user))) {
+                worklist.push(svi);
+              }
+              users.push_back(user);
+            }
+          }
+          ValueLifetimeAnalysis VLA(PAI, users);
           pass.CFGChanged |= !VLA.computeFrontier(
               PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
           assert(!PAFrontier.empty() &&
