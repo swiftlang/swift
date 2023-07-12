@@ -672,35 +672,16 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
   FindElementArchetypeForOpenedPackParam
     findElementArchetype(this, getOpenedPackParams());
 
-  return type.transformRec([&](TypeBase *ty) -> llvm::Optional<Type> {
-    // We're only directly substituting pack archetypes.
-    auto archetype = ty->getAs<PackArchetypeType>();
-    if (!archetype) {
-      // Don't recurse into nested pack expansions.
-      if (ty->is<PackExpansionType>())
-        return Type(ty);
+  return type.transformTypeParameterPacks(
+      [&](SubstitutableType *ty) -> llvm::Optional<Type> {
+        if (auto *packArchetype = dyn_cast<PackArchetypeType>(ty)) {
+          auto interfaceType = packArchetype->getInterfaceType();
+          if (sig->haveSameShape(interfaceType, shapeClass))
+            return Type(findElementArchetype(interfaceType));
+        }
 
-      // Recurse into any other type.
-      return llvm::None;
-    }
-
-    auto rootArchetype = cast<PackArchetypeType>(archetype->getRoot());
-
-    // TODO: assert that the generic environment of the pack archetype
-    // matches the signature that was originally opened to make this
-    // environment.  Unfortunately, that isn't a trivial check because of
-    // the extra opened-element parameters.
-
-    // If the archetype isn't the shape that was opened by this
-    // environment, ignore it.
-    auto rootParam = cast<GenericTypeParamType>(
-      rootArchetype->getInterfaceType().getPointer());
-    assert(rootParam->isParameterPack());
-    if (!sig->haveSameShape(rootParam, shapeClass))
-      return Type(ty);
-
-    return Type(findElementArchetype(archetype->getInterfaceType()));
-  });
+        return llvm::None;
+      });
 }
 
 CanType
