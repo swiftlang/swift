@@ -240,21 +240,25 @@ extern "C" {
 ///
 /// \returns a diagnostic instance that can be extended with additional
 /// information and then must be finished via \c SwiftDiagnostic_finish.
+__attribute__((swift_name("BridgedDiagnosticEngine.diagnose(self:severity:location:message:)")))
 BridgedDiagnostic Diagnostic_create(BridgedDiagnosticEngine cDiags,
                                     BridgedDiagnosticSeverity severity,
                                     BridgedSourceLoc cLoc, BridgedString cText);
 
 /// Highlight a source range as part of the diagnostic.
+__attribute__((swift_name("BridgedDiagnostic.highlight(self:startLoc:endLoc:)")))
 void Diagnostic_highlight(BridgedDiagnostic cDiag, BridgedSourceLoc cStartLoc,
                           BridgedSourceLoc cEndLoc);
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
+__attribute__((swift_name("BridgedDiagnostic.fixItReplace(self:startLoc:endLoc:replaceText:)")))
 void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
                              BridgedSourceLoc cStartLoc,
                              BridgedSourceLoc cEndLoc,
                              BridgedString cReplaceText);
 
 /// Finish the given diagnostic and emit it.
+__attribute__((swift_name("BridgedDiagnostic.finish(self:)")))
 void Diagnostic_finish(BridgedDiagnostic cDiag);
 
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
