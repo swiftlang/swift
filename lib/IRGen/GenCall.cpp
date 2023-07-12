@@ -1148,6 +1148,10 @@ namespace {
 #include "clang/Basic/RISCVVTypes.def"
         llvm_unreachable("RISC-V V type in ABI lowering");
 
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+        llvm_unreachable("WASM type in ABI lowering");
+
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
 #define SIGNED_TYPE(Id, SingletonId) \

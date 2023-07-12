@@ -483,6 +483,11 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 #define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
       return OmissionTypeName();
+
+    // WAM builtin types that don't have Swift equivalents.
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+      return OmissionTypeName();
     }
   }
 

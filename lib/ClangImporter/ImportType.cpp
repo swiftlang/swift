@@ -392,6 +392,11 @@ namespace {
 #define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
         return Type();
+
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+        return Type();
+
       }
 
       llvm_unreachable("Invalid BuiltinType.");
