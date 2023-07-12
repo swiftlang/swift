@@ -40,6 +40,8 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/Support/Alignment.h"
 
 using namespace swift;
 using namespace irgen;

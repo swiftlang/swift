@@ -50,7 +50,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllIR.h"
 #include "llvm/LinkAllPasses.h"
-#include "llvm/MC/SubtargetFeature.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -64,7 +64,10 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+
+// TODO: Replace pass manager:
+//       Removed in: d623b2f95fd559901f008a0588dddd0949a8db01
+/* #include "llvm/Transforms/IPO/PassManagerBuilder.h" */
 
 using namespace swift;
 

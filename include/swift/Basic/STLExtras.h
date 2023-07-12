@@ -28,6 +28,7 @@
 #include <numeric>
 #include <type_traits>
 #include <unordered_set>
+#include <optional>
 
 namespace swift {
 

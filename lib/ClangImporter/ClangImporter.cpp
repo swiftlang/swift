@@ -50,6 +50,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
+#include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"

@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "clang/CAS/CASOptions.h"
 
+#include <set>
 #include <string>
 #include <vector>
 

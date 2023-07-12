@@ -46,6 +46,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "llvm/ADT/Statistic.h"
 #define DEBUG_TYPE "Import Name"
