@@ -241,6 +241,11 @@ struct BridgedPassContext {
 
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
 
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedFunction specializeFunction(BridgedFunction function, swift::SubstitutionMap subst) const {
+    return {swift::specializeFunction(*function.getFunction(), subst, invocation->getTransform())};
+  }
+
   std::string mangleOutlinedVariable(BridgedFunction function) const;
 
   SWIFT_IMPORT_UNSAFE
@@ -408,6 +413,12 @@ struct BridgedPassContext {
     if (nextIter == t->getModule().getDefaultWitnessTables().end())
       return {nullptr};
     return {&*nextIter};
+  }
+  
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedWitnessTable lookUpWitnessTable(swift::SpecializedProtocolConformance *conf) const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return {mod->lookUpWitnessTable(conf->getGenericConformance())};
   }
 
   SWIFT_IMPORT_UNSAFE

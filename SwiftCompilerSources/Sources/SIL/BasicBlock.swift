@@ -159,6 +159,21 @@ public struct SuccessorArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
+public struct ProtocolConformanceRefArray : RandomAccessCollection, FormattedLikeArray {
+  private let base: BridgedProtocolConformanceRefArray
+
+  init(base: BridgedProtocolConformanceRefArray) {
+    self.base = base
+  }
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return base.count }
+
+  public subscript(_ index: Int) -> swift.ProtocolConformanceRef {
+    base[index]
+  }
+}
+
 public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
   private var currentSucc: OptionalBridgedSuccessor
 

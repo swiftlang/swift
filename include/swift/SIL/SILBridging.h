@@ -18,6 +18,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuilder.h"
@@ -147,6 +148,13 @@ struct OptionalBridgedOperand {
 struct BridgedOperandArray {
   OptionalBridgedOperand base;
   SwiftInt count;
+};
+
+struct BridgedProtocolConformanceRefArray {
+  const swift::ProtocolConformanceRef *base;
+  SwiftInt count;
+
+  swift::ProtocolConformanceRef operator[](SwiftInt index) const { return {base[index]}; }
 };
 
 // Unfortunately we need to take a detour over this enum.
@@ -827,6 +835,12 @@ struct BridgedInstruction {
   SwiftInt FullApplySite_numIndirectResultArguments() const {
     auto fas = swift::FullApplySite(getInst());
     return fas.getNumIndirectSILResults();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedProtocolConformanceRefArray InitExistentialAddrInst_getConformances() const {
+    auto conformances = getAs<swift::InitExistentialAddrInst>()->getConformances();
+    return {conformances.data(), (SwiftInt)conformances.size()};
   }
 };
 

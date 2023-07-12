@@ -76,6 +76,39 @@ static void transferSpecializeAttributeTargets(SILModule &M,
 }
 } // end anonymous namespace
 
+SILFunction *swift::specializeFunction(SILFunction &F, SubstitutionMap subst,
+                                       SILTransform *transform) {
+  auto &module = F.getModule();
+  ReabstractionInfo reInfo(module.getSwiftModule(), module.isWholeModule(), ApplySite(),
+                           &F, subst,
+                           IsNotSerialized,
+                           /*ConvertIndirectToDirect=*/true,
+                           /*dropMetatypeArgs=*/ false);
+
+  if (!reInfo.canBeSpecialized()) {
+    return nullptr;
+  }
+
+  SILOptFunctionBuilder funcBuilder(*transform);
+
+  GenericFuncSpecializer funcSpecializer(funcBuilder, &F, subst, reInfo);
+  SILFunction *spec = funcSpecializer.lookupSpecialization();
+  if (!spec)
+    spec = funcSpecializer.tryCreateSpecialization();
+  if (!spec || spec->getLoweredFunctionType()->hasError()) {
+    return nullptr;
+  }
+
+  // Link after prespecializing to pull in everything referenced from another
+  // module in case some referenced functions have non-public linkage.
+  module.linkFunction(spec, SILModule::LinkingMode::LinkAll);
+
+  spec->setLinkage(SILLinkage::Public);
+  spec->setSerialized(IsNotSerialized);
+
+  return spec;
+}
+
 bool swift::specializeAppliesInFunction(SILFunction &F,
                                         SILTransform *transform,
                                         bool isMandatory) {
