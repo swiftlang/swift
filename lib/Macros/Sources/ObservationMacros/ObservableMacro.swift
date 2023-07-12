@@ -59,10 +59,10 @@ public struct ObservableMacro {
   static func withMutationFunction(_ observableType: TokenSyntax) -> DeclSyntax {
     return 
       """
-      internal nonisolated func withMutation<Member, T>(
+      internal nonisolated func withMutation<Member, MutationResult>(
         keyPath: KeyPath<\(observableType), Member>,
-        _ mutation: () throws -> T
-      ) rethrows -> T {
+        _ mutation: () throws -> MutationResult
+      ) rethrows -> MutationResult {
         try \(raw: registrarVariableName).withMutation(of: self, keyPath: keyPath, mutation)
       }
       """
