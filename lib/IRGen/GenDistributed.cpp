@@ -472,6 +472,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
 
     // Remember to deallocate a copy.
     AllocatedArguments.push_back(stackAddr);
+    arguments.add(stackAddr.getAddressPointer());
     break;
   }
 
