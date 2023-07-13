@@ -352,7 +352,7 @@ class Product(object):
         vendor = 'unknown'
 
         try:
-            output = shell.capture(["clang", "--version"])
+            output = shell.capture([self.toolchain.cc, "--print-target-triple"])
 
             # clang can't handle default `*-unknown-linux-*` components on Alpine,
             # it needs special handling to propagate `vendor` and `abi` intact
