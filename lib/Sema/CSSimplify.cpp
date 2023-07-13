@@ -9162,7 +9162,6 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
   if (!patternType->hasTypeVariable()) {
     auto *loc = getConstraintLocator(locator);
     auto shapeClass = patternType->getReducedShape();
-    patternType = patternType->mapTypeOutOfContext();
     auto *elementEnv = getPackElementEnvironment(loc, shapeClass);
 
     // Without an opened element environment, we cannot derive the
@@ -9185,7 +9184,7 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
     }
 
     auto expectedElementTy =
-        elementEnv->mapPackTypeIntoElementContext(patternType);
+        elementEnv->mapContextualPackTypeIntoElementContext(patternType);
     assert(!expectedElementTy->is<PackType>());
 
     addConstraint(ConstraintKind::Equal, elementType, expectedElementTy,
