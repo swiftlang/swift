@@ -881,6 +881,10 @@ ERROR(need_cxx_interop_to_import_module,none,
 NOTE(enable_cxx_interop_docs,none,
      "visit https://www.swift.org/documentation/cxx-interop/project-build-setup to learn how to enable C++ interoperability", ())
 
+NOTE(interface_block_listed_broken,none,
+     "textual interface for %0 is blocklisted as broken; "
+     "interface verification errors are downgraded to warnings", (StringRef))
+
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
