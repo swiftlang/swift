@@ -543,6 +543,51 @@ static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
   return Identifier();
 }
 
+bool swift::diagnoseInvalidAttachedMacro(MacroRole role,
+                                         Decl *attachedTo) {
+  switch (role) {
+  case MacroRole::Expression:
+  case MacroRole::Declaration:
+  case MacroRole::CodeItem:
+    llvm_unreachable("Invalid macro role for attached macro");
+
+  case MacroRole::Accessor:
+    // Only var decls and subscripts have accessors.
+    if (isa<AbstractStorageDecl>(attachedTo) && !isa<ParamDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::MemberAttribute:
+  case MacroRole::Member:
+    // Nominal types and extensions can have members.
+    if (isa<NominalTypeDecl>(attachedTo) || isa<ExtensionDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Peer:
+    // Peer macros are allowed on everything except parameters.
+    if (!isa<ParamDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Conformance:
+  case MacroRole::Extension:
+    // Only primary declarations of nominal types
+    if (isa<NominalTypeDecl>(attachedTo))
+      return false;
+
+    break;
+  }
+
+  attachedTo->diagnose(diag::macro_attached_to_invalid_decl,
+                       getMacroRoleString(role),
+                       attachedTo->getDescriptiveKind());
+  return true;
+}
+
 static void diagnoseInvalidDecl(Decl *decl,
                                 MacroDecl *macro,
                                 llvm::function_ref<bool(DeclName)> coversName) {
