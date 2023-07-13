@@ -233,4 +233,34 @@ func test_default_inits() {
     // CHECK: function_ref variable initialization expression of y in Test3 #1 in test_default_inits()
     // CHECK-NOT: function_ref variable initialization expression of _y in Test3 #1 in test_default_inits()
   }
+
+  class Test4 {
+    var _x: Int
+
+    var x: Int = 42 {
+      @storageRestrictions(initializes: _x)
+      init {
+        _x = newValue
+      }
+      get { _x }
+    }
+
+    var _y: String
+
+    var y: String = "" {
+      @storageRestrictions(initializes: _y)
+      init {
+        _y = newValue
+      }
+      get { _y }
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering18test_default_initsyyF5Test4L_CADycfc : $@convention(method) (@owned Test4) -> @owned Test4
+    // CHECK: [[X_DEFAULT:%.*]] = function_ref @$s23assign_or_init_lowering18test_default_initsyyF5Test4L_C1xSivpfi : $@convention(thin) () -> Int
+    // CHECK-NEXT: [[X_VALUE:%.*]] = apply [[X_DEFAULT]]() : $@convention(thin) () -> Int
+    // CHECK: assign_or_init [init] self %0 : $Test4, value [[X_VALUE]] : $Int, init {{.*}} : $@convention(thin) (Int) -> @out Int, set undef : $@convention(thin) (Int) -> @out Int
+    // CHECK: [[Y_DEFAULT:%.*]] = function_ref @$s23assign_or_init_lowering18test_default_initsyyF5Test4L_C1ySSvpfi : $@convention(thin) () -> @owned String
+    // CHECK-NEXT: [[Y_VALUE:%.*]] = apply [[Y_DEFAULT]]() : $@convention(thin) () -> @owned String
+    // CHECK: assign_or_init [init] self %0 : $Test4, value [[Y_VALUE]] : $String, init {{.*}} : $@convention(thin) (@owned String) -> @out String, set undef : $@convention(thin) (@owned String) -> @out String
+  }
 }

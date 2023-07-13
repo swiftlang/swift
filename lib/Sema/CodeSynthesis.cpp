@@ -845,6 +845,10 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
   assert(!hasClangImplementation(decl));
 
+  std::multimap<VarDecl *, VarDecl *> initializedViaInitAccessor;
+  decl->collectPropertiesInitializableByInitAccessors(
+      initializedViaInitAccessor);
+
   for (auto member : decl->getImplementationContext()->getMembers()) {
     // If a stored property lacks an initial value and if there is no way to
     // synthesize an initial value (e.g. for an optional) then we suppress
@@ -859,11 +863,23 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
         bool HasStorage = false;
         bool CheckDefaultInitializer = true;
         pbd->getPattern(idx)->forEachVariable(
-            [&HasStorage, &CheckDefaultInitializer](VarDecl *VD) {
+            [&HasStorage, &CheckDefaultInitializer,
+             &initializedViaInitAccessor](VarDecl *VD) {
               // If one of the bound variables is @NSManaged, go ahead no matter
               // what.
               if (VD->getAttrs().hasAttribute<NSManagedAttr>())
                 CheckDefaultInitializer = false;
+
+              // If this property is covered by one or more init accessor(s)
+              // check whether at least one of them is initializable.
+              auto initAccessorProperties =
+                  llvm::make_range(initializedViaInitAccessor.equal_range(VD));
+              if (llvm::any_of(initAccessorProperties, [&](const auto &entry) {
+                    auto *property =
+                        entry.second->getParentPatternBinding();
+                    return property->isInitialized(0);
+                  }))
+                return;
 
               if (VD->hasStorageOrWrapsStorage())
                 HasStorage = true;

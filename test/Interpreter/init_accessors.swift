@@ -678,6 +678,27 @@ func test_properties_with_inits() {
   }
 
   _ = TestAssign(x1: S(x: 0), x2: S(x: -3), y: 2)
+
+  class TestDefault : CustomStringConvertible {
+    var _a: Int
+
+    var a: Int = 42 {
+      @storageRestrictions(initializes: _a)
+      init {
+        _a = newValue
+      }
+
+      get { _a }
+    }
+
+    var b: String = "<<default>>"
+
+    var description: String {
+      "TestDefault(a: \(a), b: \(b))"
+    }
+  }
+
+  print("test-init-expr-3: \(TestDefault())")
 }
 
 test_properties_with_inits()
@@ -687,3 +708,4 @@ test_properties_with_inits()
 // CHECK-NEXT: TestAssign in x.init: self.x = S(x: 42)
 // CHECK-NEXT: TestAssign in x.init: self.x = S(x: 0)
 // CHECK-NEXT: TestAssign: self.x = S(x: -3)
+// CHECK-NEXT: test-init-expr-3: TestDefault(a: 42, b: <<default>>)
