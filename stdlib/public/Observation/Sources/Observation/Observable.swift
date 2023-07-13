@@ -40,11 +40,7 @@ public protocol Observable { }
 ///        }
 ///     }
 @available(SwiftStdlib 5.9, *)
-#if OBSERVATION_SUPPORTS_PEER_MACROS
 @attached(member, names: named(_$observationRegistrar), named(access), named(withMutation))
-#else
-@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation), arbitrary)
-#endif
 @attached(memberAttribute)
 @attached(extension, conformances: Observable)
 public macro Observable() =
@@ -56,9 +52,7 @@ public macro Observable() =
 /// framework isn't necessary.
 @available(SwiftStdlib 5.9, *)
 @attached(accessor, names: named(init), named(get), named(set))
-#if OBSERVATION_SUPPORTS_PEER_MACROS
 @attached(peer, names: prefixed(_))
-#endif
 public macro ObservationTracked() =
   #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")
 

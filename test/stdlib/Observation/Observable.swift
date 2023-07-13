@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
+// RUN: %target-run-simple-swift( -Xfrontend -dump-macro-expansions -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
 
 // Run this test via the swift-plugin-server
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature InitAccessors -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -external-plugin-path -Xfrontend %swift-host-lib-dir/plugins#%swift-plugin-server)
@@ -183,6 +183,10 @@ struct Validator {
 
     
     let suite = TestSuite("Observable")
+
+    suite.test("only instantiate") {
+      let test = MiddleNamePerson()
+    }
     
     suite.test("unobserved value changes") {
       let test = MiddleNamePerson()
