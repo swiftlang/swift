@@ -586,3 +586,104 @@ func test_memberwise_without_stored_properties() {
 test_memberwise_without_stored_properties()
 // CHECK: no-stored: a = 1
 // CHECK-NEXT: no-stored: b = 2
+
+protocol P {
+  static var initialValue: Self { get }
+}
+
+func test_properties_with_inits() {
+  struct S: P, CustomStringConvertible {
+    var x: Int
+
+    static var initialValue: S { S(x: 42) }
+
+    var description: String {
+      "S(x: \(x))"
+    }
+  }
+
+  final class K: P, CustomStringConvertible {
+    var v: [String]
+    static var initialValue: K { K(v: ["question"]) }
+
+    var description: String {
+      "K(v: \(v))"
+    }
+
+    init(v: [String]) {
+      self.v = v
+    }
+  }
+
+  class Test<T: P> {
+    var _x: T
+
+    var x: T = T.initialValue {
+      @storageRestrictions(initializes: _x)
+      init {
+        _x = newValue
+      }
+      get { _x }
+      set { _x = newValue }
+    }
+
+    init() {}
+  }
+
+  print("test-init-expr-1: \(Test<S>().x)")
+
+  struct TestPair<T: P, U: P> {
+    var _data: (T, U)
+
+    var data: (T, U) = (T.initialValue, U.initialValue) {
+      @storageRestrictions(initializes: _data)
+      init(initialValue) {
+        _data = initialValue
+      }
+
+      get { _data }
+      set { _data = newValue }
+    }
+
+    init() {
+    }
+
+    init(x: T, y: U) {
+      self.data = (x, y)
+    }
+  }
+
+  print("test-init-expr-2: \(TestPair<S, K>().data)")
+  print("test-init-expr-2: \(TestPair<S, K>(x: S(x: 0), y: K(v: ["a", "b", "c"])).data)")
+
+  struct TestAssign<T: P> {
+    var _x: T
+    var x: T = T.initialValue {
+      @storageRestrictions(initializes: _x)
+      init {
+        _x = newValue
+        print("TestAssign in x.init: self.x = \(_x)")
+      }
+      get { _x }
+      set { _x = newValue }
+    }
+    var y: Int
+
+    init(x1: T, x2: T, y: Int) {
+      self.x = x1
+      self.y = y
+      self.x = x2
+      print("TestAssign: self.x = \(self.x)")
+    }
+  }
+
+  _ = TestAssign(x1: S(x: 0), x2: S(x: -3), y: 2)
+}
+
+test_properties_with_inits()
+// CHECK: test-init-expr-1: S(x: 42)
+// CHECK-NEXT: test-init-expr-2: (S(x: 42), K(v: ["question"]))
+// CHECK-NEXT: test-init-expr-2: (S(x: 0), K(v: ["a", "b", "c"]))
+// CHECK-NEXT: TestAssign in x.init: self.x = S(x: 42)
+// CHECK-NEXT: TestAssign in x.init: self.x = S(x: 0)
+// CHECK-NEXT: TestAssign: self.x = S(x: -3)

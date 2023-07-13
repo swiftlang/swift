@@ -802,6 +802,11 @@ public:
   void emitMemberInitializers(DeclContext *dc, VarDecl *selfDecl,
                               NominalTypeDecl *nominal);
 
+  void emitMemberInitializationViaInitAccessor(DeclContext *dc,
+                                               VarDecl *selfDecl,
+                                               PatternBindingDecl *member,
+                                               SubstitutionMap subs);
+
   /// Emit a method that initializes the ivars of a class.
   void emitIVarInitializer(SILDeclRef ivarInitializer);
 
