@@ -1398,6 +1398,10 @@ ERROR(expected_expr_after_copy, none,
       "expected expression after 'copy'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
+ERROR(expected_expr_after_each, none,
+      "expected expression after 'each'", ())
+ERROR(expected_expr_after_repeat, none,
+      "expected expression after 'repeat'", ())
 
 WARNING(move_consume_final_spelling, none,
         "'_move' has been renamed to 'consume', and the '_move' spelling will be removed shortly", ())
