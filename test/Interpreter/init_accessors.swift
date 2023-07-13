@@ -709,3 +709,44 @@ test_properties_with_inits()
 // CHECK-NEXT: TestAssign in x.init: self.x = S(x: 0)
 // CHECK-NEXT: TestAssign: self.x = S(x: -3)
 // CHECK-NEXT: test-init-expr-3: TestDefault(a: 42, b: <<default>>)
+
+func test_inheritance() {
+  class Entity {
+    var _age: Int = 0
+    var age: Int = 0 {
+      @storageRestrictions(initializes: _age)
+      init { _age = newValue }
+      get { _age }
+      set { _age = newValue }
+    }
+  }
+
+  class Person : Entity, CustomStringConvertible {
+    var _firstName: String
+    var firstName: String = "<<unknown>>" {
+      @storageRestrictions(initializes: _firstName)
+      init { _firstName = newValue }
+      get { _firstName }
+      set { _firstName = newValue }
+    }
+
+    var description: String {
+      "Person(firstName: \(firstName), age: \(age))"
+    }
+
+    override init() {}
+
+    init(firstName: String, age: Int) {
+      super.init()
+      self.firstName = firstName
+      self.age = age
+    }
+  }
+
+  print("test-inheritance-1: \(Person())")
+  print("test-inheritance-2: \(Person(firstName: "Q", age: 42))")
+}
+
+test_inheritance()
+// CHECK: test-inheritance-1: Person(firstName: <<unknown>>, age: 0)
+// CHECK-NEXT: test-inheritance-2: Person(firstName: Q, age: 42)
