@@ -3870,7 +3870,15 @@ namespace {
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
       auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
                                                             TVO_CanBindToHole);
-      CS.addConstraint(ConstraintKind::Equal, base, value, valueLocator);
+
+      // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
+      // let's record a AllowKeyPathMissingComponent fix.
+      if (E->hasSingleInvalidComponent()) {
+        auto *fix = AllowKeyPathWithoutComponents::create(CS, locator);
+        (void)CS.recordFix(fix);
+      } else {
+        CS.addConstraint(ConstraintKind::Equal, base, value, valueLocator);
+      }
       CS.recordKeyPath(E, root, value, CurDC);
 
       // The result is a KeyPath from the root to the end component.
