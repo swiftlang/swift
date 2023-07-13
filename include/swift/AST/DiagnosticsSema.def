@@ -6542,10 +6542,6 @@ ERROR(availability_macro_in_inlinable, none,
 
 #undef FRAGILE_FUNC_KIND
 
-NOTE(resilience_decl_declared_here_public,
-     none, DECL_OR_ACCESSOR "2 %1 is not public",
-     (DescriptiveDeclKind, DeclName, bool))
-
 NOTE(resilience_decl_declared_here,
      none, DECL_OR_ACCESSOR "2 %1 is not '@usableFromInline' or public",
      (DescriptiveDeclKind, DeclName, bool))
