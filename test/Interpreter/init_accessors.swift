@@ -479,9 +479,9 @@ func test_memberwise_with_default_args() {
 test_memberwise_with_default_args()
 // CHECK: test-memberwise_with_default-1: TestWithoutDefault(_a: -1, _b: 42)
 // CHECK-NEXT: test-memberwise_with_default-2: TestWithoutDefault(_a: 42, _b: -1)
-// CHECK-NEXT: test-defaulted-1: TestDefaulted(_a: 0, _b: 0)
+// CHECK-NEXT: test-defaulted-1: TestDefaulted(_a: 1, _b: 2)
 // CHECK-NEXT: test-defaulted-2: TestDefaulted(_a: 3, _b: 4)
-// CHECK-NEXT: test-defaulted-class: ("<<default>>", 1)
+// CHECK-NEXT: test-defaulted-class: ("", 42)
 
 func test_init_accessors_without_setters() {
   struct TestStruct<T> {

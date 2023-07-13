@@ -206,4 +206,31 @@ func test_default_inits() {
       self.x = x
     }
   }
+
+  class Test3 {
+    var _x: Int = 42
+    var x: Int = 42 {
+      @storageRestrictions(initializes: _x)
+      init {
+        _x = newValue
+      }
+      get { _x }
+    }
+
+    var _y: String = ""
+    var y: String = "" {
+      @storageRestrictions(initializes: _y)
+      init {
+        _y = newValue
+      }
+      get { _y }
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering18test_default_initsyyF5Test3L_CADycfc : $@convention(method) (@owned Test3) -> @owned Test3
+    // CHECK: function_ref variable initialization expression of x in Test3 #1 in test_default_inits()
+    // CHECK-NOT: function_ref variable initialization expression of _x in Test3 #1 in test_default_inits()
+    //
+    // CHECK: function_ref variable initialization expression of y in Test3 #1 in test_default_inits()
+    // CHECK-NOT: function_ref variable initialization expression of _y in Test3 #1 in test_default_inits()
+  }
 }
