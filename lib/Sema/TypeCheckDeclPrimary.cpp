@@ -2483,6 +2483,20 @@ public:
         }
       }
     }
+
+    // If this is an init accessor property with a default initializer,
+    // make sure that it subsumes initializers of all of its "initializes"
+    // stored properties.
+    if (auto *var = PBD->getSingleVar()) {
+      auto *initAccessor = var->getAccessor(AccessorKind::Init);
+      if (initAccessor && PBD->isInitialized(0)) {
+        for (auto *property : initAccessor->getInitializedProperties()) {
+          auto *propertyBinding = property->getParentPatternBinding();
+          if (propertyBinding->isInitialized(0))
+            propertyBinding->setInitializerSubsumed(0);
+        }
+      }
+    }
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
