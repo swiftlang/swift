@@ -129,10 +129,18 @@ static bool isPackExpansionType(Type type) {
 
 bool constraints::isSingleUnlabeledPackExpansionTuple(Type type) {
   auto *tuple = type->getRValueType()->getAs<TupleType>();
-  // TODO: drop no name requirement
   return tuple && (tuple->getNumElements() == 1) &&
          isPackExpansionType(tuple->getElementType(0)) &&
          !tuple->getElement(0).hasName();
+}
+
+Type constraints::getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type) {
+  if (!isSingleUnlabeledPackExpansionTuple(type)) {
+    return {};
+  }
+  auto tuple = type->getRValueType()->castTo<TupleType>();
+  auto *expansion = tuple->getElementType(0)->castTo<PackExpansionType>();
+  return expansion->getPatternType();
 }
 
 static bool containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
@@ -2283,6 +2291,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
+  case ConstraintKind::MaterializePackExpansion:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2643,6 +2652,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
+  case ConstraintKind::MaterializePackExpansion:
     return true;
   }
 
@@ -3161,6 +3171,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
+  case ConstraintKind::MaterializePackExpansion:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6827,6 +6838,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ShapeOf:
     case ConstraintKind::ExplicitGenericArguments:
     case ConstraintKind::SameShape:
+    case ConstraintKind::MaterializePackExpansion:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -9149,13 +9161,13 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
   }
 
   if (isSingleUnlabeledPackExpansionTuple(patternType)) {
-    auto *elementVar =
-        createTypeVariable(getConstraintLocator(locator), /*options=*/0);
-    addValueMemberConstraint(
-        patternType, DeclNameRef(getASTContext().Id_element), elementVar, DC,
-        FunctionRefKind::Unapplied, {},
-        getConstraintLocator(locator, {ConstraintLocator::Member}));
-    patternType = elementVar;
+    auto *packVar =
+        createTypeVariable(getConstraintLocator(locator), TVO_CanBindToPack);
+    addConstraint(ConstraintKind::MaterializePackExpansion, patternType,
+                  packVar,
+                  getConstraintLocator(locator, {ConstraintLocator::Member}));
+    addConstraint(ConstraintKind::PackElementOf, elementType, packVar, locator);
+    return SolutionKind::Solved;
   }
 
   // Let's try to resolve element type based on the pattern type.
@@ -9175,10 +9187,18 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
       if (!shapeClass->is<PackArchetypeType>()) {
         if (recordFix(AllowInvalidPackElement::create(*this, patternType, loc)))
           return SolutionKind::Error;
+      } else {
+        auto envShape = PackExpansionEnvironments.find(loc);
+        if (envShape == PackExpansionEnvironments.end()) {
+          return SolutionKind::Error;
+        }
+        auto *fix = SkipSameShapeRequirement::create(
+            *this, envShape->second.second, shapeClass,
+            getConstraintLocator(loc, ConstraintLocator::PackShape));
+        if (recordFix(fix)) {
+          return SolutionKind::Error;
+        }
       }
-
-      // Only other posibility is that there is a shape mismatch between
-      // elements of the pack expansion pattern which is detected separately.
 
       recordAnyTypeVarAsPotentialHole(elementType);
       return SolutionKind::Solved;
@@ -13553,6 +13573,37 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyMaterializePackExpansionConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *explictGenericArgs =
+          Constraint::create(*this, ConstraintKind::MaterializePackExpansion,
+                             type1, type2, getConstraintLocator(locator));
+
+      addUnsolvedConstraint(explictGenericArgs);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  type1 = simplifyType(type1);
+  if (type1->hasTypeVariable()) {
+    return formUnsolved();
+  }
+  if (auto patternType =
+          getPatternTypeOfSingleUnlabeledPackExpansionTuple(type1)) {
+    addConstraint(ConstraintKind::Equal, patternType, type2, locator);
+    return SolutionKind::Solved;
+  }
+
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -15179,6 +15230,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyExplicitGenericArgumentsConstraint(
         first, second, subflags, locator);
 
+  case ConstraintKind::MaterializePackExpansion:
+    return simplifyMaterializePackExpansionConstraint(first, second, subflags,
+                                                      locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -15756,6 +15811,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::ExplicitGenericArguments:
     return simplifyExplicitGenericArgumentsConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
+
+  case ConstraintKind::MaterializePackExpansion:
+    return simplifyMaterializePackExpansionConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags*/ llvm::None, constraint.getLocator());
   }

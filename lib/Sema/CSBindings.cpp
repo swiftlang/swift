@@ -1483,6 +1483,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
+  case ConstraintKind::MaterializePackExpansion:
     // Constraints from which we can't do anything.
     break;
 
