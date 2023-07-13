@@ -1520,8 +1520,9 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
 // storage after materializing the result. In particular, it materializes
 // init_enum_data_addr, but not inject_enum_addr.
 //
-SILValue AddressMaterialization::recursivelyMaterializeStorage(
-    ValueStorage &storage, bool intoPhiOperand = false) {
+SILValue
+AddressMaterialization::recursivelyMaterializeStorage(ValueStorage &storage,
+                                                      bool intoPhiOperand) {
   // If this storage is already materialized, then simply return its
   // address. This not only avoids redundant projections, but is necessary for
   // correctness when emitting init_enum_data_addr.
