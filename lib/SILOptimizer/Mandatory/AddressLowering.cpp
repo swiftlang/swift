@@ -1342,7 +1342,7 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   // For opened existential types, allocate stack space at the type
   // definition. Allocating as early as possible provides more opportunity for
   // creating use projections into value. But allocation must be no earlier
-  // then the latest type definition.
+  // than the latest type definition.
   SILInstruction *latestOpeningInst = nullptr;
   allocTy.getASTType().visit([&](CanType type) {
     auto archetype = dyn_cast<ArchetypeType>(type);
