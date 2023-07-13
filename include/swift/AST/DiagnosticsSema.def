@@ -6650,6 +6650,10 @@ WARNING(executor_enqueue_deprecated_owned_job_implementation,Deprecation,
         "'Executor.enqueue(Job)' is deprecated as a protocol requirement; "
         "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead",
         (Type))
+WARNING(executor_enqueue_unused_implementation, none,
+        "'Executor.enqueue(ExecutorJob)' will never be used, due to the presence of "
+        "'enqueue(UnownedJob)'",
+        ())
 
 //------------------------------------------------------------------------------
 // MARK: property wrapper diagnostics
