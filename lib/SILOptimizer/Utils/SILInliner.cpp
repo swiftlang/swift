@@ -599,8 +599,9 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   getBuilder().setCurrentDebugScope(getOpScope(Terminator->getDebugScope()));
   if (auto *RI = dyn_cast<ReturnInst>(Terminator)) {
     auto returnedValue = getMappedValue(RI->getOperand());
-    getBuilder().createBranch(getOpLocation(RI->getLoc()), ReturnToBB,
-                              returnedValue);
+    auto *branch = getBuilder().createBranch(getOpLocation(RI->getLoc()),
+                                             ReturnToBB, returnedValue);
+    recordClonedInstruction(Terminator, branch);
     return;
   }
 
@@ -609,21 +610,28 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   if (auto *TI = dyn_cast<ThrowInst>(Terminator)) {
     SILLocation Loc = getOpLocation(TI->getLoc());
     switch (Apply.getKind()) {
-    case FullApplySiteKind::ApplyInst:
-      assert(cast<ApplyInst>(Apply)->isNonThrowing()
-             && "apply of a function with error result must be non-throwing");
-      getBuilder().createUnreachable(Loc);
+    case FullApplySiteKind::ApplyInst: {
+      assert(cast<ApplyInst>(Apply)->isNonThrowing() &&
+             "apply of a function with error result must be non-throwing");
+      auto *cloned = getBuilder().createUnreachable(Loc);
+      recordClonedInstruction(TI, cloned);
       return;
-    case FullApplySiteKind::BeginApplyInst:
-      assert(cast<BeginApplyInst>(Apply)->isNonThrowing()
-             && "apply of a function with error result must be non-throwing");
-      getBuilder().createUnreachable(Loc);
+    }
+    case FullApplySiteKind::BeginApplyInst: {
+      assert(cast<BeginApplyInst>(Apply)->isNonThrowing() &&
+             "apply of a function with error result must be non-throwing");
+      auto *cloned = getBuilder().createUnreachable(Loc);
+      recordClonedInstruction(TI, cloned);
       return;
-    case FullApplySiteKind::TryApplyInst:
+    }
+    case FullApplySiteKind::TryApplyInst: {
       auto tryAI = cast<TryApplyInst>(Apply);
       auto returnedValue = getMappedValue(TI->getOperand());
-      getBuilder().createBranch(Loc, tryAI->getErrorBB(), returnedValue);
+      auto *cloned =
+          getBuilder().createBranch(Loc, tryAI->getErrorBB(), returnedValue);
+      recordClonedInstruction(TI, cloned);
       return;
+    }
     }
   }
   // Otherwise use normal visitor, which clones the existing instruction
