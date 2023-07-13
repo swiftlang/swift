@@ -258,7 +258,7 @@ protocol EmptySwiftProto {}
   }
 
   func methodObjCName3() {
-    // expected-error@-1 {{selector 'methodObjCName3' used in header by an instance method with a different name; did you mean 'methodSwiftName3()'?}} {{8-23=methodSwiftName3}} {{3-3=@objc(methodObjCName3) }}
+    // expected-error@-1 {{selector 'methodObjCName3' used in header by instance method with a different name; did you mean 'methodSwiftName3()'?}} {{8-23=methodSwiftName3}} {{3-3=@objc(methodObjCName3) }}
     // FIXME: probably needs an @objc too, since the name is not explicit
   }
 
@@ -267,11 +267,11 @@ protocol EmptySwiftProto {}
   }
 
   @objc(methodObjCName5) func methodWrongSwiftName5() {
-    // expected-error@-1 {{selector 'methodObjCName5' used in header by an instance method with a different name; did you mean 'methodSwiftName5()'?}} {{31-52=methodSwiftName5}}
+    // expected-error@-1 {{selector 'methodObjCName5' used in header by instance method with a different name; did you mean 'methodSwiftName5()'?}} {{31-52=methodSwiftName5}}
   }
 
   @objc(methodObjCName6A) func methodSwiftName6B() {
-    // expected-error@-1 {{selector 'methodObjCName6A' used in header by an instance method with a different name; did you mean 'methodSwiftName6A()'?}} {{32-49=methodSwiftName6A}}
+    // expected-error@-1 {{selector 'methodObjCName6A' used in header by instance method with a different name; did you mean 'methodSwiftName6A()'?}} {{32-49=methodSwiftName6A}}
   }
 }
 

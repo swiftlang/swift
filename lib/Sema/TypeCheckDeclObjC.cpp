@@ -3379,8 +3379,7 @@ private:
 
     case MatchOutcome::WrongSwiftName: {
       auto diag = diagnose(cand, diag::objc_implementation_wrong_swift_name,
-                           reqObjCName, req->getDescriptiveKind(),
-                           req->getName());
+                           reqObjCName, req);
       fixDeclarationName(diag, cand, req->getName());
       if (!explicitObjCName) {
         // Changing the Swift name will probably change the implicitly-computed
@@ -3444,38 +3443,36 @@ private:
       if (reqConv && !candConv)
         diagnose(cand,
                  diag::objc_implementation_candidate_has_error_convention,
-                 cand->getDescriptiveKind(), cand);
+                 cand);
       else if (!reqConv && candConv)
         diagnose(cand,
                  diag::objc_implementation_candidate_lacks_error_convention,
-                 cand->getDescriptiveKind(), cand);
+                 cand);
       else if (reqConv->getKind() != candConv->getKind())
         diagnose(cand,
                  diag::objc_implementation_mismatched_error_convention_kind,
-                 cand->getDescriptiveKind(), cand, candConv->getKind(),
-                 reqConv->getKind());
+                 cand, candConv->getKind(), reqConv->getKind());
       else if (reqConv->getErrorParameterIndex()
                   != candConv->getErrorParameterIndex())
         diagnose(cand,
                  diag::objc_implementation_mismatched_error_convention_index,
-                 cand->getDescriptiveKind(), cand,
+                 cand,
                  candConv->getErrorParameterIndex() + 1,
                  reqConv->getErrorParameterIndex() + 1);
       else if (reqConv->isErrorParameterReplacedWithVoid()
                   != candConv->isErrorParameterReplacedWithVoid())
         diagnose(cand,
                  diag::objc_implementation_mismatched_error_convention_void_param,
-                 cand->getDescriptiveKind(), cand,
-                 candConv->isErrorParameterReplacedWithVoid());
+                 cand, candConv->isErrorParameterReplacedWithVoid());
       else if (reqConv->isErrorOwned() != candConv->isErrorOwned())
         diagnose(cand,
                  diag::objc_implementation_mismatched_error_convention_ownership,
-                 cand->getDescriptiveKind(), cand, candConv->isErrorOwned());
+                 cand, candConv->isErrorOwned());
       else
         // Catch-all; probably shouldn't happen.
         diagnose(cand,
                  diag::objc_implementation_mismatched_error_convention_other,
-                 cand->getDescriptiveKind(), cand);
+                 cand);
 
       return;
     }
@@ -3524,8 +3521,7 @@ public:
       auto cand = pair.first;
 
       diagnose(cand, diag::member_of_objc_implementation_not_objc_or_final,
-               cand->getDescriptiveKind(), cand,
-               cand->getDeclContext()->getSelfClassDecl());
+               cand, cand->getDeclContext()->getSelfClassDecl());
 
       if (canBeRepresentedInObjC(cand))
         diagnose(cand, diag::fixit_add_private_for_objc_implementation,
