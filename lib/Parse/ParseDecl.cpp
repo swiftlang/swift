@@ -7187,6 +7187,7 @@ struct Parser::ParsedAccessors {
 
   /// Find the first accessor that can be used to perform mutation.
   AccessorDecl *findFirstMutator() const {
+    if (Init) return Init;
     if (Set) return Set;
     if (Modify) return Modify;
     if (MutableAddress) return MutableAddress;
