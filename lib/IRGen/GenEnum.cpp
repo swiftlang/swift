@@ -1069,7 +1069,7 @@ namespace {
     
     APInt
     getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-      return APInt::getAllOnesValue(cast<FixedTypeInfo>(TI)->getFixedSize()
+      return APInt::getAllOnes(cast<FixedTypeInfo>(TI)->getFixedSize()
                                       .getValueInBits());
     }
   };
@@ -2043,7 +2043,7 @@ namespace {
           ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
         payloadResult = payload.emitCompare(
             IGF,
-            extraInhabitantCount == 0 ? APInt::getAllOnesValue(PayloadBitCount)
+            extraInhabitantCount == 0 ? APInt::getAllOnes(PayloadBitCount)
                                       : ti.getFixedExtraInhabitantMask(IGF.IGM),
             payloadTag);
       }
@@ -2219,7 +2219,7 @@ namespace {
           
           // FIXME: Provide a mask to only match the bits in the payload
           // whose extra inhabitants differ.
-          payload.emitSwitch(IGF, APInt::getAllOnesValue(PayloadBitCount),
+          payload.emitSwitch(IGF, APInt::getAllOnes(PayloadBitCount),
                              cases,
                              SwitchDefaultDest(unreachableBB, IsUnreachable));
         }
@@ -3466,7 +3466,7 @@ namespace {
       unsigned totalSize
         = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
       if (payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        return APInt::getAllOnesValue(totalSize);
+        return APInt::getAllOnes(totalSize);
       auto baseMask =
         getFixedPayloadTypeInfo().getFixedExtraInhabitantMask(IGM);
       auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
@@ -3499,7 +3499,7 @@ namespace {
       Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
       auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
       if (Size payloadSize = payloadTI.getFixedSize()) {
-        auto payloadMask = APInt::getNullValue(payloadSize.getValueInBits());
+        auto payloadMask = APInt::getZero(payloadSize.getValueInBits());
         if (getNumExtraInhabitantTagValues() > 0)
           payloadMask |= payloadTI.getFixedExtraInhabitantMask(IGM);
         if (ExtraTagBitCount > 0)
@@ -4127,7 +4127,7 @@ namespace {
       llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
       if (!CommonSpareBits.empty()) {
         auto payloadMatch = parts.payload
-          .emitCompare(IGF, APInt::getAllOnesValue(CommonSpareBits.size()),
+          .emitCompare(IGF, APInt::getAllOnes(CommonSpareBits.size()),
                        payloadValue);
         match = IGF.Builder.CreateAnd(match, payloadMatch);
       }
@@ -4241,7 +4241,7 @@ namespace {
           
           IGF.Builder.emitBlock(tagBB);
 
-          parts.payload.emitSwitch(IGF, APInt::getAllOnesValue(PayloadBitCount),
+          parts.payload.emitSwitch(IGF, APInt::getAllOnes(PayloadBitCount),
                                  cases,
                                  SwitchDefaultDest(defaultDest, isUnreachable));
         }
