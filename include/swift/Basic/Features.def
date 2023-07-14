@@ -209,7 +209,7 @@ EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
 /// Enable reference bindings.
-EXPERIMENTAL_FEATURE(ReferenceBindings, false)
+EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
