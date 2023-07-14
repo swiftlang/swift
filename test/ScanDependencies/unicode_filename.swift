@@ -5,7 +5,9 @@
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck %s < %t/deps.json
 
-print(foo())
+public func bar() {
+    print(foo())
+}
 
 // CHECK:      "swift": "deps"
 // CHECK-NEXT:    },
