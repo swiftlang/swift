@@ -4987,6 +4987,13 @@ private:
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator);
 
+  /// Remove the tuple wrapping of left-hand type if it contains only a single
+  /// unlabeled element that is a pack expansion.
+  SolutionKind
+  simplifyMaterializePackExpansionConstraint(Type type1, Type type2,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
@@ -5546,7 +5553,8 @@ public:
     }
 
     cs.addConstraint(ConstraintKind::PackElementOf, elementType,
-                     packType, cs.getConstraintLocator(elementEnv));
+                     packType->getRValueType(),
+                     cs.getConstraintLocator(elementEnv));
     return elementType;
   }
 };
@@ -6228,6 +6236,9 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
 
 bool isSingleUnlabeledPackExpansionTuple(Type type);
+
+/// \returns null if \c type is not a single unlabeled pack expansion tuple.
+Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 
 } // end namespace constraints
 

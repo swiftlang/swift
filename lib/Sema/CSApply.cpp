@@ -3860,9 +3860,8 @@ namespace {
         auto packRefType = cs.getType(packRefExpr);
         if (auto *tuple = packRefType->getRValueType()->getAs<TupleType>();
             tuple && tuple->isSingleUnlabeledPackExpansion()) {
-          auto *expansion =
-              tuple->getElementType(0)->castTo<PackExpansionType>();
-          auto patternType = expansion->getPatternType();
+          auto patternType =
+              getPatternTypeOfSingleUnlabeledPackExpansionTuple(tuple);
           auto *materializedPackExpr = MaterializePackExpr::create(
               cs.getASTContext(), packRefExpr, packRefExpr->getLoc(),
               patternType, /*implicit*/ true);
