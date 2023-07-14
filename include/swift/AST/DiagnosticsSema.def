@@ -1668,14 +1668,14 @@ ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
 ERROR(attr_objc_implementation_must_extend_class,none,
-      "cannot mark extension of %0 %1 with '@_objcImplementation'; it is not "
+      "cannot mark extension of %kind0 with '@_objcImplementation'; it is not "
       "an imported Objective-C class",
-      (DescriptiveDeclKind, ValueDecl *))
+      (ValueDecl *))
 ERROR(attr_objc_implementation_must_be_imported,none,
-      "'@_objcImplementation' cannot be used to extend %0 %1 because it was "
+      "'@_objcImplementation' cannot be used to extend %kind0 because it was "
       "defined by a Swift 'class' declaration, not an imported Objective-C "
       "'@interface' declaration",
-      (DescriptiveDeclKind, ValueDecl *))
+      (ValueDecl *))
 ERROR(attr_objc_implementation_category_not_found,none,
       "could not find category %0 on Objective-C class %1; make sure your "
       "umbrella or bridging header imports the header that declares it",
@@ -1702,29 +1702,28 @@ NOTE(fixit_add_final_for_objc_implementation,none,
      (DescriptiveDeclKind))
 
 ERROR(objc_implementation_wrong_category,none,
-      "%0 %1 should be implemented in extension for "
-      "%select{main class interface|category %2}2, not "
-      "%select{main class interface|category %3}3",
-      (DescriptiveDeclKind, ValueDecl *, Identifier, Identifier))
+      "%kind0 should be implemented in extension for "
+      "%select{main class interface|category %1}1, not "
+      "%select{main class interface|category %2}2",
+      (ValueDecl *, Identifier, Identifier))
 
 ERROR(objc_implementation_wrong_decl_kind,none,
-      "%0 %1 does not match the %2 declared by the header",
-      (DescriptiveDeclKind, ValueDecl *, DescriptiveDeclKind))
+      "%kind0 does not match the %1 declared by the header",
+      (ValueDecl *, DescriptiveDeclKind))
 
 ERROR(objc_implementation_must_be_settable,none,
-      "%0 %1 should be settable to match the settable %2 declared by the "
+      "%kind0 should be settable to match the settable %1 declared by the "
       "header",
-      (DescriptiveDeclKind, ValueDecl *, DescriptiveDeclKind))
+      (ValueDecl *, DescriptiveDeclKind))
 
 ERROR(objc_implementation_type_mismatch,none,
-      "%0 %1 of type %2 does not match type %3 declared by the "
-      "header",
-      (DescriptiveDeclKind, ValueDecl *, Type, Type))
+      "%kind0 of type %1 does not match type %2 declared by the header",
+      (ValueDecl *, Type, Type))
 
 ERROR(objc_implementation_required_attr_mismatch,none,
-      "%0 %1 %select{should not|should}2 be 'required' to match %0 declared by "
-      "the header",
-      (DescriptiveDeclKind, ValueDecl *, bool))
+      "%kind0 %select{should not|should}2 be 'required' to match %1 declared "
+      "by the header",
+      (ValueDecl *, DescriptiveDeclKind, bool))
 
 ERROR(objc_implementation_candidate_has_error_convention,none,
       "%0 %1 does not match the declaration in the header because it throws an "
@@ -1770,8 +1769,8 @@ ERROR(objc_implementation_mismatched_error_convention_other,none,
       (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(objc_implementation_wrong_objc_name,none,
-      "selector %0 for %1 %2 not found in header; did you mean %3?",
-      (ObjCSelector, DescriptiveDeclKind, ValueDecl *, ObjCSelector))
+      "selector %0 for %kind1 not found in header; did you mean %2?",
+      (ObjCSelector, ValueDecl *, ObjCSelector))
 
 ERROR(objc_implementation_wrong_swift_name,none,
       "selector %0 used in header by an %1 with a different name; did you "
@@ -1780,30 +1779,30 @@ ERROR(objc_implementation_wrong_swift_name,none,
 
 ERROR(objc_implementation_missing_impl,none,
       "extension for %select{main class interface|category %0}0 should "
-      "provide implementation for %1 %2",
-      (Identifier, DescriptiveDeclKind, ValueDecl *))
+      "provide implementation for %kind1",
+      (Identifier, ValueDecl *))
 
 ERROR(objc_implementation_class_or_instance_mismatch,none,
-      "%0 %1 does not match %2 declared in header",
-      (DescriptiveDeclKind, ValueDecl *, DescriptiveDeclKind))
+      "%kind0 does not match %1 declared in header",
+      (ValueDecl *, DescriptiveDeclKind))
 
 ERROR(objc_implementation_multiple_matching_candidates,none,
-      "found multiple implementations that could match %0 %1 with selector %2",
-      (DescriptiveDeclKind, ValueDecl *, ObjCSelector))
+      "found multiple implementations that could match %kind0 with selector %1",
+      (ValueDecl *, ObjCSelector))
 NOTE(objc_implementation_candidate_impl_here,none,
-     "%0 %1 is a potential match%select{|; insert '@objc(%3)' to use it}2",
-     (DescriptiveDeclKind, ValueDecl *, bool, StringRef))
+     "%kind0 is a potential match%select{|; insert '@objc(%2)' to use it}1",
+     (ValueDecl *, bool, StringRef))
 NOTE(objc_implementation_requirement_here,none,
-     "%0 %1 declared in header here",
-     (DescriptiveDeclKind, ValueDecl *))
+     "%kind0 declared in header here",
+     (ValueDecl *))
 
 ERROR(objc_implementation_multiple_matching_requirements,none,
-      "%0 %1 could match several different members declared in the header",
-      (DescriptiveDeclKind, ValueDecl *))
+      "%kind0 could match several different members declared in the header",
+      (ValueDecl *))
 NOTE(objc_implementation_one_matched_requirement,none,
-     "%0 %1 (with selector %2) is a potential match%select{|; insert "
-     "'@objc(%4)' to use it}3",
-     (DescriptiveDeclKind, ValueDecl *, ObjCSelector, bool, StringRef))
+     "%kind0 (with selector %1) is a potential match%select{|; insert "
+     "'@objc(%3)' to use it}2",
+     (ValueDecl *, ObjCSelector, bool, StringRef))
 
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
@@ -1830,19 +1829,19 @@ ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
 ERROR(expose_unsupported_objc_decl_to_cxx,none,
-      "@objc %0 %1 can not yet be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+      "@objc %kind0 can not yet be exposed to C++", (ValueDecl *))
 ERROR(expose_unsupported_async_decl_to_cxx,none,
-      "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+      "async %kind0 can not be exposed to C++", (ValueDecl *))
 ERROR(expose_unsupported_actor_isolated_to_cxx,none,
-      "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+      "actor-isolated %kind0 can not be exposed to C++", (ValueDecl *))
 ERROR(expose_unsupported_client_emission_to_cxx,none,
-      "%0 %1 can not be exposed to C++ as it requires code to be emitted into client", (DescriptiveDeclKind, ValueDecl *))
+      "%kind0 can not be exposed to C++ as it requires code to be emitted into client", (ValueDecl *))
 ERROR(expose_generic_decl_to_cxx,none,
-      "generic %0 %1 can not yet be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+      "generic %kind0 can not yet be exposed to C++", (ValueDecl *))
 ERROR(expose_generic_requirement_to_cxx,none,
-      "generic requirements for %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+      "generic requirements for %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_throwing_to_cxx,none,
-      "%0 %1 can not yet be represented in C++ as it may throw an error", (DescriptiveDeclKind, ValueDecl *))
+      "%kind0 can not yet be represented in C++ as it may throw an error", (ValueDecl *))
 ERROR(expose_indirect_enum_cxx,none,
       "indirect enum %0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_enum_case_type_to_cxx,none,
@@ -1852,11 +1851,11 @@ ERROR(expose_enum_case_tuple_to_cxx,none,
 ERROR(expose_protocol_to_cxx_unsupported,none,
       "protocol %0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_move_only_to_cxx,none,
-      "noncopyable %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+      "noncopyable %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
-      "%0 %1 is not yet exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+      "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
-      "Swift %0 %1 cannot be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+      "Swift %kind0 cannot be represented in C++", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))

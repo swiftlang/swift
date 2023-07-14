@@ -3138,14 +3138,13 @@ private:
 
       // Ambiguous match (many requirements match one candidate)
       diagnose(cand, diag::objc_implementation_multiple_matching_requirements,
-                     cand->getDescriptiveKind(), cand);
+                     cand);
 
       bool shouldOfferFix = !candExplicitObjCName;
       for (auto req : matchedRequirements.matches) {
         auto diag =
             diagnose(cand, diag::objc_implementation_one_matched_requirement,
-                           req->getDescriptiveKind(), req,
-                           *req->getObjCRuntimeName(), shouldOfferFix,
+                           req, *req->getObjCRuntimeName(), shouldOfferFix,
                            req->getObjCRuntimeName()->getString(scratch));
         if (shouldOfferFix) {
           fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
@@ -3187,14 +3186,13 @@ private:
       auto ext =
           cast<ExtensionDecl>(reqIDC->getImplementationContext());
       diagnose(ext, diag::objc_implementation_multiple_matching_candidates,
-                    req->getDescriptiveKind(), req,
-                    *req->getObjCRuntimeName());
+                    req, *req->getObjCRuntimeName());
 
       for (auto cand : cands.matches) {
         bool shouldOfferFix = !unmatchedCandidates[cand];
         auto diag =
             diagnose(cand, diag::objc_implementation_candidate_impl_here,
-                           cand->getDescriptiveKind(), cand, shouldOfferFix,
+                           cand, shouldOfferFix,
                            req->getObjCRuntimeName()->getString(scratch));
 
         if (shouldOfferFix) {
@@ -3204,8 +3202,7 @@ private:
         }
       }
 
-      diagnose(req, diag::objc_implementation_requirement_here,
-                    req->getDescriptiveKind(), req);
+      diagnose(req, diag::objc_implementation_requirement_here, req);
     }
 
     // Remove matched candidates and requirements from the unmatched lists.
@@ -3377,8 +3374,7 @@ private:
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
       auto diag = diagnose(cand, diag::objc_implementation_wrong_objc_name,
-                           *cand->getObjCRuntimeName(),
-                           cand->getDescriptiveKind(), cand, reqObjCName);
+                           *cand->getObjCRuntimeName(), cand, reqObjCName);
       fixDeclarationObjCName(diag, cand, explicitObjCName, reqObjCName);
       return;
     }
@@ -3400,34 +3396,31 @@ private:
     case MatchOutcome::WrongStaticness: {
       auto diag = diagnose(cand,
                            diag::objc_implementation_class_or_instance_mismatch,
-                           cand->getDescriptiveKind(), cand,
-                           req->getDescriptiveKind());
+                           cand, req->getDescriptiveKind());
       fixDeclarationStaticSpelling(diag, cand, getStaticSpelling(req));
       return;
     }
 
     case MatchOutcome::WrongCategory:
       diagnose(cand, diag::objc_implementation_wrong_category,
-               cand->getDescriptiveKind(), cand,
-               getCategoryName(req->getDeclContext()),
+               cand, getCategoryName(req->getDeclContext()),
                getCategoryName(cand->getDeclContext()->
                                  getImplementedObjCContext()));
       return;
 
     case MatchOutcome::WrongDeclKind:
       diagnose(cand, diag::objc_implementation_wrong_decl_kind,
-               cand->getDescriptiveKind(), cand, req->getDescriptiveKind());
+               cand, req->getDescriptiveKind());
       return;
 
     case MatchOutcome::WrongType:
       diagnose(cand, diag::objc_implementation_type_mismatch,
-               cand->getDescriptiveKind(), cand,
-               getMemberType(cand), getMemberType(req));
+               cand, getMemberType(cand), getMemberType(req));
       return;
 
     case MatchOutcome::WrongWritability:
       diagnose(cand, diag::objc_implementation_must_be_settable,
-               cand->getDescriptiveKind(), cand, req->getDescriptiveKind());
+               cand, req->getDescriptiveKind());
       return;
 
     case MatchOutcome::WrongRequiredAttr: {
@@ -3435,7 +3428,7 @@ private:
 
       auto diag =
         diagnose(cand, diag::objc_implementation_required_attr_mismatch,
-                 cand->getDescriptiveKind(), cand, shouldBeRequired);
+                 cand, req->getDescriptiveKind(),  shouldBeRequired);
       
       if (shouldBeRequired)
         diag.fixItInsert(cand->getAttributeInsertionLoc(/*forModifier=*/true),
@@ -3522,8 +3515,7 @@ public:
                         ->getImplementationContext();
 
       diagnose(ext->getDecl(), diag::objc_implementation_missing_impl,
-               getCategoryName(req->getDeclContext()),
-               req->getDescriptiveKind(), req);
+               getCategoryName(req->getDeclContext()), req);
 
       // FIXME: Should give fix-it to add stub implementation
     }
