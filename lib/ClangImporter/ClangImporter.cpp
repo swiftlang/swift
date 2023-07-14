@@ -6793,14 +6793,14 @@ bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
   if (!decl->getDefinition())
     return false;
 
-  if (hasCustomCopyOrMoveConstructor(decl))
+  if (hasCustomCopyOrMoveConstructor(decl) || hasOwnedValueAttr(decl))
     return true;
   
   auto checkType = [](clang::QualType t) {
     if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
       if (auto cxxRecord =
               dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        return hasCustomCopyOrMoveConstructor(cxxRecord);
+        return anySubobjectsSelfContained(cxxRecord);
       }
     }
 
@@ -6841,9 +6841,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 
     bool parentIsSelfContained =
-      hasOwnedValueAttr(method->getParent()) ||
-      (!isForeignReferenceType(parentQualType) &&
-       anySubobjectsSelfContained(method->getParent()));
+      !isForeignReferenceType(parentQualType) &&
+      anySubobjectsSelfContained(method->getParent());
 
     // If it returns a pointer or reference from an owned parent, that's a
     // projection (unsafe).
