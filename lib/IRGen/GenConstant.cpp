@@ -218,7 +218,7 @@ static BuiltinInst *getOffsetSubtract(const TupleExtractInst *TE, SILModule &M) 
     return nullptr;
 
   auto *overflowFlag = dyn_cast<IntegerLiteralInst>(BI->getArguments()[2]);
-  if (!overflowFlag || !overflowFlag->getValue().isNullValue())
+  if (!overflowFlag || !overflowFlag->getValue().isZero())
     return nullptr;
 
   return BI;
