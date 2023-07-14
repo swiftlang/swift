@@ -2104,7 +2104,7 @@ class Super {
   var foo: Int { get { return 3 } } // expected-note 2{{overridden declaration is here}}
 
   @objc // access-note-move{{Super.process(i:)}}
-  func process(i: Int) -> Int { } // expected-note {{overriding '@objc' method 'process(i:)' here}}
+  func process(i: Int) -> Int { } // expected-note {{overriding '@objc' instance method 'process(i:)' here}}
 }
 
 class Sub1 : Super {

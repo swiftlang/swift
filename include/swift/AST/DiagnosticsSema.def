@@ -5938,8 +5938,7 @@ NOTE(objc_inferring_on_objc_protocol_member,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())
 NOTE(objc_overriding_objc_decl,none,
-     "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
-     "here", (unsigned, DeclName))
+     "overriding '@objc' %kind0 here", (const ValueDecl *))
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %0 %1 in protocol %2",
      (DescriptiveDeclKind, DeclName, Identifier))

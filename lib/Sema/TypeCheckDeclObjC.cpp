@@ -110,14 +110,8 @@ void ObjCReason::describe(const Decl *D) const {
     break;
 
   case ObjCReason::OverridesObjC: {
-    unsigned kind = isa<VarDecl>(D) ? 0
-                  : isa<SubscriptDecl>(D) ? 1
-                  : isa<ConstructorDecl>(D) ? 2
-                  : 3;
-
     auto overridden = cast<ValueDecl>(D)->getOverriddenDecl();
-    overridden->diagnose(diag::objc_overriding_objc_decl,
-                         kind, overridden->getName());
+    overridden->diagnose(diag::objc_overriding_objc_decl, overridden);
     break;
   }
 
