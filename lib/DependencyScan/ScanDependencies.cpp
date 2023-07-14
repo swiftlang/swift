@@ -852,8 +852,11 @@ static void writeJSON(llvm::raw_ostream &out,
       bool hasOverlayDependencies =
           swiftTextualDeps->swift_overlay_module_dependencies &&
           swiftTextualDeps->swift_overlay_module_dependencies->count > 0;
+      bool commaAfterBridgingHeaderPath = hasOverlayDependencies;
+      bool commaAfterExtraPcmArgs =
+          hasBridgingHeaderPath || commaAfterBridgingHeaderPath;
       bool commaAfterFramework =
-          swiftTextualDeps->extra_pcm_args->count != 0 || hasBridgingHeaderPath;
+          swiftTextualDeps->extra_pcm_args->count != 0 || commaAfterExtraPcmArgs;
 
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
                            5, commaAfterFramework);
@@ -871,7 +874,7 @@ static void writeJSON(llvm::raw_ostream &out,
           out << "\n";
         }
         out.indent(5 * 2);
-        out << (hasBridgingHeaderPath ? "],\n" : "]\n");
+        out << (commaAfterExtraPcmArgs ? "],\n" : "]\n");
       }
       /// Bridging header and its source file dependencies, if any.
       if (hasBridgingHeaderPath) {
@@ -887,12 +890,12 @@ static void writeJSON(llvm::raw_ostream &out,
                              swiftTextualDeps->bridging_module_dependencies, 6,
                              /*trailingComma=*/false);
         out.indent(5 * 2);
-        out << (hasOverlayDependencies ? "},\n" : "}\n");
+        out << (commaAfterBridgingHeaderPath ? "},\n" : "}\n");
       }
       if (hasOverlayDependencies) {
         writeDependencies(out, swiftTextualDeps->swift_overlay_module_dependencies,
                           "swiftOverlayDependencies", 5,
-                          /*trailingComma=*/true);
+                          /*trailingComma=*/false);
       }
     } else if (swiftPlaceholderDeps) {
       out << "\"swiftPlaceholder\": {\n";
