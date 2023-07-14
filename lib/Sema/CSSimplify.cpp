@@ -2487,9 +2487,21 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
   auto pattern1 = expansion1->getPatternType();
   auto pattern2 = expansion2->getPatternType();
 
-  // If both sides are expanded or neither side is, just match them
-  // directly.
-  if (pattern1->is<PackType>() == pattern2->is<PackType>()) {
+  // If both sides are expanded, just match them directly.
+  if (pattern1->is<PackType>() && pattern2->is<PackType>()) {
+    return matchTypes(pattern1, pattern2, kind, flags, locator);
+
+  } else if (!pattern1->is<PackType>() && !pattern2->is<PackType>()) {
+    if (pattern1->isTypeVariableOrMember() &&
+        !pattern2->isTypeVariableOrMember()) {
+      return matchTypes(pattern1, PackType::get(getASTContext(), Type(expansion2)),
+                        kind, flags, locator);
+    } else if (!pattern1->isTypeVariableOrMember() &&
+               pattern2->isTypeVariableOrMember()) {
+      return matchTypes(PackType::get(getASTContext(), Type(expansion1)), pattern2,
+                        kind, flags, locator);
+    }
+
     return matchTypes(pattern1, pattern2, kind, flags, locator);
 
   // If the right hand side is expanded, we have something like
@@ -13351,6 +13363,11 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
+/// FIXME: This is too conservative. Pack type variables in nested expansions
+/// should be skipped.
+///
+/// For example, the shape of `Pack{repeat G<each $T0, repeat each $T1>}` is
+/// determined only by $T0 and not $T1.
 static bool hasUnresolvedPackVars(Type type) {
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
@@ -13440,6 +13457,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
 
   if (hasUnresolvedPackVars(type1) || hasUnresolvedPackVars(type2))
     return formUnsolved();
+
+  if (type1->is<PackArchetypeType>() && type2->is<PackType>())
+    type1 = PackType::getSingletonPackExpansion(type1);
+  else if (type1->is<PackType>() && type2->is<PackArchetypeType>())
+    type2 = PackType::getSingletonPackExpansion(type2);
 
   auto shape1 = type1->getReducedShape();
   auto shape2 = type2->getReducedShape();

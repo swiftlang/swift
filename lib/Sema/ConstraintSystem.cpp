@@ -833,11 +833,17 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   // Map the generic parameters to their corresponding type variables.
   llvm::SmallVector<Type, 2> arguments;
   for (auto gp : decl->getInnermostGenericParamTypes()) {
-    auto found = replacements.find(
-      cast<GenericTypeParamType>(gp->getCanonicalType()));
-    assert(found != replacements.end() &&
-           "Missing generic parameter?");
-    arguments.push_back(found->second);
+    if (gp->isParameterPack()) {
+      PackExpansionType *expansionTy = PackExpansionType::get(gp, gp);
+      auto argTy = openPackExpansionType(expansionTy, replacements, locator);
+      arguments.push_back(PackType::get(getASTContext(), argTy));
+    } else {
+      auto found = replacements.find(
+        cast<GenericTypeParamType>(gp->getCanonicalType()));
+      assert(found != replacements.end() &&
+             "Missing generic parameter?");
+      arguments.push_back(found->second);
+    }
   }
 
   // FIXME: For some reason we can end up with unbound->getDecl()
@@ -852,28 +858,11 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
+    // FIXME: Some kind of hack to handle local types in generic context?
     result = DC->mapTypeIntoContext(result);
   }
 
-  return result.transform([&](Type type) -> Type {
-    // Although generic parameters are declared with just `each`
-    // their interface types introduce a pack expansion which
-    // means that the solver has to extact generic argument type
-    // variable from Pack{repeat ...} and drop that structure to
-    // make sure that generic argument gets inferred to a pack type.
-    if (auto *packTy = type->getAs<PackType>()) {
-      assert(packTy->getNumElements() == 1);
-      auto *expansion = packTy->getElementType(0)->castTo<PackExpansionType>();
-      auto *typeVar = expansion->getPatternType()->castTo<TypeVariableType>();
-      assert(typeVar->getImpl().getGenericParameter() &&
-             typeVar->getImpl().canBindToPack());
-      return typeVar;
-    }
-
-    if (auto *expansion = dyn_cast<PackExpansionType>(type.getPointer()))
-      return openPackExpansionType(expansion, replacements, locator);
-    return type;
-  });
+  return result;
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -1020,15 +1009,6 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
                 tuple->getASTContext());
           }
         }
-      }
-
-      // While opening variadic generic types that appear in other types
-      // we need to extract generic parameter from Pack{repeat ...} structure
-      // that gets introduced by the interface type, see
-      // \c openUnboundGenericType for more details.
-      if (auto *packTy = type->getAs<PackType>()) {
-        if (auto expansion = packTy->unwrapSingletonPackExpansion())
-          type = expansion->getPatternType();
       }
 
       if (auto *expansion = type->getAs<PackExpansionType>()) {
