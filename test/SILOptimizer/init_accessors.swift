@@ -395,6 +395,30 @@ func test_local_with_memberwise() {
   _ = TestMemberwiseGeneric(a: 1, pair: ("a", [0]))
 }
 
+// CHECK-LABEL: sil private [ossa] @$s14init_accessors023test_type_lowering_for_A9_accessoryyF4TestL_V2fnADyxq_Gq_xc_tcfC : $@convention(method) <T, U> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U>, @thin Test<T, U>.Type) -> @owned Test<T, U>
+// CHECK: {{.*}} = function_ref @$s14init_accessors023test_type_lowering_for_A9_accessoryyF4TestL_V2fnyq_xcvi : $@convention(thin) <τ_0_0, τ_0_1> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0, τ_0_1>) -> @out Optional<@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0, τ_0_1>>
+func test_type_lowering_for_init_accessor() {
+  struct Test<T, U> {
+    var _fn: ((T) -> U)? = nil
+
+    // CHECK-LABEL: sil private [ossa] @$s14init_accessors023test_type_lowering_for_A9_accessoryyF4TestL_V2fnyq_xcvi : $@convention(thin) <T, U> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U>) -> @out Optional<@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U>>
+    var fn: (T) -> U {
+      @storageRestrictions(initializes: _fn)
+      init { _fn = newValue }
+      get { _fn! }
+      set { _fn = newValue }
+    }
+
+    init(fn: @escaping (T) -> U) {
+      self.fn = fn
+    }
+  }
+
+  _ = Test<Int, () -> Void> { _ in
+    return {}
+  } // Ok
+}
+
 func test_assignments() {
   struct Test {
     var _a: Int

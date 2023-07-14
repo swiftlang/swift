@@ -2381,12 +2381,18 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   // Drop `self` parameter.
   inputs.pop_back();
 
+  auto getLoweredTypeOfProperty = [&](VarDecl *property) {
+    auto type = property->getInterfaceType();
+    AbstractionPattern pattern(genericSig, type->getCanonicalType());
+    auto loweredTy = TC.getLoweredType(pattern, type, context);
+    return loweredTy.getASTType();
+  };
+
   // accessed properties appear as `inout` parameters because they could be
   // read from and modified.
   for (auto *property : accessor->getAccessedProperties()) {
-    inputs.push_back(
-        SILParameterInfo(property->getInterfaceType()->getCanonicalType(),
-                         ParameterConvention::Indirect_Inout));
+    inputs.push_back(SILParameterInfo(getLoweredTypeOfProperty(property),
+                                      ParameterConvention::Indirect_Inout));
   }
 
   SmallVector<SILResultInfo, 8> results;
@@ -2394,9 +2400,8 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   // initialized properties appear as `@out` results because they are
   // initialized by the accessor.
   for (auto *property : accessor->getInitializedProperties()) {
-    results.push_back(
-        SILResultInfo(property->getInterfaceType()->getCanonicalType(),
-                      ResultConvention::Indirect));
+    results.push_back(SILResultInfo(getLoweredTypeOfProperty(property),
+                                    ResultConvention::Indirect));
   }
 
   auto calleeConvention = ParameterConvention::Direct_Unowned;
