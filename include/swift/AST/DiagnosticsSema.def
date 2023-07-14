@@ -7271,6 +7271,9 @@ ERROR(local_extension_macro,none,
 ERROR(extension_macro_invalid_conformance,none,
       "invalid protocol conformance %0 in extension macro",
       (Type))
+ERROR(macro_attached_to_invalid_decl,none,
+      "'%0' macro cannot be attached to %1",
+      (StringRef, DescriptiveDeclKind))
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",
