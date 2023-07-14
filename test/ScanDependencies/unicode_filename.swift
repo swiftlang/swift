@@ -4,7 +4,9 @@
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
 
-print(foo())
+public func bar() {
+    print(foo())
+}
 
 // CHECK:      "swift": "deps"
 // CHECK-NEXT:    },
