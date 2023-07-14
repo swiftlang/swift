@@ -1146,10 +1146,6 @@ struct VarRefCollector : public ASTWalker {
 
     Type openPackElement(Type packType, ConstraintLocator *locator,
                          PackExpansionExpr *packElementEnvironment) {
-      // If 'each t' is written outside of a pack expansion expression, allow the
-      // type to bind to a hole. The invalid pack reference will be diagnosed when
-      // attempting to bind the type variable for the underlying pack reference to
-      // a pack type without TVO_CanBindToPack.
       if (!packElementEnvironment) {
         return CS.createTypeVariable(locator,
                                      TVO_CanBindToHole | TVO_CanBindToNoEscape);
@@ -3127,8 +3123,14 @@ struct VarRefCollector : public ASTWalker {
           llvm_unreachable("unsupported pack reference ASTNode");
         }
 
+        auto *elementShape = CS.createTypeVariable(
+            CS.getConstraintLocator(pack, ConstraintLocator::PackShape),
+            TVO_CanBindToPack);
         CS.addConstraint(
-            ConstraintKind::ShapeOf, expansionType->getCountType(), packType,
+            ConstraintKind::ShapeOf, elementShape, packType,
+            CS.getConstraintLocator(pack, ConstraintLocator::PackShape));
+        CS.addConstraint(
+            ConstraintKind::Equal, elementShape, expansionType->getCountType(),
             CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
       }
 
@@ -3137,27 +3139,31 @@ struct VarRefCollector : public ASTWalker {
 
     Type visitPackElementExpr(PackElementExpr *expr) {
       auto packType = CS.getType(expr->getPackRefExpr());
-
-      if (isSingleUnlabeledPackExpansionTuple(packType)) {
-        packType =
-            addMemberRefConstraints(expr, expr->getPackRefExpr(),
-                                    DeclNameRef(CS.getASTContext().Id_element),
-                                    FunctionRefKind::Unapplied, {});
-        CS.setType(expr->getPackRefExpr(), packType);
-      }
-
       auto *packEnvironment = CS.getPackEnvironment(expr);
+      auto elementType = openPackElement(
+          packType, CS.getConstraintLocator(expr), packEnvironment);
       if (packEnvironment) {
         auto expansionType =
             CS.getType(packEnvironment)->castTo<PackExpansionType>();
         CS.addConstraint(ConstraintKind::ShapeOf, expansionType->getCountType(),
-                         packType,
+                         elementType,
                          CS.getConstraintLocator(packEnvironment,
                                                  ConstraintLocator::PackShape));
+        auto *elementShape = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::PackShape),
+            TVO_CanBindToPack);
+        CS.addConstraint(
+            ConstraintKind::ShapeOf, elementShape, elementType,
+            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
+        CS.addConstraint(
+            ConstraintKind::Equal, elementShape, expansionType->getCountType(),
+            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
+      } else {
+        CS.recordFix(AllowInvalidPackReference::create(
+            CS, packType, CS.getConstraintLocator(expr->getPackRefExpr())));
       }
 
-      return openPackElement(packType, CS.getConstraintLocator(expr),
-                             packEnvironment);
+      return elementType;
     }
 
     Type visitMaterializePackExpr(MaterializePackExpr *expr) {
