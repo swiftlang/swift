@@ -6,6 +6,8 @@
 struct NestedSelfContained;
 struct Empty;
 struct SelfContained;
+struct ExplicitSelfContained;
+struct NestedExplicitSelfContained;
 
 struct View {
   void *ptr;
@@ -14,6 +16,8 @@ struct View {
   void *empty() const;
   std::string name() const;
   NestedSelfContained nested() const;
+  ExplicitSelfContained explicitSelfContained() const;
+  NestedExplicitSelfContained explicitNested() const;
 };
 
 struct SelfContained {
@@ -27,6 +31,8 @@ struct SelfContained {
   int value() const;
   View view() const;
   int *pointer() const;
+  ExplicitSelfContained explicitSelfContained() const;
+  NestedExplicitSelfContained explicitNested() const;
 };
 
 struct NestedSelfContained {
@@ -39,6 +45,8 @@ struct NestedSelfContained {
   int value() const;
   View view() const;
   int *pointer() const;
+  ExplicitSelfContained explicitSelfContained() const;
+  NestedExplicitSelfContained explicitNested() const;
 };
 
 struct InheritSelfContained: SelfContained {
@@ -56,6 +64,17 @@ struct __attribute__((swift_attr("import_owned"))) ExplicitSelfContained {
   
   void *pointer() const;
   View view() const;
+  NestedSelfContained nested() const;
+};
+
+struct NestedExplicitSelfContained {
+  ExplicitSelfContained m;
+
+  SelfContained selfContained() const;
+  NestedSelfContained nested() const;
+  int value() const;
+  View view() const;
+  int *pointer() const;
 };
 
 struct Empty {

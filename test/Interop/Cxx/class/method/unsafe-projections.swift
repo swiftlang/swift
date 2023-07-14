@@ -5,6 +5,8 @@
 // CHECK:   func empty() -> UnsafeMutableRawPointer!
 // CHECK:   func name() -> std{{.*}}string
 // CHECK:   func nested() -> NestedSelfContained
+// CHECK:   func explicitSelfContained() -> ExplicitSelfContained
+// CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
 
 // CHECK: struct SelfContained {
@@ -15,6 +17,8 @@
 // CHECK:   func value() -> Int32
 // CHECK:   func __viewUnsafe() -> View
 // CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func explicitSelfContained() -> ExplicitSelfContained
+// CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
 
 // CHECK: struct NestedSelfContained {
@@ -25,6 +29,8 @@
 // CHECK:   func value() -> Int32
 // CHECK:   func __viewUnsafe() -> View
 // CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func explicitSelfContained() -> ExplicitSelfContained
+// CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
 
 // CHECK: struct InheritSelfContained {
@@ -35,11 +41,22 @@
 // CHECK:   func value() -> Int32
 // CHECK:   func __viewUnsafe() -> View
 // CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func explicitSelfContained() -> ExplicitSelfContained
+// CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
 
 // CHECK: struct ExplicitSelfContained {
 // CHECK:   func __pointerUnsafe() -> UnsafeMutableRawPointer!
 // CHECK:   func __viewUnsafe() -> View
+// CHECK:   func nested() -> NestedSelfContained
+// CHECK: }
+
+// CHECK: struct NestedExplicitSelfContained {
+// CHECK:   func selfContained() -> SelfContained
+// CHECK:   func nested() -> NestedSelfContained
+// CHECK:   func value() -> Int32
+// CHECK:   func __viewUnsafe() -> View
+// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
 // CHECK: }
 
 // CHECK: struct Empty {
