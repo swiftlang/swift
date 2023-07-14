@@ -73,7 +73,7 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   assert(func);
   if (!isa<DestructorDecl>(func) && !isa<AccessorDecl>(func)) {
     auto note =
-        func->diagnose(diag::note_add_async_to_function, func->getName());
+        func->diagnose(diag::note_add_async_to_function, func);
 
     if (func->hasThrows()) {
       auto replacement = func->getAttrs().hasAttribute<RethrowsAttr>()
@@ -1386,7 +1386,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
       missingRequirement->diagnose(diag::no_witnesses,
                                    getProtocolRequirementKind(missingRequirement),
-                                   missingRequirement->getName(),
+                                   missingRequirement,
                                    missingRequirement->getParameters()->get(0)->getInterfaceType(),
                                    /*AddFixIt=*/true);
       return;
@@ -1782,9 +1782,7 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
       case ActorIsolation::Unspecified:
         fn->diagnose(diag::note_add_globalactor_to_function,
             globalActor->getWithoutParens().getString(),
-            fn->getDescriptiveKind(),
-            fn->getName(),
-            globalActor)
+            fn, globalActor)
           .fixItInsert(fn->getAttributeInsertionLoc(false),
             diag::insert_globalactor_attr, globalActor);
           return;
@@ -3469,25 +3467,12 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
 
   // Only one such attribute is valid, but we only actually care of one of
   // them is a global actor.
-  if (numIsolationAttrs > 1) {
-    DeclName name;
-    if (auto value = dyn_cast<ValueDecl>(decl)) {
-      name = value->getName();
-    } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-      if (auto selfTypeDecl = ext->getSelfNominalTypeDecl())
-        name = selfTypeDecl->getName();
-    }
-
-    if (globalActorAttr) {
-      if (shouldDiagnose) {
-        decl->diagnose(
-            diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-            name, nonisolatedAttr->getAttrName(),
-            globalActorAttr->second->getName().str())
-          .highlight(nonisolatedAttr->getRangeWithAt())
-          .highlight(globalActorAttr->first->getRangeWithAt());
-      }
-    }
+  if (numIsolationAttrs > 1 && globalActorAttr && shouldDiagnose) {
+    decl->diagnose(diag::actor_isolation_multiple_attr, decl,
+                   nonisolatedAttr->getAttrName(),
+                   globalActorAttr->second->getName().str())
+      .highlight(nonisolatedAttr->getRangeWithAt())
+      .highlight(globalActorAttr->first->getRangeWithAt());
   }
 
   // If the declaration is explicitly marked 'nonisolated', report it as
@@ -3909,9 +3894,8 @@ static bool checkClassGlobalActorIsolation(
   }
 
   // Complain about the mismatch.
-  classDecl->diagnose(
-      diag::actor_isolation_superclass_mismatch, isolation,
-      classDecl->getName(), superIsolation, superclassDecl->getName());
+  classDecl->diagnose(diag::actor_isolation_superclass_mismatch, isolation,
+                      classDecl, superIsolation, superclassDecl);
   return true;
 }
 

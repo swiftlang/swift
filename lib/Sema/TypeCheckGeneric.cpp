@@ -299,9 +299,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      ctx.Diags.diagnose(decl,
-                         diag::requirement_restricts_self,
-                         decl->getDescriptiveKind(), decl->getName(),
+      ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
                          req.getFirstType().getString(),
                          static_cast<unsigned>(req.getKind()),
                          req.getSecondType().getString());

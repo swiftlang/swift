@@ -521,7 +521,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
       Context.Diags.diagnose(
-          Loc, diag::candidate_inaccessible, first->getBaseName(),
+          Loc, diag::candidate_inaccessible, first,
           first->getFormalAccessScope().accessLevelForDiagnostics());
 
       // FIXME: If any of the candidates (usually just one) are in the same

@@ -117,10 +117,8 @@ void ObjCReason::describe(const Decl *D) const {
 
   case ObjCReason::WitnessToObjC: {
     auto requirement = getObjCRequirement();
-    requirement->diagnose(diag::objc_witness_objc_requirement,
-                D->getDescriptiveKind(), requirement->getName(),
-                cast<ProtocolDecl>(requirement->getDeclContext())
-                  ->getName());
+    requirement->diagnose(diag::objc_witness_objc_requirement, requirement,
+                          cast<ProtocolDecl>(requirement->getDeclContext()));
     break;
   }
 
@@ -1688,9 +1686,8 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
       ASTContext &ctx = dc->getASTContext();
       auto behavior = behaviorLimitForObjCReason(*isObjC, ctx);
       if (storageObjCAttr && storageObjCAttr->isSwift3Inferred()) {
-        storage->diagnose(diag::accessor_swift3_objc_inference,
-                 storage->getDescriptiveKind(), storage->getName(),
-                 isa<SubscriptDecl>(storage), accessor->isSetter())
+        storage->diagnose(diag::accessor_swift3_objc_inference, storage,
+                          accessor->isSetter())
           .fixItInsert(storage->getAttributeInsertionLoc(/*forModifier=*/false),
                        "@objc ")
           .limitBehavior(behavior);
@@ -1861,9 +1858,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
       auto diagnoseCandidate = [&](ValueDecl *req) {
         auto proto = cast<ProtocolDecl>(req->getDeclContext());
         auto diag = decl->diagnose(diag::objc_ambiguous_inference_candidate,
-                                   req->getName(),
-                                   proto->getName(),
-                                   *req->getObjCRuntimeName());
+                                   req, proto, *req->getObjCRuntimeName());
         fixDeclarationObjCName(diag, decl,
                                decl->getObjCRuntimeName(/*skipIsObjC=*/true),
                                req->getObjCRuntimeName());
@@ -1950,13 +1945,12 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // methods.
           if (declProvidingInheritedAsyncConvention
               && inheritedAsyncConvention != reqAsyncConvention) {
-            method->diagnose(diag::objc_ambiguous_async_convention,
-                             method->getName());
+            method->diagnose(diag::objc_ambiguous_async_convention, method);
             declProvidingInheritedAsyncConvention->diagnose(
                 diag::objc_ambiguous_async_convention_candidate,
-                declProvidingInheritedAsyncConvention->getName());
+                declProvidingInheritedAsyncConvention);
             reqMethod->diagnose(diag::objc_ambiguous_async_convention_candidate,
-                                reqMethod->getName());
+                                reqMethod);
             break;
           }
 
@@ -1973,13 +1967,12 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // methods.
           if (declProvidingInheritedErrorConvention
               && inheritedErrorConvention != reqErrorConvention) {
-            method->diagnose(diag::objc_ambiguous_error_convention,
-                             method->getName());
+            method->diagnose(diag::objc_ambiguous_error_convention, method);
             declProvidingInheritedErrorConvention->diagnose(
                 diag::objc_ambiguous_error_convention_candidate,
-                declProvidingInheritedErrorConvention->getName());
+                declProvidingInheritedErrorConvention);
             reqMethod->diagnose(diag::objc_ambiguous_error_convention_candidate,
-                                reqMethod->getName());
+                                reqMethod);
             break;
           }
 

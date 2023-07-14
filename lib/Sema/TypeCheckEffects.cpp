@@ -1944,7 +1944,7 @@ public:
           if (var->isAsyncLet()) {
             Diags.diagnose(
                 e->getLoc(), diag::async_let_in_illegal_context,
-                var->getName(), static_cast<unsigned>(getKind()));
+                var, static_cast<unsigned>(getKind()));
             return;
           }
         }
@@ -2880,8 +2880,7 @@ private:
             if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
               if (var->isAsyncLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
-                                   diag::async_let_without_await,
-                                   var->getName());
+                                   diag::async_let_without_await, var);
                 continue;
               }
             }

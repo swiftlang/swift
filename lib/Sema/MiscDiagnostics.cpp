@@ -5295,7 +5295,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
               !storage->isSetterAccessibleFrom(DC)) {
             Ctx.Diags.diagnose(keyPathExpr->getLoc(),
                                swift::diag::expr_deprecated_writable_keypath,
-                               storage->getName());
+                               storage);
           }
         }
       }

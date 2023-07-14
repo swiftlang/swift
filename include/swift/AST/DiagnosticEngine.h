@@ -42,8 +42,10 @@ namespace swift {
   class Decl;
   class DeclAttribute;
   class DiagnosticEngine;
+  class FuncDecl;
   class GeneratedSourceInfo;
   class SourceManager;
+  class TypeAliasDecl;
   class ValueDecl;
   class SourceFile;
 

@@ -1929,7 +1929,7 @@ public:
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         auto &DE = Context.Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getName(), VD->getBaseIdentifier().str());
+                    VD, VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
@@ -2623,7 +2623,7 @@ public:
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
-      NTD->diagnose(diag::unsupported_nested_protocol, NTD->getName());
+      NTD->diagnose(diag::unsupported_nested_protocol, NTD);
       NTD->setInvalid();
       return;
     }
@@ -2631,11 +2631,10 @@ public:
     // We don't support nested types in protocols.
     if (auto proto = DC->getSelfProtocolDecl()) {
       if (DC->getExtendedProtocolDecl()) {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension,
-                      NTD->getName(), proto->getName());
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
+                      proto);
       } else {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol,
-                      NTD->getName(), proto->getName());
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
       }
     }
 
@@ -2644,11 +2643,10 @@ public:
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-          NTD->diagnose(diag::unsupported_type_nested_in_generic_function,
-                        NTD->getName(), AFD->getName());
+          NTD->diagnose(diag::unsupported_type_nested_in_generic_function, NTD,
+                        AFD);
         } else {
-          NTD->diagnose(diag::unsupported_type_nested_in_generic_closure,
-                        NTD->getName());
+          NTD->diagnose(diag::unsupported_type_nested_in_generic_closure, NTD);
         }
       }
     }
@@ -3381,8 +3379,8 @@ public:
         auto isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
         // We did not find 'Self'. Complain.
         FD->diagnose(diag::operator_in_unrelated_type,
-                     FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
-                     FD->getName());
+                     FD->getDeclContext()->getDeclaredInterfaceType(),
+                     isProtocol, FD);
       }
     }
 

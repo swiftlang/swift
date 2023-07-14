@@ -456,7 +456,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
         if (classDcl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
           diags.diagnose(decl->getLoc(),
                          diag::designated_init_in_extension_no_convenience_tip,
-                         nominal->getName());
+                         nominal);
 
           // despite having reported it as an error, say that it is designated.
           return CtorInitializerKind::Designated;
@@ -465,12 +465,11 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
           // tailor the diagnostic to not mention `convenience`
           diags.diagnose(decl->getLoc(),
                          diag::designated_init_in_extension_no_convenience_tip,
-                         nominal->getName());
+                         nominal);
 
         } else {
           diags.diagnose(decl->getLoc(),
-                             diag::designated_init_in_extension,
-                             nominal->getName())
+                             diag::designated_init_in_extension, nominal)
                  .fixItInsert(decl->getLoc(), "convenience ");
         }
 
@@ -947,8 +946,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
                        "static ");
     } else {
       auto *NTD = cast<NominalTypeDecl>(dc->getAsDecl());
-      decl->diagnose(diag::nonstatic_operator_in_nominal, operatorName,
-                     NTD->getName())
+      decl->diagnose(diag::nonstatic_operator_in_nominal, operatorName, NTD)
           .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
                        "static ");
     }
@@ -2690,7 +2688,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     // Once that's through, this will only fire during circular validation.
     if (VD->hasInterfaceType() &&
         !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
-      VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
+      VD->diagnose(diag::variable_bound_by_no_pattern, VD);
     }
 
     VD->getParentPattern()->setType(ErrorType::get(Context));

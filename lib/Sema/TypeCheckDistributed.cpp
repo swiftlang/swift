@@ -216,13 +216,10 @@ static bool checkAdHocRequirementAccessControl(
     return false;
   }
 
-  func->diagnose(diag::witness_not_accessible_type,
-                 diag::RequirementKind::Func,
-                 func->getName(),
-                 /*isSetter=*/false,
-                 /*requiredAccess=*/AccessLevel::Public,
-                 AccessLevel::Public,
-                 proto->getName());
+  func->diagnose(diag::witness_not_accessible_type, diag::RequirementKind::Func,
+                 func, /*isSetter=*/false,
+                 /*requiredAccess=*/AccessLevel::Public, AccessLevel::Public,
+                 proto);
       return true;
 }
 

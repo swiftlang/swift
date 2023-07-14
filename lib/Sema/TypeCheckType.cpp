@@ -247,7 +247,7 @@ Type TypeResolution::resolveDependentMemberType(Type baseTy, DeclContext *DC,
     // We have a single type result. Suggest it.
     ctx.Diags
         .diagnose(repr->getNameLoc(), diag::invalid_member_type_suggest, baseTy,
-                  repr->getNameRef(), singleType->getBaseName())
+                  repr->getNameRef(), singleType)
         .fixItReplace(repr->getNameLoc().getSourceRange(),
                       singleType->getBaseName().userFacingName());
 
@@ -1220,8 +1220,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
-  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl),
-                     typeDecl->getName(), parentTy);
+  ctx.Diags.diagnose(loc, diagCode, typeDecl, parentTy);
 }
 
 /// Returns a valid type or ErrorType in case of an error.
@@ -1342,7 +1341,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
       diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                     first->getBaseName(), first->getFormalAccess());
+                     first, first->getFormalAccess());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1419,7 +1418,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
     diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                   first->getBaseName(), first->getFormalAccess());
+                   first, first->getFormalAccess());
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
@@ -1453,7 +1452,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       auto member = results[0];
       diags
           .diagnose(repr->getNameLoc(), diag::invalid_member_reference,
-                    member->getDescriptiveKind(), member->getName(), parentType)
+                    member, parentType)
           .highlight(parentRange);
     } else {
       const auto kind = describeDeclOfType(parentType);

@@ -504,8 +504,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
         auto declAccess = isExplicit
                               ? VD->getFormalAccess()
                               : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = D->diagnose(diag::global_actor_access, declAccess,
-                                D->getDescriptiveKind(), VD->getName(),
+        auto diag = D->diagnose(diag::global_actor_access, declAccess, VD,
                                 diagAccessLevel, globalActorDecl->getName());
         highlightOffendingType(diag, complainRepr);
         noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
@@ -2324,8 +2323,7 @@ public:
 
     auto &DE = PGD->getASTContext().Diags;
     auto diag =
-        DE.diagnose(diagLoc, diag::decl_from_hidden_module_name,
-                    PGD->getDescriptiveKind(), PGD->getName(),
+        DE.diagnose(diagLoc, diag::decl_from_hidden_module, PGD,
                     static_cast<unsigned>(ExportabilityReason::General), M->getName(),
                     static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)
                     );

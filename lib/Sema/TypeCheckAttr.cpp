@@ -585,7 +585,7 @@ static void emitFixItIBActionRemoveAsync(ASTContext &ctx, const FuncDecl &FD) {
     SourceLoc endLoc =
         returnType.isValid() ? returnType.getEnd() : FD.getAsyncLoc();
     ctx.Diags
-        .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+        .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, &FD)
         .fixItReplace(
             SourceRange(FD.getSourceRangeIncludingAttrs().Start, endLoc),
             replacement);
@@ -613,7 +613,7 @@ static void emitFixItIBActionRemoveAsync(ASTContext &ctx, const FuncDecl &FD) {
   replacement += " }\n}";
 
   ctx.Diags
-      .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+      .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, &FD)
       .fixItReplace(SourceRange(FD.getSourceRangeIncludingAttrs().Start,
                                 FD.getBody()->getRBraceLoc()),
                     replacement);
@@ -1207,7 +1207,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
         if (property->isLayoutExposedToClients() && !NTD->isSPI()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
-                                VD->getName());
+                                VD);
         }
       }
     }
@@ -2031,8 +2031,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     hasExpose = NMT->getAttrs().hasAttribute<ExposeAttr>();
   }
   if (!hasExpose) {
-    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl,
-             decl->getName());
+    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl, decl);
   }
 
   // Verify that the declaration is exposable.
@@ -2604,7 +2603,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
             context.getBackDeployedConcurrencyAvailability());
     context.Diags.diagnose(attr->getLocation(),
                            diag::attr_MainType_without_main,
-                           nominal->getBaseName(), hasAsyncSupport);
+                           nominal, hasAsyncSupport);
     attr->setInvalid();
     return nullptr;
   }
@@ -3626,7 +3625,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   if (!R) {
     diagnose(attr->getLocation(),
              diag::implements_attr_protocol_lacks_member,
-             PD->getName(), attr->getMemberName())
+             PD, attr->getMemberName())
       .highlight(attr->getMemberNameLoc().getSourceRange());
     return;
   }
@@ -3637,16 +3636,14 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
     if (!OtherPD->inheritsFrom(PD)) {
       diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
+               diag::implements_attr_protocol_not_conformed_to, NTD, PD)
         .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     }
   } else {
     SmallVector<ProtocolConformance *, 2> conformances;
     if (!NTD->lookupConformance(PD, conformances)) {
       diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
+               diag::implements_attr_protocol_not_conformed_to, NTD, PD)
         .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     }
   }

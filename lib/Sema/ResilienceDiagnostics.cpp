@@ -170,7 +170,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
     auto reason = where.getExportabilityReason();
     ctx.Diags
         .diagnose(loc, diag::typealias_desugars_to_type_from_hidden_module,
-                  TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
+                  TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
         .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
@@ -179,7 +179,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
     ctx.Diags
         .diagnose(loc,
                   diag::inlinable_typealias_desugars_to_type_from_hidden_module,
-                  TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
+                  TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
         .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,

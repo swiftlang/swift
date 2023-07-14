@@ -2017,7 +2017,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
   for (const auto &choicePair : choicesByLabel) {
     auto diag = emitDiagnosticAt(
         expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
-        choicePair.first.empty(), choicePair.second->getName());
+        choicePair.first.empty(), choicePair.second);
     swift::fixItEncloseTrailingClosure(getASTContext(), diag, callExpr,
                                        choicePair.first);
   }
@@ -2644,7 +2644,7 @@ bool ContextualFailure::diagnoseAsError() {
     auto fnType = fromType->getAs<FunctionType>();
     if (!fnType) {
       emitDiagnostic(diag::expected_result_in_contextual_member,
-                     choice->getName(), fromType, toType);
+                     choice, fromType, toType);
       return true;
     }
 
@@ -2680,16 +2680,16 @@ bool ContextualFailure::diagnoseAsError() {
       if (fnType->getResult()->isEqual(toType)) {
         auto diag = emitDiagnostic(
                       diag::expected_parens_in_contextual_member_type,
-                      choice->getName(), fnType->getResult());
+                      choice, fnType->getResult());
         applyFixIt(diag);
       } else {
         auto diag = emitDiagnostic(diag::expected_parens_in_contextual_member,
-                                   choice->getName());
+                                   choice);
         applyFixIt(diag);
       }
     } else {
       emitDiagnostic(diag::expected_argument_in_contextual_member,
-                     choice->getName(), params.front().getPlainType());
+                     choice, params.front().getPlainType());
     }
 
     return true;
@@ -4901,7 +4901,7 @@ bool InvalidDynamicInitOnMetatypeFailure::diagnoseAsError() {
                  BaseType->getMetatypeInstanceType())
       .highlight(BaseRange);
   emitDiagnosticAt(Init, diag::note_nonrequired_initializer, Init->isImplicit(),
-                   Init->getName());
+                   Init);
   return true;
 }
 
@@ -5362,10 +5362,9 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   if (!funcType)
     return false;
 
-  auto name = decl->getBaseName();
   auto diagnostic =
       emitDiagnostic(diag::cannot_convert_single_tuple_into_multiple_arguments,
-                     decl->getDescriptiveKind(), name, name.isSpecial(),
+                     decl, decl->getBaseName().isSpecial(),
                      funcType->getNumParams(), isa<TupleExpr>(argExpr));
 
   // If argument is a literal tuple, let's suggest removal of parentheses.
@@ -5990,7 +5989,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
                      CD->getResultInterfaceType(), accessLevel)
         .highlight(nameLoc.getSourceRange());
   } else {
-    emitDiagnosticAt(loc, diag::candidate_inaccessible, Member->getBaseName(),
+    emitDiagnosticAt(loc, diag::candidate_inaccessible, Member,
                      accessLevel)
         .highlight(nameLoc.getSourceRange());
   }
@@ -6060,19 +6059,19 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_static_member, getName(),
+  emitDiagnostic(diag::expr_keypath_static_member, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
 
 bool InvalidEnumCaseRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_enum_case, getName(),
+  emitDiagnostic(diag::expr_keypath_enum_case, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
 
 bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_mutating_getter, getName(),
+  emitDiagnostic(diag::expr_keypath_mutating_getter, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
@@ -6435,7 +6434,7 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
     return true;
 
   if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
-    emitDiagnosticAt(SD, diag::note_call_to_subscript, SD->getName());
+    emitDiagnosticAt(SD, diag::note_call_to_subscript, SD);
     return true;
   }
 
@@ -6446,7 +6445,7 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
       emitDiagnosticAt(AFD,
                        AFD->isOperator() ? diag::note_call_to_operator
                                          : diag::note_call_to_func,
-                       AFD->getName());
+                       AFD);
     }
     return true;
   }
@@ -7547,7 +7546,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
       if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
         auto diagnostic =
             emitDiagnostic(diag::unexpected_arguments_in_enum_case,
-                           enumCase->getBaseIdentifier());
+                           enumCase);
         removeParensFixIt(diagnostic);
         return true;
       }
@@ -7601,7 +7600,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   auto *argExpr = getArgExpr();
   emitDiagnosticAt(
       argExpr->getLoc(), diag::ephemeral_pointer_argument_conversion_note,
-      getArgType(), getParamType(), getCallee(), getCalleeFullName())
+      getArgType(), getParamType(), getCallee())
       .highlight(argExpr->getSourceRange());
 
   // Then try to find a suitable alternative.
@@ -7740,11 +7739,11 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   auto *argExpr = getArgExpr();
   if (isa<InOutExpr>(argExpr)) {
     emitDiagnosticAt(argExpr->getLoc(), diag::cannot_use_inout_non_ephemeral,
-                     argDesc, getCallee(), getCalleeFullName())
+                     argDesc, getCallee())
         .highlight(argExpr->getSourceRange());
   } else {
     emitDiagnosticAt(argExpr->getLoc(), diag::cannot_pass_type_to_non_ephemeral,
-                     getArgType(), argDesc, getCallee(), getCalleeFullName())
+                     getArgType(), argDesc, getCallee())
         .highlight(argExpr->getSourceRange());
   }
   emitSuggestionNotes();
@@ -7807,7 +7806,7 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnosticAt(decl,
                        diag::cannot_convert_candidate_result_to_contextual_type,
-                       decl->getName(), getFromType(), getToType());
+                       decl, getFromType(), getToType());
       return true;
     }
   }
@@ -8132,7 +8131,7 @@ bool AbstractRawRepresentableFailure::diagnoseAsNote() {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       diagnostic.emplace(emitDiagnosticAt(
           decl, diag::cannot_convert_candidate_result_to_contextual_type,
-          decl->getName(), ExpectedType, RawReprType));
+          decl, ExpectedType, RawReprType));
     }
   } else if (auto argConv =
                  locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
@@ -8471,7 +8470,7 @@ bool ReferenceToInvalidDeclaration::diagnoseAsError() {
   // If no errors have been emitted yet, let's emit one
   // about reference to an invalid declaration.
 
-  emitDiagnostic(diag::reference_to_invalid_decl, decl->getName());
+  emitDiagnostic(diag::reference_to_invalid_decl, decl);
   emitDiagnosticAt(decl, diag::decl_declared_here, decl);
   return true;
 }

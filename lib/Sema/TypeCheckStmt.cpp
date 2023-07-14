@@ -1725,7 +1725,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
           .highlight(E->getSourceRange());
       ctx.Diags
-          .diagnose(ctor->getLoc(), diag::make_init_failable, ctor->getName())
+          .diagnose(ctor->getLoc(), diag::make_init_failable, ctor)
           .fixItInsertAfter(ctor->getLoc(), "?");
       RS->setResult(nullptr);
       return RS;
@@ -1971,7 +1971,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         // Translate calls to implicit functions to their user-facing names
         if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
             callee->getBaseName() == ctx.Id_derived_struct_equals) {
-          DE.diagnose(fn->getLoc(), diag::expression_unused_result_operator,
+          DE.diagnose(fn->getLoc(),
+                      diag::expression_unused_result_operator_name,
                    ctx.Id_EqualsOperator)
             .highlight(SR1).highlight(SR2);
           return;
@@ -1982,7 +1983,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       if (callee->getName().isOperator())
         diagID = diag::expression_unused_result_operator;
       
-      DE.diagnose(fn->getLoc(), diagID, callee->getName())
+      DE.diagnose(fn->getLoc(), diagID, callee)
         .highlight(SR1).highlight(SR2);
     } else
       DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,

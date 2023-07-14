@@ -519,8 +519,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 1;
       else
         whichKind = 2;
-      var->diagnose(diag::property_with_wrapper_in_bad_context,
-                    var->getName(), whichKind, var->getDescriptiveKind())
+      var->diagnose(diag::property_with_wrapper_in_bad_context, var, whichKind)
         .highlight(attr->getRange());
 
       continue;
