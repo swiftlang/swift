@@ -327,3 +327,124 @@ actor A_Sendable {
         await a.foo(captures_self)
     }
 }
+
+@available(SwiftStdlib 5.1, *)
+func basic_loopiness(a : A, b : Bool) async {
+    let ns = NonSendable()
+
+    while (b) {
+        //TODO: remove duplicate warnings here and in following test cases
+        await a.foo(ns) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    }
+}
+
+@available(SwiftStdlib 5.1, *)
+func basic_loopiness_unsafe(a : A, b : Bool) async {
+    var ns0 = NonSendable()
+    var ns1 = NonSendable()
+    var ns2 = NonSendable()
+    var ns3 = NonSendable()
+
+    //should merge all vars
+    while (b) {
+        (ns0, ns1, ns2, ns3) = (ns1, ns2, ns3, ns0)
+    }
+
+    await a.foo(ns0)
+    await a.foo(ns3) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+}
+
+@available(SwiftStdlib 5.1, *)
+func basic_loopiness_safe(a : A, b : Bool) async {
+    var ns0 = NonSendable()
+    var ns1 = NonSendable()
+    var ns2 = NonSendable()
+    var ns3 = NonSendable()
+
+    //should keep ns0 and ns3 separate
+    while (b) {
+        (ns0, ns1, ns2, ns3) = (ns1, ns0, ns3, ns2)
+    }
+
+    await a.foo(ns0)
+    await a.foo(ns3)
+}
+
+struct StructBox {
+    var contents : NonSendable
+
+    init() {
+        contents = NonSendable()
+    }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test_struct_assign_doesnt_merge(a : A, b : Bool) async {
+    let ns0 = NonSendable()
+    let ns1 = NonSendable()
+
+    //this should merge ns0 and ns1
+    var box = StructBox()
+    box.contents = ns0
+    box.contents = ns1
+
+    await a.foo(ns0)
+    await a.foo(ns1)
+}
+
+class ClassBox {
+    var contents : NonSendable
+
+    init() {
+        contents = NonSendable()
+    }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test_class_assign_merges(a : A, b : Bool) async {
+    let ns0 = NonSendable()
+    let ns1 = NonSendable()
+
+    //this should merge ns0 and ns1
+    //TODO: check out the warning here more
+    var box = ClassBox() //expected-warning {{}}
+    box.contents = ns0
+    box.contents = ns1
+
+    await a.foo(ns0)
+    await a.foo(ns1) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+}
+
+@available(SwiftStdlib 5.1, *)
+func test_stack_assign_doesnt_merge(a : A, b : Bool) async {
+    let ns0 = NonSendable()
+    let ns1 = NonSendable()
+
+    //this should NOT merge ns0 and ns1
+    var contents : NonSendable
+    contents = ns0
+    contents = ns1
+
+    foo_noniso(contents) //must use var to avoid warning
+
+    await a.foo(ns0)
+    await a.foo(ns1)
+}
+
+@available(SwiftStdlib 5.1, *)
+func test_stack_assign_and_capture_merges(a : A, b : Bool) async {
+    let ns0 = NonSendable()
+    let ns1 = NonSendable()
+
+    //this should NOT merge ns0 and ns1
+    var contents = NonSendable()
+
+    let closure = { print(contents) }
+    foo_noniso(closure) //must use let to avoid warning
+
+    contents = ns0
+    contents = ns1
+
+    await a.foo(ns0)
+    await a.foo(ns1) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+}

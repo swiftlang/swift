@@ -6,6 +6,7 @@
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -58,33 +59,96 @@ class PartitionOpTranslator {
   ProtocolDecl *sendableProtocol;
 
   // nodeIDMap stores unique IDs for all SILNodes corresponding to
-  // non-Sendable values. Implicit conversion from SILValue used pervasively
+  // non-Sendable values. Implicit conversion from SILValue used pervasively.
+  // ensure simplifyVal is called on SILValues before entering into this map
   llvm::DenseMap<const SILNode *, unsigned> nodeIDMap;
   unsigned nextNodeID = 0;
 
+  // some values that AccessStorage claims are uniquely identified are still
+  // captured (e.g. in a closure). This set is initialized upon
+  // PartitionOpTranslator construction to store those values.
+  // ensure simplifyVal is called on SILValues before entering into this map
+  //
+  // TODO: we could remember not just which values fit this description,
+  //       but at what points in function flow they do, this would be more
+  //       permissive, but I'm avoiding implementing it in case existing
+  //       utilities would make it easier than handrolling
+  std::set<SILValue> capturedUIValues;
+
+  void initCapturedUIValues() {
+    for (const SILBasicBlock &block: *function) {
+      for (const SILInstruction &inst: block) {
+        if (isApplyInst(inst)) {
+          // add all nonsendable, uniquely identified arguments to applications
+          // to capturedUIValues, because applications capture them
+          for (SILValue val : inst.getOperandValues()) {
+            if (isNonSendable(val) && isUniquelyIdentified(val))
+              capturedUIValues.insert(simplifyVal(val));
+          }
+        }
+      }
+    }
+  }
+
+public:
+  // create a new PartitionOpTranslator, all that's needed is the underlying
+  // SIL function
+  PartitionOpTranslator(SILFunction *function) :
+                                                 function(function),
+                                                 sendableProtocol(function->getASTContext()
+                                                                      .getProtocol(KnownProtocolKind::Sendable)) {
+    assert(sendableProtocol && "PartitionOpTranslators should only be created "
+                               "in contexts in which the availability of the "
+                               "Sendable protocol has already been checked.");
+    initCapturedUIValues();
+    LLVM_DEBUG(
+      llvm::dbgs() << "Captured Uniquely Identified addresses for "
+                     << function->getName() << ":\n";
+      for (SILValue val : capturedUIValues)
+            val->dump();
+
+    );
+  }
+
+private:
+  static inline bool isAddress(SILValue val) {
+    return val->getType().isAddress();
+  }
+
+  static bool isApplyInst(const SILInstruction &inst) {
+    return isa<ApplyInst, TryApplyInst, PartialApplyInst, BuiltinInst>(inst);
+  }
+
   AccessStorage getAccessStorageFromAddr(SILValue val) {
-    assert(val->getType().isAddress());
+    assert(isAddress(val));
     auto accessStorage = AccessStorage::compute(val);
     if (accessStorage) {
-      if (auto initExistential = dyn_cast_or_null<InitExistentialAddrInst>(
-          accessStorage.getRoot().getDefiningInstruction()))
+      auto definingInst = accessStorage.getRoot().getDefiningInstruction();
+      if (definingInst &&
+          isa<InitExistentialAddrInst, CopyValueInst>(definingInst))
         // look through these because AccessStorage does not
-        return getAccessStorageFromAddr(initExistential->getOperand());
+        return getAccessStorageFromAddr(definingInst->getOperand(0));
     }
     return accessStorage;
   }
 
   bool isUniquelyIdentified(SILValue val) {
-    if (!val->getType().isAddress())
+    val = simplifyVal(val);
+    if (!isAddress(val))
       return false;
-    if (auto accessStorage = getAccessStorageFromAddr(val)) {
-      return accessStorage.isUniquelyIdentified();
-    }
+    if (auto accessStorage = getAccessStorageFromAddr(val))
+      return accessStorage.isUniquelyIdentified() &&
+             !capturedUIValues.count(simplifyVal(val));
     return false;
   }
 
+  // simplifyVal reduces an address-typed SILValue to the root SILValue
+  // that it was derived from, reducing the set of values that must be
+  // reasoned about by rendering two values that are projections/aliases the
+  // same.
+  // TODO: make usage of this more principled with a wrapper type SimplSILValue
   SILValue simplifyVal(SILValue val) {
-    if (!val->getType().isAddress())
+    if (!isAddress(val))
       return getUnderlyingObject(val);
     if (auto accessStorage = getAccessStorageFromAddr(val)) {
       return accessStorage.getRoot();
@@ -209,17 +273,6 @@ class PartitionOpTranslator {
   }
 
 public:
-  // create a new PartitionOpTranslator, all that's needed is the underlying
-  // SIL function
-  PartitionOpTranslator(SILFunction *function) :
-      function(function),
-      sendableProtocol(function->getASTContext()
-                           .getProtocol(KnownProtocolKind::Sendable)) {
-    assert(sendableProtocol && "PartitionOpTranslators should only be created "
-                               "in contexts in which the availability of the "
-                               "Sendable protocol has already been checked.");
-  }
-
   // Create a partition that places all arguments from this function,
   // including self if available, into the same region, ensuring those
   // arguments get IDs in doing so. This Partition will be used as the
@@ -352,17 +405,22 @@ public:
   }
   // ===========================================================================
 
+  // used to index the translations of SILInstructions performed
+  int translationIndex = 0;
+
   // Some SILInstructions contribute to the partition of non-Sendable values
   // being analyzed. translateSILInstruction translate a SILInstruction
   // to its effect on the non-Sendable partition, if it has one.
   //
   // The current pattern of
   std::vector<PartitionOp> translateSILInstruction(SILInstruction *instruction) {
+    translationIndex++;
     currentInstruction = instruction;
 
     // The following instructions are treated as assigning their result to a
     // fresh region.
-    if (isa<AllocRefInst,
+    if (isa<AllocBoxInst,
+            AllocRefInst,
             AllocStackInst,
             LiteralInst>(instruction)) {
       return translateSILAssignFresh(instruction->getResult(0));
@@ -410,7 +468,7 @@ public:
     }
 
     // Handle applications
-    if (isa<ApplyInst, PartialApplyInst>(instruction)) {
+    if (isApplyInst(*instruction)) {
       return translateSILApply(instruction);
     }
 
@@ -427,6 +485,11 @@ public:
     if (auto *returnInst = dyn_cast<ReturnInst>(instruction)) {
       return translateSILRequire(returnInst->getOperand());
     }
+
+    LLVM_DEBUG(
+        llvm::dbgs() << "WARN: unhandled instruction kind "
+                     << getSILInstructionName(instruction->getKind());
+    );
 
     return {};
   }
@@ -454,8 +517,12 @@ public:
         partitionOps.push_back(op);
 
         LLVM_DEBUG(
+            llvm::dbgs() << " ┌─┬─╼";
             instruction.dump();
-            llvm::dbgs() << " └───╼ ";
+            llvm::dbgs() << " │ └─╼  ";
+            instruction.getLoc().getSourceLoc().printLineAndColumn(llvm::dbgs(), function->getASTContext().SourceMgr);
+            llvm::dbgs() << " │ translation #" << translationIndex;
+            llvm::dbgs() << "\n └─────╼ ";
             op.dump();
         );
       }
@@ -527,7 +594,8 @@ class BlockPartitionState {
     for (auto &partitionOp : blockPartitionOps) {
       workingPartition.apply(partitionOp, handleFailure,
                              translator.getNonConsumables(),
-                             handleConsumeNonConsumable);
+                             handleConsumeNonConsumable,
+                             /*reviveAfterFailure=*/ false);
     }
   }
 
