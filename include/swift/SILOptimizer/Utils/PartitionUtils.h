@@ -86,21 +86,37 @@ public:
   }
 
   void dump() const LLVM_ATTRIBUTE_USED {
+    raw_ostream &os = llvm::errs();
     switch (OpKind) {
     case PartitionOpKind::Assign:
-      llvm::dbgs() << "assign %" << OpArgs[0] << " = %" << OpArgs[1] << "\n";
+      os.changeColor(llvm::raw_ostream::CYAN, true);
+      os << "assign";
+      os.resetColor();
+      os << " %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::AssignFresh:
-      llvm::dbgs() << "assign_fresh %" << OpArgs[0] << "\n";
+      os.changeColor(llvm::raw_ostream::GREEN, true);
+      os << "assign_fresh";
+      os.resetColor();
+      os << " %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Consume:
-      llvm::dbgs() << "consume %" << OpArgs[0] << "\n";
+      os.changeColor(llvm::raw_ostream::RED, true);
+      os << "consume";
+      os.resetColor();
+      os << " %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Merge:
-      llvm::dbgs() << "merge %" << OpArgs[0] << " with %" << OpArgs[1] << "\n";
+      os.changeColor(llvm::raw_ostream::BLUE, true);
+      os << "merge";
+      os.resetColor();
+      os << " %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::Require:
-      llvm::dbgs() << "require %" << OpArgs[0] << "\n";
+      os.changeColor(llvm::raw_ostream::YELLOW, true);
+      os << "require";
+      os.resetColor();
+      os << " %%" << OpArgs[0] << "\n";
       break;
     }
   }
@@ -160,10 +176,10 @@ private:
       if (label < 0) continue;
 
       // this label should not exceed fresh_label
-      if (label >= fresh_label) return fail(i, 0);
+      if ((unsigned) label >= fresh_label) return fail(i, 0);
 
       // the label of a region should be at most as large as each index in it
-      if (i < label) return fail(i, 1);
+      if ((unsigned) label > i) return fail(i, 1);
 
       // each region label should refer to an index in that region
       if (labels[label] != label) return fail(i, 2);
@@ -299,10 +315,21 @@ public:
       PartitionOp op,
       llvm::function_ref<void(const PartitionOp&, unsigned)>
       handleFailure = [](const PartitionOp&, unsigned) {},
-      std::vector<unsigned> nonconsumables = {},
+
+      std::vector<unsigned>
+          nonconsumables = {},
+
       llvm::function_ref<void(const PartitionOp&, unsigned)>
-      handleConsumeNonConsumable = [](const PartitionOp&, unsigned) {}
+      handleConsumeNonConsumable = [](const PartitionOp&, unsigned) {},
+
+      bool reviveAfterFailure = false
   ) {
+    auto handleFailureAndRevive =
+        [&](const PartitionOp& partitionOp, unsigned consumedVal) {
+          if (reviveAfterFailure)
+            horizontalUpdate(labels, consumedVal, fresh_label++);
+          handleFailure(partitionOp, consumedVal);
+        };
     switch (op.OpKind) {
     case PartitionOpKind::Assign:
       assert(op.OpArgs.size() == 2 &&
@@ -311,7 +338,7 @@ public:
              "Assign PartitionOp's source argument should be already tracked");
       // if assigning to a missing region, handle the failure
       if (labels[op.OpArgs[1]] < 0)
-        handleFailure(op, op.OpArgs[1]);
+        handleFailureAndRevive(op, op.OpArgs[1]);
 
       labels[op.OpArgs[0]] = labels[op.OpArgs[1]];
 
@@ -322,8 +349,6 @@ public:
     case PartitionOpKind::AssignFresh:
       assert(op.OpArgs.size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
-      assert(!labels.count(op.OpArgs[0]) &&
-             "AssignFresh PartitionOp's argument should NOT already be tracked");
 
       // map index op.OpArgs[0] to a fresh label
       labels[op.OpArgs[0]] = fresh_label++;
@@ -337,7 +362,7 @@ public:
 
       // if attempting to consume a consumed region, handle the failure
       if (labels[op.OpArgs[0]] < 0)
-        handleFailure(op, op.OpArgs[0]);
+        handleFailureAndRevive(op, op.OpArgs[0]);
 
       // mark region as consumed
       horizontalUpdate(labels, op.OpArgs[0], -1);
@@ -360,11 +385,12 @@ public:
              "Merge PartitionOp should be passed 2 arguments");
       assert(labels.count(op.OpArgs[0]) && labels.count(op.OpArgs[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
+
       // if attempting to merge a consumed region, handle the failure
       if (labels[op.OpArgs[0]] < 0)
-          handleFailure(op, op.OpArgs[0]);
+        handleFailureAndRevive(op, op.OpArgs[0]);
       if (labels[op.OpArgs[1]] < 0)
-          handleFailure(op, op.OpArgs[1]);
+        handleFailureAndRevive(op, op.OpArgs[1]);
 
       merge(op.OpArgs[0], op.OpArgs[1]);
       break;
@@ -374,7 +400,7 @@ public:
       assert(labels.count(op.OpArgs[0]) &&
              "Require PartitionOp's argument should already be tracked");
       if (labels[op.OpArgs[0]] < 0)
-        handleFailure(op, op.OpArgs[0]);
+        handleFailureAndRevive(op, op.OpArgs[0]);
     }
 
     assert(is_canonical_correct());
@@ -406,9 +432,7 @@ public:
       }
       llvm::dbgs() << (label < 0 ? "}" : ")");
     }
-    llvm::dbgs() << "] | ";
-
-    dump_labels();
+    llvm::dbgs() << "]";
   }
 };
 }
