@@ -1642,6 +1642,14 @@ namespace {
       if (!isAssignmentToSelfParamInInit)
         return false;
 
+      // Properties declared in a superclass cannot be initialized via
+      // init accessor because `super.init()` should always precede
+      // any such property reference which means that it can only be
+      // mutated by a setter call.
+      if (varDecl->getDeclContext()->getSelfNominalTypeDecl() !=
+          fnDecl->getDeclContext()->getSelfNominalTypeDecl())
+        return false;
+
       auto *initAccessor = varDecl->getAccessor(AccessorKind::Init);
       if (!initAccessor)
         return false;

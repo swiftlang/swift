@@ -2,6 +2,7 @@
 
 // REQUIRES: asserts
 
+
 struct Test1 {
   var _a: Int
   var _b: String
@@ -262,5 +263,29 @@ func test_default_inits() {
     // CHECK: [[Y_DEFAULT:%.*]] = function_ref @$s23assign_or_init_lowering18test_default_initsyyF5Test4L_C1ySSvpfi : $@convention(thin) () -> @owned String
     // CHECK-NEXT: [[Y_VALUE:%.*]] = apply [[Y_DEFAULT]]() : $@convention(thin) () -> @owned String
     // CHECK: assign_or_init [init] self %0 : $Test4, value [[Y_VALUE]] : $String, init {{.*}} : $@convention(thin) (@owned String) -> @out String, set undef : $@convention(thin) (@owned String) -> @out String
+  }
+}
+
+func test_handling_of_superclass_properties() {
+  class Entity {
+    var _age: Int
+    var age: Int = 0 {
+      @storageRestrictions(initializes: _age)
+      init { _age = newValue }
+      get { _age }
+      set { _age = newValue }
+    }
+  }
+
+  class Person : Entity {
+    // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering38test_handling_of_superclass_propertiesyyF6PersonL_C3ageADSi_tcfc : $@convention(method) (Int, @owned Person) -> @owned Person
+    // CHECK: [[SELF:%.*]] = load [copy] %2 : $*Person
+    // CHECK-NEXT: [[SELF_AS_ENTITY:%.*]] = upcast [[SELF]] : $Person to $Entity
+    // CHECK-NEXT: [[AGE_SETTER:%.*]] = class_method [[SELF_AS_ENTITY]] : $Entity, #<abstract function>Entity.age!setter : (Entity) -> (Int) -> (), $@convention(method) (Int, @guaranteed Entity) -> ()
+    // CHECK-NEXT: {{.*}} = apply [[AGE_SETTER]](%0, [[SELF_AS_ENTITY]]) : $@convention(method) (Int, @guaranteed Entity) -> ()
+    init(age: Int) {
+      super.init()
+      self.age = age
+    }
   }
 }
