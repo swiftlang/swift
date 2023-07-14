@@ -4622,8 +4622,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
 }
 
 static bool shouldBlockImplicitDynamic(Decl *D) {
-  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
-      D->getAttrs().hasAttribute<SILGenNameAttr>() ||
+  if (D->getAttrs().hasAttribute<SILGenNameAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
       D->getAttrs().hasAttribute<InlinableAttr>())
     return true;
