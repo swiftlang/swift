@@ -1577,22 +1577,6 @@ EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)
                                              /*IsLastSegment=*/true,
                                              /*IndentToStrip=*/~0U)) {}
 
-std::pair<unsigned, DeclName>
-swift::getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
-  // This should always be one more than the last AccessorKind supported in
-  // the diagnostics. If you need to change it, change the assertion below as
-  // well.
-  static const unsigned NOT_ACCESSOR_INDEX = 2;
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getName();
-    assert(accessor->isGetterOrSetter());
-    return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
-  }
-
-  return {NOT_ACCESSOR_INDEX, D->getName()};
-}
-
 DeclName
 swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   ASTNode expansionNode = ASTNode::getFromOpaqueValue(info.astNode);

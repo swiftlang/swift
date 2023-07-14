@@ -4406,13 +4406,10 @@ void AttributeChecker::checkBackDeployedAttrs(
 
       if (unavailableAttr->Platform == PlatformKind::none ||
           unavailableAttr->Platform == Attr->Platform) {
-        DeclName name;
-        unsigned accessorKind;
-        std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr,
-                 accessorKind, name, prettyPlatformString(Platform));
+                 VD, prettyPlatformString(Platform));
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
-                 accessorKind, name)
+                 VD)
             .highlight(unavailableAttr->getRange());
         continue;
       }
@@ -4424,15 +4421,11 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (auto availableRangeAttrPair = VD->getSemanticAvailableRangeAttr()) {
       auto availableAttr = availableRangeAttrPair.value().first;
       if (Attr->Version <= availableAttr->Introduced.value()) {
-        DeclName name;
-        unsigned accessorKind;
-        std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, accessorKind, name, prettyPlatformString(Platform),
+                 Attr, VD, prettyPlatformString(Platform),
                  Attr->Version);
         diagnose(availableAttr->AtLoc, diag::availability_introduced_in_version,
-                 accessorKind, name,
-                 prettyPlatformString(availableAttr->Platform),
+                 VD, prettyPlatformString(availableAttr->Platform),
                  *availableAttr->Introduced)
             .highlight(availableAttr->getRange());
         continue;

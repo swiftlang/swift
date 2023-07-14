@@ -3638,14 +3638,13 @@ ERROR(attr_not_on_decl_with_invalid_access_level,none,
       (DeclAttribute, AccessLevel))
 
 ERROR(attr_has_no_effect_decl_not_available_before,none,
-      "'%0' has no effect because %select{getter for |setter for |}1%2 is not "
-      "available before %3 %4",
-      (DeclAttribute, unsigned, DeclName, StringRef, llvm::VersionTuple))
+      "'%0' has no effect because %1 is not "
+      "available before %2 %3",
+      (DeclAttribute, const ValueDecl *, StringRef, llvm::VersionTuple))
 
 ERROR(attr_has_no_effect_on_unavailable_decl,none,
-      "'%0' has no effect because %select{getter for |setter for |}1%2 is "
-      "unavailable on %3",
-      (DeclAttribute, unsigned, DeclName, StringRef))
+      "'%0' has no effect because %1 is unavailable on %2",
+      (DeclAttribute, const ValueDecl *, StringRef))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
@@ -6212,52 +6211,39 @@ NOTE(type_eraser_init_spi,none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
-      "%select{getter for |setter for |}0%1 is unavailable"
-      "%select{ in %3|}2%select{|: %4}4",
-      (unsigned, DeclName, bool, StringRef, StringRef))
-
-WARNING(availability_decl_unavailable_warn, none,
-        "%select{getter for |setter for |}0%1 is unavailable"
-        "%select{ in %3|}2%select{|: %4}4",
-        (unsigned, DeclName, bool, StringRef, StringRef))
+      "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
+      (const ValueDecl *, bool, StringRef, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
-      "%select{getter for |setter for |}0%1 has been "
-      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
-      "'%4'%select{|: %5}5",
-      (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
-
-WARNING(availability_decl_unavailable_rename_warn, none,
-        "%select{getter for |setter for |}0%1 has been "
-        "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
-        "'%4'%select{|: %5}5",
-        (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
+      "%0 has been %select{renamed to|replaced by}1"
+      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3'%select{|: %4}4",
+      (const ValueDecl *, bool, unsigned, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
-     "%select{getter for |setter for |}0%1 has been explicitly marked "
-     "unavailable here", (unsigned, DeclName))
+     "%0 has been explicitly marked unavailable here",
+     (const ValueDecl *))
 
 NOTE(availability_introduced_in_version, none,
-     "%select{getter for |setter for |}0%1 was introduced in %2 %3",
-     (unsigned, DeclName, StringRef, llvm::VersionTuple))
+     "%0 was introduced in %1 %2",
+     (const ValueDecl *, StringRef, llvm::VersionTuple))
 
 NOTE(availability_obsoleted, none,
-     "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
-     (unsigned, DeclName, StringRef, llvm::VersionTuple))
+     "%0 was obsoleted in %1 %2",
+     (const ValueDecl *, StringRef, llvm::VersionTuple))
 
 WARNING(availability_deprecated, Deprecation,
-        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
-        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
+        "%0 %select{is|%select{is|was}3}1 "
+        "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
+        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
 WARNING(availability_deprecated_rename, Deprecation,
-        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2: "
-        "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
-        "'%8'",
-        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, bool,
+        "%0 %select{is|%select{is|was}3}1 "
+        "deprecated%select{| in %2%select{| %4}3}1: "
+        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
+        "'%7'",
+        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
          unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 

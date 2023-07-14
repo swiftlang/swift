@@ -1498,13 +1498,6 @@ namespace swift {
     const StringRef Message;
   };
 
-/// Returns a value that can be used to select between accessor kinds in
-/// diagnostics.
-///
-/// This is correlated with diag::availability_deprecated and others.
-std::pair<unsigned, DeclName>
-getAccessorKindAndNameForDiagnostics(const ValueDecl *D);
-
 /// Retrieve the macro name for a generated source info that represents
 /// a macro expansion.
 DeclName getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info);
