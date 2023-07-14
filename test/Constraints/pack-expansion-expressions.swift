@@ -88,7 +88,7 @@ func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
 func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
   _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
   _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
-  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
+  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
 }
 
 func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
@@ -613,5 +613,24 @@ do {
 
   func caller2<each T>(x: repeat each T) {
     _ = { (repeat test(x: each x)) }()
+  }
+}
+
+// rdar://110401127 - name lookup bug when abstract tuple stored property shadows a global
+do {
+  let c = [false, true]
+  _ = c
+
+  struct ZipCollection<each C> {
+    public let c: (repeat each C)
+
+    func makeTuple() -> (repeat each C) {
+      fatalError()
+    }
+
+    public func f() -> (repeat Optional<each C>) {
+      _ = (repeat each makeTuple())
+      _ = (repeat (each makeTuple()))
+    }
   }
 }
