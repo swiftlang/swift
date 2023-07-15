@@ -1127,8 +1127,6 @@ protected:
 
   AllocStackInst *createStackAllocation(SILValue value);
 
-  SILBasicBlock *getLeastCommonAncestorOfUses(SILValue value);
-
   void createStackAllocationStorage(SILValue value) {
     pass.valueStorageMap.getStorage(value).storageAddress =
         createStackAllocation(value);
@@ -1322,16 +1320,6 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   pass.deleter.forceDelete(allocInst);
 }
 
-SILBasicBlock *
-OpaqueStorageAllocation::getLeastCommonAncestorOfUses(SILValue value) {
-  SILBasicBlock *lca = nullptr;
-  for (auto *use : value->getUses()) {
-    auto *block = use->getParentBlock();
-    lca = lca ? pass.domInfo->findNearestCommonDominator(lca, block) : block;
-  }
-  return lca;
-}
-
 // Create alloc_stack that dominates an owned value \p value. Create
 // jointly-postdominating dealloc_stack instructions.  Nesting will be fixed
 // later.
@@ -1400,7 +1388,8 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
     auto *alloc = maybeAlloc.value();
 
     if (allocsToReposition.contains(alloc)) {
-      auto allocPt = &*getLeastCommonAncestorOfUses(alloc)->begin();
+      auto allocPt =
+          &*pass.domInfo->getLeastCommonAncestorOfUses(alloc)->begin();
       alloc->moveBefore(allocPt);
     }
 
