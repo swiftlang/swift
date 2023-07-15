@@ -24,3 +24,8 @@ module OSObject {
   requires objc
   requires cplusplus
 }
+
+module NSTextCheckingResult {
+  header "NSTextCheckingResult.h"
+  requires objc
+}
