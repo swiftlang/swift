@@ -6774,11 +6774,66 @@ bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
   return false;
 }
 
+static bool legacyIsSafeUseOfCxxMethod(clang::CXXMethodDecl *method) {
+  // The user explicitly asked us to import this method.
+  if (hasUnsafeAPIAttr(method))
+    return true;
+
+  // If it's a static method, it cannot project anything. It's fine.
+  if (method->isOverloadedOperator() || method->isStatic() ||
+      isa<clang::CXXConstructorDecl>(decl))
+    return true;
+
+  if (isForeignReferenceType(method->getReturnType()))
+    return true;
+
+  // If it returns a pointer or reference, that's a projection.
+  if (method->getReturnType()->isPointerType() ||
+      method->getReturnType()->isReferenceType())
+    return false;
+
+  // Check if it's one of the known unsafe methods we currently
+  // mark as safe by default.
+  if (isUnsafeStdMethod(method))
+    return false;
+
+  // Try to figure out the semantics of the return type. If it's a
+  // pointer/iterator, it's unsafe.
+  if (auto returnType = dyn_cast<clang::RecordType>(
+          method->getReturnType().getCanonicalType())) {
+    if (auto cxxRecordReturnType =
+            dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
+      if (isSwiftClassType(cxxRecordReturnType))
+        return true;
+      if (hasIteratorAPIAttr(cxxRecordReturnType) ||
+          isIterator(cxxRecordReturnType)) {
+        return false;
+      }
+
+      // Mark this as safe to help our diganostics down the road.
+      if (!cxxRecordReturnType->getDefinition()) {
+        return true;
+      }
+
+      if (!hasCustomCopyOrMoveConstructor(cxxRecordReturnType) &&
+          !hasOwnedValueAttr(cxxRecordReturnType) &&
+          hasPointerInSubobjects(cxxRecordReturnType)) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+}
+
 bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
                                   SafeUseOfCxxDeclDescriptor desc) const {
   const clang::Decl *decl = desc.decl;
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
+    if (!desc.ctx.LangOpts.hasFeature(Feature::NewCxxMethodSafetyHeuristics))
+      return legacyIsSafeUseOfCxxMethod(method);
+    
     // The user explicitly asked us to import this method.
     if (hasUnsafeAPIAttr(method))
       return true;
