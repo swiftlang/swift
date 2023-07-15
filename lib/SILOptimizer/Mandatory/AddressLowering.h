@@ -317,6 +317,12 @@ public:
     return hashIter->second;
   }
 
+  ValueStoragePair &operator[](uint32_t index) { return valueVector[index]; }
+
+  ValueStoragePair const &operator[](uint32_t index) const {
+    return valueVector[index];
+  }
+
   ValueStorage &getStorage(SILValue value) {
     return valueVector[getOrdinal(value)].storage;
   }

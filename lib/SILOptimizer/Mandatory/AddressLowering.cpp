@@ -527,6 +527,12 @@ struct AddressLoweringState {
   // Handle moves from a phi's operand storage to the phi storage.
   std::unique_ptr<PhiRewriter> phiRewriter;
 
+  // Projections created for uses, recorded in order to be sunk.
+  //
+  // Not all use projections are recorded in the valueStorageMap.  It's not
+  // legal to reuse use projections for non-canonical users or for phis.
+  SmallVector<SILValue, 16> useProjections;
+
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo,
                        DeadEndBlocks *deBlocks)
       : function(function), loweredFnConv(getLoweredFnConv(function)),
@@ -1159,6 +1165,8 @@ public:
   /// jointly postdominate.
   void finalizeOpaqueStorage();
 
+  void sinkProjections();
+
 protected:
   void allocateValue(SILValue value);
   bool findProjectionIntoUseImpl(SILValue value,
@@ -1524,6 +1532,54 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   return alloc;
 }
 
+namespace {
+enum class SinkResult {
+  NoUsers,
+  Unmoved,
+  Moved,
+};
+SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
+  // Fast paths for 0 and 1 users.
+
+  if (svi->use_begin() == svi->use_end()) {
+    return SinkResult::NoUsers;
+  }
+
+  if (auto *use = svi->getSingleUse()) {
+    auto *user = use->getUser();
+    if (user == svi->getNextInstruction())
+      return SinkResult::Unmoved;
+    svi->moveBefore(user);
+    return SinkResult::Moved;
+  }
+
+  // Compute the lca and sink the instruction to before its first user or its
+  // end if there are none.
+
+  SILBasicBlock *lca = domInfo->getLeastCommonAncestorOfUses(svi);
+
+  // The lca may contain a user.  Look for the user to insert before it.
+
+  InstructionSet userSet(svi->getFunction());
+  for (auto user : svi->getUsers()) {
+    userSet.insert(user);
+  }
+
+  for (auto &instruction : *lca) {
+    if (userSet.contains(&instruction)) {
+      if (&instruction == svi->getNextInstruction())
+        return SinkResult::Unmoved;
+      svi->moveBefore(&instruction);
+      return SinkResult::Moved;
+    }
+  }
+
+  // No user was found in the lca, move to before the end.
+  svi->moveBefore(&lca->back());
+  return SinkResult::Moved;
+}
+} // end anonymous namespace
+
 void OpaqueStorageAllocation::finalizeOpaqueStorage() {
   SmallVector<SILBasicBlock *, 4> boundary;
   for (auto maybeAlloc : allocs) {
@@ -1551,6 +1607,40 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
       deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
     }
     boundary.clear();
+  }
+}
+
+void OpaqueStorageAllocation::sinkProjections() {
+  // First, sink use projections to their uses.  It's necessary to do this
+  // separately from sinking projections in valueStorageMap because not all use
+  // projections are recorded there (those for non-canonical users and those for
+  // phis).
+  //
+  // Done in reverse order because outer projections are materialized first and
+  // so appear in `useProjections` before inner projections, and inner
+  // projections must be sunk first.
+  for (auto projection : llvm::reverse(pass.useProjections)) {
+    assert(projection);
+    auto *svi = dyn_cast<SingleValueInstruction>(projection);
+    assert(svi);
+    auto sank = sinkToUses(svi, pass.domInfo);
+    if (sank == SinkResult::NoUsers) {
+      pass.deleter.forceDelete(svi);
+    }
+  }
+
+  // Second, sink all storage from the valueStorageMap.
+  for (auto pair : llvm::reverse(pass.valueStorageMap)) {
+    auto addr = pair.storage.getMaterializedAddress();
+    if (!pair.storage.isProjection())
+      continue;
+    auto *inst = dyn_cast<SingleValueInstruction>(addr);
+    if (!inst)
+      continue;
+    auto sank = sinkToUses(inst, pass.domInfo);
+    if (sank == SinkResult::NoUsers) {
+      pass.deleter.forceDelete(inst);
+    }
   }
 }
 
@@ -1613,6 +1703,8 @@ protected:
                                    SILValue elementValue, unsigned fieldIdx);
 
   SILValue materializeProjectionIntoUse(Operand *operand, bool intoPhiOperand);
+  SILValue materializeProjectionIntoUseImpl(Operand *operand,
+                                            bool intoPhiOperand);
 
   SILValue materializeComposingUser(SingleValueInstruction *user,
                                     bool intoPhiOperand) {
@@ -1794,12 +1886,20 @@ SILValue AddressMaterialization::materializeTupleExtract(
       elementValue->getType().getAddressType());
 }
 
+SILValue
+AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
+                                                     bool intoPhiOperand) {
+  auto projection = materializeProjectionIntoUseImpl(operand, intoPhiOperand);
+  pass.useProjections.push_back(projection);
+  return projection;
+}
+
 /// Recursively materialize the address of a subobject that is a member of the
 /// operand's user. The operand's user must be an aggregate struct, tuple, enum,
 /// init_existential_value.
 SILValue
-AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
-                                                     bool intoPhiOperand) {
+AddressMaterialization::materializeProjectionIntoUseImpl(Operand *operand,
+                                                         bool intoPhiOperand) {
   SILInstruction *user = operand->getUser();
   switch (user->getKind()) {
   default:
@@ -4290,6 +4390,8 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   rewriteFunction(pass);
 
   allocator.finalizeOpaqueStorage();
+
+  allocator.sinkProjections();
 
   deleteRewrittenInstructions(pass);
 
