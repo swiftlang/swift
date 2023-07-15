@@ -27,7 +27,7 @@ public struct SourceLoc {
     guard bridged.isValid() else {
       return nil
     }
-#if hasFeature(NewCxxMethodSafetyHeuristics)
+#if $NewCxxMethodSafetyHeuristics
     self.locationInFile = bridged.getOpaquePointerValue().assumingMemoryBound(to: UInt8.self)
 #else
     self.locationInFile = bridged.__getOpaquePointerValueUnsafe().assumingMemoryBound(to: UInt8.self)
@@ -61,7 +61,7 @@ public struct CharSourceRange {
   }
 
   public init?(bridged: swift.CharSourceRange) {
-#if hasFeature(NewCxxMethodSafetyHeuristics)
+#if $NewCxxMethodSafetyHeuristics
     guard let start = SourceLoc(bridged: bridged.getStart()) else {
       return nil
     }
