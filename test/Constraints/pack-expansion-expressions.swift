@@ -602,3 +602,35 @@ func test_that_expansions_are_bound_early() {
       })
   }
 }
+
+do {
+  func test<T>(x: T) {}
+
+  // rdar://110711746 to make this valid
+  func caller1<each T>(x: repeat each T) {
+    _ = (repeat { test(x: each x) }()) // expected-error {{pack reference 'each T' can only appear in pack expansion}}
+  }
+
+  func caller2<each T>(x: repeat each T) {
+    _ = { (repeat test(x: each x)) }()
+  }
+}
+
+// rdar://110401127 - name lookup bug when abstract tuple stored property shadows a global
+do {
+  let c = [false, true]
+  _ = c
+
+  struct ZipCollection<each C> {
+    public let c: (repeat each C)
+
+    func makeTuple() -> (repeat each C) {
+      fatalError()
+    }
+
+    public func f() -> (repeat Optional<each C>) {
+      _ = (repeat each makeTuple())
+      _ = (repeat (each makeTuple()))
+    }
+  }
+}

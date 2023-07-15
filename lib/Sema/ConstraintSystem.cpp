@@ -683,6 +683,21 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
                                               shapeParam, contextSubs);
 }
 
+PackExpansionExpr *
+ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
+  const auto match = PackEnvironments.find(packElement);
+  return (match == PackEnvironments.end()) ? nullptr : match->second;
+}
+
+void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
+                                          PackExpansionExpr *packExpansion) {
+  assert(packElement);
+  assert(packExpansion);
+  [[maybe_unused]] const auto inserted =
+      PackEnvironments.insert({packElement, packExpansion}).second;
+  assert(inserted && "Mapping already defined?");
+}
+
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
 static void extendDepthMap(
@@ -3593,9 +3608,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // In the future, _if_ the syntax allows for multiple expansions
     // this code would have to be adjusted to project l-value from the
     // base type just like TupleIndex does.
-    auto tuple = choice.getBaseType()->getRValueType()->castTo<TupleType>();
-    auto *expansion = tuple->getElementType(0)->castTo<PackExpansionType>();
-    adjustedRefType = expansion->getPatternType();
+    adjustedRefType =
+        getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
     refType = adjustedRefType;
     break;
   }
@@ -3851,7 +3865,8 @@ struct TypeSimplifier {
             if (typeVar->getImpl().isPackExpansion() &&
                 !resolvedType->isEqual(typeVar) &&
                 !resolvedType->is<PackExpansionType>() &&
-                !resolvedType->is<PackType>()) {
+                !resolvedType->is<PackType>() &&
+                !resolvedType->is<PackArchetypeType>()) {
               return resolvedType;
             }
           }
