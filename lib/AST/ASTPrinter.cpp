@@ -3448,6 +3448,10 @@ static bool usesFeatureBuiltinModule(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
+  return decl->hasClangNode();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {

@@ -197,6 +197,10 @@ EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
 /// signatures.
 EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
 
+// Only import C++ methods that return pointers (projections) on owned types as
+// unsafe.
+EXPERIMENTAL_FEATURE(NewCxxMethodSafetyHeuristics, true)
+
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
