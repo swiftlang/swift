@@ -351,35 +351,6 @@ public:
     return *last;
   }
 
-  /// Return the non-projection storage that this storage refers to.  If this
-  /// storage requires materializing an instruction that performs
-  /// initialization side effects (init_enum_data_addr, init_existential_addr),
-  /// return nullptr.
-  const ValueStorage *getNonInitializingBaseStorage(SILValue value) {
-    for (auto *pair : getProjections(value)) {
-      auto const &storage = pair->storage;
-      if (storage.initializes)
-        return nullptr;
-
-      if (storage.isUseProjection) {
-        continue;
-      }
-      assert(!storage.isDefProjection &&
-             "def projections should not reach here");
-      return &storage;
-    }
-    llvm_unreachable("found no non-projection storage!?");
-  }
-
-  /// Return the non-projection storage that this storage refers to, or nullptr
-  /// if \p allowInit is true and the storage initializes an Enum.
-  const ValueStorage *getBaseStorage(SILValue value, bool allowInit) {
-    if (allowInit)
-      return &getBaseStorage(value);
-
-    return getNonInitializingBaseStorage(value);
-  }
-
   void setStorageAddress(SILValue value, SILValue addr) {
     auto &storage = getStorage(value);
     assert(!storage.storageAddress || storage.storageAddress == addr);

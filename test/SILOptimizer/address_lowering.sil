@@ -123,11 +123,11 @@ bb0(%0 : @owned $(T, T)):
 
 // CHECK-LABEL: sil [ossa] @f012_decompose_tuple_arg : $@convention(thin) <T> (@in (T, T)) -> @out (T, T) {
 // CHECK: bb0(%0 : $*(T, T), %1 : $*(T, T)):
-// CHECK:   [[ARG0:%.*]] = tuple_element_addr %1 : $*(T, T), 0
-// CHECK:   [[ARG1:%.*]] = tuple_element_addr %1 : $*(T, T), 1
-// CHECK:   [[RET0:%.*]] = tuple_element_addr %0 : $*(T, T), 0
-// CHECK:   apply %{{.*}}<T>([[RET0]], [[ARG0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 // CHECK:   [[RET1:%.*]] = tuple_element_addr %0 : $*(T, T), 1
+// CHECK:   [[RET0:%.*]] = tuple_element_addr %0 : $*(T, T), 0
+// CHECK:   [[ARG1:%.*]] = tuple_element_addr %1 : $*(T, T), 1
+// CHECK:   [[ARG0:%.*]] = tuple_element_addr %1 : $*(T, T), 0
+// CHECK:   apply %{{.*}}<T>([[RET0]], [[ARG0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 // CHECK:   copy_addr [take] [[ARG1]] to [init] [[RET1]] : $*T
 // CHECK-LABEL: } // end sil function 'f012_decompose_tuple_arg'
 sil [ossa] @f012_decompose_tuple_arg : $@convention(thin) <T> (@in (T, T)) -> @out (T, T) {
@@ -143,13 +143,13 @@ bb0(%0 : @owned $(T, T)):
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   [[IN:%.*]] = alloc_stack $(T, T)
 // CHECK:   [[OUT:%.*]] = alloc_stack $(T, T)
-// CHECK:   [[IN1:%.*]] = tuple_element_addr [[IN]] : $*(T, T), 1
-// CHECK:   copy_addr %1 to [init] [[IN1]] : $*T
 // CHECK:   [[IN0:%.*]] = tuple_element_addr %2 : $*(T, T), 0
+// CHECK:   [[IN1:%.*]] = tuple_element_addr [[IN]] : $*(T, T), 1
+// CHECK:   [[DEAD:%.*]] = tuple_element_addr [[OUT]] : $*(T, T), 1
+// CHECK:   [[RET:%.*]] = tuple_element_addr [[OUT]] : $*(T, T), 0
+// CHECK:   copy_addr %1 to [init] [[IN1]] : $*T
 // CHECK:   copy_addr [take] %1 to [init] [[IN0]] : $*T
 // CHECK:   apply %{{.*}}<T>([[OUT]], [[IN]]) : $@convention(thin) <τ_0_0> (@in (τ_0_0, τ_0_0)) -> @out (τ_0_0, τ_0_0)
-// CHECK:   [[RET:%.*]] = tuple_element_addr [[OUT]] : $*(T, T), 0
-// CHECK:   [[DEAD:%.*]] = tuple_element_addr [[OUT]] : $*(T, T), 1
 // CHECK:   destroy_addr [[DEAD]] : $*T
 // CHECK:   copy_addr [take] [[RET]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'f013_pass_tuple_arg'
@@ -522,15 +522,15 @@ bb0:
 // CHECK-LABEL: sil [ossa] @f075_reusedResult : $@convention(thin) <T> (@in T, @owned any C) -> (@out T, @owned any C) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : @owned $any C):
 // CHECK:   [[TUPLE:%.*]] = alloc_stack $(T, any C)
-// CHECK:   [[E1:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, any C), 0
-// CHECK:   copy_addr [take] %1 to [init] [[E1]] : $*T
+// CHECK:   [[E1_2:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, any C), 0
+// CHECK:   [[E1_1:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, any C), 0
 // CHECK:   [[E2:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, any C), 1
+// CHECK:   copy_addr [take] %1 to [init] [[E1_1]] : $*T
 // CHECK:   store %2 to [init] [[E2]] : $*any C
 // CHECK:   apply %{{.*}}<T>([[TUPLE]]) : $@convention(thin) <τ_0_0> (@in_guaranteed (τ_0_0, any C)) -> ()
-// CHECK:   [[E1:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, any C), 0
 // CHECK:   [[E2:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, any C), 1
 // CHECK:   [[LD:%.*]] = load [take] [[E2]] : $*any C
-// CHECK:   copy_addr [take] [[E1]] to [init] %0 : $*T
+// CHECK:   copy_addr [take] [[E1_2]] to [init] %0 : $*T
 // CHECK:   dealloc_stack [[TUPLE]] : $*(T, any C)
 // CHECK:   return [[LD]] : $any C
 // CHECK-LABEL: } // end sil function 'f075_reusedResult'
@@ -631,8 +631,8 @@ bb0(%0 : @owned $Any):
 // CHECK-LABEL: sil [ossa] @f101_passAny : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   %[[A:.*]] = alloc_stack $Any
-// CHECK:   %[[F:.*]] = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
 // CHECK:   %[[T2:.*]] = init_existential_addr %[[A]] : $*Any, $T
+// CHECK:   %[[F:.*]] = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
 // CHECK:   copy_addr %0 to [init] %[[T2]] : $*T
 // CHECK:   %{{.*}} = apply %[[F]](%[[A]]) : $@convention(thin) (@in Any) -> ()
 // CHECK:   destroy_addr %0 : $*T
@@ -655,9 +655,9 @@ bb0(%0 : @owned $T):
 // CHECK-LABEL: sil [ossa] @f102_passAnyObjectAsAny : $@convention(thin) (@in AnyObject) -> () {
 // CHECK: bb0(%0 : $*AnyObject):
 // CHECK:   [[A:%.*]] = alloc_stack $Any
+// CHECK:   [[VAL:%.*]] = init_existential_addr [[A]] : $*Any, $AnyObject
 // CHECK:   [[ARG:%.*]] = load [take] %0 : $*AnyObject
 // CHECK:   [[F:%.*]] = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
-// CHECK:   [[VAL:%.*]] = init_existential_addr [[A]] : $*Any, $AnyObject
 // CHECK:   store [[ARG]] to [init] [[VAL]] : $*AnyObject
 // CHECK:   %{{.*}} = apply [[F]]([[A]]) : $@convention(thin) (@in Any) -> ()
 // CHECK:   [[R:%.*]] = tuple ()
@@ -733,9 +733,9 @@ bb0(%0 : @owned $SI<AnyObject>):
 // CHECK-LABEL: sil [ossa] @f122_testStructExtract : $@convention(method) <T> (@in SRef<T>) -> (@out AnyObject, @out T) {
 // CHECK: bb0(%0 : $*AnyObject, %1 : $*T, %2 : $*SRef<T>):
 // CHECK-NOT: alloc_stack
+// CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   [[E0:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.object
 // CHECK:   [[C:%.*]] = load [copy] [[E0]] : $*AnyObject
-// CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
 // CHECK:   destroy_addr %2 : $*SRef<T>
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
@@ -757,11 +757,11 @@ bb0(%0 : @owned $SRef<T>):
 // CHECK-LABEL: sil [ossa] @f123_testStructExtract : $@convention(method) <T> (@in SRef<T>) -> (@out AnyObject, @out T) {
 // CHECK: bb0(%0 : $*AnyObject, %1 : $*T, %2 : $*SRef<T>):
 // CHECK-NOT: alloc_stack
+// CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   [[E0:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.object
 // CHECK:   [[L:%.*]] = load_borrow [[E0]] : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
-// CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
 // CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*SRef<T>
@@ -786,9 +786,9 @@ bb0(%0 : @owned $SRef<T>):
 // CHECK-LABEL: sil [ossa] @f124_testTupleExtract : $@convention(method) <T> (@in (AnyObject, T)) -> (@out AnyObject, @out T) {
 // CHECK: bb0(%0 : $*AnyObject, %1 : $*T, %2 : $*(AnyObject, T)):
 // CHECK-NOT: alloc_stack
+// CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   [[E0:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 0
 // CHECK:   [[C:%.*]] = load [copy] [[E0]] : $*AnyObject
-// CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
 // CHECK:   destroy_addr %2 : $*(AnyObject, T)
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
@@ -809,11 +809,11 @@ bb0(%0 : @owned $(AnyObject, T)):
 // CHECK-LABEL: sil [ossa] @f125_testTupleExtract : $@convention(method) <T> (@in (AnyObject, T)) -> (@out AnyObject, @out T) {
 // CHECK: bb0(%0 : $*AnyObject, %1 : $*T, %2 : $*(AnyObject, T)):
 // CHECK-NOT: alloc_stack
+// CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   [[E0:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 0
-// CHECK:   [[L:%.*]] = load_borrow %3 : $*AnyObject
+// CHECK:   [[L:%.*]] = load_borrow [[E0]] : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
-// CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
 // CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*(AnyObject, T)
@@ -838,9 +838,9 @@ bb0(%0 : @owned $(AnyObject, T)):
 // CHECK-LABEL: sil [ossa] @f126_testDestructureAndBorrow : $@convention(method) <Element> (@in (SI<Element>, I)) -> (@out Element, @out I) {
 // CHECK: bb0(%0 : $*Element, %1 : $*I, %2 : $*(SI<Element>, I)):
 // CHECK:   [[SI:%.*]] = tuple_element_addr %2 : $*(SI<Element>, I), 0
+// CHECK:   [[E:%.*]] = struct_element_addr [[SI]] : $*SI<Element>, #SI.element
 // CHECK:   [[I:%.*]] = tuple_element_addr %2 : $*(SI<Element>, I), 1
 // CHECK:   [[LD:%.*]] = load [trivial] [[I]] : $*I
-// CHECK:   [[E:%.*]] = struct_element_addr [[SI]] : $*SI<Element>, #SI.element
 // CHECK:   copy_addr [[E]] to [init] %0 : $*Element
 // CHECK:   destroy_addr [[SI]] : $*SI<Element>
 // CHECK:   store [[LD]] to [trivial] %1 : $*I
@@ -872,12 +872,12 @@ bb0(%0 : @owned $T):
 // CHECK-LABEL: sil [ossa] @f140_testTupleProject : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   [[LOCAL:%.*]] = alloc_stack $((T, T), T)
+// CHECK:   [[ELT1:%.*]] = tuple_element_addr [[LOCAL]] : $*((T, T), T), 1
 // CHECK:   [[ELT0:%.*]] = tuple_element_addr [[LOCAL]] : $*((T, T), T), 0
+// CHECK:   [[ELT0_1:%.*]] = tuple_element_addr [[ELT0]] : $*(T, T), 1
 // CHECK:   [[ELT0_0:%.*]] = tuple_element_addr [[ELT0]] : $*(T, T), 0
 // CHECK:   copy_addr %0 to [init] [[ELT0_0]] : $*T
-// CHECK:   [[ELT1:%.*]] = tuple_element_addr [[LOCAL]] : $*((T, T), T), 1
 // CHECK:   copy_addr %0 to [init] [[ELT1]] : $*T
-// CHECK:   [[ELT0_1:%.*]] = tuple_element_addr [[ELT0]] : $*(T, T), 1
 // CHECK:   copy_addr [take] %0 to [init] [[ELT0_1]] : $*T
 // CHECK:   destroy_addr [[LOCAL]] : $*((T, T), T)
 // CHECK:   dealloc_stack [[LOCAL]] : $*((T, T), T)
@@ -897,12 +897,12 @@ bb0(%0 : @owned $T):
 // CHECK-LABEL: sil [ossa] @f150_testStructProject : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   [[ALLOC:%.*]] = alloc_stack $Pair<Pair<T>>
+// CHECK:   [[ELT_Y:%.*]] = struct_element_addr [[ALLOC]] : $*Pair<Pair<T>>, #Pair.y
 // CHECK:   [[ELT_X:%.*]] = struct_element_addr [[ALLOC]] : $*Pair<Pair<T>>, #Pair.x
+// CHECK:   [[ELT_XX:%.*]] = struct_element_addr [[ELT_X]] : $*Pair<T>, #Pair.x
 // CHECK:   [[ELT_XY:%.*]] = struct_element_addr [[ELT_X]] : $*Pair<T>, #Pair.y
 // CHECK:   copy_addr %0 to [init] [[ELT_XY]] : $*T
-// CHECK:   [[ELT_XX:%.*]] = struct_element_addr [[ELT_X]] : $*Pair<T>, #Pair.x
 // CHECK:   copy_addr [take] %0 to [init] [[ELT_XX]] : $*T
-// CHECK:   [[ELT_Y:%.*]] = struct_element_addr [[ALLOC]] : $*Pair<Pair<T>>, #Pair.y
 // CHECK:   copy_addr [[ELT_X]] to [init] [[ELT_Y]] : $*Pair<T>
 // CHECK:   destroy_addr [[ALLOC]] : $*Pair<Pair<T>>
 // CHECK:   dealloc_stack [[ALLOC]] : $*Pair<Pair<T>>
@@ -963,8 +963,8 @@ bb0(%0 : @owned $P):
 // CHECK:   copy_addr %0 to [init] [[ALLOCP]] : $*any P
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
-// CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
+// CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
@@ -1912,8 +1912,8 @@ entry:
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
 // CHECK:         [[INSTANCE_ADDR:%[^,]+]] = alloc_stack $Pair<T>
 // CHECK:         [[COPY_ADDR:%[^,]+]] = alloc_stack $T
-// CHECK:         apply undef<T>([[INSTANCE_ADDR]])
 // CHECK:         [[X_ADDR:%[^,]+]] = struct_element_addr [[INSTANCE_ADDR]]{{.*}}, #Pair.x
+// CHECK:         apply undef<T>([[INSTANCE_ADDR]])
 // CHECK:         copy_addr [[X_ADDR]] to [init] [[COPY_ADDR]]
 // CHECK:         destroy_addr [[INSTANCE_ADDR]]
 // CHECK:         copy_addr [take] [[COPY_ADDR]] to [[ADDR]]
@@ -1954,9 +1954,9 @@ entry(%addr : $*T):
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
 // CHECK:         [[INSTANCE_ADDR:%[^,]+]] = alloc_stack $(T, T)
 // CHECK:         [[COPY_ADDR:%[^,]+]] = alloc_stack $T
-// CHECK:         apply undef<T>([[INSTANCE_ADDR]]) : $@convention(thin) <τ_0_0> () -> @out (τ_0_0, τ_0_0)
-// CHECK:         [[ONE_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE_ADDR]]{{.*}}, 0
 // CHECK:         [[TWO_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE_ADDR]]{{.*}}, 1
+// CHECK:         [[ONE_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE_ADDR]]{{.*}}, 0
+// CHECK:         apply undef<T>([[INSTANCE_ADDR]]) : $@convention(thin) <τ_0_0> () -> @out (τ_0_0, τ_0_0)
 // CHECK:         copy_addr [[ONE_ADDR]] to [init] [[COPY_ADDR]]
 // CHECK:         destroy_addr [[ONE_ADDR]]
 // CHECK:         destroy_addr [[TWO_ADDR]]
@@ -2270,11 +2270,15 @@ exit:
   return %retval : $()
 }
 
+enum PairEnum<T> {
+  case it(T, T)
+}
+
 // CHECK-LABEL: sil [ossa] @test_destructure_tuple_1_guaranteed : {{.*}} {
 // CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
+// CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
 // CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
 // CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]]
-// CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
 // CHECK:         apply undef<Any>([[ANY_ADDR]])
 // CHECK:         end_borrow [[KLASS]]
 // CHECK:         destroy_addr [[INSTANCE]]
@@ -2297,6 +2301,48 @@ failure:
 exit:
   %505 = tuple ()
   return %505 : $()
+}
+
+// Verify that projections from the unchecked_take_enum_data_addr are dominated
+// by it.
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_2_from_enum : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INOUT_ADDR:%[^,]+]] :
+// CHECK:         [[ORIGINAL_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
+// CHECK:         [[NEW_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
+// CHECK:         [[NEW_PAYLOAD_ADDR:%[^,]+]] = init_enum_data_addr [[NEW_ADDR]]
+// CHECK:         [[NEW_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[NEW_PAYLOAD_ADDR]] {{.*}}, 0
+// CHECK:         [[NEW_SECOND_ADDR:%[^,]+]] = tuple_element_addr [[NEW_PAYLOAD_ADDR]] {{.*}}, 1
+// CHECK:         copy_addr [[INOUT_ADDR]] to [init] [[ORIGINAL_ADDR]] : $*PairEnum<T>
+// CHECK:         switch_enum_addr [[ORIGINAL_ADDR]] : $*PairEnum<T>
+// CHECK:       bb1:
+// CHECK:         [[ORIGINAL_PAYLOAD_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[ORIGINAL_ADDR]]
+// CHECK:         [[ORIGINAL_SECOND_ADDR:%[^,]+]] = tuple_element_addr [[ORIGINAL_PAYLOAD_ADDR]] {{.*}}, 1
+// CHECK:         [[ORIGINAL_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[ORIGINAL_PAYLOAD_ADDR]] {{.*}}, 0
+// CHECK:         apply undef<T>([[NEW_FIRST_ADDR]], [[ORIGINAL_FIRST_ADDR]])
+// CHECK:         copy_addr [[ORIGINAL_SECOND_ADDR]] to [init] [[NEW_SECOND_ADDR]] : $*T
+// CHECK:         inject_enum_addr [[NEW_ADDR]]
+// CHECK:         destroy_addr [[NEW_ADDR]]
+// CHECK:         destroy_addr [[ORIGINAL_SECOND_ADDR]]
+// CHECK:         destroy_addr [[ORIGINAL_FIRST_ADDR]]
+// CHECK:         dealloc_stack [[NEW_ADDR]]
+// CHECK:         dealloc_stack [[ORIGINAL_ADDR]]
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple_2_from_enum'
+sil [ossa] @test_destructure_tuple_2_from_enum : $@convention(thin) <T> (@inout PairEnum<T>) -> () {
+entry(%inout_addr : $*PairEnum<T>):
+  %original = load [copy] %inout_addr : $*PairEnum<T>
+  switch_enum %original : $PairEnum<T>, case #PairEnum.it!enumelt: it_block
+
+it_block(%original_payload : @owned $(T, T)):
+  (%original_first, %original_second) = destructure_tuple %original_payload : $(T, T)
+  %new_first = apply undef<T>(%original_first) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %new_second = copy_value %original_second : $T
+  %new_payload = tuple (%new_first : $T, %new_second : $T)
+  %new = enum $PairEnum<T>, #PairEnum.it!enumelt, %new_payload : $(T, T)
+  destroy_value %new : $PairEnum<T>
+  destroy_value %original_second : $T
+  destroy_value %original_first : $T
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // Check that the end_borrows created on behalf of the destructure_tuple end
@@ -2352,6 +2398,55 @@ inner_other(%s_box : @guaranteed $<Tau> { var AnyObject } <T>):
   br exit
 
 exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify that the init_enum_data_addr instruction is created before its first
+// use.  Although the opaque values are visited in forward order, their
+// uses are visited at the same time.  At that point, addresses are
+// materialized, and, in this case, an init_enum_data_addr is created.
+//
+// In this test, because %second_in is the first opaque value (i.e. in forward
+// order), its copy_value use is visited before %first_out is defined.  If the
+// init_enum_data_addr were created at that point and reused from then on, it
+// would be reused when rewriting the def of %first_out:
+//
+//     %second_in_addr = alloc_stack $T
+//     %out_addr = alloc_stack $PairEnum<T>
+//     apply undef<T>(%second_in_addr)
+//     %first_out_addr = tuple_element_addr %enum_data_addr, 0
+//                                          ^^^^^^^^^^^^^^^ USE BEFORE DEF
+//     apply undef<T>(%first_out_addr)
+//     %enum_data_addr = init_enum_data_addr %out_addr
+//     %second_out_addr = tuple_element_addr %enum_data_addr, 1
+//     copy_addr %second_in_addr to [init] %second_out_addr
+//
+// We would end up with a use of %enum_data_addr (in the definition of
+// %first_out_addr) that is not dominated by %enum_data_addr's def.
+//
+// CHECK-LABEL: sil [ossa] @test_enum_1_tuple_projection_dominance : {{.*}} {
+// CHECK:         [[SECOND_IN_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         [[OUT_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
+// CHECK:         [[ENUM_DATA_ADDR:%[^,]+]] = init_enum_data_addr [[OUT_ADDR]]
+// CHECK:         [[FIRST_OUT_ADDR:%[^,]+]] = tuple_element_addr [[ENUM_DATA_ADDR]]{{.*}}, 0
+// CHECK:         [[SECOND_OUT_ADDR:%[^,]+]] = tuple_element_addr [[ENUM_DATA_ADDR]]{{.*}}, 1
+// CHECK:         apply undef<T>([[SECOND_IN_ADDR]])
+// CHECK:         apply undef<T>([[FIRST_OUT_ADDR]])
+// CHECK:         copy_addr [[SECOND_IN_ADDR]] to [init] [[SECOND_OUT_ADDR]]
+// CHECK:         inject_enum_addr [[OUT_ADDR]]
+// CHECK:         destroy_addr [[OUT_ADDR]]
+// CHECK:         destroy_addr [[SECOND_IN_ADDR]]
+// CHECK-LABEL: } // end sil function 'test_enum_1_tuple_projection_dominance'
+sil [ossa] @test_enum_1_tuple_projection_dominance : $@convention(thin) <T> () -> () {
+bb0:
+  %second_in = apply undef<T>() : $@convention(thin) <Tee> () -> @out Tee
+  %first_out = apply undef<T>() : $@convention(thin) <Tee> () -> @out Tee
+  %second_out = copy_value %second_in : $T
+  %pair_out = tuple (%first_out : $T, %second_out : $T)
+  %out = enum $PairEnum<T>, #PairEnum.it!enumelt, %pair_out : $(T, T)
+  destroy_value %out : $PairEnum<T>
+  destroy_value %second_in : $T
   %retval = tuple ()
   return %retval : $()
 }
@@ -2577,10 +2672,10 @@ bb0(%instance : @owned $T):
   return %retval : $()
 }
 // CHECK-LABEL: sil [ossa] @test_yield_1_two_values : {{.*}} {
-// CHECK:         tuple_element_addr
-// CHECK:         tuple_element_addr
 // CHECK:         [[KEY:%[^,]+]] = tuple_element_addr {{%[^,]+}} : $*(key: Key, value: Value), 0
 // CHECK:         [[VALUE:%[^,]+]] = tuple_element_addr {{%[^,]+}} : $*(key: Key, value: Value), 1
+// CHECK:         tuple_element_addr
+// CHECK:         tuple_element_addr
 // CHECK:         yield ([[KEY]] : $*Key, [[VALUE]] : $*Value)
 // CHECK-LABEL: } // end sil function 'test_yield_1_two_values'
 sil [ossa] @test_yield_1_two_values : $@yield_once @convention(method) <Key, Value> (@in_guaranteed Key, @in_guaranteed Value) -> (@yields @in_guaranteed Key, @yields @in_guaranteed Value) {
