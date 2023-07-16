@@ -147,15 +147,21 @@ struct ValueStorage {
   // The definition of this value is fully translated to lowered SIL.
   unsigned isRewritten : 1;
 
-  // This is a use-projection into an enum. Tracked to avoid projecting enums
-  // across phis, which would result in piecewise initialization.
-  unsigned initializesEnum : 1;
+  // This is a use-projection which performs an initialization side-effect,
+  // either into an enum or an existential.
+  //
+  // Tracked to avoid projecting enums/existentials across phis, which would
+  // result in piecewise initialization.
+  //
+  // Note that the corresponding value is the payload, not the
+  // enum instruction.
+  unsigned initializes : 1;
 
   ValueStorage(SILValue storageAddress): storageAddress(storageAddress) {
     isDefProjection = false;
     isUseProjection = false;
     isRewritten = false;
-    initializesEnum = false;
+    initializes = false;
 
     // The initial storage address is only valid when the value is effectively
     // already rewritten.
@@ -346,12 +352,13 @@ public:
   }
 
   /// Return the non-projection storage that this storage refers to.  If this
-  /// storage holds an Enum or any intermediate storage that projects into this
-  /// storage holds an Enum, then return nullptr.
-  const ValueStorage *getNonEnumBaseStorage(SILValue value) {
+  /// storage requires materializing an instruction that performs
+  /// initialization side effects (init_enum_data_addr, init_existential_addr),
+  /// return nullptr.
+  const ValueStorage *getNonInitializingBaseStorage(SILValue value) {
     for (auto *pair : getProjections(value)) {
       auto const &storage = pair->storage;
-      if (storage.initializesEnum)
+      if (storage.initializes)
         return nullptr;
 
       if (storage.isUseProjection) {
@@ -365,12 +372,12 @@ public:
   }
 
   /// Return the non-projection storage that this storage refers to, or nullptr
-  /// if \p allowInitEnum is true and the storage initializes an Enum.
-  const ValueStorage *getBaseStorage(SILValue value, bool allowInitEnum) {
-    if (allowInitEnum)
+  /// if \p allowInit is true and the storage initializes an Enum.
+  const ValueStorage *getBaseStorage(SILValue value, bool allowInit) {
+    if (allowInit)
       return &getBaseStorage(value);
 
-    return getNonEnumBaseStorage(value);
+    return getNonInitializingBaseStorage(value);
   }
 
   void setStorageAddress(SILValue value, SILValue addr) {

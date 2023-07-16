@@ -439,7 +439,7 @@ void ValueStorage::dump() const {
   llvm::dbgs() << "isDefProjection: " << isDefProjection << "\n";
   llvm::dbgs() << "isUseProjection: " << isUseProjection << "\n";
   llvm::dbgs() << "isRewritten: " << isRewritten << "\n";
-  llvm::dbgs() << "initializesEnum: " << initializesEnum << "\n";
+  llvm::dbgs() << "initializes: " << initializes << "\n";
 }
 void ValueStorageMap::ValueStoragePair::dump() const {
   llvm::dbgs() << "value: ";
@@ -1071,8 +1071,9 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (userValue->getType().getEnumOrBoundGenericEnum()) {
-    storage.initializesEnum = true;
+  if (userValue->getType().getEnumOrBoundGenericEnum() ||
+      userValue->getType().isExistentialType()) {
+    storage.initializes = true;
   }
   assert(!storage.isPhiProjection());
 }
@@ -1266,8 +1267,8 @@ bool OpaqueStorageAllocation::findProjectionIntoUseImpl(
     // TODO: fix the memory verifier to consider the actual store instructions
     // to initialize an enum rather than the init_enum_data_addr to reuse enum
     // storage across multiple subobjects within the payload.
-    auto *baseStorage = pass.valueStorageMap.getBaseStorage(
-        userValue, /*allowInitEnum*/ !intoPhi);
+    auto *baseStorage =
+        pass.valueStorageMap.getBaseStorage(userValue, /*allowInit*/ !intoPhi);
     if (!baseStorage)
       continue;
 
