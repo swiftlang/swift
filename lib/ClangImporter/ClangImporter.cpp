@@ -6865,9 +6865,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return true;
 
         if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-            isIterator(cxxRecordReturnType)) {
-          return !parentIsSelfContained;
-        }
+            isIterator(cxxRecordReturnType))
+          return false;
 
         // Mark this as safe to help our diganostics down the road.
         if (!cxxRecordReturnType->getDefinition()) {
