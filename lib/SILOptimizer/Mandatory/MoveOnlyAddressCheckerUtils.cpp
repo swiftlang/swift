@@ -2813,25 +2813,32 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 
       auto r = ranges.pop_back_val();
       r.setBits(tmpBits);
-      LLVM_DEBUG(llvm::dbgs() << "            NonLifetimeEndingUse! "
-                                 "inserting destroy before instruction! Range: "
-                              << r << '\n');
+
       // If we are dealing with an inout parameter, we will have modeled our
       // last use by treating a return inst as a last use. Since it doesn't
       // have any successors, this results in us not inserting any
       // destroy_addr.
       if (isa<TermInst>(inst)) {
+      LLVM_DEBUG(llvm::dbgs() << "            Terminator NonLifetimeEndingUse! "
+                                 "inserting destroy in successors! Range: "
+                 << r << ". Bits: " << tmpBits << '\n');
         auto *block = inst->getParent();
         for (auto *succBlock : block->getSuccessorBlocks()) {
           // If we have a merge block, we need to only destroy values once.
           auto iter = mergeBlocks.find(succBlock);
+          LLVM_DEBUG(llvm::dbgs() << "                Merge Block bb" << succBlock->getDebugID() << '\n');
           if (iter == mergeBlocks.end()) {
+            LLVM_DEBUG(llvm::dbgs() << "                No state for succ block! Inserting bits!\n");
             iter = mergeBlocks.insert({succBlock, tmpBits}).first;
           } else {
             SmallBitVector &alreadySetBits = iter->second;
+            LLVM_DEBUG(llvm::dbgs() << "                Found state for succ block! Bits: " << alreadySetBits << '\n');
             bool hadCommon = alreadySetBits.anyCommon(tmpBits);
+            LLVM_DEBUG(llvm::dbgs() << "                Any Common: " << (hadCommon ? "true\n" : "false\n"));
             alreadySetBits &= tmpBits;
+            LLVM_DEBUG(llvm::dbgs() << "                Already set bits after update: " << alreadySetBits << '\n');
             if (hadCommon) {
+              LLVM_DEBUG(llvm::dbgs() << "                Since had one in common... not reinserting destroys!\n");
               continue;
             }
           }
@@ -2847,6 +2854,10 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
         }
         continue;
       }
+
+      LLVM_DEBUG(llvm::dbgs() << "            NonLifetimeEndingUse! "
+                                 "inserting destroy before instruction! Range: "
+                              << r << '\n');
 
       // If we have an implicit end of lifetime use, we do not insert a
       // destroy_addr. Instead, we insert an undef debug value after the
