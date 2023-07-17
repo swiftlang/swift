@@ -275,6 +275,27 @@ public:
         }
       }
     }
+
+    // FIXME: We can see UnresolvedDeclRefExprs here because we don't walk into
+    // patterns when running preCheckExpression, since we don't resolve patterns
+    // until CSGen. We ought to consider moving pattern resolution into
+    // pre-checking, which would allow us to pre-check patterns normally.
+    if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+      auto name = declRef->getName();
+      auto loc = declRef->getLoc();
+      if (name.isSimpleName() && loc.isValid()) {
+        auto *varDecl =
+            dyn_cast_or_null<VarDecl>(ASTScope::lookupSingleLocalDecl(
+                CS.DC->getParentSourceFile(), name.getFullName(), loc));
+        if (varDecl) {
+          if (auto varType = CS.getTypeIfAvailable(varDecl)) {
+            SmallPtrSet<TypeVariableType *, 4> typeVars;
+            varType->getTypeVariables(typeVars);
+            Vars.insert(typeVars.begin(), typeVars.end());
+          }
+        }
+      }
+    }
     return Action::Continue(expr);
   }
 
