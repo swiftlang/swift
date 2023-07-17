@@ -846,63 +846,42 @@ namespace {
   };
 } // end anonymous namespace
 
+void VarRefCollector::inferTypeVars(Decl *D) {
+  // We're only interested in VarDecls.
+  if (!isa_and_nonnull<VarDecl>(D))
+    return;
+
+  auto ty = CS.getTypeIfAvailable(D);
+  if (!ty)
+    return;
+
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  ty->getTypeVariables(typeVars);
+  TypeVars.insert(typeVars.begin(), typeVars.end());
+}
+
+ASTWalker::PreWalkResult<Expr *>
+VarRefCollector::walkToExprPre(Expr *expr) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
+    inferTypeVars(DRE->getDecl());
+
+  // FIXME: We can see UnresolvedDeclRefExprs here because we don't walk into
+  // patterns when running preCheckExpression, since we don't resolve patterns
+  // until CSGen. We ought to consider moving pattern resolution into
+  // pre-checking, which would allow us to pre-check patterns normally.
+  if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+    auto name = declRef->getName();
+    auto loc = declRef->getLoc();
+    if (name.isSimpleName() && loc.isValid()) {
+      auto *SF = CS.DC->getParentSourceFile();
+      auto *D = ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc);
+      inferTypeVars(D);
+    }
+  }
+  return Action::Continue(expr);
+}
+
 namespace {
-
-// Collect any variable references whose types involve type variables,
-// because there will be a dependency on those type variables once we have
-// generated constraints for the closure/tap body. This includes references
-// to other closure params such as in `{ x in { x }}` where the inner
-// closure is dependent on the outer closure's param type, as well as
-// cases like `for i in x where bar({ i })` where there's a dependency on
-// the type variable for the pattern `i`.
-struct VarRefCollector : public ASTWalker {
-  ConstraintSystem &cs;
-  llvm::SmallPtrSet<TypeVariableType *, 4> varRefs;
-
-  VarRefCollector(ConstraintSystem &cs) : cs(cs) {}
-
-  bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    // Retrieve type variables from references to var decls.
-    if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
-      if (auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
-        if (auto varType = cs.getTypeIfAvailable(varDecl)) {
-          varType->getTypeVariables(varRefs);
-        }
-      }
-    }
-
-    // FIXME: We can see UnresolvedDeclRefExprs here because we have
-    // not yet run preCheckExpression() on the entire closure body
-    // yet.
-    //
-    // We could consider pre-checking more eagerly.
-    if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-      auto name = declRef->getName();
-      auto loc = declRef->getLoc();
-      if (name.isSimpleName() && loc.isValid()) {
-        auto *varDecl =
-            dyn_cast_or_null<VarDecl>(ASTScope::lookupSingleLocalDecl(
-                cs.DC->getParentSourceFile(), name.getFullName(), loc));
-        if (varDecl)
-          if (auto varType = cs.getTypeIfAvailable(varDecl))
-            varType->getTypeVariables(varRefs);
-      }
-    }
-
-    return Action::Continue(expr);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
-  }
-};
-
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
@@ -1309,8 +1288,8 @@ struct VarRefCollector : public ASTWalker {
 
             body->walk(refCollector);
 
-            referencedVars.append(refCollector.varRefs.begin(),
-                                  refCollector.varRefs.end());
+            auto vars = refCollector.getTypeVars();
+            referencedVars.append(vars.begin(), vars.end());
           }
         }
 
@@ -2971,9 +2950,7 @@ struct VarRefCollector : public ASTWalker {
       if (!inferredType || inferredType->hasError())
         return Type();
 
-      SmallVector<TypeVariableType *, 4> referencedVars{
-          refCollector.varRefs.begin(), refCollector.varRefs.end()};
-
+      auto referencedVars = refCollector.getTypeVars();
       CS.addUnsolvedConstraint(
           Constraint::create(CS, ConstraintKind::FallbackType, closureType,
                              inferredType, locator, referencedVars));
