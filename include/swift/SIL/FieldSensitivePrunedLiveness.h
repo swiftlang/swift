@@ -31,6 +31,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "swift/Basic/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -754,6 +755,10 @@ public:
         return NonUser;
       return consumingBits.test(element) ? LifetimeEndingUse
                                          : NonLifetimeEndingUse;
+    }
+     __attribute__((used)) void dump() const {
+      llvm::dbgs() << liveBits << '\n';
+      llvm::dbgs() << consumingBits << '\n';
     }
   };
 

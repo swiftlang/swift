@@ -22,22 +22,13 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/Basic/BitVectorUtils.h"
 
 namespace swift {
 
 class SILFunction;
 class SILBasicBlock;
 class SingleValueInstruction;
-
-void printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits);
-
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                     const SmallBitVector &bits) {
-  printBitsAsArray(OS, bits);
-  return OS;
-}
-
-void dumpBits(const SmallBitVector &bits);
 
 /// The MemoryLocations utility provides functions to analyze memory locations.
 ///

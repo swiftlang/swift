@@ -277,6 +277,8 @@
 
 #include <utility>
 
+#pragma clang optimize off
+
 using namespace swift;
 using namespace swift::siloptimizer;
 
@@ -930,7 +932,7 @@ void UseState::initializeLiveness(
   assert(liveness.getNumSubElements() == getNumSubelements());
   // We begin by initializing all of our init uses.
   for (auto initInstAndValue : initInsts) {
-    LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
+    LLVM_DEBUG(llvm::dbgs() << "Bits: " << initInstAndValue.second << ". Found def: " << *initInstAndValue.first);
     liveness.initializeDef(initInstAndValue.first, initInstAndValue.second);
   }
 
@@ -939,7 +941,7 @@ void UseState::initializeLiveness(
   // our reinit uses to be liveness uses.
   for (auto reinitInstAndValue : reinitInsts) {
     if (isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
-      LLVM_DEBUG(llvm::dbgs() << "Found def: " << *reinitInstAndValue.first);
+      LLVM_DEBUG(llvm::dbgs() << "Bits: " << reinitInstAndValue.second << ". Found def: " << *reinitInstAndValue.first);
       liveness.initializeDef(reinitInstAndValue.first,
                              reinitInstAndValue.second);
     }
@@ -1120,7 +1122,7 @@ void UseState::initializeLiveness(
                             livenessInstAndValue.second,
                             false /*lifetime ending*/);
     }
-    LLVM_DEBUG(llvm::dbgs() << "Added liveness for livenessInst: "
+    LLVM_DEBUG(llvm::dbgs() << "Bits: " << livenessInstAndValue.second << ". Added liveness for livenessInst: "
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
   }
