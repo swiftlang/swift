@@ -13,7 +13,7 @@
 #include "ScanFixture.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Defer.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"

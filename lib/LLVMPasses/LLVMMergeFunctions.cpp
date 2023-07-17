@@ -39,7 +39,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -1092,9 +1092,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   LLVM_DEBUG(dbgs() << "  Merge into " << NewFunction->getName() << '\n');
 
   // Move the body of FirstF into the NewFunction.
-  NewFunction->getBasicBlockList().splice(NewFunction->begin(),
-                                          FirstF->getBasicBlockList());
-
+  NewFunction->splice(NewFunction->begin(), FirstF);
   auto NewArgIter = NewFunction->arg_begin();
   for (Argument &OrigArg : FirstF->args()) {
     Argument &NewArg = *NewArgIter++;

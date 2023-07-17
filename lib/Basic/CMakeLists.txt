@@ -90,7 +90,7 @@ add_swift_host_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  LLVM_LINK_COMPONENTS support)
+  LLVM_LINK_COMPONENTS support targetparser)
 _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 

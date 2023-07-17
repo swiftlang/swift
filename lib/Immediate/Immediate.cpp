@@ -39,7 +39,10 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+
+// TODO: Replace pass manager
+//       Removed in: d623b2f95fd559901f008a0588dddd0949a8db01
+/* #include "llvm/Transforms/IPO/PassManagerBuilder.h" */
 
 #define DEBUG_TYPE "swift-immediate"
 

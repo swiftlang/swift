@@ -1095,7 +1095,7 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM ? OFM.getPointer() : nullptr,
+  buildJobs(TopLevelActions, OI, OFM ? &*OFM : nullptr,
             workingDirectory, TC, *C);
 
   if (DriverPrintDerivedOutputFileMap) {

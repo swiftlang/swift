@@ -50,6 +50,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
+#include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
@@ -109,7 +110,7 @@ namespace {
     void InclusionDirective(
         clang::SourceLocation HashLoc, const clang::Token &IncludeTok,
         StringRef FileName, bool IsAngled, clang::CharSourceRange FilenameRange,
-        llvm::Optional<clang::FileEntryRef> File, StringRef SearchPath,
+        clang::OptionalFileEntryRef File, StringRef SearchPath,
         StringRef RelativePath, const clang::Module *Imported,
         clang::SrcMgr::CharacteristicKind FileType) override {
       handleImport(Imported);
@@ -284,7 +285,7 @@ private:
   void InclusionDirective(clang::SourceLocation HashLoc,
                           const clang::Token &IncludeTok, StringRef FileName,
                           bool IsAngled, clang::CharSourceRange FilenameRange,
-                          llvm::Optional<clang::FileEntryRef> File,
+                          clang::OptionalFileEntryRef File,
                           StringRef SearchPath, StringRef RelativePath,
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) override {
@@ -374,11 +375,12 @@ public:
   }
 
   void maybeAddDependency(StringRef Filename, bool FromModule, bool IsSystem,
-                          bool IsModuleFile, bool IsMissing) override {
+                          bool IsModuleFile, clang::FileManager *fileManager,
+                          bool IsMissing) override {
     if (FileCollector)
       FileCollector->addFile(Filename);
     clang::DependencyCollector::maybeAddDependency(
-        Filename, FromModule, IsSystem, IsModuleFile, IsMissing);
+        Filename, FromModule, IsSystem, IsModuleFile, fileManager, IsMissing);
   }
 };
 } // end anonymous namespace
@@ -438,7 +440,7 @@ ClangImporter::~ClangImporter() {
 static bool clangSupportsPragmaAttributeWithSwiftAttr() {
   clang::AttributeCommonInfo swiftAttrInfo(clang::SourceRange(),
      clang::AttributeCommonInfo::AT_SwiftAttr,
-     clang::AttributeCommonInfo::AS_GNU);
+     clang::AttributeCommonInfo::Form::GNU());
   auto swiftAttrParsedInfo = clang::ParsedAttrInfo::get(swiftAttrInfo);
   return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
 }
@@ -3069,7 +3071,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      llvm::Optional<clang::FileEntryRef> LocRef =
+      clang::OptionalFileEntryRef LocRef =
           ClangSM.getFileEntryRefForID(ClangSM.getFileID(ClangLoc));
       if (!LocRef || *LocRef != File)
         return false;

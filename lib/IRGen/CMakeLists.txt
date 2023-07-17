@@ -70,6 +70,7 @@ add_swift_host_library(swiftIRGen STATIC
 
   LLVM_LINK_COMPONENTS
     target
+    targetparser
     transformutils
 )
 target_link_libraries(swiftIRGen INTERFACE

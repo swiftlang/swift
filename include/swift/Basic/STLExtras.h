@@ -28,6 +28,7 @@
 #include <numeric>
 #include <type_traits>
 #include <unordered_set>
+#include <optional>
 
 namespace swift {
 
@@ -783,6 +784,17 @@ void emplace_back_all(VectorType &vector, ValueType &&value,
 template <class VectorType>
 void emplace_back_all(VectorType &vector) {}
 
+/// Apply a function to the value if present; otherwise return None.
+template <typename OptionalElement, typename Function>
+auto transform(const llvm::Optional<OptionalElement> &value,
+               const Function &operation)
+    -> llvm::Optional<decltype(operation(*value))> {
+
+  if (value) {
+    return operation(*value);
+  }
+  return llvm::None;
+}
 } // end namespace swift
 
 #endif // SWIFT_BASIC_STLEXTRAS_H

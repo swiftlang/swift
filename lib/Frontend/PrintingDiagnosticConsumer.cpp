@@ -1011,7 +1011,6 @@ static void enqueueDiagnostic(
       info.Loc.getOpaquePointerValue(),
       highlightRanges.data(), highlightRanges.size() / 2);
 }
-#endif
 
 /// Retrieve the stack of source buffers from the provided location out to
 /// a physical source file, with source buffer IDs for each step along the way
@@ -1037,7 +1036,6 @@ static SmallVector<unsigned, 1> getSourceBufferStack(
   }
 }
 
-#if SWIFT_SWIFT_PARSER
 void PrintingDiagnosticConsumer::queueBuffer(
     SourceManager &sourceMgr, unsigned bufferID) {
   QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
@@ -1085,7 +1083,7 @@ void PrintingDiagnosticConsumer::queueBuffer(
       parentID, positionInParent);
   queuedBuffers[bufferID] = sourceFile;
 }
-#endif
+#endif // SWIFT_SWIFT_PARSER
 
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,

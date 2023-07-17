@@ -144,12 +144,6 @@ namespace swift {
                                 llvm::ModuleAnalysisManager &AM);
   };
 
-  struct SwiftDbgAddrBlockSplitterPass
-      : public llvm::PassInfoMixin<SwiftDbgAddrBlockSplitterPass> {
-    llvm::PreservedAnalyses run(llvm::Function &F,
-                                llvm::FunctionAnalysisManager &AM);
-  };
-
   struct InlineTreePrinterPass
       : public llvm::PassInfoMixin<InlineTreePrinterPass> {
     llvm::PreservedAnalyses run(llvm::Module &M,

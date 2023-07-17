@@ -19,6 +19,8 @@
 
 #include "swift/Basic/LLVM.h"
 
+#include "llvm/ADT/Optional.h"
+
 namespace llvm {
 class Triple;
 class VersionTuple;

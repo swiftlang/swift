@@ -63,7 +63,7 @@
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/MC/SubtargetFeature.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -313,13 +313,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
             MPM.addPass(SwiftMergeFunctionsPass(schema.isEnabled(), key));
           }
         });
-  }
-  if (RunSwiftSpecificLLVMOptzns) {
-    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel Level) {
-      MPM.addPass(
-          createModuleToFunctionPassAdaptor(SwiftDbgAddrBlockSplitterPass()));
-    });
   }
 
   if (Opts.GenerateProfile) {

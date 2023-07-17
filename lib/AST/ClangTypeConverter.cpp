@@ -74,6 +74,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/RISCVVTypes.def"
+#define WASM_REF_TYPE(Name, MangedNameBase, Id, SingletonId, AS)               \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
   }
 
   // Not a valid BuiltinType.

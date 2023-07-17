@@ -307,7 +307,7 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
 
   // Otherwise emit a switch statement.
   auto &C = IGF.IGM.getLLVMContext();
-  unsigned numBits = mask.countPopulation();
+  unsigned numBits = mask.popcount();
   auto target = emitGatherSpareBits(IGF, SpareBitVector::fromAPInt(mask),
                                     0, numBits);
   auto swi = IGF.Builder.CreateSwitch(target, dflt.getPointer(), cases.size());
@@ -500,7 +500,7 @@ void EnumPayload::emitScatterBits(IRGenModule &IGM,
   auto &DL = IGM.DataLayout;
 
   unsigned valueBits = DL.getTypeSizeInBits(value->getType());
-  auto totalBits = std::min(valueBits, mask.countPopulation());
+  auto totalBits = std::min(valueBits, mask.popcount());
   auto maskReader = BitPatternReader(getLowestNSetBits(mask, totalBits),
                                      DL.isLittleEndian());
   auto usedBits = 0u;
@@ -515,7 +515,7 @@ void EnumPayload::emitScatterBits(IRGenModule &IGM,
     }
 
     // Calculate the number of bits we are going to scatter.
-    auto partCount = partMask.countPopulation();
+    auto partCount = partMask.popcount();
 
     // Scatter bits from the source into the bits specified by the mask.
     auto offset = usedBits;
@@ -559,7 +559,7 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
 
   auto mask = getLowestNSetBits(spareBits.asAPInt(),
                                 resultBitWidth - firstBitOffset);
-  auto bitWidth = mask.countPopulation();
+  auto bitWidth = mask.popcount();
   auto spareBitReader = BitPatternReader(std::move(mask),
                                          DL.isLittleEndian());
   auto usedBits = firstBitOffset;
@@ -576,7 +576,7 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
     // Slice the spare bit vector.
     unsigned size = DL.getTypeSizeInBits(v->getType());
     auto spareBitsPart = spareBitReader.read(size);
-    unsigned numBitsInPart = spareBitsPart.countPopulation();
+    unsigned numBitsInPart = spareBitsPart.popcount();
 
     // If there were no spare bits in this part, it has nothing to add.
     if (numBitsInPart == 0)

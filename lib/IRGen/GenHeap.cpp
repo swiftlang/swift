@@ -697,7 +697,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Error:
     llvm_unreachable("Unsupported reference-counting style");
   }
-  return APInt::getAllOnesValue(getPointerSize().getValueInBits());
+  return APInt::getAllOnes(getPointerSize().getValueInBits());
 }
 
 llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,

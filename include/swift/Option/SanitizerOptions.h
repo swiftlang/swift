@@ -15,7 +15,7 @@
 
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should

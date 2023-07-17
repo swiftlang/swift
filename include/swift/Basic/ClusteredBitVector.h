@@ -216,7 +216,7 @@ public:
 
   /// Count the number of set bits in this vector.
   size_t count() const {
-    return Bits ? Bits.value().countPopulation() : 0;
+    return Bits ? Bits.value().popcount() : 0;
   }
 
   /// Determine if there are any bits set in this vector.
