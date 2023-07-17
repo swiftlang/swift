@@ -234,6 +234,9 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "wasi";
   case llvm::Triple::UnknownOS:
     return "none";
+  case llvm::Triple::UEFI:
+  case llvm::Triple::LiteOS:
+    llvm_unreachable("unsupported OS");
   }
   llvm_unreachable("unsupported OS");
 }
