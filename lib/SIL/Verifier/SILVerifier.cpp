@@ -125,6 +125,11 @@ bool checkResilience(DeclType *D, ModuleDecl *M,
          D->isResilient(M, expansion);
 }
 
+bool checkTypeABIAccessible(SILFunction const &F, SILType ty) {
+  return F.getASTContext().LangOpts.BypassResilienceChecks ||
+         F.isTypeABIAccessible(ty);
+}
+
 /// Metaprogramming-friendly base class.
 template <class Impl>
 class SILVerifierBase : public SILInstructionVisitor<Impl> {
@@ -2907,7 +2912,7 @@ public:
             "Dest address should be lvalue");
     requireSameType(cai->getDest()->getType(), cai->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
-    require(F.isTypeABIAccessible(cai->getDest()->getType()),
+    require(checkTypeABIAccessible(F, cai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
     require(cai->getModule().getStage() == SILStage::Raw ||
                 (cai->isTakeOfSrc() || !cai->getSrc()->getType().isMoveOnly()),
@@ -2922,7 +2927,7 @@ public:
             "Dest address should be lvalue");
     requireSameType(ecai->getDest()->getType(), ecai->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
-    require(F.isTypeABIAccessible(ecai->getDest()->getType()),
+    require(checkTypeABIAccessible(F, ecai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
   }
 
@@ -2934,7 +2939,7 @@ public:
             "Dest address should be lvalue");
     requireSameType(SI->getDest()->getType(), SI->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
-    require(F.isTypeABIAccessible(SI->getDest()->getType()),
+    require(checkTypeABIAccessible(F, SI->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
   }
 
@@ -3356,7 +3361,7 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
-    require(F.isTypeABIAccessible(DI->getOperand()->getType()),
+    require(checkTypeABIAccessible(F, DI->getOperand()->getType()),
             "cannot directly destroy type with inaccessible ABI");
   }
 
