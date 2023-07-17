@@ -418,6 +418,152 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
   llvm_unreachable("Not understand subtype");
 }
 
+void TypeTreeLeafTypeRange::constructFilteredProjections(
+    SILFunction *fn, SILType type, SmallBitVector &filterBitVector,
+    llvm::function_ref<bool(SILType, TypeTreeLeafTypeRange)> callback) {
+
+  PRUNED_LIVENESS_LOG(llvm::dbgs() << "ConstructFilteredProjection. Bv: "
+                                   << filterBitVector << '\n');
+
+  auto noneSet = [](SmallBitVector &bv, unsigned start, unsigned end) {
+    return llvm::none_of(range(start, end),
+                         [&](unsigned index) { return bv[index]; });
+  };
+  auto allSet = [](SmallBitVector &bv, unsigned start, unsigned end) {
+    return llvm::all_of(range(start, end),
+                        [&](unsigned index) { return bv[index]; });
+  };
+
+  if (auto *structDecl = type.getStructOrBoundGenericStruct()) {
+    unsigned start = startEltOffset;
+    for (auto *varDecl : structDecl->getStoredProperties()) {
+      auto nextType = type.getFieldType(varDecl, fn);
+      unsigned next = start + TypeSubElementCount(nextType, fn);
+
+      // If we do not have any set bits, do not create the struct element addr
+      // for this entry.
+      if (noneSet(filterBitVector, start, next)) {
+        start = next;
+        continue;
+      }
+
+      callback(nextType, TypeTreeLeafTypeRange(start, next));
+      start = next;
+    }
+    if (type.isValueTypeWithDeinit()) {
+      // 'self' has its own liveness
+      ++start;
+    }
+    assert(start == endEltOffset);
+    return;
+  }
+
+  // We only allow for enums that can be completely destroyed. If there is code
+  // where an enum should be partially destroyed, we need to treat the
+  // unchecked_take_enum_data_addr as a separate value whose liveness we are
+  // tracking.
+  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+    unsigned start = startEltOffset;
+
+    unsigned maxSubEltCount = 0;
+    for (auto *eltDecl : enumDecl->getAllElements()) {
+      if (!eltDecl->hasAssociatedValues())
+        continue;
+      auto nextType = type.getEnumElementType(eltDecl, fn);
+      maxSubEltCount =
+          std::max(maxSubEltCount, unsigned(TypeSubElementCount(nextType, fn)));
+    }
+
+    // Add a bit for the case bit.
+    unsigned next = maxSubEltCount + 1;
+
+    // Make sure we are all set.
+    assert(allSet(filterBitVector, start, next));
+
+    // Then just pass back our enum base value as the pointer.
+    callback(type, TypeTreeLeafTypeRange(start, next));
+
+    // Then set start to next and assert we covered the entire end elt offset.
+    start = next;
+    assert(start == endEltOffset);
+    return;
+  }
+
+  if (auto tupleType = type.getAs<TupleType>()) {
+    unsigned start = startEltOffset;
+    for (unsigned index : indices(tupleType.getElementTypes())) {
+      auto nextType = type.getTupleElementType(index);
+      unsigned next = start + TypeSubElementCount(nextType, fn);
+
+      if (noneSet(filterBitVector, start, next)) {
+        start = next;
+        continue;
+      }
+
+      callback(nextType, TypeTreeLeafTypeRange(start, next));
+      start = next;
+    }
+    assert(start == endEltOffset);
+    return;
+  }
+
+  llvm_unreachable("Not understand subtype");
+}
+
+void TypeTreeLeafTypeRange::convertNeededElementsToContiguousTypeRanges(
+    SILFunction *fn, SILType rootType, SmallBitVector &neededElements,
+    SmallVectorImpl<TypeTreeLeafTypeRange> &resultingRanges) {
+  TypeTreeLeafTypeRange rootRange(rootType, fn);
+  (void)rootRange;
+  assert(rootRange.size() == neededElements.size());
+
+  StackList<std::pair<SILType, TypeTreeLeafTypeRange>> worklist(fn);
+  worklist.push_back({rootType, rootRange});
+
+  // Temporary vector we use for our computation.
+  SmallBitVector tmp(neededElements.size());
+
+  auto allInRange = [](const SmallBitVector &bv, TypeTreeLeafTypeRange span) {
+    return llvm::all_of(span.getRange(),
+                        [&bv](unsigned index) { return bv[index]; });
+  };
+
+  while (!worklist.empty()) {
+    auto pair = worklist.pop_back_val();
+    auto type = pair.first;
+    auto range = pair.second;
+
+    tmp.reset();
+    tmp.set(range.startEltOffset, range.endEltOffset);
+
+    tmp &= neededElements;
+
+    // If we do not have any unpaired bits in this range, just continue... we do
+    // not have any further work to do.
+    if (tmp.none()) {
+      continue;
+    }
+
+    // Otherwise, we had some sort of overlap. First lets see if we have
+    // everything set in the range. In that case, we just add this range to the
+    // result and continue.
+    if (allInRange(tmp, range)) {
+      resultingRanges.emplace_back(range);
+      continue;
+    }
+
+    // Otherwise, we have a partial range. We need to split our range and then
+    // recursively process those ranges looking for subranges that have
+    // completely set bits.
+    range.constructFilteredProjections(
+        fn, type, neededElements,
+        [&](SILType subType, TypeTreeLeafTypeRange range) -> bool {
+          worklist.push_back({subType, range});
+          return true;
+        });
+  }
+}
+
 void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
     SILValue rootValue, SILInstruction *insertPt,
     SmallBitVector &neededElements,

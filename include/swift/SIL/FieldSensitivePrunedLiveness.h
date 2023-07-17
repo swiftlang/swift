@@ -395,6 +395,12 @@ struct TypeTreeLeafTypeRange {
       SILValue value, SILInstruction *insertPt, SmallBitVector &filterBitVector,
       llvm::function_ref<bool(SILValue, TypeTreeLeafTypeRange)> callback);
 
+  /// Construct per field projections if the projection range has any bits in
+  /// common with filterBitVector.
+  void constructFilteredProjections(
+      SILFunction *fn, SILType type, SmallBitVector &filterBitVector,
+      llvm::function_ref<bool(SILType, TypeTreeLeafTypeRange)> callback);
+
   void print(llvm::raw_ostream &os) const {
     os << "TypeTreeLeafTypeRange: (start: " << startEltOffset
        << ", end: " << endEltOffset << ")";

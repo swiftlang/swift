@@ -602,7 +602,7 @@ sil @get_M2 : $@convention(thin) () -> @owned M2
 sil @end_addr_see_addr : $@convention(thin) (@in M, @in_guaranteed M) -> ()
 
 /// A single instruction, apply @end_addr_see_addr, consumes one field and
-/// borrows another.  
+/// borrows another.
 
 /// Varify that the consumed value isn't destroyed twice and that the borrowed
 /// value isn't destroyed before it's used.
@@ -767,4 +767,33 @@ bb2:
 bb3:
   %9999 = tuple ()
   return %9999 : $()
+}
+
+struct S : ~Copyable {
+  var a: Builtin.NativeObject
+  var currentPosition: Int
+}
+
+sil @resume_closure_callee : $@convention(thin) (Int, @inout_aliasable S) -> Bool
+sil @fake_assert : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
+
+// CHECK-LABEL: sil [ossa] @splitContiguousRegionsTest1 : $@convention(method) (Int, @inout S) -> () {
+// CHECK: fofofofofofofofo
+sil [ossa] @splitContiguousRegionsTest1 : $@convention(method) (Int, @inout S) -> () {
+bb0(%0 : $Int, %1 : $*S):
+  debug_value %0 : $Int, let, name "index", argno 1
+  debug_value %1 : $*S, var, name "self", argno 2, implicit, expr op_deref
+  %4 = mark_must_check [consumable_and_assignable] %1 : $*S
+  %5 = function_ref @resume_closure_callee : $@convention(thin) (Int, @inout_aliasable S) -> Bool
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5(%0, %4) : $@convention(thin) (Int, @inout_aliasable S) -> Bool
+  %7 = mark_dependence %6 : $@noescape @callee_guaranteed () -> Bool on %4 : $*S
+  %22 = function_ref @fake_assert : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
+  %23 = apply %22(%7) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
+  destroy_value %7 : $@noescape @callee_guaranteed () -> Bool
+  %28 = begin_access [modify] [static] %4 : $*S
+  %29 = struct_element_addr %28 : $*S, #S.currentPosition
+  store %0 to [trivial] %29 : $*Int
+  end_access %28 : $*S
+  %32 = tuple ()
+  return %32 : $()
 }

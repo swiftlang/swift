@@ -2718,7 +2718,6 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     MarkMustCheckInst *markedValue,
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     FieldSensitivePrunedLivenessBoundary &boundary) {
-  using IsInterestingUser = FieldSensitivePrunedLiveness::IsInterestingUser;
   LLVM_DEBUG(llvm::dbgs() << "Inserting destroys on boundary!\n");
 
   // If we're in no_consume_or_assign mode, we don't insert destroys, as we've
@@ -2752,97 +2751,122 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   };
 
   // Control flow merge blocks used as insertion points.
-  llvm::DenseMap<SILBasicBlock *, SmallBitVector> mergeBlocks;
+  llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 8> mergeBlocks;
+  SmallVector<TypeTreeLeafTypeRange, 4> ranges;
 
   for (auto &pair : boundary.getLastUsers()) {
+    assert(ranges.empty());
+
     auto *inst = pair.first;
     auto &bv = pair.second;
 
     LLVM_DEBUG(llvm::dbgs() << "        User: " << *inst);
+    LLVM_DEBUG(llvm::dbgs() << "        Selected Bits: " << bv << '\n');
 
     auto interestingUser = liveness.getInterestingUser(inst);
-    SmallVector<std::pair<TypeTreeLeafTypeRange, IsInterestingUser>, 4> ranges;
-    if (interestingUser) {
-      interestingUser->getContiguousRanges(ranges);
+    assert(interestingUser);
+    SmallBitVector tmpBits(bv.size());
+
+    // Mask out our bits so that we have consuming bits selected by bv.
+    auto maskedConsumedBits = interestingUser->consumingBits & bv;
+    // And separately the bits for our live bits. A consuming bit is also a live
+    // bit, so we deselect those bits from the live bits.
+    auto maskedLiveBits = interestingUser->liveBits & bv;
+    maskedLiveBits.reset(maskedConsumedBits);
+
+    // Then we process consuming bits and purely live bits separately from each
+    // other using contiguous type ranges.
+    LLVM_DEBUG(llvm::dbgs() << "            Masked Consumed Bits: "
+                            << maskedConsumedBits << '\n');
+    TypeTreeLeafTypeRange::convertNeededElementsToContiguousTypeRanges(
+        inst->getFunction(), markedValue->getType(), maskedConsumedBits,
+        ranges);
+    while (!ranges.empty()) {
+      SWIFT_DEFER { tmpBits.reset(); };
+
+      auto r = ranges.pop_back_val();
+      r.setBits(tmpBits);
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "            Lifetime ending use! Recording final consume! Range: "
+          << r << '\n');
+      // If we have a consuming use, when we stop at the consuming use we want
+      // the value to still be around. We only want the value to be
+      // invalidated once the consume operation has occured. Thus we always
+      // place the debug_value undef strictly after the consuming operation.
+      if (auto *ti = dyn_cast<TermInst>(inst)) {
+        for (auto *succBlock : ti->getSuccessorBlocks()) {
+          insertUndefDebugValue(&succBlock->front());
+        }
+      } else {
+        insertUndefDebugValue(inst->getNextInstruction());
+      }
+      consumes.recordFinalConsume(inst, tmpBits);
     }
 
-    for (auto rangePair : ranges) {
-      SmallBitVector bits(bv.size());
-      rangePair.first.setBits(bits);
-      switch (rangePair.second) {
-      case IsInterestingUser::LifetimeEndingUse: {
+    LLVM_DEBUG(llvm::dbgs()
+               << "            Masked Live Bits: " << maskedLiveBits << '\n');
+    TypeTreeLeafTypeRange::convertNeededElementsToContiguousTypeRanges(
+        inst->getFunction(), markedValue->getType(), maskedLiveBits, ranges);
+    while (!ranges.empty()) {
+      SWIFT_DEFER { tmpBits.reset(); };
+
+      auto r = ranges.pop_back_val();
+      r.setBits(tmpBits);
+      LLVM_DEBUG(llvm::dbgs() << "            NonLifetimeEndingUse! "
+                                 "inserting destroy before instruction! Range: "
+                              << r << '\n');
+      // If we are dealing with an inout parameter, we will have modeled our
+      // last use by treating a return inst as a last use. Since it doesn't
+      // have any successors, this results in us not inserting any
+      // destroy_addr.
+      if (isa<TermInst>(inst)) {
+        auto *block = inst->getParent();
+        for (auto *succBlock : block->getSuccessorBlocks()) {
+          // If we have a merge block, we need to only destroy values once.
+          auto iter = mergeBlocks.find(succBlock);
+          if (iter == mergeBlocks.end()) {
+            iter = mergeBlocks.insert({succBlock, tmpBits}).first;
+          } else {
+            SmallBitVector &alreadySetBits = iter->second;
+            bool hadCommon = alreadySetBits.anyCommon(tmpBits);
+            alreadySetBits &= tmpBits;
+            if (hadCommon) {
+              continue;
+            }
+          }
+
+          auto *insertPt = &*succBlock->begin();
+          insertDestroyBeforeInstruction(addressUseState, insertPt,
+                                         liveness.getRootValue(), tmpBits,
+                                         consumes);
+          // We insert the debug_value undef /after/ the last use since we
+          // want the value to be around when we stop at the last use
+          // instruction.
+          insertUndefDebugValue(insertPt);
+        }
+        continue;
+      }
+
+      // If we have an implicit end of lifetime use, we do not insert a
+      // destroy_addr. Instead, we insert an undef debug value after the
+      // use. This occurs if we have an end_access associated with a
+      // global_addr or a ref_element_addr field access.
+      if (addressUseState.isImplicitEndOfLifetimeLivenessUses(inst)) {
         LLVM_DEBUG(
             llvm::dbgs()
-            << "        Lifetime ending use! Recording final consume!\n");
-        // If we have a consuming use, when we stop at the consuming use we want
-        // the value to still be around. We only want the value to be
-        // invalidated once the consume operation has occured. Thus we always
-        // place the debug_value undef strictly after the consuming operation.
-        if (auto *ti = dyn_cast<TermInst>(inst)) {
-          for (auto *succBlock : ti->getSuccessorBlocks()) {
-            insertUndefDebugValue(&succBlock->front());
-          }
-        } else {
-          insertUndefDebugValue(inst->getNextInstruction());
-        }
-        consumes.recordFinalConsume(inst, bits);
+            << "            Use was an implicit end of lifetime liveness use!\n");
+        insertUndefDebugValue(inst->getNextInstruction());
         continue;
       }
-      case IsInterestingUser::NonUser:
-        break;
-      case IsInterestingUser::NonLifetimeEndingUse:
-        LLVM_DEBUG(llvm::dbgs() << "        NonLifetimeEndingUse! "
-                                   "inserting destroy before instruction!\n");
-        // If we are dealing with an inout parameter, we will have modeled our
-        // last use by treating a return inst as a last use. Since it doesn't
-        // have any successors, this results in us not inserting any
-        // destroy_addr.
-        if (isa<TermInst>(inst)) {
-          auto *block = inst->getParent();
-          for (auto *succBlock : block->getSuccessorBlocks()) {
-            auto iter = mergeBlocks.find(succBlock);
-            if (iter == mergeBlocks.end())
-              iter = mergeBlocks.insert({succBlock, bits}).first;
-            else {
-              SmallBitVector &alreadySetBits = iter->second;
-              bool hadCommon = alreadySetBits.anyCommon(bits);
-              alreadySetBits &= bits;
-              if (hadCommon)
-                continue;
-            }
 
-            auto *insertPt = &*succBlock->begin();
-            insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                           liveness.getRootValue(), bits,
-                                           consumes);
-            // We insert the debug_value undef /after/ the last use since we
-            // want the value to be around when we stop at the last use
-            // instruction.
-            insertUndefDebugValue(insertPt);
-          }
-          continue;
-        }
-
-        // If we have an implicit end of lifetime use, we do not insert a
-        // destroy_addr. Instead, we insert an undef debug value after the
-        // use. This occurs if we have an end_access associated with a
-        // global_addr or a ref_element_addr field access.
-        if (addressUseState.isImplicitEndOfLifetimeLivenessUses(inst)) {
-          LLVM_DEBUG(
-              llvm::dbgs()
-              << "    Use was an implicit end of lifetime liveness use!\n");
-          insertUndefDebugValue(inst->getNextInstruction());
-          continue;
-        }
-
-        auto *insertPt = inst->getNextInstruction();
-        insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                       liveness.getRootValue(), bits, consumes);
-        // We insert the debug_value undef /after/ the last use since we want
-        // the value to be around when we stop at the last use instruction.
-        insertUndefDebugValue(insertPt);
-        continue;
-      }
+      auto *insertPt = inst->getNextInstruction();
+      insertDestroyBeforeInstruction(addressUseState, insertPt,
+                                     liveness.getRootValue(), tmpBits,
+                                     consumes);
+      // We insert the debug_value undef /after/ the last use since we want
+      // the value to be around when we stop at the last use instruction.
+      insertUndefDebugValue(insertPt);
     }
   }
 
