@@ -829,17 +829,7 @@ public:
     LoggerRef->setImplicit(true);
 
     if (ExtendedCallbacks) {
-      auto SourceLocBufferId = Context.SourceMgr.findBufferContainingLoc(SR.Start);
-      StringRef filePath;
-
-      // Use #sourceLocation if it exists.
-      SourceLoc sl = SR.Start;
-      auto *vf = Context.SourceMgr.getVirtualFile(sl);
-      if (vf) {
-        filePath = StringRef(vf->Name);
-      } else {
-        filePath = Context.SourceMgr.getIdentifierForBuffer(SourceLocBufferId);
-      }
+      StringRef filePath = Context.SourceMgr.getDisplayNameForLoc(SR.Start);
 
       Expr *FilePathExpr = new (Context) StringLiteralExpr(
           Context.AllocateCopy(filePath), SourceRange(), /*implicit=*/true);
