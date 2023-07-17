@@ -18,7 +18,9 @@
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas -allow-unstable-cache-key-for-testing 2>&1 | %FileCheck --allow-empty --check-prefix=SKIP-CACHE %s
 
 // CACHE-MISS: remark: cache miss output file
-// CACHE-HIT: remark: replay output file
+// CACHE-HIT: remark: replay output file '<cached-diagnostics>': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}Test.swiftmodule': key 'llvmcas://{{.*}}'
 // SKIP-CACHE-NOT: remark:
 
 func testFunc() {}
