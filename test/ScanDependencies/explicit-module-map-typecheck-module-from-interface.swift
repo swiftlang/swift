@@ -35,7 +35,7 @@
 // RUN: echo "}]" >> %/t/inputs/map.json
 
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -module-cache-path %t.module-cache \
-// RUN:   -o /dev/null -explicit-interface-module-build -explicit-swift-module-map-file %t/inputs/map.json -Rmodule-loading -Xcc -Rmodule-import 2>&1 | %FileCheck %s
+// RUN:   -explicit-interface-module-build -explicit-swift-module-map-file %t/inputs/map.json -Rmodule-loading -Xcc -Rmodule-import 2>&1 | %FileCheck %s
 
 // CHECK-DAG: loaded module 'Swift'
 // CHECK-DAG: loaded module '_StringProcessing'

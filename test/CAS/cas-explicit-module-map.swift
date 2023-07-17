@@ -120,11 +120,11 @@
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -disable-implicit-swift-modules \
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid  \
 // RUN:   -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing -swift-version 5 -enable-library-evolution \
-// RUN:   -explicit-interface-module-build -o /dev/null -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=VERIFY-OUTPUT --check-prefix=CACHE-MISS
+// RUN:   -explicit-interface-module-build -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=VERIFY-OUTPUT --check-prefix=CACHE-MISS
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -disable-implicit-swift-modules \
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid  \
 // RUN:   -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing -swift-version 5 -enable-library-evolution \
-// RUN:   -explicit-interface-module-build -o %t/check.swiftmodule -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=VERIFY-OUTPUT --check-prefix=CACHE-HIT
+// RUN:   -explicit-interface-module-build -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=VERIFY-OUTPUT --check-prefix=CACHE-HIT
 
 // CHECK-DAG: loaded module 'A'
 // CHECK-DAG: loaded module 'B'
