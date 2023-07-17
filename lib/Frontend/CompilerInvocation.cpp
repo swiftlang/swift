@@ -1302,6 +1302,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Case("task-to-thread", ConcurrencyModel::TaskToThread)
             .Default(ConcurrencyModel::Standard);
   }
+  Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }
