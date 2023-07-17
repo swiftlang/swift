@@ -9378,6 +9378,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     return result;
   }
 
+  // Delay member lookup until single-element tuple with pack expansion
+  // is sufficiently resolved.
+  if (isSingleUnlabeledPackExpansionTuple(instanceTy)) {
+    auto elementTy = instanceTy->castTo<TupleType>()->getElementType(0);
+    if (elementTy->is<TypeVariableType>()) {
+      MemberLookupResult result;
+      result.OverallResult = MemberLookupResult::Unsolved;
+      return result;
+    }
+  }
+
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
