@@ -2472,39 +2472,33 @@ namespace {
       }
 
       if (cxxRecordDecl) {
-        // FIXME: Swift right now uses AddressOnly type layout
-        // in a way that conflates C++ types
-        // that need to be destroyed or copied explicitly with C++
-        // types that have to be passed indirectly, because
-        // only AddressOnly types can be copied or destroyed using C++
-        // semantics. However, in actuality these two concepts are
-        // separate and don't map to one notion of AddressOnly type
-        // layout cleanly. We should reserve the use of AddressOnly
-        // type layout when types have to use C++ copy/move/destroy
-        // operations, but allow AddressOnly types to be passed
-        // directly as well. This will help unify the MSVC and
-        // Itanium difference here, and will allow us to support
-        // trivial_abi C++ types as well.
-        auto isNonTrivialForPurposeOfCalls =
-            [](const clang::CXXRecordDecl *decl) -> bool {
-          return decl->hasNonTrivialCopyConstructor() ||
-                 decl->hasNonTrivialMoveConstructor() ||
-                 !decl->hasTrivialDestructor();
-        };
-        auto isAddressOnlySwiftStruct =
-            [&](const clang::CXXRecordDecl *decl) -> bool {
-          // MSVC ABI allows non-trivially destroyed C++ types
-          // to be passed in register. This is not supported, as such
-          // type wouldn't be destroyed in Swift correctly. Therefore,
-          // force AddressOnly type layout using the old heuristic.
-          // FIXME: Support can pass in registers for MSVC correctly.
-          if (Impl.SwiftContext.LangOpts.Target.isWindowsMSVCEnvironment())
-            return isNonTrivialForPurposeOfCalls(decl);
-          return !decl->canPassInRegisters();
-        };
-        if (auto structResult = dyn_cast<StructDecl>(result))
-          structResult->setIsCxxNonTrivial(
-              isAddressOnlySwiftStruct(cxxRecordDecl));
+        if (auto structResult = dyn_cast<StructDecl>(result)) {
+          // Address-only type is a type that can't be passed in registers.
+          // Address-only types are typically non-trivial, however some
+          // non-trivial types can be loadable as well (although such types
+          // are not yet available in Swift).
+          bool isAddressOnly = !cxxRecordDecl->canPassInRegisters();
+          // Check if the given type is non-trivial to ensure we can
+          // still perform the right copy/move/destroy even if it's
+          // not an address-only type.
+          auto isNonTrivial = [](const clang::CXXRecordDecl *decl) -> bool {
+            return decl->hasNonTrivialCopyConstructor() ||
+                   decl->hasNonTrivialMoveConstructor() ||
+                   !decl->hasTrivialDestructor();
+          };
+          if (!isAddressOnly &&
+              Impl.SwiftContext.LangOpts.Target.isWindowsMSVCEnvironment() &&
+              isNonTrivial(cxxRecordDecl)) {
+            // MSVC ABI allows non-trivially destroyed C++ types
+            // to be passed in register. This is not supported, as such
+            // type wouldn't be destroyed in Swift correctly. Therefore,
+            // mark this type as unavailable.
+            // FIXME: Support can pass in registers for MSVC correctly.
+            Impl.markUnavailable(result, "non-trivial C++ class with trivial "
+                                         "ABI is not yet available in Swift");
+          }
+          structResult->setIsCxxNonTrivial(isAddressOnly);
+        }
 
         for (auto &getterAndSetter : Impl.GetterSetterMap[result]) {
           auto getter = getterAndSetter.second.first;
