@@ -213,18 +213,17 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
 
     var context: (DWORD64, String?) = (pSymbolInfo.pointee.ModBase, nil)
-    _ = SymEnumerateModules64(
-      self.process,
-      { ModuleName, BaseOfDll, UserContext in
-        let pContext: UnsafeMutablePointer<(DWORD64, String?)> =
-          UserContext!.bindMemory(to: (DWORD64, String?).self, capacity: 1)
-
-        if BaseOfDll == pContext.pointee.0 {
-          pContext.pointee.1 = String(cString: ModuleName!)
-          return false
+    _ = withUnsafeMutablePointer(to: &context) {
+      SymEnumerateModules64(self.process, { (ModuleName, BaseOfDll, UserContext) -> WindowsBool in
+        if let pContext = UserContext?.bindMemory(to: (DWORD64, String?).self, capacity: 1) {
+          if pContext.pointee.0 == BaseOfDll {
+            pContext.pointee.1 = String(cString: ModuleName!)
+            return false
+          }
         }
         return true
-      }, &context)
+      }, $0)
+    }
 
     return (context.1, symbol)
   }
