@@ -15,6 +15,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -119,6 +120,9 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
                                               LocWithParent *parentLoc) {
+  PrettyStackTraceSILFunction stackTrace(
+      "Running performance diangostics on (visiting) ", function);
+
   if (!function->isDefinition())
     return false;
 
@@ -156,6 +160,8 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
         if (visitCallee(&inst, bca->getCalleeList(as), perfConstr, parentLoc))
           return true;
       } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
+        PrettyStackTraceSILNode biStackTrace(
+            "Validating built in (once, once with context)", bi);
         switch (bi->getBuiltinInfo().ID) {
           case BuiltinValueKind::Once:
           case BuiltinValueKind::OnceWithContext:
@@ -204,6 +210,8 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
                                             SILInstruction *callInst,
                                             PerformanceConstraints perfConstr,
                                             LocWithParent *parentLoc) {
+  PrettyStackTraceSILNode closureStackTrace("Validating closure", closure);
+
   // Walk through the definition of the closure until we find the "underlying"
   // function_ref instruction.
   while (!isa<FunctionRefInst>(closure)) {
@@ -243,6 +251,8 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
                                          CalleeList callees,
                                          PerformanceConstraints perfConstr,
                                          LocWithParent *parentLoc) {
+  PrettyStackTraceSILNode callStackTrace("Validating callee", callInst);
+
   LocWithParent asLoc(callInst->getLoc().getSourceLoc(), parentLoc);
   LocWithParent *loc = &asLoc;
   if (parentLoc && asLoc.loc == callInst->getFunction()->getLocation().getSourceLoc())
@@ -281,6 +291,8 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
 }
 
 static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
+  PrettyStackTraceSILNode mtStackTrace("Validating metatype", mt);
+
   for (Operand *use : mt->getUses()) {
     if (auto  *bi = dyn_cast<BuiltinInst>(use->getUser())) {
       switch (bi->getBuiltinInfo().ID) {
@@ -303,6 +315,8 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
 bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
                                           PerformanceConstraints perfConstr,
                                           LocWithParent *parentLoc) {
+  PrettyStackTraceSILNode stackTrace("validating sil instruction (visiting)", inst);
+
   SILType impactType;
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
