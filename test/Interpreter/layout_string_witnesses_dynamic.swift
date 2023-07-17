@@ -686,6 +686,22 @@ func testResilientSingletonEnumGenericInjectTag() {
 
 testResilientSingletonEnumGenericInjectTag()
 
+enum ResilientPayloadSinglePayloadEnum {
+    case empty0
+    case empty1
+    case empty2
+    case nonEmpty(ResilientSinglePayloadEnum, Int)
+}
+
+func testResilientPayloadSinglePayloadEnum() {
+    let xxx = ResilientPayloadSinglePayloadEnum.nonEmpty(.empty0, 1)
+
+    // CHECK: nonEmpty(layout_string_witnesses_types_resilient.ResilientSinglePayloadEnum.empty0, 1)
+    print(xxx)
+}
+
+testResilientPayloadSinglePayloadEnum()
+
 #if os(macOS)
 
 import Foundation
