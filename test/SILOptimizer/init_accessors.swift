@@ -4,6 +4,8 @@
 
 // REQUIRES: asserts
 
+class NSObject {}
+
 struct TestInit {
   var x: Int
   var y: Int
@@ -452,6 +454,33 @@ func test_assignments() {
     init(a: Int, b: Int) {
       self.a = a
       self.pair = (0, b)
+    }
+  }
+}
+
+// rdar://112417250 (Crash with macro expansion on generic NSObject subclass)
+// self is already borrowed within the initializer.
+//
+// CHECK-LABEL: sil private [ossa] @$s14init_accessors8testObjCyyF07GenericD9CSubclassL_CyADyxGxcfc : $@convention(method) <T> (@in T, @owned GenericObjCSubclass<T>) -> @owned GenericObjCSubclass<T> {
+// CHECK:   [[BORROW:%.*]] = load_borrow %{{.*}} : $*GenericObjCSubclass<T>
+// CHECK:   ref_element_addr [[BORROW]] : $GenericObjCSubclass<T>, #<abstract function>GenericObjCSubclass._value
+// CHECK:   apply
+// CHECK:   end_borrow [[BORROW]] : $GenericObjCSubclass<T>
+// CHECK-NOT: end_borrow [[BORROW]] : $GenericObjCSubclass<T>
+func testObjC() {
+  class GenericObjCSubclass<T>: NSObject {
+    var _value: T
+
+    var value: T {
+      init initializes(_value) {
+        self._value = newValue
+      }
+      get { _value }
+      set { _value = newValue }
+    }
+
+    init(_ value: T) {
+      self.value = value
     }
   }
 }
