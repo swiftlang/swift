@@ -6193,6 +6193,39 @@ public:
   }
 };
 
+/// Find any references to not yet resolved outer VarDecls (including closure
+/// parameters) used in the body of a conjunction element (e.g closures, taps,
+/// if/switch expressions). This is required because isolated conjunctions, just
+/// like single-expression closures, have to be connected to type variables they
+/// are going to use, otherwise they'll get placed in a separate solver
+/// component and would never produce a solution.
+class VarRefCollector : public ASTWalker {
+  ConstraintSystem &CS;
+  llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+
+public:
+  VarRefCollector(ConstraintSystem &cs) : CS(cs) {}
+
+  /// Infer the referenced type variables from a given decl.
+  void inferTypeVars(Decl *D);
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override;
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    // We only need to walk into PatternBindingDecls, other kinds of decls
+    // cannot reference outer vars.
+    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+  }
+
+  ArrayRef<TypeVariableType *> getTypeVars() const {
+    return TypeVars.getArrayRef();
+  }
+};
+
 /// Determine whether given type is a known one
 /// for a key path `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);

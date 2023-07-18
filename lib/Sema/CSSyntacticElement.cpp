@@ -239,50 +239,6 @@ private:
   }
 };
 
-/// Find any references to not yet resolved outer VarDecls (including closure
-/// parameters) used in the body of the inner closure. This is required because
-/// isolated conjunctions, just like single-expression closures, have
-/// to be connected to type variables they are going to use, otherwise
-/// they'll get placed in a separate solver component and would never
-/// produce a solution.
-class UnresolvedVarCollector : public ASTWalker {
-  ConstraintSystem &CS;
-
-  llvm::SmallSetVector<TypeVariableType *, 4> Vars;
-
-public:
-  UnresolvedVarCollector(ConstraintSystem &cs) : CS(cs) {}
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-      auto *decl = DRE->getDecl();
-      if (isa<VarDecl>(decl)) {
-        if (auto type = CS.getTypeIfAvailable(decl)) {
-          if (auto *typeVar = type->getAs<TypeVariableType>()) {
-            Vars.insert(typeVar);
-          } else if (type->hasTypeVariable()) {
-            // Parameter or result type could be only partially
-            // resolved e.g. `{ (x: X) -> Void in ... }` where
-            // `X` is a generic type.
-            SmallPtrSet<TypeVariableType *, 4> typeVars;
-            type->getTypeVariables(typeVars);
-            Vars.insert(typeVars.begin(), typeVars.end());
-          }
-        }
-      }
-    }
-    return Action::Continue(expr);
-  }
-
-  ArrayRef<TypeVariableType *> getVariables() const {
-    return Vars.getArrayRef();
-  }
-};
-
 // MARK: Constraint generation
 
 /// Check whether it makes sense to convert this element into a constraint.
@@ -366,7 +322,7 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
-  UnresolvedVarCollector paramCollector(cs);
+  VarRefCollector paramCollector(cs);
 
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
@@ -394,7 +350,7 @@ static void createConjunction(ConstraintSystem &cs,
   if (constraints.empty())
     return;
 
-  for (auto *externalVar : paramCollector.getVariables())
+  for (auto *externalVar : paramCollector.getTypeVars())
     referencedVars.push_back(externalVar);
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
