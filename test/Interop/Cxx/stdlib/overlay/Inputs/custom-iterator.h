@@ -830,4 +830,40 @@ struct InheritedTemplatedConstRACIteratorOutOfLineOps
 typedef InheritedTemplatedConstRACIteratorOutOfLineOps<int>
     InheritedTemplatedConstRACIteratorOutOfLineOpsInt;
 
+struct InputOutputIterator {
+private:
+  int value;
+
+public:
+  struct iterator_category : std::input_iterator_tag,
+                             std::output_iterator_tag {};
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  InputOutputIterator(int value) : value(value) {}
+  InputOutputIterator(const InputOutputIterator &other) = default;
+
+  const int &operator*() const { return value; }
+  int &operator*() { return value; }
+
+  InputOutputIterator &operator++() {
+    value++;
+    return *this;
+  }
+  InputOutputIterator operator++(int) {
+    auto tmp = InputOutputIterator(value);
+    value++;
+    return tmp;
+  }
+
+  bool operator==(const InputOutputIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const InputOutputIterator &other) const {
+    return value != other.value;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H
