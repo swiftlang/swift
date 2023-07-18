@@ -38,6 +38,17 @@ static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   return apply->getIsolationCrossing().has_value();
 }
 
+inline bool isAddress(SILValue val) {
+  return val->getType().isAddress();
+}
+
+inline bool isApplyInst(const SILInstruction &inst) {
+  return isa<ApplyInst, TryApplyInst, PartialApplyInst, BuiltinInst>(inst);
+}
+
+using TrackableValueID = PartitionPrimitives::Element;
+using Region = PartitionPrimitives::Region;
+
 // PartitionOpTranslator is responsible for performing the translation from
 // SILInstructions to PartitionOps. Not all SILInstructions have an effect on
 // the region partition, and some have multiple effects - such as an application
@@ -58,11 +69,100 @@ class PartitionOpTranslator {
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
 
+  class TrackableSILValue {
+    bool aliased = true;
+    bool sendable = false;
+    SILValue value;
+
+    AccessStorage getAccessStorageFromAddr(SILValue val) {
+      assert(isAddress(val));
+      auto accessStorage = AccessStorage::compute(val);
+      if (accessStorage) {
+        auto definingInst = accessStorage.getRoot().getDefiningInstruction();
+        if (definingInst &&
+            isa<InitExistentialAddrInst, CopyValueInst>(definingInst))
+          // look through these because AccessStorage does not
+          return getAccessStorageFromAddr(definingInst->getOperand(0));
+      }
+      return accessStorage;
+    }
+
+    // simplifyVal reduces an address-typed SILValue to the root SILValue
+    // that it was derived from, reducing the set of values that must be
+    // reasoned about by rendering two values that are projections/aliases the
+    // same.
+    SILValue simplifyVal(SILValue val) {
+      if (!isAddress(val))
+        return getUnderlyingObject(val);
+      if (auto accessStorage = getAccessStorageFromAddr(val)) {
+        return accessStorage.getRoot();
+      }
+      return val;
+    }
+
+  public:
+    TrackableSILValue(const PartitionOpTranslator *translator,
+                      SILValue value_in) :
+        value(simplifyVal(value_in)) {
+
+      // set `aliased` appropriately
+      if (isAddress(value))
+        if (auto accessStorage = AccessStorage::compute(value))
+          aliased = !accessStorage.isUniquelyIdentified() ||
+                    translator->capturedUIValues.count(*this);
+
+      // set `sendable` appropriately
+      SILInstruction *defInst = value.getDefiningInstruction();
+      if (defInst && isa<ClassMethodInst, FunctionRefInst>(defInst)) {
+        // though these values are technically non-Sendable, we can safely
+        // and consistently treat them as Sendable
+        sendable = true;
+      } else {
+        sendable = !translator->isNonSendableType(value->getType());
+      }
+    }
+    inline bool isAliased() const {
+      return aliased;
+    }
+
+    inline bool isUnaliased() const {
+      return !aliased;
+    }
+
+    inline bool isSendable() const {
+      return sendable;
+    }
+
+    inline bool isNonSendable() const {
+      return !sendable;
+    }
+
+    SILValue getValue() const {
+      return value;
+    }
+
+    // comparison operates lookthrough to the underlying SILValue
+    bool operator==(const TrackableSILValue &other) const {
+      return value == other.value;
+    }
+    bool operator<(const TrackableSILValue &other) const {
+        return value < other.value;
+    }
+  };
+
+  llvm::Optional<TrackableSILValue> trackIfNonSendable(SILValue value) const {
+    auto trackedVal = TrackableSILValue(this, value);
+    if (trackedVal.isNonSendable()) {
+        return trackedVal;
+    }
+    return {};
+  }
+
   // nodeIDMap stores unique IDs for all SILNodes corresponding to
   // non-Sendable values. Implicit conversion from SILValue used pervasively.
   // ensure simplifyVal is called on SILValues before entering into this map
-  llvm::DenseMap<const SILNode *, unsigned> nodeIDMap;
-  unsigned nextNodeID = 0;
+  std::map<TrackableSILValue, TrackableValueID> trackableValueIDs;
+  unsigned nextID = 0;
 
   // some values that AccessStorage claims are uniquely identified are still
   // captured (e.g. in a closure). This set is initialized upon
@@ -73,7 +173,7 @@ class PartitionOpTranslator {
   //       but at what points in function flow they do, this would be more
   //       permissive, but I'm avoiding implementing it in case existing
   //       utilities would make it easier than handrolling
-  std::set<SILValue> capturedUIValues;
+  std::set<TrackableSILValue> capturedUIValues;
 
   void initCapturedUIValues() {
     for (const SILBasicBlock &block: *function) {
@@ -82,8 +182,9 @@ class PartitionOpTranslator {
           // add all nonsendable, uniquely identified arguments to applications
           // to capturedUIValues, because applications capture them
           for (SILValue val : inst.getOperandValues()) {
-            if (isNonSendable(val) && isUniquelyIdentified(val))
-              capturedUIValues.insert(simplifyVal(val));
+            auto trackVal = TrackableSILValue(this, val);
+            if (trackVal.isNonSendable() && trackVal.isUnaliased())
+              capturedUIValues.insert(trackVal);
           }
         }
       }
@@ -94,9 +195,9 @@ public:
   // create a new PartitionOpTranslator, all that's needed is the underlying
   // SIL function
   PartitionOpTranslator(SILFunction *function) :
-                                                 function(function),
-                                                 sendableProtocol(function->getASTContext()
-                                                                      .getProtocol(KnownProtocolKind::Sendable)) {
+      function(function),
+      sendableProtocol(function->getASTContext()
+                           .getProtocol(KnownProtocolKind::Sendable)) {
     assert(sendableProtocol && "PartitionOpTranslators should only be created "
                                "in contexts in which the availability of the "
                                "Sendable protocol has already been checked.");
@@ -104,81 +205,33 @@ public:
     LLVM_DEBUG(
       llvm::dbgs() << "Captured Uniquely Identified addresses for "
                      << function->getName() << ":\n";
-      for (SILValue val : capturedUIValues)
-            val->dump();
-
+      for (TrackableSILValue val : capturedUIValues)
+            val.getValue()->dump();
     );
   }
 
 private:
-  static inline bool isAddress(SILValue val) {
-    return val->getType().isAddress();
-  }
-
-  static bool isApplyInst(const SILInstruction &inst) {
-    return isa<ApplyInst, TryApplyInst, PartialApplyInst, BuiltinInst>(inst);
-  }
-
-  AccessStorage getAccessStorageFromAddr(SILValue val) {
-    assert(isAddress(val));
-    auto accessStorage = AccessStorage::compute(val);
-    if (accessStorage) {
-      auto definingInst = accessStorage.getRoot().getDefiningInstruction();
-      if (definingInst &&
-          isa<InitExistentialAddrInst, CopyValueInst>(definingInst))
-        // look through these because AccessStorage does not
-        return getAccessStorageFromAddr(definingInst->getOperand(0));
-    }
-    return accessStorage;
-  }
-
-  bool isUniquelyIdentified(SILValue val) {
-    val = simplifyVal(val);
-    if (!isAddress(val))
-      return false;
-    if (auto accessStorage = getAccessStorageFromAddr(val))
-      return accessStorage.isUniquelyIdentified() &&
-             !capturedUIValues.count(simplifyVal(val));
-    return false;
-  }
-
-  // simplifyVal reduces an address-typed SILValue to the root SILValue
-  // that it was derived from, reducing the set of values that must be
-  // reasoned about by rendering two values that are projections/aliases the
-  // same.
-  // TODO: make usage of this more principled with a wrapper type SimplSILValue
-  SILValue simplifyVal(SILValue val) {
-    if (!isAddress(val))
-      return getUnderlyingObject(val);
-    if (auto accessStorage = getAccessStorageFromAddr(val)) {
-      return accessStorage.getRoot();
-    }
-    return val;
-  }
-
-  bool nodeHasID(SILValue value) {
-    value = simplifyVal(value);
-    assert(isNonSendable(value) &&
+  bool valueHasID(TrackableSILValue value) {
+    assert(value.isNonSendable() &&
            "only non-Sendable values should be entered in the map");
-    return nodeIDMap.count(value);
+    return trackableValueIDs.count(value);
   }
 
   // lookup the internally assigned unique ID of a SILValue, or create one
-  unsigned lookupNodeID(SILValue value) {
-    value = simplifyVal(value);
-    assert(isNonSendable(value) &&
+  TrackableValueID lookupValueID(TrackableSILValue value) {
+    assert(value.isNonSendable() &&
            "only non-Sendable values should be entered in the map");
-    if (nodeIDMap.count(value)) {
-      return nodeIDMap[value];
+    if (trackableValueIDs.count(value)) {
+      return trackableValueIDs.at(value);
     }
-    nodeIDMap[value] = nextNodeID;
-    return nextNodeID++;
+    trackableValueIDs.insert({value, TrackableValueID(nextID)});
+    return TrackableValueID(nextID++);
   }
 
   // check the passed type for sendability, special casing the type used for
   // raw pointers to ensure it is treated as non-Sendable and strict checking
   // is applied to it
-  bool isNonSendableType(SILType type) {
+  bool isNonSendableType(SILType type) const {
     if (type.getASTType()->getKind() == TypeKind::BuiltinNativeObject) {
       // these are very unsafe... definitely not Sendable
       return true;
@@ -189,22 +242,6 @@ private:
         .hasMissingConformance(function->getParentModule());
   }
 
-  // check the passed value for sendability, special casing for values known
-  // to be functions or class methods because these can safely be treated as
-  // Sendable despite not having true Sendable type
-  bool isNonSendable(SILValue value) {
-    value = simplifyVal(value);
-    SILInstruction *defInst = value.getDefiningInstruction();
-    if (defInst && isa<ClassMethodInst, FunctionRefInst>(defInst)) {
-      // though these values are technically non-Sendable, we can safely
-      // and consistently treat them as Sendable
-      return false;
-    }
-
-    //consider caching this if it's a bottleneck
-    return isNonSendableType(value->getType());
-  }
-
   // used to statefully track the instruction currently being translated,
   // for insertion into generated PartitionOps
   SILInstruction *currentInstruction;
@@ -213,62 +250,67 @@ private:
   // The following section of functions create fresh PartitionOps referencing
   // the current value of currentInstruction for ease of programming.
 
-  std::vector<PartitionOp> AssignFresh(SILValue value) {
-    return {PartitionOp::AssignFresh(lookupNodeID(value),
+  std::vector<PartitionOp> AssignFresh(TrackableSILValue value) {
+    return {PartitionOp::AssignFresh(
+        lookupValueID(value),
         currentInstruction)};
   }
 
-  std::vector<PartitionOp> Assign(SILValue tgt, SILValue src) {
-    assert(nodeHasID(src) &&
+  std::vector<PartitionOp> Assign(TrackableSILValue tgt, TrackableSILValue src) {
+    assert(valueHasID(src) &&
            "source value of assignment should already have been encountered");
 
-    if (lookupNodeID(tgt) == lookupNodeID(src))
+    if (lookupValueID(tgt) == lookupValueID(src))
       return {}; //noop
 
-    return {PartitionOp::Assign(lookupNodeID(tgt), lookupNodeID(src),
-                                currentInstruction)};
+    return {PartitionOp::Assign(
+        lookupValueID(tgt),
+        lookupValueID(src),
+        currentInstruction)};
   }
 
-  std::vector<PartitionOp> Consume(SILValue value) {
-    assert(nodeHasID(value) &&
+  std::vector<PartitionOp> Consume(TrackableSILValue value) {
+    assert(valueHasID(value) &&
            "consumed value should already have been encountered");
 
-    return {PartitionOp::Consume(lookupNodeID(value),
-                                currentInstruction)};
+    return {PartitionOp::Consume(
+        lookupValueID(value),
+        currentInstruction)};
   }
 
-  std::vector<PartitionOp> Merge(SILValue fst, SILValue snd) {
-    assert(nodeHasID(fst) && nodeHasID(snd) &&
+  std::vector<PartitionOp> Merge(TrackableSILValue fst, TrackableSILValue snd) {
+    assert(valueHasID(fst) && valueHasID(snd) &&
            "merged values should already have been encountered");
 
-    if (lookupNodeID(fst) == lookupNodeID(snd))
+    if (lookupValueID(fst) == lookupValueID(snd))
       return {}; //noop
 
-    return {PartitionOp::Merge(lookupNodeID(fst), lookupNodeID(snd),
+    return {PartitionOp::Merge(lookupValueID(fst), lookupValueID(snd),
                               currentInstruction)};
   }
 
-  std::vector<PartitionOp> Require(SILValue value) {
-    assert(nodeHasID(value) &&
+  std::vector<PartitionOp> Require(TrackableSILValue value) {
+    assert(valueHasID(value) &&
            "required value should already have been encountered");
-    return {PartitionOp::Require(lookupNodeID(value),
-                                currentInstruction)};
+    return {PartitionOp::Require(
+        lookupValueID(value),
+        currentInstruction)};
   }
   // ===========================================================================
 
   // Get the vector of IDs corresponding to the arguments to the underlying
   // function, and the self parameter if there is one.
-  std::vector<unsigned> getArgIDs() {
-    std::vector<unsigned> argIDs;
-    for (SILArgument *arg : function->getArguments()) {
-      if (isNonSendableType(arg->getType())) {
-        argIDs.push_back(lookupNodeID(arg));
-      }
-    }
-    if (function->hasSelfParam() &&
-        isNonSendableType(function->getSelfArgument()->getType())) {
-      argIDs.push_back(lookupNodeID(function->getSelfArgument()));
-    }
+  std::vector<TrackableValueID> getArgIDs() {
+    std::vector<TrackableValueID> argIDs;
+
+    for (SILArgument *arg : function->getArguments())
+      if (auto trackArg = trackIfNonSendable(arg))
+        argIDs.push_back(lookupValueID(trackArg.value()));
+
+    if (function->hasSelfParam())
+      if (auto trackSelf = trackIfNonSendable(function->getSelfArgument()))
+          argIDs.push_back(lookupValueID(trackSelf.value()));
+
     return argIDs;
   }
 
@@ -284,7 +326,7 @@ public:
   // Get the vector of IDs that cannot be legally consumed at any point in
   // this function. Since we place all args and self in a single region right
   // now, it is only necessary to choose a single representative of the set.
-  std::vector<unsigned> getNonConsumables() {
+  std::vector<TrackableValueID> getNonConsumables() {
     if (const auto &argIDs = getArgIDs(); !argIDs.empty()) {
       return {argIDs.front()};
     }
@@ -299,14 +341,15 @@ public:
   std::vector<PartitionOp> translateSILApply(const SILInstruction *applyInst) {
     // accumulates the non-Sendable operands to this apply, include self and
     // the callee
-    std::vector<SILValue> nonSendableOperands;
+    std::vector<TrackableSILValue> nonSendableOperands;
 
     for (SILValue operand : applyInst->getOperandValues())
-      if (isNonSendable(operand))
-        nonSendableOperands.push_back(operand);
+      if (auto trackOperand = trackIfNonSendable(operand))
+        nonSendableOperands.push_back(trackOperand.value());
 
     // check whether the result is non-Sendable
-    bool nonSendableResult = isNonSendable(applyInst->getResult(0));
+    llvm::Optional<TrackableSILValue> nonSendableResult =
+        trackIfNonSendable(applyInst->getResult(0));
 
     std::vector<PartitionOp> translated;
     auto add_to_translation = [&](std::vector<PartitionOp> ops) {
@@ -315,14 +358,14 @@ public:
 
     if (SILApplyCrossesIsolation(applyInst)) {
       // for calls that cross isolation domains, consume all operands
-      for (SILValue operand : nonSendableOperands)
+      for (auto operand : nonSendableOperands)
         add_to_translation(Consume(operand));
 
       if (nonSendableResult) {
         // returning non-Sendable values from a cross isolation call will always
         // be an error, but doesn't need to be diagnosed here, so let's pretend
         // it gets a fresh region
-        add_to_translation(AssignFresh(applyInst->getResult(0)));
+        add_to_translation(AssignFresh(nonSendableResult.value()));
       }
       return translated;
     }
@@ -333,79 +376,89 @@ public:
     if (nonSendableOperands.empty()) {
       // if no operands, a non-Sendable result gets a fresh region
       if (nonSendableResult) {
-        add_to_translation(AssignFresh(applyInst->getResult(0)));
+        add_to_translation(AssignFresh(nonSendableResult.value()));
       }
       return translated;
     }
 
-    if (nonSendableOperands.size() == 1) {
-      // only one operand, so no merges required; just a `Require`
-      add_to_translation(Require(nonSendableOperands.front()));
-    } else {
-      // merge all operands
-      for (unsigned i = 1; i < nonSendableOperands.size(); i++) {
-        add_to_translation(Merge(nonSendableOperands.at(i-1),
-                                   nonSendableOperands.at(i)));
-      }
+    // insert Requires for all operands
+    for (auto operand : nonSendableOperands)
+      add_to_translation(Require(operand));
+
+    // insert Merges all operands (left to right)
+    for (unsigned i = 1; i < nonSendableOperands.size(); i++) {
+      add_to_translation(Merge(nonSendableOperands.at(i-1),
+                               nonSendableOperands.at(i)));
     }
 
     // if the result is non-Sendable, assign it to the region of the operands
     if (nonSendableResult) {
       add_to_translation(
-          Assign(applyInst->getResult(0), nonSendableOperands.front()));
+          Assign(nonSendableResult.value(), nonSendableOperands.front()));
     }
 
     return translated;
   }
 
   std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
+    auto nonSendableTarget = trackIfNonSendable(tgt);
     // no work to be done if assignment is to a Sendable target
-    if (!isNonSendable(tgt))
+    if (!nonSendableTarget)
       return {};
 
-    if (isNonSendable(src)) {
+    auto nonSendableSource = trackIfNonSendable(src);
+
+    if (nonSendableSource) {
       // non-Sendable source and target of assignment, so just perform the assign
-      return Assign(tgt, src);
+      return Assign(nonSendableTarget.value(), nonSendableSource.value());
     }
 
     // a non-Sendable value is extracted from a Sendable value,
-    // seems to only occur when performing unchecked casts like
-    // `unchecked_ref_cast`
-    return AssignFresh(tgt);
+    // e.g. unchecked casts like `unchecked_ref_cast` or storing
+    // of a sendable value into non-sendable storage
+    return AssignFresh(nonSendableTarget.value());
   }
 
   // If the passed SILValue is NonSendable, then create a fresh region for it,
   // otherwise do nothing.
-  std::vector<PartitionOp> translateSILAssignFresh(SILValue fresh) {
-    if (isNonSendable(fresh)) {
-      return AssignFresh(fresh);
-    }
+  std::vector<PartitionOp> translateSILAssignFresh(SILValue val) {
+    if (auto nonSendableVal = trackIfNonSendable(val))
+      return AssignFresh(nonSendableVal.value());
     return {};
   }
 
   std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
-    if (isNonSendable(fst) && isNonSendable(snd)) {
-      return Merge(fst, snd);
-    }
+    auto nonSendableFst = trackIfNonSendable(fst);
+    auto nonSendableSnd = trackIfNonSendable(snd);
+    if (nonSendableFst && nonSendableSnd)
+      return Merge(nonSendableFst.value(), nonSendableSnd.value());
     return {};
   }
 
   std::vector<PartitionOp> translateSILStore(SILValue tgt, SILValue src) {
-    if (isUniquelyIdentified(tgt)) {
-      return translateSILAssign(tgt, src);
+    if (auto nonSendableTgt = trackIfNonSendable(tgt)) {
+
+      // stores to unaliased storage can be treated as assignments, not merges
+      if (nonSendableTgt.value().isUnaliased())
+        return translateSILAssign(tgt, src);
+
+      // stores to possibly aliased storage must be treated as merges
+      return translateSILMerge(tgt, src);
     }
-    return translateSILMerge(tgt, src);
+
+    // stores to storage of non-Sendable type can be ignored
+    return {};
   }
 
   std::vector<PartitionOp> translateSILRequire(SILValue val) {
-    if (isNonSendable(val)) {
-      return Require(val);
-    }
+    if (auto nonSendableVal = trackIfNonSendable(val))
+      return Require(nonSendableVal.value());
     return {};
   }
   // ===========================================================================
 
   // used to index the translations of SILInstructions performed
+  // for refrence and debugging
   int translationIndex = 0;
 
   // Some SILInstructions contribute to the partition of non-Sendable values
@@ -605,9 +658,9 @@ class BlockPartitionState {
   // but this time pass in a handleFailure closure that can be used
   // to diagnose any failures
   void diagnoseFailures(
-      llvm::function_ref<void(const PartitionOp&, unsigned)>
+      llvm::function_ref<void(const PartitionOp&, TrackableValueID)>
           handleFailure,
-      llvm::function_ref<void(const PartitionOp&, unsigned)>
+      llvm::function_ref<void(const PartitionOp&, TrackableValueID)>
           handleConsumeNonConsumable) {
     Partition workingPartition = entryPartition;
     for (auto &partitionOp : blockPartitionOps) {
@@ -806,7 +859,8 @@ public:
       llvm::function_ref<void(const PartitionOp& requireOp)>
           processRequireOp) const {
     for (auto [consumeOp, requireOps] : requirementsForConsumptions) {
-      unsigned numProcessed = std::min({requireOps.size(), (unsigned long) numRequiresPerConsume});
+      unsigned numProcessed = std::min({(unsigned) requireOps.size(),
+                                        (unsigned) numRequiresPerConsume});
       processConsumeOp(consumeOp, numProcessed, requireOps.size() - numProcessed);
       unsigned numRequiresToProcess = numRequiresPerConsume;
       for (auto [requireOp, _] : requireOps) {
@@ -826,16 +880,16 @@ public:
 class RaceTracer {
   const BasicBlockData<BlockPartitionState>& blockStates;
 
-  std::map<std::pair<SILBasicBlock *, unsigned>, ConsumedReason>
+  std::map<std::pair<SILBasicBlock *, TrackableValueID>, ConsumedReason>
       consumedAtEntryReasons;
 
   // caches the reasons why consumedVals were consumed at the exit to basic blocks
-  std::map<std::pair<SILBasicBlock *, unsigned>, LocalConsumedReason>
+  std::map<std::pair<SILBasicBlock *, TrackableValueID>, LocalConsumedReason>
       consumedAtExitReasons;
 
   ConsumeRequireAccumulator accumulator;
 
-  ConsumedReason findConsumedAtOpReason(unsigned consumedVal, PartitionOp op) {
+  ConsumedReason findConsumedAtOpReason(TrackableValueID consumedVal, PartitionOp op) {
     ConsumedReason consumedReason;
     findAndAddConsumedReasons(op.getSourceInst(true)->getParent(), consumedVal,
                               consumedReason, 0, op);
@@ -843,7 +897,7 @@ class RaceTracer {
   }
 
   void findAndAddConsumedReasons(
-      SILBasicBlock * SILBlock, unsigned consumedVal,
+      SILBasicBlock * SILBlock, TrackableValueID consumedVal,
       ConsumedReason &consumedReason, unsigned distance,
       llvm::Optional<PartitionOp> targetOp = {}) {
     assert(blockStates[SILBlock].getExitPartition().isConsumed(consumedVal));
@@ -867,7 +921,7 @@ class RaceTracer {
 
   // find the reason why a value was consumed at entry to a block
   const ConsumedReason &findConsumedAtEntryReason(
-      SILBasicBlock *SILBlock, unsigned consumedVal) {
+      SILBasicBlock *SILBlock, TrackableValueID consumedVal) {
     const BlockPartitionState &block = blockStates[SILBlock];
     assert(block.getEntryPartition().isConsumed(consumedVal));
 
@@ -878,16 +932,16 @@ class RaceTracer {
     // enter a dummy value in the cache to prevent circular call dependencies
     consumedAtEntryReasons[{SILBlock, consumedVal}] = ConsumedReason();
 
-    auto entryTracks = [&](unsigned val) {
+    auto entryTracks = [&](TrackableValueID val) {
       return block.getEntryPartition().isTracked(val);
     };
 
     // this gets populated with all the tracked values at entry to this block
     // that are consumed at the exit to some predecessor block, associated
     // with the blocks that consume them
-    std::map<unsigned, std::vector<SILBasicBlock *>> consumedInSomePred;
+    std::map<TrackableValueID, std::vector<SILBasicBlock *>> consumedInSomePred;
     for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
-      for (unsigned consumedVal
+      for (TrackableValueID consumedVal
           : blockStates[pred].getExitPartition().getConsumedVals())
         if (entryTracks(consumedVal))
           consumedInSomePred[consumedVal].push_back(pred);
@@ -896,11 +950,11 @@ class RaceTracer {
     // at entry to this block that will be merged because of common regionality
     // in the exit partition of some predecessor. It is not transitively closed
     // because we want to count how many steps transitive merges require
-    std::map<unsigned, std::set<unsigned>> singleStepJoins;
+    std::map<TrackableValueID, std::set<TrackableValueID>> singleStepJoins;
     for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
-      for (std::vector<unsigned> region
+      for (std::vector<TrackableValueID> region
           : blockStates[pred].getExitPartition().getNonConsumedRegions()) {
-        for (unsigned fst : region) for (unsigned snd : region)
+        for (TrackableValueID fst : region) for (TrackableValueID snd : region)
             if (fst != snd && entryTracks(fst) && entryTracks(snd))
               singleStepJoins[fst].insert(snd);
       }
@@ -908,16 +962,19 @@ class RaceTracer {
     // this gets populated with the distance, in terms of single step joins,
     // from the target consumedVal to other values that will get merged with it
     // because of the join at entry to this basic block
-    std::map<unsigned, unsigned> distancesFromTarget;
+    std::map<TrackableValueID, unsigned> distancesFromTarget;
 
-    //perform BFS
-    std::deque<std::pair<unsigned, unsigned>> processValues;
+    // perform BFS
+    // an entry of `{val, dist}` in the `processValues` deque indicates that
+    // `val` is known to be merged with `consumedVal` (the target of this find)
+    // at a distance of `dist` single-step joins
+    std::deque<std::pair<TrackableValueID, unsigned>> processValues;
     processValues.push_back({consumedVal, 0});
     while (!processValues.empty()) {
       auto [currentTarget, currentDistance] = processValues.front();
       processValues.pop_front();
       distancesFromTarget[currentTarget] = currentDistance;
-      for (unsigned nextTarget : singleStepJoins[currentTarget])
+      for (TrackableValueID nextTarget : singleStepJoins[currentTarget])
         if (!distancesFromTarget.count(nextTarget))
           processValues.push_back({nextTarget, currentDistance + 1});
     }
@@ -940,7 +997,7 @@ class RaceTracer {
   }
 
   LocalConsumedReason findLocalConsumedReason(
-      SILBasicBlock * SILBlock, unsigned consumedVal,
+      SILBasicBlock * SILBlock, TrackableValueID consumedVal,
       llvm::Optional<PartitionOp> targetOp = {}) {
     // if this is a query for consumption reason at block exit, check the cache
     if (!targetOp && consumedAtExitReasons.count({SILBlock, consumedVal}))
@@ -1002,7 +1059,7 @@ public:
   RaceTracer(const BasicBlockData<BlockPartitionState>& blockStates)
       : blockStates(blockStates) {}
 
-  void traceUseOfConsumedValue(PartitionOp use, unsigned consumedVal) {
+  void traceUseOfConsumedValue(PartitionOp use, TrackableValueID consumedVal) {
     accumulator.accumulateConsumedReason(
         use, findConsumedAtOpReason(consumedVal, use));
   }
@@ -1149,7 +1206,7 @@ class PartitionAnalysis {
     for (auto [_, blockState] : blockStates) {
       blockState.diagnoseFailures(
           /*handleFailure=*/
-          [&](const PartitionOp& partitionOp, unsigned consumedVal) {
+          [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
             raceTracer.traceUseOfConsumedValue(partitionOp, consumedVal);
             /*
              * This handles diagnosing accesses to consumed values at the site
@@ -1162,7 +1219,7 @@ class PartitionAnalysis {
                 */
           },
           /*handleConsumeNonConsumable=*/
-          [&](const PartitionOp& partitionOp, unsigned consumedVal) {
+          [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
             auto expr = getExprForPartitionOp(partitionOp);
             function->getASTContext().Diags.diagnose(
                 expr->getLoc(), diag::arg_region_consumed);
