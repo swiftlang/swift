@@ -6837,6 +6837,12 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
     if (isForeignReferenceType(method->getReturnType()))
       return true;
 
+    // begin and end methods likely return an interator, so they're unsafe. This
+    // is required so that automatic the conformance to RAC works properly.
+    if (method->getNameAsString() == "begin" ||
+        method->getNameAsString() == "end")
+      return false;
+
     auto parentQualType = method
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 

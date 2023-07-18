@@ -24,9 +24,7 @@ struct SimpleCopyAwareSequence {
   SimpleCopyAwareSequence(const SimpleCopyAwareSequence &other) { copiesCount++; }
 };
 
-struct
-  __attribute__((swift_attr("import_owned")))
-SimpleArrayWrapper {
+struct SimpleArrayWrapper {
 private:
   int a[5] = {10, 20, 30, 40, 50};
 
@@ -35,9 +33,7 @@ public:
   const int *end() const __attribute__((returns_nonnull)) { return &a[5]; }
 };
 
-struct
-  __attribute__((swift_attr("import_owned")))
-SimpleArrayWrapperNullableIterators {
+struct SimpleArrayWrapperNullableIterators {
 private:
   int a[5] = {10, 20, 30, 40, 50};
 
@@ -46,9 +42,7 @@ public:
   const int *end() const { return &a[5]; }
 };
 
-struct
-  __attribute__((swift_attr("import_owned")))
-SimpleEmptySequence {
+struct SimpleEmptySequence {
   const int *begin() const { return nullptr; }
   const int *end() const { return nullptr; }
 };
