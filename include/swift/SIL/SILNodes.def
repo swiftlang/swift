@@ -694,12 +694,12 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // BindMemory and RebindMemory have no physical side effect. Semantically they
-  // write to their affected memory region because any reads or writes accessing
+  // access their affected memory region because any reads or writes accessing
   // that memory must be dependent on the bind operation.
   SINGLE_VALUE_INST(BindMemoryInst, bind_memory,
-                    SILInstruction, MayWrite, DoesNotRelease)
+                    SILInstruction, MayReadWrite, DoesNotRelease)
   SINGLE_VALUE_INST(RebindMemoryInst, rebind_memory,
-                    SILInstruction, MayWrite, DoesNotRelease)
+                    SILInstruction, MayReadWrite, DoesNotRelease)
 
 SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, RebindMemoryInst)
 NODE_RANGE(ValueBase, SILPhiArgument, RebindMemoryInst)
