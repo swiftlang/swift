@@ -210,6 +210,85 @@ func testPrespecializedSingletonEnumInt() {
 
 testPrespecializedSingletonEnumInt()
 
+func testPrespecializedSinglePayloadEnumAnyObject() {
+    let ptr = UnsafeMutablePointer<PrespecializedSinglePayloadEnum<AnyObject>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedSinglePayloadEnum<AnyObject>.nonEmpty(23, SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedSinglePayloadEnum<AnyObject>.nonEmpty(32, SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testPrespecializedSinglePayloadEnumAnyObject()
+
+func testPrespecializedSinglePayloadEnumSimpleClass() {
+    let ptr = UnsafeMutablePointer<PrespecializedSinglePayloadEnum<SimpleClass>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedSinglePayloadEnum<SimpleClass>.nonEmpty(23, SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedSinglePayloadEnum<SimpleClass>.nonEmpty(32, SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testPrespecializedSinglePayloadEnumSimpleClass()
+
+
+func testPrespecializedSinglePayloadEnumInt() {
+    let ptr = UnsafeMutablePointer<PrespecializedSinglePayloadEnum<Int>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedSinglePayloadEnum<Int>.nonEmpty(23, 23)
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedSinglePayloadEnum<Int>.nonEmpty(32, 32)
+        testAssign(ptr, from: y)
+    }
+
+    ptr.deallocate()
+}
+
+testPrespecializedSinglePayloadEnumInt()
+
 func testGenericTuple() {
     let ptr = allocateInternalGenericPtr(of: GenericTupleWrapper<TestClass>.self)
 
