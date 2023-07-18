@@ -334,7 +334,7 @@ public:
 
     (*EPCIU)->createLazyCallThroughManager(
         (*J)->getExecutionSession(),
-        llvm::pointerToJITTargetAddress(&handleLazyCompilationFailure));
+        llvm::orc::ExecutorAddr::fromPtr(&handleLazyCompilationFailure));
 
     if (auto Err = setUpInProcessLCTMReentryViaEPCIU(**EPCIU))
       return std::move(Err);
@@ -404,11 +404,13 @@ private:
       return llvm::Error::success();
     }
 
-    llvm::Error notifyRemovingResources(llvm::orc::ResourceKey K) override {
+    llvm::Error notifyRemovingResources(llvm::orc::JITDylib &JD,
+                                        llvm::orc::ResourceKey K) override {
       return llvm::Error::success();
     }
 
-    void notifyTransferringResources(llvm::orc::ResourceKey DstKey,
+    void notifyTransferringResources(llvm::orc::JITDylib &JD,
+                                     llvm::orc::ResourceKey DstKey,
                                      llvm::orc::ResourceKey SrcKey) override {}
 
   private:
@@ -440,9 +442,8 @@ private:
             continue;
 
           if (ToRename.count(Sym->getName())) {
-            // FIXME: Get rid of the temporary when Swift's llvm-project is
-            // updated to LLVM 17.
-            auto NewName = G.allocateString(mangleFunctionBody(Sym->getName()));
+            auto NewName =
+                G.allocateCString(Twine(mangleFunctionBody(Sym->getName())));
             Sym->setName({NewName.data(), NewName.size()});
           }
         }
