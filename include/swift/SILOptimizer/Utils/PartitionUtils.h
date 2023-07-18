@@ -79,14 +79,22 @@ private:
   // generated during compilation from a SILBasicBlock
   SILInstruction *sourceInst;
 
+  // Record an AST expression corresponding to this PartitionOp, currently
+  // populated only for Consume expressions to indicate the value being consumed
+  Expr *sourceExpr;
+
   // TODO: can the following declarations be merged?
   PartitionOp(PartitionOpKind OpKind, Element arg1,
-              SILInstruction *sourceInst = nullptr)
-      : OpKind(OpKind), OpArgs({arg1}), sourceInst(sourceInst) {}
+              SILInstruction *sourceInst = nullptr,
+              Expr* sourceExpr = nullptr)
+      : OpKind(OpKind), OpArgs({arg1}),
+        sourceInst(sourceInst), sourceExpr(sourceExpr) {}
 
   PartitionOp(PartitionOpKind OpKind, Element arg1, Element arg2,
-              SILInstruction *sourceInst = nullptr)
-      : OpKind(OpKind), OpArgs({arg1, arg2}), sourceInst(sourceInst) {}
+              SILInstruction *sourceInst = nullptr,
+              Expr* sourceExpr = nullptr)
+      : OpKind(OpKind), OpArgs({arg1, arg2}),
+        sourceInst(sourceInst), sourceExpr(sourceExpr) {}
 
   friend class Partition;
 
@@ -102,8 +110,10 @@ public:
   }
 
   static PartitionOp Consume(Element tgt,
-                             SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Consume, tgt, sourceInst);
+                             SILInstruction *sourceInst = nullptr,
+                             Expr *sourceExpr = nullptr) {
+    return PartitionOp(PartitionOpKind::Consume, tgt,
+                       sourceInst, sourceExpr);
   }
 
   static PartitionOp Merge(Element tgt1, Element tgt2,
@@ -116,7 +126,9 @@ public:
     return PartitionOp(PartitionOpKind::Require, tgt, sourceInst);
   }
 
-  bool operator==(const PartitionOp &other) const = default;
+  bool operator==(const PartitionOp &other) const {
+      return OpKind == other.OpKind && sourceInst == other.sourceInst;
+  };
   // implemented for insertion into std::map
   bool operator<(const PartitionOp &other) const {
     if (OpKind != other.OpKind)

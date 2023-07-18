@@ -592,19 +592,26 @@ public:
 
     //translate each SIL instruction to a PartitionOp, if necessary
     std::vector<PartitionOp> partitionOps;
+    int lastTranslationIndex = -1;
     for (SILInstruction &instruction : *basicBlock) {
       auto ops = translateSILInstruction(&instruction);
       for (PartitionOp &op : ops) {
         partitionOps.push_back(op);
 
         LLVM_DEBUG(
-            llvm::dbgs() << " ┌─┬─╼";
-            instruction.dump();
-            llvm::dbgs() << " │ └─╼  ";
-            instruction.getLoc().getSourceLoc().printLineAndColumn(llvm::dbgs(), function->getASTContext().SourceMgr);
-            llvm::dbgs() << " │ translation #" << translationIndex;
-            llvm::dbgs() << "\n └─────╼ ";
+            if (translationIndex != lastTranslationIndex) {
+              llvm::dbgs() << " ┌─┬─╼";
+              instruction.dump();
+              llvm::dbgs() << " │ └─╼  ";
+              instruction.getLoc().getSourceLoc().printLineAndColumn(
+                  llvm::dbgs(), function->getASTContext().SourceMgr);
+              llvm::dbgs() << " │ translation #" << translationIndex;
+              llvm::dbgs() << "\n └─────╼ ";
+            } else {
+              llvm::dbgs() << "      └╼ ";
+            }
             op.dump();
+            lastTranslationIndex = translationIndex;
         );
       }
     }
@@ -617,7 +624,7 @@ public:
 // SILBasicBlock for the region-based Sendable checking fixpoint analysis.
 // In particular, it records flags such as whether the block has been
 // reached by the analysis, whether the prior round indicated that this block
-// needs to be updated; it recorsd aux data such as the underlying basic block
+// needs to be updated; it records aux data such as the underlying basic block
 // and associated PartitionOpTranslator; and most importantly of all it includes
 // region partitions at entry and exit to this block - these are the stateful
 // component of the fixpoint analysis.
@@ -1218,8 +1225,13 @@ class PartitionAnalysis {
           /*handleFailure=*/
           [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
             auto expr = getExprForPartitionOp(partitionOp);
+
+            // ensure that multiple consumptions at the same AST node are only
+            // entered once into the race tracer
             if (hasBeenEmitted(expr)) return;
+
             raceTracer.traceUseOfConsumedValue(partitionOp, consumedVal);
+
             /*
              * This handles diagnosing accesses to consumed values at the site
              * of access instead of the site of consumption, as this is less
@@ -1229,6 +1241,7 @@ class PartitionAnalysis {
                 expr->getLoc(), diag::consumed_value_used);
                 */
           },
+
           /*handleConsumeNonConsumable=*/
           [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
             auto expr = getExprForPartitionOp(partitionOp);
@@ -1247,11 +1260,13 @@ class PartitionAnalysis {
               expr->getLoc(), diag::consumption_yields_race,
               numDisplayed, numDisplayed != 1, numHidden > 0, numHidden);
         },
+
         /*diagnoseRequire=*/
         [&](const PartitionOp& requireOp) {
           auto expr = getExprForPartitionOp(requireOp);
           function->getASTContext().Diags.diagnose(
-              expr->getLoc(), diag::possible_racy_access_site);
+              expr->getLoc(), diag::possible_racy_access_site)
+              .highlight(expr->getSourceRange());
         });
   }
 
