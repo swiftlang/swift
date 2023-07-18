@@ -1085,13 +1085,17 @@ namespace {
     ManagedValue Value;
     llvm::Optional<SILAccessEnforcement> Enforcement;
     bool IsRValue;
+    bool IsLazyInitializedGlobal;
+
   public:
     ValueComponent(ManagedValue value,
                    llvm::Optional<SILAccessEnforcement> enforcement,
                    LValueTypeData typeData, bool isRValue = false,
-                   llvm::Optional<ActorIsolation> actorIso = llvm::None)
+                   llvm::Optional<ActorIsolation> actorIso = llvm::None,
+                   bool isLazyInitializedGlobal = false)
         : PhysicalPathComponent(typeData, ValueKind, actorIso), Value(value),
-          Enforcement(enforcement), IsRValue(isRValue) {
+          Enforcement(enforcement), IsRValue(isRValue),
+          IsLazyInitializedGlobal(isLazyInitializedGlobal) {
       assert(IsRValue || value.getType().isAddress() ||
              value.getType().isBoxedNonCopyableType(value.getFunction()));
     }
@@ -1106,7 +1110,7 @@ namespace {
       if (Value.getType().isAddress() && Value.getType().isMoveOnly()) {
         SILValue addr = Value.getValue();
         auto box = dyn_cast<ProjectBoxInst>(addr);
-        if (box || isa<GlobalAddrInst>(addr)) {
+        if (box || isa<GlobalAddrInst>(addr) || IsLazyInitializedGlobal) {
           if (Enforcement)
             addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
                                     getAccessKind(), *Enforcement,
@@ -3229,9 +3233,12 @@ void LValue::addNonMemberVarComponent(
       auto astAccessKind = mapAccessKind(this->AccessKind);
       auto address = SGF.maybeEmitValueOfLocalVarDecl(Storage, astAccessKind);
 
+      bool isLazyInitializedGlobal = false;
+
       // The only other case that should get here is a global variable.
       if (!address) {
-          address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
+        address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
+        isLazyInitializedGlobal = Storage->isLazilyInitializedGlobal();
       } else {
         assert((!ActorIso || Storage->isTopLevelGlobal()) &&
                "local var should not be actor isolated!");
@@ -3257,7 +3264,8 @@ void LValue::addNonMemberVarComponent(
       }
 
       LV.add<ValueComponent>(address, enforcement, typeData,
-                             /*isRValue=*/false, ActorIso);
+                             /*isRValue=*/false, ActorIso,
+                             isLazyInitializedGlobal);
 
       if (address.getType().is<ReferenceStorageType>())
         LV.add<OwnershipComponent>(typeData);
