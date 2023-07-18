@@ -433,3 +433,75 @@ func test_stack_assign_and_capture_merges(a : A, b : Bool) async {
     await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
     await a.foo(ns1) //expected-note{{access here could race with non-Sendable value send above}}
 }
+
+func test_tuple_formation(a : A, i : Int) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+    let ns012 = (ns0, ns1, ns2);
+    let ns13 = (ns1, ns3);
+
+    switch (i) {
+    case 0:
+        await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    case 1:
+        await a.foo(ns1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    case 2:
+        await a.foo(ns2) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    case 3:
+        await a.foo(ns4) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0);
+        foo_noniso(ns1);
+        foo_noniso(ns2);
+        foo_noniso(ns4); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012);
+        foo_noniso(ns13);
+    case 4:
+        await a.foo(ns012) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    default:
+        await a.foo(ns13) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    }
+}

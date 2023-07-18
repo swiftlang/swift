@@ -338,93 +338,94 @@ public:
   // Merge, etc functions that generate PartitionOps with more logic common to
   // the translations from source-level SILInstructions.
 
-  std::vector<PartitionOp> translateSILApply(const SILInstruction *applyInst) {
-    // accumulates the non-Sendable operands to this apply, include self and
-    // the callee
-    std::vector<TrackableSILValue> nonSendableOperands;
+  // require all non-sendable sources, merge their regions, and assign the
+  // resulting region to all non-sendable targets. If consumeSrcs is true then
+  // consume the source region instead and put all the targets in a single,
+  // fresh region.
+  std::vector<PartitionOp> translateSILMultiAssign(
+      std::vector<SILValue> tgts, std::vector<SILValue> srcs,
+      bool consumeSrcs = false) {
 
-    for (SILValue operand : applyInst->getOperandValues())
-      if (auto trackOperand = trackIfNonSendable(operand))
-        nonSendableOperands.push_back(trackOperand.value());
+    std::vector<TrackableSILValue> nonSendableSrcs;
+    std::vector<TrackableSILValue> nonSendableTgts;
 
-    // check whether the result is non-Sendable
-    llvm::Optional<TrackableSILValue> nonSendableResult =
-        trackIfNonSendable(applyInst->getResult(0));
+    for (SILValue src : srcs)
+      if (auto trackSrc = trackIfNonSendable(src))
+          nonSendableSrcs.push_back(trackSrc.value());
+
+    for (SILValue tgt : tgts)
+      if (auto trackTgt = trackIfNonSendable(tgt))
+          nonSendableTgts.push_back(trackTgt.value());
 
     std::vector<PartitionOp> translated;
     auto add_to_translation = [&](std::vector<PartitionOp> ops) {
       for (auto op : ops) translated.push_back(op);
     };
 
-    if (SILApplyCrossesIsolation(applyInst)) {
-      // for calls that cross isolation domains, consume all operands
-      for (auto operand : nonSendableOperands)
-        add_to_translation(Consume(operand));
+    if (consumeSrcs) {
+      for (auto src : nonSendableSrcs)
+          add_to_translation(Consume(src));
 
-      if (nonSendableResult) {
-        // returning non-Sendable values from a cross isolation call will always
-        // be an error, but doesn't need to be diagnosed here, so let's pretend
-        // it gets a fresh region
-        add_to_translation(AssignFresh(nonSendableResult.value()));
-      }
+      // put all the tgts in a fresh region
+      llvm::Optional<TrackableSILValue> fstTgt;
+      for (auto tgt : nonSendableTgts)
+          if (!fstTgt) {
+          fstTgt = tgt;
+          add_to_translation(AssignFresh(tgt));
+          } else {
+          add_to_translation(Assign(tgt, fstTgt.value()));
+          }
+
       return translated;
     }
 
-    // for calls that do not cross isolation domains, merge all non-Sendable
-    // operands and assign the result to the region of the operands
+    // require all srcs
+    for (auto src : nonSendableSrcs)
+      add_to_translation(Require(src));
 
-    if (nonSendableOperands.empty()) {
-      // if no operands, a non-Sendable result gets a fresh region
-      if (nonSendableResult) {
-        add_to_translation(AssignFresh(nonSendableResult.value()));
-      }
-      return translated;
+    // merge all srcs
+    for (unsigned i = 1; i < nonSendableSrcs.size(); i++) {
+      add_to_translation(Merge(nonSendableSrcs.at(i-1),
+                               nonSendableSrcs.at(i)));
     }
 
-    // insert Requires for all operands
-    for (auto operand : nonSendableOperands)
-      add_to_translation(Require(operand));
+    // if no non-sendable tgts, return at this point
+    if (nonSendableTgts.empty()) return translated;
 
-    // insert Merges all operands (left to right)
-    for (unsigned i = 1; i < nonSendableOperands.size(); i++) {
-      add_to_translation(Merge(nonSendableOperands.at(i-1),
-                               nonSendableOperands.at(i)));
+    if (nonSendableSrcs.empty()) {
+      // if no non-sendable srcs, non-sendable tgts get a fresh region
+      add_to_translation(AssignFresh(nonSendableTgts.front()));
+    } else {
+      add_to_translation(Assign(nonSendableTgts.front(),
+                                nonSendableSrcs.front()));
     }
 
-    // if the result is non-Sendable, assign it to the region of the operands
-    if (nonSendableResult) {
-      add_to_translation(
-          Assign(nonSendableResult.value(), nonSendableOperands.front()));
+    // assign all targets to the target region
+    for (unsigned i = 1; i < nonSendableTgts.size(); i++) {
+      add_to_translation(Assign(nonSendableTgts.at(i),
+                                nonSendableTgts.front()));
     }
 
     return translated;
   }
 
+  std::vector<PartitionOp> translateSILApply(const SILInstruction *applyInst) {
+    return translateSILMultiAssign(
+        {applyInst->getResult(0)},
+        {applyInst->getOperandValues().begin(),
+         applyInst->getOperandValues().end()},
+        // consume operands iff the apply crosses isolation
+        /*consumeSrcs=*/ SILApplyCrossesIsolation(applyInst));
+  }
+
   std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
-    auto nonSendableTarget = trackIfNonSendable(tgt);
-    // no work to be done if assignment is to a Sendable target
-    if (!nonSendableTarget)
-      return {};
-
-    auto nonSendableSource = trackIfNonSendable(src);
-
-    if (nonSendableSource) {
-      // non-Sendable source and target of assignment, so just perform the assign
-      return Assign(nonSendableTarget.value(), nonSendableSource.value());
-    }
-
-    // a non-Sendable value is extracted from a Sendable value,
-    // e.g. unchecked casts like `unchecked_ref_cast` or storing
-    // of a sendable value into non-sendable storage
-    return AssignFresh(nonSendableTarget.value());
+    return translateSILMultiAssign({tgt}, {src});
   }
 
   // If the passed SILValue is NonSendable, then create a fresh region for it,
   // otherwise do nothing.
   std::vector<PartitionOp> translateSILAssignFresh(SILValue val) {
-    if (auto nonSendableVal = trackIfNonSendable(val))
-      return AssignFresh(nonSendableVal.value());
-    return {};
+    return translateSILMultiAssign({val}, {});
   }
 
   std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
@@ -500,6 +501,7 @@ public:
             RefElementAddrInst,
             StrongCopyUnownedValueInst,
             TailAddrInst,
+            TupleElementAddrInst,
             UncheckedAddrCastInst,
             UncheckedOwnershipConversionInst,
             UncheckedRefCastInst>(instruction)) {
@@ -525,13 +527,19 @@ public:
       return translateSILApply(instruction);
     }
 
-    // Treat tuple destruction as a series of individual assignments
+    // handle tuple destruction and creation
     if (auto destructTupleInst = dyn_cast<DestructureTupleInst>(instruction)) {
-      std::vector<PartitionOp> translated;
-      for (SILValue result : destructTupleInst->getResults())
-        for (auto op : translateSILAssign(result, instruction->getOperand(0)))
-          translated.push_back(op);
-      return translated;
+      return translateSILMultiAssign(
+          {destructTupleInst->getResults().begin(),
+           destructTupleInst->getResults().end()},
+          {destructTupleInst->getOperand()});
+    }
+
+    if (auto tupleInst = dyn_cast<TupleInst>(instruction)) {
+      return translateSILMultiAssign(
+          {tupleInst->getResult(0)},
+          {tupleInst->getOperandValues().begin(),
+           tupleInst->getOperandValues().end()});
     }
 
     // Handle returns - require the operand to be non-consumed
@@ -549,7 +557,8 @@ public:
             EndLifetimeInst,
             HopToExecutorInst,
             MetatypeInst,
-            DeallocStackInst>(instruction)) {
+            DeallocStackInst,
+            BranchInst>(instruction)) {
       //ignored instructions
       return {};
     }
@@ -1086,7 +1095,8 @@ class PartitionAnalysis {
 
   bool solved;
 
-  const static int NUM_REQUIREMENTS_TO_DIAGNOSE = 5;
+  // TODO: make this configurable in a better way
+  const static int NUM_REQUIREMENTS_TO_DIAGNOSE = 50;
 
   // The constructor initializes each block in the function by compiling it
   // to PartitionOps, then seeds the solve method by setting `needsUpdate` to
@@ -1207,13 +1217,14 @@ class PartitionAnalysis {
       blockState.diagnoseFailures(
           /*handleFailure=*/
           [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
+            auto expr = getExprForPartitionOp(partitionOp);
+            if (hasBeenEmitted(expr)) return;
             raceTracer.traceUseOfConsumedValue(partitionOp, consumedVal);
             /*
              * This handles diagnosing accesses to consumed values at the site
              * of access instead of the site of consumption, as this is less
              * useful it will likely be eliminated, but leaving it for now
-            auto expr = getExprForPartitionOp(partitionOp);
-            if (hasBeenEmitted(expr)) return;
+
             function->getASTContext().Diags.diagnose(
                 expr->getLoc(), diag::consumed_value_used);
                 */
