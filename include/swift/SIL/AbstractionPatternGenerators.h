@@ -136,6 +136,18 @@ public:
     return origParamIsExpansion;
   }
 
+  /// Return whether the current substituted parameter is a pack
+  /// expansion but the orig function type is opaque.  This is
+  /// unimplementable in our ABI because the calling convention for
+  /// function types in the most-general abstraction pattern still
+  /// assumes a fixed arity.
+  bool isUnimplementablePackExpansion() const {
+    assert(!isFinished());
+    return (origFunctionTypeIsOpaque &&
+            isa<PackExpansionType>(
+              allSubstParams[substParamIndex].getParameterType()));
+  }
+
   /// Return the substituted parameters corresponding to the current
   /// orig parameter type.  If the current orig parameter is not a
   /// pack expansion, this will have exactly one element.

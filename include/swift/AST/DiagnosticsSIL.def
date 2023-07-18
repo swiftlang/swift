@@ -115,6 +115,12 @@ ERROR(c_function_pointer_from_function_with_context,none,
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
       ())
 
+ERROR(unsupported_variadic_function_abstraction,none,
+      "cannot fully abstract a value of variadic function type %0 because "
+      "different contexts will not be able to reliably agree on a calling "
+      "convention; try wrapping it in a struct",
+      (Type))
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))

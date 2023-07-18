@@ -6492,6 +6492,9 @@ public:
       Printer << " ";
     }
 
+    if (info.isUnimplementable()) {
+      Printer.printSimpleAttr("@unimplementable") << " ";
+    }
     if (info.isPseudogeneric()) {
       Printer.printSimpleAttr("@pseudogeneric") << " ";
     }
