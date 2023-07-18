@@ -145,6 +145,10 @@ public:
     return sourceInst;
   }
 
+  Expr *getSourceExpr() const {
+    return sourceExpr;
+  }
+
   void dump() const LLVM_ATTRIBUTE_USED {
     raw_ostream &os = llvm::errs();
     switch (OpKind) {

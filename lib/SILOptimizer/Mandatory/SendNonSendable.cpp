@@ -24,18 +24,18 @@ namespace {
 static const char *SEP_STR = "╾──────────────────────────────╼\n";
 
 // SILApplyCrossesIsolation determines if a SIL instruction is an isolation
-// crossing apply expressiong. This is done by checking its correspondence
+// crossing apply expression. This is done by checking its correspondence
 // to an ApplyExpr AST node, and then checking the internal flags of that
 // AST node to see if the ActorIsolationChecker determined it crossed isolation.
 // It's possible this is brittle and a more nuanced check is needed, but this
 // suffices for all cases tested so far.
 static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
-  ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>();
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
+    return apply->getIsolationCrossing().has_value();
+
   // if the instruction doesn't correspond to an ApplyExpr, then it can't
   // cross an isolation domain
-  if (!apply)
-    return false;
-  return apply->getIsolationCrossing().has_value();
+  return false;
 }
 
 inline bool isAddress(SILValue val) {
@@ -269,13 +269,16 @@ private:
         currentInstruction)};
   }
 
-  std::vector<PartitionOp> Consume(TrackableSILValue value) {
+  std::vector<PartitionOp> Consume(
+      TrackableSILValue value,
+      Expr *sourceExpr = nullptr) {
     assert(valueHasID(value) &&
            "consumed value should already have been encountered");
 
     return {PartitionOp::Consume(
         lookupValueID(value),
-        currentInstruction)};
+        currentInstruction,
+        sourceExpr)};
   }
 
   std::vector<PartitionOp> Merge(TrackableSILValue fst, TrackableSILValue snd) {
@@ -339,12 +342,10 @@ public:
   // the translations from source-level SILInstructions.
 
   // require all non-sendable sources, merge their regions, and assign the
-  // resulting region to all non-sendable targets. If consumeSrcs is true then
-  // consume the source region instead and put all the targets in a single,
-  // fresh region.
+  // resulting region to all non-sendable targets, or assign non-sendable
+  // targets to a fresh region if there are no non-sendable sources
   std::vector<PartitionOp> translateSILMultiAssign(
-      std::vector<SILValue> tgts, std::vector<SILValue> srcs,
-      bool consumeSrcs = false) {
+      std::vector<SILValue> tgts, std::vector<SILValue> srcs) {
 
     std::vector<TrackableSILValue> nonSendableSrcs;
     std::vector<TrackableSILValue> nonSendableTgts;
@@ -361,23 +362,6 @@ public:
     auto add_to_translation = [&](std::vector<PartitionOp> ops) {
       for (auto op : ops) translated.push_back(op);
     };
-
-    if (consumeSrcs) {
-      for (auto src : nonSendableSrcs)
-          add_to_translation(Consume(src));
-
-      // put all the tgts in a fresh region
-      llvm::Optional<TrackableSILValue> fstTgt;
-      for (auto tgt : nonSendableTgts)
-          if (!fstTgt) {
-          fstTgt = tgt;
-          add_to_translation(AssignFresh(tgt));
-          } else {
-          add_to_translation(Assign(tgt, fstTgt.value()));
-          }
-
-      return translated;
-    }
 
     // require all srcs
     for (auto src : nonSendableSrcs)
@@ -410,12 +394,69 @@ public:
   }
 
   std::vector<PartitionOp> translateSILApply(const SILInstruction *applyInst) {
-    return translateSILMultiAssign(
-        {applyInst->getResult(0)},
-        {applyInst->getOperandValues().begin(),
-         applyInst->getOperandValues().end()},
-        // consume operands iff the apply crosses isolation
-        /*consumeSrcs=*/ SILApplyCrossesIsolation(applyInst));
+    // if this apply does not cross isolation domains, it has normal,
+    // non-consuming multi-assignment semantics
+    if (!SILApplyCrossesIsolation(applyInst))
+      return translateSILMultiAssign(
+          {applyInst->getResult(0)},
+          {applyInst->getOperandValues().begin(),
+           applyInst->getOperandValues().end()}
+      );
+
+    ApplyExpr *sourceApply = applyInst->getLoc().getAsASTNode<ApplyExpr>();
+    assert(sourceApply && "only ApplyExpr's should cross isolation domains");
+
+    std::vector<PartitionOp> translated;
+    auto getSourceArg = [&](unsigned i) {
+        if (i < sourceApply->getArgs()->size())
+          return sourceApply->getArgs()->getExpr(i);
+      assert(false && "SIL instruction has too many arguments for"
+                      " corresponding AST node");
+        return (Expr *)nullptr;
+    };
+
+    auto getSourceSelf = [&]() {
+      if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
+        if (auto calledExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
+          return calledExpr->getBase();
+      return (Expr *)nullptr;
+    };
+
+    auto handleSILOperands = [&](OperandValueArrayRef ops) {
+      int argNum = 0;
+      for (auto arg : ops) {
+        if (auto trackArg = trackIfNonSendable(arg))
+          translated.push_back(
+              Consume(trackArg.value(), getSourceArg(argNum)).front());
+        argNum++;
+      }
+    };
+
+    auto handleSILSelf = [&](SILValue self) {
+      if (auto trackSelf = trackIfNonSendable(self))
+        translated.push_back(
+            Consume(trackSelf.value(), getSourceSelf()).front());
+    };
+
+    if (auto applyInstCast = dyn_cast<ApplyInst>(applyInst)) {
+      handleSILOperands(applyInstCast->getArgumentsWithoutSelf());
+      if (applyInstCast->hasSelfArgument())
+        handleSILSelf(applyInstCast->getSelfArgument());
+    } else if (auto applyInstCase = dyn_cast<TryApplyInst>(applyInst)) {
+      handleSILOperands(applyInstCast->getArgumentsWithoutSelf());
+      if (applyInstCast->hasSelfArgument())
+        handleSILSelf(applyInstCast->getSelfArgument());
+    } else {
+      llvm_unreachable("this instruction crossing isolation is not handled yet");
+    }
+
+    // non-sendable results can't be returned from cross-isolation calls without
+    // a diagnostic emitted elsewhere. Here, give them a fresh value for better
+    // diagnostics hereafter
+    if (auto trackResult = trackIfNonSendable(applyInst->getResult(0)))
+      translated.push_back(AssignFresh(trackResult.value()).front());
+
+    return translated;
   }
 
   std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
@@ -1204,7 +1245,7 @@ class PartitionAnalysis {
 
   // used for generating informative diagnostics
   Expr *getExprForPartitionOp(const PartitionOp& op) {
-    SILInstruction *sourceInstr = op.getSourceInst(true);
+    SILInstruction *sourceInstr = op.getSourceInst(/*assertNonNull=*/true);
     Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
     assert(expr && "PartitionOp's source location should correspond to"
                    "an AST node");
@@ -1231,15 +1272,6 @@ class PartitionAnalysis {
             if (hasBeenEmitted(expr)) return;
 
             raceTracer.traceUseOfConsumedValue(partitionOp, consumedVal);
-
-            /*
-             * This handles diagnosing accesses to consumed values at the site
-             * of access instead of the site of consumption, as this is less
-             * useful it will likely be eliminated, but leaving it for now
-
-            function->getASTContext().Diags.diagnose(
-                expr->getLoc(), diag::consumed_value_used);
-                */
           },
 
           /*handleConsumeNonConsumable=*/
@@ -1255,10 +1287,18 @@ class PartitionAnalysis {
         /*diagnoseConsume=*/
         [&](const PartitionOp& consumeOp,
             unsigned numDisplayed, unsigned numHidden) {
+
+          if (tryDiagnoseAsCallSite(consumeOp, numDisplayed, numHidden))
+            return;
+
+          assert(false);
+          // default to more generic diagnostic
           auto expr = getExprForPartitionOp(consumeOp);
-          function->getASTContext().Diags.diagnose(
+          auto diag = function->getASTContext().Diags.diagnose(
               expr->getLoc(), diag::consumption_yields_race,
               numDisplayed, numDisplayed != 1, numHidden > 0, numHidden);
+          if (auto sourceExpr = consumeOp.getSourceExpr())
+            diag.highlight(sourceExpr->getSourceRange());
         },
 
         /*diagnoseRequire=*/
@@ -1268,6 +1308,36 @@ class PartitionAnalysis {
               expr->getLoc(), diag::possible_racy_access_site)
               .highlight(expr->getSourceRange());
         });
+  }
+
+  // try to interpret this consumeOp as a source-level callsite (ApplyExpr),
+  // and report a diagnostic including actor isolation crossing information
+  // returns true iff one was succesfully formed and emitted
+  bool tryDiagnoseAsCallSite(
+      const PartitionOp& consumeOp, unsigned numDisplayed, unsigned numHidden) {
+    SILInstruction *sourceInst = consumeOp.getSourceInst(/*assertNonNull=*/true);
+    ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
+    if (!apply)
+      // consumption does not correspond to an apply expression
+      return false;
+    auto isolationCrossing = apply->getIsolationCrossing();
+    if (!isolationCrossing) {
+      assert(false && "ApplyExprs should be consuming only if"
+                      " they are isolation crossing");
+      return false;
+    }
+    auto argExpr = consumeOp.getSourceExpr();
+    if (!argExpr)
+      assert(false && "sourceExpr should be populated for ApplyExpr consumptions");
+
+    function->getASTContext().Diags.diagnose(
+        apply->getLoc(), diag::call_site_consumption_yields_race,
+        findOriginalValueType(argExpr),
+        isolationCrossing.value().getCallerIsolation(),
+        isolationCrossing.value().getCalleeIsolation(),
+        numDisplayed, numDisplayed != 1, numHidden > 0, numHidden)
+        .highlight(argExpr->getSourceRange());
+    return true;
   }
 
 public:
