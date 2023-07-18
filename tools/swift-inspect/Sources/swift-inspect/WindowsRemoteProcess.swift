@@ -213,18 +213,17 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
 
     var context: (DWORD64, String?) = (pSymbolInfo.pointee.ModBase, nil)
-    _ = SymEnumerateModules64(
-      self.process,
-      { ModuleName, BaseOfDll, UserContext in
-        let pContext: UnsafeMutablePointer<(DWORD64, String?)> =
-          UserContext!.bindMemory(to: (DWORD64, String?).self, capacity: 1)
-
-        if BaseOfDll == pContext.pointee.0 {
-          pContext.pointee.1 = String(cString: ModuleName!)
-          return false
+    _ = withUnsafeMutablePointer(to: &context) {
+      SymEnumerateModules64(self.process, { (ModuleName, BaseOfDll, UserContext) -> WindowsBool in
+        if let pContext = UserContext?.bindMemory(to: (DWORD64, String?).self, capacity: 1) {
+          if pContext.pointee.0 == BaseOfDll {
+            pContext.pointee.1 = String(cString: ModuleName!)
+            return false
+          }
         }
         return true
-      }, &context)
+      }, $0)
+    }
 
     return (context.1, symbol)
   }
@@ -393,41 +392,41 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   }
 
   private func allocateDllPathRemote() -> UnsafeMutableRawPointer? {
-    // The path to the dll assuming it's in the same directory as swift-inspect.
-    let swiftInspectPath = ProcessInfo.processInfo.arguments[0]
-    return URL(fileURLWithPath: swiftInspectPath)
+    URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0])
       .deletingLastPathComponent()
       .appendingPathComponent("SwiftInspectClient.dll")
-      .withUnsafeFileSystemRepresentation {
-        #"\\?\\#(String(decodingCString: unsafeBitCast($0!, to: UnsafePointer<UInt8>.self), as: UTF8.self))"#
-          .withCString(encodedAs: UTF16.self) {
-            // Check that the dll file exists
-            var faAttributes: WIN32_FILE_ATTRIBUTE_DATA = .init()
-            guard GetFileAttributesExW($0, GetFileExInfoStandard, &faAttributes),
-              faAttributes.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) == 0
-            else {
-              print("\($0) doesn't exist")
-              return nil
-            }
-            // Allocate memory in the remote process
-            let szLength = SIZE_T(wcslen($0) * MemoryLayout<WCHAR>.size + 1)
-            guard
-              let allocation = VirtualAllocEx(
-                self.process, nil, szLength,
-                DWORD(MEM_COMMIT), DWORD(PAGE_READWRITE))
-            else {
-              print("VirtualAllocEx failed \(GetLastError())")
-              return nil
-            }
-            // Write the path in the allocated memory
-            if !WriteProcessMemory(self.process, allocation, $0, szLength, nil) {
-              print("WriteProcessMemory failed \(GetLastError())")
-              VirtualFreeEx(self.process, allocation, 0, DWORD(MEM_RELEASE))
-              return nil
-            }
+      .path
+      .withCString(encodedAs: UTF16.self) { pwszPath in
+        let dwLength = GetFullPathNameW(pwszPath, 0, nil, nil)
+        return withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: Int(dwLength)) {
+          guard GetFullPathNameW(pwszPath, dwLength, $0.baseAddress, nil) == dwLength - 1 else { return nil }
 
-            return allocation
+          var faAttributes: WIN32_FILE_ATTRIBUTE_DATA = .init()
+          guard GetFileAttributesExW($0.baseAddress, GetFileExInfoStandard, &faAttributes) else {
+            print("\(String(decodingCString: $0.baseAddress!, as: UTF16.self)) doesn't exist")
+            return nil
           }
+          guard faAttributes.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) == 0 else {
+            print("\(String(decodingCString: $0.baseAddress!, as: UTF16.self)) doesn't exist")
+            return nil
+          }
+
+          let szLength = SIZE_T(Int(dwLength) * MemoryLayout<WCHAR>.size)
+          guard let pAllocation =
+              VirtualAllocEx(self.process, nil, szLength,
+                             DWORD(MEM_COMMIT), DWORD(PAGE_READWRITE)) else {
+            print("VirtualAllocEx failed \(GetLastError())")
+            return nil
+          }
+
+          if !WriteProcessMemory(self.process, pAllocation, $0.baseAddress, szLength, nil) {
+            print("WriteProcessMemory failed \(GetLastError())")
+            _ = VirtualFreeEx(self.process, pAllocation, 0, DWORD(MEM_RELEASE))
+            return nil
+          }
+
+          return pAllocation
+        }
       }
   }
 
@@ -450,7 +449,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     // Unload the dll from the remote process
     let hUnloadThread = CreateRemoteThread(
       self.process, nil, 0, freeLibraryAddr,
-      unsafeBitCast(hDllModule, to: LPVOID.self), 0, nil)
+      UnsafeMutableRawPointer(hDllModule), 0, nil)
     if hUnloadThread == HANDLE(bitPattern: 0) {
       print("CreateRemoteThread for unload failed \(GetLastError())")
       return false
