@@ -681,6 +681,7 @@ void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
       if (id == C.Id_actorSystem || id == C.Id_id) {
         prop->diagnose(diag::distributed_actor_user_defined_special_property,
                       id);
+        prop->setInvalid();
       }
     }
   }

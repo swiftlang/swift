@@ -2855,7 +2855,14 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
-      if (vd->isSynthesized()) {
+      if (vd->isSynthesized() &&
+          // FIXME: IRGen requires the distributed actor synthesized
+          // properties to be in a specific order that is different
+          // from ordering by their mangled name, so preserve the order
+          // they were added in.
+          !(nominal &&
+            (vd == nominal->getDistributedActorIDProperty() ||
+             vd == nominal->getDistributedActorSystemProperty()))) {
         synthesizedMembers.add(vd);
         return;
       }
