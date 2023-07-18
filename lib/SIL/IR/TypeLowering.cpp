@@ -4261,6 +4261,11 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy1 == fnTy2)
     return ABIDifference::CompatibleRepresentation;
 
+  // Force unimplementable functions into the thunk path so that we don't
+  // have to worry about diagnosing this in a ton of different places.
+  if (fnTy1->isUnimplementable() || fnTy2->isUnimplementable())
+    return ABIDifference::NeedsThunk;
+
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
