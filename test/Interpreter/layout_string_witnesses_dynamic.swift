@@ -52,7 +52,7 @@ func testGeneric() {
 
 testGeneric()
 
-func testPrespecializedAnyObject() {
+func testPrespecializedStructAnyObject() {
     let ptr = UnsafeMutablePointer<PrespecializedStruct<AnyObject>>.allocate(capacity: 1)
 
     do {
@@ -80,9 +80,9 @@ func testPrespecializedAnyObject() {
     ptr.deallocate()
 }
 
-testPrespecializedAnyObject()
+testPrespecializedStructAnyObject()
 
-func testPrespecializedSimpleClass() {
+func testPrespecializedStructSimpleClass() {
     let ptr = UnsafeMutablePointer<PrespecializedStruct<SimpleClass>>.allocate(capacity: 1)
 
     do {
@@ -110,10 +110,10 @@ func testPrespecializedSimpleClass() {
     ptr.deallocate()
 }
 
-testPrespecializedSimpleClass()
+testPrespecializedStructSimpleClass()
 
 
-func testPrespecializedInt() {
+func testPrespecializedStructInt() {
     let ptr = UnsafeMutablePointer<PrespecializedStruct<Int>>.allocate(capacity: 1)
 
     do {
@@ -129,7 +129,86 @@ func testPrespecializedInt() {
     ptr.deallocate()
 }
 
-testPrespecializedInt()
+testPrespecializedStructInt()
+
+func testPrespecializedSingletonEnumAnyObject() {
+    let ptr = UnsafeMutablePointer<PrespecializedSingletonEnum<AnyObject>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedSingletonEnum<AnyObject>.only(23, SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedSingletonEnum<AnyObject>.only(32, SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testPrespecializedSingletonEnumAnyObject()
+
+func testPrespecializedSingletonEnumSimpleClass() {
+    let ptr = UnsafeMutablePointer<PrespecializedSingletonEnum<SimpleClass>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedSingletonEnum<SimpleClass>.only(23, SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedSingletonEnum<SimpleClass>.only(32, SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testPrespecializedSingletonEnumSimpleClass()
+
+
+func testPrespecializedSingletonEnumInt() {
+    let ptr = UnsafeMutablePointer<PrespecializedSingletonEnum<Int>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedSingletonEnum<Int>.only(23, 23)
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedSingletonEnum<Int>.only(32, 32)
+        testAssign(ptr, from: y)
+    }
+
+    ptr.deallocate()
+}
+
+testPrespecializedSingletonEnumInt()
 
 func testGenericTuple() {
     let ptr = allocateInternalGenericPtr(of: GenericTupleWrapper<TestClass>.self)

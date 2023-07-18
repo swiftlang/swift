@@ -473,6 +473,10 @@ public struct PrespecializedStruct<T> {
     }
 }
 
+public enum PrespecializedSingletonEnum<T> {
+    case only(Int, T)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -481,6 +485,10 @@ public func preSpec() {
     consume(PrespecializedStruct<AnyObject>.self)
     consume(PrespecializedStruct<SimpleClass>.self)
     consume(PrespecializedStruct<Int>.self)
+
+    consume(PrespecializedSingletonEnum<AnyObject>.self)
+    consume(PrespecializedSingletonEnum<SimpleClass>.self)
+    consume(PrespecializedSingletonEnum<Int>.self)
 }
 
 @inline(never)
