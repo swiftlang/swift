@@ -1472,12 +1472,11 @@ public:
 
   /// Given that the value being abstracted is a pack expansion type,
   /// return the underlying pattern type.
-  ///
-  /// If you're looking for getPackExpansionCountType(), it deliberately
-  /// does not exist.  Count types are not lowered types, and the original
-  /// count types are not relevant to lowering.  Only the substituted
-  /// components and expansion counts are significant.
   AbstractionPattern getPackExpansionPatternType() const;
+
+  /// Given that the value being abstracted is a pack expansion type,
+  /// return the underlying count type.
+  AbstractionPattern getPackExpansionCountType() const;
 
   /// Given that the value being abstracted is a pack expansion type,
   /// return the appropriate pattern type for the given expansion
