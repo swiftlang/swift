@@ -2761,7 +2761,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     auto interestingUser = liveness.getInterestingUser(inst);
     SmallVector<std::pair<TypeTreeLeafTypeRange, IsInterestingUser>, 4> ranges;
     if (interestingUser) {
-      interestingUser->getContiguousRanges(ranges);
+      interestingUser->getContiguousRanges(ranges, bv);
     }
 
     for (auto rangePair : ranges) {
@@ -2799,12 +2799,14 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
           auto *block = inst->getParent();
           for (auto *succBlock : block->getSuccessorBlocks()) {
             auto iter = mergeBlocks.find(succBlock);
-            if (iter == mergeBlocks.end())
+            if (iter == mergeBlocks.end()) {
               iter = mergeBlocks.insert({succBlock, bits}).first;
-            else {
+            } else {
+              // NOTE: We use |= here so that different regions of the same
+              // terminator get updated appropriately.
               SmallBitVector &alreadySetBits = iter->second;
               bool hadCommon = alreadySetBits.anyCommon(bits);
-              alreadySetBits &= bits;
+              alreadySetBits |= bits;
               if (hadCommon)
                 continue;
             }
