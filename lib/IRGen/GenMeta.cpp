@@ -2581,16 +2581,18 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
     hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
+
+    if (!hasLayoutString &&
+        IGM.Context.LangOpts.hasFeature(
+            Feature::LayoutStringValueWitnessesInstantiation) &&
+        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+      hasLayoutString |= requiresForeignTypeMetadata(type) ||
+                         needsSingletonMetadataInitialization(IGM, type) ||
+                         (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
+    }
   }
 
   if (auto sd = dyn_cast<StructDecl>(type)) {
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
-      hasLayoutString |= requiresForeignTypeMetadata(type) ||
-        needsSingletonMetadataInitialization(IGM, type) ||
-        (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
-    }
-
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
                                    hasLayoutString).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
@@ -5487,6 +5489,26 @@ namespace {
       return emitValueWitnessTable(relativeReference);
     }
 
+    bool hasInstantiatedLayoutString() {
+      if (IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnessesInstantiation) &&
+          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+        return needsSingletonMetadataInitialization(IGM, Target);
+      }
+
+      return false;
+    }
+
+    bool hasLayoutString() {
+      if (!IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+        return false;
+      }
+
+      return hasInstantiatedLayoutString() || !!getLayoutString();
+    }
+
     llvm::Constant *emitLayoutString() {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
           !IGM.getOptions().EnableLayoutStringValueWitnesses)
@@ -5521,7 +5543,7 @@ namespace {
 
     llvm::Constant *emitNominalTypeDescriptor() {
       auto descriptor = EnumContextDescriptorBuilder(
-                            IGM, Target, RequireMetadata, !!getLayoutString())
+                            IGM, Target, RequireMetadata, hasLayoutString())
                             .emit();
       return descriptor;
     }
@@ -5570,7 +5592,7 @@ namespace {
     }
 
     bool canBeConstant() {
-      return !HasUnfilledPayloadSize;
+      return !HasUnfilledPayloadSize && !hasInstantiatedLayoutString();
     }
   };
 
