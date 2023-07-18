@@ -17,9 +17,20 @@
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar: Sendable {
   struct State: @unchecked Sendable {
+    enum ObservationKind {
+      case tracking(@Sendable () -> Void)
+    }
+    
     struct Observation {
+      var kind: ObservationKind
       var properties: Set<AnyKeyPath>
-      var observer: @Sendable () -> Void
+      
+      var observer: (@Sendable () -> Void)? {
+        switch kind {
+        case .tracking(let observer):
+          return observer
+        }
+      }
     }
     
     var id = 0
@@ -33,7 +44,7 @@ public struct ObservationRegistrar: Sendable {
     
     mutating func registerTracking(for properties: Set<AnyKeyPath>, observer: @Sendable @escaping () -> Void) -> Int {
       let id = generateId()
-      observations[id] = Observation(properties: properties, observer: observer)
+      observations[id] = Observation(kind: .tracking(observer), properties: properties)
       for keyPath in properties {
         lookups[keyPath, default: []].insert(id)
       }
@@ -41,8 +52,8 @@ public struct ObservationRegistrar: Sendable {
     }
     
     mutating func cancel(_ id: Int) {
-      if let tracking = observations.removeValue(forKey: id) {
-        for keyPath in tracking.properties {
+      if let observation = observations.removeValue(forKey: id) {
+        for keyPath in observation.properties {
           if var ids = lookups[keyPath] {
             ids.remove(id)
             if ids.count == 0 {
@@ -54,13 +65,18 @@ public struct ObservationRegistrar: Sendable {
         }
       }
     }
+
+    mutating func cancelAll() {
+      observations.removeAll()
+      lookups.removeAll()
+    }
     
     mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable () -> Void] {
       var observers = [@Sendable () -> Void]()
       if let ids = lookups[keyPath] {
         for id in ids {
-          if let observation = observations[id] {
-            observers.append(observation.observer)
+          if let observer = observations[id]?.observer {
+            observers.append(observer)
             cancel(id)
           }
         }
@@ -81,6 +97,10 @@ public struct ObservationRegistrar: Sendable {
     func cancel(_ id: Int) {
       state.withCriticalRegion { $0.cancel(id) }
     }
+
+    func cancelAll() {
+      state.withCriticalRegion { $0.cancelAll() }
+    }
     
     func willSet<Subject, Member>(
        _ subject: Subject,
@@ -91,9 +111,30 @@ public struct ObservationRegistrar: Sendable {
         action()
       }
     }
+    
+    func didSet<Subject, Member>(
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
+    ) {
+
+    }
+  }
+
+  final class Extent: @unchecked Sendable {
+    let context = Context()
+
+    init() {
+    }
+
+    deinit {
+      context.cancelAll()
+    }
   }
   
-  let context = Context()
+  var context: Context {
+    return extent.context
+  }
+  let extent = Extent()
   
   /// Creates an instance of the observation registrar.
   ///
@@ -143,7 +184,7 @@ public struct ObservationRegistrar: Sendable {
       _ subject: Subject,
       keyPath: KeyPath<Subject, Member>
   ) {
-    
+    context.didSet(subject, keyPath: keyPath)
   }
   
   /// Identifies mutations to the transactions registered for observers.
