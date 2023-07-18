@@ -1028,6 +1028,15 @@ void UseState::initializeLiveness(
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
+  if (auto *ptai = dyn_cast<PointerToAddressInst>(
+          stripAccessMarkers(address->getOperand()))) {
+    assert(ptai->isStrict());
+    LLVM_DEBUG(llvm::dbgs() << "Found pointer to address use... "
+                               "adding mark_must_check as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(address, liveness.getTopLevelSpan());
+  }
+
   // Now that we have finished initialization of defs, change our multi-maps
   // from their array form to their map form.
   liveness.finishedInitializationOfDefs();
