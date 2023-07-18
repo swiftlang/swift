@@ -483,6 +483,13 @@ public enum PrespecializedSinglePayloadEnum<T> {
     case nonEmpty(Int, T)
 }
 
+public enum PrespecializedMultiPayloadEnum<T> {
+    case empty0
+    case empty1
+    case nonEmpty0(Int, T)
+    case nonEmpty1(T, Int)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -499,6 +506,10 @@ public func preSpec() {
     consume(PrespecializedSinglePayloadEnum<AnyObject>.self)
     consume(PrespecializedSinglePayloadEnum<SimpleClass>.self)
     consume(PrespecializedSinglePayloadEnum<Int>.self)
+
+    consume(PrespecializedMultiPayloadEnum<AnyObject>.self)
+    consume(PrespecializedMultiPayloadEnum<SimpleClass>.self)
+    consume(PrespecializedMultiPayloadEnum<Int>.self)
 }
 
 @inline(never)
