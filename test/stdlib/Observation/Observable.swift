@@ -176,6 +176,32 @@ class CapturedState<State>: @unchecked Sendable {
   }
 }
 
+@Observable
+class RecursiveInner {
+  var value = "prefix"
+}
+
+@Observable
+class RecursiveOuter {
+  var inner = RecursiveInner()
+  var value = "prefix"
+  @ObservationIgnored var innerEventCount = 0
+  @ObservationIgnored var outerEventCount = 0
+
+  func recursiveTrackingCalls() {
+    withObservationTracking({
+      let _ = value
+      _ = withObservationTracking({
+        inner.value
+      }, onChange: {
+        self.innerEventCount += 1
+      })
+    }, onChange: {
+      self.outerEventCount += 1
+    })
+  }
+}
+
 @main
 struct Validator {
   @MainActor
@@ -363,7 +389,31 @@ struct Validator {
       test.test = "c"
       expectEqual(changed.state, false)
     }
-    
+
+    suite.test("recursive tracking inner then outer") {
+      let obj = RecursiveOuter()
+      obj.recursiveTrackingCalls()
+      obj.inner.value = "test"
+      expectEqual(obj.innerEventCount, 1)
+      expectEqual(obj.outerEventCount, 1)
+      obj.recursiveTrackingCalls()
+      obj.value = "test"
+      expectEqual(obj.innerEventCount, 1)
+      expectEqual(obj.outerEventCount, 2)
+    }
+
+    suite.test("recursive tracking outer then inner") {
+      let obj = RecursiveOuter()
+      obj.recursiveTrackingCalls()
+      obj.value = "test"
+      expectEqual(obj.innerEventCount, 0)
+      expectEqual(obj.outerEventCount, 1)
+      obj.recursiveTrackingCalls()
+      obj.inner.value = "test"
+      expectEqual(obj.innerEventCount, 2)
+      expectEqual(obj.outerEventCount, 2)
+    }
+
     runAllTests()
   }
 }

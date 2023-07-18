@@ -59,4 +59,16 @@ CxxSequenceTestSuite.test("SimpleSequence.forEach") {
   expectEqual([1, 2, 3, 4] as [Int32], array)
 }
 
+CxxSequenceTestSuite.test("HasInheritedConstIterator to Swift.Array") {
+  let seq = HasInheritedConstIterator()
+  let array = Array(seq)
+  expectEqual([1, 2, 3, 4, 5] as [Int32], array)
+}
+
+CxxSequenceTestSuite.test("HasInheritedTemplatedConstIterator to Swift.Array") {
+  let seq = HasInheritedTemplatedConstIteratorInt()
+  let array = Array(seq)
+  expectEqual([1, 2, 3, 4, 5, 6] as [Int32], array)
+}
+
 runAllTests()

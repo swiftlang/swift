@@ -105,3 +105,23 @@
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = TemplatedRACIteratorOutOfLineEq<Int32>.difference_type
 // CHECK: }
+
+// CHECK: struct BaseIntIterator {
+// CHECK: }
+// CHECK: struct InheritedConstIterator : UnsafeCxxInputIterator {
+// CHECK: }
+
+// CHECK: struct InheritedTemplatedConstIterator<T> {
+// CHECK: }
+// CHECK: struct InheritedTemplatedConstIterator<Int32> : UnsafeCxxInputIterator {
+// CHECK: }
+
+// CHECK: struct InheritedTemplatedConstRACIterator<T> {
+// CHECK: }
+// CHECK: struct InheritedTemplatedConstRACIterator<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK: }
+
+// CHECK: struct InheritedTemplatedConstRACIteratorOutOfLineOps<T> {
+// CHECK: }
+// CHECK: struct InheritedTemplatedConstRACIteratorOutOfLineOps<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK: }
