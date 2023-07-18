@@ -2255,7 +2255,7 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // will be deleted with its destructure_tuple.
 }
 
-/// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime
+/// Emit end_borrows for an incomplete BorrowedValue with only nonlifetime
 /// ending uses.
 static void emitEndBorrows(SILValue value, AddressLoweringState &pass);
 
