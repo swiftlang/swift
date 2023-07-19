@@ -1634,6 +1634,50 @@ swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
     if (auto file = dyn_cast<FileUnit>(
             decl->getDeclContext()->getModuleScopeContext()))
       file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
+
+    // Don't validate documented conformances for the 'conformance' role.
+    if (role == MacroRole::Conformance)
+      continue;
+
+    // Extension macros can only add conformances that are documented by
+    // the `@attached(extension)` attribute.
+    for (auto inherited : extension->getInherited()) {
+      auto constraint =
+          TypeResolution::forInterface(
+              extension->getDeclContext(),
+              TypeResolverContext::GenericRequirement,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr)
+          .resolveType(inherited.getTypeRepr());
+
+      // Already diagnosed or will be diagnosed later.
+      if (constraint->is<ErrorType>() || !constraint->isConstraintType())
+        continue;
+
+      std::function<bool(Type)> isUndocumentedConformance =
+          [&](Type constraint) -> bool {
+            if (auto *proto = constraint->getAs<ParameterizedProtocolType>())
+              return !llvm::is_contained(potentialConformances,
+                                         proto->getProtocol());
+
+            if (auto *proto = constraint->getAs<ProtocolType>())
+              return !llvm::is_contained(potentialConformances,
+                                         proto->getDecl());
+
+            return llvm::any_of(
+                constraint->castTo<ProtocolCompositionType>()->getMembers(),
+                isUndocumentedConformance);
+          };
+
+      if (isUndocumentedConformance(constraint)) {
+        extension->diagnose(
+            diag::undocumented_conformance_in_expansion,
+            constraint, macro->getBaseName());
+
+        extension->setInvalid();
+      }
+    }
   }
 
   return macroSourceFile->getBufferID();

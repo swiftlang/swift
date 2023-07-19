@@ -1437,6 +1437,52 @@ public struct DelegatedConformanceViaExtensionMacro: ExtensionMacro {
   }
 }
 
+public struct AlwaysAddConformance: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P where Element: P {
+        static func requirement() {
+          Element.requirement()
+        }
+      }
+
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
+public struct AlwaysAddCodable: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): Codable {
+      }
+
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
+
 public struct ExtendableEnum: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
