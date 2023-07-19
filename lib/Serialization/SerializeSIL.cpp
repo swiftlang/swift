@@ -2442,6 +2442,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
     ValueID listOfValues[] = {
       CBI->isExact(),
+      S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getOperand()),
       S.addTypeRef(CBI->getSourceLoweredType().getRawASTType()),
       (unsigned)CBI->getSourceLoweredType().getCategory(),

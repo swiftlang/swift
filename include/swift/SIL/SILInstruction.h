@@ -10024,12 +10024,13 @@ class CheckedCastBranchInst final
           CastBranchInstBase<OwnershipForwardingTermInst>> {
   friend SILBuilder;
 
+  CanType SrcFormalTy;
   SILType DestLoweredTy;
   CanType DestFormalTy;
   bool IsExact;
 
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
-                        SILValue Operand,
+                        SILValue Operand, CanType SrcFormalTy,
                         ArrayRef<SILValue> TypeDependentOperands,
                         SILType DestLoweredTy, CanType DestFormalTy,
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
@@ -10041,13 +10042,13 @@ class CheckedCastBranchInst final
             DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
             Target1Count, Target2Count, forwardingOwnershipKind,
             preservesOwnership),
-        DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
-        IsExact(IsExact) {}
+        SrcFormalTy(SrcFormalTy), DestLoweredTy(DestLoweredTy),
+        DestFormalTy(DestFormalTy), IsExact(IsExact) {}
 
   static CheckedCastBranchInst *
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
-         SILType DestLoweredTy, CanType DestFormalTy, SILBasicBlock *SuccessBB,
-         SILBasicBlock *FailureBB, SILFunction &F,
+         CanType SrcFormalTy, SILType DestLoweredTy, CanType DestFormalTy,
+         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
          ValueOwnershipKind forwardingOwnershipKind);
 
@@ -10055,7 +10056,7 @@ public:
   bool isExact() const { return IsExact; }
 
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
-  CanType getSourceFormalType() const { return getSourceLoweredType().getASTType(); }
+  CanType getSourceFormalType() const { return SrcFormalTy; }
 
   SILType getTargetLoweredType() const { return DestLoweredTy; }
   CanType getTargetFormalType() const { return DestFormalTy; }

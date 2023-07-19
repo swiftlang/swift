@@ -162,7 +162,7 @@ func checked_cast_branch(_ x: Float) -> Float {
 // CHECK: [ACTIVE]   %23 = apply %22(%0, %0, %21) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 
 // CHECK-LABEL: sil hidden [ossa] @${{.*}}checked_cast_branch{{.*}} : $@convention(thin) (Float) -> Float {
-// CHECK:   checked_cast_br %3 : $@thick Int.Type to any Any.Type, bb1, bb2
+// CHECK:   checked_cast_br Int.Type in %3 : $@thick Int.Type to any Any.Type, bb1, bb2
 // CHECK: }
 
 @differentiable(reverse)
