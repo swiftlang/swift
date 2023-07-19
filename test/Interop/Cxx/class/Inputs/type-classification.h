@@ -232,6 +232,7 @@ struct __attribute__((swift_attr("import_iterator"))) Iterator {
 };
 
 struct HasMethodThatReturnsIterator {
+  HasMethodThatReturnsIterator(const HasMethodThatReturnsIterator&);
   Iterator getIterator() const;
 };
 
@@ -240,6 +241,7 @@ struct IteratorBox {
 };
 
 struct HasMethodThatReturnsIteratorBox {
+  HasMethodThatReturnsIteratorBox(const HasMethodThatReturnsIteratorBox&);
   IteratorBox getIteratorBox() const;
 };
 
