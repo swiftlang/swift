@@ -657,6 +657,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
+#     [IS_FRAGILE]
 #     INSTALL_IN_COMPONENT comp
 #     MACCATALYST_BUILD_FLAVOR flavor
 #     source1 [source2 source3 ...])
@@ -723,6 +724,11 @@ endfunction()
 #
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
+
+# IS_FRAGILE
+#   Disable library evolution even
+#   if this library is part of the SDK.
+
 #
 # source1 ...
 #   Sources to add into this library
@@ -737,7 +743,8 @@ function(add_swift_target_library_single target name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED)
+        INSTALL_WITH_SHARED
+        IS_FRAGILE)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
         DEPLOYMENT_VERSION_IOS
@@ -946,6 +953,7 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
+      ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ${SWIFTLIB_SINGLE_NO_LINK_NAME_keyword}

@@ -10,7 +10,9 @@ endif()
 #
 # C++ Standard Library Overlay.
 #
-add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
+# The overlay is fragile (i.e. it does not use library evolution)
+# as it's not ABI stable.
+add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
     std.swift
     String.swift
 
