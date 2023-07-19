@@ -3731,166 +3731,18 @@ namespace {
       auto *root = CS.createTypeVariable(rootLocator, TVO_CanBindToNoEscape |
                                                           TVO_CanBindToHole);
 
-      // If a root type was explicitly given, then resolve it now.
-      if (auto rootRepr = E->getRootType()) {
-        const auto rootObjectTy = resolveTypeReferenceInExpression(
-            rootRepr, TypeResolverContext::InExpression, locator);
-        if (!rootObjectTy || rootObjectTy->hasError())
-          return Type();
-
-        CS.setType(rootRepr, rootObjectTy);
-        // Allow \Derived.property to be inferred as \Base.property to
-        // simulate a sort of covariant conversion from
-        // KeyPath<Derived, T> to KeyPath<Base, T>.
-        CS.addConstraint(ConstraintKind::Subtype, rootObjectTy, root, locator);
-      }
-      
-      bool didOptionalChain = false;
-      // We start optimistically from an lvalue base.
-      Type base = LValueType::get(root);
-
-      SmallVector<TypeVariableType *, 2> componentTypeVars;
-      for (unsigned i : indices(E->getComponents())) {
-        auto &component = E->getComponents()[i];
-        auto memberLocator = CS.getConstraintLocator(
-            locator, LocatorPathElt::KeyPathComponent(i));
-        auto resultLocator = CS.getConstraintLocator(
-            memberLocator, ConstraintLocator::KeyPathComponentResult);
-
-        switch (auto kind = component.getKind()) {
-        case KeyPathExpr::Component::Kind::Invalid:
-          break;
-        case KeyPathExpr::Component::Kind::CodeCompletion:
-          // We don't know what the code completion might resolve to, so we are
-          // creating a new type variable for its result, which might be a hole.
-          base = CS.createTypeVariable(
-              resultLocator,
-              TVO_CanBindToLValue | TVO_CanBindToNoEscape | TVO_CanBindToHole);
-          break;
-        case KeyPathExpr::Component::Kind::UnresolvedProperty:
-        // This should only appear in resolved ASTs, but we may need to
-        // re-type-check the constraints during failure diagnosis.
-        case KeyPathExpr::Component::Kind::Property: {
-          auto memberTy = CS.createTypeVariable(resultLocator,
-                                                TVO_CanBindToLValue |
-                                                TVO_CanBindToNoEscape);
-          componentTypeVars.push_back(memberTy);
-          auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
-            ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
-            : component.getDeclRef().getDecl()->createNameRef();
-          
-          auto refKind = lookupName.isSimpleName()
-            ? FunctionRefKind::Unapplied
-            : FunctionRefKind::Compound;
-          CS.addValueMemberConstraint(base, lookupName,
-                                      memberTy,
-                                      CurDC,
-                                      refKind,
-                                      /*outerAlternatives=*/{},
-                                      memberLocator);
-          base = memberTy;
-          break;
-        }
-          
-        case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-        // Subscript should only appear in resolved ASTs, but we may need to
-        // re-type-check the constraints during failure diagnosis.
-        case KeyPathExpr::Component::Kind::Subscript: {
-          auto *args = component.getSubscriptArgs();
-          base = addSubscriptConstraints(E, base, /*decl*/ nullptr, args,
-                                         memberLocator, &componentTypeVars);
-          break;
-        }
-
-        case KeyPathExpr::Component::Kind::TupleElement: {
-          // Note: If implemented, the logic in `getCalleeLocator` will need
-          // updating to return the correct callee locator for this.
-          llvm_unreachable("not implemented");
-          break;
-        }
-                
-        case KeyPathExpr::Component::Kind::OptionalChain: {
-          didOptionalChain = true;
-
-          // We can't assign an optional back through an optional chain
-          // today. Force the base to an rvalue.
-          auto rvalueTy = CS.createTypeVariable(resultLocator,
-                                                TVO_CanBindToNoEscape);
-          componentTypeVars.push_back(rvalueTy);
-          CS.addConstraint(ConstraintKind::Equal, base, rvalueTy,
-                           resultLocator);
-
-          base = rvalueTy;
-          LLVM_FALLTHROUGH;
-        }
-        case KeyPathExpr::Component::Kind::OptionalForce: {
-          auto optionalObjTy = CS.createTypeVariable(resultLocator,
-                                                     TVO_CanBindToLValue |
-                                                     TVO_CanBindToNoEscape);
-          componentTypeVars.push_back(optionalObjTy);
-
-          CS.addConstraint(ConstraintKind::OptionalObject, base, optionalObjTy,
-                           resultLocator);
-          base = optionalObjTy;
-          break;
-        }
-        
-        case KeyPathExpr::Component::Kind::OptionalWrap: {
-          // This should only appear in resolved ASTs, but we may need to
-          // re-type-check the constraints during failure diagnosis.
-          base = OptionalType::get(base);
-          break;
-        }
-        case KeyPathExpr::Component::Kind::Identity:
-          break;
-        case KeyPathExpr::Component::Kind::DictionaryKey:
-          llvm_unreachable("DictionaryKey only valid in #keyPath");
-          break;
-        }
-
-        // By now, `base` is the result type of this component. Set it in the
-        // constraint system so we can find it later.
-        CS.setType(E, i, base);
-      }
-      
-      // If there was an optional chaining component, the end result must be
-      // optional.
-      if (didOptionalChain) {
-        auto objTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape |
-                                                        TVO_CanBindToHole);
-        componentTypeVars.push_back(objTy);
-
-        auto optTy = OptionalType::get(objTy);
-        CS.addConstraint(ConstraintKind::Conversion, base, optTy,
-                         locator);
-        base = optTy;
-      }
-
       auto valueLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
       auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
                                                             TVO_CanBindToHole);
-
-      // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
-      // let's record a AllowKeyPathMissingComponent fix.
-      if (E->hasSingleInvalidComponent()) {
-        auto *fix = AllowKeyPathWithoutComponents::create(CS, locator);
-        (void)CS.recordFix(fix);
-      } else {
-        CS.addConstraint(ConstraintKind::Equal, base, value, valueLocator);
-      }
       CS.recordKeyPath(E, root, value, CurDC);
-
-      // The result is a KeyPath from the root to the end component.
-      // The type of key path depends on the overloads chosen for the key
-      // path components.
-      auto typeLoc =
-          CS.getConstraintLocator(locator, LocatorPathElt::KeyPathType());
 
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape |
                                                      TVO_CanBindToHole);
-
-      CS.addKeyPathConstraint(kpTy, root, value, componentTypeVars, locator);
+      auto *fallbackTy =
+          BoundGenericType::get(kpDecl, /*parent*/ Type(), {root, value});
+      CS.addConstraint(ConstraintKind::FallbackType, kpTy, fallbackTy,
+                       CS.getConstraintLocator(E));
 
       return kpTy;
     }
