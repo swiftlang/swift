@@ -1950,9 +1950,10 @@ public:
   SmallVector<Type, 2> substReplacementTypes;
   CanType substYieldType;
   unsigned packExpansionLevel;
+  bool &unimplementable;
   
-  SubstFunctionTypePatternVisitor(TypeConverter &TC)
-    : TC(TC), packExpansionLevel(0) {}
+  SubstFunctionTypePatternVisitor(TypeConverter &TC, bool &unimplementable)
+    : TC(TC), packExpansionLevel(0), unimplementable(unimplementable) {}
 
   // Creates and returns a fresh type parameter in the substituted generic
   // signature if `pattern` is a type parameter or opaque archetype. Returns
@@ -2358,7 +2359,10 @@ public:
 
     pattern.forEachFunctionParam(func.getParams(), /*ignore self*/ false,
                                  [&](FunctionParamGenerator &param) {
-      if (!param.isOrigPackExpansion()) {
+      if (param.isUnimplementablePackExpansion()) {
+        unimplementable = true;
+        // Just ignore it.
+      } else if (!param.isOrigPackExpansion()) {
         auto newParamTy = visit(param.getSubstParams()[0].getParameterType(),
                                 param.getOrigType());
         addParam(param.getOrigFlags(), newParamTy);
@@ -2401,7 +2405,8 @@ std::tuple<AbstractionPattern, SubstitutionMap, AbstractionPattern>
 AbstractionPattern::getSubstFunctionTypePattern(CanAnyFunctionType substType,
                                                 TypeConverter &TC,
                                                 AbstractionPattern origYieldType,
-                                                CanType substYieldType)
+                                                CanType substYieldType,
+                                                bool &unimplementable)
 const {
   // If this abstraction pattern isn't meaningfully generic, then we don't
   // need to do any transformation.
@@ -2419,7 +2424,7 @@ const {
               : AbstractionPattern::getInvalid());
   }
 
-  SubstFunctionTypePatternVisitor visitor(TC);
+  SubstFunctionTypePatternVisitor visitor(TC, unimplementable);
   auto substTy = visitor.handleUnabstractedFunctionType(substType, *this,
                                                         substYieldType,
                                                         origYieldType);
