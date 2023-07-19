@@ -1754,3 +1754,111 @@ ParamDecl *SILGenFunction::isMappedToInitAccessorArgument(VarDecl *property) {
 
   return arg->second;
 }
+
+SILValue
+SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
+                                        ManagedValue base,
+                                        SubstitutionMap substitutions) {
+  auto setterFRef = [&]() -> SILValue {
+    auto setterInfo = getConstantInfo(getTypeExpansionContext(), setter);
+    if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
+      // Emit a thunk we might have to bridge arguments.
+      auto foreignSetterThunk = setter.asForeign(false);
+      return emitDynamicMethodRef(
+                 loc, foreignSetterThunk,
+                 SGM.Types
+                     .getConstantInfo(getTypeExpansionContext(),
+                                      foreignSetterThunk)
+                     .SILFnType)
+          .getValue();
+    }
+
+    return emitGlobalFunctionRef(loc, setter, setterInfo);
+  }();
+
+  auto getSetterType = [&](SILValue setterFRef) {
+    CanSILFunctionType setterTy =
+        setterFRef->getType().castTo<SILFunctionType>();
+    return setterTy->substGenericArgs(SGM.M, substitutions,
+                                      getTypeExpansionContext());
+  };
+
+  SILFunctionConventions setterConv(getSetterType(setterFRef), SGM.M);
+
+  // Emit captures for the setter
+  SmallVector<SILValue, 4> capturedArgs;
+  auto captureInfo = SGM.Types.getLoweredLocalCaptures(setter);
+  if (!captureInfo.getCaptures().empty()) {
+    SmallVector<ManagedValue, 4> captures;
+    emitCaptures(loc, setter, CaptureEmission::AssignByWrapper, captures);
+
+    for (auto capture : captures)
+      capturedArgs.push_back(capture.forward(*this));
+  } else {
+    assert(base);
+
+    SILValue capturedBase;
+    unsigned argIdx = setterConv.getNumSILArguments() - 1;
+
+    if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+      capturedBase = base.getValue();
+    } else if (base.getType().isAddress() &&
+               base.getType().getObjectType() ==
+                   setterConv.getSILArgumentType(argIdx,
+                                                 getTypeExpansionContext())) {
+      // If the base is a reference and the setter expects a value, emit a
+      // load. This pattern is emitted for property wrappers with a
+      // nonmutating setter, for example.
+      capturedBase = B.createTrivialLoadOr(loc, base.getValue(),
+                                           LoadOwnershipQualifier::Copy);
+    } else {
+      capturedBase = base.copy(*this, loc).forward(*this);
+    }
+
+    capturedArgs.push_back(capturedBase);
+  }
+
+  PartialApplyInst *setterPAI =
+      B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
+                           ParameterConvention::Direct_Guaranteed);
+  return emitManagedRValueWithCleanup(setterPAI).getValue();
+}
+
+void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
+                                      VarDecl *field, ManagedValue newValue,
+                                      SubstitutionMap substitutions) {
+  auto fieldTy = field->getValueInterfaceType();
+  if (!substitutions.empty())
+    fieldTy = fieldTy.subst(substitutions);
+
+  // Emit the init accessor function partially applied to the base.
+  SILValue initFRef = emitGlobalFunctionRef(
+      loc, getAccessorDeclRef(field->getOpaqueAccessor(AccessorKind::Init)));
+  if (!substitutions.empty()) {
+    // If there are substitutions we need to emit partial apply to
+    // apply substitutions to the init accessor reference type.
+    auto initTy =
+        initFRef->getType().castTo<SILFunctionType>()->substGenericArgs(
+            SGM.M, substitutions, getTypeExpansionContext());
+
+    SILFunctionConventions setterConv(initTy, SGM.M);
+
+    // Emit partial apply without argument to produce a substituted
+    // init accessor reference.
+    PartialApplyInst *initPAI =
+        B.createPartialApply(loc, initFRef, substitutions, ArrayRef<SILValue>(),
+                             ParameterConvention::Direct_Guaranteed);
+    initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
+  }
+
+  SILValue setterFRef;
+  if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
+    setterFRef = emitApplyOfSetterToBase(loc, SILDeclRef(setter), selfValue,
+                                         substitutions);
+  } else {
+    setterFRef = SILUndef::get(initFRef->getType(), F);
+  }
+
+  B.createAssignOrInit(loc, selfValue.getValue(), newValue.forward(*this),
+                       initFRef, setterFRef, AssignOrInitInst::Unknown);
+}

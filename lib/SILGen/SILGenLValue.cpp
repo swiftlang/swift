@@ -1443,8 +1443,23 @@ namespace {
     }
 
     ManagedValue emitValue(SILGenFunction &SGF, SILLocation loc, VarDecl *field,
-                           Type fieldType, ArgumentSource &&value,
-                           CanSILFunctionType accessorTy) {
+                           ArgumentSource &&value, AccessorKind accessorKind) {
+      auto accessorInfo = SGF.getConstantInfo(
+          SGF.getTypeExpansionContext(),
+          SILDeclRef(field->getOpaqueAccessor(accessorKind)));
+
+      auto fieldTy = field->getValueInterfaceType();
+      auto accessorTy = SGF.SGM.Types
+                            .getLoweredType(accessorInfo.SILFnType,
+                                            SGF.getTypeExpansionContext())
+                            .castTo<SILFunctionType>();
+
+      if (!Substitutions.empty()) {
+        fieldTy = fieldTy.subst(Substitutions);
+        accessorTy = accessorTy->substGenericArgs(
+            SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
+      }
+
       SILFunctionConventions accessorConv(accessorTy, SGF.SGM.M);
 
       // FIXME: This should use CallEmission instead of doing everything
@@ -1458,96 +1473,28 @@ namespace {
         loweredSubstArgType =
             SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
       }
+
       auto loweredSubstParamTy = SILType::getPrimitiveType(
           param.getArgumentType(SGF.SGM.M, accessorTy,
                                 SGF.getTypeExpansionContext()),
           loweredSubstArgType.getCategory());
+
       // Handle reabstraction differences.
       if (Mval.getType() != loweredSubstParamTy) {
         Mval = SGF.emitSubstToOrigValue(
             loc, Mval, SGF.SGM.Types.getAbstractionPattern(field),
-            fieldType->getCanonicalType());
+            fieldTy->getCanonicalType());
       }
 
+      auto newValueArgIdx = accessorConv.getNumIndirectSILResults();
       // If we need the argument in memory, materialize an address.
-      if (accessorConv.getSILArgumentConvention(0).isIndirectConvention() &&
+      if (accessorConv.getSILArgumentConvention(newValueArgIdx)
+              .isIndirectConvention() &&
           !Mval.getType().isAddress()) {
         Mval = Mval.materialize(SGF, loc);
       }
 
       return Mval;
-    }
-
-    std::pair<SILValue, CanSILFunctionType>
-    applySetterToBase(SILGenFunction &SGF, SILLocation loc, SILDeclRef setter,
-                      ManagedValue base) const {
-      auto setterFRef = [&]() -> SILValue {
-        auto setterInfo =
-            SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
-        if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
-          // Emit a thunk we might have to bridge arguments.
-          auto foreignSetterThunk = setter.asForeign(false);
-          return SGF
-              .emitDynamicMethodRef(
-                  loc, foreignSetterThunk,
-                  SGF.SGM.Types
-                      .getConstantInfo(SGF.getTypeExpansionContext(),
-                                       foreignSetterThunk)
-                      .SILFnType)
-              .getValue();
-        }
-
-        return SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
-      }();
-
-      auto getSetterType = [&](SILValue setterFRef) {
-        CanSILFunctionType setterTy =
-            setterFRef->getType().castTo<SILFunctionType>();
-        return setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
-                                          SGF.getTypeExpansionContext());
-      };
-
-      auto setterTy = getSetterType(setterFRef);
-      SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
-
-      // Emit captures for the setter
-      SmallVector<SILValue, 4> capturedArgs;
-      auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(setter);
-      if (!captureInfo.getCaptures().empty()) {
-        SmallVector<ManagedValue, 4> captures;
-        SGF.emitCaptures(loc, setter, CaptureEmission::AssignByWrapper,
-                         captures);
-
-        for (auto capture : captures)
-          capturedArgs.push_back(capture.forward(SGF));
-      } else {
-        assert(base);
-
-        SILValue capturedBase;
-        unsigned argIdx = setterConv.getNumSILArguments() - 1;
-
-        if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
-          capturedBase = base.getValue();
-        } else if (base.getType().isAddress() &&
-                   base.getType().getObjectType() ==
-                       setterConv.getSILArgumentType(
-                           argIdx, SGF.getTypeExpansionContext())) {
-          // If the base is a reference and the setter expects a value, emit a
-          // load. This pattern is emitted for property wrappers with a
-          // nonmutating setter, for example.
-          capturedBase = SGF.B.createTrivialLoadOr(
-              loc, base.getValue(), LoadOwnershipQualifier::Copy);
-        } else {
-          capturedBase = base.copy(SGF, loc).forward(SGF);
-        }
-
-        capturedArgs.push_back(capturedBase);
-      }
-
-      PartialApplyInst *setterPAI =
-          SGF.B.createPartialApply(loc, setterFRef, Substitutions, capturedArgs,
-                                   ParameterConvention::Direct_Guaranteed);
-      return {SGF.emitManagedRValueWithCleanup(setterPAI).getValue(), setterTy};
     }
   };
 
@@ -1580,31 +1527,9 @@ namespace {
              ManagedValue base) &&
         override {
       VarDecl *field = cast<VarDecl>(Storage);
-      auto fieldType = field->getValueInterfaceType();
-      if (!Substitutions.empty()) {
-        fieldType = fieldType.subst(Substitutions);
-      }
-
-      // Emit the init accessor function partially applied to the base.
-      SILValue initFRef =
-          emitPartialInitAccessorReference(SGF, loc, getAccessorDecl());
-
-      SILValue setterFRef;
-      CanSILFunctionType setterTy;
-
-      if (auto *setter = field->getOpaqueAccessor(AccessorKind::Set)) {
-        std::tie(setterFRef, setterTy) =
-            applySetterToBase(SGF, loc, SILDeclRef(setter), base);
-      } else {
-        setterFRef = SILUndef::get(initFRef->getType(), SGF.F);
-        setterTy = initFRef->getType().castTo<SILFunctionType>();
-      }
-
       auto Mval =
-          emitValue(SGF, loc, field, fieldType, std::move(value), setterTy);
-
-      SGF.B.createAssignOrInit(loc, base.getValue(), Mval.forward(SGF),
-                               initFRef, setterFRef, AssignOrInitInst::Unknown);
+          emitValue(SGF, loc, field, std::move(value), AccessorKind::Init);
+      SGF.emitAssignOrInit(loc, base, field, Mval, Substitutions);
     }
 
     RValue get(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -1631,33 +1556,6 @@ namespace {
       return AccessStorage{Storage, IsSuper,
                            Indices.isNull() ? nullptr : &Indices,
                            ArgListForDiagnostics};
-    }
-
-  private:
-    SILValue emitPartialInitAccessorReference(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              AccessorDecl *initAccessor) {
-      assert(initAccessor->isInitAccessor());
-      auto initConstant = SGF.getAccessorDeclRef(initAccessor);
-      SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
-
-      // If there are no substitutions there is no need to emit partial
-      // apply.
-      if (Substitutions.empty())
-        return initFRef;
-
-      CanSILFunctionType initTy =
-          initFRef->getType().castTo<SILFunctionType>()->substGenericArgs(
-              SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
-
-      SILFunctionConventions setterConv(initTy, SGF.SGM.M);
-
-      // Emit partial apply without argument to produce a substituted
-      // init accessor reference.
-      PartialApplyInst *initPAI = SGF.B.createPartialApply(
-          loc, initFRef, Substitutions, ArrayRef<SILValue>(),
-          ParameterConvention::Direct_Guaranteed);
-      return SGF.emitManagedRValueWithCleanup(initPAI).getValue();
     }
   };
 
@@ -1742,6 +1640,14 @@ namespace {
       // Assignment to a wrapped property can only be re-written to initialization for
       // members of `self` in an initializer, and for local variables.
       if (!isAssignmentToSelfParamInInit)
+        return false;
+
+      // Properties declared in a superclass cannot be initialized via
+      // init accessor because `super.init()` should always precede
+      // any such property reference which means that it can only be
+      // mutated by a setter call.
+      if (varDecl->getDeclContext()->getSelfNominalTypeDecl() !=
+          fnDecl->getDeclContext()->getSelfNominalTypeDecl())
         return false;
 
       auto *initAccessor = varDecl->getAccessor(AccessorKind::Init);
@@ -1894,15 +1800,13 @@ namespace {
         ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
 
         // Create the allocating setter function. It captures the base address.
-        SILValue setterFn;
-        CanSILFunctionType setterTy;
-        std::tie(setterFn, setterTy) =
-            applySetterToBase(SGF, loc, Accessor, base);
+        SILValue setterFn =
+            SGF.emitApplyOfSetterToBase(loc, Accessor, base, Substitutions);
 
         // Create the assign_by_wrapper with the initializer and setter.
 
         auto Mval =
-            emitValue(SGF, loc, field, FieldType, std::move(value), setterTy);
+            emitValue(SGF, loc, field, std::move(value), AccessorKind::Set);
 
         SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
                                     initFn.getValue(), setterFn,
