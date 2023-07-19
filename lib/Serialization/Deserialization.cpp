@@ -6990,6 +6990,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   uint8_t rawRepresentation;
   uint8_t rawDiffKind;
   bool pseudogeneric = false;
+  bool unimplementable;
   bool concurrent;
   bool noescape;
   bool hasErrorResult;
@@ -7004,7 +7005,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, concurrent, async, rawCoroutineKind, rawCalleeConvention,
-      rawRepresentation, pseudogeneric, noescape, rawDiffKind, hasErrorResult,
+      rawRepresentation, pseudogeneric, noescape, unimplementable,
+      rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -7028,6 +7030,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   auto extInfo = SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
                                                  noescape, concurrent, async,
+                                                 unimplementable,
                                                  *diffKind, clangFunctionType)
                      .build();
 

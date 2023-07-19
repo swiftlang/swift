@@ -5358,6 +5358,12 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   return thunk;
 }
 
+static bool isUnimplementableVariadicFunctionAbstraction(AbstractionPattern origType,
+                                                         CanAnyFunctionType substType) {
+  return origType.isTypeParameterOrOpaqueArchetype() &&
+         substType->containsPackExpansionParam();
+}
+
 ManagedValue Transform::transformFunction(ManagedValue fn,
                                           AbstractionPattern inputOrigType,
                                           CanAnyFunctionType inputSubstType,
@@ -5376,6 +5382,22 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // If there's no abstraction difference, we're done.
   if (fnType == expectedFnType) {
     return fn;
+  }
+
+  // Check for unimplementable functions.
+  if (fnType->isUnimplementable() || expectedFnType->isUnimplementable()) {
+    if (isUnimplementableVariadicFunctionAbstraction(inputOrigType,
+                                                     inputSubstType)) {
+      SGF.SGM.diagnose(Loc, diag::unsupported_variadic_function_abstraction,
+                       inputSubstType);
+    } else {
+      assert(isUnimplementableVariadicFunctionAbstraction(outputOrigType,
+                                                          outputSubstType));
+      SGF.SGM.diagnose(Loc, diag::unsupported_variadic_function_abstraction,
+                       outputSubstType);
+    }
+
+    return SGF.emitUndef(expectedFnType);
   }
 
   // Check if we require a re-abstraction thunk.

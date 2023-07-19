@@ -190,6 +190,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : long {
   BridgedTypeAttrKind_opened,
   BridgedTypeAttrKind_pack_element,
   BridgedTypeAttrKind_pseudogeneric,
+  BridgedTypeAttrKind_unimplementable,
   BridgedTypeAttrKind_yields,
   BridgedTypeAttrKind_yield_once,
   BridgedTypeAttrKind_yield_many,
