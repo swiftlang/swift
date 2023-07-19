@@ -592,7 +592,25 @@ namespace {
     // Find the argument type.
     size_t nArgs = expr->getArgs()->size();
     auto fnExpr = expr->getFn();
-    
+
+    auto mustConsiderVariadicGenericOverloads = [&](ValueDecl *overload) {
+      if (overload->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+        return false;
+
+      auto genericContext = overload->getAsGenericContext();
+      if (!genericContext)
+        return false;
+
+      auto *GPL = genericContext->getGenericParams();
+      if (!GPL)
+        return false;
+
+      return llvm::any_of(GPL->getParams(),
+                          [&](const GenericTypeParamDecl *GP) {
+                            return GP->isParameterPack();
+                          });
+    };
+
     // Check to ensure that we have an OverloadedDeclRef, and that we're not
     // favoring multiple overload constraints. (Otherwise, in this case
     // favoring is useless.
@@ -630,8 +648,9 @@ namespace {
         return nArgs == paramCount.first ||
                nArgs == paramCount.second;
       };
-      
-      favorCallOverloads(expr, CS, isFavoredDecl);
+
+      favorCallOverloads(expr, CS, isFavoredDecl,
+                         mustConsiderVariadicGenericOverloads);
     }
 
     // We only currently perform favoring for unary args.
@@ -655,7 +674,8 @@ namespace {
       // inside an extension context, since any archetypes in the parameter
       // list could match exactly.
       auto mustConsider = [&](ValueDecl *value) -> bool {
-        return isa<ProtocolDecl>(value->getDeclContext());
+        return isa<ProtocolDecl>(value->getDeclContext()) ||
+               mustConsiderVariadicGenericOverloads(value);
       };
 
       favorCallOverloads(expr, CS, isFavoredDecl, mustConsider);

@@ -117,7 +117,7 @@ static llvm::Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
-static bool isPackExpansionType(Type type) {
+bool constraints::isPackExpansionType(Type type) {
   if (type->is<PackExpansionType>())
     return true;
 
@@ -152,13 +152,13 @@ Type constraints::getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type) {
   return {};
 }
 
-static bool containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
+bool constraints::containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
   return llvm::any_of(params, [&](const auto &param) {
     return isPackExpansionType(param.getPlainType());
   });
 }
 
-static bool containsPackExpansionType(TupleType *tuple) {
+bool constraints::containsPackExpansionType(TupleType *tuple) {
   return llvm::any_of(tuple->getElements(), [&](const auto &elt) {
     return isPackExpansionType(elt.getType());
   });
