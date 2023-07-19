@@ -580,7 +580,7 @@ struct BorrowedValue {
   /// instructions and pass them individually to visitor. Asserts if this is
   /// called with a scope that is not local.
   ///
-  /// Returns false and early exist if \p visitor returns false.
+  /// Returns false and exits early if \p visitor returns false.
   ///
   /// The intention is that this method can be used instead of
   /// BorrowScopeIntroducingValue::getLocalScopeEndingUses() to avoid
