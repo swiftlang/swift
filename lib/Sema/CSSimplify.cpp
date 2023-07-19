@@ -135,12 +135,21 @@ bool constraints::isSingleUnlabeledPackExpansionTuple(Type type) {
 }
 
 Type constraints::getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type) {
-  if (!isSingleUnlabeledPackExpansionTuple(type)) {
-    return {};
+  if (isSingleUnlabeledPackExpansionTuple(type)) {
+    auto tuple = type->getRValueType()->castTo<TupleType>();
+    const auto &tupleElement = tuple->getElementType(0);
+    if (auto *expansion = tupleElement->getAs<PackExpansionType>()) {
+      return expansion->getPatternType();
+    }
+    if (auto *typeVar = tupleElement->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      if (auto expansionElement =
+              locator->getLastElementAs<LocatorPathElt::PackExpansionType>()) {
+        return expansionElement->getOpenedType()->getPatternType();
+      }
+    }
   }
-  auto tuple = type->getRValueType()->castTo<TupleType>();
-  auto *expansion = tuple->getElementType(0)->castTo<PackExpansionType>();
-  return expansion->getPatternType();
+  return {};
 }
 
 static bool containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
