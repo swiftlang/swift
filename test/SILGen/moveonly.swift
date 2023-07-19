@@ -2403,7 +2403,7 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_InOut(m: inou
 }
 
 // CHECK-LABEL: sil [ossa] @$s8moveonly61testSubscriptReadModify_BaseLoadable_ResultAddressOnly_GlobalyyF : $@convention(thin) () -> () {
-// CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @$s8moveonly39globalLoadableSubscriptReadModifyTesterAA0cdefG0Vvp : 
+// CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @$s8moveonly39globalLoadableSubscriptReadModifyTesterAA0cdefG0Vvp :
 //
 // The get call
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]]
@@ -3117,3 +3117,96 @@ public func testSubscriptGetModifyThroughParentClass_BaseLoadable_ResultAddressO
     m.computedTester2[0].mutatingFunc()
 }
 
+//////////////////////////////
+// MARK: Capture Self Tests //
+//////////////////////////////
+
+func testSelfCaptureHandledCorrectly() {
+    struct E {
+        var a: [Int] = []
+    }
+
+    struct Test : ~Copyable {
+        var e: E
+
+        // Test that we capture inits by address.
+        //
+        // CHECK-LABEL: sil private [ossa] @$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_VADycfC : $@convention(method) (@thin Test.Type) -> @owned Test {
+        // CHECK: [[BOX:%.*]] = alloc_box ${ var Test }
+        // CHECK: [[MARK_UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]]
+        // CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+        // CHECK: [[PROJECT:%.*]] = project_box [[BORROW]]
+        // CHECK: apply {{%.*}}([[PROJECT]])
+        // CHECK: } // end sil function '$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_VADycfC'
+        init() {
+            e = E()
+            func capture() {
+                let e = self.e
+            }
+            capture()
+        }
+
+        // CHECK-LABEL: sil private [ossa] @$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V22captureByLocalFunctionyyF : $@convention(method) (@guaranteed Test) -> () {
+        // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
+        // CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
+        // CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+        // CHECK:   [[BORROW:%.*]] = begin_borrow [[MARK]]
+        // CHECK:   apply {{%.*}}([[BORROW]])
+        // CHECK:   end_borrow [[BORROW]]
+        // CHECK:   destroy_value [[MARK]]
+        // CHECK: } // end sil function '$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V22captureByLocalFunctionyyF'
+        func captureByLocalFunction() {
+            func capture() {
+                let e = self.e
+            }
+            capture()
+        }
+
+        // CHECK-LABEL: sil private [ossa] @$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V17captureByLocalLetyyF : $@convention(method) (@guaranteed Test) -> () {
+        // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
+        // CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
+        // CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+        // CHECK:   [[COPY2:%.*]] = copy_value [[MARK]]
+        // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[COPY2]])
+        // CHECK:   destroy_value [[MARK]]
+        // CHECK: } // end sil function '$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V17captureByLocalLetyyF'
+        func captureByLocalLet() {
+            let f = {
+                let e = self.e
+            }
+
+            f()
+        }
+
+        // CHECK-LABEL: sil private [ossa] @$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V17captureByLocalVaryyF : $@convention(method) (@guaranteed Test) -> () {
+        // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
+        // CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
+        // CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+        // CHECK:   [[COPY2:%.*]] = copy_value [[MARK]]
+        // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[COPY2]])
+        // CHECK:   destroy_value [[MARK]]
+        // CHECK: } // end sil function '$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V17captureByLocalVaryyF'
+        func captureByLocalVar() {
+            var f = {}
+            f = {
+                let e = self.e
+            }
+            f()
+        }
+
+        // CHECK-LABEL: sil private [ossa] @$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V27captureByNonEscapingClosureyyF : $@convention(method) (@guaranteed Test) -> () {
+        // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
+        // CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
+        // CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+        // CHECK:   [[COPY2:%.*]] = copy_value [[MARK]]
+        // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[COPY2]])
+        // CHECK:   destroy_value [[MARK]]
+        // CHECK: } // end sil function '$s8moveonly31testSelfCaptureHandledCorrectlyyyF4TestL_V27captureByNonEscapingClosureyyF'
+        func captureByNonEscapingClosure() {
+            func useClosure(_ f: () -> ()) {}
+            useClosure {
+                let e = self.e
+            }
+        }
+    }
+}
