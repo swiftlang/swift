@@ -247,3 +247,26 @@ do {
     }
   }
 }
+
+do {
+  class Entity {
+    var _age: Int
+    var age: Int = 0 {
+      @storageRestrictions(initializes: _age)
+      init { _age = newValue }
+      get { _age }
+      set { _age = newValue }
+    }
+  }
+
+  class Person : Entity {
+    init(age: Int) {
+      self.age = age // expected-error {{'self' used in property access 'age' before 'super.init' call}}
+    }
+
+    init(otherAge: Int) {
+      super.init()
+      self.age = otherAge // Ok
+    }
+  }
+}
