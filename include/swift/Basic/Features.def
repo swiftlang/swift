@@ -114,7 +114,7 @@ UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
-UPCOMING_FEATURE(DisableActorInferenceFromPropertyWrapperUsage, 401, 6)
+UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -209,7 +209,7 @@ EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
 /// Enable reference bindings.
-EXPERIMENTAL_FEATURE(ReferenceBindings, false)
+EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
@@ -219,6 +219,10 @@ EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
 /// Defer Sendable checking to SIL diagnostic phase.
 EXPERIMENTAL_FEATURE(DeferredSendableChecking, false)
+
+/// Enable extended callbacks (with additional parameters) to be used when the
+/// "playground transform" is enabled.
+EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

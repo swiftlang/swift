@@ -115,6 +115,12 @@ ERROR(c_function_pointer_from_function_with_context,none,
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
       ())
 
+ERROR(unsupported_variadic_function_abstraction,none,
+      "cannot fully abstract a value of variadic function type %0 because "
+      "different contexts will not be able to reliably agree on a calling "
+      "convention; try wrapping it in a struct",
+      (Type))
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
@@ -859,9 +865,13 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 // Warnings arising from the flow-sensitive checking of Sendability of
 // non-Sendable values
 WARNING(consumed_value_used, none,
-        "Non-Sendable value consumed, then used at this site; could yield race with another thread", ())
+        "non-Sendable value consumed, then used at this site; could yield race with another thread", ())
 WARNING(arg_region_consumed, none,
-        "This application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller", ())
+        "this application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller", ())
+WARNING(consumption_yields_race, none,
+        "non-Sendable value sent across isolation domains here, but could be accessed later in this function (%0 access site%select{|s}1 displayed%select{|, %3 more hidden}2)", (unsigned, bool, bool, unsigned))
+NOTE(possible_racy_access_site, none,
+    "access here could race with non-Sendable value send above", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

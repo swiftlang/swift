@@ -574,6 +574,10 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
+  // There's no representation of this in the mangling because it can't
+  // occur in well-formed programs.
+  bool unimplementable = false;
+
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
   llvm::SmallVector<SILResultInfo, 8> funcResults;
@@ -610,7 +614,8 @@ Type ASTBuilder::createImplFunctionType(
   }
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isSendable(), flags.isAsync(), diffKind, clangFnType)
+                   flags.isSendable(), flags.isAsync(),
+                   unimplementable, diffKind, clangFnType)
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,

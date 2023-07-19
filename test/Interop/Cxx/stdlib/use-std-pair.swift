@@ -33,4 +33,14 @@ StdPairTestSuite.test("PairStructInt.elements") {
   expectEqual(pair.second, 11)
 }
 
+StdPairTestSuite.test("StdPair as CxxPair") {
+  func changeFirst(_ p: inout any CxxPair<CInt, CInt>) {
+    p.first = 123
+  }
+
+  var pair: any CxxPair<CInt, CInt> = getIntPair()
+  changeFirst(&pair)
+  expectEqual(pair.first, 123)
+}
+
 runAllTests()

@@ -2842,6 +2842,12 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   if (OwningClangModule == ModuleFilter->getClangModule())
     return true;
 
+  // If this decl was implicitly synthesized by the compiler, and is not
+  // supposed to be owned by any module, return true.
+  if (Importer->isSynthesizedAndVisibleFromAllModules(D)) {
+    return true;
+  }
+
   // Friends from class templates don't have an owning module. Just return true.
   if (isa<clang::FunctionDecl>(D) &&
       cast<clang::FunctionDecl>(D)->isThisDeclarationInstantiatedFromAFriendDefinition())
@@ -6300,6 +6306,11 @@ FuncDecl *ClangImporter::getCXXSynthesizedOperatorFunc(FuncDecl *decl) {
   assert(synthesizedOperator->isOperator() &&
          "expected the alternative to be a synthesized operator");
   return cast<FuncDecl>(synthesizedOperator);
+}
+
+bool ClangImporter::isSynthesizedAndVisibleFromAllModules(
+    const clang::Decl *decl) {
+  return Impl.synthesizedAndAlwaysVisibleDecls.contains(decl);
 }
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {

@@ -3387,7 +3387,7 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
 }
 
 
-static bool usesFeatureDisableActorInferenceFromPropertyWrapperUsage(Decl *decl) {
+static bool usesFeatureDisableOutwardActorInference(Decl *decl) {
   return false;
 }
 
@@ -3477,6 +3477,10 @@ static bool usesFeatureParameterPacks(Decl *decl) {
 }
 
 static bool usesFeatureDeferredSendableChecking(Decl *decl) {
+  return false;
+}
+
+static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;
 }
 
@@ -6523,6 +6527,9 @@ public:
       Printer << " ";
     }
 
+    if (info.isUnimplementable()) {
+      Printer.printSimpleAttr("@unimplementable") << " ";
+    }
     if (info.isPseudogeneric()) {
       Printer.printSimpleAttr("@pseudogeneric") << " ";
     }

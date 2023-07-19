@@ -642,6 +642,8 @@ public:
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
+  llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>

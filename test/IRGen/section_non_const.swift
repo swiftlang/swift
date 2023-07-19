@@ -75,3 +75,6 @@ struct MyStruct6 {
     }
 }
 @_section("__TEXT,__mysection") var g_MyStruct6: MyStruct6 = MyStruct6(a: 42) // expected-error {{global variable must be a compile-time constant to use @_section attribute}}
+
+@_section("__TEXT,__mysection") var gp1: UnsafeMutablePointer<Int>? = nil
+@_section("__TEXT,__mysection") var gp2: UnsafeMutablePointer<Int>? = UnsafeMutablePointer(bitPattern: 0x42424242)

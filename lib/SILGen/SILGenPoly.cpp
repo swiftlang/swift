@@ -4970,7 +4970,86 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
   SILFunctionConventions fromConv(fromType, getModule());
   SILFunctionConventions toConv(toType, getModule());
-  assert(toConv.useLoweredAddresses());
+  if (!toConv.useLoweredAddresses()) {
+    SmallVector<ManagedValue, 4> thunkArguments;
+    for (auto *indRes : thunkIndirectResults)
+      thunkArguments.push_back(ManagedValue::forLValue(indRes));
+    thunkArguments.append(params.begin(), params.end());
+    SmallVector<SILParameterInfo, 4> toParameters(
+        toConv.getParameters().begin(), toConv.getParameters().end());
+    SmallVector<SILResultInfo, 4> toResults(toConv.getResults().begin(),
+                                            toConv.getResults().end());
+    // Handle self reordering.
+    // - For pullbacks: reorder result infos.
+    // - For differentials: reorder parameter infos and arguments.
+    auto numIndirectResults = thunkIndirectResults.size();
+    if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback &&
+        toResults.size() > 1) {
+      std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
+    }
+    if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Differential &&
+        thunkArguments.size() > 1) {
+      // Before: [arg1, arg2, ..., arg_self, df]
+      //  After: [arg_self, arg1, arg2, ..., df]
+      std::rotate(thunkArguments.begin() + numIndirectResults,
+                  thunkArguments.end() - 2, thunkArguments.end() - 1);
+      // Before: [arg1, arg2, ..., arg_self]
+      //  After: [arg_self, arg1, arg2, ...]
+      std::rotate(toParameters.begin(), toParameters.end() - 1,
+                  toParameters.end());
+    }
+
+    // Correctness assertions.
+#ifndef NDEBUG
+    assert(toType->getNumParameters() == fromType->getNumParameters());
+    for (unsigned paramIdx : range(toType->getNumParameters())) {
+      auto fromParam = fromConv.getParameters()[paramIdx];
+      auto toParam = toParameters[paramIdx];
+      assert(fromParam.getInterfaceType() == toParam.getInterfaceType());
+    }
+    assert(fromType->getNumResults() == toType->getNumResults());
+    for (unsigned resIdx : range(toType->getNumResults())) {
+      auto fromRes = fromConv.getResults()[resIdx];
+      auto toRes = toResults[resIdx];
+      assert(fromRes.getInterfaceType() == toRes.getInterfaceType());
+    }
+#endif // NDEBUG
+
+    auto *linearMapArg = thunk->getArguments().back();
+    SmallVector<SILValue, 4> arguments;
+    for (unsigned paramIdx : range(toType->getNumParameters())) {
+      arguments.push_back(thunkArguments[paramIdx].getValue());
+    }
+    auto *apply =
+        thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(), arguments);
+
+    // Get return elements.
+    SmallVector<SILValue, 4> results;
+    extractAllElements(apply, loc, thunkSGF.B, results);
+
+    // Handle self reordering.
+    // For pullbacks: rotate direct results if self is direct.
+    if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback) {
+      auto fromSelfResult = fromConv.getResults().front();
+      auto toSelfResult = toConv.getResults().back();
+      assert(fromSelfResult.getInterfaceType() ==
+             toSelfResult.getInterfaceType());
+      // Before: [dir_res_self, dir_res1, dir_res2, ...]
+      //  After: [dir_res1, dir_res2, ..., dir_res_self]
+      if (results.size() > 1) {
+        std::rotate(results.begin(), results.begin() + 1, results.end());
+      }
+    }
+    auto retVal = joinElements(results, thunkSGF.B, loc);
+
+    // Emit cleanups.
+    thunkSGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
+
+    // Create return.
+    thunkSGF.B.createReturn(loc, retVal);
+
+    return getThunkedResult();
+  }
 
   SmallVector<ManagedValue, 4> thunkArguments;
   for (auto *indRes : thunkIndirectResults)
@@ -5308,7 +5387,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   };
 
   if (!reorderSelf && linearMapFnType == targetLinearMapFnType) {
-    createReturn(apply);
+    SmallVector<SILValue, 8> results;
+    extractAllElements(apply, loc, thunkSGF.B, results);
+    auto result = joinElements(results, thunkSGF.B, apply.getLoc());
+    createReturn(result);
     return thunk;
   }
 
@@ -5358,6 +5440,12 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   return thunk;
 }
 
+static bool isUnimplementableVariadicFunctionAbstraction(AbstractionPattern origType,
+                                                         CanAnyFunctionType substType) {
+  return origType.isTypeParameterOrOpaqueArchetype() &&
+         substType->containsPackExpansionParam();
+}
+
 ManagedValue Transform::transformFunction(ManagedValue fn,
                                           AbstractionPattern inputOrigType,
                                           CanAnyFunctionType inputSubstType,
@@ -5376,6 +5464,22 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // If there's no abstraction difference, we're done.
   if (fnType == expectedFnType) {
     return fn;
+  }
+
+  // Check for unimplementable functions.
+  if (fnType->isUnimplementable() || expectedFnType->isUnimplementable()) {
+    if (isUnimplementableVariadicFunctionAbstraction(inputOrigType,
+                                                     inputSubstType)) {
+      SGF.SGM.diagnose(Loc, diag::unsupported_variadic_function_abstraction,
+                       inputSubstType);
+    } else {
+      assert(isUnimplementableVariadicFunctionAbstraction(outputOrigType,
+                                                          outputSubstType));
+      SGF.SGM.diagnose(Loc, diag::unsupported_variadic_function_abstraction,
+                       outputSubstType);
+    }
+
+    return SGF.emitUndef(expectedFnType);
   }
 
   // Check if we require a re-abstraction thunk.

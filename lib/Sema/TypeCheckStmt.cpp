@@ -2583,26 +2583,31 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getResultBuilderType(func)) {
-      auto optBody = TypeChecker::applyResultBuilderBodyTransform(
-          func, builderType,
-          /*ClosuresInResultBuilderDontParticipateInInference=*/
-          ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
-      if ((ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) || (ctx.SolutionCallback && ctx.SolutionCallback->gotCallback())) {
-        // We already informed the completion callback of solutions found by
-        // type checking the entire result builder from
-        // applyResultBuilderBodyTransform. No need to typecheck the requested
-        // AST node individually anymore.
-        return false;
+      if (func->getBody()) {
+        auto optBody = TypeChecker::applyResultBuilderBodyTransform(
+            func, builderType,
+            /*ClosuresInResultBuilderDontParticipateInInference=*/
+            ctx.CompletionCallback == nullptr &&
+                ctx.SolutionCallback == nullptr);
+        if ((ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) ||
+            (ctx.SolutionCallback && ctx.SolutionCallback->gotCallback())) {
+          // We already informed the completion callback of solutions found by
+          // type checking the entire result builder from
+          // applyResultBuilderBodyTransform. No need to typecheck the requested
+          // AST node individually anymore.
+          return false;
+        }
+        if (!ctx.CompletionCallback && !ctx.SolutionCallback && optBody &&
+            *optBody) {
+          // Wire up the function body now.
+          func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+          return false;
+        }
+        // We did not find a solution while applying the result builder,
+        // possibly because the result builder contained an invalid element and
+        // thus the transform couldn't be applied. Perform code completion
+        // pretending there was no result builder to recover.
       }
-      if (!ctx.CompletionCallback && !ctx.SolutionCallback && optBody && *optBody) {
-        // Wire up the function body now.
-        func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
-        return false;
-      }
-      // We did not find a solution while applying the result builder, possibly
-      // because the result builder contained an invalid element and thus the
-      // transform couldn't be applied. Perform code completion pretending there
-      // was no result builder to recover.
     } else if (func->hasSingleExpressionBody() &&
                 func->getResultInterfaceType()->isVoid()) {
        // The function returns void.  We don't need an explicit return, no matter

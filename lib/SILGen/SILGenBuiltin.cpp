@@ -1200,7 +1200,8 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   assert(derivativeFnType->isTrivialNoEscape());
 
   // Do the apply for the indirect result case.
-  if (derivativeFnType->hasIndirectFormalResults()) {
+  if (derivativeFnType->hasIndirectFormalResults() &&
+      SGF.SGM.M.useLoweredAddresses()) {
     auto indResBuffer = SGF.getBufferForExprResult(
         loc, derivativeFnType->getAllResultsInterfaceType(), C);
     SmallVector<SILValue, 3> applyArgs;

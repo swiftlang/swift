@@ -375,7 +375,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 11 };
-  enum { NumSILExtInfoBits = 11 };
+  enum { NumSILExtInfoBits = 12 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -3561,6 +3561,10 @@ public:
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
+  bool containsPackExpansionParam() const {
+    return containsPackExpansionType(getParams());
+  }
+
   static bool containsPackExpansionType(ArrayRef<Param> params);
 
   static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
@@ -4621,6 +4625,7 @@ public:
   }
 
   bool isSendable() const { return getExtInfo().isSendable(); }
+  bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.

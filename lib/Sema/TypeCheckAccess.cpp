@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 
@@ -1789,6 +1790,66 @@ public:
     }
   }
 };
+
+bool isFragileClangType(clang::QualType type) {
+  if (type.isNull())
+    return true;
+  auto underlyingTypePtr = type->getUnqualifiedDesugaredType();
+  // Objective-C types are compatible with library
+  // evolution.
+  if (underlyingTypePtr->isObjCObjectPointerType())
+    return false;
+  // Builtin clang types are compatible with library evolution.
+  if (underlyingTypePtr->isBuiltinType())
+    return false;
+  // Pointers to non-fragile types are non-fragile.
+  if (underlyingTypePtr->isPointerType())
+    return isFragileClangType(underlyingTypePtr->getPointeeType());
+  return true;
+}
+
+bool isFragileClangNode(const ClangNode &node) {
+  auto *decl = node.getAsDecl();
+  if (!decl)
+    return false;
+  // Namespaces by themselves don't impact ABI.
+  if (isa<clang::NamespaceDecl>(decl))
+    return false;
+  // Objective-C type declarations are compatible with library evolution.
+  if (isa<clang::ObjCContainerDecl>(decl))
+    return false;
+  if (auto *fd = dyn_cast<clang::FunctionDecl>(decl)) {
+    if (!isa<clang::CXXMethodDecl>(decl) &&
+        !isFragileClangType(fd->getDeclaredReturnType())) {
+      for (const auto *param : fd->parameters()) {
+        if (isFragileClangType(param->getType()))
+          return true;
+      }
+      // A global function whose return and parameter types are compatible with
+      // library evolution is compatible with library evolution.
+      return false;
+    }
+  }
+  if (auto *md = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    if (!isFragileClangType(md->getReturnType())) {
+      for (const auto *param : md->parameters()) {
+        if (isFragileClangType(param->getType()))
+          return true;
+      }
+      // An Objective-C method whose return and parameter types are compatible
+      // with library evolution is compatible with library evolution.
+      return false;
+    }
+  }
+  // An Objective-C property whose can be compatible
+  // with library evolution if its type is compatible.
+  if (auto *pd = dyn_cast<clang::ObjCPropertyDecl>(decl))
+    return isFragileClangType(pd->getType());
+  if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
+    return isFragileClangType(typedefDecl->getUnderlyingType());
+  return true;
+}
+
 } // end anonymous namespace
 
 /// Returns the kind of origin, implementation-only import or SPI declaration,
@@ -1894,6 +1955,14 @@ swift::getDisallowedOriginKind(const Decl *decl,
       DisallowedOriginKind::SPILocal :
       DisallowedOriginKind::SPIImported;
   }
+
+  // C++ APIs do not support library evolution.
+  if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
+      where.getDeclContext()->getAsDecl() &&
+      where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
+      decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
+      isFragileClangNode(decl->getClangNode()))
+    return DisallowedOriginKind::FragileCxxAPI;
 
   return DisallowedOriginKind::None;
 }

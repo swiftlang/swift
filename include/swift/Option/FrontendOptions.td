@@ -638,6 +638,10 @@ def disable_swift3_objc_inference :
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
+
+def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Ignore all checks for module resilience.">;
   
 def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,

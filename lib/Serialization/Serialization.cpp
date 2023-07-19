@@ -837,6 +837,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, SDK_PATH);
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
+  BLOCK_RECORD(options_block, IS_STATIC_LIBRARY);
   BLOCK_RECORD(options_block, IS_TESTABLE);
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
@@ -2957,7 +2958,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
 
     case DAK_StorageRestrictions: {
-      auto abbrCode = S.DeclTypeAbbrCodes[AccessesDeclAttrLayout::Code];
+      auto abbrCode = S.DeclTypeAbbrCodes[StorageRestrictionsDeclAttrLayout::Code];
       auto attr = cast<StorageRestrictionsAttr>(DA);
 
       SmallVector<IdentifierID, 4> properties;
@@ -5480,6 +5481,7 @@ public:
         S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
+        fnTy->isUnimplementable(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,

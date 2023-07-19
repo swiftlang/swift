@@ -1613,3 +1613,21 @@ bb0(%0 : $Int, %1 : @owned $IntAndFoo, %2 : $*IntAndFoo):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @test_bind_memory  :
+// CHECK:         store %0
+// CHECK:       end sil function 'test_bind_memory'
+sil @test_bind_memory : $@convention(thin) (UInt64, Builtin.Word) -> Builtin.Int8 {
+bb0(%0 : $UInt64, %1 : $Builtin.Word):
+  %35 = alloc_stack $(UInt64, UInt64)
+  %36 = tuple_element_addr %35 : $*(UInt64, UInt64), 0
+  store %0 to %36 : $*UInt64
+  %50 = address_to_pointer %35 : $*(UInt64, UInt64) to $Builtin.RawPointer
+  %52 = bind_memory %50 : $Builtin.RawPointer, %1 : $Builtin.Word to $*UInt8
+  %72 = pointer_to_address %50 : $Builtin.RawPointer to [strict] $*UInt8
+  %75 = struct_element_addr %72 : $*UInt8, #UInt8._value
+  %76 = load %75 : $*Builtin.Int8
+  dealloc_stack %35 : $*(UInt64, UInt64)
+  return %76 : $Builtin.Int8
+}
+

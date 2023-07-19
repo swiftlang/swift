@@ -1389,6 +1389,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     Printer << "(";
     Printer << getMacroRoleString(Attr->getMacroRole());
+
+    // Print conformances, if present.
+    auto conformances = evaluateOrDefault(
+        D->getASTContext().evaluator,
+        ResolveExtensionMacroConformances{Attr, D},
+        {});
+    if (!conformances.empty()) {
+      Printer << ", conformances: ";
+      interleave(conformances,
+                 [&](Type type) {
+                   type.print(Printer, Options);
+                 },
+                 [&] {
+                   Printer << ", ";
+                 });
+    }
+
     if (!Attr->getNames().empty()) {
       Printer << ", names: ";
       interleave(

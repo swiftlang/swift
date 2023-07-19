@@ -3684,10 +3684,17 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
   if (!nominal) {
-    // Try resolving an attached macro attribute.
-    auto *macro = D->getResolvedMacro(attr);
-    if (macro || !attr->isValid())
+    if (attr->isInvalid())
       return;
+
+    // Try resolving an attached macro attribute.
+    if (auto *macro = D->getResolvedMacro(attr)) {
+      for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
+        diagnoseInvalidAttachedMacro(roleAttr->getMacroRole(), D);
+      }
+
+      return;
+    }
 
     // Diagnose errors.
 
@@ -4615,8 +4622,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
 }
 
 static bool shouldBlockImplicitDynamic(Decl *D) {
-  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
-      D->getAttrs().hasAttribute<SILGenNameAttr>() ||
+  if (D->getAttrs().hasAttribute<SILGenNameAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
       D->getAttrs().hasAttribute<InlinableAttr>())
     return true;

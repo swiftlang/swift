@@ -1027,8 +1027,11 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
       // that gets introduced by the interface type, see
       // \c openUnboundGenericType for more details.
       if (auto *packTy = type->getAs<PackType>()) {
-        if (auto expansion = packTy->unwrapSingletonPackExpansion())
-          type = expansion->getPatternType();
+        if (auto expansionTy = packTy->unwrapSingletonPackExpansion()) {
+          auto patternTy = expansionTy->getPatternType();
+          if (patternTy->isTypeParameter())
+            return openType(patternTy, replacements, locator);
+        }
       }
 
       if (auto *expansion = type->getAs<PackExpansionType>()) {
@@ -3614,9 +3617,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // In the future, _if_ the syntax allows for multiple expansions
     // this code would have to be adjusted to project l-value from the
     // base type just like TupleIndex does.
-    auto tuple = choice.getBaseType()->getRValueType()->castTo<TupleType>();
-    auto *expansion = tuple->getElementType(0)->castTo<PackExpansionType>();
-    adjustedRefType = expansion->getPatternType();
+    adjustedRefType =
+        getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
     refType = adjustedRefType;
     break;
   }
@@ -3873,7 +3875,8 @@ struct TypeSimplifier {
             if (typeVar->getImpl().isPackExpansion() &&
                 !resolvedType->isEqual(typeVar) &&
                 !resolvedType->is<PackExpansionType>() &&
-                !resolvedType->is<PackType>()) {
+                !resolvedType->is<PackType>() &&
+                !resolvedType->is<PackArchetypeType>()) {
               return resolvedType;
             }
           }

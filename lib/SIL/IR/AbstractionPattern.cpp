@@ -795,6 +795,49 @@ AbstractionPattern AbstractionPattern::getPackExpansionPatternType() const {
   llvm_unreachable("bad kind");
 }
 
+static CanType getPackExpansionCountType(CanType type) {
+  return cast<PackExpansionType>(type).getCountType();
+}
+
+AbstractionPattern AbstractionPattern::getPackExpansionCountType() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Tuple:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::ClangType:
+    llvm_unreachable("pattern for function or tuple cannot be for "
+                     "pack expansion type");
+
+  case Kind::Opaque:
+    return *this;
+
+  case Kind::Type:
+    if (isTypeParameterOrOpaqueArchetype())
+      return AbstractionPattern::getOpaque();
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignature(),
+                              ::getPackExpansionCountType(getType()));
+
+  case Kind::Discard:
+    return AbstractionPattern::getDiscard(
+        getGenericSubstitutions(), getGenericSignature(),
+        ::getPackExpansionCountType(getType()));
+  }
+  llvm_unreachable("bad kind");
+}
+
 size_t AbstractionPattern::getNumPackExpandedComponents() const {
   assert(isPackExpansion());
   assert(getKind() == Kind::Type || getKind() == Kind::Discard);
@@ -1950,9 +1993,10 @@ public:
   SmallVector<Type, 2> substReplacementTypes;
   CanType substYieldType;
   unsigned packExpansionLevel;
+  bool &unimplementable;
   
-  SubstFunctionTypePatternVisitor(TypeConverter &TC)
-    : TC(TC), packExpansionLevel(0) {}
+  SubstFunctionTypePatternVisitor(TypeConverter &TC, bool &unimplementable)
+    : TC(TC), packExpansionLevel(0), unimplementable(unimplementable) {}
 
   // Creates and returns a fresh type parameter in the substituted generic
   // signature if `pattern` is a type parameter or opaque archetype. Returns
@@ -2267,7 +2311,7 @@ public:
     // Recursively visit the pattern type.
     auto patternTy = visit(substPatternType, origPatternType);
 
-    // Find a pack parameter from the pattern to expand over.
+    // If the pattern contains a pack parameter, use that as the count type.
     CanType countParam;
     patternTy->walkPackReferences([&](Type t) {
       if (t->isTypeParameter()) {
@@ -2281,10 +2325,22 @@ public:
       return false;
     });
 
-    // If that didn't work, we should be able to find an expansion
-    // to use from either the substituted type or the subs.  At worst,
-    // we can make one.
-    assert(countParam && "implementable but lazy");
+    // If the pattern was fully substituted, substitute the original
+    // count type and use that instead.
+    if (!countParam) {
+      auto origCountType = origExpansion.getPackExpansionCountType();
+      CanType substCountType;
+      if (origExpansion.getGenericSubstitutions()) {
+        substCountType = cast<PackExpansionType>(origExpansion.getType())
+            .getCountType();
+      } else {
+        assert(candidateSubstType);
+        substCountType =
+          cast<PackExpansionType>(candidateSubstType).getCountType();
+      }
+
+      countParam = visit(substCountType, origCountType);
+    }
 
     return CanPackExpansionType::get(patternTy, countParam);
   }
@@ -2358,7 +2414,10 @@ public:
 
     pattern.forEachFunctionParam(func.getParams(), /*ignore self*/ false,
                                  [&](FunctionParamGenerator &param) {
-      if (!param.isOrigPackExpansion()) {
+      if (param.isUnimplementablePackExpansion()) {
+        unimplementable = true;
+        // Just ignore it.
+      } else if (!param.isOrigPackExpansion()) {
         auto newParamTy = visit(param.getSubstParams()[0].getParameterType(),
                                 param.getOrigType());
         addParam(param.getOrigFlags(), newParamTy);
@@ -2401,7 +2460,8 @@ std::tuple<AbstractionPattern, SubstitutionMap, AbstractionPattern>
 AbstractionPattern::getSubstFunctionTypePattern(CanAnyFunctionType substType,
                                                 TypeConverter &TC,
                                                 AbstractionPattern origYieldType,
-                                                CanType substYieldType)
+                                                CanType substYieldType,
+                                                bool &unimplementable)
 const {
   // If this abstraction pattern isn't meaningfully generic, then we don't
   // need to do any transformation.
@@ -2419,7 +2479,7 @@ const {
               : AbstractionPattern::getInvalid());
   }
 
-  SubstFunctionTypePatternVisitor visitor(TC);
+  SubstFunctionTypePatternVisitor visitor(TC, unimplementable);
   auto substTy = visitor.handleUnabstractedFunctionType(substType, *this,
                                                         substYieldType,
                                                         origYieldType);

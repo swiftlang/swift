@@ -3370,7 +3370,8 @@ ERROR(decl_from_hidden_module,none,
       "it is an SPI imported from %3|"
       "it is SPI|"
       "%3 was imported for SPI only|"
-      "%3 was not imported by this file}4",
+      "%3 was not imported by this file|"
+      "C++ types from imported module %3 do not support library evolution}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
       "cannot use %0 %1 %select{here|as property wrapper here|"
@@ -3391,7 +3392,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
-      "%4 was not imported by this file}5",
+      "%4 was not imported by this file|"
+      "C++ types from imported module %4 do not support library evolution}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -3402,7 +3404,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
       "%3 was imported for SPI only|"
-      "%3 was not imported by this file}4",
+      "%3 was not imported by this file|"
+      "C++ types from imported module %3 do not support library evolution}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
@@ -6513,7 +6516,8 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "it is an SPI imported from %3|"
       "it is SPI|"
       "%3 was imported for SPI only|"
-      "%3 was not imported by this file}4",
+      "%3 was not imported by this file|"
+      "C++ APIs from imported module %3 do not support library evolution}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
@@ -6529,7 +6533,8 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
-      "%4 was not imported by this file}5",
+      "%4 was not imported by this file|"
+      "C++ types from imported module %4 do not support library evolution}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 NOTE(missing_import_inserted,
@@ -7249,6 +7254,9 @@ ERROR(literal_type_in_macro_expansion,none,
 ERROR(invalid_macro_introduced_name,none,
       "declaration name %0 is not covered by macro %1",
       (DeclName, DeclName))
+ERROR(undocumented_conformance_in_expansion,none,
+      "conformance to %0 is not covered by macro %1",
+      (Type, DeclName))
 ERROR(invalid_macro_role_for_macro_syntax,none,
       "invalid macro role for %{a freestanding|an attached}0 macro",
       (unsigned))
@@ -7271,6 +7279,9 @@ ERROR(local_extension_macro,none,
 ERROR(extension_macro_invalid_conformance,none,
       "invalid protocol conformance %0 in extension macro",
       (Type))
+ERROR(macro_attached_to_invalid_decl,none,
+      "'%0' macro cannot be attached to %1",
+      (StringRef, DescriptiveDeclKind))
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",

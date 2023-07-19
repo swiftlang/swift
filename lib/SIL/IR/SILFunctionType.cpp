@@ -1496,8 +1496,9 @@ public:
 
   void destructure(AbstractionPattern origType,
                    CanAnyFunctionType::CanParamArrayRef params,
-                   SILExtInfoBuilder extInfoBuilder) {
-    visitTopLevelParams(origType, params, extInfoBuilder);
+                   SILExtInfoBuilder extInfoBuilder,
+                   bool &unimplementable) {
+    visitTopLevelParams(origType, params, extInfoBuilder, unimplementable);
   }
 
 private:
@@ -1520,7 +1521,8 @@ private:
   ///     is still preserved under opaque abstraction
   void visitTopLevelParams(AbstractionPattern origType,
                            CanAnyFunctionType::CanParamArrayRef params,
-                           SILExtInfoBuilder extInfoBuilder) {
+                           SILExtInfoBuilder extInfoBuilder,
+                           bool &unimplementable) {
     // If we're working with an opaque abstraction pattern, we never
     // have to worry about pack expansions, so we can go 1-1 with the
     // substituted parameters.
@@ -1561,6 +1563,31 @@ private:
     origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
                                   /*ignore final orig param*/ hasSelf,
                                   [&](FunctionParamGenerator &param) {
+      // If the parameter is unimplementable because the orig function
+      // type is opaque and the next substituted param is a pack
+      // expansion, handle that first.
+      if (param.isUnimplementablePackExpansion()) {
+        // Record that we have an unimplementable parameter; this will
+        // ultimately end up in the function type, and then SILGen
+        // is supposed to diagnose any attempt to actually emit or
+        // call functions of such types.
+        unimplementable = true;
+
+        // Also, hack up a pack parameter defensively just in case we
+        // *do* try to actually use or emit a function with this type.
+        auto substParam = param.getSubstParams()[0];
+        auto loweredParamTy =
+          TC.getLoweredRValueType(expansion, param.getOrigType(),
+                                  substParam.getParameterType());
+        SILPackType::ExtInfo extInfo(/*address*/ true);
+        auto packTy = SILPackType::get(TC.Context, extInfo, {loweredParamTy});
+
+        auto origFlags = param.getOrigFlags();
+        addPackParameter(packTy, origFlags.getValueOwnership(),
+                         origFlags.isNoDerivative());
+        return;
+      }
+
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
@@ -2124,6 +2151,8 @@ static CanSILFunctionType getSILFunctionType(
   llvm::Optional<TypeConverter::GenericContextRAII> contextRAII;
   if (genericSig) contextRAII.emplace(TC, genericSig);
 
+  bool unimplementable = false;
+
   // Per above, only fully honor opaqueness in the abstraction pattern
   // for thick or polymorphic functions.  We don't need to worry about
   // non-opaque patterns because the type-checker forbids non-thick
@@ -2254,7 +2283,8 @@ static CanSILFunctionType getSILFunctionType(
     std::tie(origSubstPat, substFunctionTypeSubs, substYieldType)
       = origType.getSubstFunctionTypePattern(substFnInterfaceType, TC,
                                              coroutineOrigYieldType,
-                                             coroutineSubstYieldType);
+                                             coroutineSubstYieldType,
+                                             unimplementable);
 
     // We'll lower the abstraction pattern type against itself, and then apply
     // those substitutions to form the substituted lowered function type.
@@ -2281,7 +2311,7 @@ static CanSILFunctionType getSILFunctionType(
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, inputs);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
-                             extInfoBuilder);
+                             extInfoBuilder, unimplementable);
   }
 
   // Destructure the coroutine yields.
@@ -2336,6 +2366,7 @@ static CanSILFunctionType getSILFunctionType(
                         .withIsPseudogeneric(pseudogeneric)
                         .withConcurrent(isSendable)
                         .withAsync(isAsync)
+                        .withUnimplementable(unimplementable)
                         .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
@@ -2362,23 +2393,32 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
 
   // First compute `initialValue` input.
   {
+    bool unimplementable = false;
     ForeignInfo foreignInfo;
     DestructureInputs destructurer(context, TC, conventions, foreignInfo,
                                    inputs);
     destructurer.destructure(
         origType, substAccessorType.getParams(),
-        extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin));
+        extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin),
+        unimplementable);
+    assert(!unimplementable && "should never have an opaque AP here");
   }
 
   // Drop `self` parameter.
   inputs.pop_back();
 
+  auto getLoweredTypeOfProperty = [&](VarDecl *property) {
+    auto type = property->getInterfaceType();
+    AbstractionPattern pattern(genericSig, type->getCanonicalType());
+    auto loweredTy = TC.getLoweredType(pattern, type, context);
+    return loweredTy.getASTType();
+  };
+
   // accessed properties appear as `inout` parameters because they could be
   // read from and modified.
   for (auto *property : accessor->getAccessedProperties()) {
-    inputs.push_back(
-        SILParameterInfo(property->getInterfaceType()->getCanonicalType(),
-                         ParameterConvention::Indirect_Inout));
+    inputs.push_back(SILParameterInfo(getLoweredTypeOfProperty(property),
+                                      ParameterConvention::Indirect_Inout));
   }
 
   SmallVector<SILResultInfo, 8> results;
@@ -2386,9 +2426,8 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   // initialized properties appear as `@out` results because they are
   // initialized by the accessor.
   for (auto *property : accessor->getInitializedProperties()) {
-    results.push_back(
-        SILResultInfo(property->getInterfaceType()->getCanonicalType(),
-                      ResultConvention::Indirect));
+    results.push_back(SILResultInfo(getLoweredTypeOfProperty(property),
+                                    ResultConvention::Indirect));
   }
 
   auto calleeConvention = ParameterConvention::Direct_Unowned;
