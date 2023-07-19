@@ -7277,6 +7277,9 @@ ERROR(extension_macro_invalid_conformance,none,
 ERROR(macro_attached_to_invalid_decl,none,
       "'%0' macro cannot be attached to %1",
       (StringRef, DescriptiveDeclKind))
+ERROR(conformance_macro,none,
+      "conformance macros are replaced by extension macros",
+      ())
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",
