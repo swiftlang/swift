@@ -59,3 +59,8 @@ module CompatibilityAlias {
   export *
 }
 
+module ExplicitClangModule {
+  header "ExplicitClangModule.h"
+  export *
+}
+
