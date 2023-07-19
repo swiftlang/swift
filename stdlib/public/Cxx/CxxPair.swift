@@ -17,6 +17,6 @@ public protocol CxxPair<First, Second> {
   associatedtype First
   associatedtype Second
 
-  var first: First { get }
-  var second: Second { get }
+  var first: First { get set }
+  var second: Second { get set }
 }
