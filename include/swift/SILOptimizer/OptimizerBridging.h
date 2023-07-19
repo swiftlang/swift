@@ -207,6 +207,12 @@ struct BridgedPassContext {
     return {pda->get(invocation->getFunction())};
   }
 
+  SWIFT_IMPORT_UNSAFE
+  BridgedNominalTypeDecl getSwiftArrayDecl() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return {mod->getASTContext().getArrayDecl()};
+  }
+
   // SIL modifications
 
   SWIFT_IMPORT_UNSAFE

@@ -193,6 +193,10 @@ struct FunctionPassContext : MutatingContext {
     return PostDominatorTree(bridged: bridgedPDT)
   }
 
+  var swiftArrayDecl: NominalTypeDecl {
+    NominalTypeDecl(_bridged: _bridged.getSwiftArrayDecl())
+  }
+
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
       let nameStr = llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)
