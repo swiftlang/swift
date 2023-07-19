@@ -1804,7 +1804,7 @@ public func runAllTestsAsync() async {
   if _isChildProcess {
     await _childProcessAsync()
   } else {
-    var runTestsInProcess: Bool = !runTestsInProcess
+    var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
     var args = [String]()
     var i = 0
