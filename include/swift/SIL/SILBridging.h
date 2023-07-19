@@ -804,6 +804,10 @@ struct BridgedInstruction {
     getAs<swift::GlobalValueInst>()->setBare(true);
   }
 
+  void LoadInst_setOwnership(SwiftInt ownership) const {
+    getAs<swift::LoadInst>()->setOwnershipQualifier((swift::LoadOwnershipQualifier)ownership);
+  }
+
   SWIFT_IMPORT_UNSAFE
   inline BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
 
