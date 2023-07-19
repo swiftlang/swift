@@ -1590,8 +1590,8 @@ entry:
 // CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
 // CHECK:         [[BORROW_1:%[^,]+]] = load_borrow [[ADDR_1]] : $*LoadableNontrivial
 // CHECK:         struct_extract [[BORROW_1]] : $LoadableNontrivial, #LoadableNontrivial.x
-// CHECK:         end_borrow [[BORROW_1]] : $LoadableNontrivial
 // CHECK:         copy_addr [[ADDR_2]] to [init] [[OPAQUE_OUT]] : $*T
+// CHECK:         end_borrow [[BORROW_1]] : $LoadableNontrivial
 // CHECK-LABEL: } // end sil function 'testBeginApply9Yield1LoadableNontrivialGuaranteed1OpaqueGuaranteed'
 sil [ossa] @testBeginApply9Yield1LoadableNontrivialGuaranteed1OpaqueGuaranteed : $@convention(thin) <T> () -> (@out Klass, @out T) {
 entry:
