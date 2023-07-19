@@ -1353,6 +1353,8 @@ struct BridgedNominalTypeDecl {
   llvm::StringRef getName() const {
     return decl->getName().str();
   }
+
+  bool isStructWithUnreferenceableStorage() const;
 };
 
 // Passmanager and Context
