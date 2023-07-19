@@ -108,7 +108,6 @@ struct HasTemplatedIterator {
 
 typedef HasTemplatedIterator<int> HasUninstantiatableIterator;
 
-<<<<<<< HEAD
 struct HasInheritedConstIterator {
 private:
   InheritedConstIterator b = InheritedConstIterator(1);
