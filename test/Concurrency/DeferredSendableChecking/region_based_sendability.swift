@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature DeferredSendableChecking
+// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature DeferredSendableChecking -disable-availability-checking
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
@@ -28,7 +28,6 @@ class NonSendable {
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 actor A {
     func run_closure(_ closure : () -> ()) async {
         closure();
@@ -39,7 +38,6 @@ actor A {
 
 func foo_noniso(_ ns : Any) {}
 
-@available(SwiftStdlib 5.1, *)
 func test_isolation_crossing_sensitivity(a : A) async {
     let ns0 = NonSendable();
     let ns1 = NonSendable();
@@ -48,13 +46,12 @@ func test_isolation_crossing_sensitivity(a : A) async {
     foo_noniso(ns0);
 
     //this call consumes ns1
-    await a.foo(ns1);
+    await a.foo(ns1); //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
     print(ns0);
-    print(ns1); //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    print(ns1); //expected-note{{access here could race with non-Sendable value send above}}
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
     let ns_let = NonSendable();
 
@@ -65,10 +62,9 @@ func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
     await a.foo(ns_let);
 
     // not safe to consume an arg
-    await a.foo(ns_arg); //expected-warning{{This application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    await a.foo(ns_arg); //expected-warning{{this application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller}}
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_closure_capture(a : A) async {
     let ns0 = NonSendable();
     let ns1 = NonSendable();
@@ -88,31 +84,30 @@ func test_closure_capture(a : A) async {
     print(ns3)
 
     // this should consume ns0
-    await a.run_closure(captures0)
+    await a.run_closure(captures0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-    print(ns0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    print(ns0) //expected-note{{access here could race with non-Sendable value send above}}
     print(ns1)
     print(ns2)
     print(ns3)
 
     // this should consume ns1 and ns2
-    await a.run_closure(captures12)
+    await a.run_closure(captures12) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-    print(ns0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-    print(ns1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-    print(ns2) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    print(ns0) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns1) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns2) //expected-note{{access here could race with non-Sendable value send above}}
     print(ns3)
 
     // this should consume ns3
-    await a.run_closure(captures3indirect)
+    await a.run_closure(captures3indirect) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-    print(ns0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-    print(ns1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-    print(ns2) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-    print(ns3) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    print(ns0) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns1) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns2) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns3) //expected-note{{access here could race with non-Sendable value send above}}
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_regions(a : A, b : Bool) async {
     // definitely aliases - should be in the same region
     let ns0_0 = NonSendable();
@@ -133,43 +128,42 @@ func test_regions(a : A, b : Bool) async {
     // check for each of the above pairs that consuming half of it consumes the other half
 
     if (b) {
-        await a.foo(ns0_0)
+        await a.foo(ns0_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns0_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns0_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns0_1)
+        await a.foo(ns0_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns0_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns0_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns1_0)
+        await a.foo(ns1_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns1_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns1_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns1_1)
+        await a.foo(ns1_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns1_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns1_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns2_0)
+        await a.foo(ns2_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns2_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns2_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns2_1)
+        await a.foo(ns2_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns2_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns2_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_indirect_regions(a : A, b : Bool) async {
     // in each of the following, nsX_0 and nsX_1 should be in the same region for various reasons
 
@@ -209,81 +203,80 @@ func test_indirect_regions(a : A, b : Bool) async {
     // now check for each pair that consuming half of it consumed the other half
 
     if (b) {
-        await a.foo(ns0_0)
+        await a.foo(ns0_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns0_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns0_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns0_1)
+        await a.foo(ns0_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns0_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns0_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns1_0)
+        await a.foo(ns1_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns1_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns1_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns1_1)
+        await a.foo(ns1_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns1_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns1_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns2_0)
+        await a.foo(ns2_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns2_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns2_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns2_1)
+        await a.foo(ns2_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns2_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns2_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns3_0)
+        await a.foo(ns3_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns3_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns3_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns3_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns3_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns3_1)
+        await a.foo(ns3_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns3_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns3_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns3_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns3_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns4_0)
+        await a.foo(ns4_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns4_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns4_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns4_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns4_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns4_1)
+        await a.foo(ns4_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns4_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns4_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns4_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns4_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 
     if (b) {
-        await a.foo(ns5_0)
+        await a.foo(ns5_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns5_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns5_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns5_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns5_1) //expected-note{{access here could race with non-Sendable value send above}}
     } else {
-        await a.foo(ns5_1)
+        await a.foo(ns5_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
 
-        print(ns5_0) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
-        print(ns5_1) //expected-warning{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        print(ns5_0) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns5_1) //expected-note{{access here could race with non-Sendable value send above}}
     }
 }
 
 // class methods in general cannot consume self, check that this is true except for Sendable classes (and actors)
 
-@available(SwiftStdlib 5.1, *)
 class C_NonSendable {
     func bar() {}
 
@@ -294,11 +287,10 @@ class C_NonSendable {
         foo_noniso(captures_self)
 
         // this is a cross-isolation call that captures non-Sendable self, so it should not be permitted
-        await a.foo(captures_self) //expected-warning{{This application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller}}
+        await a.foo(captures_self) //expected-warning{{this application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller}}
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 final class C_Sendable : Sendable {
     func bar() {}
 
@@ -313,7 +305,6 @@ final class C_Sendable : Sendable {
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 actor A_Sendable {
     func bar() {}
 
@@ -328,17 +319,16 @@ actor A_Sendable {
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 func basic_loopiness(a : A, b : Bool) async {
     let ns = NonSendable()
 
     while (b) {
-        //TODO: remove duplicate warnings here and in following test cases
-        await a.foo(ns) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+        await a.foo(ns)
+        //expected-warning@-1{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        //expected-note@-2{{access here could race with non-Sendable value send above}}
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 func basic_loopiness_unsafe(a : A, b : Bool) async {
     var ns0 = NonSendable()
     var ns1 = NonSendable()
@@ -350,11 +340,10 @@ func basic_loopiness_unsafe(a : A, b : Bool) async {
         (ns0, ns1, ns2, ns3) = (ns1, ns2, ns3, ns0)
     }
 
-    await a.foo(ns0)
-    await a.foo(ns3) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.foo(ns3) //expected-note{{access here could race with non-Sendable value send above}}
 }
 
-@available(SwiftStdlib 5.1, *)
 func basic_loopiness_safe(a : A, b : Bool) async {
     var ns0 = NonSendable()
     var ns1 = NonSendable()
@@ -378,7 +367,6 @@ struct StructBox {
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_struct_assign_doesnt_merge(a : A, b : Bool) async {
     let ns0 = NonSendable()
     let ns1 = NonSendable()
@@ -400,7 +388,6 @@ class ClassBox {
     }
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_class_assign_merges(a : A, b : Bool) async {
     let ns0 = NonSendable()
     let ns1 = NonSendable()
@@ -411,11 +398,10 @@ func test_class_assign_merges(a : A, b : Bool) async {
     box.contents = ns0
     box.contents = ns1
 
-    await a.foo(ns0)
-    await a.foo(ns1) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.foo(ns1) //expected-note{{access here could race with non-Sendable value send above}}
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_stack_assign_doesnt_merge(a : A, b : Bool) async {
     let ns0 = NonSendable()
     let ns1 = NonSendable()
@@ -431,7 +417,6 @@ func test_stack_assign_doesnt_merge(a : A, b : Bool) async {
     await a.foo(ns1)
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_stack_assign_and_capture_merges(a : A, b : Bool) async {
     let ns0 = NonSendable()
     let ns1 = NonSendable()
@@ -445,6 +430,78 @@ func test_stack_assign_and_capture_merges(a : A, b : Bool) async {
     contents = ns0
     contents = ns1
 
-    await a.foo(ns0)
-    await a.foo(ns1) //expected-warning 2{{Non-Sendable value consumed, then used at this site; could yield race with another thread}}
+    await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.foo(ns1) //expected-note{{access here could race with non-Sendable value send above}}
+}
+
+func test_tuple_formation(a : A, i : Int) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+    let ns012 = (ns0, ns1, ns2);
+    let ns13 = (ns1, ns3);
+
+    switch (i) {
+    case 0:
+        await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    case 1:
+        await a.foo(ns1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    case 2:
+        await a.foo(ns2) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    case 3:
+        await a.foo(ns4) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0);
+        foo_noniso(ns1);
+        foo_noniso(ns2);
+        foo_noniso(ns4); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012);
+        foo_noniso(ns13);
+    case 4:
+        await a.foo(ns012) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    default:
+        await a.foo(ns13) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+
+        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4);
+        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+    }
 }
