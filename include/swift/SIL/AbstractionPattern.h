@@ -37,6 +37,7 @@ namespace swift {
 namespace Lowering {
 class FunctionParamGenerator;
 class TupleElementGenerator;
+class PackElementGenerator;
 
 /// A pattern for the abstraction of a value.
 ///
@@ -1449,6 +1450,15 @@ public:
     }
     llvm_unreachable("bad kind");
   }
+
+  /// Perform a parallel visitation of the elements of a pack type,
+  /// preserving structure about where pack expansions appear in the
+  /// original type and how many elements of the substituted type they
+  /// expand to.
+  ///
+  /// This pattern must be a pack pattern.
+  void forEachPackElement(CanPackType substPackType,
+         llvm::function_ref<void(PackElementGenerator &element)> fn) const;
 
   /// Given that the value being abstracted is a move only type, return the
   /// abstraction pattern with the move only bit removed.
