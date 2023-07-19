@@ -576,6 +576,10 @@ namespace swift {
     /// All block list configuration files to be honored in this compilation.
     std::vector<std::string> BlocklistConfigFilePaths;
 
+    /// Whether to ignore checks that a module is resilient during
+    /// type-checking, SIL verification, and IR emission,
+    bool BypassResilienceChecks = false;
+
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }
