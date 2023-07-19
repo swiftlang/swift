@@ -452,6 +452,26 @@ struct BridgedPassContext {
                                           invocation->getTransform());
   }
 
+  // SSAUpdater
+
+  void SSAUpdater_initialize(swift::SILType type, BridgedValue::Ownership ownership) const {
+    invocation->initializeSSAUpdater(type, castToOwnership(ownership));
+  }
+
+  void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
+    invocation->getSSAUpdater()->addAvailableValue(block.getBlock(), value.getSILValue());
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
+    return {invocation->getSSAUpdater()->getValueAtEndOfBlock(block.getBlock())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
+    return {invocation->getSSAUpdater()->getValueInMiddleOfBlock(block.getBlock())};
+  }
+
   // Options
 
   bool enableStackProtection() const {

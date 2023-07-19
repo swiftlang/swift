@@ -145,17 +145,15 @@ extension MutatingContext {
     SubstitutionMap(_bridged.getContextSubstitutionMap(type.bridged))
   }
 
-  // Private utilities
-
-  fileprivate func notifyInstructionsChanged() {
+  func notifyInstructionsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.instructionsChanged)
   }
 
-  fileprivate func notifyCallsChanged() {
+  func notifyCallsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.callsChanged)
   }
 
-  fileprivate func notifyBranchesChanged() {
+  func notifyBranchesChanged() {
     _bridged.asNotificationHandler().notifyChanges(.branchesChanged)
   }
 }

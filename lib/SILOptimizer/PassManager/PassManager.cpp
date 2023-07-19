@@ -1360,7 +1360,7 @@ void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
 }
 
 void SwiftPassInvocation::finishedModulePassRun() {
-  endPassRunChecks();
+  endPass();
   assert(!function && transform && "not running a pass");
   assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
          && "unhandled change notifications at end of module pass");
@@ -1368,22 +1368,26 @@ void SwiftPassInvocation::finishedModulePassRun() {
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
-  endPassRunChecks();
+  endPass();
   endTransformFunction();
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   transform = nullptr;
 }
 
 void SwiftPassInvocation::finishedInstructionPassRun() {
-  endPassRunChecks();
+  endPass();
 }
 
-void SwiftPassInvocation::endPassRunChecks() {
+void SwiftPassInvocation::endPass() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
   assert(numClonersAllocated == 0 && "Not all cloners deallocated");
   assert(!needFixStackNesting && "Stack nesting not fixed");
+  if (ssaUpdater) {
+    delete ssaUpdater;
+    ssaUpdater = nullptr;
+  }
 }
 
 void SwiftPassInvocation::beginTransformFunction(SILFunction *function) {
