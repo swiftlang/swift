@@ -1625,7 +1625,8 @@ public:
   getSubstFunctionTypePattern(CanAnyFunctionType substType,
                               TypeConverter &TC,
                               AbstractionPattern coroutineYieldOrigType,
-                              CanType coroutineYieldSubstType) const;
+                              CanType coroutineYieldSubstType,
+                              bool &unimplementable) const;
   
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;

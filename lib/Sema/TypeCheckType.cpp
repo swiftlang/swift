@@ -2921,7 +2921,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_convention, TAK_pseudogeneric,
+    TAK_convention, TAK_pseudogeneric, TAK_unimplementable,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     TAK_differentiable, TAK_escaping, TAK_Sendable,
     TAK_yield_once, TAK_yield_many, TAK_async
@@ -2939,6 +2939,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
     for (auto silOnlyAttr : {TAK_pseudogeneric,
+                             TAK_unimplementable,
                              TAK_callee_owned,
                              TAK_callee_guaranteed,
                              TAK_noescape,
@@ -3074,7 +3075,8 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
           rep, attrs.has(TAK_pseudogeneric), attrs.has(TAK_noescape),
-          attrs.has(TAK_Sendable), attrs.has(TAK_async), diffKind,
+          attrs.has(TAK_Sendable), attrs.has(TAK_async),
+          attrs.has(TAK_unimplementable), diffKind,
           parsedClangFunctionType);
 
       ty =
