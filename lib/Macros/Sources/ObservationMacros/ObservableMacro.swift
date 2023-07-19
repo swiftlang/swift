@@ -11,10 +11,9 @@
 
 import SwiftSyntax
 import SwiftSyntaxMacros
-
-@_implementationOnly import SwiftDiagnostics
-@_implementationOnly import SwiftOperators
-@_implementationOnly import SwiftSyntaxBuilder
+import SwiftDiagnostics
+import SwiftOperators
+import SwiftSyntaxBuilder
 
 public struct ObservableMacro {
   static let moduleName = "Observation"
@@ -281,13 +280,29 @@ extension ObservableMacro: ExtensionMacro {
       return []
     }
 
-    let decl: DeclSyntax = """
-      extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
-      """
+    if let availability = declaration.availability {
+      let emptyBlock: MemberDeclBlockSyntax = "{ }"
 
-    return [
-      decl.cast(ExtensionDeclSyntax.self)
-    ]
+      return [
+        ExtensionDeclSyntax(
+          leadingTrivia: .newline,
+          attributes: availability,
+          extensionKeyword: .keyword(.extension),
+          extendedType: type,
+          inheritanceClause: TypeInheritanceClauseSyntax(inheritedTypeCollection: InheritedTypeListSyntax([InheritedTypeSyntax(typeName: observableConformanceType)])),
+          memberBlock: emptyBlock,
+          trailingTrivia: .newline
+        )
+      ]
+    } else {
+      let decl: DeclSyntax = """
+        extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
+        """
+
+      return [
+        decl.cast(ExtensionDeclSyntax.self)
+      ]
+    }
   }
 }
 
