@@ -10574,11 +10574,10 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   case MacroRole::Member:
   case MacroRole::Peer:
   case MacroRole::Conformance:
+  case MacroRole::Extension:
     return true;
   case MacroRole::CodeItem:
     return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
-  case MacroRole::Extension:
-    return ctx.LangOpts.hasFeature(Feature::ExtensionMacros);
   }
 }
 

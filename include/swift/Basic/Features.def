@@ -122,7 +122,6 @@ EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(InitAccessors, false)
 
-EXPERIMENTAL_FEATURE(ExtensionMacros, true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", true)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
