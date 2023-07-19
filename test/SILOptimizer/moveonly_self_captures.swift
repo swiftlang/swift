@@ -10,6 +10,7 @@ struct E2 : ~Copyable {
     var k = Klass()
 }
 
+var g: () -> () = {}
 struct Test : ~Copyable {
     var e: E
     var e2: E2
@@ -28,10 +29,29 @@ struct Test : ~Copyable {
         e = E()
         e2 = E2()
         func capture() {
-            let _ = self // expected-error {{copy of noncopyable typed value}}
-            let _ = self.e2 // expected-error {{copy of noncopyable typed value}}
+            let _ = self
+            let _ = self.e2 // expected-error {{cannot partially consume 'self'}}
         }
         capture()
+    }
+
+    init(y: ()) { // expected-error {{missing reinitialization of closure capture 'self' after consume}}
+        e = E()
+        e2 = E2()
+        func capture() {
+            let _ = self // expected-note {{consumed here}}
+        }
+        capture()
+    }
+
+    init(z: ()) {
+        e = E()
+        e2 = E2()
+        func capture() {
+            let _ = self // expected-note {{captured here}}
+        }
+        capture()
+        g = capture // expected-error {{escaping local function captures mutating 'self' parameter}}
     }
 
     func captureByLocalFunction() {
@@ -85,5 +105,3 @@ struct Test : ~Copyable {
         }
     }
 }
-
-
