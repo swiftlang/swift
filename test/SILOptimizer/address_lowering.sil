@@ -761,9 +761,9 @@ bb0(%0 : @owned $SRef<T>):
 // CHECK:   [[L:%.*]] = load_borrow [[E0]] : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
-// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
+// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*SRef<T>
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
 // CHECK-NOT: dealloc_stack
@@ -813,9 +813,9 @@ bb0(%0 : @owned $(AnyObject, T)):
 // CHECK:   [[L:%.*]] = load_borrow %3 : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
-// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
+// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*(AnyObject, T)
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
 // CHECK-NOT: dealloc_stack
