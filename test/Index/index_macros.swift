@@ -26,7 +26,7 @@ macro freestandingDecl<T>(arg: T) = #externalMacro(module: "IndexMacros", type: 
 macro Accessor() = #externalMacro(module: "IndexMacros", type: "SomeAccessorMacro")
 // CHECK: [[@LINE-1]]:7 | macro/Swift | Accessor() |  [[ACCESSOR_USR:.*]] | Def
 
-@attached(conformance)
+@attached(extension, conformances: TestProto)
 macro Conformance() = #externalMacro(module: "IndexMacros", type: "SomeConformanceMacro")
 // CHECK: [[@LINE-1]]:7 | macro/Swift | Conformance() |  [[CONFORMANCE_USR:.*]] | Def
 
