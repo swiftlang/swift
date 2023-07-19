@@ -175,6 +175,9 @@ enum AccessBase : CustomStringConvertible, Hashable {
     case (.class(let rea1), .class(let rea2)):
       return rea1.fieldIndex == rea2.fieldIndex &&
              rea1.instance.referenceRoot == rea2.instance.referenceRoot
+    case (.tail(let rta1), .tail(let rta2)):
+      return rta1.instance.referenceRoot == rta2.instance.referenceRoot &&
+             rta1.type == rta2.type
     case (.stack(let as1), .stack(let as2)):
       return as1 == as2
     case (.global(let gl1), .global(let gl2)):
