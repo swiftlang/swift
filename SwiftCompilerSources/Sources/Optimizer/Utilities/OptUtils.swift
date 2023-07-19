@@ -146,6 +146,99 @@ extension Instruction {
   }
 }
 
+extension StoreInst {
+  func trySplit(_ context: FunctionPassContext) {
+    let builder = Builder(after: self, context)
+    let type = source.type
+    if type.isStruct {
+      if type.nominal.isStructWithUnreferenceableStorage {
+        return
+      }
+      if parentFunction.hasOwnership && source.ownership != .none {
+        let destructure = builder.createDestructureStruct(struct: source)
+        for (fieldIdx, fieldValue) in destructure.results.enumerated() {
+          let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
+          builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
+        }
+      } else {
+        for idx in 0..<type.getNominalFields(in: parentFunction).count {
+          let srcField = builder.createStructExtract(struct: source, fieldIndex: idx)
+          let fieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
+          builder.createStore(source: srcField, destination: fieldAddr, ownership: splitOwnership(for: srcField))
+        }
+      }
+    } else if type.isTuple {
+      if parentFunction.hasOwnership && source.ownership != .none {
+        let destructure = builder.createDestructureTuple(tuple: source)
+        for (elementIdx, elementValue) in destructure.results.enumerated() {
+          let elementAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: elementIdx)
+          builder.createStore(source: elementValue, destination: elementAddr, ownership: splitOwnership(for: elementValue))
+        }
+      } else {
+        for idx in 0..<type.tupleElements.count {
+          let srcField = builder.createTupleExtract(tuple: source, elementIndex: idx)
+          let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
+          builder.createStore(source: srcField, destination: destFieldAddr, ownership: splitOwnership(for: srcField))
+        }
+      }
+    } else {
+      return
+    }
+    context.erase(instruction: self)
+  }
+
+  private func splitOwnership(for fieldValue: Value) -> StoreOwnership {
+    switch self.storeOwnership {
+    case .trivial, .unqualified:
+      return self.storeOwnership
+    case .assign, .initialize:
+      return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.storeOwnership
+    }
+  }
+}
+
+extension LoadInst {
+  func trySplit(_ context: FunctionPassContext) {
+    var elements = [Value]()
+    let builder = Builder(before: self, context)
+    if type.isStruct {
+      if type.nominal.isStructWithUnreferenceableStorage {
+        return
+      }
+      for idx in 0..<type.getNominalFields(in: parentFunction).count {
+        let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newStruct = builder.createStruct(type: self.type, elements: elements)
+      self.uses.replaceAll(with: newStruct, context)
+    } else if type.isTuple {
+      var elements = [Value]()
+      let builder = Builder(before: self, context)
+      for idx in 0..<type.tupleElements.count {
+        let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newTuple = builder.createTuple(type: self.type, elements: elements)
+      self.uses.replaceAll(with: newTuple, context)
+    } else {
+      return
+    }
+    context.erase(instruction: self)
+  }
+
+  private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
+    switch self.loadOwnership {
+    case .trivial, .unqualified:
+      return self.loadOwnership
+    case .copy, .take:
+      return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
+    }
+  }
+}
+
+
 extension UseList {
   var singleNonDebugUse: Operand? {
     var singleUse: Operand?
