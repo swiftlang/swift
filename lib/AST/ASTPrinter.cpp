@@ -3387,7 +3387,7 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
 }
 
 
-static bool usesFeatureDisableActorInferenceFromPropertyWrapperUsage(Decl *decl) {
+static bool usesFeatureDisableOutwardActorInference(Decl *decl) {
   return false;
 }
 
