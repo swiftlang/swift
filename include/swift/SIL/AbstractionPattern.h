@@ -1395,7 +1395,7 @@ public:
 
   /// Is the given pack type a valid substitution of this abstraction
   /// pattern?
-  bool matchesPack(CanPackType substType);
+  bool matchesPack(CanPackType substType) const;
 
   bool isPack() const {
     switch (getKind()) {
@@ -1459,6 +1459,17 @@ public:
   /// This pattern must be a pack pattern.
   void forEachPackElement(CanPackType substPackType,
          llvm::function_ref<void(PackElementGenerator &element)> fn) const;
+
+  /// Perform a parallel visitation of the elements of a pack type,
+  /// expanding the elements of the type.  This preserves the structure
+  /// of the *substituted* pack type: it will be called once per element
+  /// of the substituted type, in order.
+  ///
+  /// This pattern must match the substituted type, but it may be an
+  /// opaque pattern.
+  void forEachExpandedPackElement(CanPackType substPackType,
+      llvm::function_ref<void(AbstractionPattern origEltType,
+                              CanType substEltType)> handleElement) const;
 
   /// Given that the value being abstracted is a move only type, return the
   /// abstraction pattern with the move only bit removed.

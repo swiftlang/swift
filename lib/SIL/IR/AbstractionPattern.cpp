@@ -707,7 +707,7 @@ AbstractionPattern::getPackElementType(unsigned index) const {
   llvm_unreachable("bad kind");
 }
 
-bool AbstractionPattern::matchesPack(CanPackType substType) {
+bool AbstractionPattern::matchesPack(CanPackType substType) const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -750,11 +750,11 @@ void AbstractionPattern::forEachPackElement(CanPackType substType,
   elt.finish();
 }
 
-void AbstractionPattern::forEachExpandedPackElement(CanPackType substType,
+void AbstractionPattern::forEachExpandedPackElement(CanPackType substPackType,
                       llvm::function_ref<void(AbstractionPattern origEltType,
                                               CanType substEltType)>
                         handleElement) const {
-  assert(matchesPack(substType));
+  assert(matchesPack(substPackType));
 
   auto substEltTypes = substPackType.getElementTypes();
 
