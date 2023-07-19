@@ -3659,10 +3659,17 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
   if (!nominal) {
-    // Try resolving an attached macro attribute.
-    auto *macro = D->getResolvedMacro(attr);
-    if (macro || !attr->isValid())
+    if (attr->isInvalid())
       return;
+
+    // Try resolving an attached macro attribute.
+    if (auto *macro = D->getResolvedMacro(attr)) {
+      for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
+        diagnoseInvalidAttachedMacro(roleAttr->getMacroRole(), D);
+      }
+
+      return;
+    }
 
     // Diagnose errors.
 

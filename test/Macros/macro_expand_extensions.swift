@@ -6,6 +6,10 @@
 // RUN: %target-swift-frontend -enable-experimental-feature ExtensionMacros -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) %s -I %t -disable-availability-checking -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ExtensionMacros -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 -I %t
+
+// RUN: not %target-swift-frontend -enable-experimental-feature ExtensionMacros -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics
+// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
+
 // RUN: %target-build-swift -enable-experimental-feature ExtensionMacros -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5 -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
@@ -106,4 +110,49 @@ func testLocal() {
   struct Local<Element> {}
   // expected-error@-1{{local type cannot have attached extension macro}}
 }
+
+@DelegatedConformance
+typealias A = Int
+// expected-error@-1 {{'extension' macro cannot be attached to type alias}}
+
+@DelegatedConformance
+extension Int {}
+// expected-error@-1 {{'extension' macro cannot be attached to extension}}
+
+@attached(extension, conformances: P)
+macro UndocumentedNamesInExtension() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")
+
+@UndocumentedNamesInExtension
+struct S<Element> {}
+// expected-note@-1 {{in expansion of macro 'UndocumentedNamesInExtension' here}}
+
+// CHECK-DIAGS: error: declaration name 'requirement()' is not covered by macro 'UndocumentedNamesInExtension'
+
+@attached(extension, names: named(requirement))
+macro UndocumentedConformanceInExtension() = #externalMacro(module: "MacroDefinition", type: "AlwaysAddConformance")
+
+@UndocumentedConformanceInExtension
+struct InvalidConformance<Element> {}
+// expected-note@-1 {{in expansion of macro 'UndocumentedConformanceInExtension' here}}
+
+// CHECK-DIAGS: error: conformance to 'P' is not covered by macro 'UndocumentedConformanceInExtension'
+
+@attached(extension)
+macro UndocumentedCodable() = #externalMacro(module: "MacroDefinition", type: "AlwaysAddCodable")
+
+@UndocumentedCodable
+struct TestUndocumentedCodable {}
+// expected-note@-1 {{in expansion of macro 'UndocumentedCodable' here}}
+
+// CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedCodable'
+
+@attached(extension, conformances: Decodable)
+macro UndocumentedEncodable() = #externalMacro(module: "MacroDefinition", type: "AlwaysAddCodable")
+
+@UndocumentedEncodable
+struct TestUndocumentedEncodable {}
+// expected-note@-1 {{in expansion of macro 'UndocumentedEncodable' here}}
+
+// CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedEncodable'
+
 #endif
