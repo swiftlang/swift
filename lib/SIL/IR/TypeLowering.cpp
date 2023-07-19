@@ -2608,14 +2608,13 @@ static CanSILPackType computeLoweredPackType(TypeConverter &tc,
   SmallVector<CanType, 4> loweredElts;
   loweredElts.reserve(substType->getNumElements());
 
-  for (auto i : indices(substType->getElementTypes())) {
-    auto origEltType = origType.getPackElementType(i);
-    auto substEltType = substType.getElementType(i);
-
-    CanType loweredTy =
+  origType.forEachExpandedPackElement(substType,
+                                      [&](AbstractionPattern origEltType,
+                                          CanType substEltType) {
+    auto loweredTy =
         tc.getLoweredRValueType(context, origEltType, substEltType);
     loweredElts.push_back(loweredTy);
-  }
+  });
 
   bool elementIsAddress = true; // TODO
   SILPackType::ExtInfo extInfo(elementIsAddress);
