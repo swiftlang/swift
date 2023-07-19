@@ -1290,6 +1290,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPrivateImportsEnabled();
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
+    if (Invocation.getLangOptions().BypassResilienceChecks)
+      MainModule->setBypassResilience();
     if (!Invocation.getFrontendOptions().ModuleABIName.empty()) {
       MainModule->setABIName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().ModuleABIName));
