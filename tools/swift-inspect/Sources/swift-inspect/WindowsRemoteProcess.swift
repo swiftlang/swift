@@ -161,16 +161,13 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     self.context = context
 
     // Locate swiftCore.dll in the target process and load modules.
-    iterateRemoteModules(
-      dwProcessId: processId,
-      closure: { (entry, module) in
-        // FIXME(compnerd) support static linking at some point
-        if module == "swiftCore.dll" {
-          self.hSwiftCore = entry.hModule
-        }
-        _ = swift_reflection_addImage(
-          context, unsafeBitCast(entry.modBaseAddr, to: swift_addr_t.self))
-      })
+    modules(of: processId) { (entry, module) in
+      // FIXME(compnerd) support static linking at some point
+      if module == "swiftCore.dll" { self.hSwiftCore = entry.hModule }
+      _ = swift_reflection_addImage(context,
+                                    unsafeBitCast(entry.modBaseAddr,
+                                                  to: swift_addr_t.self))
+    }
     if self.hSwiftCore == HMODULE(bitPattern: -1) {
       // FIXME(compnerd) log error
       return nil
@@ -321,7 +318,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       print("Failed to find remote LoadLibraryW/FreeLibrary addresses")
       return
     }
-    let (loadLibraryAddr, freeLibraryAddr) = (remoteAddrs[0], remoteAddrs[1])
+    let (loadLibraryAddr, pfnFreeLibrary) = (remoteAddrs[0], remoteAddrs[1])
     let hThread: HANDLE = CreateRemoteThread(
       self.process, nil, 0, loadLibraryAddr,
       dllPathRemote, 0, nil)
@@ -330,6 +327,18 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       return
     }
     defer { CloseHandle(hThread) }
+
+    defer {
+      // Always perform the code ejection process even if the heap walk fails.
+      // The module cannot re-execute the heap walk and will leave a retain
+      // count behind, preventing the module from being unlinked on the file
+      // system as well as leave code in the inspected process.  This will
+      // eventually be an issue for treating the injected code as a resource
+      // which is extracted temporarily.
+      if !eject(module: dllPathRemote, from: dwProcessId, pfnFreeLibrary) {
+        print("Failed to unload the remote dll")
+      }
+    }
 
     // The main heap iteration loop.
     outer: while true {
@@ -381,14 +390,6 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       print("LoadLibraryW failed \(threadExitCode)")
       return
     }
-
-    // Unload the dll and deallocate the dll path from the remote process
-    if !unloadDllAndPathRemote(
-      dwProcessId: dwProcessId, dllPathRemote: dllPathRemote, freeLibraryAddr: freeLibraryAddr)
-    {
-      print("Failed to unload the remote dll")
-      return
-    }
   }
 
   private func allocateDllPathRemote() -> UnsafeMutableRawPointer? {
@@ -430,26 +431,27 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       }
   }
 
-  private func unloadDllAndPathRemote(
-    dwProcessId: DWORD, dllPathRemote: UnsafeMutableRawPointer,
-    freeLibraryAddr: LPTHREAD_START_ROUTINE
-  ) -> Bool {
+  /// Eject the injected code from the instrumented process.
+  ///
+  /// Performs the necessary clean up to remove the injected code from the
+  /// instrumented process once the heap walk is complete.
+  private func eject(module dllPathRemote: UnsafeMutableRawPointer,
+                     from dwProcessId: DWORD,
+                     _ freeLibraryAddr: LPTHREAD_START_ROUTINE) -> Bool {
     // Get the dll module handle in the remote process to use it to
     // unload it below.
+
     // GetExitCodeThread returns a DWORD (32-bit) but the HMODULE
     // returned from LoadLibraryW is a 64-bit pointer and may be truncated.
     // So, search for it using the snapshot instead.
-    guard
-      let hDllModule = findRemoteModule(
-        dwProcessId: dwProcessId, moduleName: "SwiftInspectClient.dll")
-    else {
+    guard let hModule = find(module: "SwiftInspectClient.dll", in: dwProcessId) else {
       print("Failed to find the client dll")
       return false
     }
     // Unload the dll from the remote process
     let hUnloadThread = CreateRemoteThread(
       self.process, nil, 0, freeLibraryAddr,
-      UnsafeMutableRawPointer(hDllModule), 0, nil)
+      UnsafeMutableRawPointer(hModule), 0, nil)
     if hUnloadThread == HANDLE(bitPattern: 0) {
       print("CreateRemoteThread for unload failed \(GetLastError())")
       return false
@@ -476,7 +478,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     return true
   }
 
-  private func iterateRemoteModules(dwProcessId: DWORD, closure: (MODULEENTRY32W, String) -> Void) {
+  private func modules(of dwProcessId: DWORD, _ closure: (MODULEENTRY32W, String) -> Void) {
     let hModuleSnapshot: HANDLE =
       CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPMODULE), dwProcessId)
     if hModuleSnapshot == INVALID_HANDLE_VALUE {
@@ -503,22 +505,18 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     } while Module32NextW(hModuleSnapshot, &entry)
   }
 
-  private func findRemoteModule(dwProcessId: DWORD, moduleName: String) -> HMODULE? {
-    var hDllModule: HMODULE? = nil
-    iterateRemoteModules(
-      dwProcessId: dwProcessId,
-      closure: { (entry, module) in
-        if module == moduleName {
-          hDllModule = entry.hModule
-        }
-      })
-    return hDllModule
+  private func find(module named: String, in dwProcessId: DWORD) -> HMODULE? {
+    var hModule: HMODULE?
+    modules(of: dwProcessId) { (entry, module) in
+      if module == named { hModule = entry.hModule }
+    }
+    return hModule
   }
 
   private func findRemoteAddresses(dwProcessId: DWORD, moduleName: String, symbols: [String])
     -> [LPTHREAD_START_ROUTINE]?
   {
-    guard let hDllModule = findRemoteModule(dwProcessId: dwProcessId, moduleName: moduleName) else {
+    guard let hDllModule = find(module: moduleName, in: dwProcessId) else {
       print("Failed to find remote module \(moduleName)")
       return nil
     }
