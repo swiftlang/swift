@@ -98,9 +98,14 @@ class ModuleDependencyInfoStorageBase {
 public:
   const ModuleDependencyKind dependencyKind;
 
+  ModuleDependencyInfoStorageBase(ModuleDependencyKind dependencyKind)
+      : dependencyKind(dependencyKind),
+        resolved(false) { }
+
   ModuleDependencyInfoStorageBase(ModuleDependencyKind dependencyKind,
-                                  bool resolved = false)
-      : dependencyKind(dependencyKind), resolved(resolved) { }
+                                  const std::vector<std::string> &moduleImports)
+      : dependencyKind(dependencyKind), moduleImports(moduleImports),
+        resolved(false)  {}
 
   virtual ModuleDependencyInfoStorageBase *clone() const = 0;
 
@@ -245,11 +250,13 @@ public:
   SwiftBinaryModuleDependencyStorage(const std::string &compiledModulePath,
                                      const std::string &moduleDocPath,
                                      const std::string &sourceInfoPath,
+                                     const std::vector<std::string> &moduleImports,
+                                     const std::vector<std::string> &headerImports,
                                      const bool isFramework)
-      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary),
-        compiledModulePath(compiledModulePath),
-        moduleDocPath(moduleDocPath),
-        sourceInfoPath(sourceInfoPath),
+      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
+                                        moduleImports),
+        compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
+        sourceInfoPath(sourceInfoPath), preCompiledBridgingHeaderPaths(headerImports),
         isFramework(isFramework) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -264,6 +271,9 @@ public:
 
   /// The path to the .swiftSourceInfo file.
   const std::string sourceInfoPath;
+
+  /// The paths of all the .pch dependencies of this module.
+  const std::vector<std::string> preCompiledBridgingHeaderPaths;
 
   /// A flag that indicates this dependency is a framework
   const bool isFramework;
@@ -400,10 +410,13 @@ public:
       const std::string &compiledModulePath,
       const std::string &moduleDocPath,
       const std::string &sourceInfoPath,
+      const std::vector<std::string> &moduleImports,
+      const std::vector<std::string> &headerImports,
       bool isFramework) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
-          compiledModulePath, moduleDocPath, sourceInfoPath, isFramework));
+          compiledModulePath, moduleDocPath, sourceInfoPath,
+          moduleImports, headerImports, isFramework));
   }
 
   /// Describe the main Swift module.

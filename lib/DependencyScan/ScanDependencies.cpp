@@ -243,6 +243,10 @@ computeTransitiveClosureOfExplicitDependencies(
       llvm::set_union(modReachableSet, succReachableSet);
     }
   }
+  // For ease of use down-the-line, remove the node's self from its set of reachable nodes
+  for (const auto &modID : topologicallySortedModuleList)
+    result[modID].erase(modID);
+
   return result;
 }
 
@@ -272,8 +276,15 @@ resolveExplicitModuleInputs(ModuleDependencyID moduleID,
     case swift::ModuleDependencyKind::SwiftBinary: {
       auto binaryDepDetails = depInfo->getAsSwiftBinaryModule();
       assert(binaryDepDetails && "Expected Swift Binary Module dependency.");
+      auto &path = binaryDepDetails->compiledModulePath;
       commandLine.push_back("-swift-module-file=" + depModuleID.first + "=" +
-                            binaryDepDetails->compiledModulePath);
+                            path);
+      for (const auto &headerDep : binaryDepDetails->preCompiledBridgingHeaderPaths) {
+        commandLine.push_back("-Xcc");
+        commandLine.push_back("-include-pch");
+        commandLine.push_back("-Xcc");
+        commandLine.push_back(headerDep);
+      }
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
       auto placeholderDetails = depInfo->getAsPlaceholderDependencyModule();
@@ -942,6 +953,13 @@ static void writeJSON(llvm::raw_ostream &out,
                              swiftBinaryDeps->module_source_info_path,
                              /*indentLevel=*/5,
                              /*trailingComma=*/true);
+
+      // Module Header Dependencies
+      if (swiftBinaryDeps->header_dependencies->count != 0)
+        writeJSONSingleField(out, "headerDependencies",
+                             swiftBinaryDeps->header_dependencies, 5,
+                             /*trailingComma=*/true);
+
       writeJSONSingleField(out, "isFramework", swiftBinaryDeps->is_framework,
                            5, /*trailingComma=*/false);
     } else {
@@ -1128,6 +1146,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
             create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
+            create_set(swiftBinaryDeps->preCompiledBridgingHeaderPaths),
             swiftBinaryDeps->isFramework};
       } else {
         // Clang module details
