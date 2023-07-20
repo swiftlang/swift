@@ -908,11 +908,10 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   // to the top-level code to check initialization of any captured globals.
   FuncDecl *deferDecl = S->getTempDecl();
   auto declCtxKind = deferDecl->getDeclContext()->getContextKind();
-  auto &sgm = SGF.SGM;
-  if (declCtxKind == DeclContextKind::TopLevelCodeDecl && sgm.TopLevelSGF &&
-      sgm.TopLevelSGF->B.hasValidInsertionPoint()) {
-    sgm.emitMarkFunctionEscapeForTopLevelCodeGlobals(
-        S, deferDecl->getCaptureInfo());
+  if (declCtxKind == DeclContextKind::TopLevelCodeDecl &&
+      SGF.isEmittingTopLevelCode()) {
+      SGF.emitMarkFunctionEscapeForTopLevelCodeGlobals(
+          S, deferDecl->getCaptureInfo());
   }
   SGF.visitFuncDecl(deferDecl);
 
