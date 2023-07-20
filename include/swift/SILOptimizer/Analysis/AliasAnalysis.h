@@ -206,6 +206,8 @@ public:
   /// Returns true if the address(es of) `addr` can escape to `toInst`.
   MemoryBehavior getMemoryBehaviorOfInst(SILValue addr, SILInstruction *toInst);
 
+  int getComplexityBudget(SILValue valueInFunction);
+
   /// Returns true if the object(s of) `obj` can escape to `toInst`.
   bool isObjectReleasedByInst(SILValue obj, SILInstruction *toInst);
 

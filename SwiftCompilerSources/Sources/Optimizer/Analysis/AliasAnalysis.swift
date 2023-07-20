@@ -63,7 +63,7 @@ struct AliasAnalysis {
   static func register() {
     BridgedAliasAnalysis.registerAnalysis(
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> swift.MemoryBehavior in
+      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> swift.MemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
@@ -77,7 +77,8 @@ struct AliasAnalysis {
             case (true, true):   return .MayReadWrite
           }
         }
-        if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true), context) {
+        if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true),
+                                   complexityBudget: complexityBudget, context) {
           return .MayReadWrite
         }
         return .None
