@@ -680,3 +680,30 @@ do {
     }
   }
 }
+
+// rdar://112029630 - incorrect variadic generic overload ranking
+do {
+  func test1<T>(_: T...) {}
+  // expected-note@-1 {{found this candidate}}
+  func test1<each T>(_: repeat each T) {}
+  // expected-note@-1 {{found this candidate}}
+
+  test1(1, 2, 3) // expected-error {{ambiguous use of 'test1'}}
+  test1(1, "a") // Ok
+
+  func test2<each T>(_: repeat each T) {}
+  // expected-note@-1 {{found this candidate}}
+  func test2<each T>(vals: repeat each T) {}
+  // expected-note@-1 {{found this candidate}}
+
+  test2() // expected-error {{ambiguous use of 'test2'}}
+
+  func test_different_requirements<A: BinaryInteger & StringProtocol>(_ a: A) {
+    func test3<each T: BinaryInteger>(str: String, _: repeat each T) {}
+    // expected-note@-1 {{found this candidate}}
+    func test3<each U: StringProtocol>(str: repeat each U) {}
+    // expected-note@-1 {{found this candidate}}
+
+    test3(str: "", a, a)  // expected-error {{ambiguous use of 'test3'}}
+  }
+}
