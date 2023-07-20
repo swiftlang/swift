@@ -432,6 +432,14 @@ public struct ComplexNesting<A, B, C, D> {
     }
 }
 
+public enum SinglePayloadAnyHashableEnum {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case nonEmpty(AnyHashable)
+}
+
 internal enum InternalEnum {
   case a(Int, AnyObject)
   case b(Int)
