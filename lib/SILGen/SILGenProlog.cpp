@@ -1141,11 +1141,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     fArg->setClosureCapture(true);
     arg = SILValue(fArg);
 
-    // If our capture is no escape and we have a noncopyable value, insert a
-    // consumable and assignable. If we have an escaping closure, we are going
-    // to emit an error later in SIL since it is illegal to capture an inout
-    // value in an escaping closure.
-    if (isInOut && ty.isPureMoveOnly() && capture.isNoEscape()) {
+    // If we have an inout noncopyable paramter, insert a consumable and
+    // assignable.
+    //
+    // NOTE: If we have an escaping closure, we are going to emit an error later
+    // in SIL since it is illegal to capture an inout value in an escaping
+    // closure. The later code knows how to handle that we have the
+    // mark_must_check here.
+    if (isInOut && ty.isPureMoveOnly()) {
       arg = SGF.B.createMarkMustCheckInst(
           Loc, arg, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }

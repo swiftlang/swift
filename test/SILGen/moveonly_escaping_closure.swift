@@ -611,7 +611,8 @@ func testConsumingEscapeClosureCaptureLet(_ f: consuming @escaping () -> ()) {
 // CHECK: } // end sil function '$s16moveonly_closure29testGlobalClosureCaptureInOutyyAA9SingleEltVzF'
 
 // CHECK-LABEL: sil private [ossa] @$s16moveonly_closure29testGlobalClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
-// CHECK: bb0([[PROJECT:%.*]] : @closureCapture
+// CHECK: bb0([[ARG:%.*]] : @closureCapture
+// CHECK:   [[PROJECT:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[LOADED:%.*]] = load [copy] [[ACCESS]]
@@ -654,7 +655,8 @@ func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalLetClosureCaptureInOutyyAA9SingleEltVzF'
 //
 // CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testLocalLetClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
-// CHECK: bb0([[PROJECT:%.*]] : @closureCapture
+// CHECK: bb0([[ARG:%.*]] : @closureCapture
+// CHECK:   [[PROJECT:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[LOADED:%.*]] = load [copy] [[ACCESS]]
@@ -701,7 +703,8 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzF'
 //
 // CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
-// CHECK: bb0([[PROJECT:%.*]] : @closureCapture
+// CHECK: bb0([[ARG:%.*]] : @closureCapture
+// CHECK:   [[PROJECT:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[LOADED:%.*]] = load [copy] [[ACCESS]]
@@ -749,7 +752,8 @@ func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztF'
 //
 // CHECK-LABEL: sil private [ossa] @$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
-// CHECK: bb0([[PROJECT:%.*]] : @closureCapture
+// CHECK: bb0([[ARG:%.*]] : @closureCapture
+// CHECK:   [[PROJECT:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[LOADED:%.*]] = load [copy] [[ACCESS]]
@@ -804,7 +808,8 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztF'
 //
 // CHECK-LABEL: sil private [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
-// CHECK: bb0([[PROJECT:%.*]] : @closureCapture
+// CHECK: bb0([[ARG:%.*]] : @closureCapture
+// CHECK:   [[PROJECT:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[LOADED:%.*]] = load [copy] [[ACCESS]]

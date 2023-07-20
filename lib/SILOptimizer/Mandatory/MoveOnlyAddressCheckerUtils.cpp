@@ -2323,6 +2323,18 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       }
     }
 
+    // If our partial apply takes this parameter as an inout parameter and it
+    // has the no move only diagnostics marker on it, do not emit an error
+    // either.
+    if (auto *f = pas->getCalleeFunction()) {
+      if (f->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
+        if (ApplySite(pas).getArgumentOperandConvention(*op).isInoutConvention()) {
+          diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
+          return false;
+        }
+      }
+    }
+
     if (pas->isOnStack() ||
         ApplySite(pas).getArgumentConvention(*op).isInoutConvention()) {
       LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
