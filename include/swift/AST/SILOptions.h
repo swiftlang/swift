@@ -172,7 +172,7 @@ public:
   bool EnableOSSAModules = false;
 
   /// If set to true, compile with the SIL Opaque Values enabled.
-  bool EnableSILOpaqueValues = false;
+  bool EnableSILOpaqueValues = true;
 
   /// Require linear OSSA lifetimes after SILGen
   bool OSSACompleteLifetimes = false;
