@@ -127,12 +127,16 @@ public:
   }
 
   bool operator==(const PartitionOp &other) const {
-      return OpKind == other.OpKind && sourceInst == other.sourceInst;
+      return OpKind == other.OpKind
+             && OpArgs == other.OpArgs
+                && sourceInst == other.sourceInst;
   };
   // implemented for insertion into std::map
   bool operator<(const PartitionOp &other) const {
     if (OpKind != other.OpKind)
       return OpKind < other.OpKind;
+    if (OpArgs != other.OpArgs)
+      return OpArgs < other.OpArgs;
     return sourceInst < other.sourceInst;
   }
 
@@ -143,6 +147,10 @@ public:
            sourceInst && "PartitionOps should be assigned SILInstruction"
                          " sources when used for the core analysis");
     return sourceInst;
+  }
+
+  Expr *getSourceExpr() const {
+    return sourceExpr;
   }
 
   void dump() const LLVM_ATTRIBUTE_USED {
@@ -440,24 +448,25 @@ public:
       assert(labels.count(op.OpArgs[0]) &&
              "Consume PartitionOp's argument should already be tracked");
 
-      // if attempting to consume a consumed region, handle the failure
-      if (isConsumed(op.OpArgs[0]))
-        handleFailure(op, op.OpArgs[0]);
-
-      // mark region as consumed
-      horizontalUpdate(labels, op.OpArgs[0], Region::consumed());
-
-      // check if any nonconsumables were consumed, and handle the failure if so
+      // check if any nonconsumables are consumed here, and handle the failure if so
       for (Element nonconsumable : nonconsumables) {
         assert(labels.count(nonconsumable) &&
                "nonconsumables should be function args and self, and therefore"
                "always present in the label map because of initialization at "
                "entry");
-        if (isConsumed(nonconsumable)) {
+        if (!isConsumed(nonconsumable) &&
+            labels.at(nonconsumable) == labels.at(op.OpArgs[0])) {
           handleConsumeNonConsumable(op, nonconsumable);
           break;
         }
       }
+
+      // ensure region is consumed
+      if (!isConsumed(op.OpArgs[0]))
+        // mark region as consumed
+        horizontalUpdate(labels, op.OpArgs[0], Region::consumed());
+
+
 
       break;
     case PartitionOpKind::Merge:
@@ -523,7 +532,7 @@ public:
     llvm::dbgs() << "}\n";
   }
 
-  void dump() LLVM_ATTRIBUTE_USED {
+  void dump() const LLVM_ATTRIBUTE_USED {
     std::map<Region, std::vector<Element>> buckets;
 
     for (auto [i, label] : labels)

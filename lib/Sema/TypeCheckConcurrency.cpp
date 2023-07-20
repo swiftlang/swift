@@ -1813,7 +1813,7 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
 
 /// Find the original type of a value, looking through various implicit
 /// conversions.
-static Type findOriginalValueType(Expr *expr) {
+Type swift::findOriginalValueType(Expr *expr) {
   do {
     expr = expr->getSemanticsProvidingExpr();
 
