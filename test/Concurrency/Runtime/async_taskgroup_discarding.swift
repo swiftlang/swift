@@ -34,7 +34,6 @@ actor SimpleCountDownLatch {
       fatalError("Counted down more times than expected! (From: \(from))")
     } else if count == 1 {
       print("hit resume")
-      print("resume")
       continuation?.resume()
     }
   }
