@@ -12,6 +12,8 @@ import ObjectiveC
 import Foundation
 
 class MyObject : NSObject {
+
+  
   // Ensure we don't emit linetable entries for ObjC thunks.
   // LOC-CHECK: define {{.*}} @"$s4main8MyObjectC0B3ArrSo7NSArrayCvgTo"
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
@@ -27,9 +29,8 @@ class MyObject : NSObject {
   // IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[OVERLAY]]
 
   // ALLOCCTOR-CHECK: ![[F:.*]] = !DIFile(filename: "<compiler-generated>",
-  // ALLOCCTOR-CHECK: distinct !DISubprogram(name: "init",
-  // ALLOCCTOR-CHECK-SAME:                   linkageName: "$sSo7NSArrayCABycfC",
-  // ALLOCCTOR-CHECK-SAME:                   file: ![[F]],
+  // ALLOCCTOR-CHECK: distinct !DISubprogram(name: "init", linkageName: "$sSo7NSArrayCABycfC"
+  // ALLOCCTOR-CHECK-SAME: file: ![[F]],
   @objc func foo(_ obj: MyObject) {
     return obj.foo(obj)
   }

@@ -293,6 +293,7 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
 
   void emitEntryPoint(SourceFile *SF);
+  void emitEntryPoint(SourceFile *SF, SILFunction *TopLevel);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
 

@@ -1095,6 +1095,14 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   case SILDeclRef::Kind::AsyncEntryPoint:
   case SILDeclRef::Kind::EntryPoint: {
     f->setBare(IsBare);
+    if (constant.hasFileUnit()) {
+      auto *File = constant.getFileUnit();
+      // In script mode
+      assert(isa<SourceFile>(File) && "Emitting entry-point of non source file?!");
+      auto *SF = dyn_cast<SourceFile>(File);
+      emitEntryPoint(SF, f);
+      return;
+    }
 
     // TODO: Handle main SourceFile emission (currently done by
     // SourceFileScope).
@@ -1920,15 +1928,9 @@ void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   // Nothing to do for #error/#warning; they've already been emitted.
 }
 
-void SILGenModule::emitEntryPoint(SourceFile *SF) {
-  assert(!M.lookUpFunction(getASTContext().getEntryPointFunctionName()) &&
-         "already emitted toplevel?!");
+void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
 
-  auto mainEntryRef = SILDeclRef::getMainFileEntryPoint(SF);
-  SILFunction *TopLevel = getFunction(mainEntryRef, ForDefinition);
-  TopLevel->setBare(IsBare);
-  SILDeclRef EntryRef = mainEntryRef;
-
+  auto EntryRef = SILDeclRef::getMainFileEntryPoint(SF);
   bool isAsyncTopLevel = false;
   if (SF->isAsyncContext()) {
     isAsyncTopLevel = true;
@@ -1968,37 +1970,10 @@ void SILGenModule::emitEntryPoint(SourceFile *SF) {
     entry->createFunctionArgument(*std::next(paramTypeIter));
   }
 
-  llvm::Optional<Scope> S;
-  S.emplace(TopLevelSGF.Cleanups, moduleCleanupLoc);
-
-  SILGenTopLevel SGT(TopLevelSGF);
-
-  for (auto *D : SF->getTopLevelDecls()) {
-    // Emit auxiliary decls.
-    D->visitAuxiliaryDecls(
-        [&](Decl *AuxiliaryDecl) { SGT.visit(AuxiliaryDecl); });
-    SGT.visit(D);
+  {
+    Scope S(TopLevelSGF.Cleanups, moduleCleanupLoc);
+    SILGenTopLevel(TopLevelSGF).visitSourceFile(SF);
   }
-
-  if (auto *synthesizedFile = SF->getSynthesizedFile()) {
-    for (auto *D : synthesizedFile->getTopLevelDecls()) {
-      if (isa<ExtensionDecl>(D)) {
-        SGT.visit(D);
-      }
-    }
-  }
-
-  for (Decl *D : SF->getHoistedDecls()) {
-    SGT.visit(D);
-  }
-
-  for (TypeDecl *TD : SF->LocalTypeDecls) {
-    if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
-      continue;
-    SGT.visit(TD);
-  }
-
-  S.reset();
 
   // Unregister the top-level function emitter.
   TopLevelSGF.stopEmittingTopLevelCode();
@@ -2106,6 +2081,16 @@ void SILGenModule::emitEntryPoint(SourceFile *SF) {
              toplevel.print(llvm::dbgs()));
   toplevel.verifyIncompleteOSSA();
   emitLazyConformancesForFunction(&toplevel);
+}
+
+void SILGenModule::emitEntryPoint(SourceFile *SF) {
+  assert(!M.lookUpFunction(getASTContext().getEntryPointFunctionName()) &&
+         "already emitted toplevel?!");
+
+  auto mainEntryRef = SILDeclRef::getMainFileEntryPoint(SF);
+  SILFunction *TopLevel = getFunction(mainEntryRef, ForDefinition);
+  TopLevel->setBare(IsBare);
+  emitEntryPoint(SF, TopLevel);
 }
 
 namespace {

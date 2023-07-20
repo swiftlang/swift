@@ -15,6 +15,7 @@
 
 #include "SILGen.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeMemberVisitor.h"
 
 namespace swift {
@@ -27,6 +28,7 @@ public:
   /// Generate SIL for toplevel code into `SGF`
   SILGenTopLevel(SILGenFunction &SGF);
 
+  void visitSourceFile(SourceFile *SF);
   void visitDecl(Decl *D) {}
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
   void visitExtensionDecl(ExtensionDecl *ED);

@@ -20,6 +20,32 @@ static void emitMarkFunctionEscape(SILGenFunction &SGF,
 
 SILGenTopLevel::SILGenTopLevel(SILGenFunction &SGF) : SGF(SGF) {}
 
+void SILGenTopLevel::visitSourceFile(SourceFile *SF) {
+
+  for (auto *D : SF->getTopLevelDecls()) {
+    D->visitAuxiliaryDecls([&](Decl *AuxiliaryDecl) { visit(AuxiliaryDecl); });
+    visit(D);
+  }
+
+  if (auto *SynthesizedFile = SF->getSynthesizedFile()) {
+    for (auto *D : SynthesizedFile->getTopLevelDecls()) {
+      if (isa<ExtensionDecl>(D)) {
+        visit(D);
+      }
+    }
+  }
+
+  for (Decl *D : SF->getHoistedDecls()) {
+    visit(D);
+  }
+
+  for (TypeDecl *TD : SF->LocalTypeDecls) {
+    if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+      continue;
+    visit(TD);
+  }
+}
+
 void SILGenTopLevel::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   TypeVisitor(SGF).emit(NTD);
 }
