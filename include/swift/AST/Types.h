@@ -2494,10 +2494,6 @@ public:
   
   bool containsPackExpansionType() const;
 
-  /// Check whether this tuple consists of a single unlabeled element
-  /// of \c PackExpansionType.
-  bool isSingleUnlabeledPackExpansion() const;
-
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties)

@@ -14,19 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
+#include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckType.h"
-#include "MiscDiagnostics.h"
-#include "swift/Subsystems.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -41,7 +40,9 @@
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -1751,7 +1752,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
 static bool isDiscardableType(Type type) {
   // If type is `(_: repeat ...)`, it can be discardable.
   if (auto *tuple = type->getAs<TupleType>()) {
-    if (tuple->isSingleUnlabeledPackExpansion()) {
+    if (constraints::isSingleUnlabeledPackExpansionTuple(tuple)) {
       type = tuple->getElementType(0);
     }
   }

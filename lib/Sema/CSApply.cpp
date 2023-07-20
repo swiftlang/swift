@@ -3858,10 +3858,9 @@ namespace {
       if (auto *packRefExpr = expr->getPackRefExpr()) {
         packRefExpr = cs.coerceToRValue(packRefExpr);
         auto packRefType = cs.getType(packRefExpr);
-        if (auto *tuple = packRefType->getRValueType()->getAs<TupleType>();
-            tuple && tuple->isSingleUnlabeledPackExpansion()) {
-          auto patternType =
-              getPatternTypeOfSingleUnlabeledPackExpansionTuple(tuple);
+        if (auto patternType =
+                getPatternTypeOfSingleUnlabeledPackExpansionTuple(
+                    packRefType)) {
           auto *materializedPackExpr = MaterializePackExpr::create(
               cs.getASTContext(), packRefExpr, packRefExpr->getLoc(),
               patternType, /*implicit*/ true);
