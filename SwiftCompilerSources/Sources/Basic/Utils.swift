@@ -78,7 +78,7 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
     let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.bytes_begin(),
                                             count: count)
 #else
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.bytes_begin(),
+    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.__bytes_beginUnsafe(),
                                             count: count)
 #endif
     return buffer[index]
@@ -90,7 +90,9 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
       start: lhs._bridged.bytes_begin(),
       count: lhs.count)
 #else
-      count: Int(lhs._bridged.__bytes_endUnsafe() - lhs._bridged.__bytes_beginUnsafe()))
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(
+      start: lhs._bridged.__bytes_beginUnsafe(),
+      count: lhs.count)
 #endif
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }

@@ -6834,7 +6834,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         }
 
         // A projection of a view type (such as a string_view) from a self
-        // contained parent is a proejction (unsafe).
+        // contained parent is a projection (unsafe).
         if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
             !hasOwnedValueAttr(cxxRecordReturnType) &&
             hasPointerInSubobjects(cxxRecordReturnType)) {
