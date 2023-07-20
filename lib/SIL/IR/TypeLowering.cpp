@@ -126,7 +126,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   if (!var->supportsMutation() && lowering.getLoweredType().isPureMoveOnly() &&
       !capture.isNoEscape()) {
       auto *param = dyn_cast<ParamDecl>(var);
-      if (!param || param->getValueOwnership() != ValueOwnership::Shared) {
+      if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
+                     !param->isSelfParameter())) {
         return CaptureKind::ImmutableBox;
       }
   }

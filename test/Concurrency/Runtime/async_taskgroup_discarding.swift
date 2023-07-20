@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 // TODO: move to target-run-simple-leaks-swift once CI is using at least Xcode 14.3
 
-// rdar://110025115 - Temporarily disable this test
-// REQUIRES: rdar110025115
-
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
