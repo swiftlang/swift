@@ -1920,7 +1920,7 @@ LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
   auto *mod = desc.Mod;
   auto type = desc.Ty;
-  auto protocol = desc.PD;
+  auto *protocol = desc.PD;
   ASTContext &ctx = mod->getASTContext();
 
   // A dynamic Self type conforms to whatever its underlying type
@@ -2007,9 +2007,10 @@ LookupConformanceInModuleRequest::evaluate(
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
   }
 
-  // Specific handling of Copyable for pack expansions.
+  // Specific handling of Copyable and Sendable for pack expansions.
   if (auto packExpansion = type->getAs<PackExpansionType>()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
+        protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       auto patternType = packExpansion->getPatternType();
       return (patternType->isTypeParameter()
                ? ProtocolConformanceRef(protocol)
