@@ -7152,9 +7152,9 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
     case MacroRole::Peer:
       break;
     case MacroRole::Conformance:
-      if (!attr->getNames().empty())
-        diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
-                              getMacroRoleString(attr->getMacroRole()));
+      diagnoseAndRemoveAttr(attr, diag::conformance_macro)
+          .fixItReplace(attr->getRange(),
+                        "@attached(extension, conformances: <#Protocol#>)");
       break;
     case MacroRole::Extension:
       break;
