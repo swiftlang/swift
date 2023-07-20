@@ -10,6 +10,7 @@
 // REQUIRES: objc_interop
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// REQUIRES: rdar112623492
 
 import Observation
 
