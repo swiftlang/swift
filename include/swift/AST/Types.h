@@ -767,6 +767,10 @@ public:
   /// include type parameters in nested positions e.g. \c X<T...>.
   bool isParameterPack();
 
+  /// Determine whether this type is directly a type parameter pack, which
+  /// can only be a GenericTypeParamType.
+  bool isRootParameterPack();
+
   /// Determine whether this type can dynamically be an optional type.
   ///
   /// \param includeExistential Whether an existential type should be considered
