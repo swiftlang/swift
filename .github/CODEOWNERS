@@ -182,6 +182,7 @@
 /tools/SourceKit                                    @ahoppen @bnbarham @rintaro @hamishknight
 /tools/lldb-moduleimport-test/                      @adrian-prantl
 /tools/swift-ide-test                               @ahoppen @bnbarham @rintaro @hamishknight
+/tools/swift-inspect                                @mikeash @al45tair @compnerd
 /tools/swift-refactor                               @ahoppen @bnbarham
 
 # unittests
