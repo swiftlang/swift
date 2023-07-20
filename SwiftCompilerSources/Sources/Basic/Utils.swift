@@ -78,7 +78,7 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
     let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.bytes_begin(),
                                             count: count)
 #else
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.bytes_begin(),
+    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.__bytes_beginUnsafe(),
                                             count: count)
 #endif
     return buffer[index]
