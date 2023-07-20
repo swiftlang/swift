@@ -1371,7 +1371,7 @@ public:
     // guaranteed address-only values are forwarded with the same
     // representation. Non-destructive projection is allowed. Aggregation and
     // destructive disaggregation is not allowed. See SIL.rst, Forwarding
-    // Addres-Only Values.
+    // Address-Only Values.
     if (ownership == OwnershipKind::Guaranteed && fwdOp.isAddressOnly()) {
       require(fwdOp.hasSameRepresentation(),
               "Forwarding a guaranteed address-only value requires the same "

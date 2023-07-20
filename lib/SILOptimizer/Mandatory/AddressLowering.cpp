@@ -150,6 +150,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -383,6 +384,10 @@ static bool isStoreCopy(SILValue value) {
     // - visit borrow introducers via visitBorrowIntroducers
     // - call ExtendedLiveness.compute on each borrow introducer
     if (llvm::any_of(roots, [&](SILValue root) {
+          // Nothing is out of range of a function argument.
+          if (isa<SILFunctionArgument>(root))
+            return false;
+
           // Handle forwarding phis conservatively rather than recursing.
           if (SILArgument::asPhi(root) && !BorrowedValue(root))
             return true;
@@ -2259,6 +2264,13 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
 /// ending uses.
 static void emitEndBorrows(SILValue value, AddressLoweringState &pass);
 
+/// Emit end_borrows at the lifetime ends of the guaranteed value which
+/// encloses \p enclosingValue.
+static void
+emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
+                                            SILValue enclosingValue,
+                                            AddressLoweringState &pass);
+
 void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   // Avoid revisiting this apply.
   bool erased = pass.indirectApplies.erase(apply);
@@ -3268,7 +3280,8 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
       }
       result->replaceAllUsesWith(loadElement);
       if (guaranteed) {
-        emitEndBorrows(loadElement, pass);
+        emitEndBorrowsAtEnclosingGuaranteedBoundary(
+            loadElement, destructure->getOperand(0), pass);
       }
     }
   }
@@ -3395,8 +3408,56 @@ static void emitEndBorrows(SILValue value, AddressLoweringState &pass) {
       });
 }
 
+/// Emit end_borrows at the lifetime ends of the guaranteed value which
+/// encloses \p enclosingValue.
+///
+/// precondition: \p enclosingValue must be of opaque type
+static void
+emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
+                                            SILValue enclosingValue,
+                                            AddressLoweringState &pass) {
+  /// It's necessary that enclosingValue be of opaque type.  In practice, this
+  /// is the only situation in which AddressLowering needs to create a borrow
+  /// scope corresponding to some guaranteed value: the enclosingValue is the
+  /// opaque value that AddressLowering is rewriting.
+  ///
+  /// It's required in order to ensure that no introducer of enclosingValue has
+  /// a phi scope-ending use.  That enables just visiting the local scope ending
+  /// uses.
+  ///
+  /// Given: enclosingValue is opaque.
+  ///
+  /// Then every introducer is opaque.  In fact every introducer's type is some
+  /// aggregate in which enclosingValue's type appears.  The reason is that
+  /// representation-changing forwarding guaranteed operations are not allowed
+  /// on opaque values.  (See SIL.rst, Forwarding Address-Only Values).
+  ///
+  /// Thus no introducer is reborrowed.  For suppose that some introducer were
+  /// reborrowed.  Then it would appear as an operand of some phi with
+  /// guaranteed ownership. And that phi would be of opaque type. But that's
+  /// invalid! (See SILVerifier::visitSILPhiArgument.)
+  assert(enclosingValue->getType().isAddressOnly(*pass.function));
+  TinyPtrVector<SILValue> introducers;
+  visitBorrowIntroducers(enclosingValue, [&](SILValue introducer) {
+    introducers.push_back(introducer);
+    return true;
+  });
+  assert(introducers.size() == 1);
+  for (auto introducer : introducers) {
+    assert(introducer->getType().isAddressOnly(*pass.function));
+    auto borrow = BorrowedValue(introducer);
+    borrow.visitLocalScopeEndingUses([&](Operand *use) {
+      assert(!PhiOperand(use));
+      pass.getBuilder(use->getUser()->getIterator())
+          .createEndBorrow(pass.genLoc(), lifetimeToEnd);
+      return true;
+    });
+  }
+}
+
 // Extract from an opaque struct or tuple.
 void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
+  auto source = extractInst->getOperand(0);
   SILValue extractAddr = addrMat.materializeDefProjection(extractInst);
 
   if (extractInst->getType().isAddressOnly(*pass.function)) {
@@ -3427,7 +3488,7 @@ void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
   SILValue loadElement =
       builder.emitLoadBorrowOperation(extractInst->getLoc(), extractAddr);
   replaceUsesWithLoad(extractInst, loadElement);
-  emitEndBorrows(loadElement, pass);
+  emitEndBorrowsAtEnclosingGuaranteedBoundary(loadElement, source, pass);
 }
 
 void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
@@ -3808,11 +3869,21 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (valueDef->getType().isAddress())
       continue;
 
+    // Collect end_borrows and rewrite them last so that when rewriting other
+    // users the lifetime ends of a borrow introducer can be used.
+    StackList<EndBorrowInst *> endBorrows(pass.function);
     SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
     for (auto *oper : uses) {
       originalUses.insert(oper);
+      if (auto *ebi = dyn_cast<EndBorrowInst>(oper->getUser())) {
+        endBorrows.push_back(ebi);
+        continue;
+      }
       UseRewriter::rewriteUse(oper, pass);
+    }
+    for (auto *ebi : endBorrows) {
+      UseRewriter::rewriteUse(&ebi->getOperandRef(), pass);
     }
     // Rewrite every new use that was added.
     uses.clear();

@@ -60,7 +60,12 @@ enum Mixed<T> {
   case i(Int)
   case t(T)
   case o(AnyObject)
-};
+}
+
+indirect enum RE<T> {
+   case recursive(RE, T) 
+   case other(AnyObject)
+}
 
 class TestGeneric<T> {
   init()
@@ -756,9 +761,9 @@ bb0(%0 : @owned $SRef<T>):
 // CHECK:   [[L:%.*]] = load_borrow [[E0]] : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
-// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
+// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*SRef<T>
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
 // CHECK-NOT: dealloc_stack
@@ -808,9 +813,9 @@ bb0(%0 : @owned $(AnyObject, T)):
 // CHECK:   [[L:%.*]] = load_borrow %3 : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
-// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
+// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*(AnyObject, T)
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
 // CHECK-NOT: dealloc_stack
@@ -1038,6 +1043,31 @@ bb7:
   destroy_value %0 : $P
   %23 = tuple ()
   return %23 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f163_testOpenedArchetype : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Optional<Any>
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[AN_ERROR:%[^,]+]] = open_existential_box [[BORROW]]
+// CHECK:         [[ANY_ADDR:%[^,]+]] = init_enum_data_addr [[ADDR]]
+// CHECK:         [[OPENED_ADDR:%[^,]+]] = init_existential_addr [[ANY_ADDR]]
+// CHECK:         copy_addr [[AN_ERROR]] to [init] [[OPENED_ADDR]]
+// CHECK:         inject_enum_addr [[ADDR]] : $*Optional<Any>, #Optional.some!enumelt
+// CHECK:         apply undef<Any>([[ADDR]])
+// CHECK-LABEL: } // end sil function 'f163_testOpenedArchetype'
+sil [ossa] @f163_testOpenedArchetype : $@convention(c) (@owned any Error) -> () {
+block(%instance : @owned $any Error):
+  %borrow = begin_borrow [lexical] %instance : $any Error
+  %an_error = open_existential_box_value %borrow : $any Error to $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self
+  %an_owned_error = copy_value %an_error : $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self
+  %any = init_existential_value %an_owned_error : $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self, $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self, $Any
+  %some_any = enum $Optional<Any>, #Optional.some!enumelt, %any : $Any
+  apply undef<Any>(%some_any) : $@convention(thin) <T> (@in Optional<T>) -> ()
+  end_borrow %borrow : $any Error
+  destroy_value %instance : $any Error
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @f170_compare : $@convention(thin) <T where T : Comparable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
@@ -2224,9 +2254,9 @@ exit:
 // CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
 // CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
 // CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]]
-// CHECK:         end_borrow [[KLASS]]
 // CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
 // CHECK:         apply undef<Any>([[ANY_ADDR]])
+// CHECK:         end_borrow [[KLASS]]
 // CHECK:         destroy_addr [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'test_destructure_tuple_1_guaranteed'
 sil [ossa] @test_destructure_tuple_1_guaranteed : $@convention(thin) () -> () {
@@ -2249,6 +2279,62 @@ exit:
   return %505 : $()
 }
 
+// Check that the end_borrows created on behalf of the destructure_tuple end
+// after the use of the load_borrow of the projection of the terminator result
+// of the switch_enum that is guaranteed by that load_borrow.
+//
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_load_borrow_projected_box : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[OUTER:%[^,]+]] :
+// CHECK:         switch_enum [[OUTER]] : $RE<T>, case #RE.recursive!enumelt: [[OUTER_RECURSIVE:bb[0-9]+]], case #RE.other!enumelt: [[OUTER_OTHER:bb[0-9]+]]
+// CHECK:       [[OUTER_OTHER]]({{%[^,]+}} :
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[OUTER_RECURSIVE]]([[TUPLE_BOX:%[^,]+]] :
+// CHECK-NEXT:    [[TUPLE_ADDR:%[^,]+]] = project_box [[TUPLE_BOX]]
+// CHECK:         [[INNER_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE_ADDR]]
+// CHECK:         [[INNER:%[^,]+]] = load_borrow [[INNER_ADDR]]
+// CHECK:         switch_enum [[INNER]] : $RE<T>, case #RE.recursive!enumelt: [[INNER_RECURSIVE:bb[0-9]+]], case #RE.other!enumelt: [[INNER_OTHER:bb[0-9]+]]
+// CHECK:       [[INNER_OTHER]]([[OTHER_BOX:%[^,]+]] :
+// CHECK:         [[OTHER_ADDR:%[^,]+]] = project_box [[OTHER_BOX]]
+// CHECK:         [[OTHER:%[^,]+]] = load_borrow [[OTHER_ADDR]]
+// CHECK:         [[OTHER_COPY:%[^,]+]] = copy_value [[OTHER]]
+// CHECK:         end_borrow [[OTHER]]
+// CHECK:         end_borrow [[INNER]]
+// CHECK:         destroy_value [[OTHER_COPY]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[INNER_RECURSIVE]]
+// CHECK:         end_borrow [[INNER]]
+// CHECK:         br [[EXIT]]
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple_load_borrow_projected_box'
+sil [ossa] @test_destructure_tuple_load_borrow_projected_box : $@convention(thin) <T> (@guaranteed RE<T>) -> () {
+entry(%o : @guaranteed $RE<T>):
+  switch_enum %o : $RE<T>, case #RE.recursive!enumelt: outer_recursive, case #RE.other!enumelt: outer_other
+
+outer_other(%other : @guaranteed $<τ_0_0> { var AnyObject } <T>):
+  br exit
+
+outer_recursive(%tuple_box : @guaranteed $<Tau> { var (RE<Tau>, Tau) } <T>):
+  %tuple_addr = project_box %tuple_box : $<Tau> { var (RE<Tau>, Tau) } <T>, 0
+  %tuple = load_borrow %tuple_addr : $*(RE<T>, T)
+  (%i, %c) = destructure_tuple %tuple : $(RE<T>, T)
+  switch_enum %i : $RE<T>, case #RE.recursive!enumelt: inner_recursive, case #RE.other!enumelt: inner_other
+
+inner_recursive(%in_tuple_box : @guaranteed $<Tau> { var (RE<Tau>, Tau) } <T>):
+  end_borrow %tuple : $(RE<T>, T)
+  br exit
+
+inner_other(%s_box : @guaranteed $<Tau> { var AnyObject } <T>):
+  %s_addr = project_box %s_box : $<Tau> { var AnyObject } <T>, 0
+  %s = load_borrow %s_addr : $*AnyObject
+  %sc = copy_value %s : $AnyObject
+  end_borrow %s : $AnyObject
+  end_borrow %tuple : $(RE<T>, T)
+  destroy_value %sc : $AnyObject
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
 
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
