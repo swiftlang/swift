@@ -59,7 +59,7 @@ extension P {
 
 
 func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
-  let _: (repeat (each T.A, U)) = (repeat ((each t).value, u))
+  let _: (repeat ((each T).A, U)) = (repeat ((each t).value, u))
 }
 
 func sameElement<each T, U>(t: repeat each T, u: U) where repeat each T: P, repeat each T == U {
@@ -478,11 +478,11 @@ do {
 
 // rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without a type annotation`
 do {
-  func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+  func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat (each T).A) {
     return (repeat (each value).makeA()) // Ok
   }
 
-  func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+  func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat (each T).A) {
     return (repeat each value.makeA())
     // expected-error@-1 {{value pack 'each T' must be referenced with 'each'}} {{25-25=(each }} {{30-30=)}}
   }

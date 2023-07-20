@@ -186,6 +186,12 @@ bool TypeBase::isParameterPack() {
   while (auto *memberTy = t->getAs<DependentMemberType>())
     t = memberTy->getBase();
 
+  return t->isRootParameterPack();
+}
+
+bool TypeBase::isRootParameterPack() {
+  Type t(this);
+
   return t->is<GenericTypeParamType>() &&
          t->castTo<GenericTypeParamType>()->isParameterPack();
 }
