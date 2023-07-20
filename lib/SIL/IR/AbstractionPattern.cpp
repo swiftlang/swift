@@ -707,7 +707,7 @@ AbstractionPattern::getPackElementType(unsigned index) const {
   llvm_unreachable("bad kind");
 }
 
-bool AbstractionPattern::matchesPack(CanPackType substType) {
+bool AbstractionPattern::matchesPack(CanPackType substType) const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -739,6 +739,72 @@ bool AbstractionPattern::matchesPack(CanPackType substType) {
   }
   }
   llvm_unreachable("bad kind");
+}
+
+void AbstractionPattern::forEachPackElement(CanPackType substType,
+      llvm::function_ref<void(PackElementGenerator &)> handleElement) const {
+  PackElementGenerator elt(*this, substType);
+  for (; !elt.isFinished(); elt.advance()) {
+    handleElement(elt);
+  }
+  elt.finish();
+}
+
+void AbstractionPattern::forEachExpandedPackElement(CanPackType substPackType,
+                      llvm::function_ref<void(AbstractionPattern origEltType,
+                                              CanType substEltType)>
+                        handleElement) const {
+  assert(matchesPack(substPackType));
+
+  auto substEltTypes = substPackType.getElementTypes();
+
+  // Handle opaque patterns by just iterating the substituted components.
+  if (!isPack()) {
+    for (auto i : indices(substEltTypes)) {
+      handleElement(getPackElementType(i), substEltTypes[i]);
+    }
+    return;
+  }
+
+  // For non-opaque patterns, we have to iterate the original components
+  // in order to match things up properly, but we'll still end up calling
+  // once per substituted element.
+  size_t substEltIndex = 0;
+  for (size_t origEltIndex : range(getNumPackElements())) {
+    auto origEltType = getPackElementType(origEltIndex);
+    if (!origEltType.isPackExpansion()) {
+      handleElement(origEltType, substEltTypes[substEltIndex]);
+      substEltIndex++;
+    } else {
+      auto origPatternType = origEltType.getPackExpansionPatternType();
+      for (auto i : range(origEltType.getNumPackExpandedComponents())) {
+        (void) i;
+        auto substEltType = substEltTypes[substEltIndex];
+        // When the substituted type is a pack expansion, pass down
+        // the original element type so that it's *also* a pack expansion.
+        // Clients expect to look through this structure in parallel on
+        // both types.  The count is misleading, but normal usage won't
+        // access it, and there's nothing we could provide that *wouldn't*
+        // be misleading in one way or another.
+        handleElement(isa<PackExpansionType>(substEltType)
+                        ? origEltType : origPatternType,
+                      substEltType);
+        substEltIndex++;
+      }
+    }
+  }
+  assert(substEltIndex == substEltTypes.size());
+}
+
+PackElementGenerator::PackElementGenerator(
+                            AbstractionPattern origPackType,
+                            CanPackType substPackType)
+    : origPackType(origPackType), substPackType(substPackType) {
+  assert(origPackType.isPack());
+  assert(origPackType.matchesPack(substPackType));
+  numOrigElts = origPackType.getNumPackElements();
+
+  if (!isFinished()) loadElement();
 }
 
 AbstractionPattern
@@ -2257,12 +2323,25 @@ public:
   }
 
   CanType visitPackType(CanPackType pack, AbstractionPattern pattern) {
+    assert(pattern.isPack());
+
     // Break down the pack.
     SmallVector<CanType, 4> packElts;
-    for (auto i : range(pack->getNumElements())) {
-      packElts.push_back(visit(pack.getElementType(i),
-                               pattern.getPackElementType(i)));
-    }
+
+    pattern.forEachPackElement(pack, [&](PackElementGenerator &elt) {
+      auto substEltTypes = elt.getSubstTypes();
+      CanType eltTy;
+      if (!elt.isOrigPackExpansion()) {
+        eltTy = visit(substEltTypes[0], elt.getOrigType());
+      } else {
+        CanType candidateSubstType;
+        if (!substEltTypes.empty())
+          candidateSubstType = substEltTypes[0];
+        eltTy = handlePackExpansion(elt.getOrigType(), candidateSubstType);
+      }
+
+      packElts.push_back(eltTy);
+    });
 
     return CanPackType::get(TC.Context, packElts);
   }
