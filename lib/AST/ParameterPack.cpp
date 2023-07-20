@@ -66,8 +66,7 @@ static Type transformTypeParameterPacksRec(
     if (auto *paramType = dyn_cast<SubstitutableType>(t)) {
       if (expansionLevel == 0 &&
           (isa<PackArchetypeType>(paramType) ||
-           (isa<GenericTypeParamType>(paramType) &&
-            cast<GenericTypeParamType>(paramType)->isParameterPack()))) {
+           paramType->isRootParameterPack())) {
         return fn(paramType);
       }
 

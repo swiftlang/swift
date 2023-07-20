@@ -653,8 +653,7 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
 static Type getTypeForDWARFMangling(Type t) {
   return t.subst(
     [](SubstitutableType *t) -> Type {
-      if (isa<GenericTypeParamType>(t) &&
-          cast<GenericTypeParamType>(t)->isParameterPack()) {
+      if (t->isRootParameterPack()) {
         return PackType::getSingletonPackExpansion(t->getCanonicalType());
       }
       return t->getCanonicalType();
