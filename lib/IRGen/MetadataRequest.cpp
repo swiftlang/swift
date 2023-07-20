@@ -3307,11 +3307,10 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType ty) {
-    return ty;
-  }
-
-  CanType visitPackElementType(CanPackElementType ty) {
-    llvm_unreachable("not implemented for PackElementType");
+    CanType pattern = ty.getPatternType();
+    CanType loweredPattern = visit(ty.getPatternType());
+    if (pattern == loweredPattern) return ty;
+    return CanPackExpansionType::get(loweredPattern, ty.getCountType());
   }
 
   CanType visitTupleType(CanTupleType ty) {
