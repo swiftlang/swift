@@ -384,6 +384,10 @@ static bool isStoreCopy(SILValue value) {
     // - visit borrow introducers via visitBorrowIntroducers
     // - call ExtendedLiveness.compute on each borrow introducer
     if (llvm::any_of(roots, [&](SILValue root) {
+          // Nothing is out of range of a function argument.
+          if (isa<SILFunctionArgument>(root))
+            return false;
+
           // Handle forwarding phis conservatively rather than recursing.
           if (SILArgument::asPhi(root) && !BorrowedValue(root))
             return true;

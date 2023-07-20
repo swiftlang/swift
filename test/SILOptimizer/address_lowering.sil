@@ -1045,6 +1045,31 @@ bb7:
   return %23 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @f163_testOpenedArchetype : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Optional<Any>
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[AN_ERROR:%[^,]+]] = open_existential_box [[BORROW]]
+// CHECK:         [[ANY_ADDR:%[^,]+]] = init_enum_data_addr [[ADDR]]
+// CHECK:         [[OPENED_ADDR:%[^,]+]] = init_existential_addr [[ANY_ADDR]]
+// CHECK:         copy_addr [[AN_ERROR]] to [init] [[OPENED_ADDR]]
+// CHECK:         inject_enum_addr [[ADDR]] : $*Optional<Any>, #Optional.some!enumelt
+// CHECK:         apply undef<Any>([[ADDR]])
+// CHECK-LABEL: } // end sil function 'f163_testOpenedArchetype'
+sil [ossa] @f163_testOpenedArchetype : $@convention(c) (@owned any Error) -> () {
+block(%instance : @owned $any Error):
+  %borrow = begin_borrow [lexical] %instance : $any Error
+  %an_error = open_existential_box_value %borrow : $any Error to $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self
+  %an_owned_error = copy_value %an_error : $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self
+  %any = init_existential_value %an_owned_error : $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self, $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self, $Any
+  %some_any = enum $Optional<Any>, #Optional.some!enumelt, %any : $Any
+  apply undef<Any>(%some_any) : $@convention(thin) <T> (@in Optional<T>) -> ()
+  end_borrow %borrow : $any Error
+  destroy_value %instance : $any Error
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @f170_compare : $@convention(thin) <T where T : Comparable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   [[WT:%.*]] = witness_method $T, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Builtin.Int1 : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Builtin.Int1
