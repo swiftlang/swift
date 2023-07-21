@@ -892,11 +892,20 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
     return false;
   }
 
-  // For simplicity just bail if the keypath has a non-trivial operands.
-  // TODO: don't bail but insert compensating destroys for such operands.
-  for (const Operand &Op : KPI->getPatternOperands()) {
-    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
-      return false;
+  // In non-ossa, bail out if we have non-trivial pattern operands
+  if (!KPI->getFunction()->hasOwnership()) {
+    for (const Operand &Op : KPI->getPatternOperands()) {
+      if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+        return false;
+    }
+  }
+
+  if (KPI->getFunction()->hasOwnership()) {
+    for (const Operand &Op : KPI->getPatternOperands()) {
+      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+        continue;
+      SILBuilderWithScope(KPI).createDestroyValue(KPI->getLoc(), Op.get());
+    }
   }
 
   // Remove the keypath and all of its users.
