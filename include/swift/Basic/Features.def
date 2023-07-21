@@ -218,7 +218,7 @@ EXPERIMENTAL_FEATURE(BuiltinModule, true)
 EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
 /// Defer Sendable checking to SIL diagnostic phase.
-EXPERIMENTAL_FEATURE(DeferredSendableChecking, false)
+EXPERIMENTAL_FEATURE(SendNonSendable, false)
 
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.

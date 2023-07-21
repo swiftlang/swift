@@ -54,8 +54,7 @@ enum class PartitionOpKind : uint8_t {
   // Assign one value to a fresh region, takes one arg.
   AssignFresh,
 
-  // Consume the region of a value, takes one arg. Region of arg must be
-  // non-consumed before the op.
+  // Consume the region of a value if not already consumed, takes one arg.
   Consume,
 
   // Merge the regions of two values, takes two args, both must be from
