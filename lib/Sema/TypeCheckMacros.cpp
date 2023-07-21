@@ -543,8 +543,8 @@ static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
   return Identifier();
 }
 
-bool swift::diagnoseInvalidAttachedMacro(MacroRole role,
-                                         Decl *attachedTo) {
+bool swift::isInvalidAttachedMacro(MacroRole role,
+                                   Decl *attachedTo) {
   switch (role) {
   case MacroRole::Expression:
   case MacroRole::Declaration:
@@ -582,9 +582,6 @@ bool swift::diagnoseInvalidAttachedMacro(MacroRole role,
     break;
   }
 
-  attachedTo->diagnose(diag::macro_attached_to_invalid_decl,
-                       getMacroRoleString(role),
-                       attachedTo->getDescriptiveKind());
   return true;
 }
 

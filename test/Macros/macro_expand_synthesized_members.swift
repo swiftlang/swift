@@ -22,7 +22,7 @@ macro addMembersQuotedInit() = #externalMacro(module: "MacroDefinition", type: "
 #if TEST_DIAGNOSTICS
 @addMembers
 import Swift
-// expected-error@-1 {{'member' macro cannot be attached to import}}
+// expected-error@-2 {{'member' macro cannot be attached to import}}
 #endif
 
 @addMembers
