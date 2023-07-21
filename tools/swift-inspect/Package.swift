@@ -22,17 +22,11 @@ let package = Package(
                 .target(name: "SwiftInspectClient", condition: .when(platforms: [.windows])),
                 .target(name: "SwiftInspectClientInterface", condition: .when(platforms: [.windows])),
             ],
-            swiftSettings: [
-                .unsafeFlags([
-                    "-parse-as-library",
-                    "-Xcc",
-                    "-Xclang",
-                    "-Xcc",
-                    "-fno-split-cold-code", // Workaround https://github.com/llvm/llvm-project/issues/40056
-                ]),
-            ]),
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]),
         .target(
-            name: "SwiftInspectClient"),
+            name: "SwiftInspectClient",
+            // Workaround https://github.com/llvm/llvm-project/issues/40056
+            cxxSettings: [.unsafeFlags(["-Xclang", "-fno-split-cold-code"])]),
         .systemLibrary(
             name: "SwiftInspectClientInterface"),
         .testTarget(
