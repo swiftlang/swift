@@ -28,6 +28,7 @@
 // %l = load %s                               the access
 // ```
 //===----------------------------------------------------------------------===//
+
 import SIL
 
 /// AccessBase describes the base address of a memory access (e.g. of a `load` or `store``).
@@ -68,7 +69,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   case argument(FunctionArgument)
   
   /// An indirect result of a `begin_apply`.
-  case yield(BeginApplyInst)
+  case yield(MultipleValueInstructionResult)
 
   /// An address which is derived from a `Builtin.RawPointer`.
   case pointer(PointerToAddressInst)
@@ -86,8 +87,8 @@ enum AccessBase : CustomStringConvertible, Hashable {
     case let arg as FunctionArgument     : self = .argument(arg)
     case let ga as GlobalAddrInst        : self = .global(ga.global)
     case let mvr as MultipleValueInstructionResult:
-      if let ba = mvr.parentInstruction as? BeginApplyInst, baseAddress.type.isAddress {
-        self = .yield(ba)
+      if mvr.parentInstruction is BeginApplyInst && baseAddress.type.isAddress {
+        self = .yield(mvr)
       } else {
         self = .unidentified
       }
@@ -105,7 +106,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
       case .class(let rea):    return "class  - \(rea)"
       case .tail(let rta):     return "tail - \(rta.instance)"
       case .argument(let arg): return "argument - \(arg)"
-      case .yield(let ba):     return "yield - \(ba)"
+      case .yield(let result): return "yield - \(result)"
       case .pointer(let p):    return "pointer - \(p)"
     }
   }
@@ -180,8 +181,8 @@ enum AccessBase : CustomStringConvertible, Hashable {
       return gl1 == gl2
     case (.argument(let arg1), .argument(let arg2)):
       return arg1 == arg2
-    case (.yield(let ba1), .yield(let ba2)):
-      return ba1 == ba2
+    case (.yield(let baResult1), .yield(let baResult2)):
+      return baResult1 == baResult2
     case (.pointer(let p1), .pointer(let p2)):
       return p1 == p2
     default:
