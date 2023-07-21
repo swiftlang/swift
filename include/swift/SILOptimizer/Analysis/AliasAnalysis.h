@@ -133,6 +133,8 @@ private:
 public:
   AliasAnalysis(SILPassManager *PM) : PM(PM) {}
 
+  ~AliasAnalysis();
+
   static SILAnalysisKind getAnalysisKind() { return SILAnalysisKind::Alias; }
 
   /// Perform an alias query to see if V1, V2 refer to the same values.

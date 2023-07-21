@@ -37,6 +37,9 @@ DominanceInfo::DominanceInfo(SILFunction *F)
   recalculate(*F);
 }
 
+DominanceInfo::~DominanceInfo() {
+}
+
 bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
   auto aBlock = a->getParent(), bBlock = b->getParent();
 

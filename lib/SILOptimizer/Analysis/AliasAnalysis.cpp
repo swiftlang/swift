@@ -526,6 +526,9 @@ static BridgedAliasAnalysis::Escaping2InstFn isObjReleasedFunction = nullptr;
 static BridgedAliasAnalysis::Escaping2ValIntFn isAddrVisibleFromObjFunction = nullptr;
 static BridgedAliasAnalysis::Escaping2ValFn canReferenceSameFieldFunction = nullptr;
 
+AliasAnalysis::~AliasAnalysis() {
+}
+
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
 AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
