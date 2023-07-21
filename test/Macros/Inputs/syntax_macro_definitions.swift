@@ -1838,3 +1838,36 @@ public struct PeerValueWithSuffixNameMacro: PeerMacro {
     return ["var \(raw: identified.identifier.text)_peer: Int { 1 }"]
   }
 }
+
+public struct MagicFileMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return "#file"
+  }
+}
+
+public struct MagicLineMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return "(#line)"
+  }
+}
+
+public struct NestedMagicLiteralMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return
+      """
+      {
+        print(#MagicFile)
+        print(#MagicLine)
+      }()
+      """
+  }
+}

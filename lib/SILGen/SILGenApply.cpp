@@ -2124,6 +2124,28 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   return args;
 }
 
+/// Returns the source location in the outermost source file
+/// for the given source location.
+///
+/// If the given source loc is in a macro expansion buffer, this
+/// method walks up the macro expansion buffer tree to the outermost
+/// source file. Otherwise, the method returns the given loc.
+static SourceLoc
+getLocInOutermostSourceFile(SourceManager &sourceManager, SourceLoc loc) {
+  auto outermostLoc = loc;
+  auto bufferID = sourceManager.findBufferContainingLoc(outermostLoc);
+
+  // Walk up the macro expansion buffer tree to the outermost
+  // source file.
+  while (auto generated = sourceManager.getGeneratedSourceInfo(bufferID)) {
+    auto node = ASTNode::getFromOpaqueValue(generated->astNode);
+    outermostLoc = node.getStartLoc();
+    bufferID = sourceManager.findBufferContainingLoc(outermostLoc);
+  }
+
+  return outermostLoc;
+}
+
 static inline PreparedArguments
 buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         MagicIdentifierLiteralExpr *magicLiteral) {
@@ -2153,7 +2175,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 
   case MagicIdentifierLiteralExpr::Line:
   case MagicIdentifierLiteralExpr::Column: {
-    SourceLoc Loc = magicLiteral->getStartLoc();
+    auto Loc = getLocInOutermostSourceFile(SGF.getSourceManager(),
+                                           magicLiteral->getStartLoc());
     unsigned Value = 0;
     if (Loc.isValid()) {
       Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
@@ -6002,7 +6025,10 @@ StringRef SILGenFunction::getMagicFunctionString() {
 
 StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   assert(loc.isValid());
-  return getSourceManager().getDisplayNameForLoc(loc);
+  auto &sourceManager = getSourceManager();
+  auto outermostLoc = getLocInOutermostSourceFile(sourceManager, loc);
+
+  return getSourceManager().getDisplayNameForLoc(outermostLoc);
 }
 
 std::string SILGenFunction::getMagicFileIDString(SourceLoc loc) {
