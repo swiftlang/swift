@@ -3259,20 +3259,30 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
 }
 
 namespace {
-  /// A visitor class for emitting a reference to type metatype for a
-  /// SILType, i.e. a lowered representation type.  In general, the type
-  /// metadata produced here might not correspond to the formal type that
-  /// would belong to the unlowered type.  For correctness, it is important
-  /// not to cache the result as if it were the metadata for a formal type
-  /// unless the type actually cannot possibly be a formal type, e.g. because
-  /// it is one of the special lowered type kinds like SILFunctionType.
+  /// A visitor class for rewriting a lowered (SIL) type to a formal
+  /// type with the same type layout that we can fetch metadata for.
+  /// We need type metadata in order to do value operations on some
+  /// lowered types (like allocating or copying them), but we can
+  /// only fetch type metadata for formal types.   We can't reliably
+  /// reverse the type lowering process to get the original formal
+  /// type, but we should be able to reliably find a formal type with
+  /// the same layout as a lowered type.
+  ///
+  /// We can't reliably do this on types expressed in terms of builtin
+  /// types, because there aren't type metadata for all builtin types.
+  /// Fortunately, we really shouldn't need type metadata to do value
+  /// operations on builtin types, and we shouldn't ever see compound
+  /// types with them that would require metadata to manipulate (like
+  /// a tuple of a builtin type and a resilient type) --- we can rely
+  /// on stdlib programmers to not write such types, and we can rely on
+  /// SIL transformations not introducing them unnecessarily.
   ///
   /// NOTE: If you modify the special cases in this, you should update
   /// isTypeMetadataForLayoutAccessible in SIL.cpp.
-class EmitTypeMetadataRefForLayout
-    : public CanTypeVisitor<EmitTypeMetadataRefForLayout, CanType> {
+class GetFormalTypeWithSameLayout
+    : public CanTypeVisitor<GetFormalTypeWithSameLayout, CanType> {
 public:
-  EmitTypeMetadataRefForLayout() {}
+  GetFormalTypeWithSameLayout() {}
 
   /// For most types, we can just emit the usual metadata.
   CanType visitType(CanType t) { return t; }
@@ -3293,15 +3303,14 @@ public:
   }
 
   CanType visitPackType(CanPackType ty) {
-    llvm_unreachable("");
+    llvm_unreachable("requesting type metadata for a pack type?");
   }
 
   CanType visitPackExpansionType(CanPackExpansionType ty) {
-    return ty;
-  }
-
-  CanType visitPackElementType(CanPackElementType ty) {
-    llvm_unreachable("not implemented for PackElementType");
+    CanType pattern = ty.getPatternType();
+    CanType loweredPattern = visit(ty.getPatternType());
+    if (pattern == loweredPattern) return ty;
+    return CanPackExpansionType::get(loweredPattern, ty.getCountType());
   }
 
   CanType visitTupleType(CanTupleType ty) {
@@ -3399,7 +3408,7 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
 
   // Map to a layout equivalent AST type.
   auto layoutEquivalentType =
-      EmitTypeMetadataRefForLayout().visit(ty.getASTType());
+      GetFormalTypeWithSameLayout().visit(ty.getASTType());
   auto response = emitTypeMetadataRef(layoutEquivalentType, request);
   setScopedLocalTypeMetadataForLayout(ty.getObjectType(), response);
   return response.getMetadata();
