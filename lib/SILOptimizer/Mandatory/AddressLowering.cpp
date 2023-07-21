@@ -3442,17 +3442,18 @@ emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
     introducers.push_back(introducer);
     return true;
   });
+  /// Since aggregating instructions (struct, tuple, enum) change
+  /// representation, there can only be a single introducer.
   assert(introducers.size() == 1);
-  for (auto introducer : introducers) {
-    assert(introducer->getType().isAddressOnly(*pass.function));
-    auto borrow = BorrowedValue(introducer);
-    borrow.visitLocalScopeEndingUses([&](Operand *use) {
-      assert(!PhiOperand(use));
-      pass.getBuilder(use->getUser()->getIterator())
-          .createEndBorrow(pass.genLoc(), lifetimeToEnd);
-      return true;
-    });
-  }
+  auto introducer = introducers[0];
+  assert(introducer->getType().isAddressOnly(*pass.function));
+  auto borrow = BorrowedValue(introducer);
+  borrow.visitLocalScopeEndingUses([&](Operand *use) {
+    assert(!PhiOperand(use));
+    pass.getBuilder(use->getUser()->getIterator())
+        .createEndBorrow(pass.genLoc(), lifetimeToEnd);
+    return true;
+  });
 }
 
 // Extract from an opaque struct or tuple.
