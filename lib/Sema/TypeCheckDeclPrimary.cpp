@@ -459,9 +459,8 @@ static void diagnoseDuplicateDecls(T &&decls) {
       auto *other = found.first->second;
 
       current->getASTContext().Diags.diagnoseWithNotes(
-        current->diagnose(diag::invalid_redecl,
-                          current->getName()), [&]() {
-        other->diagnose(diag::invalid_redecl_prev, other->getName());
+        current->diagnose(diag::invalid_redecl, current), [&]() {
+        other->diagnose(diag::invalid_redecl_prev, other);
       });
 
       // Mark the decl as invalid. This is needed to avoid emitting a
@@ -760,9 +759,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                 
                 if (optionalRedecl && currIsIUO != otherIsIUO) {
                   ctx.Diags.diagnoseWithNotes(
-                    current->diagnose(diag::invalid_redecl,
-                                      current->getName()), [&]() {
-                    other->diagnose(diag::invalid_redecl_prev, other->getName());
+                    current->diagnose(diag::invalid_redecl, current), [&]() {
+                    other->diagnose(diag::invalid_redecl_prev, other);
                   });
                   current->diagnose(diag::invalid_redecl_by_optionality_note,
                                     otherIsIUO, currIsIUO);
@@ -869,9 +867,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       // If this isn't a redeclaration in the current version of Swift, but
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
-        current->diagnose(diag::invalid_redecl_swift5_warning,
-                          current->getName());
-        other->diagnose(diag::invalid_redecl_prev, other->getName());
+        current->diagnose(diag::invalid_redecl_swift5_warning, current);
+        other->diagnose(diag::invalid_redecl_prev, other);
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -881,8 +878,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           // checker should have already taken care of emitting a more
           // productive diagnostic.
           if (!other->getOverriddenDecl())
-            current->diagnose(diag::invalid_redecl_init,
-                              current->getName(),
+            current->diagnose(diag::invalid_redecl_init, current,
                               otherInit->isMemberwiseInitializer());
         } else if (current->isImplicit() || other->isImplicit()) {
           // If both declarations are implicit, we do not diagnose anything
@@ -937,7 +933,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
             }
             declToDiagnose->diagnose(diag::invalid_redecl_implicit,
                                      current->getDescriptiveKind(),
-                                     isProtocolRequirement, other->getName());
+                                     isProtocolRequirement, other);
 
             // Emit a specialized note if the one of the declarations is
             // the backing storage property ('_foo') or projected value
@@ -965,7 +961,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
             if (varToDiagnose) {
               assert(declToDiagnose);
               varToDiagnose->diagnose(
-                  diag::invalid_redecl_implicit_wrapper, varToDiagnose->getName(),
+                  diag::invalid_redecl_implicit_wrapper, varToDiagnose,
                   kind == PropertyWrapperSynthesizedPropertyKind::Backing);
             }
 
@@ -973,9 +969,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           }
         } else {
           ctx.Diags.diagnoseWithNotes(
-            current->diagnose(diag::invalid_redecl,
-                              current->getName()), [&]() {
-            other->diagnose(diag::invalid_redecl_prev, other->getName());
+            current->diagnose(diag::invalid_redecl, current), [&]() {
+            other->diagnose(diag::invalid_redecl_prev, other);
           });
 
           current->setInvalid();
@@ -1934,7 +1929,7 @@ public:
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         auto &DE = Context.Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getName(), VD->getBaseIdentifier().str());
+                    VD, VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
@@ -2625,8 +2620,7 @@ public:
       if (mentionsItself) {
         auto &DE = getASTContext().Diags;
         DE.diagnose(AT->getDefaultDefinitionTypeRepr()->getLoc(),
-                    diag::recursive_decl_reference, AT->getDescriptiveKind(),
-                    AT->getName());
+                    diag::recursive_decl_reference, AT);
         AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
       }
     }
@@ -2643,7 +2637,7 @@ public:
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
-      NTD->diagnose(diag::unsupported_nested_protocol, NTD->getName());
+      NTD->diagnose(diag::unsupported_nested_protocol, NTD);
       NTD->setInvalid();
       return;
     }
@@ -2651,11 +2645,10 @@ public:
     // We don't support nested types in protocols.
     if (auto proto = DC->getSelfProtocolDecl()) {
       if (DC->getExtendedProtocolDecl()) {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension,
-                      NTD->getName(), proto->getName());
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
+                      proto);
       } else {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol,
-                      NTD->getName(), proto->getName());
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
       }
     }
 
@@ -2664,11 +2657,10 @@ public:
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-          NTD->diagnose(diag::unsupported_type_nested_in_generic_function,
-                        NTD->getName(), AFD->getName());
+          NTD->diagnose(diag::unsupported_type_nested_in_generic_function, NTD,
+                        AFD);
         } else {
-          NTD->diagnose(diag::unsupported_type_nested_in_generic_closure,
-                        NTD->getName());
+          NTD->diagnose(diag::unsupported_type_nested_in_generic_closure, NTD);
         }
       }
     }
@@ -2757,8 +2749,7 @@ public:
       if (!ED->getASTContext().LangOpts.hasFeature(
               Feature::MoveOnlyResilientTypes) &&
           ED->isResilient()) {
-        ED->diagnose(diag::noncopyable_types_cannot_be_resilient,
-                     ED->getDescriptiveKind(), ED->getBaseIdentifier());
+        ED->diagnose(diag::noncopyable_types_cannot_be_resilient, ED);
       }
     }
   }
@@ -2804,8 +2795,7 @@ public:
     if (!SD->getASTContext().LangOpts.hasFeature(
             Feature::MoveOnlyResilientTypes) &&
         SD->isResilient() && SD->isMoveOnly()) {
-      SD->diagnose(diag::noncopyable_types_cannot_be_resilient,
-                   SD->getDescriptiveKind(), SD->getBaseIdentifier());
+      SD->diagnose(diag::noncopyable_types_cannot_be_resilient, SD);
     }
   }
 
@@ -2930,11 +2920,8 @@ public:
     }
 
     auto &ctx = moveonlyType->getASTContext();
-    ctx.Diags.diagnose(loc,
-                       diag::noncopyable_cannot_conform_to_type,
-                       moveonlyType->getDescriptiveKind(),
-                       moveonlyType->getBaseName(),
-                       type);
+    ctx.Diags.diagnose(loc, diag::noncopyable_cannot_conform_to_type,
+                       moveonlyType, type);
     return true;
   }
 
@@ -3406,8 +3393,8 @@ public:
         auto isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
         // We did not find 'Self'. Complain.
         FD->diagnose(diag::operator_in_unrelated_type,
-                     FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
-                     FD->getName());
+                     FD->getDeclContext()->getDeclaredInterfaceType(),
+                     isProtocol, FD);
       }
     }
 

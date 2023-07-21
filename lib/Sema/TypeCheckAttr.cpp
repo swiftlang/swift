@@ -585,7 +585,7 @@ static void emitFixItIBActionRemoveAsync(ASTContext &ctx, const FuncDecl &FD) {
     SourceLoc endLoc =
         returnType.isValid() ? returnType.getEnd() : FD.getAsyncLoc();
     ctx.Diags
-        .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+        .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, &FD)
         .fixItReplace(
             SourceRange(FD.getSourceRangeIncludingAttrs().Start, endLoc),
             replacement);
@@ -613,7 +613,7 @@ static void emitFixItIBActionRemoveAsync(ASTContext &ctx, const FuncDecl &FD) {
   replacement += " }\n}";
 
   ctx.Diags
-      .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+      .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, &FD)
       .fixItReplace(SourceRange(FD.getSourceRangeIncludingAttrs().Start,
                                 FD.getBody()->getRBraceLoc()),
                     replacement);
@@ -1207,7 +1207,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
         if (property->isLayoutExposedToClients() && !NTD->isSPI()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
-                                VD->getName());
+                                VD);
         }
       }
     }
@@ -1218,7 +1218,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
         if (ED->getAttrs().hasAttribute<FrozenAttr>(/*allowInvalid*/ true) &&
             !ED->isSPI()) {
           diagnoseAndRemoveAttr(attr, diag::spi_attribute_on_frozen_enum_case,
-                                VD->getDescriptiveKind(), VD->getName());
+                                VD);
         }
       }
     }
@@ -1482,17 +1482,16 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   if (!CD) {
     diagnoseAndRemoveAttr(attr,
                           diag::attr_objc_implementation_must_extend_class,
-                          ED->getExtendedNominal()->getDescriptiveKind(),
                           ED->getExtendedNominal());
     ED->getExtendedNominal()->diagnose(diag::decl_declared_here,
-                                       ED->getExtendedNominal()->getName());
+                                       ED->getExtendedNominal());
     return;
   }
 
   if (!CD->hasClangNode()) {
     diagnoseAndRemoveAttr(attr, diag::attr_objc_implementation_must_be_imported,
-                          CD->getDescriptiveKind(), CD);
-    CD->diagnose(diag::decl_declared_here, CD->getName());
+                          CD);
+    CD->diagnose(diag::decl_declared_here, CD);
     return;
   }
 
@@ -1884,7 +1883,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       if (const ValueDecl *vd = dyn_cast<ValueDecl>(D)) {
         D->getASTContext().Diags.diagnose(
             D->getLoc(), diag::async_named_decl_must_be_available_from_async,
-            D->getDescriptiveKind(), vd->getName());
+            vd);
       } else {
         D->getASTContext().Diags.diagnose(
             D->getLoc(), diag::async_decl_must_be_available_from_async,
@@ -2032,8 +2031,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     hasExpose = NMT->getAttrs().hasAttribute<ExposeAttr>();
   }
   if (!hasExpose) {
-    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl,
-             decl->getName());
+    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl, decl);
   }
 
   // Verify that the declaration is exposable.
@@ -2605,7 +2603,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
             context.getBackDeployedConcurrencyAvailability());
     context.Diags.diagnose(attr->getLocation(),
                            diag::attr_MainType_without_main,
-                           nominal->getBaseName(), hasAsyncSupport);
+                           nominal, hasAsyncSupport);
     attr->setInvalid();
     return nullptr;
   }
@@ -2910,7 +2908,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
     if (Ctx.isSwiftVersionAtLeast(4,2))
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
-                            VD->getDescriptiveKind(), VD->getName());
+                            VD);
     return;
   }
 }
@@ -3627,7 +3625,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   if (!R) {
     diagnose(attr->getLocation(),
              diag::implements_attr_protocol_lacks_member,
-             PD->getName(), attr->getMemberName())
+             PD, attr->getMemberName())
       .highlight(attr->getMemberNameLoc().getSourceRange());
     return;
   }
@@ -3638,16 +3636,14 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
     if (!OtherPD->inheritsFrom(PD)) {
       diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
+               diag::implements_attr_protocol_not_conformed_to, NTD, PD)
         .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     }
   } else {
     SmallVector<ProtocolConformance *, 2> conformances;
     if (!NTD->lookupConformance(PD, conformances)) {
       diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
+               diag::implements_attr_protocol_not_conformed_to, NTD, PD)
         .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     }
   }
@@ -3972,9 +3968,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
-           nominal->getDescriptiveKind(), nominal->getName());
-  nominal->diagnose(diag::decl_declared_here, nominal->getName());
+  diagnose(attr->getLocation(), diag::nominal_type_not_attribute, nominal);
+  nominal->diagnose(diag::decl_declared_here, nominal);
   attr->setInvalid();
 }
 
@@ -4408,13 +4403,10 @@ void AttributeChecker::checkBackDeployedAttrs(
 
       if (unavailableAttr->Platform == PlatformKind::none ||
           unavailableAttr->Platform == Attr->Platform) {
-        DeclName name;
-        unsigned accessorKind;
-        std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr,
-                 accessorKind, name, prettyPlatformString(Platform));
+                 VD, prettyPlatformString(Platform));
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
-                 accessorKind, name)
+                 VD)
             .highlight(unavailableAttr->getRange());
         continue;
       }
@@ -4426,15 +4418,11 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (auto availableRangeAttrPair = VD->getSemanticAvailableRangeAttr()) {
       auto availableAttr = availableRangeAttrPair.value().first;
       if (Attr->Version <= availableAttr->Introduced.value()) {
-        DeclName name;
-        unsigned accessorKind;
-        std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, accessorKind, name, prettyPlatformString(Platform),
+                 Attr, VD, prettyPlatformString(Platform),
                  Attr->Version);
         diagnose(availableAttr->AtLoc, diag::availability_introduced_in_version,
-                 accessorKind, name,
-                 prettyPlatformString(availableAttr->Platform),
+                 VD, prettyPlatformString(availableAttr->Platform),
                  *availableAttr->Introduced)
             .highlight(availableAttr->getRange());
         continue;
@@ -4857,8 +4845,7 @@ static IndexSubset *computeDifferentiabilityParameters(
     // If function is not an instance method, diagnose immediately.
     if (!isInstanceMethod) {
       diags
-          .diagnose(attrLoc, diag::diff_function_no_parameters,
-                    function->getName())
+          .diagnose(attrLoc, diag::diff_function_no_parameters, function)
           .highlight(function->getSignatureSourceRange());
       return nullptr;
     }
@@ -4872,8 +4859,7 @@ static IndexSubset *computeDifferentiabilityParameters(
         selfType = function->mapTypeIntoContext(selfType);
       if (!conformsToDifferentiable(selfType, module)) {
         diags
-            .diagnose(attrLoc, diag::diff_function_no_parameters,
-                      function->getName())
+            .diagnose(attrLoc, diag::diff_function_no_parameters, function)
             .highlight(function->getSignatureSourceRange());
         return nullptr;
       }
@@ -5449,7 +5435,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
           .diagnose(
               attr->getLocation(),
               diag::differentiable_attr_where_clause_for_nongeneric_original,
-              original->getName())
+              original)
           .highlight(whereClause->getSourceRange());
       attr->setInvalid();
       return true;
@@ -5989,8 +5975,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
       diags.diagnose(originalName.Loc,
                      diag::derivative_attr_original_stored_property_unsupported,
                      originalName.Name);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
-                     asd->getName());
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
       return true;
     }
     // Diagnose original class property and subscript setters.
@@ -5999,8 +5984,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
         accessorDecl->getAccessorKind() == AccessorKind::Set) {
       diags.diagnose(originalName.Loc,
                      diag::derivative_attr_class_setter_unsupported);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
-                     asd->getName());
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
       return true;
     }
   }
@@ -6065,16 +6049,15 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     diags
         .diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
                   diag::derivative_attr_static_method_mismatch_original,
-                  originalAFD->getName(), derivative->getName(),
-                  derivativeMustBeStatic)
+                  originalAFD, derivative, derivativeMustBeStatic)
         .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diags.diagnose(originalAFD->getNameLoc(),
                    diag::derivative_attr_static_method_mismatch_original_note,
-                   originalAFD->getName(), derivativeMustBeStatic);
+                   originalAFD, derivativeMustBeStatic);
     auto fixItDiag =
         diags.diagnose(derivative->getStartLoc(),
                        diag::derivative_attr_static_method_mismatch_fix,
-                       derivative->getName(), derivativeMustBeStatic);
+                       derivative, derivativeMustBeStatic);
     if (derivativeMustBeStatic) {
       fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
     } else {
@@ -6102,8 +6085,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
         derivative->getFormalAccessScope().accessLevelForDiagnostics();
     diags.diagnose(originalName.Loc,
                    diag::derivative_attr_access_level_mismatch,
-                   originalAFD->getName(), originalAccess,
-                   derivative->getName(), derivativeAccess);
+                   originalAFD, originalAccess,
+                   derivative, derivativeAccess);
     auto fixItDiag =
         derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
     // If original access is public, suggest adding `@usableFromInline` to
@@ -6211,7 +6194,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     // Emit differential/pullback type mismatch error on attribute.
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_result_func_type_mismatch,
-                   funcResultElt.getName(), originalAFD->getName());
+                   funcResultElt.getName(), originalAFD);
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
@@ -6226,7 +6209,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     if (originalAFD->getLoc().isValid())
       diags.diagnose(originalAFD->getLoc(),
                      diag::derivative_attr_result_func_original_note,
-                     originalAFD->getName());
+                     originalAFD);
     return true;
   }
 
@@ -6237,7 +6220,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   if (derivativeAttrs.size() > 1) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_original_already_has_derivative,
-                   originalAFD->getName());
+                   originalAFD);
     for (auto *duplicateAttr : derivativeAttrs) {
       if (duplicateAttr == attr)
         continue;
@@ -6599,15 +6582,14 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     bool transposeMustBeStatic = !transpose->isStatic();
     diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
              diag::transpose_attr_static_method_mismatch_original,
-             originalAFD->getName(), transpose->getName(),
-             transposeMustBeStatic)
+             originalAFD, transpose, transposeMustBeStatic)
         .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diagnose(originalAFD->getNameLoc(),
              diag::transpose_attr_static_method_mismatch_original_note,
-             originalAFD->getName(), transposeMustBeStatic);
+             originalAFD, transposeMustBeStatic);
     auto fixItDiag = diagnose(transpose->getStartLoc(),
                               diag::transpose_attr_static_method_mismatch_fix,
-                              transpose->getName(), transposeMustBeStatic);
+                              transpose, transposeMustBeStatic);
     if (transposeMustBeStatic) {
       fixItDiag.fixItInsert(transpose->getStartLoc(), "static ");
     } else {
@@ -6704,7 +6686,7 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
     if (isolation.isActorIsolated()) {
       diagnoseAndRemoveAttr(
           attr, diag::sendable_isolated_sync_function,
-          isolation, value->getDescriptiveKind(), value->getName())
+          isolation, value)
         .warnUntilSwiftVersion(6);
     }
   }
@@ -6877,8 +6859,7 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
       proto->diagnose(
           diag::marker_protocol_inherit_nonmarker,
           proto->getName(), inheritedProto->getName());
-      inheritedProto->diagnose(
-          diag::decl_declared_here, inheritedProto->getName());
+      inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
     }
   }
 
@@ -6921,7 +6902,7 @@ void AttributeChecker::visitUnavailableFromAsyncAttr(
       if (ValueDecl *vd = dyn_cast<ValueDecl>(D)) {
         D->getASTContext().Diags.diagnose(
             D->getLoc(), diag::async_named_decl_must_be_available_from_async,
-            D->getDescriptiveKind(), vd->getName());
+            vd);
       } else {
         D->getASTContext().Diags.diagnose(
             D->getLoc(), diag::async_decl_must_be_available_from_async,
@@ -7101,8 +7082,7 @@ void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
         case UnviabilityReason::Inaccessible:
           diagnose(init,
                    diag::runtime_attribute_type_requirement_not_accessible,
-                   init->getFormalAccess(), init->getDescriptiveKind(),
-                   init->getName(), nominal->getDeclaredType(),
+                   init->getFormalAccess(), init, nominal->getDeclaredType(),
                    nominal->getFormalAccess());
           break;
         }
@@ -7652,7 +7632,7 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
                          DeclNameRef(name));
 
       for (auto *choice : propertyResults) {
-        ctx.Diags.diagnose(choice, diag::decl_declared_here, choice->getName());
+        ctx.Diags.diagnose(choice, diag::decl_declared_here, choice);
       }
 
       failed = true;

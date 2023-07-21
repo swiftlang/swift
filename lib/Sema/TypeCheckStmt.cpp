@@ -152,16 +152,6 @@ namespace {
     }
   };
 
-  static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
-    DeclName name = AFD->getName();
-    if (!name) {
-      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        name = accessor->getStorage()->getName();
-      }
-    }
-    return name;
-  }
-
   /// Used for debugging which parts of the code are taking a long time to
   /// compile.
   class FunctionBodyTimer {
@@ -188,7 +178,8 @@ namespace {
         if (AFD) {
           llvm::errs()
             << "\t" << Decl::getDescriptiveKindName(AFD->getDescriptiveKind())
-            << " " << getDescriptiveName(AFD);
+            << " ";
+          AFD->dumpRef(llvm::errs());
         } else {
           llvm::errs() << "\t(closure)";
         }
@@ -199,8 +190,7 @@ namespace {
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
-                             AFD->getDescriptiveKind(), getDescriptiveName(AFD),
-                             elapsedMS, WarnLimit);
+                             AFD, elapsedMS, WarnLimit);
         } else {
           ctx.Diags.diagnose(Function.getLoc(), diag::debug_long_closure_body,
                              elapsedMS, WarnLimit);
@@ -599,7 +589,7 @@ static void checkLabeledStmtShadowing(
       ctx.Diags.diagnose(
           ls->getLabelInfo().Loc, diag::label_shadowed, name);
       ctx.Diags.diagnose(
-          prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev, name);
+          prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev_name, name);
     }
   }
 }
@@ -617,7 +607,7 @@ emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
       .fixItReplace(SourceRange(targetLoc),
                     corrections.begin()->Value->getLabelInfo().Name.str());
     DE.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                diag::decl_declared_here,
+                diag::name_declared_here,
                 corrections.begin()->Value->getLabelInfo().Name);
   } else {
     // If we have multiple corrections or none, produce a generic diagnostic
@@ -1736,7 +1726,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
           .highlight(E->getSourceRange());
       ctx.Diags
-          .diagnose(ctor->getLoc(), diag::make_init_failable, ctor->getName())
+          .diagnose(ctor->getLoc(), diag::make_init_failable, ctor)
           .fixItInsertAfter(ctor->getLoc(), "?");
       RS->setResult(nullptr);
       return RS;
@@ -1982,7 +1972,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         // Translate calls to implicit functions to their user-facing names
         if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
             callee->getBaseName() == ctx.Id_derived_struct_equals) {
-          DE.diagnose(fn->getLoc(), diag::expression_unused_result_operator,
+          DE.diagnose(fn->getLoc(),
+                      diag::expression_unused_result_operator_name,
                    ctx.Id_EqualsOperator)
             .highlight(SR1).highlight(SR2);
           return;
@@ -1993,7 +1984,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       if (callee->getName().isOperator())
         diagID = diag::expression_unused_result_operator;
       
-      DE.diagnose(fn->getLoc(), diagID, callee->getName())
+      DE.diagnose(fn->getLoc(), diagID, callee)
         .highlight(SR1).highlight(SR2);
     } else
       DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
@@ -2224,8 +2215,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
         ExportContext::forFunctionBody(fromCtor, loc));
     if (didDiagnose) {
       fromCtor->diagnose(diag::availability_unavailable_implicit_init,
-                         ctor->getDescriptiveKind(), ctor->getName(),
-                         superclassDecl->getName());
+                         ctor, superclassDecl->getName());
     }
 
     // Not allowed to implicitly generate a super.init() call if the init

@@ -298,26 +298,19 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
                                                    ValueDecl *vd) {
   switch (error) {
   case UnrepresentableObjC:
-    return Diagnostic(diag::expose_unsupported_objc_decl_to_cxx,
-                      vd->getDescriptiveKind(), vd);
+    return Diagnostic(diag::expose_unsupported_objc_decl_to_cxx, vd);
   case UnrepresentableAsync:
-    return Diagnostic(diag::expose_unsupported_async_decl_to_cxx,
-                      vd->getDescriptiveKind(), vd);
+    return Diagnostic(diag::expose_unsupported_async_decl_to_cxx, vd);
   case UnrepresentableIsolatedInActor:
-    return Diagnostic(diag::expose_unsupported_actor_isolated_to_cxx,
-                      vd->getDescriptiveKind(), vd);
+    return Diagnostic(diag::expose_unsupported_actor_isolated_to_cxx, vd);
   case UnrepresentableRequiresClientEmission:
-    return Diagnostic(diag::expose_unsupported_client_emission_to_cxx,
-                      vd->getDescriptiveKind(), vd);
+    return Diagnostic(diag::expose_unsupported_client_emission_to_cxx, vd);
   case UnrepresentableGeneric:
-    return Diagnostic(diag::expose_generic_decl_to_cxx,
-                      vd->getDescriptiveKind(), vd);
+    return Diagnostic(diag::expose_generic_decl_to_cxx, vd);
   case UnrepresentableGenericRequirements:
-    return Diagnostic(diag::expose_generic_requirement_to_cxx,
-                      vd->getDescriptiveKind(), vd);
+    return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
   case UnrepresentableThrows:
-    return Diagnostic(diag::expose_throwing_to_cxx, vd->getDescriptiveKind(),
-                      vd);
+    return Diagnostic(diag::expose_throwing_to_cxx, vd);
   case UnrepresentableIndirectEnum:
     return Diagnostic(diag::expose_indirect_enum_cxx, vd);
   case UnrepresentableEnumCaseType:
@@ -327,7 +320,6 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
   case UnrepresentableProtocol:
     return Diagnostic(diag::expose_protocol_to_cxx_unsupported, vd);
   case UnrepresentableMoveOnly:
-    return Diagnostic(diag::expose_move_only_to_cxx, vd->getDescriptiveKind(),
-                      vd);
+    return Diagnostic(diag::expose_move_only_to_cxx, vd);
   }
 }

@@ -73,7 +73,7 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   assert(func);
   if (!isa<DestructorDecl>(func) && !isa<AccessorDecl>(func)) {
     auto note =
-        func->diagnose(diag::note_add_async_to_function, func->getName());
+        func->diagnose(diag::note_add_async_to_function, func);
 
     if (func->hasThrows()) {
       auto replacement = func->getAttrs().hasAttribute<RethrowsAttr>()
@@ -941,19 +941,14 @@ static bool diagnoseSingleNonSendableType(
       // `Sendable` if it might make sense. Otherwise, just complain.
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         auto note = nominal->diagnose(
-            diag::add_nominal_sendable_conformance,
-            nominal->getDescriptiveKind(), nominal->getName());
+            diag::add_nominal_sendable_conformance, nominal);
         addSendableFixIt(nominal, note, /*unchecked=*/false);
       } else {
-        nominal->diagnose(
-            diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-            nominal->getName());
+        nominal->diagnose(diag::non_sendable_nominal, nominal);
       }
     } else if (nominal) {
       // Note which nominal type does not conform to `Sendable`.
-      nominal->diagnose(
-          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-          nominal->getName());
+      nominal->diagnose(diag::non_sendable_nominal, nominal);
     } else if (auto genericArchetype = type->getAs<ArchetypeType>()) {
       auto interfaceType = genericArchetype->getInterfaceType();
       if (auto genericParamType =
@@ -1025,8 +1020,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
             paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
-            (unsigned)refKind, function->getDescriptiveKind(),
-            function->getName(), getActorIsolation()))
+            (unsigned)refKind, function, getActorIsolation()))
           return true;
       }
     }
@@ -1039,8 +1033,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
             resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_result_type,
-            (unsigned)refKind, func->getDescriptiveKind(), func->getName(),
-            getActorIsolation()))
+            (unsigned)refKind, func, getActorIsolation()))
           return true;
       }
     }
@@ -1055,7 +1048,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (diagnoseNonSendableTypes(
             propertyType, fromDC, refLoc,
             diag::non_sendable_property_type,
-            var->getDescriptiveKind(), var->getName(),
+            var,
             var->isLocalCapture(),
             (unsigned)refKind,
             getActorIsolation()))
@@ -1070,8 +1063,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
-                (unsigned)refKind, subscript->getDescriptiveKind(),
-                subscript->getName(), getActorIsolation()))
+                (unsigned)refKind, subscript, getActorIsolation()))
           return true;
       }
     }
@@ -1082,8 +1074,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
           resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
               diag::non_sendable_result_type,
-          (unsigned)refKind, subscript->getDescriptiveKind(),
-          subscript->getName(), getActorIsolation()))
+          (unsigned)refKind, subscript, getActorIsolation()))
         return true;
     }
 
@@ -1211,9 +1202,7 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
     return;
 
   // Diagnose it.
-  nominal->diagnose(
-      diag::public_decl_needs_sendable, nominal->getDescriptiveKind(),
-      nominal->getName());
+  nominal->diagnose(diag::public_decl_needs_sendable, nominal);
 
   // Note to add a Sendable conformance, possibly an unchecked one.
   {
@@ -1231,7 +1220,7 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
     auto note = nominal->diagnose(
         isUnchecked ? diag::explicit_unchecked_sendable
                     : diag::add_nominal_sendable_conformance,
-        nominal->getDescriptiveKind(), nominal->getName());
+        nominal);
     if (canMakeSendable && !requirements.empty()) {
       // Produce a Fix-It containing a conditional conformance to Sendable,
       // based on the requirements harvested from instance storage.
@@ -1262,9 +1251,7 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
 
   // Note to disable the warning.
   {
-    auto note = nominal->diagnose(
-        diag::explicit_disable_sendable, nominal->getDescriptiveKind(),
-        nominal->getName());
+    auto note = nominal->diagnose(diag::explicit_disable_sendable, nominal);
     auto insertionLoc = nominal->getBraces().End;
     note.fixItInsertAfter(
         insertionLoc,
@@ -1399,7 +1386,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
       missingRequirement->diagnose(diag::no_witnesses,
                                    getProtocolRequirementKind(missingRequirement),
-                                   missingRequirement->getName(),
+                                   missingRequirement,
                                    missingRequirement->getParameters()->get(0)->getInterfaceType(),
                                    /*AddFixIt=*/true);
       return;
@@ -1517,25 +1504,21 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
       if (varDecl->isDistributed()) {
         // This is an attempt to access a `distributed var` synchronously, so offer a more detailed error
         decl->diagnose(diag::distributed_actor_synchronous_access_distributed_computed_property,
-                       decl->getDescriptiveKind(), decl->getName(),
+                       decl,
                        nominal->getName());
       } else {
         // Distributed actor properties are never accessible externally.
         decl->diagnose(diag::distributed_actor_isolated_property,
-                       decl->getDescriptiveKind(), decl->getName(),
+                       decl,
                        nominal->getName());
       }
 
     } else {
       // it's a function or subscript
-      decl->diagnose(diag::note_distributed_actor_isolated_method,
-                     decl->getDescriptiveKind(),
-                     decl->getName());
+      decl->diagnose(diag::note_distributed_actor_isolated_method, decl);
     }
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    func->diagnose(diag::actor_isolated_sync_func,
-      decl->getDescriptiveKind(),
-      decl->getName());
+    func->diagnose(diag::actor_isolated_sync_func, decl);
 
     // was it an attempt to mutate an actor instance's isolated state?
   } else if (useKind) {
@@ -1622,8 +1605,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(
 
     diags.diagnose(
         memberLoc, diag::actor_isolated_non_self_reference,
-        member->getDescriptiveKind(),
-        member->getName(),
+        member,
         useKindInt,
         baseActor.kind + 1,
         baseActor.globalActor,
@@ -1800,9 +1782,7 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
       case ActorIsolation::Unspecified:
         fn->diagnose(diag::note_add_globalactor_to_function,
             globalActor->getWithoutParens().getString(),
-            fn->getDescriptiveKind(),
-            fn->getName(),
-            globalActor)
+            fn, globalActor)
           .fixItInsert(fn->getAttributeInsertionLoc(false),
             diag::insert_globalactor_attr, globalActor);
           return;
@@ -2558,9 +2538,7 @@ namespace {
       if (getActorIsolation(value).isActorIsolated())
         return false;
 
-      ctx.Diags.diagnose(
-          loc, diag::shared_mutable_state_access,
-          value->getDescriptiveKind(), value->getName());
+      ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       return true;
     }
@@ -2591,8 +2569,7 @@ namespace {
               ValueDecl *fnDecl = declRef->getDecl();
               ctx.Diags.diagnose(call->getLoc(),
                                  diag::actor_isolated_mutating_func,
-                                 fnDecl->getName(), decl->getDescriptiveKind(),
-                                 decl->getName());
+                                 fnDecl->getName(), decl);
               result = true;
               return;
             }
@@ -2600,8 +2577,7 @@ namespace {
         }
 
         ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
-                           decl->getDescriptiveKind(), decl->getName(),
-                           call->isImplicitlyAsync().has_value());
+                           decl, call->isImplicitlyAsync().has_value());
         decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
         result = true;
         return;
@@ -2689,7 +2665,7 @@ namespace {
       // This is either non-distributed variable, subscript, or something else.
       ctx.Diags.diagnose(declLoc,
                          diag::distributed_actor_isolated_non_self_reference,
-                         decl->getDescriptiveKind(), decl->getName());
+                         decl);
       noteIsolatedActorMember(decl, context);
       return llvm::None;
     }
@@ -2900,12 +2876,10 @@ namespace {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
-              calleeDecl->getDescriptiveKind(), calleeDecl->getName(),
+              calleeDecl,
               getContextIsolation())
             .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
-          calleeDecl->diagnose(
-              diag::actor_isolated_sync_func, calleeDecl->getDescriptiveKind(),
-              calleeDecl->getName());
+          calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
         } else {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
@@ -3023,7 +2997,7 @@ namespace {
         ctx.Diags.diagnose(
             loc, diag::concurrent_access_of_local_capture,
             parent.dyn_cast<LoadExpr *>(),
-            var->getDescriptiveKind(), var->getName())
+            var)
           .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
         return true;
       }
@@ -3032,9 +3006,7 @@ namespace {
         if (func->isSendable())
           return false;
 
-        func->diagnose(
-            diag::local_function_executed_concurrently,
-            func->getDescriptiveKind(), func->getName())
+        func->diagnose(diag::local_function_executed_concurrently, func)
           .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ")
           .warnUntilSwiftVersion(6);
 
@@ -3046,9 +3018,7 @@ namespace {
       }
 
       // Concurrent access to some other local.
-      ctx.Diags.diagnose(
-          loc, diag::concurrent_access_local,
-          value->getDescriptiveKind(), value->getName());
+      ctx.Diags.diagnose(loc, diag::concurrent_access_local, value);
       value->diagnose(
           diag::kind_declared_here, value->getDescriptiveKind());
       return true;
@@ -3098,7 +3068,7 @@ namespace {
             ctx.Diags.diagnose(component.getLoc(),
                                diag::actor_isolated_keypath_component,
                                isolation.isDistributedActor(),
-                               decl->getDescriptiveKind(), decl->getName());
+                               decl);
             diagnosed = true;
             break;
           }
@@ -3193,10 +3163,7 @@ namespace {
       // An escaping partial application of something that is part of
       // the actor's isolated state is never permitted.
       if (partialApply && partialApply->isEscaping && !isAsyncDecl(declRef)) {
-        ctx.Diags.diagnose(
-            loc, diag::actor_isolated_partial_apply,
-            decl->getDescriptiveKind(),
-            decl->getName());
+        ctx.Diags.diagnose(loc, diag::actor_isolated_partial_apply, decl);
         return true;
       }
 
@@ -3265,8 +3232,7 @@ namespace {
 
         ctx.Diags.diagnose(
             loc, diag::actor_isolated_non_self_reference,
-            decl->getDescriptiveKind(),
-            decl->getName(),
+            decl,
             useKind,
             refKind + 1, refGlobalActor,
             result.isolation)
@@ -3501,25 +3467,12 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
 
   // Only one such attribute is valid, but we only actually care of one of
   // them is a global actor.
-  if (numIsolationAttrs > 1) {
-    DeclName name;
-    if (auto value = dyn_cast<ValueDecl>(decl)) {
-      name = value->getName();
-    } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-      if (auto selfTypeDecl = ext->getSelfNominalTypeDecl())
-        name = selfTypeDecl->getName();
-    }
-
-    if (globalActorAttr) {
-      if (shouldDiagnose) {
-        decl->diagnose(
-            diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-            name, nonisolatedAttr->getAttrName(),
-            globalActorAttr->second->getName().str())
-          .highlight(nonisolatedAttr->getRangeWithAt())
-          .highlight(globalActorAttr->first->getRangeWithAt());
-      }
-    }
+  if (numIsolationAttrs > 1 && globalActorAttr && shouldDiagnose) {
+    decl->diagnose(diag::actor_isolation_multiple_attr, decl,
+                   nonisolatedAttr->getAttrName(),
+                   globalActorAttr->second->getName().str())
+      .highlight(nonisolatedAttr->getRangeWithAt())
+      .highlight(globalActorAttr->first->getRangeWithAt());
   }
 
   // If the declaration is explicitly marked 'nonisolated', report it as
@@ -3941,9 +3894,8 @@ static bool checkClassGlobalActorIsolation(
   }
 
   // Complain about the mismatch.
-  classDecl->diagnose(
-      diag::actor_isolation_superclass_mismatch, isolation,
-      classDecl->getName(), superIsolation, superclassDecl->getName());
+  classDecl->diagnose(diag::actor_isolation_superclass_mismatch, isolation,
+                      classDecl, superIsolation, superclassDecl);
   return true;
 }
 
@@ -4481,7 +4433,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
-      value->getDescriptiveKind(), value->getName(), overriddenIsolation)
+      value, overriddenIsolation)
     .limitBehavior(behavior);
   overridden->diagnose(diag::overridden_here);
 }
@@ -4635,8 +4587,7 @@ static bool checkSendableInstanceStorage(
             dc, check).defaultDiagnosticBehavior();
         if (behavior != DiagnosticBehavior::Ignore) {
           property->diagnose(diag::concurrent_value_class_mutable_property,
-                             property->getName(), nominal->getDescriptiveKind(),
-                             nominal->getName())
+                             property->getName(), nominal)
               .limitBehavior(behavior);
         }
         invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
@@ -4664,8 +4615,7 @@ static bool checkSendableInstanceStorage(
 
             property->diagnose(diag::non_concurrent_type_member,
                                propertyType, false, property->getName(),
-                               nominal->getDescriptiveKind(),
-                               nominal->getName())
+                               nominal)
                 .limitBehavior(behavior);
             return false;
           });
@@ -4700,9 +4650,7 @@ static bool checkSendableInstanceStorage(
             }
 
             element->diagnose(diag::non_concurrent_type_member, type,
-                              true, element->getName(),
-                              nominal->getDescriptiveKind(),
-                              nominal->getName())
+                              true, element->getName(), nominal)
                 .limitBehavior(behavior);
             return false;
           });
@@ -4760,8 +4708,7 @@ bool swift::checkSendableConformance(
   if (conformanceDC->getParentSourceFile() &&
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
-                              nominal->getDescriptiveKind(),
-                              nominal->getName())
+                              nominal)
       .limitBehavior(behavior);
 
     if (behavior == DiagnosticBehavior::Unspecified)

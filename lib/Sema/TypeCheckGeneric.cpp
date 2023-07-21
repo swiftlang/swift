@@ -299,9 +299,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      ctx.Diags.diagnose(decl,
-                         diag::requirement_restricts_self,
-                         decl->getDescriptiveKind(), decl->getName(),
+      ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
                          req.getFirstType().getString(),
                          static_cast<unsigned>(req.getKind()),
                          req.getSecondType().getString());
@@ -525,18 +523,16 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       auto *existingParamDecl = found->second;
 
       if (existingParamDecl->getDeclContext() == dc) {
-        genericParamDecl->diagnose(
-            diag::invalid_redecl,
-            genericParamDecl->getName());
+        genericParamDecl->diagnose(diag::invalid_redecl, genericParamDecl);
       } else {
         genericParamDecl->diagnose(
             diag::shadowed_generic_param,
-            genericParamDecl->getName()).warnUntilSwiftVersion(6);
+            genericParamDecl).warnUntilSwiftVersion(6);
       }
 
       if (existingParamDecl->getLoc()) {
         existingParamDecl->diagnose(diag::invalid_redecl_prev,
-                                    existingParamDecl->getName());
+                                    existingParamDecl);
       }
 
       continue;

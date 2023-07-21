@@ -1022,7 +1022,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       ctx.Diags.diagnose(loc, diag::external_macro_not_found,
                          external.moduleName.str(),
                          external.macroTypeName.str(), macro->getName());
-      macro->diagnose(diag::decl_declared_here, macro->getName());
+      macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
 
@@ -1283,7 +1283,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                         external.macroTypeName.str(),
                         macro->getName()
       );
-      macro->diagnose(diag::decl_declared_here, macro->getName());
+      macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
 
