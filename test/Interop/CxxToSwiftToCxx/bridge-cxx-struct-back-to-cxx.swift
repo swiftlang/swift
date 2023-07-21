@@ -37,7 +37,7 @@ namespace ns {
         T x;
 
         NonTrivialTemplate();
-        NonTrivialTemplate(const NonTrivialTemplate<T> &) = default;
+        NonTrivialTemplate(const NonTrivialTemplate<T> &other) : x(other.x) {}
         NonTrivialTemplate(NonTrivialTemplate<T> &&) = default;
         ~NonTrivialTemplate() {}
     };
@@ -46,6 +46,8 @@ namespace ns {
 
     struct NonTrivialImplicitMove {
         NonTrivialTemplate<int> member;
+
+        NonTrivialImplicitMove(const NonTrivialImplicitMove &other) : member(other.member) {}
     };
 
     #define IMMORTAL_REF                                \

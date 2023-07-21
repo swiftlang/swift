@@ -80,6 +80,12 @@ struct StructWithSubobjectMoveAssignment {
 };
 
 struct __attribute__((swift_attr("import_unsafe"))) StructWithDestructor {
+#if __is_target_os(windows)
+  // On windows, force this type to be address-only.
+  StructWithDestructor() {}
+  StructWithDestructor(const StructWithDestructor &other) {}
+#endif
+
   ~StructWithDestructor() {}
 };
 
