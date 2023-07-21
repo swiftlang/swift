@@ -581,8 +581,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
     ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
-                              Nominal->getDescriptiveKind(), Nominal->getName(),
-                              synthesizing->getName(),
+                              Nominal, synthesizing->getName(),
                               getProtocolType());
     Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 

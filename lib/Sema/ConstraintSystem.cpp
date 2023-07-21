@@ -4739,7 +4739,7 @@ static bool diagnoseAmbiguityWithContextualType(
             contextualTy->is<ProtocolType>()
                 ? diag::overload_result_type_does_not_conform
                 : diag::cannot_convert_candidate_result_to_contextual_type,
-            decl->getName(), fnType->getResult(), contextualTy);
+            decl, fnType->getResult(), contextualTy);
       } else {
         DE.diagnose(decl, diag::found_candidate_type, type);
       }
@@ -4796,12 +4796,11 @@ static bool diagnoseAmbiguityWithGenericRequirements(
   // Produce "no exact matches" diagnostic.
   auto &ctx = cs.getASTContext();
   auto *choice = *overloadChoices.begin();
-  auto name = choice->getName();
 
   ctx.Diags.diagnose(getLoc(primaryFix.second->getLocator()->getAnchor()),
                      diag::no_overloads_match_exactly_in_call,
-                     /*isApplication=*/false, choice->getDescriptiveKind(),
-                     name.isSpecial(), name.getBaseName());
+                     /*isApplication=*/false, choice,
+                     choice->getName().isSpecial());
 
   for (const auto &entry : aggregate) {
     entry.second->diagnose(*entry.first, /*asNote=*/true);
@@ -4894,8 +4893,7 @@ static bool diagnoseAmbiguity(
       }
 
       DE.diagnose(anchor->getLoc(), diag::no_overloads_match_exactly_in_call,
-                  /*isApplication=*/false, decl->getDescriptiveKind(),
-                  name.isSpecial(), name.getBaseName());
+                  /*isApplication=*/false, decl, name.isSpecial());
     } else {
       bool isApplication = llvm::any_of(solutions, [&](const auto &S) {
           return llvm::any_of(S.argumentLists, [&](const auto &pair) {
@@ -4905,8 +4903,7 @@ static bool diagnoseAmbiguity(
 
       DE.diagnose(getLoc(commonAnchor),
                   diag::no_overloads_match_exactly_in_call, isApplication,
-                  decl->getDescriptiveKind(), name.isSpecial(),
-                  name.getBaseName());
+                  decl, name.isSpecial());
     }
 
     // Produce candidate notes

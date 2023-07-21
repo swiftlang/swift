@@ -1020,7 +1020,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
             .fixItRemove(assocTypeDecl->getSourceRange());
 
           ctx.Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                             inheritedAssocTypeDecl->getName());
+                             inheritedAssocTypeDecl);
 
           shouldWarnAboutRedeclaration = false;
         }
@@ -1096,7 +1096,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
                                   getConcreteTypeReq(type, fixItWhere.Item))
                 .fixItRemove(type->getSourceRange());
               ctx.Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                                 inheritedAssocTypeDecl->getName());
+                                 inheritedAssocTypeDecl);
 
               shouldWarnAboutRedeclaration = false;
             }

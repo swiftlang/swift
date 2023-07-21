@@ -811,14 +811,12 @@ void GenericSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto *D = GC->getAsDecl();
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    VD->diagnose(diag::recursive_generic_signature,
-                 VD->getDescriptiveKind(), VD->getBaseName());
+    VD->diagnose(diag::recursive_generic_signature, VD);
   } else {
     auto *ED = cast<ExtensionDecl>(D);
     auto *NTD = ED->getExtendedNominal();
 
-    ED->diagnose(diag::recursive_generic_signature_extension,
-                 NTD->getDescriptiveKind(), NTD->getName());
+    ED->diagnose(diag::recursive_generic_signature_extension, NTD);
   }
 }
 
@@ -852,9 +850,7 @@ void UnderlyingTypeRequest::cacheResult(Type value) const {
 
 void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto aliasDecl = std::get<0>(getStorage());
-  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
-                 aliasDecl->getDescriptiveKind(),
-                 aliasDecl->getName());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference, aliasDecl);
 }
 
 //----------------------------------------------------------------------------//
@@ -863,9 +859,7 @@ void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto aliasDecl = std::get<0>(getStorage());
-  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
-                 aliasDecl->getDescriptiveKind(),
-                 aliasDecl->getName());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference, aliasDecl);
 }
 
 //----------------------------------------------------------------------------//

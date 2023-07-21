@@ -210,7 +210,7 @@ class SubWUnsafeSubscript : SuperWUnsafeSubscript {
   override nonisolated subscript<T>(x : T) -> Int {
     get async {
       // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated subscript 'subscript(_:)' cannot cross actor boundary}}
-      // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated getter '_' cannot cross actor boundary}}
+      // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated getter for subscript 'subscript(_:)' cannot cross actor boundary}}
       // there really shouldn't be two warnings produced here, see rdar://110846040 (Sendable diagnostics reported twice for subscript getters)
       return 0
     }

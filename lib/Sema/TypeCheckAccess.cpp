@@ -354,10 +354,10 @@ static void noteLimitingImport(ASTContext &ctx,
          "a public import shouldn't limit the access level of a decl");
 
   if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = ITR->getBoundDecl();
-    ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::decl_import_via_here,
-                       DescriptiveDeclKind::Type,
-                       VD->getName(),
+    ValueDecl *VD = ITR->getBoundDecl();
+    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+                       diag::decl_import_via_here,
+                       VD,
                        limitImport->accessLevel,
                        limitImport->module.importedModule->getName());
   } else {
@@ -494,7 +494,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
           AccessLevel diagAccessLevel) {
         if (checkUsableFromInline) {
           auto diag = D->diagnose(diag::global_actor_not_usable_from_inline,
-                                  D->getDescriptiveKind(), VD->getName());
+                                  VD);
           highlightOffendingType(diag, complainRepr);
           noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
           return;
@@ -504,8 +504,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
         auto declAccess = isExplicit
                               ? VD->getFormalAccess()
                               : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = D->diagnose(diag::global_actor_access, declAccess,
-                                D->getDescriptiveKind(), VD->getName(),
+        auto diag = D->diagnose(diag::global_actor_access, declAccess, VD,
                                 diagAccessLevel, globalActorDecl->getName());
         highlightOffendingType(diag, complainRepr);
         noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
@@ -2324,15 +2323,14 @@ public:
 
     auto &DE = PGD->getASTContext().Diags;
     auto diag =
-        DE.diagnose(diagLoc, diag::decl_from_hidden_module,
-                    PGD->getDescriptiveKind(), PGD->getName(),
+        DE.diagnose(diagLoc, diag::decl_from_hidden_module, PGD,
                     static_cast<unsigned>(ExportabilityReason::General), M->getName(),
                     static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)
                     );
     if (refRange.isValid())
       diag.highlight(refRange);
     diag.flush();
-    PGD->diagnose(diag::decl_declared_here, PGD->getName());
+    PGD->diagnose(diag::name_declared_here, PGD->getName());
   }
 
   void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
