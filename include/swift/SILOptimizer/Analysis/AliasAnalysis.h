@@ -219,7 +219,7 @@ public:
   /// Returns true if \p Ptr may be released by the builtin \p BI.
   bool canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr);
 
-  int getEstimatedFunctionSize(SILValue valueInFunction);
+  int getComplexityBudget(SILValue valueInFunction);
 
   /// Returns true if the object(s of) `obj` can escape to `toInst`.
   ///

@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -68,6 +69,8 @@ class SwiftPassInvocation {
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
+  SILSSAUpdater *ssaUpdater = nullptr;
+
   static constexpr int BlockSetCapacity = 8;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
@@ -82,7 +85,7 @@ class SwiftPassInvocation {
 
   bool needFixStackNesting = false;
 
-  void endPassRunChecks();
+  void endPass();
 
 public:
   SwiftPassInvocation(SILPassManager *passManager, SILFunction *function,
@@ -143,6 +146,17 @@ public:
 
   void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
   bool getNeedFixStackNesting() const { return needFixStackNesting; }
+
+  void initializeSSAUpdater(SILType type, ValueOwnershipKind ownership) {
+    if (!ssaUpdater)
+      ssaUpdater = new SILSSAUpdater;
+    ssaUpdater->initialize(type, ownership);
+  }
+
+  SILSSAUpdater *getSSAUpdater() const {
+    assert(ssaUpdater && "SSAUpdater not initialized");
+    return ssaUpdater;
+  }
 };
 
 /// The SIL pass manager.

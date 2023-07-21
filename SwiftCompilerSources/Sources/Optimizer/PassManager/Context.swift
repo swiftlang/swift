@@ -145,17 +145,15 @@ extension MutatingContext {
     SubstitutionMap(_bridged.getContextSubstitutionMap(type.bridged))
   }
 
-  // Private utilities
-
-  fileprivate func notifyInstructionsChanged() {
+  func notifyInstructionsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.instructionsChanged)
   }
 
-  fileprivate func notifyCallsChanged() {
+  func notifyCallsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.callsChanged)
   }
 
-  fileprivate func notifyBranchesChanged() {
+  func notifyBranchesChanged() {
     _bridged.asNotificationHandler().notifyChanges(.branchesChanged)
   }
 }
@@ -193,6 +191,10 @@ struct FunctionPassContext : MutatingContext {
   var postDominatorTree: PostDominatorTree {
     let bridgedPDT = _bridged.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
+  }
+
+  var swiftArrayDecl: NominalTypeDecl {
+    NominalTypeDecl(_bridged: _bridged.getSwiftArrayDecl())
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
@@ -442,6 +444,14 @@ extension GlobalValueInst {
   func setIsBare(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.GlobalValueInst_setIsBare()
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension LoadInst {
+  func set(ownership: LoadInst.LoadOwnership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadInst_setOwnership(ownership.rawValue)
     context.notifyInstructionChanged(self)
   }
 }

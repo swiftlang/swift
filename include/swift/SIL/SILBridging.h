@@ -804,6 +804,10 @@ struct BridgedInstruction {
     getAs<swift::GlobalValueInst>()->setBare(true);
   }
 
+  void LoadInst_setOwnership(SwiftInt ownership) const {
+    getAs<swift::LoadInst>()->setOwnershipQualifier((swift::LoadOwnershipQualifier)ownership);
+  }
+
   SWIFT_IMPORT_UNSAFE
   inline BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
 
@@ -1165,6 +1169,16 @@ struct BridgedBuilder{
   }
 
   SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createBeginBorrow(BridgedValue op) const {
+    return {builder().createBeginBorrow(regularLoc(), op.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createEndBorrow(BridgedValue op) const {
+    return {builder().createEndBorrow(regularLoc(), op.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
   BridgedInstruction createCopyAddr(BridgedValue from, BridgedValue to,
                                     bool takeSource, bool initializeDest) const {
     return {builder().createCopyAddr(regularLoc(),
@@ -1176,6 +1190,11 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE
   BridgedInstruction createDestroyValue(BridgedValue op) const {
     return {builder().createDestroyValue(regularLoc(), op.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDestroyAddr(BridgedValue op) const {
+    return {builder().createDestroyAddr(regularLoc(), op.getSILValue())};
   }
 
   SWIFT_IMPORT_UNSAFE
@@ -1283,6 +1302,11 @@ struct BridgedBuilder{
   }
 
   SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDestructureStruct(BridgedValue str) const {
+    return {builder().createDestructureStruct(regularLoc(), str.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
   BridgedInstruction createTuple(swift::SILType type, BridgedValueArray elements) const {
     llvm::SmallVector<swift::SILValue, 16> elementValues;
     return {builder().createTuple(regularLoc(), type, elements.getValues(elementValues))};
@@ -1298,6 +1322,11 @@ struct BridgedBuilder{
   BridgedInstruction createTupleElementAddr(BridgedValue addr, SwiftInt elementIndex) const {
     swift::SILValue v = addr.getSILValue();
     return {builder().createTupleElementAddr(regularLoc(), v, elementIndex)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDestructureTuple(BridgedValue str) const {
+    return {builder().createDestructureTuple(regularLoc(), str.getSILValue())};
   }
 
   SWIFT_IMPORT_UNSAFE
@@ -1328,6 +1357,8 @@ struct BridgedNominalTypeDecl {
   llvm::StringRef getName() const {
     return decl->getName().str();
   }
+
+  bool isStructWithUnreferenceableStorage() const;
 };
 
 // Passmanager and Context

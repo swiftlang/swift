@@ -33,7 +33,7 @@ struct BridgedAliasAnalysis {
   }
 
   typedef swift::MemoryBehavior (* _Nonnull GetMemEffectFn)(
-        BridgedPassContext context, BridgedValue, BridgedInstruction);
+        BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
   typedef bool (* _Nonnull Escaping2InstFn)(
         BridgedPassContext context, BridgedValue, BridgedInstruction);
   typedef bool (* _Nonnull Escaping2ValFn)(
@@ -205,6 +205,12 @@ struct BridgedPassContext {
   BridgedPostDomTree getPostDomTree() const {
     auto *pda = invocation->getPassManager()->getAnalysis<swift::PostDominanceAnalysis>();
     return {pda->get(invocation->getFunction())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedNominalTypeDecl getSwiftArrayDecl() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return {mod->getASTContext().getArrayDecl()};
   }
 
   // SIL modifications
@@ -450,6 +456,26 @@ struct BridgedPassContext {
     return pm->continueWithNextSubpassRun(inst.getInst(),
                                           invocation->getFunction(),
                                           invocation->getTransform());
+  }
+
+  // SSAUpdater
+
+  void SSAUpdater_initialize(swift::SILType type, BridgedValue::Ownership ownership) const {
+    invocation->initializeSSAUpdater(type, castToOwnership(ownership));
+  }
+
+  void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
+    invocation->getSSAUpdater()->addAvailableValue(block.getBlock(), value.getSILValue());
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
+    return {invocation->getSSAUpdater()->getValueAtEndOfBlock(block.getBlock())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
+    return {invocation->getSSAUpdater()->getValueInMiddleOfBlock(block.getBlock())};
   }
 
   // Options

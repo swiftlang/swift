@@ -81,6 +81,12 @@ SILValue swift::getUnderlyingObject(SILValue v) {
     v2 = stripAddressProjections(v2);
     v2 = stripIndexingInsts(v2);
     v2 = lookThroughOwnershipInsts(v2);
+    if (auto *ecm = dyn_cast<EndCOWMutationInst>(v2)) {
+      v2 = ecm->getOperand();
+    } else if (auto *mvr = dyn_cast<MultipleValueInstructionResult>(v2)) {
+      if (auto *bci = dyn_cast<BeginCOWMutationInst>(mvr->getParent()))
+        v2 = bci->getOperand();
+    }
     if (v2 == v)
       return v2;
     v = v2;
