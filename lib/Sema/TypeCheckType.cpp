@@ -4673,7 +4673,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
   if (packReference->hasError())
     return ErrorType::get(ctx);
 
-  if (!packReference->isParameterPack()) {
+  if (!packReference->isRootParameterPack()) {
     auto diag =
         ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
     bool addEachFixitApplied = false;

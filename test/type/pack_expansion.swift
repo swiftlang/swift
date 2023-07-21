@@ -64,7 +64,7 @@ struct Outer<each T> {
 
 func packRef<each T>(_: repeat each T) where repeat each T: P {}
 
-func packMemberRef<each T>(_: repeat each T.T) where repeat each T: P {}
+func packMemberRef<each T>(_: repeat (each T).T) where repeat each T: P {}
 
 // expected-error@+1 {{'each' cannot be applied to non-pack type 'Int'}}{{31-35=}}
 func invalidPackRefEachInt(_: each Int) {}
