@@ -209,6 +209,10 @@ struct Validator {
 
     
     let suite = TestSuite("Observable")
+
+    suite.test("only instantiate") {
+      let test = MiddleNamePerson()
+    }
     
     suite.test("unobserved value changes") {
       let test = MiddleNamePerson()
