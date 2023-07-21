@@ -270,8 +270,6 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
   if (auto *store = dyn_cast<StoreInst>(Inst)) {
-    // TODO: when we have OSSA, we can also accept stores of non trivial values:
-    //       just replace the store with a destroy_value.
     return !onlyAcceptTrivialStores ||
            store->getSrc()->getType().isTrivial(*store->getFunction());
   }
@@ -397,7 +395,6 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
       LLVM_DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
       continue;
     }
-
     if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
       if (!rea->getType().isTrivial(*rea->getFunction()))
         refElementAddrs.push_back(rea);
@@ -751,10 +748,11 @@ class DeadObjectElimination : public SILFunctionTransform {
     DeadEndBlocks DEBlocks(&Fn);
     DestructorAnalysisCache.clear();
 
+    LLVM_DEBUG(llvm::dbgs() << "Processing " << Fn.getName() << "\n");
+
     bool Changed = false;
 
     for (auto &BB : Fn) {
-
       for (SILInstruction &inst : BB.deletableInstructions()) {
         if (auto *A = dyn_cast<AllocRefInstBase>(&inst))
           Changed |= processAllocRef(A);
@@ -773,10 +771,6 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
-    // FIXME: We should support ownership eventually.
-    if (getFunction()->hasOwnership())
-      return;
-
     assert(!domInfo);
 
     if (processFunction(*getFunction())) {
@@ -859,11 +853,26 @@ bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors.
   bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
+  // In non-ossa, only accept trivial stores if we have a non-trivial
+  // alloc_stack
+  bool onlyAcceptTrivialStores =
+      ASI->getFunction()->hasOwnership() ? false : !isTrivialType;
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
-      /*onlyAcceptTrivialStores*/!isTrivialType)) {
+  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/true,
+                          onlyAcceptTrivialStores)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
+  }
+
+  if (ASI->getFunction()->hasOwnership()) {
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
+        continue;
+      SILBuilderWithScope(store).createDestroyValue(store->getLoc(),
+                                                    store->getSrc());
+    }
   }
 
   // Remove the AllocRef and all of its users.
