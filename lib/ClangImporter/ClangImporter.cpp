@@ -6743,6 +6743,37 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
+  if (!decl->getDefinition())
+    return false;
+
+  if (hasCustomCopyOrMoveConstructor(decl) || hasOwnedValueAttr(decl))
+    return true;
+  
+  auto checkType = [](clang::QualType t) {
+    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
+      if (auto cxxRecord =
+              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
+        return anySubobjectsSelfContained(cxxRecord);
+      }
+    }
+
+    return false;
+  };
+
+  for (auto field : decl->fields()) {
+    if (checkType(field->getType()))
+      return true;
+  }
+
+  for (auto base : decl->bases()) {
+    if (checkType(base.getType()))
+      return true;
+  }
+  
+  return false;
+}
+
 bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
                                   SafeUseOfCxxDeclDescriptor desc) const {
   const clang::Decl *decl = desc.decl;
@@ -6760,10 +6791,24 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
     if (isForeignReferenceType(method->getReturnType()))
       return true;
 
-    // If it returns a pointer or reference, that's a projection.
+    // begin and end methods likely return an interator, so they're unsafe. This
+    // is required so that automatic the conformance to RAC works properly.
+    if (method->getNameAsString() == "begin" ||
+        method->getNameAsString() == "end")
+      return false;
+
+    auto parentQualType = method
+      ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+
+    bool parentIsSelfContained =
+      !isForeignReferenceType(parentQualType) &&
+      anySubobjectsSelfContained(method->getParent());
+
+    // If it returns a pointer or reference from an owned parent, that's a
+    // projection (unsafe).
     if (method->getReturnType()->isPointerType() ||
         method->getReturnType()->isReferenceType())
-      return false;
+      return !parentIsSelfContained;
 
     // Check if it's one of the known unsafe methods we currently
     // mark as safe by default.
@@ -6778,20 +6823,22 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
               dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
         if (isSwiftClassType(cxxRecordReturnType))
           return true;
+
         if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-            isIterator(cxxRecordReturnType)) {
+            isIterator(cxxRecordReturnType))
           return false;
-        }
 
         // Mark this as safe to help our diganostics down the road.
         if (!cxxRecordReturnType->getDefinition()) {
           return true;
         }
 
-        if (!hasCustomCopyOrMoveConstructor(cxxRecordReturnType) &&
+        // A projection of a view type (such as a string_view) from a self
+        // contained parent is a projection (unsafe).
+        if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
             !hasOwnedValueAttr(cxxRecordReturnType) &&
             hasPointerInSubobjects(cxxRecordReturnType)) {
-          return false;
+          return !parentIsSelfContained;
         }
       }
     }
