@@ -17,6 +17,7 @@ extension HasUserProvidedDestructorAndDummy : InitWithDummy { }
 
 // CHECK-LABEL: define {{.*}}void @"$s4main37testHasUserProvidedDestructorAndDummyyyF"
 // CHECK: [[OBJ:%.*]] = alloca %TSo33HasUserProvidedDestructorAndDummyV
+// CHECK: [[CXX_OBJ_PRE:%.*]] = bitcast %TSo33HasUserProvidedDestructorAndDummyV* [[OBJ]] to %struct.HasUserProvidedDestructorAndDummy*
 // CHECK: [[CXX_OBJ:%.*]] = bitcast %TSo33HasUserProvidedDestructorAndDummyV* [[OBJ]] to %struct.HasUserProvidedDestructorAndDummy*
 // CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(%struct.HasUserProvidedDestructorAndDummy* [[CXX_OBJ]])
 // CHECK: ret void

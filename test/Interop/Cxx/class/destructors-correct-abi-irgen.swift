@@ -4,6 +4,7 @@ import Destructors
 
 // CHECK-LABEL: define {{.*}}void @"$s4main4testyyF"
 // CHECK: [[H:%.*]] = alloca %TSo33HasUserProvidedDestructorAndDummyV
+// CHECK: [[CXX_THIS_PRE:%.*]] = bitcast %TSo33HasUserProvidedDestructorAndDummyV* [[H]] to %struct.HasUserProvidedDestructorAndDummy*
 // CHECK: [[CXX_THIS:%.*]] = bitcast %TSo33HasUserProvidedDestructorAndDummyV* [[H]] to %struct.HasUserProvidedDestructorAndDummy*
 // CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(%struct.HasUserProvidedDestructorAndDummy* [[CXX_THIS]])
 

@@ -12,6 +12,8 @@ public func use() -> CInt {
 
 // CHECK: %[[instance:.*]] = alloca %TSo10HasMethodsV
 // CHECK: %[[result:.*]] = alloca %TSo19NonTrivialInWrapperV
-// CHECK: call void @"?nonConstPassThroughAsWrapper@HasMethods@@QEAA?AUNonTrivialInWrapper@@H@Z"(ptr %[[instance]], ptr sret(%struct.NonTrivialInWrapper) %[[result]], i32 42)
+// CHECK: %[[CXX_THIS_PRE:.*]] = bitcast %TSo10HasMethodsV* %[[instance]] to %struct.HasMethods*
+// CHECK: %[[CXX_THIS:.*]] = bitcast %TSo10HasMethodsV* %[[instance]] to %struct.HasMethods*
+// CHECK: call void @"?nonConstPassThroughAsWrapper@HasMethods@@QEAA?AUNonTrivialInWrapper@@H@Z"(%struct.HasMethods* %[[CXX_THIS]], %struct.NonTrivialInWrapper* sret(%struct.NonTrivialInWrapper) %{{.*}}, i32 42)
 
-// CHECK: define {{.*}} void @"?nonConstPassThroughAsWrapper@HasMethods@@QEAA?AUNonTrivialInWrapper@@H@Z"(ptr {{.*}} %{{.*}}, ptr noalias sret(%struct.NonTrivialInWrapper) {{.*}} %{{.*}}, i32 noundef %{{.*}})
+// CHECK: define {{.*}} void @"?nonConstPassThroughAsWrapper@HasMethods@@QEAA?AUNonTrivialInWrapper@@H@Z"(%struct.HasMethods* {{.*}} %{{.*}}, %struct.NonTrivialInWrapper* noalias sret(%struct.NonTrivialInWrapper) {{.*}} %{{.*}}, i32 noundef %{{.*}})
