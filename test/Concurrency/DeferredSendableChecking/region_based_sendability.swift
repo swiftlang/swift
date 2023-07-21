@@ -34,9 +34,17 @@ actor A {
     }
 
     func foo(_ ns : Any) {}
+
+    func foo_multi(_ : Any, _ : Any, _ : Any) {}
+
+    func foo_vararg(_ : Any ...) {}
 }
 
 func foo_noniso(_ ns : Any) {}
+
+func foo_noniso_multi(_ : Any, _ : Any, _ : Any) {}
+
+func foo_noniso_vararg(_ : Any ...) {}
 
 func test_isolation_crossing_sensitivity(a : A) async {
     let ns0 = NonSendable();
@@ -46,10 +54,10 @@ func test_isolation_crossing_sensitivity(a : A) async {
     foo_noniso(ns0);
 
     //this call consumes ns1
-    await a.foo(ns1); //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.foo(ns1); //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
 
     print(ns0);
-    print(ns1); //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns1); //expected-note{{access here could race}}
 }
 
 func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
@@ -62,7 +70,10 @@ func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
     await a.foo(ns_let);
 
     // not safe to consume an arg
-    await a.foo(ns_arg); //expected-warning{{this application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    await a.foo(ns_arg); //expected-warning{{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+
+    // check for no duplicate warnings once self is "consumed"
+    await a.foo(NonSendable());
 }
 
 func test_closure_capture(a : A) async {
@@ -84,28 +95,28 @@ func test_closure_capture(a : A) async {
     print(ns3)
 
     // this should consume ns0
-    await a.run_closure(captures0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.run_closure(captures0) //expected-warning{{passing argument of non-sendable type '() -> ()' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (3 access sites displayed)}}
 
-    print(ns0) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns0) //expected-note{{access here could race}}
     print(ns1)
     print(ns2)
     print(ns3)
 
     // this should consume ns1 and ns2
-    await a.run_closure(captures12) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.run_closure(captures12) //expected-warning{{passing argument of non-sendable type '() -> ()' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (4 access sites displayed)}}
 
-    print(ns0) //expected-note{{access here could race with non-Sendable value send above}}
-    print(ns1) //expected-note{{access here could race with non-Sendable value send above}}
-    print(ns2) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns0) //expected-note{{access here could race}}
+    print(ns1) //expected-note{{access here could race}}
+    print(ns2) //expected-note{{access here could race}}
     print(ns3)
 
     // this should consume ns3
-    await a.run_closure(captures3indirect) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+    await a.run_closure(captures3indirect) //expected-warning{{passing argument of non-sendable type '() -> ()' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
 
-    print(ns0) //expected-note{{access here could race with non-Sendable value send above}}
-    print(ns1) //expected-note{{access here could race with non-Sendable value send above}}
-    print(ns2) //expected-note{{access here could race with non-Sendable value send above}}
-    print(ns3) //expected-note{{access here could race with non-Sendable value send above}}
+    print(ns0) //expected-note{{access here could race}}
+    print(ns1) //expected-note{{access here could race}}
+    print(ns2) //expected-note{{access here could race}}
+    print(ns3) //expected-note{{access here could race}}
 }
 
 func test_regions(a : A, b : Bool) async {
@@ -128,39 +139,39 @@ func test_regions(a : A, b : Bool) async {
     // check for each of the above pairs that consuming half of it consumes the other half
 
     if (b) {
-        await a.foo(ns0_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns0_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_0) //expected-note{{access here could race}}
+        print(ns0_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns0_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns0_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_0) //expected-note{{access here could race}}
+        print(ns0_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns1_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns1_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_0) //expected-note{{access here could race}}
+        print(ns1_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns1_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns1_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_0) //expected-note{{access here could race}}
+        print(ns1_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns2_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns2_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_0) //expected-note{{access here could race}}
+        print(ns2_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns2_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns2_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_0) //expected-note{{access here could race}}
+        print(ns2_1) //expected-note{{access here could race}}
     }
 }
 
@@ -203,75 +214,75 @@ func test_indirect_regions(a : A, b : Bool) async {
     // now check for each pair that consuming half of it consumed the other half
 
     if (b) {
-        await a.foo(ns0_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns0_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_0) //expected-note{{access here could race}}
+        print(ns0_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns0_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns0_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns0_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns0_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns0_0) //expected-note{{access here could race}}
+        print(ns0_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns1_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns1_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_0) //expected-note{{access here could race}}
+        print(ns1_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns1_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns1_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns1_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns1_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns1_0) //expected-note{{access here could race}}
+        print(ns1_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns2_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns2_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_0) //expected-note{{access here could race}}
+        print(ns2_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns2_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns2_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns2_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns2_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns2_0) //expected-note{{access here could race}}
+        print(ns2_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns3_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns3_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns3_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns3_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns3_0) //expected-note{{access here could race}}
+        print(ns3_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns3_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns3_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns3_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns3_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns3_0) //expected-note{{access here could race}}
+        print(ns3_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns4_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns4_0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns4_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns4_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns4_0) //expected-note{{access here could race}}
+        print(ns4_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns4_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns4_1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns4_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns4_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns4_0) //expected-note{{access here could race}}
+        print(ns4_1) //expected-note{{access here could race}}
     }
 
     if (b) {
-        await a.foo(ns5_0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns5_0) //expected-warning{{passing argument of non-sendable type 'Any' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns5_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns5_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns5_0) //expected-note{{access here could race}}
+        print(ns5_1) //expected-note{{access here could race}}
     } else {
-        await a.foo(ns5_1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns5_1) //expected-warning{{passing argument of non-sendable type 'Any' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (2 access sites displayed)}}
 
-        print(ns5_0) //expected-note{{access here could race with non-Sendable value send above}}
-        print(ns5_1) //expected-note{{access here could race with non-Sendable value send above}}
+        print(ns5_0) //expected-note{{access here could race}}
+        print(ns5_1) //expected-note{{access here could race}}
     }
 }
 
@@ -287,7 +298,7 @@ class C_NonSendable {
         foo_noniso(captures_self)
 
         // this is a cross-isolation call that captures non-Sendable self, so it should not be permitted
-        await a.foo(captures_self) //expected-warning{{this application could pass `self` or a Non-Sendable argument of this function to another thread, potentially yielding a race with the caller}}
+        await a.foo(captures_self) //expected-warning{{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     }
 }
 
@@ -324,8 +335,8 @@ func basic_loopiness(a : A, b : Bool) async {
 
     while (b) {
         await a.foo(ns)
-        //expected-warning@-1{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
-        //expected-note@-2{{access here could race with non-Sendable value send above}}
+        //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+        //expected-note@-2{{access here could race}}
     }
 }
 
@@ -340,8 +351,8 @@ func basic_loopiness_unsafe(a : A, b : Bool) async {
         (ns0, ns1, ns2, ns3) = (ns1, ns2, ns3, ns0)
     }
 
-    await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
-    await a.foo(ns3) //expected-note{{access here could race with non-Sendable value send above}}
+    await a.foo(ns0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo(ns3) //expected-note{{access here could race}}
 }
 
 func basic_loopiness_safe(a : A, b : Bool) async {
@@ -398,8 +409,8 @@ func test_class_assign_merges(a : A, b : Bool) async {
     box.contents = ns0
     box.contents = ns1
 
-    await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
-    await a.foo(ns1) //expected-note{{access here could race with non-Sendable value send above}}
+    await a.foo(ns0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo(ns1) //expected-note{{access here could race}}
 }
 
 func test_stack_assign_doesnt_merge(a : A, b : Bool) async {
@@ -430,8 +441,8 @@ func test_stack_assign_and_capture_merges(a : A, b : Bool) async {
     contents = ns0
     contents = ns1
 
-    await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
-    await a.foo(ns1) //expected-note{{access here could race with non-Sendable value send above}}
+    await a.foo(ns0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo(ns1) //expected-note{{access here could race}}
 }
 
 func test_tuple_formation(a : A, i : Int) async {
@@ -445,63 +456,217 @@ func test_tuple_formation(a : A, i : Int) async {
 
     switch (i) {
     case 0:
-        await a.foo(ns0) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns0) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (6 access sites displayed)}}
 
-        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns0); //expected-note{{access here could race}}
+        foo_noniso(ns1); //expected-note{{access here could race}}
+        foo_noniso(ns2); //expected-note{{access here could race}}
+        foo_noniso(ns3); //expected-note{{access here could race}}
         foo_noniso(ns4);
-        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012); //expected-note{{access here could race}}
+        foo_noniso(ns13); //expected-note{{access here could race}}
     case 1:
-        await a.foo(ns1) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns1) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (6 access sites displayed)}}
 
-        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns0); //expected-note{{access here could race}}
+        foo_noniso(ns1); //expected-note{{access here could race}}
+        foo_noniso(ns2); //expected-note{{access here could race}}
+        foo_noniso(ns3); //expected-note{{access here could race}}
         foo_noniso(ns4);
-        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012); //expected-note{{access here could race}}
+        foo_noniso(ns13); //expected-note{{access here could race}}
     case 2:
-        await a.foo(ns2) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns2) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (6 access sites displayed)}}
 
-        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns0); //expected-note{{access here could race}}
+        foo_noniso(ns1); //expected-note{{access here could race}}
+        foo_noniso(ns2); //expected-note{{access here could race}}
+        foo_noniso(ns3); //expected-note{{access here could race}}
         foo_noniso(ns4);
-        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012); //expected-note{{access here could race}}
+        foo_noniso(ns13); //expected-note{{access here could race}}
     case 3:
-        await a.foo(ns4) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns4) //expected-warning{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
 
         foo_noniso(ns0);
         foo_noniso(ns1);
         foo_noniso(ns2);
-        foo_noniso(ns4); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns4); //expected-note{{access here could race}}
         foo_noniso(ns012);
         foo_noniso(ns13);
     case 4:
-        await a.foo(ns012) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns012) //expected-warning{{passing argument of non-sendable type '(NonSendable, NonSendable, NonSendable)' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (6 access sites displayed)}}
 
-        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns0); //expected-note{{access here could race}}
+        foo_noniso(ns1); //expected-note{{access here could race}}
+        foo_noniso(ns2); //expected-note{{access here could race}}
+        foo_noniso(ns3); //expected-note{{access here could race}}
         foo_noniso(ns4);
-        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012); //expected-note{{access here could race}}
+        foo_noniso(ns13); //expected-note{{access here could race}}
     default:
-        await a.foo(ns13) //expected-warning{{non-Sendable value sent across isolation domains here, but could be accessed later in this function}}
+        await a.foo(ns13) //expected-warning{{passing argument of non-sendable type '(NonSendable, NonSendable)' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (6 access sites displayed)}}
 
-        foo_noniso(ns0); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns1); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns2); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns3); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns0); //expected-note{{access here could race}}
+        foo_noniso(ns1); //expected-note{{access here could race}}
+        foo_noniso(ns2); //expected-note{{access here could race}}
+        foo_noniso(ns3); //expected-note{{access here could race}}
         foo_noniso(ns4);
-        foo_noniso(ns012); //expected-note{{access here could race with non-Sendable value send above}}
-        foo_noniso(ns13); //expected-note{{access here could race with non-Sendable value send above}}
+        foo_noniso(ns012); //expected-note{{access here could race}}
+        foo_noniso(ns13); //expected-note{{access here could race}}
     }
+}
+
+func reuse_args_safe(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+
+    // this should be perfectly legal - arguments are assumed to come from the same region
+    await a.foo_multi(ns0, ns0, ns0);
+    await a.foo_multi(ns1, ns2, ns1);
+}
+
+func one_consume_many_require(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+
+    await a.foo_multi(ns0, ns1, ns2);
+    //expected-warning@-1 3{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+
+    foo_noniso_multi(ns0, ns3, ns4); //expected-note {{access here could race}}
+    foo_noniso_multi(ns3, ns1, ns4); //expected-note {{access here could race}}
+    foo_noniso_multi(ns4, ns3, ns2); //expected-note {{access here could race}}
+}
+
+func one_consume_one_require(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+
+    await a.foo_multi(ns0, ns1, ns2);
+    //expected-warning@-1 3{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+
+    foo_noniso_multi(ns0, ns1, ns2); //expected-note 3{{access here could race}}
+}
+
+func many_consume_one_require(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+    let ns5 = NonSendable();
+
+    await a.foo_multi(ns0, ns3, ns3)
+    //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_multi(ns4, ns1, ns4)
+    //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_multi(ns5, ns5, ns2)
+    //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+
+    foo_noniso_multi(ns0, ns1, ns2); //expected-note 3{{access here could race}}
+}
+
+func many_consume_many_require(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+    let ns5 = NonSendable();
+    let ns6 = NonSendable();
+    let ns7 = NonSendable();
+
+    await a.foo_multi(ns0, ns3, ns3)
+    //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_multi(ns4, ns1, ns4)
+    //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_multi(ns5, ns5, ns2)
+    //expected-warning@-1{{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+
+    foo_noniso_multi(ns0, ns6, ns7); //expected-note {{access here could race}}
+    foo_noniso_multi(ns6, ns1, ns7); //expected-note {{access here could race}}
+    foo_noniso_multi(ns7, ns6, ns2); //expected-note {{access here could race}}
+}
+
+
+func reuse_args_safe_vararg(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+
+    // this should be perfectly legal - arguments are assumed to come from the same region
+    await a.foo_vararg(ns0, ns0, ns0);
+    await a.foo_vararg(ns1, ns2, ns1);
+}
+
+func one_consume_many_require_varag(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+
+    //TODO: find a way to make the type used in the diagnostic more specific than the signature type
+    await a.foo_vararg(ns0, ns1, ns2);
+    //expected-warning@-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (3 access sites displayed)}}
+
+    foo_noniso_vararg(ns0, ns3, ns4); //expected-note {{access here could race}}
+    foo_noniso_vararg(ns3, ns1, ns4); //expected-note {{access here could race}}
+    foo_noniso_vararg(ns4, ns3, ns2); //expected-note {{access here could race}}
+}
+
+func one_consume_one_require_vararg(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+
+    await a.foo_vararg(ns0, ns1, ns2);
+    //expected-warning@-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (3 access sites displayed)}}
+
+    foo_noniso_vararg(ns0, ns1, ns2); //expected-note 3{{access here could race}}
+}
+
+func many_consume_one_require_vararg(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+    let ns5 = NonSendable();
+
+    await a.foo_vararg(ns0, ns3, ns3)
+    //expected-warning@-1{{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_vararg(ns4, ns1, ns4)
+    //expected-warning@-1{{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_vararg(ns5, ns5, ns2)
+    //expected-warning@-1{{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+
+    foo_noniso_vararg(ns0, ns1, ns2); //expected-note 3{{access here could race}}
+}
+
+func many_consume_many_require_vararg(a : A) async {
+    let ns0 = NonSendable();
+    let ns1 = NonSendable();
+    let ns2 = NonSendable();
+    let ns3 = NonSendable();
+    let ns4 = NonSendable();
+    let ns5 = NonSendable();
+    let ns6 = NonSendable();
+    let ns7 = NonSendable();
+
+    await a.foo_vararg(ns0, ns3, ns3)
+    //expected-warning@-1{{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_vararg(ns4, ns1, ns4)
+    //expected-warning@-1{{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    await a.foo_vararg(ns5, ns5, ns2)
+    //expected-warning@-1{{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+
+    foo_noniso_vararg(ns0, ns6, ns7); //expected-note {{access here could race}}
+    foo_noniso_vararg(ns6, ns1, ns7); //expected-note {{access here could race}}
+    foo_noniso_vararg(ns7, ns6, ns2); //expected-note {{access here could race}}
 }
