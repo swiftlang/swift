@@ -12,7 +12,7 @@ func inferSameShape<each T, each U>(ts t: repeat each T, us u: repeat each U) wh
 // CHECK-LABEL: desugarSameShape(ts:us:)
 // CHECK-NEXT: Generic signature: <each T, each U where repeat each T : P, (repeat (each T, each U)) : Any, repeat each U : P>
 func desugarSameShape<each T, each U>(ts t: repeat each T, us u: repeat each U)
-  where repeat each T: P, repeat each U: P, (repeat (each T.A, each U.A)): Any {}
+  where repeat each T: P, repeat each U: P, (repeat ((each T).A, (each U).A)): Any {}
 
 // CHECK-LABEL: multipleSameShape1(ts:us:vs:)
 // CHECK-NEXT: Generic signature: <each T, each U, each V where (repeat (each T, each U)) : Any, (repeat (each U, each V)) : Any>
@@ -75,11 +75,11 @@ func expandedParameters<each T, each Result>(_ t: repeat each T, transform: repe
 
 // CHECK-LABEL: sameType1
 // CHECK-NEXT: Generic signature: <each T, each U where repeat each T : P, repeat each U : P, repeat (each T).[P]A == (each U).[P]A>
-func sameType1<each T, each U>(_: repeat (each T, each U)) where repeat each T: P, repeat each U: P, repeat each T.A == each U.A {}
+func sameType1<each T, each U>(_: repeat (each T, each U)) where repeat each T: P, repeat each U: P, repeat (each T).A == (each U).A {}
 
 // Make sure inherited associated types are handled
 protocol Q: P where A: Q {}
 
 // CHECK-LABEL: sameType2
 // CHECK-NEXT: Generic signature: <each T, each U where repeat each T : Q, repeat each U : Q, repeat (each T).[P]A.[P]A == (each U).[P]A.[P]A>
-func sameType2<each T, each U>(_: repeat (each T, each U)) where repeat each T: Q, repeat each U: Q, repeat each T.A.A == each U.A.A {}
+func sameType2<each T, each U>(_: repeat (each T, each U)) where repeat each T: Q, repeat each U: Q, repeat (each T).A.A == (each U).A.A {}
