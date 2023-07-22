@@ -834,7 +834,9 @@ def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Restrict code to those available for App Extensions">;
 
-def libc : Separate<["-"], "libc">, HelpText<"libc runtime library to use">;
+def libc : Separate<["-"], "libc">,
+           Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+           HelpText<"libc runtime library to use">;
 
 // Linker options
 
