@@ -2301,7 +2301,14 @@ public:
     SILFunctionConventions fnConv(origCalleeType, IGF.getSILModule());
 
     // Pass along the indirect result pointers.
-    original.transferInto(adjusted, fnConv.getNumIndirectSILResults());
+    auto passIndirectResults = [&]() {
+        original.transferInto(adjusted, fnConv.getNumIndirectSILResults());
+    };
+    // Indirect results for C++ methods can come
+    // after `this`.
+    if (getCallee().getRepresentation() !=
+        SILFunctionTypeRepresentation::CXXMethod)
+      passIndirectResults();
 
     // Pass along the coroutine buffer.
     switch (origCalleeType->getCoroutineKind()) {
@@ -2341,7 +2348,14 @@ public:
                                        IGF.IGM.getPointerAlignment());
         }
 
+        // Windows ABI places `this` before the
+        // returned indirect values.
+        bool isThisFirst = IGF.IGM.Triple.isWindowsMSVCEnvironment();
+        if (!isThisFirst)
+          passIndirectResults();
         adjusted.add(arg);
+        if (isThisFirst)
+          passIndirectResults();
       }
 
       LLVM_FALLTHROUGH;

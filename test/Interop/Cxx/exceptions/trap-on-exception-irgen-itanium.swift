@@ -92,6 +92,11 @@ public:
 class ClassWithDestructor {
   int m = 0;
 public:
+#if __is_target_os(windows)
+  // On windows, force this type to be address-only.
+  inline ClassWithDestructor() noexcept {}
+  inline ClassWithDestructor(const ClassWithDestructor &other) noexcept : m(other.m)  {}
+#endif
   inline ~ClassWithDestructor() {
     (void)freeFunctionNoThrow(0);
   }
@@ -100,6 +105,11 @@ public:
 class ClassWithThrowingDestructor {
   int m = 0;
 public:
+#if __is_target_os(windows)
+  // On windows, force this type to be address-only.
+  inline ClassWithThrowingDestructor() noexcept {}
+  inline ClassWithThrowingDestructor(const ClassWithThrowingDestructor &other) noexcept : m(other.m) {}
+#endif
   inline ~ClassWithThrowingDestructor() noexcept(false) {
     throw 2;
   }
@@ -139,6 +149,8 @@ struct StructWithDefaultConstructor {
 
 
 struct NonTrivial {
+  NonTrivial() noexcept;
+  NonTrivial(const NonTrivial &other) noexcept;
   ~NonTrivial() {}
 };
 
