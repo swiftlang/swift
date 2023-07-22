@@ -290,6 +290,28 @@ ${concurrency_libs}
       swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                                  DESTINATION "lib/swift_static/${lowercase_sdk}"
                                  COMPONENT stdlib)
+    elseif("${sdk}" STREQUAL "WASI")
+      set(swift_icu_libs_wasi_list)
+      set(icu_modules UC I18N DATA)
+      foreach(module IN LISTS icu_modules)
+        set(module_lib "${SWIFT_WASI_wasm32_ICU_${module}}")
+        get_filename_component(module_lib_name ${module_lib} NAME)
+        add_custom_command_target(swift_icu_${module}_${sdk}
+          COMMAND
+            "${CMAKE_COMMAND}" -E copy
+            "${module_lib}"
+            "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}/${module_lib_name}"
+          OUTPUT
+            "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}/${module_lib_name}"
+          DEPENDS
+            "${module_lib}")
+        list(APPEND swift_icu_libs_wasi_list ${swift_icu_${module}_${sdk}})
+        swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}/${module_lib_name}"
+                                  DESTINATION "lib/swift_static/${lowercase_sdk}"
+                                  COMPONENT stdlib)
+      endforeach()
+      add_custom_target(swift_icu_libs_wasi ALL DEPENDS ${swift_icu_libs_wasi_list})
+      add_dependencies(stdlib swift_icu_libs_wasi)
     endif()
   endforeach()
 endforeach()
