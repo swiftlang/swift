@@ -74,7 +74,7 @@ actor Someone {
 
       // FIXME: calling without await from main() should also succeed, we must set the executor while we're kicking off main
 
-      tests.test("preconditionTaskOnActorExecutor(main): from Main friend") {
+      tests.test("MainActor.preconditionIsolated(): from Main friend") {
         await MainFriend().callCheckMainActor()
       }
 
