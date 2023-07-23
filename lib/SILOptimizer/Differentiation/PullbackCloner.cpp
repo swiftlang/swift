@@ -110,7 +110,7 @@ private:
   /// Mapping from original basic blocks to local temporary values to be cleaned
   /// up. This is populated when pullback emission is run on one basic block and
   /// cleaned before processing another basic block.
-  llvm::DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>>
+  llvm::DenseMap<SILBasicBlock *, llvm::SmallSetVector<SILValue, 32>>
       blockTemporaries;
 
   /// The scope cloner.

@@ -55,8 +55,8 @@ namespace {
 
 struct CheckerLivenessInfo {
   GraphNodeWorklist<SILValue, 8> defUseWorklist;
-  SmallSetVector<Operand *, 8> consumingUse;
-  SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
+  llvm::SmallSetVector<Operand *, 8> consumingUse;
+  llvm::SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
   BitfieldRef<DiagnosticPrunedLiveness> liveness;
 
@@ -397,7 +397,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
 }
 
 bool ConsumeOperatorCopyableValuesChecker::check() {
-  SmallSetVector<SILValue, 32> valuesToCheck;
+  llvm::SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
     if (arg->getOwnershipKind() == OwnershipKind::Owned &&

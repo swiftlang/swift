@@ -97,7 +97,7 @@ class MoveOnlyObjectCheckerTesterPass : public SILFunctionTransform {
     borrowtodestructure::IntervalMapAllocator allocator;
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-    SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
     bool madeChange = searchForCandidateObjectMarkMustChecks(
         fn, moveIntroducersToProcess, diagnosticEmitter);
 

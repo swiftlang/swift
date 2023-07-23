@@ -568,8 +568,8 @@ GenericSignatureImpl::haveSameShape(Type type1, Type type2) const {
   return getRequirementMachine()->haveSameShape(type1, type2);
 }
 
-SmallVector<CanType, 2> GenericSignatureImpl::getShapeClasses() const {
-  SmallSetVector<CanType, 2> result;
+llvm::SmallVector<CanType, 2> GenericSignatureImpl::getShapeClasses() const {
+  llvm::SmallSetVector<CanType, 2> result;
 
   forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     if (!canonical || !gp->isParameterPack())

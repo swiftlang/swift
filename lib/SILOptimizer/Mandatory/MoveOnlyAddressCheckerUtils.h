@@ -27,7 +27,7 @@ class DiagnosticEmitter;
 /// diagnosticEmitter.getDiagnosticCount().
 void searchForCandidateAddressMarkMustChecks(
     SILFunction *fn,
-    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
 
 struct MoveOnlyAddressChecker {
@@ -39,7 +39,7 @@ struct MoveOnlyAddressChecker {
 
   /// \returns true if we changed the IR. To see if we emitted a diagnostic, use
   /// \p diagnosticEmitter.getDiagnosticCount().
-  bool check(SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess);
+  bool check(llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess);
 };
 
 } // namespace siloptimizer

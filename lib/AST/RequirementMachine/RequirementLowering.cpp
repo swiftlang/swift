@@ -1135,7 +1135,7 @@ ArrayRef<ProtocolDecl *>
 ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   auto &ctx = proto->getASTContext();
-  SmallSetVector<ProtocolDecl *, 4> result;
+  llvm::SmallSetVector<ProtocolDecl *, 4> result;
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.

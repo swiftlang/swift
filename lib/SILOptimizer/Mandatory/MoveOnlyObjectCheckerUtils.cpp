@@ -69,7 +69,7 @@ using namespace swift::siloptimizer;
 
 bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
     SILFunction *fn,
-    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
     DiagnosticEmitter &emitter) {
   bool localChanged = false;
   for (auto &block : *fn) {

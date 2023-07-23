@@ -41,6 +41,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
@@ -2596,7 +2597,7 @@ static bool contextDependsOn(const NominalTypeDecl *decl,
   return false;
 }
 
-static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
+static void collectDependenciesFromType(swift::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const DeclContext *excluding) {
   if (!ty)
@@ -2612,7 +2613,7 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
 }
 
 static void
-collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
+collectDependenciesFromRequirement(swift::SmallSetVector<Type, 4> &seen,
                                    const Requirement &req,
                                    const DeclContext *excluding) {
   collectDependenciesFromType(seen, req.getFirstType(), excluding);
@@ -2621,7 +2622,7 @@ collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
 }
 
 static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
-  llvm::SmallSetVector<Type, 4> result;
+  swift::SmallSetVector<Type, 4> result;
   collectDependenciesFromType(result, ty, /*excluding*/nullptr);
   return result.takeVector();
 }
@@ -3827,7 +3828,7 @@ public:
     size_t numInherited = addInherited(
         extension->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencies;
+    swift::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(
       dependencies, extendedType, /*excluding*/nullptr);
     for (Requirement req : extension->getGenericRequirements()) {
@@ -3982,7 +3983,7 @@ public:
 
     auto underlying = typeAlias->getUnderlyingType();
 
-    llvm::SmallSetVector<Type, 4> dependencies;
+    swift::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
                                 /*excluding*/nullptr);
     for (Requirement req : typeAlias->getGenericRequirements()) {
@@ -4059,7 +4060,7 @@ public:
 
     unsigned numInherited = addInherited(theStruct->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
       collectDependenciesFromRequirement(dependencyTypes, req,
                                          /*excluding*/nullptr);
@@ -4103,7 +4104,7 @@ public:
 
     unsigned numInherited = addInherited(theEnum->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
       if (!nextElt->hasAssociatedValues())
         continue;
@@ -4160,7 +4161,7 @@ public:
 
     unsigned numInherited = addInherited(theClass->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
       // FIXME: Nested types can still be a problem here: it's possible that (for
       // whatever reason) they won't be able to be deserialized, in which case
@@ -4210,7 +4211,7 @@ public:
     auto contextID = S.addDeclContextRef(proto->getDeclContext());
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
 
     unsigned numInherited = addInherited(
         proto->getInherited(), inheritedAndDependencyTypes);

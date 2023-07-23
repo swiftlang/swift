@@ -103,7 +103,7 @@ struct State {
 
   /// A list of successor blocks that we must visit by the time the algorithm
   /// terminates.
-  SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
+  llvm::SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(
       SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,

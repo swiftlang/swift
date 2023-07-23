@@ -95,7 +95,7 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     auto *poa = getAnalysis<PostOrderAnalysis>();
 
     DiagnosticEmitter diagnosticEmitter(fn);
-    SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
     searchForCandidateAddressMarkMustChecks(fn, moveIntroducersToProcess,
                                             diagnosticEmitter);
 

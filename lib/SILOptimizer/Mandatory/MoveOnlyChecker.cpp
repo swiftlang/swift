@@ -92,7 +92,7 @@ struct MoveOnlyChecker {
 } // namespace
 
 void MoveOnlyChecker::checkObjects() {
-  SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+  llvm::SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
   madeChange |= searchForCandidateObjectMarkMustChecks(
       fn, moveIntroducersToProcess, diagnosticEmitter);
@@ -115,7 +115,7 @@ void MoveOnlyChecker::checkObjects() {
 
 void MoveOnlyChecker::checkAddresses() {
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-  SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+  llvm::SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
   searchForCandidateAddressMarkMustChecks(fn, moveIntroducersToProcess,
                                           diagnosticEmitter);
 

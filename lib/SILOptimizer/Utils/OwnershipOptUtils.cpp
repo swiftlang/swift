@@ -43,7 +43,7 @@ void swift::extendOwnedLifetime(SILValue ownedValue,
                                 PrunedLivenessBoundary &lifetimeBoundary,
                                 InstructionDeleter &deleter) {
   // Gather the current set of destroy_values, which may die.
-  SmallSetVector<Operand *, 4> extraConsumes;
+  llvm::SmallSetVector<Operand *, 4> extraConsumes;
   SmallPtrSet<SILInstruction *, 4> extraConsumers;
   for (Operand *use : ownedValue->getUses()) {
     if (use->isConsuming()) {
@@ -1697,7 +1697,7 @@ SILBasicBlock::iterator OwnershipReplaceSingleUseHelper::perform() {
 class GuaranteedPhiBorrowFixup {
   // A phi in mustConvertPhis has already been determined to be part of this
   // new nested borrow scope.
-  SmallSetVector<SILPhiArgument *, 8> mustConvertPhis;
+  llvm::SmallSetVector<SILPhiArgument *, 8> mustConvertPhis;
 
   // Phi operands that are already within the new nested borrow scope.
   llvm::SmallDenseSet<PhiOperand, 8> nestedPhiOperands;

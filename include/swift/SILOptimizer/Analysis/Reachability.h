@@ -247,7 +247,7 @@ public:
     /// reachability may extend.
     BasicBlockSetVector discoveredBlocks;
     /// The sublist of gens which are killed within the blocks where they occur.
-    SmallSetVector<SILInstruction *, 32> localGens;
+    llvm::SmallSetVector<SILInstruction *, 32> localGens;
 
     /// Construct a result for running IterativeBackwardReachability in a given
     /// function.

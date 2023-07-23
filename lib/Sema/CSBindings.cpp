@@ -316,7 +316,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
     // class, make it a "representative" and let it infer
     // supertypes and direct protocol requirements from
     // other members and their equivalence classes.
-    SmallSetVector<TypeVariableType *, 4> equivalenceClass;
+    llvm::SmallSetVector<TypeVariableType *, 4> equivalenceClass;
     {
       SmallVector<TypeVariableType *, 4> workList;
       workList.push_back(currentVar);
