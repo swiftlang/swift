@@ -126,7 +126,25 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncStream.swift
   AsyncThrowingStream.swift
   AsyncStream.cpp
-  Deque.swift
+  Deque/_DequeBuffer.swift
+  Deque/_DequeBufferHeader.swift
+  Deque/_DequeSlot.swift
+  Deque/_UnsafeWrappedBuffer.swift
+  Deque/Compatibility.swift
+  Deque/Deque+Storage.swift
+  Deque/Deque+UnsafeHandle.swift
+  Deque/Deque.swift
+  Deque/Deque+Codable.swift
+  Deque/Deque+Collection.swift
+  Deque/Deque+CustomDebugStringConvertible.swift
+  Deque/Deque+CustomReflectable.swift
+  Deque/Deque+CustomStringConvertible.swift
+  Deque/Deque+Equatable.swift
+  Deque/Deque+ExpressibleByArrayLiteral.swift
+  Deque/Deque+Extras.swift
+  Deque/Deque+Hashable.swift
+  Deque/Deque+Testing.swift
+  Deque/UnsafeMutableBufferPointer+Utilities.swift
   ${swift_concurrency_extra_sources}
   linker-support/magic-symbols-for-install-name.c
 
