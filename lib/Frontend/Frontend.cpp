@@ -1540,10 +1540,22 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     opts |= ParsingFlags::SuppressWarnings;
   }
 
-  // Turn off round-trip checking for secondary files, and for dependency
-  // scanning and IDE inspection.
+  // Turn off new parser round-trip and diagnostics checking for
+  //   - secondary files
+  //     - Only want to verify on primary files, no point checking more than
+  //       once
+  //   - IDE inspection
+  //     - We don't want to pay the cost of verification for simple IDE
+  //       functionality (eg. completion and cursor info)
+  //   - dependency scanning
+  //     - Same as IDE inspection, this is meant to be a very fast operation.
+  //       Don't slow it down
+  //   - skipped function bodies
+  //     - Swift parser doesn't support function body skipping yet, so this
+  //       would result in verification failures when bodies have errors
   if (!isEffectivelyPrimary || SourceMgr.hasIDEInspectionTargetBuffer() ||
-      frontendOpts.RequestedAction == ActionType::ScanDependencies) {
+      frontendOpts.RequestedAction == ActionType::ScanDependencies ||
+      typeOpts.SkipFunctionBodies != FunctionBodySkipping::None) {
     opts -= ParsingFlags::RoundTrip;
     opts -= ParsingFlags::ValidateNewParserDiagnostics;
   }
