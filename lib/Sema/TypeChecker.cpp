@@ -260,7 +260,8 @@ void swift::performTypeChecking(SourceFile &SF) {
 }
 
 evaluator::SideEffect
-TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
+TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF,
+                                     bool CheckFunctionBodies) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
          "Should not be re-typechecking this file!");
@@ -306,8 +307,9 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
         }
       }
     }
-
-    typeCheckDelayedFunctions(*SF);
+    if (CheckFunctionBodies) {
+      typeCheckDelayedFunctions(*SF);
+    }
   }
 
   diagnoseUnnecessaryPreconcurrencyImports(*SF);

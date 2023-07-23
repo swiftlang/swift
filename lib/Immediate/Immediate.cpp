@@ -23,6 +23,8 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SILGenRequests.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -303,6 +305,7 @@ createLLJIT(const IRGenOptions &IRGenOpts, ASTContext &Ctx) {
 }
 
 class SILMaterializationUnit;
+class SwiftMaterializationUnit;
 
 /// Wraps an LLJIT instance, adds lazy compilation.
 class SwiftJIT {
@@ -351,7 +354,7 @@ public:
   /// Register a the materialization unit `MU` with the `JITDylib``JD` and
   /// create lazy reexports for all functions defined in the interface of `MU`
   llvm::Error addSwift(llvm::orc::JITDylib &JD,
-                       std::unique_ptr<SILMaterializationUnit> MU);
+                       std::unique_ptr<llvm::orc::MaterializationUnit> MU);
 
   llvm::Error initialize(llvm::orc::JITDylib &JD) { return J->initialize(JD); }
 
@@ -372,6 +375,10 @@ public:
   // interface generator for Swift.
   llvm::orc::SymbolStringPtr mangleAndIntern(StringRef Name) {
     return J->mangleAndIntern(Name);
+  }
+
+  llvm::orc::SymbolStringPtr intern(StringRef Name) {
+    return J->getExecutionSession().intern(Name);
   }
 
   llvm::orc::IRCompileLayer &getIRCompileLayer() {
@@ -489,13 +496,14 @@ static void dumpJIT(llvm::orc::LLJIT &JIT, const llvm::Module &Module,
 /// IRGen the provided `SILModule` with the specified options.
 /// Returns `std::nullopt` if a compiler error is encountered
 static std::optional<GeneratedModule>
-generateModule(const CompilerInstance &CI, const IRGenOptions &IRGenOpts,
-               std::unique_ptr<SILModule> SM) {
+generateModule(const CompilerInstance &CI, std::unique_ptr<SILModule> SM) {
   // TODO: Use OptimizedIRRequest for this.
   const auto &Context = CI.getASTContext();
   auto *swiftModule = CI.getMainModule();
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
-  const auto &TBDOpts = CI.getInvocation().getTBDGenOptions();
+  const auto &Invocation = CI.getInvocation();
+  const auto &TBDOpts = Invocation.getTBDGenOptions();
+  const auto &IRGenOpts = Invocation.getIRGenOptions();
 
   // Lower the SIL module to LLVM IR
   auto GenModule = performIRGeneration(
@@ -527,6 +535,122 @@ static void logError(llvm::Error Err) {
   logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
 }
 
+/// Allows lazy materialization of `SILDeclRef`s
+class SwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
+public:
+  static std::unique_ptr<SwiftMaterializationUnit>
+  Create(SwiftJIT &JIT, CompilerInstance &CI) {
+    auto *M = CI.getMainModule();
+    TBDGenOptions Opts;
+    Opts.PublicSymbolsOnly = false;
+    auto TBDDesc = TBDGenDescriptor::forModule(M, std::move(Opts));
+    SymbolSourceMapRequest SourceReq{TBDDesc};
+    auto Sources =
+        llvm::cantFail(M->getASTContext().evaluator(std::move(SourceReq)));
+    llvm::orc::SymbolFlagsMap PublicInterface;
+    for (const auto &Entry : *Sources.storage) {
+      const auto &Source = Entry.getValue();
+      if (Source.kind != SymbolSource::Kind::SIL) {
+        continue;
+      }
+      auto Ref = Source.getSILDeclRef();
+      if (Ref.getDefinitionLinkage() != SILLinkage::Public)
+        continue;
+      const auto &SymbolName = Entry.getKey();
+      const auto Flags =
+          llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable;
+      PublicInterface[JIT.intern(SymbolName)] = Flags;
+    }
+    return std::unique_ptr<SwiftMaterializationUnit>(
+        new SwiftMaterializationUnit(JIT, CI, std::move(Sources),
+                                     std::move(PublicInterface)));
+  }
+
+  StringRef getName() const override { return "SwiftMaterializationUnit"; }
+
+private:
+  SwiftMaterializationUnit(SwiftJIT &JIT, CompilerInstance &CI,
+                           SymbolSourceMap Sources,
+                           llvm::orc::SymbolFlagsMap Symbols)
+      : MaterializationUnit({std::move(Symbols), nullptr}),
+        Sources(std::move(Sources)), JIT(JIT), CI(CI) {}
+
+  void addGlobal(llvm::orc::SymbolFlagsMap &Symbols,
+                 const llvm::GlobalValue &Global,
+                 const llvm::orc::MaterializationResponsibility &MR) {
+    // Ignore all symbols that will not appear in symbol table
+    if (Global.hasLocalLinkage() || Global.hasAppendingLinkage() ||
+        Global.isDeclaration()) {
+      return;
+    }
+    auto Name = Global.getName();
+    auto MangledName = JIT.mangleAndIntern(Name);
+    if (MR.getRequestedSymbols().contains(MangledName)) {
+      return;
+    }
+    Symbols[MangledName] = llvm::JITSymbolFlags::fromGlobalValue(Global);
+  }
+
+  void materialize(
+      std::unique_ptr<llvm::orc::MaterializationResponsibility> R) override {
+    SILRefsToEmit Refs;
+    for (auto &Sym : R->getRequestedSymbols()) {
+      const auto &Source = Sources.storage->find(*Sym)->getValue();
+      Refs.push_back(Source.getSILDeclRef());
+    }
+    auto SM = performASTLowering(CI, std::move(Refs));
+    runSILDiagnosticPasses(*SM);
+    runSILLoweringPasses(*SM);
+    auto GM = generateModule(CI, std::move(SM));
+    if (!GM) {
+      R->failMaterialization();
+      return;
+    }
+    auto *Module = GM->getModule();
+    // Now we must register all other public symbols defined by
+    // the module with the JIT
+    llvm::orc::SymbolFlagsMap LazilyDiscoveredSymbols;
+    // Register all global objects, including global
+    // variables and functions
+    for (const auto &Global : Module->global_objects()) {
+      addGlobal(LazilyDiscoveredSymbols, Global, *R);
+    }
+    // Register all global aliases
+    for (const auto &Global : Module->aliases()) {
+      addGlobal(LazilyDiscoveredSymbols, Global, *R);
+    }
+    llvm::orc::SymbolFlagsMap UnrequestedSymbols;
+    for (auto &[Sym, Flags] : R->getSymbols()) {
+      if (!R->getRequestedSymbols().contains(Sym) &&
+          !LazilyDiscoveredSymbols.count(Sym)) {
+        UnrequestedSymbols[Sym] = Flags;
+      }
+    }
+    std::unique_ptr<MaterializationUnit> UnrequestedMU(
+        new SwiftMaterializationUnit(JIT, CI, std::move(Sources),
+                                     std::move(UnrequestedSymbols)));
+    if (auto Err = R->replace(std::move(UnrequestedMU))) {
+      logError(std::move(Err));
+      R->failMaterialization();
+      return;
+    }
+    if (auto Err = R->defineMaterializing(std::move(LazilyDiscoveredSymbols))) {
+      logError(std::move(Err));
+      R->failMaterialization();
+      return;
+    }
+    auto TSM = std::move(*GM).intoThreadSafeContext();
+    JIT.getIRCompileLayer().emit(std::move(R), std::move(TSM));
+  }
+
+  void discard(const llvm::orc::JITDylib &JD,
+               const llvm::orc::SymbolStringPtr &Sym) override {}
+
+  SymbolSourceMap Sources;
+  SwiftJIT &JIT;
+  CompilerInstance &CI;
+};
+
 /// Lazily materializes an entire SIL module
 class SILMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
@@ -539,7 +663,7 @@ public:
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> R) override {
 
-    auto GenModule = generateModule(CI, IRGenOpts, std::move(SM));
+    auto GenModule = generateModule(CI, std::move(SM));
 
     if (!GenModule) {
       R->failMaterialization();
@@ -614,8 +738,9 @@ private:
   std::unique_ptr<SILModule> SM;
 };
 
-llvm::Error SwiftJIT::addSwift(llvm::orc::JITDylib &JD,
-                               std::unique_ptr<SILMaterializationUnit> MU) {
+llvm::Error
+SwiftJIT::addSwift(llvm::orc::JITDylib &JD,
+                   std::unique_ptr<llvm::orc::MaterializationUnit> MU) {
   // Create stub map.
   llvm::orc::SymbolAliasMap Stubs;
   for (auto &[Name, Flags] : MU->getSymbols()) {
@@ -749,7 +874,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
     logError(std::move(Err));
     return -1;
   }
-  auto GenModule = generateModule(CI, IRGenOpts, std::move(SM));
+  auto GenModule = generateModule(CI, std::move(SM));
   if (!GenModule)
     return -1;
   auto *Module = GenModule->getModule();
@@ -760,4 +885,86 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
     return -1;
   }
   return runMain(**JIT, CmdLine);
+}
+
+int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
+
+  auto &Context = CI.getASTContext();
+
+  const auto &Invocation = CI.getInvocation();
+  const auto &FrontendOpts = Invocation.getFrontendOptions();
+
+  const ProcessCmdLine &CmdLine = ProcessCmdLine(
+      FrontendOpts.ImmediateArgv.begin(), FrontendOpts.ImmediateArgv.end());
+
+  // Load libSwiftCore to setup process arguments.
+  //
+  // This must be done here, before any library loading has been done, to avoid
+  // racing with the static initializers in user code.
+  // Setup interpreted process arguments.
+  using ArgOverride = void (*SWIFT_CC(swift))(const char **, int);
+#if defined(_WIN32)
+  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
+  if (!stdlib) {
+    CI.getDiags().diagnose(SourceLoc(),
+                           diag::error_immediate_mode_missing_stdlib);
+    return -1;
+  }
+  auto module = static_cast<HMODULE>(stdlib);
+  auto emplaceProcessArgs = reinterpret_cast<ArgOverride>(
+      GetProcAddress(module, "_swift_stdlib_overrideUnsafeArgvArgc"));
+  if (emplaceProcessArgs == nullptr)
+    return -1;
+#else
+  // In case the compiler is built with swift modules, it already has the stdlib
+  // linked to. First try to lookup the symbol with the standard library
+  // resolving.
+  auto emplaceProcessArgs =
+      (ArgOverride)dlsym(RTLD_DEFAULT, "_swift_stdlib_overrideUnsafeArgvArgc");
+
+  if (dlerror()) {
+    // If this does not work (= the Swift modules are not linked to the tool),
+    // we have to explicitly load the stdlib.
+    auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
+    if (!stdlib) {
+      CI.getDiags().diagnose(SourceLoc(),
+                             diag::error_immediate_mode_missing_stdlib);
+      return -1;
+    }
+    dlerror();
+    emplaceProcessArgs =
+        (ArgOverride)dlsym(stdlib, "_swift_stdlib_overrideUnsafeArgvArgc");
+    if (dlerror())
+      return -1;
+  }
+#endif
+
+  SmallVector<const char *, 32> argBuf;
+  for (size_t i = 0; i < CmdLine.size(); ++i) {
+    argBuf.push_back(CmdLine[i].c_str());
+  }
+  argBuf.push_back(nullptr);
+
+  (*emplaceProcessArgs)(argBuf.data(), CmdLine.size());
+
+  auto *swiftModule = CI.getMainModule();
+  const auto &IRGenOpts = Invocation.getIRGenOptions();
+  if (autolinkImportedModules(swiftModule, IRGenOpts))
+    return -1;
+
+  auto &Target = swiftModule->getASTContext().LangOpts.Target;
+  assert(Target.isMacOSX());
+  auto JIT = SwiftJIT::Create(IRGenOpts, swiftModule->getASTContext());
+  if (auto Err = JIT.takeError()) {
+    logError(std::move(Err));
+    return -1;
+  }
+
+  auto MU = SwiftMaterializationUnit::Create(**JIT, CI);
+  if (auto Err = (*JIT)->addSwift((*JIT)->getMainJITDylib(), std::move(MU))) {
+    logError(std::move(Err));
+    return -1;
+  }
+
+  return runMain((*JIT)->getJIT(), CmdLine);
 }

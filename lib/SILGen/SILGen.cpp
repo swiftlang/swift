@@ -34,6 +34,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -2106,6 +2107,18 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                                                     llvm::None, irgenOptions);
   return llvm::cantFail(
       mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
+}
+
+std::unique_ptr<SILModule> swift::performASTLowering(CompilerInstance &CI,
+                                                     SILRefsToEmit Refs) {
+  auto *M = CI.getMainModule();
+  const auto &Invocation = CI.getInvocation();
+  const auto &SILOpts = Invocation.getSILOptions();
+  const auto &IRGenOpts = Invocation.getIRGenOptions();
+  auto &TC = CI.getSILTypes();
+  auto Desc =
+      ASTLoweringDescriptor::forWholeModule(M, TC, SILOpts, Refs, &IRGenOpts);
+  return llvm::cantFail(M->getASTContext().evaluator(ASTLoweringRequest{Desc}));
 }
 
 std::unique_ptr<SILModule>

@@ -843,6 +843,10 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     SILOptions SILOpts = getSILOptions(PSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
+    if (Invocation.getFrontendOptions().RequestedAction ==
+        FrontendOptions::ActionType::Immediate) {
+      return RunImmediatelyFromAST(Instance) != -1;
+    }
     auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
                                  &irgenOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,

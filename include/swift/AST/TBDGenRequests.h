@@ -209,13 +209,13 @@ class SymbolSourceMap {
   friend class SymbolSourceMapRequest;
 
   using Storage = llvm::StringMap<SymbolSource>;
-  const Storage *storage;
 
-  explicit SymbolSourceMap(const Storage *storage) : storage(storage) {
+  explicit SymbolSourceMap(Storage *storage) : storage(storage) {
     assert(storage);
   }
 
 public:
+  Storage *storage;
   llvm::Optional<SymbolSource> find(StringRef symbol) const {
     auto result = storage->find(symbol);
     if (result == storage->end())
