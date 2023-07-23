@@ -113,11 +113,11 @@ func testLocal() {
 
 @DelegatedConformance
 typealias A = Int
-// expected-error@-2 {{'extension' macro cannot be attached to type alias}}
+// expected-error@-2 {{'extension' macro cannot be attached to type alias ('A')}}
 
 @DelegatedConformance
 extension Int {}
-// expected-error@-2 {{'extension' macro cannot be attached to extension}}
+// expected-error@-2 {{'extension' macro cannot be attached to extension (extension of 'Int')}}
 
 @attached(extension, conformances: P)
 macro UndocumentedNamesInExtension() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")

@@ -217,7 +217,7 @@ func testVarPeer() {
 #if TEST_DIAGNOSTICS
 // Macros cannot be attached to function parameters
 
-// expected-error@+1{{'peer' macro cannot be attached to parameter}}
+// expected-error@+1{{'peer' macro cannot be attached to parameter ('x')}}
 func test(@declareVarValuePeer x: Int) {}
 #endif
 
