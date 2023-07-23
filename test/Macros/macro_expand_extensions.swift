@@ -124,7 +124,7 @@ macro UndocumentedNamesInExtension() = #externalMacro(module: "MacroDefinition",
 
 @UndocumentedNamesInExtension
 struct S<Element> {}
-// expected-note@-1 {{in expansion of macro 'UndocumentedNamesInExtension' here}}
+// expected-note@-2 {{in expansion of macro 'UndocumentedNamesInExtension' on generic struct 'S' here}}
 
 // CHECK-DIAGS: error: declaration name 'requirement()' is not covered by macro 'UndocumentedNamesInExtension'
 
@@ -133,7 +133,7 @@ macro UndocumentedConformanceInExtension() = #externalMacro(module: "MacroDefini
 
 @UndocumentedConformanceInExtension
 struct InvalidConformance<Element> {}
-// expected-note@-1 {{in expansion of macro 'UndocumentedConformanceInExtension' here}}
+// expected-note@-2 {{in expansion of macro 'UndocumentedConformanceInExtension' on generic struct 'InvalidConformance' here}}
 
 // CHECK-DIAGS: error: conformance to 'P' is not covered by macro 'UndocumentedConformanceInExtension'
 
@@ -142,7 +142,7 @@ macro UndocumentedCodable() = #externalMacro(module: "MacroDefinition", type: "A
 
 @UndocumentedCodable
 struct TestUndocumentedCodable {}
-// expected-note@-1 {{in expansion of macro 'UndocumentedCodable' here}}
+// expected-note@-2 {{in expansion of macro 'UndocumentedCodable' on struct 'TestUndocumentedCodable' here}}
 
 // CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedCodable'
 
@@ -151,7 +151,7 @@ macro UndocumentedEncodable() = #externalMacro(module: "MacroDefinition", type: 
 
 @UndocumentedEncodable
 struct TestUndocumentedEncodable {}
-// expected-note@-1 {{in expansion of macro 'UndocumentedEncodable' here}}
+// expected-note@-2 {{in expansion of macro 'UndocumentedEncodable' on struct 'TestUndocumentedEncodable' here}}
 
 // CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedEncodable'
 
