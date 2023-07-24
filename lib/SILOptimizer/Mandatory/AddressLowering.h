@@ -69,6 +69,53 @@ namespace swift {
 /// a place-holder value and updating the map entry. This works because the
 /// value storage map holds no direct references to any SIL entities, such as
 /// Operands or SILValues.
+///
+/// An opaque value's storage will be a def-projection if it's the result of
+/// some disaggregation.  If %o = disaggregate %p then %o's storage will be
+/// a def-projection out of %p's storage.
+///
+/// An opaque value's storage _may_ be a use-projection if it's an operand of
+/// some aggregation.  If %p = aggregate %o, then %o's storage may be a
+/// use-projection out of %p's storage.
+///
+/// Projections naturally form chains.  A value's storage may be a projection
+/// out of the storage of some other value's storage which is itself a
+/// projection out of a third value's storage.  This can happen in three ways:
+///
+/// (1) %o -def-> %p -def-> %q
+///       %p = disaggregate %q
+///       %o = disaggregate %p
+/// (2) %o -use-> %p -use-> %q
+///       %p = aggregate %o
+///       %q = aggregate %p
+/// (3) %o -def-> %p -use-> %q
+///       %p = ...
+///       cond_br left, right
+///     left:
+///       %o = disaggregate %p
+///     right:
+///       %q = aggregate %p
+///
+///     Branching like this is actually necessary.  It's not legal to aggregate
+///     guaranteed opaque values since doing so changes representation which
+///     implies a copy.
+///
+/// It is NOT possible to have links like
+///
+/// (4) %o -use-> %p -def-> %q
+///
+///     The reason is that the links mean contradictory things:
+///       %o -use-> %p means %p = aggregate %o
+///       %p -def-> %q means %p = disaggregate %q
+///     There is no overlap between the "aggregate" and the "disaggregate"
+///     opcodes.
+///
+/// This means that any chain of projections looks like
+///
+///    %d_0 -def-> ... -def-> %d_N -use-> %u_0 -use-> ... -use-> %u_M
+///
+/// a sequence (possibly empty) of def projections followed by a sequence
+/// (possibly emtpy) of use projections [projection_chain_structure].
 struct ValueStorage {
   enum : uint32_t { InvalidID = uint32_t(~0) };
   enum : uint16_t { InvalidOper = uint16_t(~0) };
