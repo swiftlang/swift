@@ -1029,7 +1029,7 @@ void ValueStorageMap::recordDefProjection(Operand *oper,
   storage.isDefProjection = true;
 }
 
-// Mark this operand as coalesced with \p useValue storage.
+// Mark this operand as coalesced with \p userValue storage.
 void ValueStorageMap::recordComposingUseProjection(Operand *oper,
                                                    SILValue userValue) {
   auto &storage = getStorage(oper->get());
