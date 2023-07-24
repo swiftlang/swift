@@ -1360,8 +1360,8 @@ SILInstruction *AddressLoweringState::getLatestOpeningInst(SILType ty) const {
       auto openingVal =
           getModule()->getRootLocalArchetypeDef(openedTy, function);
 
-      auto *openingInst = openingVal->getDefiningInstruction();
       assert(openingVal && "all opened archetypes should be resolved");
+      auto *openingInst = openingVal->getDefiningInstruction();
       if (latestOpeningInst) {
         if (domInfo->dominates(openingInst, latestOpeningInst))
           return;
