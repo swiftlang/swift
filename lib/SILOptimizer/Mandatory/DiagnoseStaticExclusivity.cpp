@@ -977,7 +977,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
     // The in-progress accesses for the current program point, represented
     // as map from storage locations to the accesses in progress for the
     // location.
-    State.Accesses = BBState.getPointer();
+    State.Accesses = &*BBState;
     for (auto &I : *BB)
       checkForViolationsAtInstruction(I, State);
   }

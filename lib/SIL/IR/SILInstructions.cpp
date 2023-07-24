@@ -814,7 +814,7 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
   auto derivativeFunctions =
       VJPAndJVPFunctions.has_value()
           ? ArrayRef<SILValue>(
-                reinterpret_cast<SILValue *>(VJPAndJVPFunctions.getPointer()),
+                reinterpret_cast<SILValue *>(&*VJPAndJVPFunctions),
                 2)
           : ArrayRef<SILValue>();
   size_t size = totalSizeToAlloc<Operand>(1 + derivativeFunctions.size());
@@ -841,7 +841,7 @@ LinearFunctionInst::LinearFunctionInst(
     : InstructionBaseWithTrailingOperands(
           OriginalFunction,
           TransposeFunction.has_value()
-              ? ArrayRef<SILValue>(TransposeFunction.getPointer(), 1)
+              ? ArrayRef<SILValue>(&*TransposeFunction, 1)
               : ArrayRef<SILValue>(),
           Loc, getLinearFunctionType(OriginalFunction, ParameterIndices),
           forwardingOwnershipKind),
