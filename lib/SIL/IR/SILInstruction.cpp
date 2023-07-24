@@ -1314,17 +1314,15 @@ bool SILInstruction::mayRequirePackMetadata() const {
     }
     return false;
   }
-  case SILInstructionKind::DebugValueInst: {
-    auto *dvi = cast<DebugValueInst>(this);
-    return dvi->getOperand()->getType().hasPack();
+  case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::DebugValueInst: 
+  // Unary instructions.
+  {
+    return getOperand(0)->getType().hasPack();
   }
   case SILInstructionKind::MetatypeInst: {
     auto *mi = cast<MetatypeInst>(this);
     return mi->getType().hasPack();
-  }
-  case SILInstructionKind::ClassMethodInst: {
-    auto *cmi = cast<ClassMethodInst>(this);
-    return cmi->getOperand()->getType().hasPack();
   }
   case SILInstructionKind::WitnessMethodInst: {
     auto *wmi = cast<WitnessMethodInst>(this);
