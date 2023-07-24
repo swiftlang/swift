@@ -2788,6 +2788,15 @@ getClangOwningModule(ClangNode Node, const clang::ASTContext &ClangCtx) {
         originalDecl = pattern;
       }
     }
+    if (!originalDecl->hasOwningModule()) {
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(D)) {
+        if (auto pattern = cxxRecordDecl->getTemplateInstantiationPattern()) {
+          // Class template instantiations sometimes don't have an owning Clang
+          // module, if the instantiation is not typedef-ed.
+          originalDecl = pattern;
+        }
+      }
+    }
 
     return ExtSource->getModule(originalDecl->getOwningModuleID());
   }
