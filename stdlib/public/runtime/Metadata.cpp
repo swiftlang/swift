@@ -2827,9 +2827,9 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
       }
 
       if (offset) {
+        LayoutStringReader tagReader {writer.layoutStr, writer.offset};
         auto writerOffsetCopy = writer.offset;
-        reader.offset = layoutStringHeaderSize;
-        auto firstTagAndOffset = reader.readBytes<uint64_t>();
+        auto firstTagAndOffset = tagReader.readBytes<uint64_t>();
         firstTagAndOffset += offset;
         writer.writeBytes(firstTagAndOffset);
         writer.offset = writerOffsetCopy;
