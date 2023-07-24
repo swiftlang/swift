@@ -1034,7 +1034,7 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
       reader.skip(sizeof(uintptr_t));
       break;
     case RefCountingKind::SinglePayloadEnumSimple:
-      reader.skip((3 * sizeof(uint64_t)) + (4 * sizeof(size_t)));
+      reader.skip((2 * sizeof(uint64_t)) + (4 * sizeof(size_t)));
       break;
 
     case RefCountingKind::SinglePayloadEnumFN: {

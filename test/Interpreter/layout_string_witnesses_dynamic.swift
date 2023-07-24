@@ -974,6 +974,41 @@ func testResilientPayloadSinglePayloadEnum() {
 
 testResilientPayloadSinglePayloadEnum()
 
+struct SinglePayloadSimpleResolve {
+    let x: ResilientSinglePayloadEnumSimple
+    let y: ResilientSinglePayloadEnumComplex
+}
+
+func testSinglePayloadSimpleResolve() {
+    let ptr = allocateInternalGenericPtr(of: SinglePayloadSimpleResolve.self)
+
+    do {
+        let x = SinglePayloadSimpleResolve(x: .nonEmpty(SimpleClass(x: 23)), y: .nonEmpty(.nonEmpty1(SimpleClass(x: 23))))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadSimpleResolve(x: .nonEmpty(SimpleClass(x: 32)), y: .nonEmpty(.nonEmpty1(SimpleClass(x: 32))))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericDestroy(ptr, of: SinglePayloadSimpleResolve.self)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadSimpleResolve()
+
 #if os(macOS)
 
 import Foundation
