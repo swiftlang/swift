@@ -747,7 +747,7 @@ function(_compile_swift_files
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
 
-  if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     set(HOST_EXECUTABLE_SUFFIX .exe)
   endif()
   if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
@@ -765,7 +765,7 @@ function(_compile_swift_files
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}"
         "${SWIFTFILE_BOOTSTRAPPING}")
 
-    if(NOT ${SWIFTFILE_BOOTSTRAPPING} STREQUAL "")
+    if(NOT "${SWIFTFILE_BOOTSTRAPPING}" STREQUAL "")
       set(target_suffix "-bootstrapping${SWIFTFILE_BOOTSTRAPPING}")
     endif()
 
@@ -803,7 +803,7 @@ function(_compile_swift_files
       # When building the stdlib with bootstrapping, the compiler needs
       # to pick up the stdlib from the previous bootstrapping stage, because the
       # stdlib in the current stage is not built yet.
-      if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+      if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
       elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
