@@ -2745,7 +2745,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       // Advance the offset for the next piece.
       OffsetInBits += SizeInBits;
       SizeInBits = IGM.DataLayout.getTypeSizeInBits(Piece->getType());
-      AlignInBits = IGM.DataLayout.getABITypeAlignment(Piece->getType());
+      AlignInBits = IGM.DataLayout.getABITypeAlign(Piece->getType()).value();
       if (!AlignInBits)
         AlignInBits = SizeOfByte;
 

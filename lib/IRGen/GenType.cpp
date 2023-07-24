@@ -2171,7 +2171,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     case BuiltinFloatType::IEEE80: {
       llvm::Type *floatTy = llvm::Type::getX86_FP80Ty(ctx);
       uint64_t ByteSize = IGM.DataLayout.getTypeAllocSize(floatTy);
-      unsigned align = IGM.DataLayout.getABITypeAlignment(floatTy);
+      unsigned align = IGM.DataLayout.getABITypeAlign(floatTy).value();
       return RetTy{ floatTy, Size(ByteSize), Alignment(align) };
     }
     case BuiltinFloatType::IEEE128:
