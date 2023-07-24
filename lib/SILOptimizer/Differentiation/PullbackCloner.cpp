@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
@@ -579,7 +580,7 @@ private:
     llvm::SmallString<32> adjName;
     auto *newBuf = createFunctionLocalAllocation(
         bufType, loc, /*zeroInitialize*/ true,
-        debugInfo.transform(
+        swift::transform(debugInfo,
           [&](AdjointValue::DebugInfo di) {
             llvm::raw_svector_ostream adjNameStream(adjName);
             SILDebugVariable &dv = di.second;

@@ -29,6 +29,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1116,7 +1117,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{
         desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
-        symsToEmit.transform([](const auto &x) { return x.silRefsToEmit; })};
+        swift::transform(symsToEmit, [](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
     // If there was an error, bail.

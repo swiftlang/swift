@@ -30,6 +30,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -300,9 +301,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
       // for the fact that they are preceded by the block_storage arguments.
-      auto errorIndex = convention.completionHandlerErrorParamIndex().transform(
+      auto errorIndex = swift::transform(convention.completionHandlerErrorParamIndex(),
           [](auto original) { return original + 1; });
-      auto flagIndex = convention.completionHandlerFlagParamIndex().transform(
+      auto flagIndex = swift::transform(convention.completionHandlerFlagParamIndex(),
           [](auto original) { return original + 1; });
 
       FuncDecl *resumeIntrinsic;

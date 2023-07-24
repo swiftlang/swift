@@ -3456,10 +3456,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   void writeForeignAsyncConvention(const ForeignAsyncConvention &fac) {
     using namespace decls_block;
     TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
-    unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
-      .transform([](unsigned index) { return index + 1; }).value_or(0);
-    unsigned rawErrorFlagParameterIndex = fac.completionHandlerFlagParamIndex()
-      .transform([](unsigned index) { return index + 1; }).value_or(0);
+
+    unsigned rawErrorParameterIndex =
+        swift::transform(fac.completionHandlerErrorParamIndex(),
+                         [](unsigned index) { return index + 1; })
+            .value_or(0);
+    unsigned rawErrorFlagParameterIndex =
+        swift::transform(fac.completionHandlerFlagParamIndex(),
+                         [](unsigned index) { return index + 1; })
+            .value_or(0);
     auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
     ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                              completionHandlerTypeID,

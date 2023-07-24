@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/Common.h"
@@ -251,12 +252,12 @@ void collectMinimalIndicesForFunctionCall(
 llvm::Optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
-    return asi->getVarInfo().transform([&](SILDebugVariable var) {
+    return swift::transform(asi->getVarInfo(),  [&](SILDebugVariable var) {
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      return dvi->getVarInfo().transform([&](SILDebugVariable var) {
+      return swift::transform(dvi->getVarInfo(), [&](SILDebugVariable var) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)
