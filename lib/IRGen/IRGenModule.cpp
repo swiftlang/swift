@@ -1430,7 +1430,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
     buffer += library;
-    if (!library.endswith_insensitive(".lib"))
+    if (!library.ends_with_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
