@@ -1316,6 +1316,8 @@ bool SILInstruction::mayRequirePackMetadata() const {
   }
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::DebugValueInst: 
+  case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyValueInst:
   // Unary instructions.
   {
     return getOperand(0)->getType().hasPack();
