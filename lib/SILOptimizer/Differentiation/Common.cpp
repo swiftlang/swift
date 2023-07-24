@@ -211,8 +211,8 @@ void collectMinimalIndicesForFunctionCall(
   results.reserve(calleeFnTy->getNumResults());
   unsigned dirResIdx = 0;
   unsigned indResIdx = calleeConvs.getSILArgIndexOfFirstIndirectResult();
-  for (auto &resAndIdx : enumerate(calleeConvs.getResults())) {
-    auto &res = resAndIdx.value();
+  for (const auto &resAndIdx : enumerate(calleeConvs.getResults())) {
+    const auto &res = resAndIdx.value();
     unsigned idx = resAndIdx.index();
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
@@ -229,8 +229,8 @@ void collectMinimalIndicesForFunctionCall(
   }
   // Record all `inout` parameters as results.
   auto inoutParamResultIndex = calleeFnTy->getNumResults();
-  for (auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
-    auto &param = paramAndIdx.value();
+  for (const auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
+    const auto &param = paramAndIdx.value();
     if (!param.isIndirectMutating())
       continue;
     unsigned idx = paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();

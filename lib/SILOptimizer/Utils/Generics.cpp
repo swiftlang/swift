@@ -2938,7 +2938,7 @@ bool usePrespecialized(
       }
 
       unsigned score = 0;
-      for (auto &entry :
+      for (const auto &entry :
            llvm::enumerate(apply.getSubstitutionMap().getReplacementTypes())) {
 
         auto genericParam = specializedSig.getGenericParams()[entry.index()];
