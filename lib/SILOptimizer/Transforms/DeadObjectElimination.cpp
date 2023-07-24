@@ -384,7 +384,6 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
 
   SmallVector<RefElementAddrInst *, 8> refElementAddrs;
-  bool deallocationMaybeInlined = false;
   BuiltinInst *destroyArray = nullptr;
   auto *allocRef = dyn_cast<AllocRefInstBase>(allocation);
 
@@ -400,10 +399,8 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
       continue;
     }
     if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
-      if (!rea->getType().isTrivial(*rea->getFunction()))
+      if (rea != allocation && !rea->getType().isTrivial(*rea->getFunction()))
         refElementAddrs.push_back(rea);
-    } else if (isa<SetDeallocatingInst>(I)) {
-      deallocationMaybeInlined = true;
     } else if (allocRef && Users && isDestroyArray(I)) {
       if (destroyArray)
         return true;
@@ -443,18 +440,14 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
   if (destroyArray)
     return !onlyStoresToTailObjects(destroyArray, *Users, allocRef);
 
-  if (deallocationMaybeInlined) {
-    // The alloc_ref is not destructed by a strong_release which is calling the
-    // deallocator (destroying all stored properties).
-    // In non-OSSA we cannot reliably track the lifetime of non-trivial stored
-    // properties. Removing the dead alloc_ref might leak a property value.
-    // TODO: in OSSA we can replace stores to properties with a destroy_value.
-    for (RefElementAddrInst *rea : refElementAddrs) {
-      // Re-run the check with not accepting non-trivial stores.
-      if (hasUnremovableUsers(rea, nullptr, acceptRefCountInsts,
-                              /*onlyAcceptTrivialStores*/ true))
-        return true;
-    }
+  // In non-OSSA we cannot reliably track the lifetime of non-trivial stored
+  // properties. Removing the dead alloc_ref might leak a property value.
+  // TODO: in OSSA we can replace stores to properties with a destroy_value.
+  for (RefElementAddrInst *rea : refElementAddrs) {
+    // Re-run the check with not accepting non-trivial stores.
+    if (hasUnremovableUsers(rea, nullptr, acceptRefCountInsts,
+                            /*onlyAcceptTrivialStores*/ true))
+      return true;
   }
 
   return false;
