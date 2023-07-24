@@ -280,28 +280,15 @@ extension ObservableMacro: ExtensionMacro {
       return []
     }
 
-    if let availability = declaration.availability {
-      let emptyBlock: MemberDeclBlockSyntax = "{ }"
-
-      return [
-        ExtensionDeclSyntax(
-          leadingTrivia: .newline,
-          attributes: availability,
-          extensionKeyword: .keyword(.extension),
-          extendedType: type,
-          inheritanceClause: TypeInheritanceClauseSyntax(inheritedTypeCollection: InheritedTypeListSyntax([InheritedTypeSyntax(typeName: observableConformanceType)])),
-          memberBlock: emptyBlock,
-          trailingTrivia: .newline
-        )
-      ]
-    } else {
-      let decl: DeclSyntax = """
+    let decl: DeclSyntax = """
         extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
         """
+    let ext = decl.cast(ExtensionDeclSyntax.self)
 
-      return [
-        decl.cast(ExtensionDeclSyntax.self)
-      ]
+    if let availability = declaration.availability {
+      return [ext.with(\.attributes, availability)]
+    } else {
+      return [ext]
     }
   }
 }
