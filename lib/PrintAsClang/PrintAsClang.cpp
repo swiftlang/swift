@@ -309,14 +309,13 @@ static void collectClangModuleHeaderIncludes(
     requiredTextualIncludes.insert(textualInclude);
   };
 
-  if (clang::Module::Header umbrellaHeader = clangModule->getUmbrellaHeader()) {
-    addHeader(umbrellaHeader.Entry->tryGetRealPathName(),
-              umbrellaHeader.PathRelativeToRootModuleDirectory);
-  } else if (clang::Module::DirectoryName umbrellaDir =
-                 clangModule->getUmbrellaDir()) {
+  if (llvm::Optional<clang::Module::Header> umbrellaHeader = clangModule->getUmbrellaHeaderAsWritten()) {
+    addHeader(umbrellaHeader->Entry.getFileEntry().tryGetRealPathName(),
+        umbrellaHeader->PathRelativeToRootModuleDirectory);
+  } else if (llvm::Optional<clang::Module::DirectoryName> umbrellaDir = clangModule->getUmbrellaDirAsWritten()) {
     SmallString<128> nativeUmbrellaDirPath;
     std::error_code errorCode;
-    llvm::sys::path::native(umbrellaDir.Entry->getName(),
+    llvm::sys::path::native(umbrellaDir->Entry.getDirEntry().getName(),
                             nativeUmbrellaDirPath);
     llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
     for (llvm::vfs::recursive_directory_iterator
@@ -338,8 +337,8 @@ static void collectClangModuleHeaderIncludes(
           pathComponents.push_back(*pathIt);
         // Then append this to the path from module root to umbrella dir
         SmallString<128> relativeHeaderPath;
-        if (umbrellaDir.PathRelativeToRootModuleDirectory != ".")
-          relativeHeaderPath += umbrellaDir.PathRelativeToRootModuleDirectory;
+        if (umbrellaDir->PathRelativeToRootModuleDirectory != ".")
+          relativeHeaderPath += umbrellaDir->PathRelativeToRootModuleDirectory;
 
         for (auto it = pathComponents.rbegin(), end = pathComponents.rend();
              it != end; ++it) {
@@ -354,7 +353,7 @@ static void collectClangModuleHeaderIncludes(
          {clang::Module::HK_Normal, clang::Module::HK_Textual}) {
       for (const clang::Module::Header &header :
            clangModule->Headers[headerKind]) {
-        addHeader(header.Entry->tryGetRealPathName(),
+        addHeader(header.Entry.getFileEntry().tryGetRealPathName(),
                   header.PathRelativeToRootModuleDirectory);
       }
     }
