@@ -127,6 +127,10 @@ static bool isDestroyArray(SILInstruction *inst) {
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.
+/// TODO: Most default destructors with non-trivial elements will have a
+/// destroy_addr of the non-trivial element in the destructor, this analysis
+/// will return as having side-effects in such cases, leading to conservative
+/// results. Check if we can do better here.
 static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
   SILFunction *Fn = getDestructor(ARI);
   // If we can't find a constructor then assume it has side effects.
