@@ -43,9 +43,6 @@ public:
     if (addr == llvm::DenseMapInfo<llvm::Value *>::getEmptyKey() ||
         llvm::DenseMapInfo<llvm::Value *>::getTombstoneKey())
       return;
-    assert(llvm::cast<llvm::PointerType>(addr->getType())
-               ->isOpaqueOrPointeeTypeMatches(elementType) &&
-           "Incorrect pointer element type");
     assert(addr != nullptr && "building an invalid address");
   }
 
