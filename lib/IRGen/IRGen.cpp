@@ -493,11 +493,11 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
                                 const llvm::Module& Module) {
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time if possible.
-  C.NumIRGlobals += Module.getGlobalList().size();
+  C.NumIRGlobals += Module.global_size();
   C.NumIRFunctions += Module.getFunctionList().size();
-  C.NumIRAliases += Module.getAliasList().size();
-  C.NumIRIFuncs += Module.getIFuncList().size();
-  C.NumIRNamedMetaData += Module.getNamedMDList().size();
+  C.NumIRAliases += Module.alias_size();
+  C.NumIRIFuncs += Module.ifunc_size();
+  C.NumIRNamedMetaData += Module.named_metadata_size();
   C.NumIRValueSymbols += Module.getValueSymbolTable().size();
   C.NumIRComdatSymbols += Module.getComdatSymbolTable().size();
   for (auto const &Func : Module) {
@@ -1472,13 +1472,13 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         G.setLinkage(GlobalValue::ExternalLinkage);
       }
     };
-    for (llvm::GlobalVariable &G : M->getGlobalList()) {
+    for (llvm::GlobalVariable &G : M->globals()) {
       collectReference(G);
     }
     for (llvm::Function &F : M->getFunctionList()) {
       collectReference(F);
     }
-    for (llvm::GlobalAlias &A : M->getAliasList()) {
+    for (llvm::GlobalAlias &A : M->aliases()) {
       collectReference(A);
     }
   }
@@ -1498,13 +1498,13 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         G.setLinkage(GlobalValue::WeakODRLinkage);
       }
     };
-    for (llvm::GlobalVariable &G : M->getGlobalList()) {
+    for (llvm::GlobalVariable &G : M->globals()) {
       updateLinkage(G);
     }
     for (llvm::Function &F : M->getFunctionList()) {
       updateLinkage(F);
     }
-    for (llvm::GlobalAlias &A : M->getAliasList()) {
+    for (llvm::GlobalAlias &A : M->aliases()) {
       updateLinkage(A);
     }
 
