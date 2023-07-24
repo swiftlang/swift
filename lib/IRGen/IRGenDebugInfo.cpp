@@ -1179,7 +1179,7 @@ private:
       return createPointerSizedStruct(Scope, Name, FwdDecl, File, Line, Flags,
                                       MangledName);
     } else {
-      unsigned SizeInBits = CI.getTargetInfo().getPointerWidth(0);
+      unsigned SizeInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return createOpaqueStruct(Scope, Name, File, Line, SizeInBits, 0, Flags,
                                 MangledName);
     }
@@ -1190,7 +1190,7 @@ private:
                                          llvm::DIFile *File, unsigned Line,
                                          llvm::DINode::DIFlags Flags,
                                          StringRef MangledName) {
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, 0);
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
         Scope, "ptr", File, 0, PtrSize, 0, 0, Flags, PtrTy)};
@@ -1205,7 +1205,7 @@ private:
                                  llvm::DIType *PointeeTy, llvm::DIFile *File,
                                  unsigned Line, llvm::DINode::DIFlags Flags,
                                  StringRef MangledName) {
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     llvm::Metadata *Elements[] = {
         DBuilder.createMemberType(
             Scope, "ptr", File, 0, PtrSize, 0, 0, Flags,
@@ -1221,7 +1221,7 @@ private:
 
   llvm::DIType *createFixedValueBufferStruct(llvm::DIType *PointeeTy) {
     unsigned Line = 0;
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagArtificial;
     llvm::DIFile *File = MainFile;
     llvm::DIScope *Scope = TheCU;
@@ -1265,7 +1265,7 @@ private:
     auto FnTy = DBuilder.createSubroutineType(Params, Flags);
     llvm::DIType *DITy;
     if (FunTy->getRepresentation() == SILFunctionType::Representation::Thick) {
-      if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(0))
+      if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(clang::LangAS::Default))
         // This is a FunctionPairTy: { i8*, %swift.refcounted* }.
         DITy = createDoublePointerSizedStruct(Scope, MangledName, FnTy,
                                               MainFile, 0, Flags, MangledName);
@@ -1274,7 +1274,7 @@ private:
         DITy = createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
                                   AlignInBits, Flags, MangledName);
     } else {
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
                                       Flags, MangledName);
     }
@@ -1394,7 +1394,7 @@ private:
     }
 
     case TypeKind::BuiltinNativeObject: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
                                             /* DWARFAddressSpace */ llvm::None,
                                             MangledName);
@@ -1402,7 +1402,7 @@ private:
     }
 
     case TypeKind::BuiltinBridgeObject: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
                                             /* DWARFAddressSpace */ llvm::None,
                                             MangledName);
@@ -1410,21 +1410,21 @@ private:
     }
 
     case TypeKind::BuiltinRawPointer: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return DBuilder.createPointerType(nullptr, PtrSize, 0,
                                         /* DWARFAddressSpace */ llvm::None,
                                         MangledName);
     }
 
     case TypeKind::BuiltinRawUnsafeContinuation: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return DBuilder.createPointerType(nullptr, PtrSize, 0,
                                         /* DWARFAddressSpace */ llvm::None,
                                         MangledName);
     }
 
     case TypeKind::BuiltinJob: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return DBuilder.createPointerType(nullptr, PtrSize, 0,
                                         /* DWARFAddressSpace */ llvm::None,
                                         MangledName);
@@ -1483,7 +1483,7 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       return createPointerSizedStruct(Scope, Decl->getNameStr(), File,
                                       FwdDeclLine, Flags, MangledName);
     }
@@ -1518,7 +1518,7 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       return createPointerSizedStruct(Scope,
                                       Decl ? Decl->getNameStr() : MangledName,
                                       File, FwdDeclLine, Flags, MangledName);
@@ -1544,7 +1544,7 @@ private:
 
       // TODO: We may want to peek at Decl->isObjC() and set this
       // attribute accordingly.
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       return createPointerSizedStruct(Scope,
                                       Decl ? Decl->getNameStr() : MangledName,
                                       File, FwdDeclLine, Flags, MangledName);
@@ -3039,12 +3039,12 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   static const char *Tau = u8"\u03C4";
   llvm::raw_svector_ostream OS(Buf);
   OS << '$' << Tau << '_' << Depth << '_' << Index;
-  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(0);
+  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
   assert(PtrWidthInBits % 8 == 0);
   auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(PtrWidthInBits / 8),
-      Alignment(CI.getTargetInfo().getPointerAlign(0)));
+      Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           {}, {OS.str().str(), 0, false},
                           // swift.type is already a pointer type,
@@ -3065,7 +3065,7 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  Type IntTy = BuiltinIntegerType::get(CI.getTargetInfo().getPointerWidth(0),
+  Type IntTy = BuiltinIntegerType::get(CI.getTargetInfo().getPointerWidth(clang::LangAS::Default),
                                        IGM.getSwiftModule()->getASTContext());
   auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
