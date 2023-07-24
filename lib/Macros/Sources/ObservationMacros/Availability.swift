@@ -44,34 +44,14 @@ extension IfConfigClauseSyntax.Elements {
 extension IfConfigClauseSyntax {
   var availability: IfConfigClauseSyntax? {
     if let availability = elements?.availability {
-      return IfConfigClauseSyntax(
-        leadingTrivia: leadingTrivia,
-        unexpectedBeforePoundKeyword,
-        poundKeyword: poundKeyword,
-        unexpectedBetweenPoundKeywordAndCondition,
-        condition: condition,
-        unexpectedBetweenConditionAndElements,
-        elements: availability,
-        unexpectedAfterElements,
-        trailingTrivia: trailingTrivia
-      )
+      return with(\.elements, availability)
     } else {
       return nil
     }
   }
   
   var clonedAsIf: IfConfigClauseSyntax {
-    IfConfigClauseSyntax(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforePoundKeyword,
-      poundKeyword: .poundIfKeyword(),
-      unexpectedBetweenPoundKeywordAndCondition,
-      condition: condition,
-      unexpectedBetweenConditionAndElements,
-      elements: elements,
-      unexpectedAfterElements,
-      trailingTrivia: trailingTrivia
-    )
+    detached.with(\.poundKeyword, .poundIfKeyword())
   }
 }
 
@@ -90,15 +70,7 @@ extension IfConfigDeclSyntax {
     if elements.isEmpty {
       return nil
     } else {
-      return IfConfigDeclSyntax(
-        leadingTrivia: leadingTrivia,
-        unexpectedBeforeClauses,
-        clauses: IfConfigClauseListSyntax(elements),
-        unexpectedBetweenClausesAndPoundEndif,
-        poundEndif: poundEndif,
-        unexpectedAfterPoundEndif,
-        trailingTrivia: trailingTrivia
-      )
+      return with(\.clauses, IfConfigClauseListSyntax(elements))
     }
     
   }
