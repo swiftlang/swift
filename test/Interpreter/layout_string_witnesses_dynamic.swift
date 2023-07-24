@@ -753,6 +753,41 @@ func testGenericSinglePayloadEnumManyXI() {
 
 testGenericSinglePayloadEnumManyXI()
 
+struct RefPlusEnumResolve {
+    let x: SimpleClass
+    let y: ResilientSinglePayloadEnumComplex
+}
+
+func testRefPlusEnumResolve() {
+    let ptr = allocateInternalGenericPtr(of: RefPlusEnumResolve.self)
+
+    do {
+        let x = RefPlusEnumResolve(x: SimpleClass(x: 23), y: .nonEmpty(.nonEmpty1(SimpleClass(x: 23))))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = RefPlusEnumResolve(x: SimpleClass(x: 23), y: .nonEmpty(.nonEmpty1(SimpleClass(x: 23))))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericDestroy(ptr, of: RefPlusEnumResolve.self)
+
+    ptr.deallocate()
+}
+
+testRefPlusEnumResolve()
+
 func testResilientSingletonEnumTag() {
     let x = switch getResilientSingletonEnumNonEmpty(SimpleClass(x: 23)) {
     case .nonEmpty: 0
@@ -938,6 +973,41 @@ func testResilientPayloadSinglePayloadEnum() {
 }
 
 testResilientPayloadSinglePayloadEnum()
+
+struct SinglePayloadSimpleResolve {
+    let x: ResilientSinglePayloadEnumSimple
+    let y: ResilientSinglePayloadEnumComplex
+}
+
+func testSinglePayloadSimpleResolve() {
+    let ptr = allocateInternalGenericPtr(of: SinglePayloadSimpleResolve.self)
+
+    do {
+        let x = SinglePayloadSimpleResolve(x: .nonEmpty(SimpleClass(x: 23)), y: .nonEmpty(.nonEmpty1(SimpleClass(x: 23))))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadSimpleResolve(x: .nonEmpty(SimpleClass(x: 32)), y: .nonEmpty(.nonEmpty1(SimpleClass(x: 32))))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericDestroy(ptr, of: SinglePayloadSimpleResolve.self)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadSimpleResolve()
 
 #if os(macOS)
 
