@@ -335,7 +335,7 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
 
       // The padding can be used as spare bits by enum layout.
       auto numBits = Size(paddingRequired).getValueInBits();
-      auto mask = llvm::APInt::getAllOnesValue(numBits);
+      auto mask = llvm::APInt::getAllOnes(numBits);
       CurSpareBits.push_back(SpareBitVector::fromAPInt(mask));
     }
   }

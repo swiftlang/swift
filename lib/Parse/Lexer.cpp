@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -60,7 +61,7 @@ using clang::isWhitespace;
 static bool EncodeToUTF8(unsigned CharValue,
                          SmallVectorImpl<char> &Result) {
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
+  unsigned NumBits = 32-llvm::countl_zero(CharValue);
 
   // Handle the leading byte, based on the number of bits in the value.
   unsigned NumTrailingBytes;
@@ -100,7 +101,7 @@ static bool EncodeToUTF8(unsigned CharValue,
 
 /// CLO8 - Return the number of leading ones in the specified 8-bit value.
 static unsigned CLO8(unsigned char C) {
-  return llvm::countLeadingOnes(uint32_t(C) << 24);
+  return llvm::countl_zero(uint32_t(C) << 24);
 }
 
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
@@ -162,7 +163,7 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
+  unsigned NumBits = 32-llvm::countl_zero(CharValue);
   
   if (NumBits <= 5+6)
     return EncodedBytes == 2 ? CharValue : ~0U;

@@ -934,7 +934,7 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
     occupiedIndex = index;
     spareIndex = spareBitBias;
   } else {
-    auto occupiedBitMask = APInt::getAllOnesValue(occupiedBitCount);
+    auto occupiedBitMask = APInt::getAllOnes(occupiedBitCount);
     occupiedBitMask = occupiedBitMask.zext(32);
     auto occupiedBitMaskValue = llvm::ConstantInt::get(C, occupiedBitMask);
     occupiedIndex = IGF.Builder.CreateAnd(index, occupiedBitMaskValue);
