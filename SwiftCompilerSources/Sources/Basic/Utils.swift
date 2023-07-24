@@ -126,10 +126,13 @@ extension String {
   }
 
   /// Underscored to avoid name collision with the std overlay.
-  /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
+  /// To be replaced with an overlay call once the CI uses Swift 5.9.
   public init(_cxxString s: std.string) {
-    self.init(cString: s.__c_strUnsafe())
-    withExtendedLifetime(s) {}
+#if compiler(>=5.9)
+    self.init(s)
+#else
+    self.init(cxxString: s)
+#endif
   }
 }
 
