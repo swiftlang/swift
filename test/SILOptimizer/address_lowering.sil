@@ -1070,6 +1070,26 @@ block(%instance : @owned $any Error):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @f164_testOpenedArchetype2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ERROR_EXI:%[^,]+]] :
+// CHECK:         [[ERROR_CONCR:%[^,]+]] = open_existential_box [[ERROR_EXI]]
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         copy_addr [[ERROR_CONCR]] to [init] [[STACK]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'f164_testOpenedArchetype2'
+sil [ossa] @f164_testOpenedArchetype2 : $@convention(thin) (@guaranteed any Error) -> () {
+bb0(%error_exi : @guaranteed $any Error):
+  %error_concr = open_existential_box_value %error_exi : $any Error to $@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  %stack = alloc_stack $@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  %error_copy = copy_value %error_concr : $@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  store %error_copy to [init] %stack : $*@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  destroy_addr %stack : $*@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  dealloc_stack %stack : $*@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  %tuple = tuple ()
+  return %tuple : $()
+}
+
 // CHECK-LABEL: sil [ossa] @f170_compare : $@convention(thin) <T where T : Comparable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   [[WT:%.*]] = witness_method $T, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Builtin.Int1 : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Builtin.Int1
