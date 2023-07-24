@@ -177,13 +177,22 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
           assert(RefInst->getNumOperands() == 1 &&
                  "Make sure RefInst only has one argument.");
           LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
-                     "Self.\n");
+                                     "Self.\n");
           continue;
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
-                     "not on self.\n");
-          return DestructorEffects::Unknown;
         }
+        LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                                   "not on self.\n");
+        return DestructorEffects::Unknown;
+      }
+      if (auto *destroy = dyn_cast<DestroyValueInst>(&I)) {
+        if (stripCasts(destroy->getOperand()) == Self) {
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
+                                     "Self.\n");
+          continue;
+        }
+        LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                                   "not on self.\n");
+        return DestructorEffects::Unknown;
       }
 
       // dealloc_stack can be ignored.
@@ -246,7 +255,15 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
 /// alloc_ref alive.
 static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
                               bool onlyAcceptTrivialStores) {
-  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
+  if (isa<DestroyValueInst>(Inst)) {
+    return acceptRefCountInsts;
+  }
+  if (isa<CopyValueInst>(Inst) || isa<BeginBorrowInst>(Inst) ||
+      isa<MoveValueInst>(Inst)) {
+    return true;
+  }
+  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst) ||
+      isa<EndBorrowInst>(Inst))
     return true;
 
   // It is ok to eliminate various retains/releases. We are either removing
@@ -384,6 +401,7 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
 
   SmallVector<RefElementAddrInst *, 8> refElementAddrs;
+
   BuiltinInst *destroyArray = nullptr;
   auto *allocRef = dyn_cast<AllocRefInstBase>(allocation);
 
@@ -397,11 +415,10 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
     if (Users && !Users->insert(I)) {
       LLVM_DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
       continue;
-    }
-    if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
+    } else if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
       if (rea != allocation && !rea->getType().isTrivial(*rea->getFunction()))
         refElementAddrs.push_back(rea);
-    } else if (allocRef && Users && isDestroyArray(I)) {
+    } else if (allocRef && isDestroyArray(I)) {
       if (destroyArray)
         return true;
       destroyArray = cast<BuiltinInst>(I);
@@ -434,20 +451,20 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
     }
   }
 
-  // In OSSA, we don't have to do this check. We can always accept a
-  // destroyArray and insert the compensating destroys right at the store
-  // instructions.
-  if (destroyArray)
-    return !onlyStoresToTailObjects(destroyArray, *Users, allocRef);
-
-  // In non-OSSA we cannot reliably track the lifetime of non-trivial stored
-  // properties. Removing the dead alloc_ref might leak a property value.
-  // TODO: in OSSA we can replace stores to properties with a destroy_value.
-  for (RefElementAddrInst *rea : refElementAddrs) {
-    // Re-run the check with not accepting non-trivial stores.
-    if (hasUnremovableUsers(rea, nullptr, acceptRefCountInsts,
-                            /*onlyAcceptTrivialStores*/ true))
-      return true;
+  if (!allocation->getFunction()->hasOwnership()) {
+    // In non-ossa, if we found a destroy array builtin that destroys the tail
+    // elements, ensure all stores are to the taile elems.
+    if (destroyArray) {
+      return !onlyStoresToTailObjects(destroyArray, *Users, allocRef);
+    }
+    // In non-OSSA we cannot reliably track the lifetime of non-trivial stored
+    // properties. Removing the dead alloc_ref might leak a property value.
+    for (RefElementAddrInst *rea : refElementAddrs) {
+      // Re-run the check with not accepting non-trivial stores.
+      if (hasUnremovableUsers(rea, nullptr, acceptRefCountInsts,
+                              /*onlyAcceptTrivialStores*/ true))
+        return true;
+    }
   }
 
   return false;
@@ -820,21 +837,35 @@ bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
     return false;
   }
 
-  // Find the instruction which releases the object's tail elements.
-  SILInstruction *releaseOfTailElems = nullptr;
-  for (SILInstruction *user : UsersToRemove) {
-    if (isDestroyArray(user) ||
-       (destructorEffects == DestructorEffects::DestroysTailElems &&
-        isa<RefCountingInst>(user) && user->mayRelease())) {
-      // Bail if we find multiple such instructions.
-      if (releaseOfTailElems)
+  if (!ARI->getFunction()->hasOwnership()) {
+    // Find the instruction which releases the object's tail elements.
+    SILInstruction *releaseOfTailElems = nullptr;
+    for (SILInstruction *user : UsersToRemove) {
+      if (isDestroyArray(user) ||
+          (destructorEffects == DestructorEffects::DestroysTailElems &&
+           isa<RefCountingInst>(user) && user->mayRelease())) {
+        // Bail if we find multiple such instructions.
+        if (releaseOfTailElems)
+          return false;
+        releaseOfTailElems = user;
+      }
+    }
+    if (releaseOfTailElems) {
+      if (!insertCompensatingReleases(releaseOfTailElems, UsersToRemove)) {
         return false;
-      releaseOfTailElems = user;
+      }
     }
   }
-  if (releaseOfTailElems) {
-    if (!insertCompensatingReleases(releaseOfTailElems, UsersToRemove)) {
-      return false;
+
+  if (ARI->getFunction()->hasOwnership()) {
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial) {
+        continue;
+      }
+      SILBuilderWithScope(store).createDestroyValue(store->getLoc(),
+                                                    store->getSrc());
     }
   }
 
