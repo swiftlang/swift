@@ -7365,6 +7365,9 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
       "non-@frozen public and @usableFromInline noncopyable types are not "
       "supported",
       (const ValueDecl *))
+ERROR(noncopyable_cannot_have_read_set_accessor,none,
+      "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
+      (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)
