@@ -232,9 +232,9 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   PrintPassOptions PrintPassOpts;
   PrintPassOpts.Indent = DebugPassStructure;
   PrintPassOpts.SkipAnalyses = DebugPassStructure;
-  StandardInstrumentations SI(DebugPassStructure, /*VerifyEach*/ false,
-                              PrintPassOpts);
-  SI.registerCallbacks(PIC, &FAM);
+  StandardInstrumentations SI(Module->getContext(), DebugPassStructure,
+                              /*VerifyEach*/ false, PrintPassOpts);
+  SI.registerCallbacks(PIC, &MAM);
 
   PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
 
