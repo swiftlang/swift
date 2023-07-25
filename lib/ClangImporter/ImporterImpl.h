@@ -589,6 +589,17 @@ public:
     return Instance.get();
   }
 
+  /// Whether the C++ interoperability compatibility version is at least
+  /// 'major'.
+  ///
+  /// Use the
+  /// `isCxxInteropCompatVersionAtLeast(version::getUpcomingCxxInteropCompatVersion())`
+  /// check when making a source breaking C++ interop change.
+  bool isCxxInteropCompatVersionAtLeast(unsigned major,
+                                        unsigned minor = 0) const {
+    return SwiftContext.LangOpts.isCxxInteropCompatVersionAtLeast(major, minor);
+  }
+
 private:
   /// The Importer may be configured to load modules of a different OS Version
   /// than the underlying Swift compilation. This is the `TargetOptions`
