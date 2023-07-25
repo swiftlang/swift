@@ -83,3 +83,27 @@ protocol Q: P where A: Q {}
 // CHECK-LABEL: sameType2
 // CHECK-NEXT: Generic signature: <each T, each U where repeat each T : Q, repeat each U : Q, repeat (each T).[P]A.[P]A == (each U).[P]A.[P]A>
 func sameType2<each T, each U>(_: repeat (each T, each U)) where repeat each T: Q, repeat each U: Q, repeat (each T).A.A == (each U).A.A {}
+
+
+//////
+///
+/// A same-type requirement between two pack expansion types
+/// should desugar to a same-shape requirement between their
+/// count types and a same-type requirement between their
+/// element types.
+///
+//////
+
+typealias First<T, U> = T
+typealias Shape<each T> = (repeat First<(), each T>)
+
+// CHECK-LABEL: sameTypeDesugar1
+// CHECK-NEXT: Generic signature: <each T, each U where (repeat (each T, each U)) : Any>
+func sameTypeDesugar1<each T, each U>(t: repeat each T, u: repeat each U)
+  where Shape<repeat each T> == Shape<repeat each U> {}
+
+// CHECK-LABEL: sameTypeDesugar2
+// CHECK-NEXT: Generic signature: <each T, each U where repeat each T : P, (repeat (each T, each U)) : Any, repeat each U : P>
+func sameTypeDesugar2<each T: P, each U: P>(t: repeat each T, u: repeat each U)
+  where Shape<repeat (each T).A> == Shape<repeat (each U).A> {}
+
