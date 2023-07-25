@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
+#include "LocalTypeDataKind.h"
 
 namespace llvm {
   class Value;
@@ -37,7 +38,6 @@ class Address;
 class Explosion;
 class IRGenFunction;
 class IRGenModule;
-class LocalTypeDataKey;
 class TypeInfo;
 
 /// A helper class for emitting outlined value operations.
