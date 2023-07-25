@@ -2199,6 +2199,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
 
           case TypePosition::Contravariant:
           case TypePosition::Invariant:
+          case TypePosition::Shape:
             return Type(t);
           }
 
