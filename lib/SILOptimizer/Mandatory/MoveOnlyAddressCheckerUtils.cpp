@@ -280,6 +280,8 @@
 using namespace swift;
 using namespace swift::siloptimizer;
 
+#pragma clang optimize off
+
 llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
     "move-only-address-checker-disable-lifetime-extension",
     llvm::cl::init(false),
@@ -342,7 +344,7 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
     break;
   }
   }
-  
+
   // Insert a new debug_value instruction after the reinitialization, so that
   // the debugger knows that the variable is in a usable form again.
   insertDebugValueBefore(memInst->getNextInstruction(), debugVar,
@@ -931,6 +933,7 @@ void UseState::initializeLiveness(
   // We begin by initializing all of our init uses.
   for (auto initInstAndValue : initInsts) {
     LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
+
     liveness.initializeDef(initInstAndValue.first, initInstAndValue.second);
   }
 
@@ -944,7 +947,7 @@ void UseState::initializeLiveness(
                              reinitInstAndValue.second);
     }
   }
-  
+
   // Then check if our markedValue is from an argument that is in,
   // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
   // the initialization point.
@@ -1049,6 +1052,26 @@ void UseState::initializeLiveness(
 
   LLVM_DEBUG(llvm::dbgs() << "Liveness with just inits:\n";
              liveness.print(llvm::dbgs()));
+
+  for (auto initInstAndValue : initInsts) {
+    // If our init inst is a store_borrow, treat the end_borrow as liveness
+    // uses.
+    //
+    // NOTE: We do not need to check for access scopes here since store_borrow
+    // can only apply to alloc_stack today.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(initInstAndValue.first)) {
+      // We can only store_borrow if our mark_must_check is a
+      // no_consume_or_assign.
+      assert(address->getCheckKind() ==
+                 MarkMustCheckInst::CheckKind::NoConsumeOrAssign &&
+             "store_borrow implies no_consume_or_assign since we cannot "
+             "consume a borrowed inited value");
+      for (auto *ebi : sbi->getEndBorrows()) {
+        liveness.updateForUse(ebi, initInstAndValue.second,
+                              false /*lifetime ending*/);
+      }
+    }
+  }
 
   // Now at this point, we have defined all of our defs so we can start adding
   // uses to the liveness.
@@ -1978,6 +2001,22 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
+
+  // This visitor looks through store_borrow instructions but does visit the
+  // end_borrow of the store_borrow. If we see such an end_borrow, register the
+  // store_borrow instead. Since we use sets, if we visit multiple end_borrows,
+  // we will only record the store_borrow once.
+  if (auto *ebi = dyn_cast<EndBorrowInst>(user)) {
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
+      LLVM_DEBUG(llvm::dbgs() << "Found store_borrow: " << *sbi);
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange)
+        return false;
+
+      useState.recordInitUse(user, op->get(), *leafRange);
+      return true;
+    }
+  }
 
   if (auto *di = dyn_cast<DebugValueInst>(user)) {
     // Save the debug_value if it is attached directly to this mark_must_check.

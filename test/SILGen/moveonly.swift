@@ -818,13 +818,10 @@ func enumSwitchTest1(_ e: borrowing EnumSwitchTests.E) {
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
-// FIXME: this copy probably shouldn't be here when accessing through the letGlobal, but maybe it's cleaned up?
-// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]] : $*NonTrivialStruct
-// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
-// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]] : $NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]] : $*NonTrivialStruct
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_VAL]] : $NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
 // CHECK: apply {{%.*}}([[LOADED_GEP]])
-// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
-// CHECK: destroy_value [[LOADED_VAL]]
+// CHECK: end_borrow [[LOADED_VAL]]
 // CHECK: } // end sil function '$s8moveonly16testGlobalBorrowyyF'
 func testGlobalBorrow() {
     borrowVal(varGlobal)
@@ -856,13 +853,11 @@ func testGlobalBorrow() {
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
-// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
-// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
-// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_VAL]]
 // CHECK: [[LOADED_GEP_COPY:%.*]] = copy_value [[LOADED_GEP]]
-// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
-// CHECK: destroy_value [[LOADED_VAL]]
 // CHECK: apply {{%.*}}([[LOADED_GEP_COPY]])
+// CHECK: end_borrow [[LOADED_VAL]]
 //
 // CHECK: } // end sil function '$s8moveonly17testGlobalConsumeyyF'
 func testGlobalConsume() {
@@ -1833,11 +1828,8 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Var() {
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[LOAD_BORROW]])
-// CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
-// CHECK: copy_addr [[CORO_RESULT]] to [init] [[TEMP]]
+// CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: apply {{%.*}}([[TEMP]])
-// CHECK: destroy_addr [[TEMP]]
 // CHECK: end_borrow [[LOAD_BORROW]]
 // CHECK: } // end sil function '$s8moveonly58testSubscriptReadModify_BaseLoadable_ResultAddressOnly_LetyyF'
 public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Let() {

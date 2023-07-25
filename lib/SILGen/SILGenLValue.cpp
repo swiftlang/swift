@@ -2918,6 +2918,8 @@ public:
       return m->getType()->isPureMoveOnly() ||
              m->getBase()->getType()->isPureMoveOnly();
     }
+    if (auto *d = dyn_cast<DeclRefExpr>(e))
+      return e->getType()->isPureMoveOnly();
     return false;
   }
 

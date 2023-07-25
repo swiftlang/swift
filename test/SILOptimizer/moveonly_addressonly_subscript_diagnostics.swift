@@ -203,7 +203,6 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Var() {
 public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Let() {
     let m = LoadableSubscriptReadModifyTester()
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
 }
 
 public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_InOut(m: inout LoadableSubscriptReadModifyTester) {

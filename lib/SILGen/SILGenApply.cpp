@@ -3124,6 +3124,21 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
     return nullptr;
 
+  // If we did not see a load or a subscript expr and our argExpr is a
+  // declref_expr, return nullptr. We have an object not something that will be
+  // in memory. This can happen with classes or with values captured by a
+  // closure.
+  //
+  // NOTE: If we see a member_ref_expr from a decl_ref_expr, we still process it
+  // since the declref_expr could be from a class.
+  if (!sawLoad && !subscriptExpr) {
+    if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
+      assert(!declRef->getType()->is<LValueType>() &&
+             "Shouldn't ever have an lvalue type here!");
+      return nullptr;
+    }
+  }
+
   auto result = ::findStorageReferenceExprForBorrow(argExpr);
 
   if (!result)
@@ -3143,31 +3158,18 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   }
 
   if (!storage)
-      return nullptr;
+    return nullptr;
   assert(type);
 
   SILType ty =
       SGF.getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
   bool isMoveOnly = ty.isPureMoveOnly();
   if (auto *pd = dyn_cast<ParamDecl>(storage)) {
-      isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Borrowing;
-      isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Consuming;
+    isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Borrowing;
+    isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Consuming;
   }
   if (!isMoveOnly)
-      return nullptr;
-
-  // It makes sense to borrow any kind of storage we refer to at this stage,
-  // but SILGenLValue does not currently handle some kinds of references well.
-  //
-  // When rejecting to do the LValue-style borrow here, it'll end up going thru
-  // the RValue-style emission, after which the extra copy will get eliminated.
-  //
-  // If we did not see a LoadExpr around the argument expression, then only
-  // do the borrow if the storage is non-local.
-  // FIXME: I don't have a principled reason for why this matters and hope that
-  // we can fix the AST we're working with.
-  if (!sawLoad && storage->getDeclContext()->isLocalContext())
-      return nullptr;
+    return nullptr;
 
   // Claim the value of this argument since we found a storage reference that
   // has a move only base.
