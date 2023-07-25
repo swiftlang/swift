@@ -14,6 +14,7 @@
 #define SWIFT_AST_RESILIENCE_EXPANSION_H
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
