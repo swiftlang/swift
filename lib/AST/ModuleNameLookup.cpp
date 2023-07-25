@@ -162,6 +162,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       [&](ValueDecl *VD) {
         if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
           return true;
+        if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(VD))
+          return true;
         if (respectAccessControl &&
             !VD->isAccessibleFrom(moduleScopeContext, false,
                                   includeUsableFromInline))
@@ -310,6 +312,9 @@ void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {
     return;
   case ResolutionKind::TypesOnly:
     out << "TypesOnly";
+    return;
+  case ResolutionKind::MacrosOnly:
+    out << "MacrosOnly";
     return;
   }
   llvm_unreachable("Unhandled case in switch");
