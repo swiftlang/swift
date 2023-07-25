@@ -786,10 +786,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Extract all direct results.
   SmallVector<SILValue, 8> directResults;
   extractAllElements(apply, builder, directResults);
-  auto originalDirectResults = ArrayRef<SILValue>(directResults).drop_back(1);
-  auto originalDirectResult =
-      joinElements(originalDirectResults, builder, apply->getLoc());
   auto linearMap = directResults.back();
+  directResults.pop_back();
 
   auto linearMapType = linearMap->getType().castTo<SILFunctionType>();
   auto linearMapTargetType = targetType->getResults()
@@ -830,8 +828,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
          0);
   if (origFnType->getNumResults() > 0 &&
       origFnType->getResults().front().isFormalDirect()) {
-    auto result =
-        joinElements({originalDirectResult, thunkedLinearMap}, builder, loc);
+    directResults.push_back(thunkedLinearMap);
+    auto result = joinElements(directResults, builder, loc);
     builder.createReturn(loc, result);
   } else {
     builder.createReturn(loc, thunkedLinearMap);
