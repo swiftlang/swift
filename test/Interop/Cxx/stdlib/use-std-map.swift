@@ -39,4 +39,22 @@ StdMapTestSuite.test("UnorderedMap.subscript") {
   expectNil(m[5])
 }
 
+StdMapTestSuite.test("Map.erase") {
+  var m = initMap()
+  expectNotNil(m[1])
+  m.erase(1)
+  expectNil(m[1])
+  m.erase(1)
+  expectNil(m[1])
+}
+
+StdMapTestSuite.test("UnorderedMap.erase") {
+  var m = initUnorderedMap()
+  expectNotNil(m[2])
+  m.erase(2)
+  expectNil(m[2])
+  m.erase(2)
+  expectNil(m[2])
+}
+
 runAllTests()
