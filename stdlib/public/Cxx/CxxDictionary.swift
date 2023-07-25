@@ -42,8 +42,26 @@ public protocol CxxDictionary<Key, Value> {
   /// Do not implement this function manually in Swift.
   func __endUnsafe() -> RawIterator
 
+<<<<<<< HEAD
   /// Do not implement this function manually in Swift.
   mutating func __endMutatingUnsafe() -> RawMutableIterator
+=======
+  func filter(
+    _ isIncluded: (Key, Value) throws -> Bool
+  ) rethrows -> [Key: Value] {
+    var filteredDictionary: [Key: Value] = [:]
+    let iterator = __findUnsafe(Key)
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+      let pair = iterator.pointee
+      if try isIncluded(pair.first, pair.second) {
+        filteredDictionary[pair.first] = pair.second
+      }
+      iterator.successor()
+    }
+  }
+>>>>>>> 2dccec95be3 (Add filter method for ordered and unordered map)
 }
 
 extension CxxDictionary {
