@@ -107,3 +107,22 @@ func sameTypeDesugar1<each T, each U>(t: repeat each T, u: repeat each U)
 func sameTypeDesugar2<each T: P, each U: P>(t: repeat each T, u: repeat each U)
   where Shape<repeat (each T).A> == Shape<repeat (each U).A> {}
 
+/// More complex example involving concrete type matching in
+/// property map construction
+
+protocol PP {
+  associatedtype A
+}
+
+struct G<each T> {}
+
+// CHECK-LABEL: sameTypeMatch1
+// CHECK-NEXT: <T, each U, each V where T : PP, repeat each U : PP, repeat each V : PP, T.[PP]A == G<repeat (each U).[PP]A>, repeat (each U).[PP]A == (each V).[PP]A>
+func sameTypeMatch1<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: repeat each V)
+  where T.A == G<repeat (each U).A>, T.A == G<repeat (each V).A>,
+        (repeat (each U, each V)) : Any {}
+
+// CHECK-LABEL: sameTypeMatch2
+// CHECK-NEXT: <T, each U, each V where T : PP, repeat each U : PP, (repeat (each U, each V)) : Any, repeat each V : PP, T.[PP]A == (/* shape: each U */ repeat ())>
+func sameTypeMatch2<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: repeat each V)
+  where T.A == Shape<repeat each U>, T.A == Shape<repeat each V> {}
