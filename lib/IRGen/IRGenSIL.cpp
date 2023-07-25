@@ -2653,6 +2653,10 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         llvm::report_fatal_error(
             "Instruction resulted in on-stack pack metadata emission but no "
             "cleanup instructions were added");
+        // The markers which indicate where on-stack pack metadata should be
+        // deallocated were not inserted for I.  To fix this, add I's opcode to
+        // SILInstruction::mayRequirePackMetadata subject to the appropriate
+        // checks.
       }
     }
 #endif
