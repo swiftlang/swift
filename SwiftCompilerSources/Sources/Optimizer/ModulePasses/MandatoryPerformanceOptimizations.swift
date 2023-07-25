@@ -134,15 +134,64 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
     return true
   }
-  if apply.parentFunction.isGlobalInitOnceFunction,
-      let global = apply.parentFunction.getInitializedGlobal(),
-      global.mustBeInitializedStatically,
-      let applyInst = apply as? ApplyInst,
-      let projectionPath = applyInst.isStored(to: global),
-      alreadyInlinedFunctions.insert(PathFunctionTuple(path: projectionPath, function: callee)).inserted {
+
+  if apply.substitutionMap.isEmpty,
+     let pathIntoGlobal = apply.resultIsUsedInGlobalInitialization(),
+     alreadyInlinedFunctions.insert(PathFunctionTuple(path: pathIntoGlobal, function: callee)).inserted {
     return true
   }
+
   return false
+}
+
+private extension FullApplySite {
+  func resultIsUsedInGlobalInitialization() -> SmallProjectionPath? {
+    guard parentFunction.isGlobalInitOnceFunction,
+          let global = parentFunction.getInitializedGlobal() else {
+      return nil
+    }
+
+    switch numIndirectResultArguments {
+    case 0:
+      return singleDirectResult?.isStored(to: global)
+    case 1:
+      let resultAccessPath = arguments[0].accessPath
+      switch resultAccessPath.base {
+      case .global(let resultGlobal) where resultGlobal == global:
+        return resultAccessPath.materializableProjectionPath
+      case .stack(let allocStack) where resultAccessPath.projectionPath.isEmpty:
+        return allocStack.getStoredValue(by: self)?.isStored(to: global)
+      default:
+        return nil
+      }
+    default:
+      return nil
+    }
+  }
+}
+
+private extension AllocStackInst {
+  func getStoredValue(by storingInstruction: Instruction) -> Value? {
+    // If the only use (beside `storingInstruction`) is a load, it's the value which is
+    // stored by `storingInstruction`.
+    var loadedValue: Value? = nil
+    for use in self.uses {
+      switch use.instruction {
+      case is DeallocStackInst:
+        break
+      case let load as LoadInst:
+        if loadedValue != nil {
+          return nil
+        }
+        loadedValue = load
+      default:
+        if use.instruction != storingInstruction {
+          return nil
+        }
+      }
+    }
+    return loadedValue
+  }
 }
 
 private extension Value {
@@ -193,15 +242,13 @@ private extension Value {
         path = path.push(.enumCase, index: ei.caseIndex)
         break
       case let si as StoreInst:
-        guard let storeDestination = si.destination as? GlobalAddrInst else {
+        let accessPath = si.destination.getAccessPath(fromInitialPath: path)
+        switch accessPath.base {
+        case .global(let storedGlobal) where storedGlobal == global:
+          return accessPath.materializableProjectionPath
+        default:
           return nil
         }
-
-        guard storeDestination.global == global else {
-          return nil
-        }
-        
-        return path
       default:
         return nil
       }
