@@ -1538,9 +1538,10 @@ synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked*/ true};
 }
 
-/// Synthesizer callback for a subscript setter.
+/// Synthesizer callback for a subscript setter or a setter for a dereference
+/// property (`var pointee`).
 static std::pair<BraceStmt *, bool>
-synthesizeSubscriptSetterBody(AbstractFunctionDecl *afd, void *context) {
+synthesizeUnwrappingSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto setterDecl = cast<AccessorDecl>(afd);
   auto setterImpl = static_cast<FuncDecl *>(context);
 
@@ -1548,7 +1549,11 @@ synthesizeSubscriptSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   auto selfArg = createSelfArg(setterDecl);
   DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
-  DeclRefExpr *keyParamRefExpr = createParamRefExpr(setterDecl, 1);
+  // For a subscript this decl will have two parameters, for a pointee property
+  // it will only have one.
+  DeclRefExpr *keyParamRefExpr = setterDecl->getParameters()->size() == 1
+                                     ? nullptr
+                                     : createParamRefExpr(setterDecl, 1);
 
   Type elementTy = valueParamRefExpr->getDecl()->getInterfaceType();
 
@@ -1644,7 +1649,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
-    setterDecl->setBodySynthesizer(synthesizeSubscriptSetterBody, setterImpl);
+    setterDecl->setBodySynthesizer(synthesizeUnwrappingSetterBody, setterImpl);
 
     if (setterImpl->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1663,13 +1668,19 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
 // MARK: C++ dereference operator
 
-VarDecl *SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
-    FuncDecl *dereferenceFunc) {
+VarDecl *
+SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
+                                                      FuncDecl *setter) {
+  assert((getter || setter) &&
+         "getter or setter required to generate a pointee property");
+
   auto &ctx = ImporterImpl.SwiftContext;
-  auto dc = dereferenceFunc->getDeclContext();
+  FuncDecl *getterImpl = getter ? getter : setter;
+  FuncDecl *setterImpl = setter;
+  auto dc = getterImpl->getDeclContext();
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
-  const auto rawElementTy = dereferenceFunc->getResultInterfaceType();
+  const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
   const auto elementTy = rawElementTy->getAnyPointerElementType()
                              ? rawElementTy->getAnyPointerElementType()
@@ -1677,14 +1688,14 @@ VarDecl *SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
-              dereferenceFunc->getStartLoc(), ctx.getIdentifier("pointee"), dc);
+              getterImpl->getStartLoc(), ctx.getIdentifier("pointee"), dc);
   result->setInterfaceType(elementTy);
   result->setAccess(AccessLevel::Public);
   result->setImplInfo(StorageImplInfo::getImmutableComputed());
 
   AccessorDecl *getterDecl = AccessorDecl::create(
-      ctx, dereferenceFunc->getLoc(), dereferenceFunc->getLoc(),
-      AccessorKind::Get, result, SourceLoc(), StaticSpellingKind::None,
+      ctx, getterImpl->getLoc(), getterImpl->getLoc(), AccessorKind::Get,
+      result, SourceLoc(), StaticSpellingKind::None,
       /*async*/ false, SourceLoc(),
       /*throws*/ false, SourceLoc(), ParameterList::createEmpty(ctx), elementTy,
       dc);
@@ -1693,14 +1704,43 @@ VarDecl *SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
   getterDecl->setBodySynthesizer(synthesizeUnwrappingGetterBody,
-                                 dereferenceFunc);
+                                 getterImpl);
 
-  if (dereferenceFunc->isMutating()) {
+  if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
     result->setIsGetterMutating(true);
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, /*setter*/ nullptr);
+  AccessorDecl *setterDecl = nullptr;
+  if (setterImpl) {
+    auto paramVarDecl =
+        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                            ctx.getIdentifier("newValue"), dc);
+    paramVarDecl->setSpecifier(ParamSpecifier::Default);
+    paramVarDecl->setInterfaceType(elementTy);
+
+    auto setterParamList =
+        ParameterList::create(ctx, {paramVarDecl});
+
+    setterDecl = AccessorDecl::create(
+        ctx, setterImpl->getLoc(), setterImpl->getLoc(), AccessorKind::Set,
+        result, SourceLoc(), StaticSpellingKind::None,
+        /*async*/ false, SourceLoc(),
+        /*throws*/ false, SourceLoc(), setterParamList,
+        TupleType::getEmpty(ctx), dc);
+    setterDecl->setAccess(AccessLevel::Public);
+    setterDecl->setImplicit();
+    setterDecl->setIsDynamic(false);
+    setterDecl->setIsTransparent(true);
+    setterDecl->setBodySynthesizer(synthesizeUnwrappingSetterBody, setterImpl);
+
+    if (setterImpl->isMutating()) {
+      setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+      result->setIsSetterMutating(true);
+    }
+  }
+
+  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
   return result;
 }
 
