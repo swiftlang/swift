@@ -112,6 +112,7 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
       {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
+      {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -1618,6 +1619,11 @@ namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
 
+  // When performing lookup for freestanding macro roles, only consider
+  // macro names, ignoring types.
+  bool onlyMacros = static_cast<bool>(roles & getFreestandingMacroRoles()) &&
+      !(roles - getFreestandingMacroRoles());
+
   // Macro lookup should always exclude macro expansions; macro
   // expansions cannot introduce new macro declarations. Note that
   // the source location here doesn't matter.
@@ -1626,8 +1632,12 @@ namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
     UnqualifiedLookupFlags::ExcludeMacroExpansions
   };
 
+  if (onlyMacros)
+    descriptor.Options |= UnqualifiedLookupFlags::MacroLookup;
+
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+
   for (const auto &found : lookup.allResults()) {
     if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
       auto candidateRoles = macro->getMacroRoles();
@@ -1638,6 +1648,7 @@ namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
       }
     }
   }
+
   return choices;
 }
 
@@ -2408,6 +2419,11 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
+      // If we're performing a macro lookup, don't even attempt to validate
+      // the decl if its not a macro.
+      if ((options & NL_OnlyMacros) && !isa<MacroDecl>(decl))
+        continue;
+
       if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits))
         decls.push_back(decl);
     }
@@ -2491,8 +2507,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-  auto kind = (options & NL_OnlyTypes
-               ? ResolutionKind::TypesOnly
+  auto kind = (options & NL_OnlyTypes ? ResolutionKind::TypesOnly
+               : options & NL_OnlyMacros ? ResolutionKind::MacrosOnly
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
@@ -2534,8 +2550,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-  // Type-only lookup won't find anything on AnyObject.
-  if (options & NL_OnlyTypes)
+  // Type-only and macro lookup won't find anything on AnyObject.
+  if (options & (NL_OnlyTypes | NL_OnlyMacros))
     return decls;
 
   // Collect all of the visible declarations.
@@ -4027,6 +4043,7 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NL_RemoveOverridden)
     FLAG(NL_IgnoreAccessControl)
     FLAG(NL_OnlyTypes)
+    FLAG(NL_OnlyMacros)
     FLAG(NL_IncludeAttributeImplements)
 #undef FLAG
   };
