@@ -1183,8 +1183,7 @@ public:
     if (!FailBBs.empty()) {
       // Move the trap basic blocks to the end of the function.
       for (auto *FailBB : FailBBs) {
-        auto &BlockList = CurFn->getBasicBlockList();
-        BlockList.splice(BlockList.end(), BlockList, FailBB);
+        CurFn->splice(CurFn->end(), CurFn, llvm::Function::iterator(FailBB));
       }
     }
   }
@@ -2417,7 +2416,7 @@ void IRGenSILFunction::emitSILFunction() {
     // FIXME: Use the SIL basic block's name.
     llvm::BasicBlock *llBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
     auto phis = emitPHINodesForBBArgs(*this, &*bi, llBB);
-    CurFn->getBasicBlockList().push_back(llBB);
+    CurFn->insert(CurFn->end(), llBB);
     LoweredBBs[&*bi] = LoweredBB(llBB, std::move(phis));
   }
 
