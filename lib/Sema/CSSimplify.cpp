@@ -5093,7 +5093,7 @@ bool ConstraintSystem::repairFailures(
     if (auto objType = valueType->getOptionalObjectType())
       valueType = objType;
 
-    if (rawReprType->isTypeVariableOrMember())
+    if (rawReprType->isTypeVariableOrMember() || rawReprType->isPlaceholder())
       return false;
 
     auto rawValue = isRawRepresentable(*this, rawReprType);
@@ -5348,6 +5348,11 @@ bool ConstraintSystem::repairFailures(
         return true;
 
       if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
+        return true;
+
+      // If either side is a placeholder then let's consider this
+      // assignment correctly typed.
+      if (lhs->isPlaceholder() || rhs->isPlaceholder())
         return true;
 
       // Let's try to match source and destination types one more
