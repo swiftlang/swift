@@ -2186,17 +2186,6 @@ namespace {
       // The name of every member.
       llvm::DenseSet<StringRef> allMemberNames;
 
-      bool hasConstOperatorStar = false;
-      for (auto member : decl->decls()) {
-        if (auto method = dyn_cast<clang::CXXMethodDecl>(member)) {
-          if (method->getOverloadedOperator() ==
-                  clang::OverloadedOperatorKind::OO_Star &&
-              method->param_empty() && method->isConst())
-            hasConstOperatorStar = true;
-        }
-      }
-      bool hasSynthesizedPointeeProperty = false;
-
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
       for (auto m : decl->decls()) {
@@ -2275,26 +2264,11 @@ namespace {
 
         if (auto MD = dyn_cast<FuncDecl>(member)) {
           if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
+            ImportedName methodImportedName =
+                Impl.importFullName(cxxMethod, getActiveSwiftVersion());
             auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
 
-            if (cxxOperatorKind == clang::OO_Star && cxxMethod->param_empty()) {
-              // This is a dereference operator. We synthesize a computed
-              // property called `pointee` for it.
-
-              // If this record has multiple overloads of `operator*`, prefer
-              // the const overload if it exists.
-              if ((cxxMethod->isConst() || !hasConstOperatorStar) &&
-                  !hasSynthesizedPointeeProperty) {
-                VarDecl *pointeeProperty =
-                    synthesizer.makeDereferencedPointeeProperty(MD);
-                result->addMember(pointeeProperty);
-                hasSynthesizedPointeeProperty = true;
-              }
-
-              Impl.markUnavailable(MD, "use .pointee property");
-              MD->overwriteAccess(AccessLevel::Private);
-            } else if (cxxOperatorKind ==
-                       clang::OverloadedOperatorKind::OO_PlusPlus) {
+            if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_PlusPlus) {
               // Make sure the type is not a foreign reference type.
               // We cannot handle `operator++` for those types, since the
               // current implementation creates a new instance of the type.
@@ -2319,8 +2293,8 @@ namespace {
                          clang::OverloadedOperatorKind::OO_PlusPlus &&
                      cxxOperatorKind !=
                          clang::OverloadedOperatorKind::OO_Call &&
-                     cxxOperatorKind !=
-                         clang::OverloadedOperatorKind::OO_Subscript) {
+                     !methodImportedName.isSubscriptAccessor() &&
+                     !methodImportedName.isDereferenceAccessor()) {
 
               auto opFuncDecl = synthesizer.makeOperator(MD, cxxMethod);
 
@@ -2544,6 +2518,18 @@ namespace {
           // carried into derived classes.
           auto *subscriptImpl = getterAndSetter.first ? getterAndSetter.first : getterAndSetter.second;
           Impl.addAlternateDecl(subscriptImpl, subscript);
+        }
+
+        if (Impl.cxxDereferenceOperators.find(result) !=
+            Impl.cxxDereferenceOperators.end()) {
+          // If this type has a dereference operator, synthesize a computed
+          // property called `pointee` for it.
+          auto getterAndSetter = Impl.cxxDereferenceOperators[result];
+
+          VarDecl *pointeeProperty =
+              synthesizer.makeDereferencedPointeeProperty(
+                  getterAndSetter.first, getterAndSetter.second);
+          result->addMember(pointeeProperty);
         }
       }
 
@@ -3185,6 +3171,8 @@ namespace {
       case ImportedAccessorKind::None:
       case ImportedAccessorKind::SubscriptGetter:
       case ImportedAccessorKind::SubscriptSetter:
+      case ImportedAccessorKind::DereferenceGetter:
+      case ImportedAccessorKind::DereferenceSetter:
         break;
 
       case ImportedAccessorKind::PropertyGetter: {
@@ -3525,6 +3513,8 @@ namespace {
           }
         }
 
+        bool makePrivate = false;
+
         if (importedName.isSubscriptAccessor() && !importFuncWithoutSignature) {
           assert(func->getParameters()->size() == 1);
           auto typeDecl = dc->getSelfNominalTypeDecl();
@@ -3552,8 +3542,32 @@ namespace {
 
           Impl.markUnavailable(func, "use subscript");
         }
-        // Someday, maybe this will need to be 'open' for C++ virtual methods.
-        func->setAccess(AccessLevel::Public);
+
+        if (importedName.isDereferenceAccessor() &&
+            !importFuncWithoutSignature) {
+          auto typeDecl = dc->getSelfNominalTypeDecl();
+          auto &getterAndSetter = Impl.cxxDereferenceOperators[typeDecl];
+
+          switch (importedName.getAccessorKind()) {
+          case ImportedAccessorKind::DereferenceGetter:
+            getterAndSetter.first = func;
+            break;
+          case ImportedAccessorKind::DereferenceSetter:
+            getterAndSetter.second = func;
+            break;
+          default:
+            llvm_unreachable("invalid dereference operator kind");
+          }
+
+          Impl.markUnavailable(func, "use .pointee property");
+          makePrivate = true;
+        }
+
+        if (makePrivate)
+          func->setAccess(AccessLevel::Private);
+        else
+          // Someday, maybe this will need to be 'open' for C++ virtual methods.
+          func->setAccess(AccessLevel::Public);
       }
 
       result->setIsObjC(false);
@@ -3977,6 +3991,10 @@ namespace {
       case ImportedAccessorKind::SubscriptSetter:
       case ImportedAccessorKind::None:
         return importObjCMethodDecl(decl, dc, llvm::None);
+
+      case ImportedAccessorKind::DereferenceGetter:
+      case ImportedAccessorKind::DereferenceSetter:
+        llvm_unreachable("dereference operators only exist in C++");
       }
     }
 
@@ -6038,6 +6056,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   case ImportedAccessorKind::None:
   case ImportedAccessorKind::SubscriptGetter:
   case ImportedAccessorKind::SubscriptSetter:
+  case ImportedAccessorKind::DereferenceGetter:
+  case ImportedAccessorKind::DereferenceSetter:
     llvm_unreachable("Not a property accessor");
 
   case ImportedAccessorKind::PropertyGetter:

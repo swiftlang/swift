@@ -349,6 +349,9 @@ OperatorsTestSuite.test("Iterator.pointee") {
   var iter = Iterator()
   let res = iter.pointee
   expectEqual(123, res)
+
+  iter.pointee = 456
+  expectEqual(456, iter.pointee)
 }
 
 OperatorsTestSuite.test("ConstIterator.pointee") {
