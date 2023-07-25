@@ -1265,10 +1265,9 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $LoadableSubscriptGetOnlyTester
-// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: store [[CORO_RESULT_COPY]] to [init] [[TEMP_MARK]]
-// CHECK: [[LOAD:%.*]] = load_borrow [[TEMP_MARK]]
+// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[TEMP]]
+// CHECK: [[TEMP_MARK_BORROW:%.*]] = store_borrow [[CORO_RESULT]] to [[TEMP_MARK]]
+// CHECK: [[LOAD:%.*]] = load_borrow [[TEMP_MARK_BORROW]]
 // CHECK: [[TEMP2:%.*]] = alloc_stack $
 // CHECK: [[TEMP2_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP2]]
 // CHECK: apply {{%.*}}([[TEMP2_MARK]], {{%.*}}, [[LOAD]])
@@ -1284,10 +1283,9 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $LoadableSubscriptGetOnlyTester
-// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: store [[CORO_RESULT_COPY]] to [init] [[TEMP_MARK]]
-// CHECK: [[GEP:%.*]] = struct_element_addr [[TEMP_MARK]]
+// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[TEMP]]
+// CHECK: [[TEMP_MARK_BORROW:%.*]] = store_borrow [[CORO_RESULT]] to [[TEMP_MARK]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[TEMP_MARK_BORROW]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[GEP]]
 // CHECK: [[TEMP2:%.*]] = alloc_stack $
 // CHECK: [[TEMP2_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP2]]

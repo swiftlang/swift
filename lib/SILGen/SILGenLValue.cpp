@@ -2156,12 +2156,25 @@ namespace {
         if (value.getType().isAddress() ||
             !isReadAccessResultAddress(getAccessKind()))
           return value;
+
+        // If we have a guaranteed object and our read access result requires an
+        // address, store it using a store_borrow.
+        if (value.getType().isObject() &&
+            value.getOwnershipKind() == OwnershipKind::Guaranteed) {
+          SILValue alloc = SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
+          if (alloc->getType().isMoveOnly())
+            alloc = SGF.B.createMarkMustCheckInst(
+                loc, alloc, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+          return SGF.B.createFormalAccessStoreBorrow(loc, value, alloc);
+        }
       }
 
       // Otherwise, we need to make a temporary.
+      // TODO: This needs to be changed to use actual store_borrows. Noncopyable
+      // types do not support tuples today, so we can avoid this for now.
       // TODO: build a scalar tuple if possible.
-      auto temporary =
-        SGF.emitTemporary(loc, SGF.getTypeLowering(getTypeOfRValue()));
+      auto temporary = SGF.emitFormalAccessTemporary(
+          loc, SGF.getTypeLowering(getTypeOfRValue()));
       auto yieldsAsArray = llvm::makeArrayRef(yields);
       copyBorrowedYieldsIntoTemporary(SGF, loc, yieldsAsArray,
                                       getOrigFormalType(), getSubstFormalType(),

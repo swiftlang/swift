@@ -80,9 +80,7 @@ public func testSubscriptGetOnlyThroughParentClass_BaseLoadable_ResultLoadable_V
     var m = LoadableSubscriptGetOnlyTesterClassParent()
     m = LoadableSubscriptGetOnlyTesterClassParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.testerParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester[0].nonMutatingFunc()
 }
 
