@@ -520,38 +520,44 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  if (Invocation.getFrontendOptions().EnableCaching &&
-      (!Invocation.getFrontendOptions().CASFSRootIDs.empty() ||
-       !Invocation.getFrontendOptions().ClangIncludeTrees.empty())) {
-    // Set up CASFS as BaseFS.
+  if (Invocation.getFrontendOptions().EnableCaching) {
     const auto &Opts = getInvocation().getFrontendOptions();
-    auto FS =
-        createCASFileSystem(*CAS, Opts.CASFSRootIDs, Opts.ClangIncludeTrees);
-    if (!FS) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
-                           toString(FS.takeError()));
-      return true;
+    if (!Invocation.getFrontendOptions().CASFSRootIDs.empty() ||
+        !Invocation.getFrontendOptions().ClangIncludeTrees.empty()) {
+      // Set up CASFS as BaseFS.
+      auto FS =
+          createCASFileSystem(*CAS, Opts.CASFSRootIDs, Opts.ClangIncludeTrees);
+      if (!FS) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                             toString(FS.takeError()));
+        return true;
+      }
+      SourceMgr.setFileSystem(std::move(*FS));
     }
-    SourceMgr.setFileSystem(std::move(*FS));
-  }
 
-  // If we have a bridging header cache key, try load it now and overlay it.
-  if (!Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey.empty() &&
-      Invocation.getFrontendOptions().EnableCaching) {
-    auto loadedBridgingBuffer = loadCachedCompileResultFromCacheKey(
-        getObjectStore(), getActionCache(), Diagnostics,
-        Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey,
-        Invocation.getClangImporterOptions().BridgingHeader);
-    if (loadedBridgingBuffer) {
-      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> PCHFS =
-          new llvm::vfs::InMemoryFileSystem();
-      PCHFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
-                     std::move(loadedBridgingBuffer));
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
-          new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
-      OverlayVFS->pushOverlay(PCHFS);
-      SourceMgr.setFileSystem(std::move(OverlayVFS));
+    // If we need to load any files from CAS, try load it now and overlay it.
+    llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MemFS =
+        new llvm::vfs::InMemoryFileSystem();
+    const auto &ClangOpts = getInvocation().getClangImporterOptions();
+
+    if (!ClangOpts.BridgingHeaderPCHCacheKey.empty()) {
+      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
+              getObjectStore(), getActionCache(), Diagnostics,
+              ClangOpts.BridgingHeaderPCHCacheKey, ClangOpts.BridgingHeader))
+        MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
+                       std::move(loadedBuffer));
     }
+    if (!Opts.InputFileKey.empty()) {
+      auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
+              getObjectStore(), getActionCache(), Diagnostics,
+              Opts.InputFileKey, InputPath))
+        MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+    }
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
+        new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
+    OverlayVFS->pushOverlay(MemFS);
+    SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
   auto ExpectedOverlay =
