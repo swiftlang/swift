@@ -137,8 +137,8 @@
         "rebranch": {
             "aliases": ["rebranch"],
             "repos": {
-                "llvm-project": "stable/20221013",
-                "swift-llvm-bindings": "stable/20221013",
+                "llvm-project": "stable/20230725",
+                "swift-llvm-bindings": "stable/20230725",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
