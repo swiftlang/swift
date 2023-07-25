@@ -2972,7 +2972,7 @@ function(add_swift_target_executable name)
       add_dependencies(${install_in_component} ${lipo_target})
 
       set(install_dest "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
-      swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
+      swift_install_in_component(FILES "${UNIVERSAL_NAME}"
                                    DESTINATION ${install_dest}
                                    COMPONENT "${install_in_component}"
                                  PERMISSIONS
