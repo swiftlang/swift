@@ -4677,7 +4677,7 @@ case TypeKind::Id:
       return Type();
 
     Type transformedCount =
-        expand->getCountType().transformWithPosition(pos, fn);
+        expand->getCountType().transformWithPosition(TypePosition::Shape, fn);
     if (!transformedCount)
       return Type();
 
