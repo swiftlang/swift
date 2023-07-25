@@ -89,4 +89,22 @@ StdSetTestSuite.test("UnorderedSetOfCInt.insert") {
 }
 #endif
 
+StdSetTestSuite.test("SetOfCInt.erase") {
+    var s = initSetOfCInt()
+    expectTrue(s.contains(1))
+    s.erase(1)
+    expectFalse(s.contains(1))
+    s.erase(1)
+    expectFalse(s.contains(1))
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt.erase") {
+    var s = initUnorderedSetOfCInt()
+    expectTrue(s.contains(2))
+    s.erase(2)
+    expectFalse(s.contains(2))
+    s.erase(2)
+    expectFalse(s.contains(2))
+}
+
 runAllTests()
