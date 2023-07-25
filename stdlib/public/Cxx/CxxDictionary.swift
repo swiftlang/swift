@@ -41,11 +41,23 @@ public protocol CxxDictionary<Key, Value> {
 
   /// Do not implement this function manually in Swift.
   func __endUnsafe() -> RawIterator
+}
 
-<<<<<<< HEAD
   /// Do not implement this function manually in Swift.
   mutating func __endMutatingUnsafe() -> RawMutableIterator
-=======
+
+extension CxxDictionary {
+  @inlinable
+  public subscript(key: Key) -> Value? {
+    get {
+      let iter = __findUnsafe(key)
+      guard iter != __endUnsafe() else {
+        return nil
+      }
+      return iter.pointee.second
+    }
+  }
+  
   func filter(
     _ isIncluded: (Key, Value) throws -> Bool
   ) rethrows -> [Key: Value] {
@@ -61,7 +73,6 @@ public protocol CxxDictionary<Key, Value> {
       iterator.successor()
     }
   }
->>>>>>> 2dccec95be3 (Add filter method for ordered and unordered map)
 }
 
 extension CxxDictionary {
