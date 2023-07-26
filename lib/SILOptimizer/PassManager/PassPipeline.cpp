@@ -234,6 +234,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
 
+  // Needed to fold MemoryLayout constants in performance-annotated functions.
+  P.addTargetConstantFolding();
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
@@ -1022,9 +1025,6 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");
   P.addUsePrespecialized();
-
-  // Needed to fold MemoryLayout constants in performance-annotated functions.
-  P.addTargetConstantFolding();
 
   // Has only an effect if the -assume-single-thread option is specified.
   if (P.getOptions().AssumeSingleThreaded) {
