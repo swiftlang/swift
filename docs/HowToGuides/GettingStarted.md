@@ -191,7 +191,7 @@ toolchain as a one-off, there are a couple of differences:
 ### Spot check dependencies
 
 * Run `cmake --version`; this should be at least 3.19.6 (3.24.2 if you want to use Xcode for editing on macOS).
-* Run `python3 --version`; check that this succeeds.
+* Run `python3 --version`; this should be at least 3.6.
 * Run `ninja --version`; check that this succeeds.
 * If you installed and want to use Sccache: Run `sccache --version`; check
   that this succeeds.
