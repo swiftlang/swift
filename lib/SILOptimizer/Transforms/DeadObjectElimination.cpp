@@ -29,6 +29,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -858,6 +859,19 @@ bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
   }
 
   if (ARI->getFunction()->hasOwnership()) {
+    // In ossa, we are going to delete the dead element store and insert a
+    // destroy_value of the store's source. This is shortening the store's
+    // source lifetime. Check if there was a pointer escape of the store's
+    // source, if so bail out.
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
+        continue;
+      if (findPointerEscape(store->getSrc())) {
+        return false;
+      }
+    }
     for (auto *user : UsersToRemove) {
       auto *store = dyn_cast<StoreInst>(user);
       if (!store ||
@@ -898,6 +912,19 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
       if (!store ||
           store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
         continue;
+      // In ossa, we are going to delete the dead store and insert a
+      // destroy_value of the store's source. This is shortening the store's
+      // source lifetime. Check if there was a pointer escape of the store's
+      // source, if so bail out.
+      if (findPointerEscape(store->getSrc())) {
+        return false;
+      }
+    }
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
+        continue;
       SILBuilderWithScope(store).createDestroyValue(store->getLoc(),
                                                     store->getSrc());
     }
@@ -929,6 +956,17 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
   }
 
   if (KPI->getFunction()->hasOwnership()) {
+    for (const Operand &Op : KPI->getPatternOperands()) {
+      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+        continue;
+      // In ossa, we are going to delete the dead keypath which was consuming
+      // the pattern operand and insert a destroy_value of the pattern operand
+      // value. This is shortening the pattern operand value's lifetime. Check
+      // if there was a pointer escape, if so bail out.
+      if (findPointerEscape(Op.get())) {
+        return false;
+      }
+    }
     for (const Operand &Op : KPI->getPatternOperands()) {
       if (Op.get()->getType().isTrivial(*KPI->getFunction()))
         continue;
