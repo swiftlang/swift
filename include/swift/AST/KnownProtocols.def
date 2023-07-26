@@ -116,6 +116,7 @@ PROTOCOL(CxxRandomAccessCollection)
 PROTOCOL(CxxSequence)
 PROTOCOL(CxxUniqueSet)
 PROTOCOL(UnsafeCxxInputIterator)
+PROTOCOL(UnsafeCxxMutableInputIterator)
 PROTOCOL(UnsafeCxxRandomAccessIterator)
 
 PROTOCOL(AsyncSequence)
