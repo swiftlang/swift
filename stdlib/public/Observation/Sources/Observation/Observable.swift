@@ -15,7 +15,7 @@
 /// Conforming to this protocol signals to other APIs that the type supports
 /// observation. However, applying the `Observable` protocol by itself to a
 /// type doesn't add observation functionality to the type. Instead, always use
-/// the ``Observation/Observable-swift.macro`` macro when adding observation
+/// the ``Observation/Observable()`` macro when adding observation
 /// support to a type.
 @available(SwiftStdlib 5.9, *)
 public protocol Observable { }
@@ -25,9 +25,8 @@ public protocol Observable { }
 /// Defines and implements conformance of the Observable protocol.
 ///
 /// This macro adds observation support to a custom type and conforms the type
-/// to the ``Observation/Observable-swift.protocol`` protocol. For example, the
-/// following code applies the `Observable` macro to the type `Car` making it
-/// observable:
+/// to the ``Observation/Observable`` protocol. For example, the following code
+/// applies the `Observable` macro to the type `Car` making it observable:
 ///
 ///     @Observable 
 ///     class Car {
