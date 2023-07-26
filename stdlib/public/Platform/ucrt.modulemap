@@ -163,6 +163,11 @@ module corecrt [system] {
     export *
   }
 
+  module stdlib {
+    header "corecrt_wstdlib.h"
+    export *
+  }
+
   module string {
     header "corecrt_wstring.h"
     export *
