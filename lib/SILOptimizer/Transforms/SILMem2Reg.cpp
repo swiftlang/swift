@@ -1948,7 +1948,8 @@ class MemoryToRegisters {
 
   /// Canonicalize the lifetimes of the specified owned and guaranteed values.
   void canonicalizeValueLifetimes(StackList<SILValue> &owned,
-                                  StackList<SILValue> &guaranteed);
+                                  StackList<SILValue> &guaranteed,
+                                  BasicBlockSetVector &livePhiBlocks);
 
 public:
   /// C'tor
@@ -2163,10 +2164,29 @@ void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
 }
 
 void MemoryToRegisters::canonicalizeValueLifetimes(
-    StackList<SILValue> &owned, StackList<SILValue> &guaranteed) {
+    StackList<SILValue> &owned, StackList<SILValue> &guaranteed,
+    BasicBlockSetVector &livePhiBlocks) {
   if (Mem2RegDisableLifetimeCanonicalization)
     return;
 
+  for (auto *block : livePhiBlocks) {
+    // When a single alloc_stack is promoted, any block gains at most a single
+    // new phi, which appears at the end of its argument list.  The collection
+    // \p livePhiBlocks consists of exactly those blocks which gained such a
+    // new phi.
+    SILPhiArgument *argument =
+        cast<SILPhiArgument>(block->getArgument(block->getNumArguments() - 1));
+    switch (argument->getOwnershipKind()) {
+    case OwnershipKind::Owned:
+      owned.push_back(argument);
+      break;
+    case OwnershipKind::Guaranteed:
+      guaranteed.push_back(argument);
+      break;
+    default:
+      break;
+    }
+  }
   CanonicalizeOSSALifetime canonicalizer(
       /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
       accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
@@ -2278,7 +2298,8 @@ bool MemoryToRegisters::run() {
         }
         instructionsToDelete.clear();
         ++NumInstRemoved;
-        canonicalizeValueLifetimes(ownedValues, guaranteedValues);
+        canonicalizeValueLifetimes(ownedValues, guaranteedValues,
+                                   livePhiBlocks);
         madeChange = true;
       }
     }

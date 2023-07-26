@@ -325,8 +325,9 @@ bb2:
 bb3:
 // CHECK-NOT: load
   %13 = load [copy] %1 : $*@callee_owned () -> Int
-// CHECK: [[COPY:%.*]] = copy_value [[ARG]]
-// CHECK: [[RESULT:%.*]] = apply [[COPY]]
+//      : [[COPY:%.*]] = copy_value [[ARG]]
+// The above copy is eliminated by owned value canonicalization.
+// CHECK: [[RESULT:%.*]] = apply [[ARG]]
   %15 = apply %13() : $@callee_owned () -> Int
   br bb4
 
