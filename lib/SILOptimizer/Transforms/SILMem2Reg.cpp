@@ -31,11 +31,15 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ScopeOptUtils.h"
@@ -55,6 +59,10 @@ using namespace swift::siloptimizer;
 STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
+
+llvm::cl::opt<bool> Mem2RegDisableLifetimeCanonicalization(
+    "sil-mem2reg-disable-lifetime-canonicalization", llvm::cl::init(false),
+    llvm::cl::desc("Don't canonicalize any lifetimes during Mem2Reg."));
 
 static bool lexicalLifetimeEnsured(AllocStackInst *asi);
 static bool isGuaranteedLexicalValue(SILValue src);
@@ -1881,6 +1889,10 @@ class MemoryToRegisters {
   /// Dominators.
   DominanceInfo *domInfo;
 
+  NonLocalAccessBlockAnalysis *accessBlockAnalysis;
+
+  BasicCalleeAnalysis *calleeAnalysis;
+
   /// The builder context used when creating new instructions during register
   /// promotion.
   SILBuilderContext ctx;
@@ -1929,10 +1941,23 @@ class MemoryToRegisters {
   bool promoteAllocation(AllocStackInst *asi,
                          BasicBlockSetVector &livePhiBlocks);
 
+  /// Record all the values stored and store_borrow'd into the address so that
+  /// they can be canonicalized if promotion succeeds.
+  void collectStoredValues(AllocStackInst *asi, StackList<SILValue> &owned,
+                           StackList<SILValue> &guaranteed);
+
+  /// Canonicalize the lifetimes of the specified owned and guaranteed values.
+  void canonicalizeValueLifetimes(StackList<SILValue> &owned,
+                                  StackList<SILValue> &guaranteed);
+
 public:
   /// C'tor
-  MemoryToRegisters(SILFunction &inputFunc, DominanceInfo *inputDomInfo)
-      : f(inputFunc), domInfo(inputDomInfo), ctx(inputFunc.getModule()) {}
+  MemoryToRegisters(SILFunction &inputFunc, DominanceInfo *inputDomInfo,
+                    NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                    BasicCalleeAnalysis *calleeAnalysis)
+      : f(inputFunc), domInfo(inputDomInfo),
+        accessBlockAnalysis(accessBlockAnalysis),
+        calleeAnalysis(calleeAnalysis), ctx(inputFunc.getModule()) {}
 
   /// Promote memory to registers. Return True on change.
   bool run();
@@ -2124,6 +2149,50 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   }
 }
 
+void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
+                                            StackList<SILValue> &owned,
+                                            StackList<SILValue> &guaranteed) {
+  for (auto *use : asi->getUses()) {
+    auto *user = use->getUser();
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      owned.push_back(si->getSrc());
+    } else if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
+      guaranteed.push_back(sbi->getSrc());
+    }
+  }
+}
+
+void MemoryToRegisters::canonicalizeValueLifetimes(
+    StackList<SILValue> &owned, StackList<SILValue> &guaranteed) {
+  if (Mem2RegDisableLifetimeCanonicalization)
+    return;
+
+  CanonicalizeOSSALifetime canonicalizer(
+      /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
+      accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
+  for (auto value : owned) {
+    auto root = CanonicalizeOSSALifetime::getCanonicalCopiedDef(value);
+    if (auto *copy = dyn_cast<CopyValueInst>(root)) {
+      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
+              copy->getOperand())) {
+        guaranteed.push_back(copy);
+        continue;
+      }
+    }
+    canonicalizer.canonicalizeValueLifetime(root);
+  }
+  CanonicalizeBorrowScope borrowCanonicalizer(&f, deleter);
+  for (auto value : guaranteed) {
+    auto borrowee = CanonicalizeBorrowScope::getCanonicalBorrowedDef(value);
+    if (!borrowee)
+      continue;
+    BorrowedValue borrow(borrowee);
+    if (borrow.kind != BorrowedValueKind::SILFunctionArgument)
+      continue;
+    borrowCanonicalizer.canonicalizeBorrowScope(borrow);
+  }
+}
+
 /// Attempt to promote the specified stack allocation, returning true if so
 /// or false if not.  On success, this returns true and usually drops all of the
 /// uses of the AllocStackInst, but never deletes the ASI itself.  Callers
@@ -2192,6 +2261,13 @@ bool MemoryToRegisters::run() {
       if (!asi)
         continue;
 
+      // Record stored values because promoting a store eliminates a consuming
+      // use of the stored value. If promotion succeeds, these values'
+      // lifetimes are canonicalized, eliminating unnecessary copies.
+      StackList<SILValue> ownedValues(&f);
+      StackList<SILValue> guaranteedValues(&f);
+      collectStoredValues(asi, ownedValues, guaranteedValues);
+
       // The blocks which still have new phis after fixBranchesAndUses runs.
       // These are not necessarily the same as phiBlocks because
       // fixBranchesAndUses removes superfluous proactive phis.
@@ -2202,6 +2278,7 @@ bool MemoryToRegisters::run() {
         }
         instructionsToDelete.clear();
         ++NumInstRemoved;
+        canonicalizeValueLifetimes(ownedValues, guaranteedValues);
         madeChange = true;
       }
     }
@@ -2222,9 +2299,13 @@ class SILMem2Reg : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs()
                << "** Mem2Reg on function: " << f->getName() << " **\n");
 
-    auto *da = PM->getAnalysis<DominanceAnalysis>();
+    auto *da = getAnalysis<DominanceAnalysis>();
+    auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
+    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
 
-    bool madeChange = MemoryToRegisters(*f, da->get(f)).run();
+    bool madeChange =
+        MemoryToRegisters(*f, da->get(f), accessBlockAnalysis, calleeAnalysis)
+            .run();
     if (madeChange)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
