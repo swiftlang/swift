@@ -3193,9 +3193,9 @@ public:
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
 
     /// Whether the parameter might be a semantic result for autodiff purposes.
-    /// This includes inout parameters.
+    /// This includes inout and class-bound parameters.
     bool isAutoDiffSemanticResult() const {
-      return isInOut();
+      return isInOut() || Ty->getClassOrBoundGenericClass() != nullptr;
     }
 
     ValueOwnership getValueOwnership() const {
@@ -4102,7 +4102,8 @@ public:
         || getConvention() == ParameterConvention::Indirect_InoutAliasable;
   }
   bool isAutoDiffSemanticResult() const {
-    return isIndirectMutating();
+    return isIndirectMutating() ||
+      getInterfaceType().getClassOrBoundGenericClass() != nullptr;
   }
 
   bool isPack() const {
@@ -4866,6 +4867,7 @@ public:
   /// Returns the number of function potential semantic results:
   ///  * Usual results
   ///  * Inout parameters
+  ///  * Class or class-bound parameters  
   unsigned getNumAutoDiffSemanticResults() const {
     return getNumResults() + getNumAutoDiffSemanticResultsParameters();
   }

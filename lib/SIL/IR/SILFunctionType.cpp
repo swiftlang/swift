@@ -240,19 +240,19 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
 
   auto numSemanticResults = getNumResults();
   
-  // Check semantic results (`inout`) parameters.
+  // Check semantic results (`inout` or class-bound) parameters.
   for (auto resultParamAndIndex : enumerate(getAutoDiffSemanticResultsParameters()))
-    // Currently, an `inout` parameter can either be:
+    // Currently, a semantic result parameter can either be:
     // 1. Both a differentiability parameter and a differentiability result.
     // 2. `@noDerivative`: neither a differentiability parameter nor a
     //    differentiability result.
-    // However, there is no way to represent an `inout` parameter that:
+    // However, there is no way to represent a semantic result parameter that:
     // 3. Is a differentiability result but not a differentiability parameter.
     // 4. Is a differentiability parameter but not a differentiability result.
     //    This case is not currently expressible and does not yet have clear use
     //    cases, so supporting it is a non-goal.
     //
-    // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
+    // See TF-1305 for solution ideas. For now, `@noDerivative` semantic result
     // parameters are not treated as differentiability results.
     if (resultParamAndIndex.value().getDifferentiability() !=
         SILParameterDifferentiability::NotDifferentiable)
@@ -736,6 +736,9 @@ static CanSILFunctionType getAutoDiffPullbackType(
               ->getAutoDiffTangentSpace(lookupConformance)
               ->getCanonicalType(),
           origRes.getConvention());
+      if (origRes.getInterfaceType().getClassOrBoundGenericClass())
+        paramConv = ParameterConvention::Indirect_In_Guaranteed;
+
       pullbackParams.emplace_back(resultTanType, paramConv);
       continue;
     }
@@ -755,8 +758,17 @@ static CanSILFunctionType getAutoDiffPullbackType(
       resultParam.getInterfaceType(), lookupConformance,
       substGenericParams, substReplacements, ctx);
     ParameterConvention paramTanConvention = resultParam.getConvention();
-    if (!parameterIndices->contains(paramIndex))
-      paramTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+    if (resultParam.isIndirectMutating()) {
+      if (!parameterIndices->contains(paramIndex))
+        paramTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+    } else {
+      assert(resultParam.getInterfaceType().getClassOrBoundGenericClass() &&
+             "expected class bound parameter");
+      if (!parameterIndices->contains(paramIndex))
+        paramTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+      else
+        paramTanConvention = ParameterConvention::Indirect_Inout;
+    }
 
     pullbackParams.emplace_back(resultParamTanType, paramTanConvention);
   }

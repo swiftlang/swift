@@ -785,6 +785,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
       original->isDistributed(),
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
+  vjp->setInlineStrategy(original->getInlineStrategy());
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
                           << "\n");

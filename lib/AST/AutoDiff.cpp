@@ -207,7 +207,7 @@ void autodiff::getFunctionSemanticResults(
     }
   }
 
-  // Collect wrt semantic result (`inout`) parameters as
+  // Collect wrt semantic result (`inout` and class references) parameters as
   // semantic results
   auto collectSemanticResults = [&](const AnyFunctionType *functionType,
                                     unsigned curryOffset = 0) {

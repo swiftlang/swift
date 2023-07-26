@@ -399,17 +399,17 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 /// differentiated, given the differentiation indices of the instruction's
 /// parent function. Whether the `apply` should be differentiated is determined
 /// sequentially from the following conditions:
-/// 1. The instruction has an active `inout` argument.
+/// 1. The instruction has an active semantic result argument.
 /// 2. The instruction is a call to the array literal initialization intrinsic
 ///    ("array.uninitialized_intrinsic"), where the result is active and where
 ///    there is a `store` of an active value into the array's buffer.
 /// 3. The instruction has both an active result (direct or indirect) and an
 ///    active argument.
 bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
-  // Function applications with an active inout argument should be
+  // Function applications with an active semantic result argument should be
   // differentiated.
-  for (auto inoutArg : applySite.getInoutArguments())
-    if (activityInfo.isActive(inoutArg, config))
+  for (auto semanticResArg : applySite.getAutoDiffSemanticResultArguments())
+    if (activityInfo.isActive(semanticResArg, config))
       return true;
 
   bool hasActiveDirectResults = false;

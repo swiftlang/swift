@@ -910,6 +910,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
               ->getType()
               ->getReducedType(witnessCanGenSig),
           origResult.getConvention());
+      if (origResult.getInterfaceType()->getClassOrBoundGenericClass())
+        paramInfo = paramInfo.getWithConvention(ParameterConvention::Indirect_In_Guaranteed);
       pbParams.push_back(paramInfo);
       continue;
     }
@@ -933,8 +935,17 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       resultParam.getInterfaceType()->getReducedType(witnessCanGenSig));
 
     auto resultParamTanConvention = resultParam.getConvention();
-    if (!config.isWrtParameter(paramIndex))
-      resultParamTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+    if (resultParam.isIndirectMutating()) {
+      if (!config.isWrtParameter(paramIndex))
+        resultParamTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+    } else {
+      assert(resultParam.getInterfaceType()->getClassOrBoundGenericClass() &&
+             "expected class-bound semantic result param");
+      if (config.isWrtParameter(paramIndex))
+        resultParamTanConvention = ParameterConvention::Indirect_Inout;
+      else
+        resultParamTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+    }
 
     pbParams.emplace_back(origResult.getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
@@ -998,6 +1009,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       original->isRuntimeAccessible());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
+  pullback->setInlineStrategy(original->getInlineStrategy());
 
   return pullback;
 }

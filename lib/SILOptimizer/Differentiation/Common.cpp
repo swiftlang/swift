@@ -131,6 +131,7 @@ void forEachApplyDirectResult(
 
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
+  LLVM_DEBUG(llvm::dbgs() << "Calculating results for: " << function.getName() << "\n");
   SILFunctionConventions convs(function.getLoweredFunctionType(),
                                function.getModule());
   auto indResults = function.getIndirectResults();
