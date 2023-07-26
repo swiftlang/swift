@@ -202,6 +202,16 @@ class RecursiveOuter {
   }
 }
 
+@Observable
+#if FOO
+@available(SwiftStdlib 5.9, *)
+#elseif BAR
+@available(SwiftStdlib 5.9, *)
+#else
+#endif
+class GuardedAvailability {
+}
+
 @main
 struct Validator {
   @MainActor
