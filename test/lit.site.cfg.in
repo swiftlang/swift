@@ -11,8 +11,13 @@
 # -----------------------------------------------------------------------------
 
 import os
-import platform
-import sys
+
+# Tell pylint that we know config and lit_config exist somewhere.
+if 'PYLINT_IMPORT' in os.environ:
+  from lit.LitConfig import LitConfig
+  from lit.TestingConfig import TestingConfig
+  config = TestingConfig()
+  lit_config = LitConfig()
 
 config.cmake = "@CMAKE_COMMAND@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
