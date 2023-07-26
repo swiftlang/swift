@@ -1918,15 +1918,18 @@ class MemoryToRegisters {
     return *domTreeLevels;
   }
 
-  /// Promote all of the AllocStacks in a single basic block in one
-  /// linear scan. Note: This function deletes all of the users of the
-  /// AllocStackInst, including the DeallocStackInst but it does not remove the
-  /// AllocStackInst itself!
+  /// Promote the specified stack location whose uses are all within a single
+  /// block.
+  ///
+  /// Note: Deletes all of the users of the alloc_stack, including the
+  ///       dealloc_stack but it does not remove the alloc_stack itself.
   void removeSingleBlockAllocation(AllocStackInst *asi);
 
-  /// Attempt to promote the specified stack allocation, returning true if so
-  /// or false if not.  On success, all uses of the AllocStackInst have been
-  /// removed, but the ASI itself is still in the program.
+  /// Attempt to promote the specified stack allocation.  Its uses may be in a
+  /// single block or in multiple blocks.
+  ///
+  /// Note: Populates instructionsToDelete with the instructions the caller is
+  ///       responsible for deleting.
   bool promoteAllocation(AllocStackInst *asi);
 
 public:
