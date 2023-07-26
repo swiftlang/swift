@@ -309,13 +309,15 @@ static void collectClangModuleHeaderIncludes(
     requiredTextualIncludes.insert(textualInclude);
   };
 
-  if (llvm::Optional<clang::Module::Header> umbrellaHeader = clangModule->getUmbrellaHeaderAsWritten()) {
-    addHeader(umbrellaHeader->Entry.getFileEntry().tryGetRealPathName(),
-        umbrellaHeader->PathRelativeToRootModuleDirectory);
-  } else if (llvm::Optional<clang::Module::DirectoryName> umbrellaDir = clangModule->getUmbrellaDirAsWritten()) {
+  if (llvm::Optional<clang::Module::Header> umbrellaHeader =
+          clangModule->getUmbrellaHeaderAsWritten()) {
+    addHeader(umbrellaHeader->Entry.getNameAsRequested(),
+              umbrellaHeader->PathRelativeToRootModuleDirectory);
+  } else if (llvm::Optional<clang::Module::DirectoryName> umbrellaDir =
+                 clangModule->getUmbrellaDirAsWritten()) {
     SmallString<128> nativeUmbrellaDirPath;
     std::error_code errorCode;
-    llvm::sys::path::native(umbrellaDir->Entry.getDirEntry().getName(),
+    llvm::sys::path::native(umbrellaDir->Entry.getName(),
                             nativeUmbrellaDirPath);
     llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
     for (llvm::vfs::recursive_directory_iterator
