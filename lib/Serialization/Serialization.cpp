@@ -3190,6 +3190,35 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           introducedDeclNames);
       return;
     }
+    
+    case DAK_RawLayout: {
+      auto *attr = cast<RawLayoutAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[RawLayoutDeclAttrLayout::Code];
+      
+      uint32_t rawSize;
+      uint8_t rawAlign;
+      TypeID typeID;
+      
+      if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
+        typeID = 0;
+        rawSize = sizeAndAlign->first;
+        rawAlign = sizeAndAlign->second;
+      } else if (auto likeType = attr->getResolvedScalarLikeType()) {
+        typeID = S.addTypeRef(*likeType);
+        rawSize = 0;
+        rawAlign = 0;
+      } else if (auto likeArrayTypeAndCount = attr->getResolvedArrayLikeTypeAndCount()) {
+        typeID = S.addTypeRef(likeArrayTypeAndCount->first);
+        rawSize = likeArrayTypeAndCount->second;
+        rawAlign = ~0u;
+      } else {
+        llvm_unreachable("unhandled raw layout attribute, or trying to serialize unresolved attr!");
+      }
+      
+      RawLayoutDeclAttrLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
+        typeID, rawSize, rawAlign);
+    }
     }
   }
 
