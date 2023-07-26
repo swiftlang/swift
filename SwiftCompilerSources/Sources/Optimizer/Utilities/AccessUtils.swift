@@ -293,6 +293,13 @@ struct AccessPath : CustomStringConvertible {
     return getProjection(to: other) != nil
   }
 
+  var materializableProjectionPath: SmallProjectionPath? {
+    if projectionPath.isMaterializable {
+      return projectionPath
+    }
+    return nil
+  }
+
   /// Returns the projection path to `other` if this access path is equal or contains `other`.
   ///
   /// For example,
