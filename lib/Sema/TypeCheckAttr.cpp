@@ -7121,11 +7121,17 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       break;
     case MacroRole::Peer:
       break;
-    case MacroRole::Conformance:
+    case MacroRole::Conformance: {
+      // Suppress the conformance macro error in swiftinterfaces.
+      SourceFile *file = D->getDeclContext()->getParentSourceFile();
+      if (file && file->Kind == SourceFileKind::Interface)
+        break;
+
       diagnoseAndRemoveAttr(attr, diag::conformance_macro)
           .fixItReplace(attr->getRange(),
                         "@attached(extension, conformances: <#Protocol#>)");
       break;
+    }
     case MacroRole::Extension:
       break;
     default:
