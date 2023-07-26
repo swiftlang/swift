@@ -2822,8 +2822,9 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
              reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
 
       if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
-                                         reader.layoutStr, fieldType);
+        swift_resolve_resilientAccessors(
+            writer.layoutStr, writer.offset,
+            reader.layoutStr + layoutStringHeaderSize, fieldType);
       }
 
       if (offset) {
