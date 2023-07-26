@@ -3114,12 +3114,11 @@ public:
     return E;
   }
 
-  void setContextualType(ASTNode node, TypeLoc T,
-                         ContextualTypePurpose purpose) {
+  void setContextualInfo(ASTNode node, ContextualTypeInfo info) {
     assert(bool(node) && "Expected non-null expression!");
     assert(contextualTypes.count(node) == 0 &&
            "Already set this contextual type");
-    contextualTypes[node] = {{T, purpose}, Type()};
+    contextualTypes[node] = {info, Type()};
   }
 
   llvm::Optional<ContextualTypeInfo> getContextualTypeInfo(ASTNode node) const {
