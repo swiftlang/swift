@@ -703,23 +703,27 @@ module std [system] {
     export *
   }
 
-  explicit module xmemory {
-    header "xmemory"
-    export *
-  }
+  module _Private [system] {
+    requires cplusplus
 
-  explicit module xtr1common {
-    header "xtr1common"
-    export *
-  }
+    explicit module xmemory {
+      header "xmemory"
+      export *
+    }
 
-  explicit module xstring {
-    header "xstring"
-    export *
-  }
+    explicit module xtr1common {
+      header "xtr1common"
+      export *
+    }
 
-  explicit module xtree {
-    header "xtree"
-    export *
+    explicit module xstring {
+      header "xstring"
+      export *
+    }
+
+    explicit module xtree {
+      header "xtree"
+      export *
+    }
   }
 }
