@@ -950,7 +950,7 @@ public:
   }
 
   /// Promote the Allocation.
-  void run();
+  void run(BasicBlockSetVector &livePhiBlocks);
 
 private:
   /// Promote AllocStacks into SSA.
@@ -1808,18 +1808,13 @@ void StackAllocationPromoter::promoteAllocationToPhi(
   LLVM_DEBUG(llvm::dbgs() << "*** Finished placing Phis ***\n");
 }
 
-void StackAllocationPromoter::run() {
+void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   auto *function = asi->getFunction();
 
   // Reduce the number of load/stores in the function to minimum.
   // After this phase we are left with up to one load and store
   // per block and the last store is recorded.
   pruneAllocStackUsage();
-
-  // The blocks which still have new phis after fixBranchesAndUses runs.  These
-  // are not necessarily the same as phiBlocks because fixBranchesAndUses
-  // removes superfluous proactive phis.
-  BasicBlockSetVector livePhiBlocks(asi->getFunction());
 
   // Replace AllocStacks with Phi-nodes.
   promoteAllocationToPhi(livePhiBlocks);
@@ -1931,7 +1926,8 @@ class MemoryToRegisters {
   ///
   /// Note: Populates instructionsToDelete with the instructions the caller is
   ///       responsible for deleting.
-  bool promoteAllocation(AllocStackInst *asi);
+  bool promoteAllocation(AllocStackInst *asi,
+                         BasicBlockSetVector &livePhiBlocks);
 
 public:
   /// C'tor
@@ -2132,7 +2128,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
 /// or false if not.  On success, this returns true and usually drops all of the
 /// uses of the AllocStackInst, but never deletes the ASI itself.  Callers
 /// should check to see if the ASI is dead after this and remove it if so.
-bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc) {
+bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
+                                          BasicBlockSetVector &livePhiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
   ++NumAllocStackFound;
 
@@ -2174,7 +2171,8 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc) {
   auto &domTreeLevels = getDomTreeLevels();
   StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx, deleter,
                           instructionsToDelete)
-      .run();
+      .run(livePhiBlocks);
+
   return true;
 }
 
@@ -2194,7 +2192,11 @@ bool MemoryToRegisters::run() {
       if (!asi)
         continue;
 
-      if (promoteAllocation(asi)) {
+      // The blocks which still have new phis after fixBranchesAndUses runs.
+      // These are not necessarily the same as phiBlocks because
+      // fixBranchesAndUses removes superfluous proactive phis.
+      BasicBlockSetVector livePhiBlocks(asi->getFunction());
+      if (promoteAllocation(asi, livePhiBlocks)) {
         for (auto *inst : instructionsToDelete) {
           deleter.forceDelete(inst);
         }
