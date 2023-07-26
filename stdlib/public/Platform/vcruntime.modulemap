@@ -707,6 +707,10 @@ module std [system] {
       export *
     }
 
+    explicit module xstddef {
+      header "xstddef"
+      export *
+    }
 
     explicit module xstring {
       header "xstring"
@@ -725,6 +729,16 @@ module std [system] {
 
     explicit module xutility {
       header "xutility"
+      export *
+    }
+
+    explicit module yvals {
+      header "yvals.h"
+      export *
+    }
+
+    explicit module yvals_core {
+      header "yvals_core.h"
       export *
     }
   }
