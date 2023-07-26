@@ -298,7 +298,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   if (!enableCopyPropagation || !Builder.hasOwnership())
     return;
 
-  SmallSetVector<SILValue, 16> defsToCanonicalize;
+  llvm::SmallSetVector<SILValue, 16> defsToCanonicalize;
 
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
   // produced by the visitor. Find the canonical def.

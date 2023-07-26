@@ -626,7 +626,7 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
   // 'names' in macro role attributes). Since expansions are cached, it doesn't
   // cause duplicated expansions, but different 'unexpandedDecl' may report the
   // same 'ValueDecl'.
-  SmallSetVector<ValueDecl *, 4> macroExpandedDecls;
+  llvm::SmallSetVector<ValueDecl *, 4> macroExpandedDecls;
   for (MissingDecl *unexpandedDecl : unexpandedDecls) {
     unexpandedDecl->forEachMacroExpandedDecl([&](ValueDecl *vd) {
       macroExpandedDecls.insert(vd);

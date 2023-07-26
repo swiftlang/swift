@@ -138,7 +138,7 @@ class SinkAddressProjections {
   SmallVector<SingleValueInstruction *, 4> oldProjections;
   // Cloned projections to avoid address phis.
   SmallVectorImpl<SingleValueInstruction *> *newProjections;
-  SmallSetVector<SILValue, 4> inBlockDefs;
+  llvm::SmallSetVector<SILValue, 4> inBlockDefs;
 
   // Transient per-projection data for use during cloning.
   SmallVector<Operand *, 4> usesToReplace;

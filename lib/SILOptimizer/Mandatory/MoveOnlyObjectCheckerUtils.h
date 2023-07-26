@@ -168,7 +168,7 @@ struct OSSACanonicalizer {
 /// must checks to process.
 bool searchForCandidateObjectMarkMustChecks(
     SILFunction *fn,
-    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
 
 struct MoveOnlyObjectChecker {

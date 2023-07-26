@@ -4537,7 +4537,7 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     auto *typeVar = entry.first;
     auto GP = entry.second;
 
-    llvm::SmallSetVector<Type, 4> arguments;
+    swift::SmallSetVector<Type, 4> arguments;
     for (const auto &solution : solutions) {
       auto type = solution.typeBindings.lookup(typeVar);
       // Type variables gathered from a solution's type binding context may not
@@ -5083,7 +5083,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
   // So let's try to collect the set of fixed types for the generic parameter
   // from all the closure contextual fix/solutions and if there are more than
   // one fixed type diagnose it.
-  llvm::SmallSetVector<Type, 4> genericParamInferredTypes;
+  swift::SmallSetVector<Type, 4> genericParamInferredTypes;
   for (auto &fix : contextualFixes)
     genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
 

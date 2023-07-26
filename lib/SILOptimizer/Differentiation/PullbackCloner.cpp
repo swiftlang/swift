@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
@@ -110,7 +111,7 @@ private:
   /// Mapping from original basic blocks to local temporary values to be cleaned
   /// up. This is populated when pullback emission is run on one basic block and
   /// cleaned before processing another basic block.
-  llvm::DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>>
+  llvm::DenseMap<SILBasicBlock *, llvm::SmallSetVector<SILValue, 32>>
       blockTemporaries;
 
   /// The scope cloner.
@@ -579,7 +580,7 @@ private:
     llvm::SmallString<32> adjName;
     auto *newBuf = createFunctionLocalAllocation(
         bufType, loc, /*zeroInitialize*/ true,
-        debugInfo.transform(
+        swift::transform(debugInfo,
           [&](AdjointValue::DebugInfo di) {
             llvm::raw_svector_ostream adjNameStream(adjName);
             SILDebugVariable &dv = di.second;

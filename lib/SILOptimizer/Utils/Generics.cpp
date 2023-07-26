@@ -1173,7 +1173,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // we should return true.
       auto First = Req.getFirstType()->getCanonicalType();
       auto Second = Req.getSecondType()->getCanonicalType();
-      SmallSetVector<TypeBase *, 2> UsedGenericParams;
+      llvm::SmallSetVector<TypeBase *, 2> UsedGenericParams;
       First.visit([&](Type Ty) {
         if (auto *GP = Ty->getAs<GenericTypeParamType>()) {
           UsedGenericParams.insert(GP);
@@ -1225,7 +1225,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
       // we should return true.
       auto First = Req.getFirstType()->getCanonicalType();
       auto Second = Req.getSecondType()->getCanonicalType();
-      SmallSetVector<GenericTypeParamType *, 2> UsedGenericParams;
+      llvm::SmallSetVector<GenericTypeParamType *, 2> UsedGenericParams;
       First.visit([&](Type Ty) {
         if (auto *GP = Ty->getAs<GenericTypeParamType>()) {
           UsedGenericParams.insert(GP);
@@ -2938,7 +2938,7 @@ bool usePrespecialized(
       }
 
       unsigned score = 0;
-      for (auto &entry :
+      for (const auto &entry :
            llvm::enumerate(apply.getSubstitutionMap().getReplacementTypes())) {
 
         auto genericParam = specializedSig.getGenericParams()[entry.index()];

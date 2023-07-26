@@ -41,6 +41,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/BasicBlockData.h"
@@ -525,7 +526,7 @@ public:
   }
 };
 
-typedef SmallSetVector<Invariants, 4> InvariantsSet;
+typedef swift::SmallSetVector<Invariants, 4> InvariantsSet;
 
 /// Collect invariants with which we should try the analysis and return true if
 /// there is at least one recursive call in the function.

@@ -301,7 +301,7 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
                                     AllocRefInstBase *allocRef) {
   // Get the number of destroyed elements.
   auto *literal = dyn_cast<IntegerLiteralInst>(destroyArray->getArguments()[2]);
-  if (!literal || literal->getValue().getMinSignedBits() > 32)
+  if (!literal || literal->getValue().getSignificantBits() > 32)
     return false;
   int numDestroyed = literal->getValue().getSExtValue();
   

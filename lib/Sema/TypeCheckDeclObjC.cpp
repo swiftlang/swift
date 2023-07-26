@@ -2872,7 +2872,7 @@ class ObjCImplementationChecker {
     return diag;
   }
 
-  SmallSetVector<ValueDecl *, 16> unmatchedRequirements;
+  llvm::SmallSetVector<ValueDecl *, 16> unmatchedRequirements;
 
   /// Candidates with their explicit ObjC names, if any.
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
@@ -3087,8 +3087,8 @@ private:
 
     // Requirements and candidates that have been matched (even ambiguously) and
     // should be removed from our unmatched lists.
-    SmallSetVector<ValueDecl *, 16> requirementsToRemove;
-    SmallSetVector<ValueDecl *, 16> candidatesToRemove;
+    llvm::SmallSetVector<ValueDecl *, 16> requirementsToRemove;
+    llvm::SmallSetVector<ValueDecl *, 16> candidatesToRemove;
 
     // First, loop through unsatisfied candidates and try the requirements.
     for (const auto &pair : unmatchedCandidates) {

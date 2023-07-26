@@ -40,7 +40,7 @@
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
-#include "clang/Basic/CodeGenOptions.h"
+#include "llvm/Frontend/Debug/Options.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -96,26 +96,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getCodeGenOpts();
-  if (CGO.OpaquePointers) {
-    LLVMContext.setOpaquePointers(true);
-  } else {
-    LLVMContext.setOpaquePointers(false);
-  }
-
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
   CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoLevel::LineTables:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
   switch (Opts.DebugInfoFormat) {
@@ -1430,7 +1424,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
     buffer += library;
-    if (!library.endswith_insensitive(".lib"))
+    if (!library.ends_with_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';

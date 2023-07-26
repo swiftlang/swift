@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/Common.h"
@@ -210,8 +211,8 @@ void collectMinimalIndicesForFunctionCall(
   results.reserve(calleeFnTy->getNumResults());
   unsigned dirResIdx = 0;
   unsigned indResIdx = calleeConvs.getSILArgIndexOfFirstIndirectResult();
-  for (auto &resAndIdx : enumerate(calleeConvs.getResults())) {
-    auto &res = resAndIdx.value();
+  for (const auto &resAndIdx : enumerate(calleeConvs.getResults())) {
+    const auto &res = resAndIdx.value();
     unsigned idx = resAndIdx.index();
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
@@ -228,8 +229,8 @@ void collectMinimalIndicesForFunctionCall(
   }
   // Record all `inout` parameters as results.
   auto inoutParamResultIndex = calleeFnTy->getNumResults();
-  for (auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
-    auto &param = paramAndIdx.value();
+  for (const auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
+    const auto &param = paramAndIdx.value();
     if (!param.isIndirectMutating())
       continue;
     unsigned idx = paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();
@@ -251,12 +252,12 @@ void collectMinimalIndicesForFunctionCall(
 llvm::Optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
-    return asi->getVarInfo().transform([&](SILDebugVariable var) {
+    return swift::transform(asi->getVarInfo(),  [&](SILDebugVariable var) {
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      return dvi->getVarInfo().transform([&](SILDebugVariable var) {
+      return swift::transform(dvi->getVarInfo(), [&](SILDebugVariable var) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)

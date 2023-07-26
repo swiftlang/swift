@@ -29,6 +29,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -55,7 +56,7 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -80,7 +81,6 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
@@ -232,9 +232,9 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   PrintPassOptions PrintPassOpts;
   PrintPassOpts.Indent = DebugPassStructure;
   PrintPassOpts.SkipAnalyses = DebugPassStructure;
-  StandardInstrumentations SI(DebugPassStructure, /*VerifyEach*/ false,
-                              PrintPassOpts);
-  SI.registerCallbacks(PIC, &FAM);
+  StandardInstrumentations SI(Module->getContext(), DebugPassStructure,
+                              /*VerifyEach*/ false, PrintPassOpts);
+  SI.registerCallbacks(PIC, &MAM);
 
   PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
 
@@ -373,7 +373,9 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   case IRGenOutputKind::Module:
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
-    PassManagerToRun.addPass(PrintModulePass(*out, "", false));
+    PassManagerToRun.addPass(
+        llvm::PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
+                              /*EmitSummaryIndex=*/false));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -492,11 +494,11 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
                                 const llvm::Module& Module) {
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time if possible.
-  C.NumIRGlobals += Module.getGlobalList().size();
+  C.NumIRGlobals += Module.global_size();
   C.NumIRFunctions += Module.getFunctionList().size();
-  C.NumIRAliases += Module.getAliasList().size();
-  C.NumIRIFuncs += Module.getIFuncList().size();
-  C.NumIRNamedMetaData += Module.getNamedMDList().size();
+  C.NumIRAliases += Module.alias_size();
+  C.NumIRIFuncs += Module.ifunc_size();
+  C.NumIRNamedMetaData += Module.named_metadata_size();
   C.NumIRValueSymbols += Module.getValueSymbolTable().size();
   C.NumIRComdatSymbols += Module.getComdatSymbolTable().size();
   for (auto const &Func : Module) {
@@ -1116,7 +1118,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{
         desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
-        symsToEmit.transform([](const auto &x) { return x.silRefsToEmit; })};
+        swift::transform(symsToEmit, [](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
     // If there was an error, bail.
@@ -1471,13 +1473,13 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         G.setLinkage(GlobalValue::ExternalLinkage);
       }
     };
-    for (llvm::GlobalVariable &G : M->getGlobalList()) {
+    for (llvm::GlobalVariable &G : M->globals()) {
       collectReference(G);
     }
     for (llvm::Function &F : M->getFunctionList()) {
       collectReference(F);
     }
-    for (llvm::GlobalAlias &A : M->getAliasList()) {
+    for (llvm::GlobalAlias &A : M->aliases()) {
       collectReference(A);
     }
   }
@@ -1497,13 +1499,13 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         G.setLinkage(GlobalValue::WeakODRLinkage);
       }
     };
-    for (llvm::GlobalVariable &G : M->getGlobalList()) {
+    for (llvm::GlobalVariable &G : M->globals()) {
       updateLinkage(G);
     }
     for (llvm::Function &F : M->getFunctionList()) {
       updateLinkage(F);
     }
-    for (llvm::GlobalAlias &A : M->getAliasList()) {
+    for (llvm::GlobalAlias &A : M->aliases()) {
       updateLinkage(A);
     }
 

@@ -72,6 +72,7 @@ add_swift_host_library(swiftIRGen STATIC
     target
     targetparser
     transformutils
+    irprinter
 )
 target_link_libraries(swiftIRGen INTERFACE
   clangCodeGen

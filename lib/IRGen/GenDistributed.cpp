@@ -721,12 +721,12 @@ void DistributedAccessor::emit() {
     for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
       auto offset =
           Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-      auto alignment =
-          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+      llvm::Align alignment =
+          IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
 
-      auto substitution =
-          IGF.emitAddressAtOffset(substitutionBuffer, Offset(offset),
-                                  IGM.TypeMetadataPtrTy, Alignment(alignment));
+      auto substitution = IGF.emitAddressAtOffset(
+          substitutionBuffer, Offset(offset), IGM.TypeMetadataPtrTy,
+          Alignment(alignment.value()));
       arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
     }
 
