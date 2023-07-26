@@ -1192,6 +1192,9 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
 
+  if (Invocation.getClangImporterOptions().BridgingHeaderAsModule)
+    pushImport(CLANG_HEADER_MODULE_NAME, {ImportFlags::ImplementationOnly});
+
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
   return imports;

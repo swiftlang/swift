@@ -1547,6 +1547,12 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PrecompiledHeaderOutputDir = A->getValue();
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
+  Opts.BridgingHeaderAsModule |=
+      Args.hasArg(OPT_experimental_bridging_header_as_module);
+
+  // Forward clang module map to clang importer through ExtraArgs.
+  for (const Arg *A : Args.filtered(OPT_clang_module_map))
+    Opts.ExtraArgs.push_back(std::string("-fmodule-map-file=") + A->getValue());
 
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;

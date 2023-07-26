@@ -192,6 +192,10 @@ def clang_build_session_file : Separate<["-"], "clang-build-session-file">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Use the last modification time of <file> as the underlying Clang build session timestamp">;
 
+def clang_module_map : Separate<["-"], "clang-module-map">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"clang module map path">, MetaVarName<"<path>">;
+
 def disallow_forwarding_driver :
   Flag<["-"], "disallow-use-new-driver">, Flags<[]>,
   HelpText<"Disable using new swift-driver">;
@@ -1837,6 +1841,10 @@ def cas_plugin_path: Separate<["-"], "cas-plugin-path">,
 def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
+
+def experimental_bridging_header_as_module: Flag<["-"], "experimental-bridging-header-as-module">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Import bridging header as module">;
 
 
 // END ONLY SUPPORTED IN NEW DRIVER
