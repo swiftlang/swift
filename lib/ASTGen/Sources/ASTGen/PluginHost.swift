@@ -274,10 +274,11 @@ class PluginDiagnosticsEngine {
     // Emit the diagnostic
     var mutableMessage = message
     let diag = mutableMessage.withBridgedString { bridgedMessage in
-      Diagnostic_create(
-        bridgedDiagEngine, bridgedSeverity,
-        bridgedSourceLoc(at: position),
-        bridgedMessage)
+      bridgedDiagEngine.diagnose(
+        severity: bridgedSeverity,
+        location: bridgedSourceLoc(at: position),
+        message: bridgedMessage
+      )
     }
 
     // Emit highlights
@@ -285,7 +286,7 @@ class PluginDiagnosticsEngine {
       guard let (startLoc, endLoc) = bridgedSourceRange(for: highlight) else {
         continue
       }
-      Diagnostic_highlight(diag, startLoc, endLoc)
+      diag.highlight(startLoc: startLoc, endLoc: endLoc)
     }
 
     // Emit changes for a Fix-It.
@@ -295,12 +296,15 @@ class PluginDiagnosticsEngine {
       }
       var newText = change.newText
       newText.withBridgedString { bridgedFixItText in
-        Diagnostic_fixItReplace(
-          diag, startLoc, endLoc, bridgedFixItText)
+        diag.fixItReplace(
+          startLoc: startLoc,
+          endLoc: endLoc,
+          replaceText: bridgedFixItText
+        )
       }
     }
 
-    Diagnostic_finish(diag)
+    diag.finish()
   }
 
   /// Emit diagnostics.
