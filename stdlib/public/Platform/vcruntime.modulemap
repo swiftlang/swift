@@ -711,10 +711,6 @@ module std [system] {
       export *
     }
 
-    explicit module xtr1common {
-      header "xtr1common"
-      export *
-    }
 
     explicit module xstring {
       header "xstring"
@@ -723,6 +719,16 @@ module std [system] {
 
     explicit module xtree {
       header "xtree"
+      export *
+    }
+
+    explicit module xtr1common {
+      header "xtr1common"
+      export *
+    }
+
+    explicit module xutility {
+      header "xutility"
       export *
     }
   }
