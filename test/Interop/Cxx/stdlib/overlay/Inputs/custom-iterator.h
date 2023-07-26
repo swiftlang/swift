@@ -866,4 +866,60 @@ public:
   }
 };
 
+struct MutableRACIterator {
+private:
+  int value;
+
+public:
+  struct iterator_category : std::random_access_iterator_tag,
+                             std::output_iterator_tag {};
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  MutableRACIterator(int value) : value(value) {}
+  MutableRACIterator(const MutableRACIterator &other) = default;
+
+  const int &operator*() const { return value; }
+  int &operator*() { return value; }
+
+  MutableRACIterator &operator++() {
+    value++;
+    return *this;
+  }
+  MutableRACIterator operator++(int) {
+    auto tmp = MutableRACIterator(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  MutableRACIterator operator+(difference_type v) const {
+    return MutableRACIterator(value + v);
+  }
+  MutableRACIterator operator-(difference_type v) const {
+    return MutableRACIterator(value - v);
+  }
+  friend MutableRACIterator operator+(difference_type v,
+                                      const MutableRACIterator &it) {
+    return it + v;
+  }
+  int operator-(const MutableRACIterator &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const MutableRACIterator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const MutableRACIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const MutableRACIterator &other) const {
+    return value != other.value;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H
