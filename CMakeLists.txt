@@ -1214,7 +1214,7 @@ endif()
 # Find required dependencies.
 #
 
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Python3 3.6 COMPONENTS Interpreter REQUIRED)
 
 #
 # Find optional dependencies.
