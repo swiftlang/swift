@@ -355,6 +355,12 @@ module std [system] {
     export *
   }
 
+  module expected {
+    requires cplusplus23
+    header "expected"
+    export *
+  }
+
   module filesystem {
     requires cplusplus17
     header "filesystem"
@@ -573,13 +579,11 @@ module std [system] {
     export *
   }
 
-/*
   module spanstream {
     requires cpluplus23
     header "spanstream"
     export *
   }
-*/
 
   module sstream {
     header "sstream"
@@ -588,6 +592,12 @@ module std [system] {
 
   module stack {
     header "stack"
+    export *
+  }
+
+  module stacktrace {
+    requires cplusplus23
+    header "stacktrace"
     export *
   }
 
