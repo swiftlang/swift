@@ -637,8 +637,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 // callees. This provides more precise escape analysis and side effect analysis
 // of callee arguments.
 static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("HighLevel,Function+EarlyLoopOpt");
-  // FIXME: update EagerSpecializer to be a function pass!
+  P.startPipeline("HighLevel,Function+EarlyLoopOpt",
+                  true /*isFunctionPassPipeline*/);
   P.addEagerSpecializer();
   P.addObjCBridgingOptimization();
 
