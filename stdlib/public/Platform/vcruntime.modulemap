@@ -409,6 +409,11 @@ module std [system] {
     export *
   }
 
+  module iomanip {
+    header "iomanip"
+    export *
+  }
+
   module ios {
     header "ios"
     export *
