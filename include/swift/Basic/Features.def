@@ -224,6 +224,9 @@ EXPERIMENTAL_FEATURE(DeferredSendableChecking, false)
 /// "playground transform" is enabled.
 EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
 
+/// Enable the `@_rawLayout` attribute.
+EXPERIMENTAL_FEATURE(RawLayout, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

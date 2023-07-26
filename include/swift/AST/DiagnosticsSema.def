@@ -3794,6 +3794,15 @@ ERROR(attr_MainType_without_main,none,
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
 
+ERROR(attr_rawlayout_experimental,none,
+      "the @_rawLayout attribute is experimental", ())
+ERROR(attr_rawlayout_cannot_be_copyable,none,
+      "type with @_rawLayout cannot be copied and must be declared ~Copyable", ())
+ERROR(attr_rawlayout_cannot_have_stored_properties,none,
+      "type with @_rawLayout cannot have stored properties", ())
+ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
+      "type with @_rawLayout cannot also have an @_alignment attribute", ())
+      
 // lazy
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
@@ -5318,6 +5327,8 @@ ERROR(concurrent_value_inherit,none,
       (bool, DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
+ERROR(sendable_raw_storage,none,
+      "struct %0 with @_rawLayout does not conform to the 'Sendable' protocol", (DeclName))
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))

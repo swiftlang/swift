@@ -5934,6 +5934,38 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::RawLayout_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeID;
+        uint32_t rawSize;
+        uint8_t rawAlign;
+        serialization::decls_block::RawLayoutDeclAttrLayout::
+          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign);
+        
+        if (typeID) {
+          auto type = MF.getTypeChecked(typeID);
+          if (!type) {
+            return type.takeError();
+          }
+          auto typeRepr = new (ctx) FixedTypeRepr(type.get(), SourceLoc());
+          if (rawAlign == 0) {
+            Attr = new (ctx) RawLayoutAttr(typeRepr,
+                                           SourceLoc(),
+                                           SourceRange());
+            break;
+          } else {
+            Attr = new (ctx) RawLayoutAttr(typeRepr, rawSize,
+                                           SourceLoc(),
+                                           SourceRange());
+            break;
+          }
+        }
+        
+        Attr = new (ctx) RawLayoutAttr(rawSize, rawAlign,
+                                       SourceLoc(), SourceRange());
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

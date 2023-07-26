@@ -1932,14 +1932,16 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   // This lookup only can fail if the stdlib (i.e. the Swift module) has not
   // been loaded because you've passed `-parse-stdlib` and are not building the
   // stdlib itself (which would have `-module-name Swift` too).
-  if (auto *copyable = TypeChecker::getProtocol(getASTContext(), SourceLoc(),
-                                                KnownProtocolKind::Copyable)) {
-    addConstraint(
-        ConstraintKind::ConformsTo, typeVar,
-        copyable->getDeclaredInterfaceType(),
-        locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
+  if (!outerDC->getParentModule()->isBuiltinModule()) {
+    if (auto *copyable = TypeChecker::getProtocol(getASTContext(), SourceLoc(),
+                                                  KnownProtocolKind::Copyable)) {
+      addConstraint(
+          ConstraintKind::ConformsTo, typeVar,
+          copyable->getDeclaredInterfaceType(),
+          locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
+    }
   }
-
+  
   return typeVar;
 }
 

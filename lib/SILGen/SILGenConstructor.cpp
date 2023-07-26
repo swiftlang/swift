@@ -722,8 +722,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     // DISCUSSION: This only happens with noncopyable types since the memory
     // lifetime checker doesn't seem to process trivial locations. But empty
     // move only structs are non-trivial, so we need to handle this here.
-    if (isa<StructDecl>(nominal) && nominal->isMoveOnly() &&
-        nominal->getStoredProperties().empty()) {
+    if (isa<StructDecl>(nominal) && nominal->isMoveOnly()
+        && !nominal->getAttrs().hasAttribute<RawLayoutAttr>()
+        && nominal->getStoredProperties().empty()) {
       auto *si = B.createStruct(ctor, lowering.getLoweredType(), {});
       B.emitStoreValueOperation(ctor, si, selfLV.getLValueAddress(),
                                 StoreOwnershipQualifier::Init);

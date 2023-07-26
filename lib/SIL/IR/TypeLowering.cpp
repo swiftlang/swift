@@ -2360,6 +2360,14 @@ namespace {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
       }
+      
+      // If the type has raw storage, it is move-only and address-only.
+      if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
+        properties.setAddressOnly();
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return handleMoveOnlyAddressOnly(structType, properties);
+      }
 
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
