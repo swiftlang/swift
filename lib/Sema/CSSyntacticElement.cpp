@@ -1224,8 +1224,7 @@ private:
 
     auto contextualResultInfo = getContextualResultInfo();
     SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                  contextualResultInfo.purpose,
-                                  contextualResultInfo.getType(),
+                                  contextualResultInfo,
                                   /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target)) {
@@ -1233,9 +1232,7 @@ private:
       return;
     }
 
-    cs.setContextualType(target.getAsExpr(),
-                         TypeLoc::withoutLoc(contextualResultInfo.getType()),
-                         contextualResultInfo.purpose);
+    cs.setContextualInfo(target.getAsExpr(), contextualResultInfo);
     cs.setTargetFor(returnStmt, target);
   }
 
@@ -1391,9 +1388,15 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   // Assign contextual types for each of the expression branches.
   SmallVector<Expr *, 4> scratch;
   auto branches = E->getSingleExprBranches(scratch);
-  for (auto *branch : branches) {
-    setContextualType(branch, TypeLoc::withoutLoc(resultTy),
-                      CTP_SingleValueStmtBranch);
+  for (auto idx : indices(branches)) {
+    auto *branch = branches[idx];
+
+    auto ctpElt = LocatorPathElt::ContextualType(CTP_SingleValueStmtBranch);
+    auto *loc = getConstraintLocator(
+        E, {LocatorPathElt::SingleValueStmtBranch(idx), ctpElt});
+
+    ContextualTypeInfo info(resultTy, CTP_SingleValueStmtBranch, loc);
+    setContextualInfo(branch, info);
   }
 
   TypeJoinExpr *join = nullptr;
@@ -1546,26 +1549,8 @@ ConstraintSystem::simplifySyntacticElementConstraint(
                                                 getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
-    auto ctpElt = LocatorPathElt::ContextualType(contextInfo.purpose);
-    auto *contextualTypeLoc = getConstraintLocator(expr, {ctpElt});
-
-    // If this is a branch expression in a SingleValueStmtExpr, form a locator
-    // based on the branch index.
-    if (auto *SVE = getAsExpr<SingleValueStmtExpr>(locator.getAnchor())) {
-      SmallVector<Expr *, 4> scratch;
-      auto branches = SVE->getSingleExprBranches(scratch);
-      for (auto idx : indices(branches)) {
-        if (expr == branches[idx]) {
-          contextualTypeLoc = getConstraintLocator(
-              SVE, {LocatorPathElt::SingleValueStmtBranch(idx), ctpElt});
-          break;
-        }
-      }
-    }
-
     SyntacticElementTarget target(expr, context->getAsDeclContext(),
-                                  contextInfo.purpose, contextInfo.getType(),
-                                  contextualTypeLoc, isDiscarded);
+                                  contextInfo, isDiscarded);
 
     if (generateConstraints(target))
       return SolutionKind::Error;

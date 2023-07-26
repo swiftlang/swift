@@ -432,6 +432,11 @@ void swift::conformToCxxIteratorIfNeeded(
   if (!pointee || pointee->isGetterMutating() || pointee->getType()->hasError())
     return;
 
+  // Check if `var pointee: Pointee` is settable. This is required for the
+  // conformance to UnsafeCxxMutableInputIterator but is not necessary for
+  // UnsafeCxxInputIterator.
+  bool pointeeSettable = pointee->isSettable(nullptr);
+
   // Check if present: `func successor() -> Self`
   auto successorId = ctx.getIdentifier("successor");
   auto successor =
@@ -469,8 +474,13 @@ void swift::conformToCxxIteratorIfNeeded(
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),
                                pointee->getType());
-  impl.addSynthesizedProtocolAttrs(decl,
-                                   {KnownProtocolKind::UnsafeCxxInputIterator});
+  if (pointeeSettable)
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::UnsafeCxxMutableInputIterator});
+  else
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::UnsafeCxxInputIterator});
+
   if (!isRandomAccessIterator ||
       !ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator))
     return;

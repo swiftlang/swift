@@ -126,7 +126,15 @@
 // CHECK: struct InheritedTemplatedConstRACIteratorOutOfLineOps<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK: }
 
-// CHECK: struct InputOutputIterator : UnsafeCxxInputIterator {
+// CHECK: struct InputOutputIterator : UnsafeCxxMutableInputIterator {
 // CHECK:   func successor() -> InputOutputIterator
 // CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = Int32
+// CHECK: }
+
+// CHECK: struct MutableRACIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {
+// CHECK:   func successor() -> MutableRACIterator
+// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
 // CHECK: }
