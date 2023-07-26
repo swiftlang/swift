@@ -3058,6 +3058,10 @@ void SubstGenericParametersFromMetadata::setup() const {
 MetadataOrPack
 SubstGenericParametersFromMetadata::getMetadata(
                                         unsigned depth, unsigned index) const {
+  // Don't attempt anything if we have no generic parameters.
+  if (genericArgs == nullptr)
+    return MetadataOrPack();
+
   // On first access, compute the descriptor path.
   setup();
 
@@ -3099,6 +3103,10 @@ SubstGenericParametersFromMetadata::getMetadata(
 const WitnessTable *
 SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
                                                     unsigned index) const {
+  // Don't attempt anything if we have no generic parameters.
+  if (genericArgs == nullptr)
+    return nullptr;
+
   // On first access, compute the descriptor path.
   setup();
 
