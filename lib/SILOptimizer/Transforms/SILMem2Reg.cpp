@@ -1927,7 +1927,7 @@ class MemoryToRegisters {
   /// Attempt to promote the specified stack allocation, returning true if so
   /// or false if not.  On success, all uses of the AllocStackInst have been
   /// removed, but the ASI itself is still in the program.
-  bool promoteSingleAllocation(AllocStackInst *asi);
+  bool promoteAllocation(AllocStackInst *asi);
 
 public:
   /// C'tor
@@ -2128,7 +2128,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
 /// or false if not.  On success, this returns true and usually drops all of the
 /// uses of the AllocStackInst, but never deletes the ASI itself.  Callers
 /// should check to see if the ASI is dead after this and remove it if so.
-bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
+bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc) {
   LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
   ++NumAllocStackFound;
 
@@ -2190,7 +2190,7 @@ bool MemoryToRegisters::run() {
       if (!asi)
         continue;
 
-      if (promoteSingleAllocation(asi)) {
+      if (promoteAllocation(asi)) {
         for (auto *inst : instructionsToDelete) {
           deleter.forceDelete(inst);
         }
