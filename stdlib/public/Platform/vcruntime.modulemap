@@ -395,20 +395,6 @@ module std [system] {
     export *
   }
 
-/*
-  module hash_map {
-    header "hash_map"
-    export *
-  }
-*/
-
-/*
-  module hash_set {
-    header "hash_set"
-    export *
-  }
-*/
-
   module initializer_list {
     requires cplusplus11
     header "initializer_list"
