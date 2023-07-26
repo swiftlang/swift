@@ -71,4 +71,10 @@ CxxSequenceTestSuite.test("HasInheritedTemplatedConstIterator to Swift.Array") {
   expectEqual([1, 2, 3, 4, 5, 6] as [Int32], array)
 }
 
+CxxSequenceTestSuite.test("HasInputOutputConstIterator to Swift.Array") {
+  let seq = HasInputOutputConstIterator()
+  let array = Array(seq)
+  expectEqual([5, 4, 3, 2, 1] as [Int32], array)
+}
+
 runAllTests()
