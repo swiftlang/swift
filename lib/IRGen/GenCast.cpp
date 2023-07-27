@@ -883,6 +883,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   bool sourceWrappedInOptional = false;
 
+  llvm::Optional<ConditionalDominanceScope> domScope;
   if (auto sourceOptObjectType = sourceLoweredType.getOptionalObjectType()) {
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
@@ -912,6 +913,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
       Builder.CreateCondBr(isNotNil, isNotNilContBB, nilMergeBB);
 
       Builder.emitBlock(isNotNilContBB);
+      domScope.emplace(IGF);
     }
   }
 
