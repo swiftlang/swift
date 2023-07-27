@@ -61,6 +61,9 @@ public:
   /// Does value A properly dominate instruction B?
   bool properlyDominates(SILValue a, SILInstruction *b);
 
+  /// The nearest block which dominates all the uses of \p value.
+  SILBasicBlock *getLeastCommonAncestorOfUses(SILValue value);
+
   void verify() const;
 
   /// Return true if the other dominator tree does not match this dominator
