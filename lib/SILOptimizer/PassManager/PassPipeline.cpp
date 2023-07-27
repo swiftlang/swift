@@ -423,6 +423,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
 
+  P.addDeadObjectElimination();
+
   if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
@@ -657,7 +659,6 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel,Module+StackPromote");
   P.addDeadFunctionAndGlobalElimination();
   P.addPerformanceSILLinker();
-  P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
 
   // Do the first stack promotion on high-level SIL before serialization.
