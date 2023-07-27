@@ -12,7 +12,7 @@
 
 import SIL
 
-extension TupleExtractInst : OnoneSimplifyable {
+extension TupleExtractInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Replace tuple_extract(tuple(x)) -> x
@@ -20,7 +20,10 @@ extension TupleExtractInst : OnoneSimplifyable {
     guard let tupleInst = tuple as? TupleInst else {
       return
     }
-    context.tryReplaceRedundantInstructionPair(first: tupleInst, second: self,
-                                               with: tupleInst.operands[fieldIndex].value)
+    context.tryReplaceRedundantInstructionPair(
+      first: tupleInst,
+      second: self,
+      with: tupleInst.operands[fieldIndex].value
+    )
   }
 }

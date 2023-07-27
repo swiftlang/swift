@@ -42,19 +42,19 @@ private extension Value {
   }
 }
 
-private struct IsBareObjectWalker : ValueDefUseWalker {
+private struct IsBareObjectWalker: ValueDefUseWalker {
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   mutating func walkDown(value operand: Operand, path: Path) -> WalkResult {
     switch operand.instruction {
     // White-list all instructions which don't use the object header.
     case is StructInst, is TupleInst, is EnumInst,
-         is StructExtractInst, is TupleExtractInst, is UncheckedEnumDataInst,
-         is DestructureStructInst, is DestructureTupleInst,
-         is BeginBorrowInst, is MarkDependenceInst,
-         is BranchInst, is CondBranchInst, is SwitchEnumInst,
-         is UpcastInst, is UncheckedRefCastInst,
-         is EndCOWMutationInst:
+      is StructExtractInst, is TupleExtractInst, is UncheckedEnumDataInst,
+      is DestructureStructInst, is DestructureTupleInst,
+      is BeginBorrowInst, is MarkDependenceInst,
+      is BranchInst, is CondBranchInst, is SwitchEnumInst,
+      is UpcastInst, is UncheckedRefCastInst,
+      is EndCOWMutationInst:
       return walkDownDefault(value: operand, path: path)
     default:
       return leafUse(value: operand, path: path)
@@ -65,8 +65,8 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
     switch operand.instruction {
     // White-list all instructions which don't use the object header.
     case is RefElementAddrInst, is RefTailAddrInst,
-         is DeallocRefInst, is DeallocStackRefInst, is SetDeallocatingInst,
-         is DebugValueInst, is FixLifetimeInst:
+      is DeallocRefInst, is DeallocStackRefInst, is SetDeallocatingInst,
+      is DebugValueInst, is FixLifetimeInst:
       return .continueWalk
     default:
       return .abortWalk

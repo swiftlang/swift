@@ -19,36 +19,39 @@ import SIL
 /// dumps anything, but aborts if the result is wrong.
 ///
 /// This pass is used for testing `AccessUtils`.
-let accessDumper = FunctionPass(name: "dump-access", {
-  (function: Function, context: FunctionPassContext) in
-  print("Accesses for \(function.name)")
+let accessDumper = FunctionPass(
+  name: "dump-access",
+  {
+    (function: Function, context: FunctionPassContext) in
+    print("Accesses for \(function.name)")
 
-  for block in function.blocks {
-    for instr in block.instructions {
-      switch instr {
-      case let st as StoreInst:
-        printAccessInfo(address: st.destination)
-      case let load as LoadInst:
-        printAccessInfo(address: load.address)
-      case let apply as ApplyInst:
-        guard let callee = apply.referencedFunction else {
+    for block in function.blocks {
+      for instr in block.instructions {
+        switch instr {
+        case let st as StoreInst:
+          printAccessInfo(address: st.destination)
+        case let load as LoadInst:
+          printAccessInfo(address: load.address)
+        case let apply as ApplyInst:
+          guard let callee = apply.referencedFunction else {
+            break
+          }
+          if callee.name == "_isDistinct" {
+            checkAliasInfo(forArgumentsOf: apply, expectDistinct: true)
+          } else if callee.name == "_isNotDistinct" {
+            checkAliasInfo(forArgumentsOf: apply, expectDistinct: false)
+          }
+        default:
           break
         }
-        if callee.name == "_isDistinct" {
-          checkAliasInfo(forArgumentsOf: apply, expectDistinct: true)
-        } else if callee.name == "_isNotDistinct" {
-          checkAliasInfo(forArgumentsOf: apply, expectDistinct: false)
-        }
-      default:
-        break
       }
     }
+
+    print("End accesses for \(function.name)")
   }
+)
 
-  print("End accesses for \(function.name)")
-})
-
-private struct AccessStoragePathVisitor : ValueUseDefWalker {
+private struct AccessStoragePathVisitor: ValueUseDefWalker {
   var walkUpCache = WalkerCache<Path>()
   mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
     print("    Storage: \(value)")
@@ -89,7 +92,7 @@ private func checkAliasInfo(forArgumentsOf apply: ApplyInst, expectDistinct: Boo
   } else {
     return
   }
-  
+
   print("in function")
   print(apply.parentFunction)
   fatalError()

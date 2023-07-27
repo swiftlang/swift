@@ -40,7 +40,7 @@ struct FunctionUses {
   fileprivate struct FirstUse {
     // The head of the use-list.
     var first: Int?
-    
+
     // True if the function has unknown uses
     var hasUnknownUses: Bool
 
@@ -56,11 +56,11 @@ struct FunctionUses {
   }
 
   /// The list of uses of a function.
-  struct UseList : CollectionLikeSequence, CustomStringConvertible {
-    struct Iterator : IteratorProtocol {
+  struct UseList: CollectionLikeSequence, CustomStringConvertible {
+    struct Iterator: IteratorProtocol {
       fileprivate let useStorage: [Use]
       fileprivate var currentUseIdx: Int?
-      
+
       mutating func next() -> Instruction? {
         if let useIdx = currentUseIdx {
           let use = useStorage[useIdx]
@@ -86,7 +86,7 @@ struct FunctionUses {
     func makeIterator() -> Iterator {
       return Iterator(useStorage: useStorage, currentUseIdx: firstUse.first)
     }
-    
+
     var description: String {
       var result = "[\n"
       if hasUnknownUses {
@@ -94,12 +94,12 @@ struct FunctionUses {
       }
       for inst in self {
         result += "@\(inst.parentFunction.name): \(inst)\n"
-  
+
       }
       result += "]"
       return result
     }
-    
+
     var customMirror: Mirror { Mirror(self, children: []) }
   }
 
@@ -108,7 +108,7 @@ struct FunctionUses {
 
   // The use-list head for each function.
   private var uses: [Function: FirstUse] = [:]
-  
+
   /// Returns the use-list of `function`.
   ///
   /// Note that `collect` must be called before `getUses` can be used.

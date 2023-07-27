@@ -38,31 +38,37 @@ private func log(_ message: @autoclosure () -> String) {
 /// inter-procedural analysis. If this is not possible and the `enableMoveInoutStackProtection`
 /// option is set, the fallback is to move the argument into a temporary `alloc_stack`
 /// and do the unsafe pointer operations on the temporary.
-let stackProtection = ModulePass(name: "stack-protection", {
+let stackProtection = ModulePass(
+  name: "stack-protection",
+  {
     (context: ModulePassContext) in
 
-  if !context.options.enableStackProtection {
-    return
-  }
+    if !context.options.enableStackProtection {
+      return
+    }
 
-  var optimization = StackProtectionOptimization(enableMoveInout: context.options.enableMoveInoutStackProtection)
-  optimization.processModule(context)
-})
+    var optimization = StackProtectionOptimization(enableMoveInout: context.options.enableMoveInoutStackProtection)
+    optimization.processModule(context)
+  }
+)
 
 /// The stack-protection optimization on function-level.
 ///
 /// In contrast to the `stack-protection` pass, this pass doesn't do any inter-procedural
 /// analysis. It runs at Onone.
-let functionStackProtection = FunctionPass(name: "function-stack-protection", {
-  (function: Function, context: FunctionPassContext) in
+let functionStackProtection = FunctionPass(
+  name: "function-stack-protection",
+  {
+    (function: Function, context: FunctionPassContext) in
 
-  if !context.options.enableStackProtection {
-    return
+    if !context.options.enableStackProtection {
+      return
+    }
+
+    var optimization = StackProtectionOptimization(enableMoveInout: context.options.enableMoveInoutStackProtection)
+    optimization.process(function: function, context)
   }
-
-  var optimization = StackProtectionOptimization(enableMoveInout: context.options.enableMoveInoutStackProtection)
-  optimization.process(function: function, context)
-})
+)
 
 /// The optimization algorithm.
 private struct StackProtectionOptimization {
@@ -105,7 +111,7 @@ private struct StackProtectionOptimization {
       needStackProtection.removeAll(keepingCapacity: true)
     }
   }
-  
+
   /// The main entry point if running on function-level.
   mutating func process(function: Function, _ context: FunctionPassContext) {
     var mustFixStackNesting = false
@@ -126,8 +132,12 @@ private struct StackProtectionOptimization {
   ///   add the relevant callers to `self.needStackProtection`, or
   /// - if the origin is unknown, move the value into a temporary and set the function's
   ///   `needStackProtection` flag.
-  private mutating func process(instruction: Instruction, in function: Function,
-                                mustFixStackNesting: inout Bool, _ context: FunctionPassContext) {
+  private mutating func process(
+    instruction: Instruction,
+    in function: Function,
+    mustFixStackNesting: inout Bool,
+    _ context: FunctionPassContext
+  ) {
 
     // `withUnsafeTemporaryAllocation(of:capacity:_:)` is compiled to a `builtin "stackAlloc"`.
     if let bi = instruction as? BuiltinInst, bi.id == .StackAlloc {
@@ -200,7 +210,8 @@ private struct StackProtectionOptimization {
       //   bb0(%0: $Class):
       //     %baseAddr = ref_element_addr %0 : $Class, #Class.field
       if findOriginsInCallers(&worklist) == NeedInsertMoves.yes,
-         let beginAccess = scope {
+        let beginAccess = scope
+      {
         // We don't know the origin of the object. Therefore we need to do the
         // conservative default which is to move the value to a temporary stack location.
         moveToTemporary(scope: beginAccess, mustFixStackNesting: &mustFixStackNesting, context)
@@ -227,12 +238,12 @@ private struct StackProtectionOptimization {
   /// All functions, which allocate such an origin are added to `self.needStackProtection`.
   /// Returns true if all origins could be found and false, if there are unknown origins.
   private mutating func findOriginsInCallers(_ worklist: inout ArgumentWorklist) -> NeedInsertMoves {
-  
+
     guard let moduleContext = moduleContext else {
       // Don't do any inter-procedural analysis when used on function-level.
       return enableMoveInout ? .yes : .no
     }
-  
+
     // Put the resulting functions into a temporary array, because we only add them to
     // `self.needStackProtection` if we don't return false.
     var newFunctions = Stack<Function>(moduleContext)
@@ -249,7 +260,7 @@ private struct StackProtectionOptimization {
       if uses.hasUnknownUses && enableMoveInout {
         return NeedInsertMoves.yes
       }
-      
+
       for useInst in uses {
         guard let fri = useInst as? FunctionRefInst else {
           if enableMoveInout {
@@ -257,10 +268,11 @@ private struct StackProtectionOptimization {
           }
           continue
         }
-      
+
         for functionRefUse in fri.uses {
           guard let apply = functionRefUse.instruction as? ApplySite,
-                let callerArgIdx = apply.callerArgIndex(calleeArgIndex: arg.index) else {
+            let callerArgIdx = apply.callerArgIndex(calleeArgIndex: arg.index)
+          else {
             if enableMoveInout {
               return NeedInsertMoves.yes
             }
@@ -348,20 +360,23 @@ private struct StackProtectionOptimization {
       }
     }
     log("move addr protection in \(function.name): \(argument)")
-    
+
     function.setNeedsStackProtection(context)
   }
 
   /// Moves the value of a `beginAccess` to a temporary stack location, if possible.
-  private func moveToTemporary(scope beginAccess: BeginAccessInst, mustFixStackNesting: inout Bool,
-                               _ context: FunctionPassContext) {
+  private func moveToTemporary(
+    scope beginAccess: BeginAccessInst,
+    mustFixStackNesting: inout Bool,
+    _ context: FunctionPassContext
+  ) {
     if beginAccess.accessKind != .Modify {
       // We can only move from a `modify` access.
       // Also, read-only accesses shouldn't be subject to buffer overflows (because
       // no one should ever write to such a storage).
       return
     }
-  
+
     let builder = Builder(after: beginAccess, location: beginAccess.location.autoGenerated, context)
     let temporary = builder.createAllocStack(beginAccess.type)
 
@@ -387,7 +402,7 @@ private struct StackProtectionOptimization {
 }
 
 /// Worklist for inter-procedural analysis of function arguments.
-private struct ArgumentWorklist : ValueUseDefWalker {
+private struct ArgumentWorklist: ValueUseDefWalker {
   var walkUpCache = WalkerCache<SmallProjectionPath>()
 
   // Used in `push(rootsOf:)`
@@ -422,7 +437,7 @@ private struct ArgumentWorklist : ValueUseDefWalker {
   mutating func push(rootsOf object: Value) -> (foundUnknownRoots: Bool, foundStackAlloc: Bool) {
     foundStackAlloc = false
     foundUnknownRoots = false
-    _ =  walkUp(value: object, path: SmallProjectionPath(.anything))
+    _ = walkUp(value: object, path: SmallProjectionPath(.anything))
     return (foundUnknownRoots, foundStackAlloc)
   }
 
@@ -433,14 +448,14 @@ private struct ArgumentWorklist : ValueUseDefWalker {
   // Internal walker function.
   mutating func rootDef(value: Value, path: Path) -> WalkResult {
     switch value {
-      case let ar as AllocRefInstBase:
-        if ar.canAllocOnStack {
-          foundStackAlloc = true
-        }
-      case let arg as FunctionArgument:
-        push(arg)
+    case let ar as AllocRefInstBase:
+      if ar.canAllocOnStack {
+        foundStackAlloc = true
+      }
+    case let arg as FunctionArgument:
+      push(arg)
     default:
-        foundUnknownRoots = true
+      foundUnknownRoots = true
     }
     return .continueWalk
   }
@@ -457,22 +472,22 @@ private extension AccessBase {
 
   var isStackAllocated: IsStackAllocatedResult {
     switch self {
-      case .stack:
-        return .yes
-      case .box, .global:
-        return .no
-      case .class(let rea):
-        return .objectIfStackPromoted(rea.instance)
-      case .tail(let rta):
-        return .objectIfStackPromoted(rta.instance)
-      case .argument(let arg):
-        return .decidedInCaller(arg)
-      case .yield, .pointer:
-        return .unknown
-      case .unidentified:
-        // In the rare case of an unidentified access, just ignore it.
-        // This should not happen in regular SIL, anyway.
-        return .no
+    case .stack:
+      return .yes
+    case .box, .global:
+      return .no
+    case .class(let rea):
+      return .objectIfStackPromoted(rea.instance)
+    case .tail(let rta):
+      return .objectIfStackPromoted(rta.instance)
+    case .argument(let arg):
+      return .decidedInCaller(arg)
+    case .yield, .pointer:
+      return .unknown
+    case .unidentified:
+      // In the rare case of an unidentified access, just ignore it.
+      // This should not happen in regular SIL, anyway.
+      return .no
     }
   }
 }
@@ -482,31 +497,31 @@ private extension Instruction {
   var accessBaseToProtect: (AccessBase, scope: BeginAccessInst?)? {
     let baseAddr: Value
     switch self {
-      case let atp as AddressToPointerInst:
-        if !atp.needsStackProtection {
-          return nil
-        }
-        var hasNoStores = NoStores()
-        if hasNoStores.walkDownUses(ofValue: atp, path: SmallProjectionPath()) == .continueWalk {
-          return nil
-        }
-
-        // The result of an `address_to_pointer` may be used in any unsafe way, e.g.
-        // passed to a C function.
-        baseAddr = atp.address
-      case let ia as IndexAddrInst:
-        if !ia.needsStackProtection {
-          return nil
-        }
-        var hasNoStores = NoStores()
-        if hasNoStores.walkDownUses(ofAddress: ia, path: SmallProjectionPath()) == .continueWalk {
-          return nil
-        }
-
-        // `index_addr` is unsafe if not used for tail-allocated elements (e.g. in Array).
-        baseAddr = ia.base
-      default:
+    case let atp as AddressToPointerInst:
+      if !atp.needsStackProtection {
         return nil
+      }
+      var hasNoStores = NoStores()
+      if hasNoStores.walkDownUses(ofValue: atp, path: SmallProjectionPath()) == .continueWalk {
+        return nil
+      }
+
+      // The result of an `address_to_pointer` may be used in any unsafe way, e.g.
+      // passed to a C function.
+      baseAddr = atp.address
+    case let ia as IndexAddrInst:
+      if !ia.needsStackProtection {
+        return nil
+      }
+      var hasNoStores = NoStores()
+      if hasNoStores.walkDownUses(ofAddress: ia, path: SmallProjectionPath()) == .continueWalk {
+        return nil
+      }
+
+      // `index_addr` is unsafe if not used for tail-allocated elements (e.g. in Array).
+      baseAddr = ia.base
+    default:
+      return nil
     }
     let (accessPath, scope) = baseAddr.accessPathWithScope
 
@@ -520,7 +535,7 @@ private extension Instruction {
 }
 
 /// Checks if there are no stores to an address or raw pointer.
-private struct NoStores : ValueDefUseWalker, AddressDefUseWalker {
+private struct NoStores: ValueDefUseWalker, AddressDefUseWalker {
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {

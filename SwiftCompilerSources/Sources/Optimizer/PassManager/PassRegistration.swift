@@ -23,37 +23,44 @@ public func initializeSwiftModules() {
 }
 
 private func registerPass(
-      _ pass: ModulePass,
-      _ runFn: @escaping (@convention(c) (BridgedPassContext) -> ())) {
+  _ pass: ModulePass,
+  _ runFn: @escaping (@convention(c) (BridgedPassContext) -> ())
+) {
   pass.name._withStringRef { nameStr in
     SILPassManager_registerModulePass(nameStr, runFn)
   }
 }
 
 private func registerPass(
-      _ pass: FunctionPass,
-      _ runFn: @escaping (@convention(c) (BridgedFunctionPassCtxt) -> ())) {
+  _ pass: FunctionPass,
+  _ runFn: @escaping (@convention(c) (BridgedFunctionPassCtxt) -> ())
+) {
   pass.name._withStringRef { nameStr in
     SILPassManager_registerFunctionPass(nameStr, runFn)
   }
 }
 
-protocol SILCombineSimplifyable : Instruction {
+protocol SILCombineSimplifyable: Instruction {
   func simplify(_ context: SimplifyContext)
 }
 
-private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
-                                                   _ bridgedCtxt: BridgedInstructionPassCtxt) {
+private func run<InstType: SILCombineSimplifyable>(
+  _ instType: InstType.Type,
+  _ bridgedCtxt: BridgedInstructionPassCtxt
+) {
   let inst = bridgedCtxt.instruction.getAs(instType)
-  let context = SimplifyContext(_bridged: bridgedCtxt.passContext,
-                                notifyInstructionChanged: {inst in},
-                                preserveDebugInfo: false)
+  let context = SimplifyContext(
+    _bridged: bridgedCtxt.passContext,
+    notifyInstructionChanged: { inst in },
+    preserveDebugInfo: false
+  )
   inst.simplify(context)
 }
 
 private func registerForSILCombine<InstType: SILCombineSimplifyable>(
-      _ instType: InstType.Type,
-      _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
+  _ instType: InstType.Type,
+  _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())
+) {
   String(describing: instType)._withStringRef { instClassStr in
     SILCombine_registerInstructionPass(instClassStr, runFn)
   }
@@ -88,12 +95,12 @@ private func registerSwiftPasses() {
 
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
-  registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
-  registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
-  registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
-  registerForSILCombine(RetainValueInst.self,      { run(RetainValueInst.self, $0) })
-  registerForSILCombine(ReleaseValueInst.self,     { run(ReleaseValueInst.self, $0) })
-  registerForSILCombine(LoadInst.self,             { run(LoadInst.self, $0) })
+  registerForSILCombine(GlobalValueInst.self, { run(GlobalValueInst.self, $0) })
+  registerForSILCombine(StrongRetainInst.self, { run(StrongRetainInst.self, $0) })
+  registerForSILCombine(StrongReleaseInst.self, { run(StrongReleaseInst.self, $0) })
+  registerForSILCombine(RetainValueInst.self, { run(RetainValueInst.self, $0) })
+  registerForSILCombine(ReleaseValueInst.self, { run(ReleaseValueInst.self, $0) })
+  registerForSILCombine(LoadInst.self, { run(LoadInst.self, $0) })
 
   // Test passes
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })

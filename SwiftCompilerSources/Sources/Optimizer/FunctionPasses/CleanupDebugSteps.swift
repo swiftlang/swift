@@ -38,7 +38,8 @@ private func cleanupDebugSteps(in block: BasicBlock, _ context: FunctionPassCont
     }
 
     if let li = lastInstWithSameLocation,
-       !inst.location.hasSameSourceLocation(as: li.location) {
+      !inst.location.hasSameSourceLocation(as: li.location)
+    {
       lastInstWithSameLocation = nil
     }
 

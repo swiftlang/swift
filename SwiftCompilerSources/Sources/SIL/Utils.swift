@@ -29,27 +29,28 @@ public protocol HasShortDescription {
   var shortDescription: String { get }
 }
 
-private struct CustomMirrorChild : CustomStringConvertible, NoReflectionChildren {
+private struct CustomMirrorChild: CustomStringConvertible, NoReflectionChildren {
   public var description: String
-  
+
   public init(description: String) { self.description = description }
 }
 
 /// Makes a Sequence's `description` and `customMirror` formatted like Array, e.g. [a, b, c].
-public protocol FormattedLikeArray : Sequence, CustomStringConvertible, CustomReflectable {
+public protocol FormattedLikeArray: Sequence, CustomStringConvertible, CustomReflectable {
 }
 
 extension FormattedLikeArray {
   /// Display a Sequence in an array like format, e.g. [a, b, c]
   public var description: String {
-    "[" + map {
-      if let named = $0 as? HasShortDescription {
-        return named.shortDescription
-      }
-      return String(describing: $0)
-    }.joined(separator: ", ") + "]"
+    "["
+      + map {
+        if let named = $0 as? HasShortDescription {
+          return named.shortDescription
+        }
+        return String(describing: $0)
+      }.joined(separator: ", ") + "]"
   }
-  
+
   /// The mirror which adds the children of a Sequence, similar to `Array`.
   public var customMirror: Mirror {
     // If the one-line description is not too large, print that instead of the
@@ -75,7 +76,7 @@ extension FormattedLikeArray {
 /// It fixes the default reflection for bridged random access collections, which usually have a
 /// `bridged` stored property.
 /// Conforming to this protocol displays the "real" children  not just `bridged`.
-public protocol BridgedRandomAccessCollection : RandomAccessCollection, CustomReflectable {
+public protocol BridgedRandomAccessCollection: RandomAccessCollection, CustomReflectable {
 }
 
 extension BridgedRandomAccessCollection {
@@ -91,7 +92,7 @@ extension BridgedRandomAccessCollection {
 /// to CollectionLikeSequence.
 ///
 /// For convenience it also inherits from FormattedLikeArray.
-public protocol CollectionLikeSequence : FormattedLikeArray {
+public protocol CollectionLikeSequence: FormattedLikeArray {
 }
 
 public extension CollectionLikeSequence {
@@ -100,21 +101,21 @@ public extension CollectionLikeSequence {
 
 // Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.
 
-extension LazySequence : CollectionLikeSequence,
-                         FormattedLikeArray, CustomStringConvertible, CustomReflectable
-                         where Base: CollectionLikeSequence {}
+extension LazySequence: CollectionLikeSequence,
+  FormattedLikeArray, CustomStringConvertible, CustomReflectable
+where Base: CollectionLikeSequence {}
 
-extension FlattenSequence : CollectionLikeSequence,
-                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
-                            where Base: CollectionLikeSequence {}
+extension FlattenSequence: CollectionLikeSequence,
+  FormattedLikeArray, CustomStringConvertible, CustomReflectable
+where Base: CollectionLikeSequence {}
 
-extension LazyMapSequence : CollectionLikeSequence,
-                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
-                            where Base: CollectionLikeSequence {}
+extension LazyMapSequence: CollectionLikeSequence,
+  FormattedLikeArray, CustomStringConvertible, CustomReflectable
+where Base: CollectionLikeSequence {}
 
-extension LazyFilterSequence : CollectionLikeSequence,
-                               FormattedLikeArray, CustomStringConvertible, CustomReflectable
-                               where Base: CollectionLikeSequence {}
+extension LazyFilterSequence: CollectionLikeSequence,
+  FormattedLikeArray, CustomStringConvertible, CustomReflectable
+where Base: CollectionLikeSequence {}
 
 //===----------------------------------------------------------------------===//
 //                            String parsing
@@ -123,7 +124,7 @@ extension LazyFilterSequence : CollectionLikeSequence,
 public struct StringParser {
   private var s: Substring
   private let originalLength: Int
-  
+
   private mutating func consumeWhitespace() {
     s = s.drop { $0.isWhitespace }
   }
@@ -132,7 +133,7 @@ public struct StringParser {
     s = Substring(string)
     originalLength = string.count
   }
-  
+
   mutating func isEmpty() -> Bool {
     consumeWhitespace()
     return s.isEmpty
@@ -159,7 +160,7 @@ public struct StringParser {
     }
     return Int(intStr)
   }
-  
+
   public mutating func consumeIdentifier() -> String? {
     consumeWhitespace()
     var name = ""
@@ -172,13 +173,13 @@ public struct StringParser {
     }
     return name.isEmpty ? nil : name
   }
-  
+
   public func throwError(_ message: StaticString) throws -> Never {
     throw ParsingError(message: message, position: originalLength - s.count)
   }
 }
 
-public struct ParsingError : Error {
+public struct ParsingError: Error {
   public let message: StaticString
   public let position: Int
 }
@@ -197,4 +198,3 @@ extension Array where Element == Value {
     }
   }
 }
-

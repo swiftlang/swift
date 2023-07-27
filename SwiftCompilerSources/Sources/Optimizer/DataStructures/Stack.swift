@@ -24,7 +24,7 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct Stack<Element> : CollectionLikeSequence {
+struct Stack<Element>: CollectionLikeSequence {
 
   private let bridgedContext: BridgedPassContext
   private var firstSlab = BridgedPassContext.Slab(nil)
@@ -39,20 +39,20 @@ struct Stack<Element> : CollectionLikeSequence {
     return UnsafeMutableRawPointer(slab.data!).bindMemory(to: Element.self, capacity: Stack.slabCapacity)
   }
 
-  struct Iterator : IteratorProtocol {
+  struct Iterator: IteratorProtocol {
     var slab: BridgedPassContext.Slab
     var index: Int
     let lastSlab: BridgedPassContext.Slab
     let endIndex: Int
-    
+
     mutating func next() -> Element? {
       let end = (slab.data == lastSlab.data ? endIndex : slabCapacity)
-      
+
       guard index < end else { return nil }
-    
+
       let elem = Stack.bind(slab)[index]
       index += 1
-      
+
       if index >= end && slab.data != lastSlab.data {
         slab = slab.getNext()
         index = 0
@@ -60,7 +60,7 @@ struct Stack<Element> : CollectionLikeSequence {
       return elem
     }
   }
-  
+
   init(_ context: some Context) { self.bridgedContext = context._bridged }
 
   func makeIterator() -> Iterator {
@@ -98,7 +98,7 @@ struct Stack<Element> : CollectionLikeSequence {
   }
 
   var isEmpty: Bool { return endIndex == 0 }
-  
+
   mutating func pop() -> Element? {
     if isEmpty {
       return nil
@@ -106,7 +106,7 @@ struct Stack<Element> : CollectionLikeSequence {
     assert(endIndex > 0)
     endIndex -= 1
     let elem = (Stack.bind(lastSlab) + endIndex).move()
-    
+
     if endIndex == 0 {
       if lastSlab.data == firstSlab.data {
         _ = bridgedContext.freeSlab(lastSlab)
@@ -121,9 +121,9 @@ struct Stack<Element> : CollectionLikeSequence {
 
     return elem
   }
-  
+
   mutating func removeAll() {
-    while pop() != nil { }
+    while pop() != nil {}
   }
 
   /// TODO: once we have move-only types, make this a real deinit.

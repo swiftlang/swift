@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
+final public class GlobalVariable: CustomStringConvertible, HasShortDescription, Hashable {
   public var name: StringRef {
     return StringRef(bridged: bridged.getName())
   }
@@ -57,7 +57,7 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
     return bridged.mustBeInitializedStatically()
   }
 
-  public static func ==(lhs: GlobalVariable, rhs: GlobalVariable) -> Bool {
+  public static func == (lhs: GlobalVariable, rhs: GlobalVariable) -> Bool {
     lhs === rhs
   }
 
@@ -97,7 +97,8 @@ extension Instruction {
         // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
         // This pattern appears in UTF8 String literal construction.
         if let tei = bi.uses.getSingleUser(ofType: TupleExtractInst.self),
-           tei.isResultOfOffsetSubtract {
+          tei.isResultOfOffsetSubtract
+        {
           return true
         }
         return false
@@ -110,8 +111,9 @@ extension Instruction {
       // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
       // This pattern appears in UTF8 String literal construction.
       if tei.isResultOfOffsetSubtract,
-         let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
-         bi.id == .StringObjectOr {
+        let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
+        bi.id == .StringObjectOr
+      {
         return true
       }
       return false
@@ -128,14 +130,14 @@ extension Instruction {
       // TODO: support async function pointers in static globals.
       return !fri.referencedFunction.isAsync
     case is StructInst,
-         is TupleInst,
-         is EnumInst,
-         is IntegerLiteralInst,
-         is FloatLiteralInst,
-         is ObjectInst,
-         is ValueToBridgeObjectInst,
-         is ConvertFunctionInst,
-         is ThinToThickFunctionInst:
+      is TupleInst,
+      is EnumInst,
+      is IntegerLiteralInst,
+      is FloatLiteralInst,
+      is ObjectInst,
+      is ValueToBridgeObjectInst,
+      is ConvertFunctionInst,
+      is ThinToThickFunctionInst:
       return true
     default:
       return false
@@ -148,11 +150,12 @@ extension Instruction {
 private extension TupleExtractInst {
   var isResultOfOffsetSubtract: Bool {
     if fieldIndex == 0,
-       let bi = tuple as? BuiltinInst,
-       bi.id == .USubOver,
-       bi.operands[1].value is IntegerLiteralInst,
-       let overFlowFlag = bi.operands[2].value as? IntegerLiteralInst,
-       overFlowFlag.value.isNullValue() {
+      let bi = tuple as? BuiltinInst,
+      bi.id == .USubOver,
+      bi.operands[1].value is IntegerLiteralInst,
+      let overFlowFlag = bi.operands[2].value as? IntegerLiteralInst,
+      overFlowFlag.value.isNullValue()
+    {
       return true
     }
     return false

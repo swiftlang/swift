@@ -12,19 +12,19 @@
 
 import SIL
 
-extension ApplyInst : OnoneSimplifyable {
+extension ApplyInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }
 }
 
-extension TryApplyInst : OnoneSimplifyable {
+extension TryApplyInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }
 }
 
-extension BeginApplyInst : OnoneSimplifyable {
+extension BeginApplyInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }

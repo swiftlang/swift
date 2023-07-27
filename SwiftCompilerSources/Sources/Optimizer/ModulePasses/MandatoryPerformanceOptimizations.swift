@@ -36,8 +36,10 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
 }
 
-private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
-                                      _ moduleContext: ModulePassContext) {
+private func optimizeFunctionsTopDown(
+  using worklist: inout FunctionWorklist,
+  _ moduleContext: ModulePassContext
+) {
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
       if !context.loadFunction(function: f, loadCalleesRecursively: true) {
@@ -56,7 +58,7 @@ fileprivate struct PathFunctionTuple: Hashable {
 
 private func optimize(function: Function, _ context: FunctionPassContext) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
-  
+
   var changed = true
   while changed {
     changed = runSimplification(on: function, context, preserveDebugInfo: true) { instruction, simplifyCtxt in
@@ -84,8 +86,12 @@ private func optimize(function: Function, _ context: FunctionPassContext) {
   }
 }
 
-private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
-                                   _ context: FunctionPassContext, _ simplifyCtxt: SimplifyContext) {
+private func inlineAndDevirtualize(
+  apply: FullApplySite,
+  alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
+  _ context: FunctionPassContext,
+  _ simplifyCtxt: SimplifyContext
+) {
   if simplifyCtxt.tryDevirtualize(apply: apply, isMandatory: true) != nil {
     return
   }
@@ -106,7 +112,7 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     // It is possible for their destroys to violate stack discipline.
     // When inlining into non-OSSA, those destroys are lowered to dealloc_stacks.
     // This can result in invalid stack nesting.
-    if callee.hasOwnership && !apply.parentFunction.hasOwnership  {
+    if callee.hasOwnership && !apply.parentFunction.hasOwnership {
       simplifyCtxt.notifyInvalidatedStackNesting()
     }
   }
@@ -115,13 +121,16 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
 private func removeUnusedMetatypeInstructions(in function: Function, _ context: FunctionPassContext) {
   for inst in function.instructions {
     if let mt = inst as? MetatypeInst,
-       mt.isTriviallyDeadIgnoringDebugUses {
+      mt.isTriviallyDeadIgnoringDebugUses
+    {
       context.erase(instructionIncludingDebugUses: mt)
     }
   }
 }
 
-private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
+private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>)
+  -> Bool
+{
   if callee.isTransparent {
     return true
   }
@@ -136,8 +145,9 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   }
 
   if apply.substitutionMap.isEmpty,
-     let pathIntoGlobal = apply.resultIsUsedInGlobalInitialization(),
-     alreadyInlinedFunctions.insert(PathFunctionTuple(path: pathIntoGlobal, function: callee)).inserted {
+    let pathIntoGlobal = apply.resultIsUsedInGlobalInitialization(),
+    alreadyInlinedFunctions.insert(PathFunctionTuple(path: pathIntoGlobal, function: callee)).inserted
+  {
     return true
   }
 
@@ -147,7 +157,8 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
 private extension FullApplySite {
   func resultIsUsedInGlobalInitialization() -> SmallProjectionPath? {
     guard parentFunction.isGlobalInitOnceFunction,
-          let global = parentFunction.getInitializedGlobal() else {
+      let global = parentFunction.getInitializedGlobal()
+    else {
       return nil
     }
 
@@ -230,7 +241,7 @@ private extension Value {
       guard let use = singleUseValue.uses.singleNonDebugUse else {
         return nil
       }
-      
+
       switch use.instruction {
       case is StructInst:
         path = path.push(.structField, index: use.index)
@@ -301,7 +312,8 @@ fileprivate struct FunctionWorklist {
   mutating func addAllAnnotatedGlobalInitOnceFunctions(of moduleContext: ModulePassContext) {
     for f in moduleContext.functions where f.isGlobalInitOnceFunction {
       if let global = f.getInitializedGlobal(),
-         global.mustBeInitializedStatically {
+        global.mustBeInitializedStatically
+      {
         pushIfNotVisited(f)
       }
     }

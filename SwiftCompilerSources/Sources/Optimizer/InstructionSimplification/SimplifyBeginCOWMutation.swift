@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginCOWMutationInst : Simplifyable, SILCombineSimplifyable {
+extension BeginCOWMutationInst: Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     /// The buffer of an empty Array/Set/Dictionary singleton is known to be not
@@ -109,19 +109,18 @@ private func isEmptyCOWSingleton(_ value: Value) -> Bool {
   var v = value
   while true {
     switch v {
-      case is UncheckedRefCastInst,
-           is UpcastInst,
-           is RawPointerToRefInst,
-           is AddressToPointerInst,
-           is CopyValueInst:
-        v = (v as! UnaryInstruction).operand.value
-      case let globalAddr as GlobalAddrInst:
-        let name = globalAddr.global.name
-        return name == "_swiftEmptyArrayStorage" ||
-               name == "_swiftEmptyDictionarySingleton" ||
-               name == "_swiftEmptySetSingleton"
-      default:
-        return false
+    case is UncheckedRefCastInst,
+      is UpcastInst,
+      is RawPointerToRefInst,
+      is AddressToPointerInst,
+      is CopyValueInst:
+      v = (v as! UnaryInstruction).operand.value
+    case let globalAddr as GlobalAddrInst:
+      let name = globalAddr.global.name
+      return name == "_swiftEmptyArrayStorage" || name == "_swiftEmptyDictionarySingleton"
+        || name == "_swiftEmptySetSingleton"
+    default:
+      return false
     }
   }
 }

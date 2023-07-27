@@ -46,14 +46,14 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
+struct BasicBlockRange: CustomStringConvertible, NoReflectionChildren {
 
   /// The dominating begin block.
   let begin: BasicBlock
 
   /// The inclusive range, i.e. the exclusive range plus the end blocks.
   private(set) var inclusiveRange: Stack<BasicBlock>
-  
+
   /// The exclusive range, i.e. not containing the end blocks.
   var range: LazyFilterSequence<Stack<BasicBlock>> {
     inclusiveRange.lazy.filter { contains($0) }
@@ -65,7 +65,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   private var wasInserted: BasicBlockSet
   private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
-  
+
   init(begin: BasicBlock, _ context: some Context) {
     self.begin = begin
     self.inclusiveRange = Stack(context)
@@ -102,18 +102,18 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the exclusive range contains `block`.
   func contains(_ block: BasicBlock) -> Bool { inExclusiveRange.contains(block) }
-  
+
   /// Returns true if the inclusive range contains `block`.
-  func inclusiveRangeContains (_ block: BasicBlock) -> Bool {
+  func inclusiveRangeContains(_ block: BasicBlock) -> Bool {
     worklist.hasBeenPushed(block)
   }
 
   /// Returns true if the range is valid and that's iff the begin block dominates all blocks of the range.
   var isValid: Bool {
     let entry = begin.parentFunction.entryBlock
-    return begin == entry ||
+    return begin == entry
       // If any block in the range is not dominated by `begin`, the range propagates back to the entry block.
-      !inclusiveRangeContains(entry)
+      || !inclusiveRangeContains(entry)
   }
 
   /// Returns the end blocks.
@@ -122,9 +122,16 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns the exit blocks.
-  var exits: LazySequence<FlattenSequence<
-                    LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
-                                    LazyFilterSequence<SuccessorArray>>>> {
+  var exits:
+    LazySequence<
+      FlattenSequence<
+        LazyMapSequence<
+          LazyFilterSequence<Stack<BasicBlock>>,
+          LazyFilterSequence<SuccessorArray>
+        >
+      >
+    >
+  {
     range.flatMap {
       $0.successors.lazy.filter {
         !inclusiveRangeContains($0) || $0 == begin
@@ -136,10 +143,9 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   var interiors: LazyFilterSequence<Stack<BasicBlock>> {
     inserted.lazy.filter { contains($0) && $0 != begin }
   }
-  
+
   var description: String {
-    return (isValid ? "" : "<invalid>\n") +
-      """
+    return (isValid ? "" : "<invalid>\n") + """
       begin:     \(begin.name)
       range:     \(range)
       inclrange: \(inclusiveRange)

@@ -50,9 +50,13 @@ private func _RegexLiteralLexingFn(
 ) -> /*CompletelyErroneous*/ CBool {
   let inputPtr = curPtrPtr.pointee
 
-  guard let (resumePtr, error) = swiftCompilerLexRegexLiteral(
-    start: inputPtr, bufferEnd: bufferEndPtr, mustBeRegex: mustBeRegex
-  ) else {
+  guard
+    let (resumePtr, error) = swiftCompilerLexRegexLiteral(
+      start: inputPtr,
+      bufferEnd: bufferEndPtr,
+      mustBeRegex: mustBeRegex
+    )
+  else {
     // Not a regex literal, fallback without advancing the pointer.
     return false
   }
@@ -64,7 +68,8 @@ private func _RegexLiteralLexingFn(
     // Emit diagnostic if diagnostics are enabled.
     if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
       let startLoc = SourceLoc(
-        locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
+        locationInFile: error.location.assumingMemoryBound(to: UInt8.self)
+      )!
       diagEngine.diagnose(startLoc, .foreign_diagnostic, error.message)
     }
     return error.completelyErroneous
@@ -97,12 +102,16 @@ public func _RegexLiteralParsingFn(
 ) -> Bool {
   let str = String(cString: inputPtr)
   let captureBuffer = UnsafeMutableRawBufferPointer(
-    start: captureStructureOut, count: Int(captureStructureSize))
+    start: captureStructureOut,
+    count: Int(captureStructureSize)
+  )
   do {
     // FIXME: We need to plumb through the 'regexToEmit' result to the caller.
     // For now, it is the same as the input.
     let (_, version) = try swiftCompilerParseRegexLiteral(
-      str, captureBufferOut: captureBuffer)
+      str,
+      captureBufferOut: captureBuffer
+    )
     versionOut.pointee = CUnsignedInt(version)
     return false
   } catch let error as CompilerParseError {
@@ -119,9 +128,9 @@ public func _RegexLiteralParsingFn(
   }
 }
 
-#else // canImport(_CompilerRegexParser)
+#else  // canImport(_CompilerRegexParser)
 
 #warning("Regex parsing is disabled")
 func registerRegexParser() {}
 
-#endif // canImport(_CompilerRegexParser)
+#endif  // canImport(_CompilerRegexParser)

@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 @_semantics("arc.immortal")
-final public class Function : CustomStringConvertible, HasShortDescription, Hashable {
+final public class Function: CustomStringConvertible, HasShortDescription, Hashable {
   public private(set) var effects = FunctionEffects()
 
   public var name: StringRef {
@@ -39,7 +39,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// This is the case if the functioun contains a body, i.e. some basic blocks.
   public var isDefinition: Bool { blocks.first != nil }
 
-  public var blocks : BasicBlockList { BasicBlockList(first: bridged.getFirstBlock().block) }
+  public var blocks: BasicBlockList { BasicBlockList(first: bridged.getFirstBlock().block) }
 
   public var entryBlock: BasicBlock { blocks.first! }
 
@@ -52,13 +52,15 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.lazy.flatMap { $0.instructions }
   }
 
-  public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
+  public var reversedInstructions:
+    LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>
+  {
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
 
   /// The number of indirect result arguments.
   public var numIndirectResultArguments: Int { bridged.getNumIndirectFormalResults() }
-  
+
   /// The number of arguments which correspond to parameters (and not to indirect results).
   public var numParameterArguments: Int { bridged.getNumParameters() }
 
@@ -80,7 +82,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
-  
+
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { bridged.getSILResultType().type }
 
@@ -141,7 +143,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public enum EffectAttribute {
     /// No effect attribute is specified.
     case none
-    
+
     /// `[readnone]`
     ///
     /// A readnone function does not have any observable memory read or write operations.
@@ -158,7 +160,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     ///   referenced from a parameter.
     /// * Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
     case readNone
-    
+
     /// `[readonly]`
     ///
     /// A readonly function does not have any observable memory write operations.
@@ -168,7 +170,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     /// a function if its return value is not used.
     /// The same conclusions as for readnone also apply to readonly.
     case readOnly
-    
+
     /// `[releasenone]`
     ///
     /// A releasenone function must not perform any observable release-operation on an object.
@@ -183,10 +185,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// The effect attribute which is specified in the source code (if any).
   public var effectAttribute: EffectAttribute {
     switch bridged.getEffectAttribute() {
-      case .ReadNone: return .readNone
-      case .ReadOnly: return .readOnly
-      case .ReleaseNone: return .releaseNone
-      default: return .none
+    case .ReadNone: return .readNone
+    case .ReadOnly: return .readOnly
+    case .ReleaseNone: return .releaseNone
+    default: return .none
     }
   }
 
@@ -198,10 +200,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var performanceConstraints: PerformanceConstraints {
     switch bridged.getPerformanceConstraints() {
-      case .None: return .none
-      case .NoAllocation: return .noAllocations
-      case .NoLocks: return .noLocks
-      default: fatalError("unknown performance constraint")
+    case .None: return .none
+    case .NoAllocation: return .noAllocations
+    case .NoLocks: return .noLocks
+    default: fatalError("unknown performance constraint")
     }
   }
 
@@ -213,11 +215,11 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var inlineStrategy: InlineStrategy {
     switch bridged.getInlineStrategy() {
-      case .InlineDefault: return .automatic
-      case .NoInline: return .never
-      case .AlwaysInline: return .always
-      default:
-        fatalError()
+    case .InlineDefault: return .automatic
+    case .NoInline: return .never
+    case .AlwaysInline: return .always
+    default:
+      fatalError()
     }
   }
 
@@ -245,14 +247,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   static func register() {
-    func checkLayout(_ p: UnsafeMutablePointer<FunctionEffects>,
-                     data: UnsafeMutableRawPointer, size: Int) {
+    func checkLayout(
+      _ p: UnsafeMutablePointer<FunctionEffects>,
+      data: UnsafeMutableRawPointer,
+      size: Int
+    ) {
       assert(MemoryLayout<FunctionEffects>.size <= size, "wrong FunctionInfo size")
       assert(UnsafeMutableRawPointer(p) == data, "wrong FunctionInfo layout")
     }
 
     let metatype = unsafeBitCast(Function.self, to: SwiftMetatype.self)
-    BridgedFunction.registerBridging(metatype,
+    BridgedFunction.registerBridging(
+      metatype,
       // initFn
       { (f: BridgedFunction, data: UnsafeMutableRawPointer, size: Int) in
         checkLayout(&f.function.effects, data: data, size: size)
@@ -285,7 +291,14 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         s._withStringRef { OStream_write(os, $0) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: llvm.StringRef, mode: BridgedFunction.ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedFunction.ParsingError in
+      {
+        (
+          f: BridgedFunction,
+          str: llvm.StringRef,
+          mode: BridgedFunction.ParseEffectsMode,
+          argumentIndex: Int,
+          paramNames: BridgedArrayRef
+        ) -> BridgedFunction.ParsingError in
         do {
           var parser = StringParser(str.string)
           let function = f.function
@@ -293,7 +306,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
           switch mode {
           case .argumentEffectsFromSource:
             let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
-                (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
+              (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
               let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
               return Dictionary(uniqueKeysWithValues: keyValPairs)
             }
@@ -322,25 +335,30 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         let destFunc = toFunc.function
         let srcResultArgs = srcFunc.numIndirectResultArguments
         let destResultArgs = destFunc.numIndirectResultArguments
-        
+
         // We only support reabstraction (indirect -> direct) of a single
         // return value.
-        if srcResultArgs != destResultArgs &&
-           (srcResultArgs > 1 || destResultArgs > 1) {
+        if srcResultArgs != destResultArgs && (srcResultArgs > 1 || destResultArgs > 1) {
           return 0
         }
         destFunc.effects =
-          FunctionEffects(copiedFrom: srcFunc.effects,
-                          resultArgDelta: destResultArgs - srcResultArgs)
+          FunctionEffects(
+            copiedFrom: srcFunc.effects,
+            resultArgDelta: destResultArgs - srcResultArgs
+          )
         return 1
       },
       // getEffectInfo
-      {  (f: BridgedFunction, idx: Int) -> BridgedFunction.EffectInfo in
+      { (f: BridgedFunction, idx: Int) -> BridgedFunction.EffectInfo in
         let effects = f.function.effects
         if idx < effects.escapeEffects.arguments.count {
           let effect = effects.escapeEffects.arguments[idx]
-          return BridgedFunction.EffectInfo(argumentIndex: effect.argumentIndex,
-                                            isDerived: effect.isDerived, isEmpty: false, isValid: true)
+          return BridgedFunction.EffectInfo(
+            argumentIndex: effect.argumentIndex,
+            isDerived: effect.isDerived,
+            isEmpty: false,
+            isValid: true
+          )
         }
         if let sideEffects = effects.sideEffects {
           let globalIdx = idx - effects.escapeEffects.arguments.count
@@ -349,8 +367,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
           }
           let seIdx = globalIdx - 1
           if seIdx < sideEffects.arguments.count {
-            return BridgedFunction.EffectInfo(argumentIndex: seIdx, isDerived: true,
-                                              isEmpty: sideEffects.arguments[seIdx].isEmpty, isValid: true)
+            return BridgedFunction.EffectInfo(
+              argumentIndex: seIdx,
+              isDerived: true,
+              isEmpty: sideEffects.arguments[seIdx].isEmpty,
+              isValid: true
+            )
           }
         }
         return BridgedFunction.EffectInfo(argumentIndex: -1, isDerived: false, isEmpty: true, isValid: false)
@@ -369,7 +391,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
 public func != (lhs: Function, rhs: Function) -> Bool { lhs !== rhs }
 
-public struct ArgumentTypeArray : RandomAccessCollection, FormattedLikeArray {
+public struct ArgumentTypeArray: RandomAccessCollection, FormattedLikeArray {
   fileprivate let function: Function
 
   public var startIndex: Int { return 0 }
@@ -404,7 +426,7 @@ public extension SideEffects.GlobalEffects {
   }
 }
 
-public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
+public struct BasicBlockList: CollectionLikeSequence, IteratorProtocol {
   private var currentBlock: BasicBlock?
 
   public init(first: BasicBlock?) { currentBlock = first }
@@ -428,7 +450,7 @@ public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
   }
 }
 
-public struct ReverseBasicBlockList : CollectionLikeSequence, IteratorProtocol {
+public struct ReverseBasicBlockList: CollectionLikeSequence, IteratorProtocol {
   private var currentBlock: BasicBlock?
 
   public init(first: BasicBlock?) { currentBlock = first }

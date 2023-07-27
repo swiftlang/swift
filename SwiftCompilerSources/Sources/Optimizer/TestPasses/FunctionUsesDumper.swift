@@ -12,17 +12,20 @@
 
 import SIL
 
-let functionUsesDumper = ModulePass(name: "dump-function-uses", {
+let functionUsesDumper = ModulePass(
+  name: "dump-function-uses",
+  {
     (context: ModulePassContext) in
 
-  var functionUses = FunctionUses()
-  functionUses.collect(context: context)
+    var functionUses = FunctionUses()
+    functionUses.collect(context: context)
 
-  for function in context.functions {
-    let uses = functionUses.getUses(of: function)
-    
-    print("Uses of \(function.name)")
-    print(uses)
-    print("End function \(function.name)\n")
+    for function in context.functions {
+      let uses = functionUses.getUses(of: function)
+
+      print("Uses of \(function.name)")
+      print(uses)
+      print("End function \(function.name)\n")
+    }
   }
-})
+)

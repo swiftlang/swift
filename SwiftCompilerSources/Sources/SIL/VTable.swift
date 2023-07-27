@@ -12,14 +12,14 @@
 
 import SILBridging
 
-public struct VTable : CustomStringConvertible, NoReflectionChildren {
+public struct VTable: CustomStringConvertible, NoReflectionChildren {
   let bridged: BridgedVTable
 
   public init(bridged: BridgedVTable) { self.bridged = bridged }
 
-  public struct Entry : CustomStringConvertible, NoReflectionChildren {
+  public struct Entry: CustomStringConvertible, NoReflectionChildren {
     fileprivate let bridged: BridgedVTableEntry
-    
+
     public var function: Function { bridged.getImplementation().function }
 
     public var description: String {
@@ -28,13 +28,13 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
-  public struct EntryArray : BridgedRandomAccessCollection {
+  public struct EntryArray: BridgedRandomAccessCollection {
     fileprivate let base: BridgedVTableEntry
     public let count: Int
-    
+
     public var startIndex: Int { return 0 }
     public var endIndex: Int { return count }
-    
+
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
       return Entry(bridged: BridgedVTableEntry(entry: base.entry + index))

@@ -18,7 +18,7 @@ import OptimizerBridging
 /// It provides access to all functions, v-tables and witness tables of a module,
 /// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
-struct ModulePassContext : Context, CustomStringConvertible {
+struct ModulePassContext: Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
 
   public var description: String {
@@ -26,9 +26,9 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return String(_cxxString: stdString)
   }
 
-  struct FunctionList : CollectionLikeSequence, IteratorProtocol {
+  struct FunctionList: CollectionLikeSequence, IteratorProtocol {
     private var currentFunction: Function?
-    
+
     fileprivate init(first: Function?) { currentFunction = first }
 
     mutating func next() -> Function? {
@@ -40,7 +40,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
   }
 
-  struct GlobalVariableList : CollectionLikeSequence, IteratorProtocol {
+  struct GlobalVariableList: CollectionLikeSequence, IteratorProtocol {
     private var currentGlobal: GlobalVariable?
 
     fileprivate init(first: GlobalVariable?) { currentGlobal = first }
@@ -54,7 +54,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
   }
 
-  struct VTableArray : BridgedRandomAccessCollection {
+  struct VTableArray: BridgedRandomAccessCollection {
     fileprivate let bridged: BridgedPassContext.VTableArray
 
     var startIndex: Int { return 0 }
@@ -66,9 +66,9 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
   }
 
-  struct WitnessTableList : CollectionLikeSequence, IteratorProtocol {
+  struct WitnessTableList: CollectionLikeSequence, IteratorProtocol {
     private var currentTable: WitnessTable?
-    
+
     fileprivate init(first: WitnessTable?) { currentTable = first }
 
     mutating func next() -> WitnessTable? {
@@ -80,9 +80,9 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
   }
 
-  struct DefaultWitnessTableList : CollectionLikeSequence, IteratorProtocol {
+  struct DefaultWitnessTableList: CollectionLikeSequence, IteratorProtocol {
     private var currentTable: DefaultWitnessTable?
-    
+
     fileprivate init(first: DefaultWitnessTable?) { currentTable = first }
 
     mutating func next() -> DefaultWitnessTable? {
@@ -97,7 +97,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
   var functions: FunctionList {
     FunctionList(first: _bridged.getFirstFunctionInModule().function)
   }
-  
+
   var globalVariables: GlobalVariableList {
     GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
   }
@@ -105,7 +105,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
   var vTables: VTableArray {
     VTableArray(bridged: _bridged.getVTables())
   }
-  
+
   var witnessTables: WitnessTableList {
     WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
   }

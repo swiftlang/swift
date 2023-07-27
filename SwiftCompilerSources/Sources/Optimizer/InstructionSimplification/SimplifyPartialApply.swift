@@ -12,7 +12,7 @@
 
 import SIL
 
-extension PartialApplyInst : OnoneSimplifyable {
+extension PartialApplyInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     let optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
     if optimizedApplyOfPartialApply {

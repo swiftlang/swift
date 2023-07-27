@@ -36,9 +36,9 @@ struct Options {
 
   var assertConfiguration: AssertConfiguration {
     switch _bridged.getAssertConfiguration() {
-      case .Debug:               return .enabled
-      case .Release, .Unchecked: return .disabled
-      default:                   return .unknown
+    case .Debug: return .enabled
+    case .Release, .Unchecked: return .disabled
+    default: return .unknown
     }
   }
 }

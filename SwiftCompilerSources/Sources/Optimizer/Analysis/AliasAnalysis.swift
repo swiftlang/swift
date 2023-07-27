@@ -26,17 +26,23 @@ struct AliasAnalysis {
     // Some optimizations use the address-alias APIs with non-address SIL values.
     // TODO: this is non-intuitive and we should eliminate those API uses.
     if ty.isClass {
-    // If the value is a (non-address) reference it means: all addresses within the class instance.
+      // If the value is a (non-address) reference it means: all addresses within the class instance.
       return SmallProjectionPath(.anyValueFields).push(.anyClassField)
     }
     // Any other non-address value means: all addresses of any referenced class instances within the value.
     return SmallProjectionPath(.anyValueFields).push(.anyClassField).push(.anyValueFields)
   }
-  
+
   static func register() {
     BridgedAliasAnalysis.registerAnalysis(
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> swift.MemoryBehavior in
+      {
+        (
+          bridgedCtxt: BridgedPassContext,
+          bridgedVal: BridgedValue,
+          bridgedInst: BridgedInstruction,
+          complexityBudget: Int
+        ) -> swift.MemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
@@ -47,8 +53,11 @@ struct AliasAnalysis {
         case let builtin as BuiltinInst:
           return getMemoryEffect(ofBuiltin: builtin, for: val, path: path, context).bridged
         default:
-          if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true),
-                                     complexityBudget: complexityBudget, context) {
+          if val.at(path).isEscaping(
+            using: EscapesToInstructionVisitor(target: inst, isAddress: true),
+            complexityBudget: complexityBudget,
+            context
+          ) {
             return .MayReadWrite
           }
           return .None
@@ -69,7 +78,9 @@ struct AliasAnalysis {
       },
 
       // isAddrVisibleFromObj
-      { (bridgedCtxt: BridgedPassContext, bridgedAddr: BridgedValue, bridgedObj: BridgedValue, complexityBudget: Int) -> Bool in
+      {
+        (bridgedCtxt: BridgedPassContext, bridgedAddr: BridgedValue, bridgedObj: BridgedValue, complexityBudget: Int)
+          -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let addr = bridgedAddr.value.at(AliasAnalysis.getPtrOrAddressPath(for: bridgedAddr.value))
 
@@ -96,33 +107,38 @@ struct AliasAnalysis {
 extension Instruction {
   func mayRead(fromAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     switch aliasAnalysis.bridged.getMemBehavior(bridged, fromAddress.bridged) {
-      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
+    case .MayRead, .MayReadWrite, .MayHaveSideEffects:
+      return true
+    default:
+      return false
     }
   }
 
   func mayWrite(toAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     switch aliasAnalysis.bridged.getMemBehavior(bridged, toAddress.bridged) {
-      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
+    case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
+      return true
+    default:
+      return false
     }
   }
 
   func mayReadOrWrite(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     switch aliasAnalysis.bridged.getMemBehavior(bridged, address.bridged) {
-      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
+    case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
+      return true
+    default:
+      return false
     }
   }
 }
 
-private func getMemoryEffect(ofApply apply: ApplySite, for address: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Memory {
+private func getMemoryEffect(
+  ofApply apply: ApplySite,
+  for address: Value,
+  path: SmallProjectionPath,
+  _ context: FunctionPassContext
+) -> SideEffects.Memory {
   let calleeAnalysis = context.calleeAnalysis
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: calleeAnalysis, isAddress: true)
   let memoryEffects: SideEffects.Memory
@@ -145,7 +161,12 @@ private func getMemoryEffect(ofApply apply: ApplySite, for address: Value, path:
   return memoryEffects
 }
 
-private func getMemoryEffect(ofBuiltin builtin: BuiltinInst, for address: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Memory {
+private func getMemoryEffect(
+  ofBuiltin builtin: BuiltinInst,
+  for address: Value,
+  path: SmallProjectionPath,
+  _ context: FunctionPassContext
+) -> SideEffects.Memory {
 
   switch builtin.id {
   case .Once, .OnceWithContext:
@@ -159,7 +180,12 @@ private func getMemoryEffect(ofBuiltin builtin: BuiltinInst, for address: Value,
   }
 }
 
-private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Ownership {
+private func getOwnershipEffect(
+  of apply: ApplySite,
+  for value: Value,
+  path: SmallProjectionPath,
+  _ context: FunctionPassContext
+) -> SideEffects.Ownership {
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
   if let result = value.at(path).visit(using: visitor, context) {
     // The resulting effects are the argument effects to which `value` escapes to.
@@ -170,7 +196,7 @@ private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: Sma
   }
 }
 
-private struct SideEffectsVisitor : EscapeVisitorWithResult {
+private struct SideEffectsVisitor: EscapeVisitorWithResult {
   let apply: ApplySite
   let calleeAnalysis: CalleeAnalysis
   let isAddress: Bool
@@ -195,13 +221,13 @@ private struct SideEffectsVisitor : EscapeVisitorWithResult {
   var followLoads: Bool { !isAddress }
 }
 
-private struct AddressVisibleByBuiltinOnceVisitor : EscapeVisitor {
+private struct AddressVisibleByBuiltinOnceVisitor: EscapeVisitor {
   var followTrivialTypes: Bool { true }
   var followLoads: Bool { false }
 }
 
 /// Lets `ProjectedValue.isEscaping` return true if the value is "escaping" to the `target` instruction.
-private struct EscapesToInstructionVisitor : EscapeVisitor {
+private struct EscapesToInstructionVisitor: EscapeVisitor {
   let target: Instruction
   let isAddress: Bool
 
@@ -241,8 +267,9 @@ private struct IsIndirectResultWalker: AddressDefUseWalker {
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     if address.instruction == apply,
-       let argIdx = apply.argumentIndex(of: address),
-       argIdx < apply.numIndirectResultArguments {
+      let argIdx = apply.argumentIndex(of: address),
+      argIdx < apply.numIndirectResultArguments
+    {
       return .abortWalk
     }
     return .continueWalk
@@ -252,10 +279,10 @@ private struct IsIndirectResultWalker: AddressDefUseWalker {
 private extension SideEffects.Memory {
   var bridged: swift.MemoryBehavior {
     switch (read, write) {
-      case (false, false): return .None
-      case (true, false):  return .MayRead
-      case (false, true):  return .MayWrite
-      case (true, true):   return .MayReadWrite
+    case (false, false): return .None
+    case (true, false): return .MayRead
+    case (false, true): return .MayWrite
+    case (true, true): return .MayReadWrite
     }
   }
 }

@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 @_semantics("arc.immortal")
-final public class BasicBlock : CustomStringConvertible, HasShortDescription, Equatable {
+final public class BasicBlock: CustomStringConvertible, HasShortDescription, Equatable {
   public var next: BasicBlock? { bridged.getNext().block }
   public var previous: BasicBlock? { bridged.getPrevious().block }
 
@@ -51,7 +51,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
     }
     return nil
   }
-  
+
   public var hasSinglePredecessor: Bool { singlePredecessor != nil }
 
   /// The index of the basic block in its function.
@@ -62,7 +62,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
     }
     fatalError()
   }
- 
+
   public var name: String { "bb\(index)" }
 
   public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
@@ -74,7 +74,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
 ///
 /// It's allowed to delete the current, next or any other instructions while
 /// iterating over the instruction list.
-public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
+public struct InstructionList: CollectionLikeSequence, IteratorProtocol {
   private var currentInstruction: Instruction?
 
   public init(first: Instruction?) { currentInstruction = first }
@@ -108,7 +108,7 @@ public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
 ///
 /// It's allowed to delete the current, next or any other instructions while
 /// iterating over the instruction list.
-public struct ReverseInstructionList : CollectionLikeSequence, IteratorProtocol {
+public struct ReverseInstructionList: CollectionLikeSequence, IteratorProtocol {
   private var currentInstruction: Instruction?
 
   public init(first: Instruction?) { currentInstruction = first }
@@ -130,7 +130,7 @@ public struct ReverseInstructionList : CollectionLikeSequence, IteratorProtocol 
   public var first: Instruction? { currentInstruction }
 }
 
-public struct ArgumentArray : RandomAccessCollection {
+public struct ArgumentArray: RandomAccessCollection {
   fileprivate let block: BasicBlock
 
   public var startIndex: Int { return 0 }
@@ -141,7 +141,7 @@ public struct ArgumentArray : RandomAccessCollection {
   }
 }
 
-public struct SuccessorArray : RandomAccessCollection, FormattedLikeArray {
+public struct SuccessorArray: RandomAccessCollection, FormattedLikeArray {
   private let base: OptionalBridgedSuccessor
   public let count: Int
 
@@ -159,7 +159,7 @@ public struct SuccessorArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
-public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
+public struct PredecessorList: CollectionLikeSequence, IteratorProtocol {
   private var currentSucc: OptionalBridgedSuccessor
 
   public init(startAt: OptionalBridgedSuccessor) { currentSucc = startAt }
@@ -172,7 +172,6 @@ public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
     return nil
   }
 }
-
 
 // Bridging utilities
 

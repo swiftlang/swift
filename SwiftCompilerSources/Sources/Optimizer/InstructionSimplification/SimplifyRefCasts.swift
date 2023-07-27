@@ -15,14 +15,14 @@ import SIL
 // Note: this simplifications are not SILCombineSimplifyable, because SILCombine has
 // its own simplifications for those cast instructions which are not ported to Swift, yet.
 
-extension CheckedCastBranchInst : OnoneSimplifyable {
+extension CheckedCastBranchInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     // Has only an effect if the source is an (existential) reference.
     simplifySourceOperandOfRefCast(context)
   }
 }
 
-extension UncheckedRefCastInst : OnoneSimplifyable {
+extension UncheckedRefCastInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     simplifySourceOperandOfRefCast(context)
   }
@@ -108,7 +108,11 @@ private extension UnaryInstruction {
 /// failure_block(%newArg : $Derived):
 ///   %3 = upcast %newArg : $Derived to $Base
 /// ```
-private func insertCompensatingInstructions(for inst: Instruction, in failureBlock: BasicBlock, _ context: SimplifyContext) {
+private func insertCompensatingInstructions(
+  for inst: Instruction,
+  in failureBlock: BasicBlock,
+  _ context: SimplifyContext
+) {
   assert(failureBlock.arguments.count == 1)
   let sourceValue = inst.operands[0].value
   let newArg = failureBlock.addBlockArgument(type: sourceValue.type, ownership: sourceValue.ownership, context)

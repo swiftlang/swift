@@ -17,11 +17,11 @@ public struct ApplyOperands {
   public static let firstArgumentIndex = 1
 }
 
-public protocol ApplySite : Instruction {
+public protocol ApplySite: Instruction {
   var operands: OperandArray { get }
   var numArguments: Int { get }
   var substitutionMap: SubstitutionMap { get }
-  
+
   /// Converts an argument index of the apply to the corresponding argument index of the callee.
   ///
   /// For a FullApplySite this is always a 1-to-1 mapping.
@@ -93,8 +93,7 @@ extension ApplySite {
   /// it's the callee function operand.
   public func argumentIndex(of operand: Operand) -> Int? {
     let opIdx = operand.index
-    if opIdx >= ApplyOperands.firstArgumentIndex &&
-       opIdx <= ApplyOperands.firstArgumentIndex + numArguments {
+    if opIdx >= ApplyOperands.firstArgumentIndex && opIdx <= ApplyOperands.firstArgumentIndex + numArguments {
       return opIdx - ApplyOperands.firstArgumentIndex
     }
     return nil
@@ -104,11 +103,11 @@ extension ApplySite {
   public func isCalleeOperand(_ operand: Operand) -> Bool {
     return operand.index < ApplyOperands.firstArgumentIndex
   }
-  
+
   public func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention {
     return bridged.ApplySite_getArgumentConvention(calleeArgIndex).convention
   }
-  
+
   public var referencedFunction: Function? {
     if let fri = callee as? FunctionRefInst {
       return fri.referencedFunction
@@ -124,7 +123,7 @@ extension ApplySite {
   }
 }
 
-public protocol FullApplySite : ApplySite {
+public protocol FullApplySite: ApplySite {
   var singleDirectResult: Value? { get }
 }
 

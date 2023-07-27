@@ -12,7 +12,7 @@
 
 import SIL
 
-extension RetainValueInst : Simplifyable, SILCombineSimplifyable {
+extension RetainValueInst: Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Remove pairs of
@@ -59,7 +59,7 @@ extension RetainValueInst : Simplifyable, SILCombineSimplifyable {
   }
 }
 
-extension ReleaseValueInst : Simplifyable, SILCombineSimplifyable {
+extension ReleaseValueInst: Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Replace
@@ -98,8 +98,9 @@ extension ReleaseValueInst : Simplifyable, SILCombineSimplifyable {
 private extension RetainValueInst {
   func optimizeReleaseRetainPair(_ context: SimplifyContext) -> Bool {
     if let prevInst = self.previous,
-       let release = prevInst as? ReleaseValueInst,
-       release.value == self.value {
+      let release = prevInst as? ReleaseValueInst,
+      release.value == self.value
+    {
       context.erase(instruction: release)
       context.erase(instruction: self)
       return true
@@ -137,8 +138,9 @@ private extension ReleaseValueInst {
 private extension UnaryInstruction {
   func replaceOperandWithPayloadOfEnum(_ context: SimplifyContext) {
     if let e = operand.value as? EnumInst,
-       !e.type.isValueTypeWithDeinit,
-       let payload = e.payload {
+      !e.type.isValueTypeWithDeinit,
+      let payload = e.payload
+    {
       operand.set(to: payload, context)
     }
   }

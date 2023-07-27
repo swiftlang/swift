@@ -30,14 +30,23 @@ public struct Builder {
   public var bridged: BridgedBuilder {
     switch insertAt {
     case .before(let inst):
-      return BridgedBuilder(insertAt: .beforeInst, insertionObj: inst.bridged.obj,
-                            loc: location.bridged)
+      return BridgedBuilder(
+        insertAt: .beforeInst,
+        insertionObj: inst.bridged.obj,
+        loc: location.bridged
+      )
     case .atEndOf(let block):
-      return BridgedBuilder(insertAt: .endOfBlock, insertionObj: block.bridged.obj,
-                            loc: location.bridged)
+      return BridgedBuilder(
+        insertAt: .endOfBlock,
+        insertionObj: block.bridged.obj,
+        loc: location.bridged
+      )
     case .staticInitializer(let global):
-      return BridgedBuilder(insertAt: .intoGlobal, insertionObj: global.bridged.obj,
-                            loc: location.bridged)
+      return BridgedBuilder(
+        insertAt: .intoGlobal,
+        insertionObj: global.bridged.obj,
+        loc: location.bridged
+      )
     }
   }
 
@@ -53,21 +62,32 @@ public struct Builder {
     return instruction
   }
 
-  public init(insertAt: InsertionPoint, location: Location,
-              _ notifyNewInstruction: @escaping (Instruction) -> (),
-              _ notificationHandler: BridgedChangeNotificationHandler) {
+  public init(
+    insertAt: InsertionPoint,
+    location: Location,
+    _ notifyNewInstruction: @escaping (Instruction) -> (),
+    _ notificationHandler: BridgedChangeNotificationHandler
+  ) {
     self.insertAt = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
     self.notificationHandler = notificationHandler
   }
 
-  public func createBuiltinBinaryFunction(name: String,
-      operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
+  public func createBuiltinBinaryFunction(
+    name: String,
+    operandType: Type,
+    resultType: Type,
+    arguments: [Value]
+  ) -> BuiltinInst {
     return arguments.withBridgedValues { valuesRef in
       return name._withStringRef { nameStr in
         let bi = bridged.createBuiltinBinaryFunction(
-          nameStr, operandType.bridged, resultType.bridged, valuesRef)
+          nameStr,
+          operandType.bridged,
+          resultType.bridged,
+          valuesRef
+        )
         return notifyNew(bi.getAs(BuiltinInst.self))
       }
     }
@@ -85,8 +105,12 @@ public struct Builder {
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
 
-  public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
-                               isLexical: Bool = false, usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
+  public func createAllocStack(
+    _ type: Type,
+    hasDynamicLifetime: Bool = false,
+    isLexical: Bool = false,
+    usesMoveableValueDebugInfo: Bool = false
+  ) -> AllocStackInst {
     let dr = bridged.createAllocStack(type.bridged, hasDynamicLifetime, isLexical, usesMoveableValueDebugInfo)
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
@@ -167,10 +191,20 @@ public struct Builder {
   }
 
   @discardableResult
-  public func createCopyAddr(from fromAddr: Value, to toAddr: Value,
-                             takeSource: Bool = false, initializeDest: Bool = false) -> CopyAddrInst {
-    return notifyNew(bridged.createCopyAddr(fromAddr.bridged, toAddr.bridged,
-                                            takeSource, initializeDest).getAs(CopyAddrInst.self))
+  public func createCopyAddr(
+    from fromAddr: Value,
+    to toAddr: Value,
+    takeSource: Bool = false,
+    initializeDest: Bool = false
+  ) -> CopyAddrInst {
+    return notifyNew(
+      bridged.createCopyAddr(
+        fromAddr.bridged,
+        toAddr.bridged,
+        takeSource,
+        initializeDest
+      ).getAs(CopyAddrInst.self)
+    )
   }
 
   @discardableResult
@@ -198,15 +232,23 @@ public struct Builder {
     specializationInfo: ApplyInst.SpecializationInfo = nil
   ) -> ApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
-      bridged.createApply(function.bridged, substitutionMap.bridged, valuesRef,
-                          isNonThrowing, isNonAsync, specializationInfo)
+      bridged.createApply(
+        function.bridged,
+        substitutionMap.bridged,
+        valuesRef,
+        isNonThrowing,
+        isNonAsync,
+        specializationInfo
+      )
     }
     return notifyNew(apply.getAs(ApplyInst.self))
   }
-  
-  public func createUncheckedEnumData(enum enumVal: Value,
-                                      caseIndex: Int,
-                                      resultType: Type) -> UncheckedEnumDataInst {
+
+  public func createUncheckedEnumData(
+    enum enumVal: Value,
+    caseIndex: Int,
+    resultType: Type
+  ) -> UncheckedEnumDataInst {
     let ued = bridged.createUncheckedEnumData(enumVal.bridged, caseIndex, resultType.bridged)
     return notifyNew(ued.getAs(UncheckedEnumDataInst.self))
   }
@@ -217,16 +259,22 @@ public struct Builder {
   }
 
   @discardableResult
-  public func createSwitchEnum(enum enumVal: Value,
-                               cases: [(Int, BasicBlock)],
-                               defaultBlock: BasicBlock? = nil) -> SwitchEnumInst {
+  public func createSwitchEnum(
+    enum enumVal: Value,
+    cases: [(Int, BasicBlock)],
+    defaultBlock: BasicBlock? = nil
+  ) -> SwitchEnumInst {
     let se = cases.withUnsafeBufferPointer { caseBuffer in
-      bridged.createSwitchEnumInst(enumVal.bridged, defaultBlock.bridged,
-                                   caseBuffer.baseAddress, caseBuffer.count)
+      bridged.createSwitchEnumInst(
+        enumVal.bridged,
+        defaultBlock.bridged,
+        caseBuffer.baseAddress,
+        caseBuffer.count
+      )
     }
     return notifyNew(se.getAs(SwitchEnumInst.self))
   }
-  
+
   @discardableResult
   public func createBranch(to destBlock: BasicBlock, arguments: [Value] = []) -> BranchInst {
     return arguments.withBridgedValues { valuesRef in
@@ -269,7 +317,9 @@ public struct Builder {
   }
 
   public func createStructElementAddr(structAddress: Value, fieldIndex: Int) -> StructElementAddrInst {
-    return notifyNew(bridged.createStructElementAddr(structAddress.bridged, fieldIndex).getAs(StructElementAddrInst.self))
+    return notifyNew(
+      bridged.createStructElementAddr(structAddress.bridged, fieldIndex).getAs(StructElementAddrInst.self)
+    )
   }
 
   public func createDestructureStruct(struct: Value) -> DestructureStructInst {
@@ -288,7 +338,9 @@ public struct Builder {
   }
 
   public func createTupleElementAddr(tupleAddress: Value, elementIndex: Int) -> TupleElementAddrInst {
-    return notifyNew(bridged.createTupleElementAddr(tupleAddress.bridged, elementIndex).getAs(TupleElementAddrInst.self))
+    return notifyNew(
+      bridged.createTupleElementAddr(tupleAddress.bridged, elementIndex).getAs(TupleElementAddrInst.self)
+    )
   }
 
   public func createDestructureTuple(tuple: Value) -> DestructureTupleInst {
@@ -301,12 +353,16 @@ public struct Builder {
     return notifyNew(store.getAs(StoreInst.self))
   }
 
-  public func createInitExistentialRef(instance: Value,
-                                       existentialType: Type,
-                                       useConformancesOf: InitExistentialRefInst) -> InitExistentialRefInst {
-    let initExistential = bridged.createInitExistentialRef(instance.bridged,
-                                                           existentialType.bridged,
-                                                           useConformancesOf.bridged)
+  public func createInitExistentialRef(
+    instance: Value,
+    existentialType: Type,
+    useConformancesOf: InitExistentialRefInst
+  ) -> InitExistentialRefInst {
+    let initExistential = bridged.createInitExistentialRef(
+      instance.bridged,
+      existentialType.bridged,
+      useConformancesOf.bridged
+    )
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 }

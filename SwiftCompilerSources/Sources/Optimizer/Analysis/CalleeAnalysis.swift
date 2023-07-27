@@ -19,7 +19,7 @@ public struct CalleeAnalysis {
   static func register() {
     BridgedCalleeAnalysis.registerAnalysis(
       // isDeinitBarrierFn:
-      { (inst : BridgedInstruction, bca: BridgedCalleeAnalysis) -> Bool in
+      { (inst: BridgedInstruction, bca: BridgedCalleeAnalysis) -> Bool in
         return inst.instruction.isDeinitBarrier(bca.analysis)
       },
       // getMemBehaviorFn
@@ -78,7 +78,9 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the argument specific side effects of an apply.
-  public func getSideEffects(of apply: ApplySite, forArgument argumentIdx: Int, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
+  public func getSideEffects(of apply: ApplySite, forArgument argumentIdx: Int, path: SmallProjectionPath)
+    -> SideEffects.GlobalEffects
+  {
     let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argumentIdx)
     let convention = apply.getArgumentConvention(calleeArgIndex: calleeArgIdx)
     let argument = apply.arguments[argumentIdx].at(path)
@@ -86,12 +88,14 @@ public struct CalleeAnalysis {
     guard let callees = getCallees(callee: apply.callee) else {
       return .worstEffects.restrictedTo(argument: argument, withConvention: convention)
     }
-  
+
     var result = SideEffects.GlobalEffects()
     for callee in callees {
-      let calleeEffects = callee.getSideEffects(forArgument: argument,
-                                                atIndex: calleeArgIdx,
-                                                withConvention: convention)
+      let calleeEffects = callee.getSideEffects(
+        forArgument: argument,
+        atIndex: calleeArgIdx,
+        withConvention: convention
+      )
       result.merge(with: calleeEffects)
     }
     return result.restrictedTo(argument: argument, withConvention: convention)
@@ -125,7 +129,7 @@ extension Instruction {
   }
 }
 
-public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
+public struct FunctionArray: RandomAccessCollection, FormattedLikeArray {
   fileprivate let bridged: swift.CalleeList
 
   public var startIndex: Int { 0 }
@@ -140,4 +144,3 @@ public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
 extension BridgedCalleeAnalysis {
   public var analysis: CalleeAnalysis { .init(bridged: self) }
 }
-

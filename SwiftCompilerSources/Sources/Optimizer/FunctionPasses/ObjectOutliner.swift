@@ -59,7 +59,8 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
   // The presence of an end_cow_mutation guarantees that the originally initialized
   // object is not mutated (because it must be copied before mutation).
   guard let endCOW = findEndCOWMutation(of: allocRef),
-        !endCOW.doKeepUnique else {
+    !endCOW.doKeepUnique
+  else {
     return nil
   }
 
@@ -68,8 +69,10 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
   }
 
   let outlinedGlobal = context.createGlobalVariable(
-        name: context.mangleOutlinedVariable(from: allocRef.parentFunction),
-        type: allocRef.type, isPrivate: true)
+    name: context.mangleOutlinedVariable(from: allocRef.parentFunction),
+    type: allocRef.type,
+    isPrivate: true
+  )
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
@@ -98,9 +101,13 @@ private func findEndCOWMutation(of object: Value) -> EndCOWMutationInst? {
   return nil
 }
 
-private func getInitialization(of allocRef: AllocRefInstBase,
-                               ignore endCOW: EndCOWMutationInst) -> (storesToClassFields: [StoreInst],
-                                                                      storesToTailElements: [StoreInst])? {
+private func getInitialization(
+  of allocRef: AllocRefInstBase,
+  ignore endCOW: EndCOWMutationInst
+) -> (
+  storesToClassFields: [StoreInst],
+  storesToTailElements: [StoreInst]
+)? {
   guard let numTailElements = allocRef.numTailElements else {
     return nil
   }
@@ -126,10 +133,12 @@ private func getInitialization(of allocRef: AllocRefInstBase,
   return (fieldStores.map { $0! }, tailStores.map { $0! })
 }
 
-private func findInitStores(of object: Value,
-                            _ fieldStores: inout [StoreInst?],
-                            _ tailStores: inout [StoreInst?],
-                            ignore endCOW: EndCOWMutationInst) -> Bool {
+private func findInitStores(
+  of object: Value,
+  _ fieldStores: inout [StoreInst?],
+  _ tailStores: inout [StoreInst?],
+  ignore endCOW: EndCOWMutationInst
+) -> Bool {
   for use in object.uses {
     switch use.instruction {
     case let uci as UpcastInst:
@@ -208,8 +217,9 @@ private func findStores(inUsesOf address: Value, index: Int, stores: inout [Stor
 
 private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreInst?]) -> Bool {
   if index >= 0 && index < stores.count,
-     store.source.isValidGlobalInitValue,
-     stores[index] == nil {
+    store.source.isValidGlobalInitValue,
+    stores[index] == nil
+  {
     stores[index] = store
     return true
   }
@@ -223,24 +233,24 @@ private func isValidUseOfObject(_ inst: Instruction, ignore endCOW: EndCOWMutati
 
   switch inst {
   case is DebugValueInst,
-       is LoadInst,
-       is DeallocRefInst,
-       is DeallocStackRefInst,
-       is StrongRetainInst,
-       is StrongReleaseInst,
-       is FixLifetimeInst,
-       is SetDeallocatingInst:
+    is LoadInst,
+    is DeallocRefInst,
+    is DeallocStackRefInst,
+    is StrongRetainInst,
+    is StrongReleaseInst,
+    is FixLifetimeInst,
+    is SetDeallocatingInst:
     return true
 
   case is StructElementAddrInst,
-       is AddressToPointerInst,
-       is StructInst,
-       is TupleInst,
-       is TupleExtractInst,
-       is EnumInst,
-       is StructExtractInst,
-       is UncheckedRefCastInst,
-       is UpcastInst:
+    is AddressToPointerInst,
+    is StructInst,
+    is TupleInst,
+    is TupleExtractInst,
+    is EnumInst,
+    is StructExtractInst,
+    is UncheckedRefCastInst,
+    is UpcastInst:
     for use in (inst as! SingleValueInstruction).uses {
       if !isValidUseOfObject(use.instruction, ignore: endCOW) {
         return false
@@ -268,10 +278,13 @@ private func isValidUseOfObject(_ inst: Instruction, ignore endCOW: EndCOWMutati
   }
 }
 
-private func constructObject(of allocRef: AllocRefInstBase,
-                             inInitializerOf global: GlobalVariable,
-                             _ storesToClassFields: [StoreInst], _ storesToTailElements: [StoreInst],
-                             _ context: FunctionPassContext) {
+private func constructObject(
+  of allocRef: AllocRefInstBase,
+  inInitializerOf global: GlobalVariable,
+  _ storesToClassFields: [StoreInst],
+  _ storesToTailElements: [StoreInst],
+  _ context: FunctionPassContext
+) {
   var cloner = StaticInitCloner(cloneTo: global, context)
   defer { cloner.deinitialize() }
 
@@ -304,9 +317,12 @@ private func constructObject(of allocRef: AllocRefInstBase,
   globalBuilder.createObject(type: allocRef.type, arguments: objectArgs, numBaseElements: storesToClassFields.count)
 }
 
-private func replace(object allocRef: AllocRefInstBase,
-                     with global: GlobalVariable,
-                     _ endCOW: EndCOWMutationInst, _ context: FunctionPassContext) -> GlobalValueInst {
+private func replace(
+  object allocRef: AllocRefInstBase,
+  with global: GlobalVariable,
+  _ endCOW: EndCOWMutationInst,
+  _ context: FunctionPassContext
+) -> GlobalValueInst {
 
   // Replace the alloc_ref by global_value + strong_retain instructions.
   let builder = Builder(before: allocRef, context)
@@ -354,7 +370,8 @@ private extension Value {
 private extension AllocRefInstBase {
   var fieldsKnownStatically: Bool {
     if let allocDynamic = self as? AllocRefDynamicInst,
-       !allocDynamic.isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType {
+      !allocDynamic.isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType
+    {
       return false
     }
     if isObjC {
@@ -373,7 +390,8 @@ private extension AllocRefInstBase {
 
     // The number of tail allocated elements must be constant.
     guard let tailCountLiteral = tailAllocatedCounts[0].value as? IntegerLiteralInst,
-          tailCountLiteral.value.getActiveBits() <= 20 else {
+      tailCountLiteral.value.getActiveBits() <= 20
+    else {
       return nil
     }
     return Int(tailCountLiteral.value.getZExtValue());
@@ -403,8 +421,9 @@ private extension FunctionPassContext {
 
 private func optimizeFindStringCall(stringArray: GlobalValueInst, _ context: FunctionPassContext) {
   if stringArray.numArrayElements > 16,
-     let findStringCall = findFindStringCall(stringArray: stringArray),
-     let cachedFindStringFunc = getFindStringSwitchCaseWithCacheFunction(context) {
+    let findStringCall = findFindStringCall(stringArray: stringArray),
+    let cachedFindStringFunc = getFindStringSwitchCaseWithCacheFunction(context)
+  {
     replace(findStringCall: findStringCall, with: cachedFindStringFunc, context)
   }
 }
@@ -421,9 +440,9 @@ private func findFindStringCall(stringArray: Value) -> ApplyInst? {
         return apply
       }
     case is StructInst,
-         is TupleInst,
-         is UncheckedRefCastInst,
-         is UpcastInst:
+      is TupleInst,
+      is UncheckedRefCastInst,
+      is UpcastInst:
       if let foundCall = findFindStringCall(stringArray: use.instruction as! SingleValueInstruction) {
         return foundCall
       }
@@ -436,15 +455,18 @@ private func findFindStringCall(stringArray: Value) -> ApplyInst? {
 
 private func getFindStringSwitchCaseWithCacheFunction(_ context: FunctionPassContext) -> Function? {
   if let f = context.lookupStdlibFunction(name: "_findStringSwitchCaseWithCache"),
-     f.argumentTypes.count == 3 {
+    f.argumentTypes.count == 3
+  {
     return f
   }
   return nil
 }
 
-private func replace(findStringCall: ApplyInst,
-                     with cachedFindStringFunc: Function,
-                     _ context: FunctionPassContext) {
+private func replace(
+  findStringCall: ApplyInst,
+  with cachedFindStringFunc: Function,
+  _ context: FunctionPassContext
+) {
   let cacheType = cachedFindStringFunc.argumentTypes[2].objectType
   let wordTy = cacheType.getNominalFields(in: findStringCall.parentFunction)[0]
 
@@ -461,10 +483,15 @@ private func replace(findStringCall: ApplyInst,
   let builder = Builder(before: findStringCall, context)
   let cacheAddr = builder.createGlobalAddr(global: cacheVar)
   let findStringRef = builder.createFunctionRef(cachedFindStringFunc)
-  let newCall = builder.createApply(function: findStringRef, SubstitutionMap(),
-                                    arguments: [findStringCall.arguments[0],
-                                                findStringCall.arguments[1],
-                                                cacheAddr])
+  let newCall = builder.createApply(
+    function: findStringRef,
+    SubstitutionMap(),
+    arguments: [
+      findStringCall.arguments[0],
+      findStringCall.arguments[1],
+      cacheAddr,
+    ]
+  )
 
   findStringCall.uses.replaceAll(with: newCall, context)
   context.erase(instruction: findStringCall)

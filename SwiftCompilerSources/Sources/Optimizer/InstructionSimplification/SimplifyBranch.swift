@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BranchInst : OnoneSimplifyable {
+extension BranchInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     tryMergeWithTargetBlock(context)
   }
@@ -63,8 +63,7 @@ private extension BranchInst {
     // The order is essential because if many blocks are merged and this is done
     // in the wrong order, we end up with quadratic complexity.
     //
-    if parentBB.hasLessInstructions(than: targetBB) &&
-       parentBB != parentBB.parentFunction.entryBlock {
+    if parentBB.hasLessInstructions(than: targetBB) && parentBB != parentBB.parentFunction.entryBlock {
       for pred in parentBB.predecessors {
         pred.terminator.replaceBranchTarget(from: parentBB, to: targetBB, context)
       }

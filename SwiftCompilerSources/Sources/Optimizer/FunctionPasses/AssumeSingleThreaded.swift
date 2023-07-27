@@ -28,7 +28,8 @@
 import SIL
 
 let assumeSingleThreadedPass = FunctionPass(
-  name: "sil-assume-single-threaded", { function, context in
+  name: "sil-assume-single-threaded",
+  { function, context in
     for inst in function.instructions {
       guard let rcInst = inst as? RefCountingInst else { continue }
 

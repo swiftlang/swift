@@ -31,7 +31,8 @@ import SIL
 /// known to have no associated objects (which are not explicitly released
 /// in the deinit method).
 let releaseDevirtualizerPass = FunctionPass(
-  name: "release-devirtualizer", { function, context in
+  name: "release-devirtualizer",
+  { function, context in
     for block in function.blocks {
       // The last `release_value`` or `strong_release`` instruction before the
       // deallocation.
@@ -53,14 +54,14 @@ let releaseDevirtualizerPass = FunctionPass(
         }
 
         switch instruction {
-          case is ReleaseValueInst, is StrongReleaseInst:
-            lastRelease = instruction as? RefCountingInst
-          case is DeallocRefInst, is SetDeallocatingInst:
+        case is ReleaseValueInst, is StrongReleaseInst:
+          lastRelease = instruction as? RefCountingInst
+        case is DeallocRefInst, is SetDeallocatingInst:
+          lastRelease = nil
+        default:
+          if instruction.mayRelease {
             lastRelease = nil
-          default:
-            if instruction.mayRelease {
-              lastRelease = nil
-            }
+          }
         }
       }
     }
@@ -109,7 +110,7 @@ private func tryDevirtualizeReleaseOfObject(
 }
 
 // Up-walker to find the root of a release instruction.
-private struct FindAllocationOfRelease : ValueUseDefWalker {
+private struct FindAllocationOfRelease: ValueUseDefWalker {
   private let allocInst: AllocRefInstBase
   private var allocFound = false
 
@@ -119,8 +120,7 @@ private struct FindAllocationOfRelease : ValueUseDefWalker {
 
   /// The top-level entry point: returns true if the root of `value` is the `allocInst`.
   mutating func allocationIsRoot(of value: Value) -> Bool {
-    return walkUp(value: value, path: UnusedWalkingPath()) != .abortWalk &&
-           allocFound
+    return walkUp(value: value, path: UnusedWalkingPath()) != .abortWalk && allocFound
   }
 
   mutating func rootDef(value: Value, path: UnusedWalkingPath) -> WalkResult {
@@ -134,7 +134,7 @@ private struct FindAllocationOfRelease : ValueUseDefWalker {
   // This function is called for `struct` and `tuple` instructions in case the `path` doesn't select
   // a specific operand but all operands.
   mutating func walkUpAllOperands(of def: Instruction, path: UnusedWalkingPath) -> WalkResult {
-  
+
     // Instead of walking up _all_ operands (which would be the default behavior), require that only a
     // _single_ operand is not trivial and walk up that operand.
     // We need to check this because the released value must not contain multiple copies of the

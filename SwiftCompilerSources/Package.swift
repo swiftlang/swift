@@ -24,8 +24,8 @@ private extension Target {
       "-Xcc", "-I", "-Xcc", "../../llvm-project/llvm/include",
       // Clang modules and headers
       "-Xcc", "-I", "-Xcc", "../../llvm-project/clang/include",
-      "-cross-module-optimization"
-    ]),
+      "-cross-module-optimization",
+    ])
   ]
 
   static func compilerModuleTarget(
@@ -33,30 +33,32 @@ private extension Target {
     dependencies: [Dependency],
     path: String? = nil,
     sources: [String]? = nil,
-    swiftSettings: [SwiftSetting] = []) -> Target {
-      .target(
-        name: name,
-        dependencies: dependencies,
-        path: path ?? "Sources/\(name)",
-        exclude: ["CMakeLists.txt"],
-        sources: sources,
-        swiftSettings: defaultSwiftSettings + swiftSettings)
-    }
+    swiftSettings: [SwiftSetting] = []
+  ) -> Target {
+    .target(
+      name: name,
+      dependencies: dependencies,
+      path: path ?? "Sources/\(name)",
+      exclude: ["CMakeLists.txt"],
+      sources: sources,
+      swiftSettings: defaultSwiftSettings + swiftSettings
+    )
+  }
 }
 
 let package = Package(
   name: "SwiftCompilerSources",
   platforms: [
-    .macOS("10.9"),
+    .macOS("10.9")
   ],
   products: [
     .library(
       name: "swiftCompilerModules",
       type: .static,
-      targets: ["Basic", "AST", "Parse", "SIL", "Optimizer", "_CompilerRegexParser"]),
+      targets: ["Basic", "AST", "Parse", "SIL", "Optimizer", "_CompilerRegexParser"]
+    )
   ],
-  dependencies: [
-  ],
+  dependencies: [],
   // Note that targets and their dependencies must align with
   // 'SwiftCompilerSources/Sources/CMakeLists.txt'
   targets: [
@@ -69,22 +71,29 @@ let package = Package(
         // by `_StringProcessing`.
         .unsafeFlags([
           "-Xfrontend",
-          "-disable-implicit-string-processing-module-import"
-        ])]),
+          "-disable-implicit-string-processing-module-import",
+        ])
+      ]
+    ),
     .compilerModuleTarget(
       name: "Basic",
-      dependencies: []),
+      dependencies: []
+    ),
     .compilerModuleTarget(
       name: "AST",
-      dependencies: ["Basic"]),
+      dependencies: ["Basic"]
+    ),
     .compilerModuleTarget(
       name: "Parse",
-      dependencies: ["Basic", "AST", "_CompilerRegexParser"]),
+      dependencies: ["Basic", "AST", "_CompilerRegexParser"]
+    ),
     .compilerModuleTarget(
       name: "SIL",
-      dependencies: ["Basic"]),
+      dependencies: ["Basic"]
+    ),
     .compilerModuleTarget(
       name: "Optimizer",
-      dependencies: ["Basic", "SIL", "Parse"]),
+      dependencies: ["Basic", "SIL", "Parse"]
+    ),
   ]
 )

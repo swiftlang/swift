@@ -44,7 +44,8 @@ extension Value {
         worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
       case let en as EnumInst:
         if let payload = en.payload,
-           !(payload is Undef) {
+          !(payload is Undef)
+        {
           worklist.pushIfNotVisited(payload)
         }
       default:
@@ -56,14 +57,23 @@ extension Value {
 }
 
 extension Builder {
-  static func insert(after inst: Instruction, location: Location,
-                     _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
+  static func insert(
+    after inst: Instruction,
+    location: Location,
+    _ context: some MutatingContext,
+    insertFunc: (Builder) -> ()
+  ) {
     if inst is TermInst {
       for succ in inst.parentBlock.successors {
-        assert(succ.hasSinglePredecessor,
-               "the terminator instruction must not have critical successors")
-        let builder = Builder(before: succ.instructions.first!, location: location,
-                              context)
+        assert(
+          succ.hasSinglePredecessor,
+          "the terminator instruction must not have critical successors"
+        )
+        let builder = Builder(
+          before: succ.instructions.first!,
+          location: location,
+          context
+        )
         insertFunc(builder)
       }
     } else {
@@ -95,7 +105,7 @@ extension Value {
       let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)
     }
-  
+
     if useToDefRange.contains(destBlock) {
       // The `destBlock` is within a loop, so we need to copy the value at each iteration.
       let builder = Builder(before: destBlock.instructions.first!, context)
@@ -107,8 +117,11 @@ extension Value {
   /// Copies this value at `insertionPoint` and makes the copy available to be used in `destBlock`.
   ///
   /// For details see `makeAvailable`.
-  func copy(at insertionPoint: Instruction, andMakeAvailableIn destBlock: BasicBlock,
-            _ context: some MutatingContext) -> Value {
+  func copy(
+    at insertionPoint: Instruction,
+    andMakeAvailableIn destBlock: BasicBlock,
+    _ context: some MutatingContext
+  ) -> Value {
     let builder = Builder(before: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
@@ -158,7 +171,11 @@ extension StoreInst {
         let destructure = builder.createDestructureStruct(struct: source)
         for (fieldIdx, fieldValue) in destructure.results.enumerated() {
           let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
-          builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
+          builder.createStore(
+            source: fieldValue,
+            destination: destFieldAddr,
+            ownership: splitOwnership(for: fieldValue)
+          )
         }
       } else {
         for idx in 0..<type.getNominalFields(in: parentFunction).count {
@@ -172,7 +189,11 @@ extension StoreInst {
         let destructure = builder.createDestructureTuple(tuple: source)
         for (elementIdx, elementValue) in destructure.results.enumerated() {
           let elementAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: elementIdx)
-          builder.createStore(source: elementValue, destination: elementAddr, ownership: splitOwnership(for: elementValue))
+          builder.createStore(
+            source: elementValue,
+            destination: elementAddr,
+            ownership: splitOwnership(for: elementValue)
+          )
         }
       } else {
         for idx in 0..<type.tupleElements.count {
@@ -237,7 +258,6 @@ extension LoadInst {
     }
   }
 }
-
 
 extension UseList {
   var singleNonDebugUse: Operand? {
@@ -321,8 +341,11 @@ extension SimplifyContext {
   /// ```
   /// Replaces `%second` with `%replacement` and deletes the instructions if possible - or required.
   /// The operation is not done if it would require to insert a copy due to keep ownership correct.
-  func tryReplaceRedundantInstructionPair(first: SingleValueInstruction, second: SingleValueInstruction,
-                                          with replacement: Value) {
+  func tryReplaceRedundantInstructionPair(
+    first: SingleValueInstruction,
+    second: SingleValueInstruction,
+    with replacement: Value
+  ) {
     let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.singleNonDebugUse
     let canEraseFirst = singleUse?.instruction == second
 
@@ -366,7 +389,7 @@ extension ProjectedValue {
   }
 }
 
-private struct EscapesToValueVisitor : EscapeVisitor {
+private struct EscapesToValueVisitor: EscapeVisitor {
   let target: ProjectedValue
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
@@ -387,12 +410,12 @@ private struct EscapesToValueVisitor : EscapeVisitor {
 extension Function {
   var globalOfGlobalInitFunction: GlobalVariable? {
     if isGlobalInitFunction,
-       let ret = returnInstruction,
-       let atp = ret.returnedValue as? AddressToPointerInst,
-       let ga = atp.address as? GlobalAddrInst {
+      let ret = returnInstruction,
+      let atp = ret.returnedValue as? AddressToPointerInst,
+      let ga = atp.address as? GlobalAddrInst
+    {
       return ga.global
     }
     return nil
   }
 }
-

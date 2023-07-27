@@ -12,7 +12,7 @@
 
 import SIL
 
-extension InitEnumDataAddrInst : OnoneSimplifyable {
+extension InitEnumDataAddrInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Optimize the sequence
@@ -32,16 +32,21 @@ extension InitEnumDataAddrInst : OnoneSimplifyable {
     // We also check that between the init and the store, no instruction writes to memory.
     //
     if let store = self.uses.singleUse?.instruction as? StoreInst,
-       store.destination == self,
-       let inject = store.next as? InjectEnumAddrInst,
-       inject.enum == self.enum,
-       inject.enum.type.isLoadable(in: parentFunction),
-       !anyInstructionMayWriteToMemory(between: self, and: store) {
+      store.destination == self,
+      let inject = store.next as? InjectEnumAddrInst,
+      inject.enum == self.enum,
+      inject.enum.type.isLoadable(in: parentFunction),
+      !anyInstructionMayWriteToMemory(between: self, and: store)
+    {
 
       assert(self.caseIndex == inject.caseIndex, "mismatching case indices when creating an enum")
 
       let builder = Builder(before: store, context)
-      let enumInst = builder.createEnum(caseIndex: self.caseIndex, payload: store.source, enumType: self.enum.type.objectType)
+      let enumInst = builder.createEnum(
+        caseIndex: self.caseIndex,
+        payload: store.source,
+        enumType: self.enum.type.objectType
+      )
       let storeOwnership = StoreInst.StoreOwnership(for: self.enum.type, in: parentFunction, initialize: true)
       builder.createStore(source: enumInst, destination: self.enum, ownership: storeOwnership)
       context.erase(instruction: store)

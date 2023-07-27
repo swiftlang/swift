@@ -30,7 +30,7 @@ extension Context {
 }
 
 /// A context which allows mutation of a function's SIL.
-protocol MutatingContext : Context {
+protocol MutatingContext: Context {
   // Called by all instruction mutations, including inserted new instructions.
   var notifyInstructionChanged: (Instruction) -> () { get }
 }
@@ -159,7 +159,7 @@ extension MutatingContext {
 }
 
 /// The context which is passed to the run-function of a FunctionPass.
-struct FunctionPassContext : MutatingContext {
+struct FunctionPassContext: MutatingContext {
   let _bridged: BridgedPassContext
 
   // A no-op.
@@ -169,8 +169,14 @@ struct FunctionPassContext : MutatingContext {
     return _bridged.continueWithNextSubpassRun(inst.bridged)
   }
 
-  func createSimplifyContext(preserveDebugInfo: Bool, notifyInstructionChanged: @escaping (Instruction) -> ()) -> SimplifyContext {
-    SimplifyContext(_bridged: _bridged, notifyInstructionChanged: notifyInstructionChanged, preserveDebugInfo: preserveDebugInfo)
+  func createSimplifyContext(preserveDebugInfo: Bool, notifyInstructionChanged: @escaping (Instruction) -> ())
+    -> SimplifyContext
+  {
+    SimplifyContext(
+      _bridged: _bridged,
+      notifyInstructionChanged: notifyInstructionChanged,
+      preserveDebugInfo: preserveDebugInfo
+    )
   }
 
   var aliasAnalysis: AliasAnalysis {
@@ -273,7 +279,7 @@ struct FunctionPassContext : MutatingContext {
   }
 }
 
-struct SimplifyContext : MutatingContext {
+struct SimplifyContext: MutatingContext {
   let _bridged: BridgedPassContext
   let notifyInstructionChanged: (Instruction) -> ()
   let preserveDebugInfo: Bool
@@ -286,24 +292,40 @@ struct SimplifyContext : MutatingContext {
 extension Builder {
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
-    self.init(insertAt: .before(insPnt), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(
+      insertAt: .before(insPnt),
+      location: location,
+      context.notifyInstructionChanged,
+      context._bridged.asNotificationHandler()
+    )
   }
 
   /// Creates a builder which inserts _before_ `insPnt`, using the location of `insPnt`.
   init(before insPnt: Instruction, _ context: some MutatingContext) {
-    self.init(insertAt: .before(insPnt), location: insPnt.location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(
+      insertAt: .before(insPnt),
+      location: insPnt.location,
+      context.notifyInstructionChanged,
+      context._bridged.asNotificationHandler()
+    )
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
   init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
     if let nextInst = insPnt.next {
-      self.init(insertAt: .before(nextInst), location: location,
-                context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+      self.init(
+        insertAt: .before(nextInst),
+        location: location,
+        context.notifyInstructionChanged,
+        context._bridged.asNotificationHandler()
+      )
     } else {
-      self.init(insertAt: .atEndOf(insPnt.parentBlock), location: location,
-                context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+      self.init(
+        insertAt: .atEndOf(insPnt.parentBlock),
+        location: location,
+        context.notifyInstructionChanged,
+        context._bridged.asNotificationHandler()
+      )
     }
   }
 
@@ -314,29 +336,44 @@ extension Builder {
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   init(atEndOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
-    self.init(insertAt: .atEndOf(block), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(
+      insertAt: .atEndOf(block),
+      location: location,
+      context.notifyInstructionChanged,
+      context._bridged.asNotificationHandler()
+    )
   }
 
   /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
   init(atBeginOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
     let firstInst = block.instructions.first!
-    self.init(insertAt: .before(firstInst), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(
+      insertAt: .before(firstInst),
+      location: location,
+      context.notifyInstructionChanged,
+      context._bridged.asNotificationHandler()
+    )
   }
 
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
   /// instruction of `block`.
   init(atBeginOf block: BasicBlock, _ context: some MutatingContext) {
     let firstInst = block.instructions.first!
-    self.init(insertAt: .before(firstInst), location: firstInst.location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(
+      insertAt: .before(firstInst),
+      location: firstInst.location,
+      context.notifyInstructionChanged,
+      context._bridged.asNotificationHandler()
+    )
   }
 
   init(staticInitializerOf global: GlobalVariable, _ context: some MutatingContext) {
-    self.init(insertAt: .staticInitializer(global),
-              location: Location.artificialUnreachableLocation,
-              { _ in }, context._bridged.asNotificationHandler())
+    self.init(
+      insertAt: .staticInitializer(global),
+      location: Location.artificialUnreachableLocation,
+      { _ in },
+      context._bridged.asNotificationHandler()
+    )
   }
 }
 
@@ -355,7 +392,7 @@ extension BasicBlock {
     context.notifyInstructionsChanged()
     return bridged.addBlockArgument(type.bridged, ownership._bridged).blockArgument
   }
-  
+
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.eraseArgument(index)
@@ -375,7 +412,7 @@ extension BasicBlock {
 
   func eraseAllArguments(_ context: some MutatingContext) {
     // Arguments are stored in an array. We need to erase in reverse order to avoid quadratic complexity.
-    for argIdx in (0 ..< arguments.count).reversed() {
+    for argIdx in (0..<arguments.count).reversed() {
       eraseArgument(at: argIdx, context)
     }
   }
@@ -408,7 +445,7 @@ extension Operand {
 }
 
 extension Instruction {
-  func setOperand(at index : Int, to value: Value, _ context: some MutatingContext) {
+  func setOperand(at index: Int, to value: Value, _ context: some MutatingContext) {
     if self is FullApplySite && index == ApplyOperands.calleeOperandIndex {
       context.notifyCallsChanged()
     }

@@ -18,7 +18,7 @@ public struct SubstitutionMap {
   public init(_ bridged: swift.SubstitutionMap) {
     self.bridged = bridged
   }
-  
+
   public init() {
     self.bridged = swift.SubstitutionMap()
   }

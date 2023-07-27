@@ -12,20 +12,20 @@
 
 import SILBridging
 
-public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
+public struct WitnessTable: CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedWitnessTable
 
   public init(bridged: BridgedWitnessTable) { self.bridged = bridged }
 
-  public struct Entry : CustomStringConvertible, NoReflectionChildren {
+  public struct Entry: CustomStringConvertible, NoReflectionChildren {
     fileprivate let bridged: BridgedWitnessTableEntry
-    
+
     public typealias Kind = swift.SILWitnessTable.WitnessKind
-    
+
     public var kind: Kind {
       return bridged.getKind()
     }
-    
+
     public var methodFunction: Function? {
       assert(kind == .Method)
       return bridged.getMethodFunction().function
@@ -37,13 +37,13 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
-  public struct EntryArray : BridgedRandomAccessCollection {
+  public struct EntryArray: BridgedRandomAccessCollection {
     fileprivate let base: BridgedWitnessTableEntry
     public let count: Int
-    
+
     public var startIndex: Int { return 0 }
     public var endIndex: Int { return count }
-    
+
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
       return Entry(bridged: BridgedWitnessTableEntry(entry: base.entry + index))
@@ -61,7 +61,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   }
 }
 
-public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildren {
+public struct DefaultWitnessTable: CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedDefaultWitnessTable
 
   public init(bridged: BridgedDefaultWitnessTable) { self.bridged = bridged }

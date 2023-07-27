@@ -12,7 +12,7 @@
 
 import SIL
 
-extension DestructureTupleInst : OnoneSimplifyable {
+extension DestructureTupleInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Eliminate the redundant instruction pair
@@ -28,7 +28,7 @@ extension DestructureTupleInst : OnoneSimplifyable {
   }
 }
 
-extension DestructureStructInst : OnoneSimplifyable {
+extension DestructureStructInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Eliminate the redundant instruction pair
@@ -44,9 +44,11 @@ extension DestructureStructInst : OnoneSimplifyable {
   }
 }
 
-private func tryReplaceConstructDestructPair(construct: SingleValueInstruction,
-                                             destruct: MultipleValueInstruction,
-                                             _ context: SimplifyContext) {
+private func tryReplaceConstructDestructPair(
+  construct: SingleValueInstruction,
+  destruct: MultipleValueInstruction,
+  _ context: SimplifyContext
+) {
   let singleUse = context.preserveDebugInfo ? construct.uses.singleUse : construct.uses.singleNonDebugUse
   let canEraseFirst = singleUse?.instruction == destruct
 

@@ -58,21 +58,21 @@ private extension Instruction {
   var shouldTest: Bool {
     switch self {
     case is ApplyInst,
-         is TryApplyInst,
-         is EndApplyInst,
-         is BeginApplyInst,
-         is AbortApplyInst,
-         is BeginAccessInst,
-         is EndAccessInst,
-         is EndCOWMutationInst,
-         is CopyValueInst,
-         is DestroyValueInst,
-         is EndBorrowInst,
-         is LoadInst,
-         is StoreInst,
-         is CopyAddrInst,
-         is BuiltinInst,
-         is DebugValueInst:
+      is TryApplyInst,
+      is EndApplyInst,
+      is BeginApplyInst,
+      is AbortApplyInst,
+      is BeginAccessInst,
+      is EndAccessInst,
+      is EndCOWMutationInst,
+      is CopyValueInst,
+      is DestroyValueInst,
+      is EndBorrowInst,
+      is LoadInst,
+      is StoreInst,
+      is CopyAddrInst,
+      is BuiltinInst,
+      is DebugValueInst:
       return true
     default:
       return false

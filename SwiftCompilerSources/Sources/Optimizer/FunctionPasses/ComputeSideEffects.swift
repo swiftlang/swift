@@ -24,54 +24,61 @@ import SIL
 /// ```
 /// are computed.
 ///
-let computeSideEffects = FunctionPass(name: "compute-side-effects", {
-  (function: Function, context: FunctionPassContext) in
+let computeSideEffects = FunctionPass(
+  name: "compute-side-effects",
+  {
+    (function: Function, context: FunctionPassContext) in
 
-  if function.isAvailableExternally {
-    // We cannot assume anything about function, which are defined in another module,
-    // even if the serialized SIL of its body is available in the current module.
-    // If the other module was compiled with library evolution, the implementation
-    // (and it's effects) might change in future versions of the other module/library.
+    if function.isAvailableExternally {
+      // We cannot assume anything about function, which are defined in another module,
+      // even if the serialized SIL of its body is available in the current module.
+      // If the other module was compiled with library evolution, the implementation
+      // (and it's effects) might change in future versions of the other module/library.
+      //
+      // TODO: only do this for functions which are de-serialized from library-evolution modules.
+      return
+    }
+
+    if function.effectAttribute != .none {
+      // Don't try to infer side effects if there are defined effect attributes.
+      return
+    }
+
+    var collectedEffects = CollectedEffects(function: function, context)
+
+    // First step: collect effects from all instructions.
     //
-    // TODO: only do this for functions which are de-serialized from library-evolution modules.
-    return
-  }
+    for block in function.blocks {
+      for inst in block.instructions {
+        collectedEffects.addInstructionEffects(inst)
+      }
+    }
 
-  if function.effectAttribute != .none {
-    // Don't try to infer side effects if there are defined effect attributes.
-    return
-  }
+    // Second step: If an argument has unknown uses, we must add all previously collected
+    // global effects to the argument, because we don't know to which "global" side-effect
+    // instruction the argument might have escaped.
+    for argument in function.arguments {
+      collectedEffects.addEffectsForEcapingArgument(argument: argument)
+    }
 
-  var collectedEffects = CollectedEffects(function: function, context)
+    // Don't modify the effects if they didn't change. This avoids sending a change notification
+    // which can trigger unnecessary other invalidations.
+    if let existingEffects = function.effects.sideEffects,
+      existingEffects.arguments == collectedEffects.argumentEffects,
+      existingEffects.global == collectedEffects.globalEffects
+    {
+      return
+    }
 
-  // First step: collect effects from all instructions.
-  //
-  for block in function.blocks {
-    for inst in block.instructions {
-      collectedEffects.addInstructionEffects(inst)
+    // Finally replace the function's side effects.
+    context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
+      effects.sideEffects = SideEffects(
+        arguments: collectedEffects.argumentEffects,
+        global: collectedEffects.globalEffects
+      )
     }
   }
-
-  // Second step: If an argument has unknown uses, we must add all previously collected
-  // global effects to the argument, because we don't know to which "global" side-effect
-  // instruction the argument might have escaped.
-  for argument in function.arguments {
-    collectedEffects.addEffectsForEcapingArgument(argument: argument)
-  }
-
-  // Don't modify the effects if they didn't change. This avoids sending a change notification
-  // which can trigger unnecessary other invalidations.
-  if let existingEffects = function.effects.sideEffects,
-     existingEffects.arguments == collectedEffects.argumentEffects,
-     existingEffects.global == collectedEffects.globalEffects {
-    return
-  }
-
-  // Finally replace the function's side effects.
-  context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
-  }
-})
+)
 
 /// The collected argument and global side effects of the function.
 private struct CollectedEffects {
@@ -148,10 +155,10 @@ private struct CollectedEffects {
       // releases moving above the fix_lifetime.
       addEffects(.read, to: fl.operand.value)
 
-      // Instructions which have effects defined in SILNodes.def, but those effects are
-      // not relevant for our purpose.
-      // In most cases these conservative effects are there to prevent code re-scheduling within
-      // the function. But this is not relevant for side effect summaries which we compute here.
+    // Instructions which have effects defined in SILNodes.def, but those effects are
+    // not relevant for our purpose.
+    // In most cases these conservative effects are there to prevent code re-scheduling within
+    // the function. But this is not relevant for side effect summaries which we compute here.
     case is DeallocStackInst, is DeallocStackRefInst,
       is BeginAccessInst, is EndAccessInst,
       is BeginBorrowInst, is EndBorrowInst,
@@ -183,7 +190,8 @@ private struct CollectedEffects {
       // Ignore "local" allocations, which don't escape. They cannot be observed
       // from outside the function.
       if let alloc = inst as? Allocation, !(inst is AllocStackInst),
-         alloc.isEscaping(context) {
+        alloc.isEscaping(context)
+      {
         globalEffects.allocates = true
       }
     }
@@ -191,18 +199,24 @@ private struct CollectedEffects {
     // barrier.  If it's an apply of some sort, that was already done in
     // handleApply.
     if !checkedIfDeinitBarrier,
-       inst.mayBeDeinitBarrierNotConsideringSideEffects {
+      inst.mayBeDeinitBarrierNotConsideringSideEffects
+    {
       globalEffects.isDeinitBarrier = true
     }
   }
-  
+
   mutating func addEffectsForEcapingArgument(argument: FunctionArgument) {
     var escapeWalker = ArgumentEscapingWalker()
 
     if escapeWalker.hasUnknownUses(argument: argument) {
       // Worst case: we don't know anything about how the argument escapes.
-      addEffects(globalEffects.restrictedTo(argument: argument.at(SmallProjectionPath(.anything)),
-                                            withConvention: argument.convention), to: argument)
+      addEffects(
+        globalEffects.restrictedTo(
+          argument: argument.at(SmallProjectionPath(.anything)),
+          withConvention: argument.convention
+        ),
+        to: argument
+      )
 
     } else if escapeWalker.foundTakingLoad {
       // In most cases we can just ignore loads. But if the load is actually "taking" the
@@ -210,20 +224,27 @@ private struct CollectedEffects {
       // know what's happening with the loaded value. If there is any destroying instruction in the
       // function, it might be the destroy of the loaded value.
       let effects = SideEffects.GlobalEffects(ownership: globalEffects.ownership)
-      addEffects(effects.restrictedTo(argument: argument.at(SmallProjectionPath(.anything)),
-                                      withConvention: argument.convention), to: argument)
+      addEffects(
+        effects.restrictedTo(
+          argument: argument.at(SmallProjectionPath(.anything)),
+          withConvention: argument.convention
+        ),
+        to: argument
+      )
 
     } else if escapeWalker.foundConsumingPartialApply && globalEffects.ownership.destroy {
       // Similar situation with apply instructions which consume the callee closure.
       addEffects(.destroy, to: argument)
     }
   }
-  
+
   private mutating func handleApply(_ apply: ApplySite) {
     let callees = calleeAnalysis.getCallees(callee: apply.callee)
     let args = apply.arguments.enumerated().lazy.map {
-      (calleeArgumentIndex: apply.calleeArgIndex(callerArgIndex: $0.0),
-       callerArgument: $0.1)
+      (
+        calleeArgumentIndex: apply.calleeArgIndex(callerArgIndex: $0.0),
+        callerArgument: $0.1
+      )
     }
     addEffects(ofFunctions: callees, withArguments: args)
   }
@@ -266,9 +287,11 @@ private struct CollectedEffects {
     }
   }
 
-  private mutating func addEffects<Arguments: Sequence>(ofFunctions callees: FunctionArray?,
-                                                        withArguments arguments: Arguments)
-                                   where Arguments.Element == (calleeArgumentIndex: Int, callerArgument: Value) {
+  private mutating func addEffects<Arguments: Sequence>(
+    ofFunctions callees: FunctionArray?,
+    withArguments arguments: Arguments
+  )
+  where Arguments.Element == (calleeArgumentIndex: Int, callerArgument: Value) {
     guard let callees = callees else {
       // We don't know which function(s) are called.
       globalEffects = .worstEffects
@@ -293,16 +316,18 @@ private struct CollectedEffects {
           let calleeEffect = sideEffects.getArgumentEffects(for: calleeArgIdx)
 
           // Merge the callee effects into this function's effects
-          if let calleePath = calleeEffect.read    { addEffects(.read,    to: argument, fromInitialPath: calleePath) }
-          if let calleePath = calleeEffect.write   { addEffects(.write,   to: argument, fromInitialPath: calleePath) }
-          if let calleePath = calleeEffect.copy    { addEffects(.copy,    to: argument, fromInitialPath: calleePath) }
+          if let calleePath = calleeEffect.read { addEffects(.read, to: argument, fromInitialPath: calleePath) }
+          if let calleePath = calleeEffect.write { addEffects(.write, to: argument, fromInitialPath: calleePath) }
+          if let calleePath = calleeEffect.copy { addEffects(.copy, to: argument, fromInitialPath: calleePath) }
           if let calleePath = calleeEffect.destroy { addEffects(.destroy, to: argument, fromInitialPath: calleePath) }
         } else {
           let convention = callee.getArgumentConvention(for: calleeArgIdx)
           let wholeArgument = argument.at(defaultPath(for: argument))
-          let calleeEffects = callee.getSideEffects(forArgument: wholeArgument,
-                                                    atIndex: calleeArgIdx,
-                                                    withConvention: convention)
+          let calleeEffects = callee.getSideEffects(
+            forArgument: wholeArgument,
+            atIndex: calleeArgIdx,
+            withConvention: convention
+          )
           addEffects(calleeEffects.restrictedTo(argument: wholeArgument, withConvention: convention), to: argument)
         }
       }
@@ -317,11 +342,14 @@ private struct CollectedEffects {
     addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
   }
 
-  private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value,
-                                   fromInitialPath: SmallProjectionPath) {
+  private mutating func addEffects(
+    _ effects: SideEffects.GlobalEffects,
+    to value: Value,
+    fromInitialPath: SmallProjectionPath
+  ) {
 
     /// Collects the (non-address) roots of a value.
-    struct GetRootsWalker : ValueUseDefWalker {
+    struct GetRootsWalker: ValueUseDefWalker {
       // All function-argument roots of the value, including the path from the arguments to the values.
       var roots: Stack<(FunctionArgument, SmallProjectionPath)>
 
@@ -352,22 +380,22 @@ private struct CollectedEffects {
     if value.type.isAddress {
       let accessPath = value.getAccessPath(fromInitialPath: fromInitialPath)
       switch accessPath.base {
-        case .stack:
-          // We don't care about read and writes from/to stack locations (because they are
-          // not observable from outside the function). But we need to consider copies and destroys.
-          // For example, an argument could be "moved" to a stack location, which is eventually destroyed.
-          // In this case it's in fact the original argument value which is destroyed.
-          globalEffects.ownership.merge(with: effects.ownership)
-          return
-        case .argument(let arg):
-          // The `value` is an address projection of an indirect argument.
-          argumentEffects[arg.index].merge(effects, with: accessPath.projectionPath)
-          return
-        default:
-          // Handle address `value`s which are are field projections from class references in direct arguments.
-          if !findRoots.visitAccessStorageRoots(of: accessPath) {
-            findRoots.nonArgumentRootsFound = true
-          }
+      case .stack:
+        // We don't care about read and writes from/to stack locations (because they are
+        // not observable from outside the function). But we need to consider copies and destroys.
+        // For example, an argument could be "moved" to a stack location, which is eventually destroyed.
+        // In this case it's in fact the original argument value which is destroyed.
+        globalEffects.ownership.merge(with: effects.ownership)
+        return
+      case .argument(let arg):
+        // The `value` is an address projection of an indirect argument.
+        argumentEffects[arg.index].merge(effects, with: accessPath.projectionPath)
+        return
+      default:
+        // Handle address `value`s which are are field projections from class references in direct arguments.
+        if !findRoots.visitAccessStorageRoots(of: accessPath) {
+          findRoots.nonArgumentRootsFound = true
+        }
       }
     } else {
       _ = findRoots.walkUp(value: value, path: fromInitialPath)
@@ -394,7 +422,7 @@ private func defaultPath(for value: Value) -> SmallProjectionPath {
 }
 
 /// Checks if an argument escapes to some unknown user.
-private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
+private struct ArgumentEscapingWalker: ValueDefUseWalker, AddressDefUseWalker {
   var walkDownCache = WalkerCache<UnusedWalkingPath>()
 
   /// True if the argument escapes to a load which (potentially) "takes" the memory location.
@@ -420,9 +448,9 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
 
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
     case is CopyValueInst, is RetainValueInst, is StrongRetainInst,
-         is DestroyValueInst, is ReleaseValueInst, is StrongReleaseInst,
-         is DebugValueInst, is UnconditionalCheckedCastInst,
-         is ReturnInst:
+      is DestroyValueInst, is ReleaseValueInst, is StrongReleaseInst,
+      is DebugValueInst, is UnconditionalCheckedCastInst,
+      is ReturnInst:
       return .continueWalk
 
     case let apply as ApplySite:
@@ -444,17 +472,17 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     let function = inst.parentFunction
     switch inst {
     case let copy as CopyAddrInst:
-      if address == copy.sourceOperand &&
-          !address.value.hasTrivialType &&
-          (!function.hasOwnership || copy.isTakeOfSrc) {
+      if address == copy.sourceOperand && !address.value.hasTrivialType && (!function.hasOwnership || copy.isTakeOfSrc)
+      {
         foundTakingLoad = true
       }
       return .continueWalk
- 
+
     case let load as LoadInst:
-      if !address.value.hasTrivialType &&
-          // In non-ossa SIL we don't know if a load is taking.
-          (!function.hasOwnership || load.loadOwnership == .take) {
+      if !address.value.hasTrivialType
+        // In non-ossa SIL we don't know if a load is taking.
+        && (!function.hasOwnership || load.loadOwnership == .take)
+      {
         foundTakingLoad = true
       }
       return .continueWalk
@@ -467,7 +495,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
 
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
     case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst,
-         is DebugValueInst:
+      is DebugValueInst:
       return .continueWalk
 
     default:
@@ -477,24 +505,24 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
 }
 
 private extension SideEffects.GlobalEffects {
-  static var read: Self    { Self(memory: SideEffects.Memory(read: true)) }
-  static var write: Self   { Self(memory: SideEffects.Memory(write: true)) }
-  static var copy: Self    { Self(ownership: SideEffects.Ownership(copy: true)) }
+  static var read: Self { Self(memory: SideEffects.Memory(read: true)) }
+  static var write: Self { Self(memory: SideEffects.Memory(write: true)) }
+  static var copy: Self { Self(ownership: SideEffects.Ownership(copy: true)) }
   static var destroy: Self { Self(ownership: SideEffects.Ownership(destroy: true)) }
 }
 
 private extension SideEffects.ArgumentEffects {
   mutating func merge(_ effects: SideEffects.GlobalEffects, with path: SmallProjectionPath) {
-    if effects.memory.read       { read.merge(with: path) }
-    if effects.memory.write      { write.merge(with: path) }
-    if effects.ownership.copy    { copy.merge(with: path) }
+    if effects.memory.read { read.merge(with: path) }
+    if effects.memory.write { write.merge(with: path) }
+    if effects.ownership.copy { copy.merge(with: path) }
     if effects.ownership.destroy { destroy.merge(with: path) }
   }
 }
 
 private extension PartialApplyInst {
   func canBeAppliedInFunction(_ context: FunctionPassContext) -> Bool {
-    struct EscapesToApply : EscapeVisitor {
+    struct EscapesToApply: EscapeVisitor {
       func visitUse(operand: Operand, path: EscapePath) -> UseResult {
         switch operand.instruction {
         case is FullApplySite:

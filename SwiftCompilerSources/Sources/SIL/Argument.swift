@@ -16,7 +16,7 @@ import SILBridging
 /// A basic block argument.
 ///
 /// Maps to both, SILPhiArgument and SILFunctionArgument.
-public class Argument : Value, Hashable {
+public class Argument: Value, Hashable {
   public var definingInstruction: Instruction? { nil }
 
   public var parentBlock: BasicBlock {
@@ -24,12 +24,12 @@ public class Argument : Value, Hashable {
   }
 
   var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
-  
+
   public var index: Int {
     return parentBlock.arguments.firstIndex(of: self)!
   }
-  
-  public static func ==(lhs: Argument, rhs: Argument) -> Bool {
+
+  public static func == (lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
   }
 
@@ -38,7 +38,7 @@ public class Argument : Value, Hashable {
   }
 }
 
-final public class FunctionArgument : Argument {
+final public class FunctionArgument: Argument {
   public var convention: ArgumentConvention {
     bridged.getConvention().convention
   }
@@ -48,7 +48,7 @@ final public class FunctionArgument : Argument {
   }
 }
 
-final public class BlockArgument : Argument {
+final public class BlockArgument: Argument {
   public var isPhiArgument: Bool {
     parentBlock.predecessors.allSatisfy {
       let term = $0.terminator
@@ -61,18 +61,18 @@ final public class BlockArgument : Argument {
     let idx = index
     return parentBlock.predecessors.lazy.map {
       switch $0.terminator {
-        case let br as BranchInst:
-          return br.operands[idx]
-        case let condBr as CondBranchInst:
-          if condBr.trueBlock == self.parentBlock {
-            assert(condBr.falseBlock != self.parentBlock)
-            return condBr.trueOperands[idx]
-          } else {
-            assert(condBr.falseBlock == self.parentBlock)
-            return condBr.falseOperands[idx]
-          }
-        default:
-          fatalError("wrong terminator for phi-argument")
+      case let br as BranchInst:
+        return br.operands[idx]
+      case let condBr as CondBranchInst:
+        if condBr.trueBlock == self.parentBlock {
+          assert(condBr.falseBlock != self.parentBlock)
+          return condBr.trueOperands[idx]
+        } else {
+          assert(condBr.falseBlock == self.parentBlock)
+          return condBr.falseOperands[idx]
+        }
+      default:
+        fatalError("wrong terminator for phi-argument")
       }
     }
   }
@@ -150,8 +150,8 @@ public enum ArgumentConvention {
   public var isIndirect: Bool {
     switch self {
     case .indirectIn, .indirectInGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut,
-         .packOut, .packInout, .packOwned, .packGuaranteed:
+      .indirectInout, .indirectInoutAliasable, .indirectOut,
+      .packOut, .packInout, .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
       return false
@@ -161,11 +161,11 @@ public enum ArgumentConvention {
   public var isIndirectIn: Bool {
     switch self {
     case .indirectIn, .indirectInGuaranteed,
-         .packOwned, .packGuaranteed:
+      .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut,
-         .packOut, .packInout:
+      .indirectInout, .indirectInoutAliasable, .indirectOut,
+      .packOut, .packInout:
       return false
     }
   }
@@ -175,9 +175,9 @@ public enum ArgumentConvention {
     case .indirectOut, .packOut:
       return true
     case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed,
-         .indirectIn, .directOwned, .directUnowned,
-         .indirectInout, .indirectInoutAliasable,
-         .packInout, .packOwned:
+      .indirectIn, .directOwned, .directUnowned,
+      .indirectInout, .indirectInoutAliasable,
+      .packInout, .packOwned:
       return false
     }
   }
@@ -187,8 +187,8 @@ public enum ArgumentConvention {
     case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed:
       return true
     case .indirectIn, .directOwned, .directUnowned,
-         .indirectInout, .indirectInoutAliasable, .indirectOut,
-         .packOut, .packInout, .packOwned:
+      .indirectInout, .indirectInoutAliasable, .indirectOut,
+      .packOut, .packInout, .packOwned:
       return false
     }
   }
@@ -196,19 +196,19 @@ public enum ArgumentConvention {
   public var isExclusiveIndirect: Bool {
     switch self {
     case .indirectIn,
-         .indirectOut,
-         .indirectInGuaranteed,
-         .indirectInout,
-         .packOut,
-         .packInout,
-         .packOwned,
-         .packGuaranteed:
+      .indirectOut,
+      .indirectInGuaranteed,
+      .indirectInout,
+      .packOut,
+      .packInout,
+      .packOwned,
+      .packGuaranteed:
       return true
 
     case .indirectInoutAliasable,
-         .directUnowned,
-         .directGuaranteed,
-         .directOwned:
+      .directUnowned,
+      .directGuaranteed,
+      .directOwned:
       return false
     }
   }
@@ -216,19 +216,19 @@ public enum ArgumentConvention {
   public var isInout: Bool {
     switch self {
     case .indirectInout,
-         .indirectInoutAliasable,
-         .packInout:
+      .indirectInoutAliasable,
+      .packInout:
       return true
 
     case .indirectIn,
-         .indirectOut,
-         .indirectInGuaranteed,
-         .directUnowned,
-         .directGuaranteed,
-         .directOwned,
-         .packOut,
-         .packOwned,
-         .packGuaranteed:
+      .indirectOut,
+      .indirectInGuaranteed,
+      .directUnowned,
+      .directGuaranteed,
+      .directOwned,
+      .packOut,
+      .packOwned,
+      .packGuaranteed:
       return false
     }
   }
@@ -245,20 +245,20 @@ extension BridgedArgument {
 extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
-      case .Indirect_In:             return .indirectIn
-      case .Indirect_In_Guaranteed:  return .indirectInGuaranteed
-      case .Indirect_Inout:          return .indirectInout
-      case .Indirect_InoutAliasable: return .indirectInoutAliasable
-      case .Indirect_Out:            return .indirectOut
-      case .Direct_Owned:            return .directOwned
-      case .Direct_Unowned:          return .directUnowned
-      case .Direct_Guaranteed:       return .directGuaranteed
-      case .Pack_Out:                return .packOut
-      case .Pack_Inout:              return .packInout
-      case .Pack_Owned:              return .packOwned
-      case .Pack_Guaranteed:         return .packGuaranteed
-      default:
-        fatalError("unsupported argument convention")
+    case .Indirect_In: return .indirectIn
+    case .Indirect_In_Guaranteed: return .indirectInGuaranteed
+    case .Indirect_Inout: return .indirectInout
+    case .Indirect_InoutAliasable: return .indirectInoutAliasable
+    case .Indirect_Out: return .indirectOut
+    case .Direct_Owned: return .directOwned
+    case .Direct_Unowned: return .directUnowned
+    case .Direct_Guaranteed: return .directGuaranteed
+    case .Pack_Out: return .packOut
+    case .Pack_Inout: return .packInout
+    case .Pack_Owned: return .packOwned
+    case .Pack_Guaranteed: return .packGuaranteed
+    default:
+      fatalError("unsupported argument convention")
     }
   }
 }
