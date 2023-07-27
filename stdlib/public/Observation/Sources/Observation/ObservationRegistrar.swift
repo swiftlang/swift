@@ -12,8 +12,7 @@
 /// Provides storage for tracking and access to data changes.
 ///
 /// You don't need to create an instance of `ObservationRegistrar` when using
-/// the ``Observation/Observable-swift.macro`` macro to indicate observability
-/// of a type.
+/// the ``Observation/Observable()`` macro to indicate observability of a type.
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar: Sendable {
   internal class ValueObservationStorage {
@@ -301,7 +300,7 @@ public struct ObservationRegistrar: Sendable {
   ///
   /// You don't need to create an instance of
   /// ``Observation/ObservationRegistrar`` when using the
-  /// ``Observation/Observable-swift.macro`` macro to indicate observably
+  /// ``Observation/Observable()`` macro to indicate observably
   /// of a type.
   public init() {
   }

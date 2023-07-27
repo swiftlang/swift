@@ -3656,6 +3656,142 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return Attr;
     break;
   }
+  case DAK_RawLayout: {
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+
+    if (!Tok.canBeArgumentLabel()) {
+      diagnose(Loc, diag::attr_rawlayout_expected_label, "'size', 'like', or 'likeArrayOf'");
+      consumeIf(tok::r_paren);
+      return makeParserSuccess();
+    }
+    
+    Identifier firstLabel;
+    SourceLoc firstLabelLoc = consumeArgumentLabel(firstLabel, true);
+    if (!consumeIf(tok::colon)) {
+      diagnose(Loc, diag::attr_expected_colon_after_label, firstLabel.str());
+      return makeParserSuccess();
+    }
+    
+    RawLayoutAttr *attr;
+    if (firstLabel.is("size")) {
+      // @_rawLayout(size: N, alignment: N)
+      unsigned size;
+      SourceLoc sizeLoc;
+      if (parseUnsignedInteger(size, sizeLoc,
+                               diag::attr_rawlayout_expected_integer_size)) {
+        return makeParserSuccess();
+      }
+      
+      if (!consumeIf(tok::comma)) {
+        diagnose(Loc, diag::attr_rawlayout_expected_params, "size", "alignment");
+        consumeIf(tok::r_paren);
+        return makeParserSuccess();
+      }
+
+      if (!Tok.canBeArgumentLabel()) {
+        diagnose(Loc, diag::attr_rawlayout_expected_label, "'alignment'");
+        return makeParserSuccess();
+      }
+
+      Identifier alignLabel;
+      SourceLoc alignLabelLoc = consumeArgumentLabel(alignLabel, true);
+      if (!consumeIf(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_colon_after_label, "alignment");
+        return makeParserSuccess();
+      }
+      if (!alignLabel.is("alignment")) {
+        diagnose(Loc, diag::attr_rawlayout_expected_label, "'alignment'");
+        return makeParserSuccess();
+      }
+      
+      unsigned align;
+      SourceLoc alignLoc;
+      if (parseUnsignedInteger(align, alignLoc,
+                             diag::attr_rawlayout_expected_integer_alignment)) {
+        return makeParserSuccess();
+      }
+      
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen,
+                 AttrName, /*isModifier*/false);
+        return makeParserSuccess();
+      }
+      
+      attr = new (Context) RawLayoutAttr(size, align,
+                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+    } else if (firstLabel.is("like")) {
+      // @_rawLayout(like: T)
+      auto likeType = parseType(diag::expected_type);
+      if (likeType.isNull()) {
+        return makeParserSuccess();
+      }
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen,
+                 AttrName, /*isModifier*/false);
+        return makeParserSuccess();
+      }
+
+      attr = new (Context) RawLayoutAttr(likeType.get(),
+                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+    } else if (firstLabel.is("likeArrayOf")) {
+      // @_rawLayout(likeArrayOf: T, count: N)
+      auto likeType = parseType(diag::expected_type);
+      if (likeType.isNull()) {
+        return makeParserSuccess();
+      }
+
+      if (!consumeIf(tok::comma)) {
+        diagnose(Loc, diag::attr_rawlayout_expected_params, "likeArrayOf", "count");
+        consumeIf(tok::r_paren);
+        return makeParserSuccess();
+      }
+
+      if (!Tok.canBeArgumentLabel()) {
+        diagnose(Loc, diag::attr_rawlayout_expected_label, "'count'");
+        consumeIf(tok::r_paren);
+        return makeParserSuccess();
+      }
+
+      Identifier countLabel;
+      SourceLoc countLabelLoc = consumeArgumentLabel(countLabel, true);
+      if (!consumeIf(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_colon_after_label, "count");
+        return makeParserSuccess();
+      }
+       if (!countLabel.is("count")) {
+        diagnose(Loc, diag::attr_rawlayout_expected_label, "'count'");
+        return makeParserSuccess();
+      }
+     
+      unsigned count;
+      SourceLoc countLoc;
+      if (parseUnsignedInteger(count, countLoc,
+                               diag::attr_rawlayout_expected_integer_count)) {
+        return makeParserSuccess();
+      }
+      
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen,
+                 AttrName, /*isModifier*/false);
+        return makeParserSuccess();
+      }
+      
+      attr = new (Context) RawLayoutAttr(likeType.get(), count,
+                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+    } else {
+      diagnose(Loc, diag::attr_rawlayout_expected_label,
+               "'size', 'like', or 'likeArrayOf'");
+      return makeParserSuccess();
+    }
+    Attributes.add(attr);
+    break;
+  }
   }
 
   if (DuplicateAttribute) {

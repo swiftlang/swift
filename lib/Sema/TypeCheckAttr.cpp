@@ -348,6 +348,8 @@ public:
   void visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr);
 
   void visitMacroRoleAttr(MacroRoleAttr *attr);
+  
+  void visitRawLayoutAttr(RawLayoutAttr *attr);
 };
 
 } // end anonymous namespace
@@ -3688,10 +3690,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
         auto role = roleAttr->getMacroRole();
         if (isInvalidAttachedMacro(role, D)) {
-          diagnoseAndRemoveAttr(attr,
-                                diag::macro_attached_to_invalid_decl,
+          diagnoseAndRemoveAttr(attr, diag::macro_attached_to_invalid_decl,
                                 getMacroRoleString(role),
-                                D->getDescriptiveKind());
+                                D->getDescriptiveKind(), D);
         }
       }
 
@@ -7137,11 +7138,17 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       break;
     case MacroRole::Peer:
       break;
-    case MacroRole::Conformance:
+    case MacroRole::Conformance: {
+      // Suppress the conformance macro error in swiftinterfaces.
+      SourceFile *file = D->getDeclContext()->getParentSourceFile();
+      if (file && file->Kind == SourceFileKind::Interface)
+        break;
+
       diagnoseAndRemoveAttr(attr, diag::conformance_macro)
           .fixItReplace(attr->getRange(),
                         "@attached(extension, conformances: <#Protocol#>)");
       break;
+    }
     case MacroRole::Extension:
       break;
     default:
@@ -7157,6 +7164,75 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       Ctx.evaluator,
       ResolveExtensionMacroConformances{attr, D},
       {});
+}
+
+void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::RawLayout)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_experimental);
+    return;
+  }
+
+  // Can only apply to structs.
+  auto sd = dyn_cast<StructDecl>(D);
+  if (!sd) {
+    diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
+                          attr, "struct");
+    return;
+  }
+  
+  if (!sd->isMoveOnly()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_be_copyable);
+  }
+  
+  if (!sd->getStoredProperties().empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_have_stored_properties);
+  }
+
+  if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
+    // Alignment must be a power of two.
+    auto align = sizeAndAlign->second;
+    if (align == 0 || (align & (align - 1)) != 0) {
+      diagnoseAndRemoveAttr(attr, diag::alignment_not_power_of_two);
+      return;
+    }
+  } else if (auto likeType = attr->getScalarLikeType()) {
+    // Resolve the like type in the struct's context.
+    auto resolvedType = TypeResolution::resolveContextualType(
+        likeType, sd, llvm::None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+        
+    attr->setResolvedLikeType(resolvedType);
+  } else if (auto arrayType = attr->getArrayLikeTypeAndCount()) {
+    // Resolve the like type in the struct's context.
+    auto resolvedType = TypeResolution::resolveContextualType(
+        arrayType->first, sd, llvm::None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+        
+    attr->setResolvedLikeType(resolvedType);
+  } else {
+    llvm_unreachable("new unhandled rawLayout attribute form?");
+  }
+  
+  // If the type also specifies an `@_alignment`, that's an error.
+  // Maybe this is interesting to support to have a layout like another
+  // type but with different alignment in the future.
+  if (D->getAttrs().hasAttribute<AlignmentAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_have_alignment_attr);
+    return;
+  }
+  
+  // The storage is not directly referenceable by stored properties.
+  sd->setHasUnreferenceableStorage(true);
 }
 
 namespace {

@@ -323,10 +323,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Add the contextual types.
   for (const auto &contextualType : solution.contextualTypes) {
-    if (!getContextualTypeInfo(contextualType.first)) {
-      setContextualType(contextualType.first, contextualType.second.typeLoc,
-                        contextualType.second.purpose);
-    }
+    if (!getContextualTypeInfo(contextualType.first))
+      setContextualInfo(contextualType.first, contextualType.second);
   }
 
   // Register the statement condition targets.
@@ -1731,8 +1729,7 @@ bool ConstraintSystem::solveForCodeCompletion(
     SyntacticElementTarget &target, SmallVectorImpl<Solution> &solutions) {
   if (auto *expr = target.getAsExpr()) {
     // Tell the constraint system what the contextual type is.
-    setContextualType(expr, target.getExprContextualTypeLoc(),
-                      target.getExprContextualTypePurpose());
+    setContextualInfo(expr, target.getExprContextualTypeInfo());
 
     // Set up the expression type checker timer.
     Timer.emplace(expr, *this);

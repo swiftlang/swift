@@ -1462,6 +1462,28 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
   }
+  
+  case DAK_RawLayout: {
+    auto *attr = cast<RawLayoutAttr>(this);
+    Printer.printAttrName("@_rawLayout");
+    Printer << "(";
+    
+    if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
+      Printer << "size: " << sizeAndAlign->first
+              << ", alignment: " << sizeAndAlign->second;
+    } else if (auto type = attr->getScalarLikeType()) {
+      Printer << "like: ";
+      type->print(Printer, Options);
+    } else if (auto array = attr->getArrayLikeTypeAndCount()) {
+      Printer << "likeArrayOf: ";
+      array->first->print(Printer, Options);
+      Printer << ", count: " << array->second;
+    } else {
+      llvm_unreachable("unhandled @_rawLayout form");
+    }
+    Printer << ")";
+    break;
+  }
 
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
@@ -1653,6 +1675,8 @@ StringRef DeclAttribute::getAttrName() const {
     case MacroSyntax::Attached:
       return "attached";
     }
+  case DAK_RawLayout:
+    return "_rawLayout";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

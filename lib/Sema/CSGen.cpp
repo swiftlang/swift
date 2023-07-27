@@ -4334,8 +4334,9 @@ bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
       ConstraintKind::Equal, propertyType, wrappedValueType,
       getConstraintLocator(
           wrappedVar, LocatorPathElt::ContextualType(CTP_WrappedProperty)));
-  setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
-                    CTP_WrappedProperty);
+
+  ContextualTypeInfo contextInfo(wrappedValueType, CTP_WrappedProperty);
+  setContextualInfo(wrappedVar, contextInfo);
   return false;
 }
 
@@ -4419,10 +4420,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
         makeIteratorCall, dc, /*patternType=*/Type(), PB, /*index=*/0,
         /*shouldBindPatternsOneWay=*/false);
 
-    cs.setContextualType(
-        sequenceExpr,
-        TypeLoc::withoutLoc(sequenceProto->getDeclaredInterfaceType()),
-        CTP_ForEachSequence);
+    ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
+                                   CTP_ForEachSequence);
+    cs.setContextualInfo(sequenceExpr, contextInfo);
 
     if (cs.generateConstraints(makeIteratorTarget))
       return llvm::None;
@@ -4480,10 +4480,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
       if (!iteratorProto)
         return llvm::None;
 
-      cs.setContextualType(
-          nextRef->getBase(),
-          TypeLoc::withoutLoc(iteratorProto->getDeclaredInterfaceType()),
-          CTP_ForEachSequence);
+      ContextualTypeInfo contextInfo(iteratorProto->getDeclaredInterfaceType(),
+                                     CTP_ForEachSequence);
+      cs.setContextualInfo(nextRef->getBase(), contextInfo);
     }
 
     SyntacticElementTarget nextTarget(nextCall, dc, CTP_Unused,
@@ -4549,8 +4548,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
       return llvm::None;
 
     cs.setTargetFor(whereExpr, whereTarget);
-    cs.setContextualType(whereExpr, TypeLoc::withoutLoc(boolType),
-                         CTP_Condition);
+
+    ContextualTypeInfo contextInfo(boolType, CTP_Condition);
+    cs.setContextualInfo(whereExpr, contextInfo);
   }
 
   // Populate all of the information for a for-each loop.

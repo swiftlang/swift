@@ -81,7 +81,7 @@ private extension BuiltinInst {
     // because memory effects are not computed in the Onone pipeline, yet.
     // This is no problem because the callee (usually a global init function )is mostly very small,
     // or contains the side-effect instruction `alloc_global` right at the beginning.
-    if callee.instructions.contains(where: { $0.mayReadOrWriteMemory || $0.hasUnspecifiedSideEffects }) {
+    if callee.instructions.contains(where: hasSideEffectForBuiltinOnce) {
       return
     }
     context.erase(instruction: self)
@@ -130,6 +130,16 @@ private extension BuiltinInst {
     }
     uses.replaceAll(with: literal, context)
     context.erase(instruction: self)
+  }
+}
+
+private func hasSideEffectForBuiltinOnce(_ instruction: Instruction) -> Bool {
+  switch instruction {
+  case is DebugStepInst, is DebugValueInst:
+    return false
+  default:
+    return instruction.mayReadOrWriteMemory ||
+           instruction.hasUnspecifiedSideEffects
   }
 }
 

@@ -3794,6 +3794,15 @@ ERROR(attr_MainType_without_main,none,
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
 
+ERROR(attr_rawlayout_experimental,none,
+      "the @_rawLayout attribute is experimental", ())
+ERROR(attr_rawlayout_cannot_be_copyable,none,
+      "type with @_rawLayout cannot be copied and must be declared ~Copyable", ())
+ERROR(attr_rawlayout_cannot_have_stored_properties,none,
+      "type with @_rawLayout cannot have stored properties", ())
+ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
+      "type with @_rawLayout cannot also have an @_alignment attribute", ())
+      
 // lazy
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
@@ -5318,6 +5327,8 @@ ERROR(concurrent_value_inherit,none,
       (bool, DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
+ERROR(sendable_raw_storage,none,
+      "struct %0 with @_rawLayout does not conform to the 'Sendable' protocol", (DeclName))
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
@@ -7066,7 +7077,7 @@ ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
       (DeclAttribute, DescriptiveDeclKind))
 
-WARNING(backdeployed_opaque_result_not_supported,none,
+ERROR(backdeployed_opaque_result_not_supported,none,
       "'%0' is unsupported on a %1 with a 'some' return type",
       (DeclAttribute, DescriptiveDeclKind))
 
@@ -7232,8 +7243,8 @@ ERROR(extension_macro_invalid_conformance,none,
       "invalid protocol conformance %0 in extension macro",
       (Type))
 ERROR(macro_attached_to_invalid_decl,none,
-      "'%0' macro cannot be attached to %1",
-      (StringRef, DescriptiveDeclKind))
+      "'%0' macro cannot be attached to %1 (%base2)",
+      (StringRef, DescriptiveDeclKind, const Decl *))
 ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
@@ -7354,6 +7365,9 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
       "non-@frozen public and @usableFromInline noncopyable types are not "
       "supported",
       (const ValueDecl *))
+ERROR(noncopyable_cannot_have_read_set_accessor,none,
+      "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
+      (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)

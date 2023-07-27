@@ -2479,16 +2479,37 @@ public:
       }
     }
 
-    // If this is an init accessor property with a default initializer,
-    // make sure that it subsumes initializers of all of its "initializes"
-    // stored properties.
     if (auto *var = PBD->getSingleVar()) {
+
+      // If this is an init accessor property with a default initializer,
+      // make sure that it subsumes initializers of all of its "initializes"
+      // stored properties.
       auto *initAccessor = var->getAccessor(AccessorKind::Init);
       if (initAccessor && PBD->isInitialized(0)) {
         for (auto *property : initAccessor->getInitializedProperties()) {
           auto *propertyBinding = property->getParentPatternBinding();
           if (propertyBinding->isInitialized(0))
             propertyBinding->setInitializerSubsumed(0);
+        }
+      }
+
+      // If we have a pure noncopyable type, we cannot have explicit read/set
+      // accessors since this means that we cannot call mutating methods without
+      // copying. We do not want to support types that one cannot define a
+      // modify operation via a get/set or a modify.
+      if (var->getInterfaceType()->isPureMoveOnly()) {
+        if (auto *read = var->getAccessor(AccessorKind::Read)) {
+          if (!read->isImplicit()) {
+            if (auto *set = var->getAccessor(AccessorKind::Set)) {
+              if (!set->isImplicit()) {
+                var->diagnose(diag::noncopyable_cannot_have_read_set_accessor,
+                              0);
+                PBD->setInvalid();
+                var->setInvalid();
+                return;
+              }
+            }
+          }
         }
       }
     }
@@ -2560,6 +2581,23 @@ public:
         SD->getDeclContext()->getSelfClassDecl()->isActor()) {
       SD->diagnose(diag::class_subscript_not_in_class, false)
           .fixItReplace(SD->getStaticLoc(), "static");
+    }
+
+    // Reject noncopyable typed subscripts with read/set accessors since we
+    // cannot define modify operations upon them without copying the read.
+    if (SD->getElementInterfaceType()->isPureMoveOnly()) {
+      if (auto *read = SD->getAccessor(AccessorKind::Read)) {
+        if (!read->isImplicit()) {
+          if (auto *set = SD->getAccessor(AccessorKind::Set)) {
+            if (!set->isImplicit()) {
+              SD->diagnose(diag::noncopyable_cannot_have_read_set_accessor,
+                           1);
+              SD->setInvalid();
+              return;
+            }
+          }
+        }
+      }
     }
 
     // Now check all the accessors.

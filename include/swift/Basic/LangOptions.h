@@ -310,6 +310,10 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
+    /// The C++ interoperability source compatibility version. Defaults
+    /// to the Swift language version.
+    version::Version cxxInteropCompatVersion;
+
     bool CForeignReferenceTypes = false;
 
     /// Imports getters and setters as computed properties.
@@ -653,6 +657,13 @@ namespace swift {
     /// check for isSwiftVersionAtLeast(5).
     bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
+    }
+
+    /// Whether the C++ interoperability compatibility version is at least
+    /// 'major'.
+    bool isCxxInteropCompatVersionAtLeast(unsigned major,
+                                          unsigned minor = 0) const {
+      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
     }
 
     /// Determine whether the given feature is enabled.

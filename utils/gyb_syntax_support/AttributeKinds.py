@@ -741,6 +741,12 @@ DECL_ATTR_KINDS = [
                   APIBreakingToAdd, APIBreakingToRemove,
                   code=144),
 
+    DeclAttribute('_rawLayout', 'RawLayout',
+                  OnStruct,
+                  UserInaccessible,
+                  ABIBreakingToAdd, ABIBreakingToRemove,
+                  APIStableToAdd, APIStableToRemove,
+                  code=146)
 ]
 
 # Schema for declaration modifiers:
