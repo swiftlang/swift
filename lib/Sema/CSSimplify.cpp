@@ -4439,6 +4439,13 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    if (flags.contains(TMF_BindingTypeVariable))
+      return resolveKeyPath(typeVar, type, locator)
+                 ? getTypeMatchSuccess()
+                 : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -4630,6 +4637,13 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
   return true;
 }
 
+/// Return tuple of type and number of optionals on that type.
+static std::pair<Type, unsigned> getObjectTypeAndNumUnwraps(Type type) {
+  SmallVector<Type, 2> optionals;
+  Type objType = type->lookThroughAllOptionalTypes(optionals);
+  return std::make_pair(objType, optionals.size());
+}
+
 static bool
 repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
                         ConstraintKind matchKind,
@@ -4747,17 +4761,11 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     }
   }
 
-  auto getObjectTypeAndUnwraps = [](Type type) -> std::pair<Type, unsigned> {
-    SmallVector<Type, 2> optionals;
-    Type objType = type->lookThroughAllOptionalTypes(optionals);
-    return std::make_pair(objType, optionals.size());
-  };
-
   Type fromObjectType, toObjectType;
   unsigned fromUnwraps, toUnwraps;
 
-  std::tie(fromObjectType, fromUnwraps) = getObjectTypeAndUnwraps(fromType);
-  std::tie(toObjectType, toUnwraps) = getObjectTypeAndUnwraps(toType);
+  std::tie(fromObjectType, fromUnwraps) = getObjectTypeAndNumUnwraps(fromType);
+  std::tie(toObjectType, toUnwraps) = getObjectTypeAndNumUnwraps(toType);
 
   // Since equality is symmetric and it decays into a `Bind`, eagerly
   // unwrapping optionals from either side might be incorrect since
@@ -6491,6 +6499,19 @@ bool ConstraintSystem::repairFailures(
     if (!fromType || !toType)
       break;
 
+    Type fromObjectType, toObjectType;
+    unsigned fromUnwraps, toUnwraps;
+
+    std::tie(fromObjectType, fromUnwraps) = getObjectTypeAndNumUnwraps(lhs);
+    std::tie(toObjectType, toUnwraps) = getObjectTypeAndNumUnwraps(rhs);
+
+    // If the bound contextual type is more optional than the binding type, then
+    // propogate binding type to contextual type and attempt to solve.
+    if (fromUnwraps < toUnwraps) {
+      (void)matchTypes(fromObjectType, toObjectType, ConstraintKind::Bind,
+                       TMF_ApplyingFix, locator);
+    }
+
     // Drop both `GenericType` elements.
     path.pop_back();
     path.pop_back();
@@ -6702,6 +6723,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Merge the equivalence classes corresponding to these two variables.
         mergeEquivalenceClasses(rep1, rep2, /*updateWorkList=*/true);
         return getTypeMatchSuccess();
+      }
+
+      // If type variable represents a key path value type, defer binding it to
+      // contextual type in diagnostic mode. We want it to be bound from the
+      // last key path component to help with diagnostics.
+      if (shouldAttemptFixes()) {
+        if (typeVar1 && typeVar1->getImpl().isKeyPathValue() &&
+            !flags.contains(TMF_BindingTypeVariable))
+          return formUnsolvedResult();
       }
 
       assert((type1->is<TypeVariableType>() != type2->is<TypeVariableType>()) &&
@@ -11540,6 +11570,31 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Generate constraints from the body of this closure.
   return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
+}
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+  auto *keyPathLocator = typeVar->getImpl().getLocator();
+  auto *keyPath = castToExpr<KeyPathExpr>(keyPathLocator->getAnchor());
+  if (keyPath->hasSingleInvalidComponent()) {
+    assignFixedType(typeVar, contextualType);
+    return true;
+  }
+  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
+    auto args = BGT->getGenericArgs();
+    if (isKnownKeyPathType(contextualType) && args.size() >= 1) {
+      auto root = BGT->getGenericArgs()[0];
+
+      auto *keyPathValueTV = getKeyPathValueType(keyPath);
+      contextualType = BoundGenericType::get(
+          args.size() == 1 ? getASTContext().getKeyPathDecl() : BGT->getDecl(),
+          /*parent=*/Type(), {root, keyPathValueTV});
+    }
+  }
+
+  assignFixedType(typeVar, contextualType);
+  return true;
 }
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
