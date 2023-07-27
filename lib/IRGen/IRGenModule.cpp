@@ -22,6 +22,7 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -1770,7 +1771,7 @@ void IRGenModule::emitAutolinkInfo() {
   StringRef AutolinkSectionName = Autolink.getSectionNameMetadata();
 
   auto *Metadata = Module.getOrInsertNamedMetadata(AutolinkSectionName);
-  llvm::SmallSetVector<llvm::MDNode *, 4> Entries;
+  swift::SmallSetVector<llvm::MDNode *, 4> Entries;
 
   // Collect the linker options already in the module (from ClangCodeGen).
   for (auto Entry : Metadata->operands()) {
