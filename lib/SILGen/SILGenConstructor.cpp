@@ -1577,14 +1577,28 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
 
+  llvm::SmallPtrSet<PatternBindingDecl *, 4> alreadyInitialized;
   for (auto member : nominal->getImplementationContext()->getAllMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
+      if (alreadyInitialized.count(pbd))
+        continue;
+
       // Emit default initialization for an init accessor property.
       if (auto *var = pbd->getSingleVar()) {
         if (var->hasInitAccessor()) {
+          auto initAccessor = var->getAccessor(AccessorKind::Init);
+
+          // Make sure that initializations for the accessed properties
+          // are emitted before the init accessor that uses them.
+          for (auto *property : initAccessor->getAccessedProperties()) {
+            auto *PBD = property->getParentPatternBinding();
+            if (alreadyInitialized.insert(PBD).second)
+              emitMemberInitializer(dc, selfDecl, PBD, subs);
+          }
+
           emitMemberInitializationViaInitAccessor(dc, selfDecl, pbd, subs);
           continue;
         }
