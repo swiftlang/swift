@@ -76,7 +76,7 @@ macro Invalid() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro"
 
 @Invalid
 struct Bad {}
-// expected-note@-1 18 {{in expansion of macro 'Invalid' here}}
+// expected-note@-2 18 {{in expansion of macro 'Invalid' on struct 'Bad' here}}
 
 // CHECK-DIAGS: error: macro expansion cannot introduce import
 // CHECK-DIAGS: error: macro expansion cannot introduce precedence group

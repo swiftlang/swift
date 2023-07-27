@@ -3690,10 +3690,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
         auto role = roleAttr->getMacroRole();
         if (isInvalidAttachedMacro(role, D)) {
-          diagnoseAndRemoveAttr(attr,
-                                diag::macro_attached_to_invalid_decl,
+          diagnoseAndRemoveAttr(attr, diag::macro_attached_to_invalid_decl,
                                 getMacroRoleString(role),
-                                D->getDescriptiveKind());
+                                D->getDescriptiveKind(), D);
         }
       }
 

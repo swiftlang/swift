@@ -7243,8 +7243,8 @@ ERROR(extension_macro_invalid_conformance,none,
       "invalid protocol conformance %0 in extension macro",
       (Type))
 ERROR(macro_attached_to_invalid_decl,none,
-      "'%0' macro cannot be attached to %1",
-      (StringRef, DescriptiveDeclKind))
+      "'%0' macro cannot be attached to %1 (%base2)",
+      (StringRef, DescriptiveDeclKind, const Decl *))
 ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
