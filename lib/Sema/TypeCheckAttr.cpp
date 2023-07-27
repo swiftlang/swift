@@ -161,6 +161,7 @@ public:
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
+  IGNORED_ATTR(NonEscapable)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -346,6 +347,8 @@ public:
   void visitMacroRoleAttr(MacroRoleAttr *attr);
   
   void visitRawLayoutAttr(RawLayoutAttr *attr);
+
+  void visitNonEscapableAtr(NonEscapableAttr *attr);
 };
 
 } // end anonymous namespace

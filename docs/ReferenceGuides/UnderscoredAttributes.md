@@ -603,6 +603,15 @@ This is the default behavior, unless the type annotated is an aggregate that
 consists entirely of `@_eagerMove` or trivial values, in which case the
 attribute overrides the inferred type-level annotation.
 
+## `@_nonEscapable`
+
+Indicates that a type is non-escapable. All instances of this type are
+non-escaping values. A non-escaping value's lifetime must be confined
+to another "parent" lifetime.
+
+This is temporary until ~Escapable syntax is supported, which will
+also work as a generic type constraint.
+
 ## `@_marker`
 
 Indicates that a protocol is a marker protocol. Marker protocols represent some
