@@ -589,6 +589,9 @@ int main(int argc, char **argv) {
       toOptionalBool(EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
     Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
+
+  Invocation.getLangOptions().Features.insert(Feature::LayoutPrespecialization);
+
   for (auto &featureName : ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().Features.insert(*feature);
