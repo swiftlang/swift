@@ -1406,11 +1406,25 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::PeerMacroExpansion:
     case GeneratedSourceInfo::ConformanceMacroExpansion:
     case GeneratedSourceInfo::ExtensionMacroExpansion: {
-      SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName = getGeneratedSourceInfoMacroName(*generatedInfo);
 
-      Diagnostic expansionNote(diag::in_macro_expansion, macroName);
-      expansionNote.setLoc(origRange.Start);
+      // If it was an expansion of an attached macro, increase the range to
+      // include the decl's attributes. Also add the name of the decl the macro
+      // is attached to.
+      CustomAttr *attachedAttr = generatedInfo->attachedMacroCustomAttr;
+      Decl *attachedDecl =
+          attachedAttr ? expansionNode.dyn_cast<Decl *>() : nullptr;
+      SourceRange origRange = attachedDecl
+                                  ? attachedDecl->getSourceRangeIncludingAttrs()
+                                  : expansionNode.getSourceRange();
+
+      Diagnostic expansionNote(diag::in_macro_expansion, macroName,
+                               attachedDecl);
+      if (attachedAttr) {
+        expansionNote.setLoc(attachedAttr->getLocation());
+      } else {
+        expansionNote.setLoc(origRange.Start);
+      }
       expansionNote.addRange(
           Lexer::getCharSourceRangeFromSourceRange(SourceMgr, origRange));
       expansionNote.setIsChildNote(true);

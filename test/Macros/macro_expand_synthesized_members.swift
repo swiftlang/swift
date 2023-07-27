@@ -104,7 +104,8 @@ print(ElementType.paper.unknown())
 
 #if TEST_DIAGNOSTICS
 @addMembersQuotedInit
-struct S2 { // expected-note{{in expansion of macro 'addMembersQuotedInit' here}}
+struct S2 {
+// expected-note@-2 {{in expansion of macro 'addMembersQuotedInit' on struct 'S2' here}}
   func useSynthesized() {
     S.method()
     print(type(of: getStorage()))
