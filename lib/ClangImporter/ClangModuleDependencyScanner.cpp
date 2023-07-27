@@ -143,6 +143,11 @@ void ClangImporter::recordModuleDependencies(
                     ModuleDependencyKind::Clang))
       continue;
 
+    // Record this module as one we have now seen, to prevent future
+    // scand unnecessarily return it as a result
+    cache.addSeenClangModule(clang::tooling::dependencies::ModuleID{
+        clangModuleDep.ID.ModuleName, clangModuleDep.ID.ContextHash});
+
     // File dependencies for this module.
     std::vector<std::string> fileDeps;
     for (const auto &fileDep : clangModuleDep.FileDeps) {
