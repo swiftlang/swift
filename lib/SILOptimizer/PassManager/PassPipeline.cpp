@@ -234,6 +234,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
 
+  P.addDevirtualizeWitnessTables();
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();

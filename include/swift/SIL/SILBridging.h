@@ -15,9 +15,11 @@
 
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuilder.h"
@@ -147,6 +149,13 @@ struct OptionalBridgedOperand {
 struct BridgedOperandArray {
   OptionalBridgedOperand base;
   SwiftInt count;
+};
+
+struct BridgedProtocolConformanceRefArray {
+  const swift::ProtocolConformanceRef *base;
+  SwiftInt count;
+
+  swift::ProtocolConformanceRef operator[](SwiftInt index) const { return {base[index]}; }
 };
 
 // Unfortunately we need to take a detour over this enum.
@@ -834,6 +843,12 @@ struct BridgedInstruction {
     auto fas = swift::FullApplySite(getInst());
     return fas.getNumIndirectSILResults();
   }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedProtocolConformanceRefArray InitExistentialAddrInst_getConformances() const {
+    auto conformances = getAs<swift::InitExistentialAddrInst>()->getConformances();
+    return {conformances.data(), (SwiftInt)conformances.size()};
+  }
 };
 
 struct BridgedArgument {
@@ -1001,24 +1016,26 @@ struct BridgedVTable {
 };
 
 struct BridgedWitnessTableEntry {
-  const swift::SILWitnessTable::Entry * _Nonnull entry;
+  swift::SILWitnessTable::Entry entry;
 
   SWIFT_IMPORT_UNSAFE
   std::string getDebugDescription() const;
 
   swift::SILWitnessTable::WitnessKind getKind() const {
-    return entry->getKind();
+    return entry.getKind();
   }
 
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedFunction getMethodFunction() const {
-    return {entry->getMethodWitness().Witness};
+    return {entry.getMethodWitness().Witness};
   }
 };
 
 struct BridgedWitnessTableEntryArray {
-  BridgedWitnessTableEntry base;
+  BridgedWitnessTableEntry *base;
   SwiftInt count;
+  
+  BridgedWitnessTableEntry operator[](SwiftInt index) const { return base[index]; }
 };
 
 struct BridgedWitnessTable {
@@ -1029,7 +1046,18 @@ struct BridgedWitnessTable {
   SWIFT_IMPORT_UNSAFE
   BridgedWitnessTableEntryArray getEntries() const {
     auto entries = table->getEntries();
-    return {{entries.data()}, (SwiftInt)entries.size()};
+    return {(BridgedWitnessTableEntry *)entries.data(), (SwiftInt)entries.size()};
+  }
+  
+  static BridgedWitnessTable create(void *module,
+                                    swift::SpecializedProtocolConformance *spec,
+                                    BridgedArrayRef entries) {
+    return {swift::SILWitnessTable::create(*((swift::SILModule *)module),
+                                    swift::SILLinkage::Shared,
+                                    swift::IsNotSerialized,
+                                    spec->getGenericConformance(),
+                                           swift::getArrayRef<swift::SILWitnessTable::Entry>(entries),
+                                    { })};
   }
 };
 
@@ -1045,7 +1073,7 @@ struct BridgedDefaultWitnessTable {
   SWIFT_IMPORT_UNSAFE
   BridgedWitnessTableEntryArray getEntries() const {
     auto entries = table->getEntries();
-    return {{entries.data()}, (SwiftInt)entries.size()};
+    return {(BridgedWitnessTableEntry *)entries.data(), (SwiftInt)entries.size()};
   }
 };
 

@@ -379,6 +379,8 @@ SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
 SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
+SWIFT_MODULE_PASS(DevirtualizeWitnessTables, "devirtualize-witness-tables",
+     "Devirtualize witness tables.")
 SWIFT_MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
      "Performs optimizations for performance-annotated functions")
 SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",

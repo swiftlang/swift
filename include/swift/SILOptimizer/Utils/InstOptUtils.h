@@ -593,6 +593,9 @@ bool eliminateDeadAllocations(SILFunction *fn);
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
                                  bool isMandatory);
+
+SILFunction *_Nullable specializeFunction(SILFunction &F, SubstitutionMap subst,
+                                          SILTransform *transform);
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H

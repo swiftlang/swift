@@ -39,6 +39,7 @@ class RootProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
 class SubstitutableType;
+class SpecializedProtocolConformance;
 enum class AllocationArena;
 
 /// Type substitution mapping from substitutable types to their
@@ -91,7 +92,12 @@ enum class ProtocolConformanceState {
 ///
 /// ProtocolConformance is an abstract base class, implemented by subclasses
 /// for the various kinds of conformance (normal, specialized, inherited).
-class alignas(1 << DeclAlignInBits) ProtocolConformance
+class
+  __attribute__((swift_attr("import_as_ref")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+  alignas(1 << DeclAlignInBits)
+ProtocolConformance
     : public ASTAllocated<ProtocolConformance> {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
@@ -317,6 +323,11 @@ public:
   /// subsystem.
   ProtocolConformance *subst(InFlightSubstitution &IFS) const;
 
+  const SpecializedProtocolConformance *_Nullable
+  getAsSpecializedProtocolConformance() const {
+    return dyn_cast<SpecializedProtocolConformance>(this);
+  }
+
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };
@@ -330,7 +341,11 @@ public:
 ///   self-conformance) or
 /// - the type's conformance is declared within the runtime (a builtin
 ///   conformance).
-class RootProtocolConformance : public ProtocolConformance {
+class
+  __attribute__((swift_attr("import_as_ref")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+RootProtocolConformance : public ProtocolConformance {
 protected:
   RootProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : ProtocolConformance(kind, conformingType) {}
@@ -763,8 +778,12 @@ public:
 /// example, \c A<Int> conforms to \c P via a specialized protocol conformance
 /// that refers to the normal protocol conformance \c A<T> to \c P with the
 /// substitution \c T -> \c Int.
-class SpecializedProtocolConformance : public ProtocolConformance,
-                                       public llvm::FoldingSetNode {
+class
+  __attribute__((swift_attr("import_as_ref")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+SpecializedProtocolConformance : public ProtocolConformance,
+                                 public llvm::FoldingSetNode {
   /// The generic conformance from which this conformance was derived.
   RootProtocolConformance *GenericConformance;
 
@@ -793,12 +812,14 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 public:
   /// Get the generic conformance from which this conformance was derived,
   /// if there is one.
+  SWIFT_IMPORT_UNSAFE
   RootProtocolConformance *getGenericConformance() const {
     return GenericConformance;
   }
 
   /// Get the substitution map representing the substitutions used to produce
   /// this specialized conformance.
+  SWIFT_IMPORT_UNSAFE
   SubstitutionMap getSubstitutionMap() const { return GenericSubstitutions; }
 
   /// Get any requirements that must be satisfied for this conformance to apply.

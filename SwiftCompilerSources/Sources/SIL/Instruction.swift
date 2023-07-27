@@ -486,7 +486,11 @@ final public
 class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var conformances: ProtocolConformanceRefArray {
+    .init(base: bridged.InitExistentialAddrInst_getConformances())
+  }
+}
 
 final public
 class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}

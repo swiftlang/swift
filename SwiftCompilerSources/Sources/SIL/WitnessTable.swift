@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+import OptimizerBridging
 
 public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedWitnessTable
@@ -18,7 +19,15 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public init(bridged: BridgedWitnessTable) { self.bridged = bridged }
 
   public struct Entry : CustomStringConvertible, NoReflectionChildren {
-    fileprivate let bridged: BridgedWitnessTableEntry
+    public let bridged: BridgedWitnessTableEntry
+    
+    internal init(bridged: BridgedWitnessTableEntry) {
+      self.bridged = bridged
+    }
+    
+    public init(_ entry: swift.SILWitnessTable.Entry) {
+      self.bridged = BridgedWitnessTableEntry(entry: entry)
+    }
     
     public typealias Kind = swift.SILWitnessTable.WitnessKind
     
@@ -38,26 +47,35 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   }
 
   public struct EntryArray : BridgedRandomAccessCollection {
-    fileprivate let base: BridgedWitnessTableEntry
-    public let count: Int
+    fileprivate let base: BridgedWitnessTableEntryArray
     
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { return count }
+    public var endIndex: Int { return base.count }
     
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
-      return Entry(bridged: BridgedWitnessTableEntry(entry: base.entry + index))
+      return Entry(bridged: base[index])
     }
   }
 
   public var entries: EntryArray {
     let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
+    return EntryArray(base: entries)
   }
 
   public var description: String {
     let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
+  }
+  
+  static public func create(
+    _ ctx: BridgedPassContext, // TODO: layering problem here with context.
+    _ spec: swift.SpecializedProtocolConformance,
+    _ entries: [Entry]
+  ) -> WitnessTable {
+    entries.withBridgedArrayRef { ref in
+      WitnessTable(bridged: BridgedWitnessTable.create(ctx.getSILModuleOpaque(), spec, ref))
+    }
   }
 }
 
@@ -71,7 +89,7 @@ public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildre
 
   public var entries: EntryArray {
     let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
+    return EntryArray(base: entries)
   }
 
   public var description: String {

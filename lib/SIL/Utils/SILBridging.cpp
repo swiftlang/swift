@@ -240,7 +240,7 @@ std::string BridgedVTableEntry::getDebugDescription() const {
 std::string BridgedWitnessTableEntry::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  entry->print(os, /*verbose=*/ false, PrintOptions::printSIL());
+  entry.print(os, /*verbose=*/ false, PrintOptions::printSIL());
   str.pop_back(); // Remove trailing newline.
   return str;
 }

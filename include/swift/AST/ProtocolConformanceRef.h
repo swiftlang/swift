@@ -16,7 +16,6 @@
 #ifndef SWIFT_AST_PROTOCOLCONFORMANCEREF_H
 #define SWIFT_AST_PROTOCOLCONFORMANCEREF_H
 
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -35,7 +34,6 @@ namespace swift {
 class BuiltinProtocolConformance;
 class ConcreteDeclRef;
 class PackConformance;
-class ProtocolConformance;
 enum class EffectKind : uint8_t;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
@@ -102,6 +100,8 @@ public:
   bool isConcrete() const {
     return !isInvalid() && Union.is<ProtocolConformance*>();
   }
+  
+  SWIFT_IMPORT_UNSAFE
   ProtocolConformance *getConcrete() const {
     return Union.get<ProtocolConformance*>();
   }

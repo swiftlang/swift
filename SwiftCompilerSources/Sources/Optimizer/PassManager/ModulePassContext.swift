@@ -113,6 +113,18 @@ struct ModulePassContext : Context, CustomStringConvertible {
   var defaultWitnessTables: DefaultWitnessTableList {
     DefaultWitnessTableList(first: _bridged.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
   }
+  
+  func lookUpWitnessTable(_ conf: swift.SpecializedProtocolConformance) -> WitnessTable? {
+    _bridged.lookUpWitnessTable(conf).witnessTable
+  }
+
+  func lookUpWitnessTable(_ conf: swift.RootProtocolConformance) -> WitnessTable? {
+    _bridged.lookUpWitnessTable(conf).witnessTable
+  }
+
+  func specialize(function: Function, withSubstitutions subst: swift.SubstitutionMap) -> Function? {
+    _bridged.specializeFunction(function.bridged, subst).function
+  }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
   ///
