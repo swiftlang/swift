@@ -45,12 +45,13 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/ModRef.h"
 #include <algorithm>
 
 using namespace swift;
@@ -2324,9 +2325,9 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
                                  accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->addFnAttr(allocatedArgsBuffer
-                      ? llvm::Attribute::InaccessibleMemOrArgMemOnly
-                      : llvm::Attribute::ReadNone);
+  call->setMemoryEffects(allocatedArgsBuffer
+                             ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
+                             : llvm::MemoryEffects::none());
 
   // If we allocated a buffer for the arguments, end its lifetime.
   if (allocatedArgsBuffer)
