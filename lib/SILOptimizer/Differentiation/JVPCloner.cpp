@@ -103,7 +103,7 @@ private:
   TangentBuilder diffLocalAllocBuilder;
 
   /// Stack buffers allocated for storing local tangent values.
-  SmallVector<SILValue, 8> differentialLocalAllocations;
+  SmallVector<AllocStackInst *, 64> differentialLocalAllocations;
 
   /// Mapping from original blocks to differential values. Used to build
   /// differential struct instances.
@@ -301,7 +301,8 @@ private:
   /// original buffer does not already have a tangent buffer.
   void setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
                         SILValue tangentBuffer) {
-    assert(originalBuffer->getType().isAddress());
+    assert(originalBuffer->getType().isAddress() ||
+           originalBuffer->getType().getClassOrBoundGenericClass());
     auto insertion =
         bufferMap.try_emplace({origBB, originalBuffer}, tangentBuffer);
     assert(insertion.second && "Tangent buffer already exists");
@@ -311,7 +312,8 @@ private:
   /// Returns the tangent buffer for the original buffer. Asserts that the
   /// original buffer has a tangent buffer.
   SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
-    assert(originalBuffer->getType().isAddress());
+    assert(originalBuffer->getType().isAddress() ||
+           originalBuffer->getType().getClassOrBoundGenericClass());
     assert(originalBuffer->getFunction() == original);
     auto it = bufferMap.find({origBB, originalBuffer});
     assert(it != bufferMap.end() && "Tangent buffer should already exist");
@@ -436,7 +438,7 @@ public:
     TypeSubstCloner::visitInstructionsInBlock(bb);
   }
 
-  // If an `apply` has active results or active inout parameters, replace it
+  // If an `apply` has active results or active semantic result parameters, replace it
   // with an `apply` of its JVP.
   void visitApplyInst(ApplyInst *ai) {
     bool shouldDifferentiate =
@@ -487,9 +489,7 @@ public:
                s << "}\n";);
 
     // Form expected indices.
-    auto numResults =
-        ai->getSubstCalleeType()->getNumResults() +
-        ai->getSubstCalleeType()->getNumIndirectMutatingParameters();
+    auto numResults =  ai->getSubstCalleeType()->getNumAutoDiffSemanticResults();
     AutoDiffConfig config(
         IndexSubset::get(getASTContext(),
                          ai->getArgumentsWithoutIndirectResults().size(),
@@ -576,10 +576,11 @@ public:
             for (auto resultIndex : config.resultIndices->getIndices()) {
               SILType remappedResultType;
               if (resultIndex >= originalFnTy->getNumResults()) {
-                auto inoutArgIdx = resultIndex - originalFnTy->getNumResults();
-                auto inoutArg =
-                    *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
-                remappedResultType = inoutArg->getType();
+                auto semanticResArgIdx = resultIndex - originalFnTy->getNumResults();
+                auto semanticResArg =
+                    *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                               semanticResArgIdx);
+                remappedResultType = semanticResArg->getType();
               } else {
                 remappedResultType = originalFnTy->getResults()[resultIndex]
                                          .getSILStorageInterfaceType();
@@ -775,17 +776,33 @@ public:
   CLONE_AND_EMIT_TANGENT(BeginBorrow, bbi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = bbi->getLoc();
-    auto tanVal = materializeTangent(getTangentValue(bbi->getOperand()), loc);
-    auto tanValBorrow = diffBuilder.emitBeginBorrowOperation(loc, tanVal);
-    setTangentValue(bbi->getParent(), bbi,
-                    makeConcreteTangentValue(tanValBorrow));
+    auto *bb = bbi->getParent();
+    if (bbi->getType().getClassOrBoundGenericClass()) {
+      //setTangentBuffer(bb, bbi, getTangentBuffer(bb, bbi->getOperand()));
+      auto tanBufAcc = diffBuilder.createBeginAccess(
+        loc, getTangentBuffer(bb, bbi->getOperand()),
+        SILAccessKind::Modify, SILAccessEnforcement::Static, false, false);
+      setTangentBuffer(bb, bbi, tanBufAcc);
+    } else {
+      auto tanVal = materializeTangent(getTangentValue(bbi->getOperand()), loc);
+      auto tanValBorrow = diffBuilder.emitBeginBorrowOperation(loc, tanVal);
+      setTangentValue(bbi->getParent(), bbi,
+                      makeConcreteTangentValue(tanValBorrow));
+    }
   }
 
   CLONE_AND_EMIT_TANGENT(EndBorrow, ebi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = ebi->getLoc();
-    auto tanVal = materializeTangent(getTangentValue(ebi->getOperand()), loc);
-    diffBuilder.emitEndBorrowOperation(loc, tanVal);
+    auto *bb = ebi->getParent();
+
+    if (ebi->getOperand()->getType().getClassOrBoundGenericClass()) {
+      auto tanBuf = getTangentBuffer(bb, ebi->getOperand());
+      diffBuilder.createEndAccess(loc, tanBuf, false);
+    } else {
+      auto tanVal = materializeTangent(getTangentValue(ebi->getOperand()), loc);
+      diffBuilder.emitEndBorrowOperation(loc, tanVal);
+    }
   }
 
   CLONE_AND_EMIT_TANGENT(DestroyValue, dvi) {
@@ -809,6 +826,7 @@ public:
   ///    Tangent: tan[y] = load tan[x]
   void visitLoadInst(LoadInst *li) {
     TypeSubstCloner::visitLoadInst(li);
+    auto *bb = li->getParent();
     // If an active buffer is loaded with take to a non-active value, destroy
     // the active buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(li)) {
@@ -819,10 +837,14 @@ public:
         getDifferentialBuilder().emitDestroyOperation(tanBuf.getLoc(), tanBuf);
       }
       return;
+    } else if (li->getType().getClassOrBoundGenericClass()) { // Treat load of class value as a projection
+      setTangentBuffer(bb, li,
+                       getTangentBuffer(bb, li->getOperand()));
+      return;
     }
+
     // Otherwise, do standard differential cloning.
     auto &diffBuilder = getDifferentialBuilder();
-    auto *bb = li->getParent();
     auto loc = li->getLoc();
     auto tanBuf = getTangentBuffer(bb, li->getOperand());
     auto tanVal = diffBuilder.emitLoadValueOperation(
@@ -992,6 +1014,20 @@ public:
     setTangentBuffer(asi->getParent(), asi, mappedAllocStackInst);
   }
 
+  /// Handle `alloc_ref` instruction.
+  ///   Original: y = alloc_ref $C
+  ///    Tangent: tan[y] = alloc_stack $C.Tangent
+  CLONE_AND_EMIT_TANGENT(AllocRef, ari) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *mappedAllocStackInst = diffBuilder.createAllocStack(
+        ari->getLoc(), getRemappedTangentType(ari->getType()));
+    diffBuilder.emitZeroIntoBuffer(ari->getLoc(),
+                                   mappedAllocStackInst,
+                                   IsInitialization_t::IsInitialization);
+    differentialLocalAllocations.push_back(mappedAllocStackInst);
+    setTangentBuffer(ari->getParent(), ari, mappedAllocStackInst);
+  }
+
   /// Handle `dealloc_stack` instruction.
   ///   Original: dealloc_stack x
   ///    Tangent: dealloc_stack tan[x]
@@ -1080,6 +1116,35 @@ public:
         diffBuilder.createStructElementAddr(loc, tanOperand, tanField);
     // Update tangent buffer map for `struct_element_addr`.
     setTangentBuffer(bb, seai, tangentInst);
+  }
+
+  /// Handle `ref_element_addr` instruction.
+  ///   Original: y = ref_element_addr C, #field
+  ///    Tangent: tan[y] = struct_element_addr *tan[x], #field'
+  ///                                                   ^~~~~~~
+  ///                          field in tangent space corresponding to #field
+  CLONE_AND_EMIT_TANGENT(RefElementAddr, reai) {
+    assert(!reai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
+           "`ref_element_addr` with `@noDerivative` field should not be "
+           "differentiated; activity analysis should not marked as varied.");
+    auto diffBuilder = getDifferentialBuilder();
+    auto *bb = reai->getParent();
+    auto loc = getValidLocation(reai);
+    // Find the corresponding field in the tangent space.
+    auto classOperandType =
+        remapSILTypeInDifferential(reai->getOperand()->getType()).getASTType();
+    auto *tanField =
+      getTangentStoredProperty(context, reai, classOperandType, invoker);
+    if (!tanField) {
+      errorOccurred = true;
+      return;
+    }
+    // Emit tangent `struct_element_addr`.
+    auto tanOperand = getTangentBuffer(bb, reai->getOperand());
+    auto tangentInst =
+        diffBuilder.createStructElementAddr(loc, tanOperand, tanField);
+    // Update tangent buffer map for `ref_element_addr`.
+    setTangentBuffer(bb, reai, tangentInst);
   }
 
   /// Handle `tuple` instruction.
@@ -1235,7 +1300,8 @@ public:
             origCalleeType->getDifferentiabilityParameterIndices();
         if (actualOrigCalleeIndices->contains(i)) {
           SILValue tanParam;
-          if (origArg->getType().isObject()) {
+          if (origArg->getType().isObject() &&
+             !origArg->getType().getClassOrBoundGenericClass()) {
             tanParam = emitZeroDirect(
                 getRemappedTangentType(origArg->getType()).getASTType(), loc);
             diffArgs.push_back(tanParam);
@@ -1252,7 +1318,8 @@ public:
       // getting its tangent value.
       else {
         SILValue tanParam;
-        if (origArg->getType().isObject()) {
+        if (origArg->getType().isObject() &&
+            !origArg->getType().getClassOrBoundGenericClass()) {
           tanParam = materializeTangent(getTangentValue(origArg), loc);
         } else {
           tanParam = getTangentBuffer(ai->getParent(), origArg);
@@ -1275,8 +1342,10 @@ public:
     }
 
     // Call the differential.
+    differential->dump();
     auto *differentialCall =
         diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs);
+    differentialCall->dump();
     diffBuilder.emitDestroyValueOperation(loc, differential);
 
     // Get the original `apply` results.
@@ -1294,10 +1363,10 @@ public:
     SmallVector<SILValue, 8> differentialAllResults;
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirectResults, differentialAllResults);
-    for (auto inoutArg : ai->getInoutArguments())
-      origAllResults.push_back(inoutArg);
-    for (auto inoutArg : differentialCall->getInoutArguments())
-      differentialAllResults.push_back(inoutArg);
+    for (auto semResultArg : ai->getAutoDiffSemanticResultArguments())
+      origAllResults.push_back(semResultArg);
+    for (auto semResultArg : differentialCall->getAutoDiffSemanticResultArguments())
+      differentialAllResults.push_back(semResultArg);
     assert(applyConfig.resultIndices->getNumIndices() ==
            differentialAllResults.size());
 
@@ -1307,7 +1376,8 @@ public:
       auto origResult = origAllResults[resultIndex];
       auto differentialResult =
           differentialAllResults[differentialResultIndex++];
-      if (origResult->getType().isObject()) {
+      if (origResult->getType().isObject() &&
+          !origResult->getType().getClassOrBoundGenericClass()) {
         if (!origResult->getType().is<TupleType>()) {
           setTangentValue(bb, origResult,
                           makeConcreteTangentValue(differentialResult));
@@ -1345,6 +1415,15 @@ public:
         continue;
       auto tanVal = materializeTangent(getTangentValue(origResult), diffLoc);
       retElts.push_back(tanVal);
+    }
+
+    // Deallocate local allocations.
+    for (auto alloc : differentialLocalAllocations) {
+      // Assert that local allocations have at least one use.
+      // Buffers should not be allocated needlessly.
+      assert(!alloc->use_empty());
+      diffBuilder.emitDestroyAddrAndFold(diffLoc, alloc);
+      diffBuilder.createDeallocStack(diffLoc, alloc);
     }
 
     diffBuilder.createReturn(diffLoc,
@@ -1537,7 +1616,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   }
 
   // Initialize tangent mapping for original indirect results and non-wrt
-  // `inout` parameters. The tangent buffers of these address values are
+  // semantic result parameters. The tangent buffers of these address values are
   // differential indirect results.
 
   // Collect original results.
@@ -1564,20 +1643,20 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                          diffLoc);
       continue;
     }
-    // Handle original non-wrt `inout` parameter.
-    // Only original *non-wrt* `inout` parameters have corresponding
+    // Handle original non-wrt semantic result parameter.
+    // Only original *non-wrt* semantic result parameters have corresponding
     // differential indirect results.
-    auto inoutParamIndex = resultIndex - origFnTy->getNumResults();
-    auto inoutParamIt = std::next(
-        origFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    auto resultParamIndex = resultIndex - origFnTy->getNumResults();
+    auto resultParamIt = std::next(
+        origFnTy->getAutoDiffSemanticResultsParameters().begin(), resultParamIndex);
     auto paramIndex =
-        std::distance(origFnTy->getParameters().begin(), &*inoutParamIt);
+        std::distance(origFnTy->getParameters().begin(), &*resultParamIt);
     if (getConfig().parameterIndices->contains(paramIndex))
       continue;
     auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
     setTangentBuffer(origEntry, origResult, diffIndResult);
-    // Original `inout` parameters are initialized, so their tangent buffers
-    // must also be initialized.
+    // Original semantic result parameters are initialized, so their tangent
+    // buffers must also be initialized.
     emitZeroIndirect(diffIndResult->getType().getASTType(), diffIndResult,
                      diffLoc);
   }
@@ -1621,19 +1700,20 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                             ->getReducedType(witnessCanGenSig),
                         origResult.getConvention()));
     } else {
-      // Handle original `inout` parameter.
-      auto inoutParamIndex = resultIndex - origTy->getNumResults();
-      auto inoutParamIt = std::next(
-          origTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+      // Handle semantic result parameter.
+      auto resultParamIndex = resultIndex - origTy->getNumResults();
+      auto resultParamIt = std::next(
+          origTy->getAutoDiffSemanticResultsParameters().begin(),
+          resultParamIndex);
       auto paramIndex =
-          std::distance(origTy->getParameters().begin(), &*inoutParamIt);
-      // If the original `inout` parameter is a differentiability parameter,
+          std::distance(origTy->getParameters().begin(), &*resultParamIt);
+      // If the original semantic result parameter is a differentiability parameter,
       // then it already has a corresponding differential parameter. Do not add
       // a corresponding differential result.
       if (config.parameterIndices->contains(paramIndex))
         continue;
-      auto inoutParam = origTy->getParameters()[paramIndex];
-      auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+      auto resultParam = origTy->getParameters()[paramIndex];
+      auto paramTan = resultParam.getInterfaceType()->getAutoDiffTangentSpace(
           lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");
       dfResults.push_back(
@@ -1646,12 +1726,15 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     auto origParam = origParams[i];
     origParam = origParam.getWithInterfaceType(
         origParam.getInterfaceType()->getReducedType(witnessCanGenSig));
-    dfParams.push_back(
-        SILParameterInfo(origParam.getInterfaceType()
-                             ->getAutoDiffTangentSpace(lookupConformance)
-                             ->getType()
-                             ->getReducedType(witnessCanGenSig),
-                         origParam.getConvention()));
+
+    SILParameterInfo paramInfo(origParam.getInterfaceType()
+                               ->getAutoDiffTangentSpace(lookupConformance)
+                               ->getType()
+                               ->getReducedType(witnessCanGenSig),
+                               origParam.getConvention());
+    if (origParam.getInterfaceType()->getClassOrBoundGenericClass())
+      paramInfo = paramInfo.getWithConvention(ParameterConvention::Indirect_Inout);
+    dfParams.push_back(paramInfo);
   }
 
   // Accept a differential struct in the differential parameter list. This is

@@ -578,7 +578,9 @@ static CanSILFunctionType getAutoDiffDifferentialType(
             ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         param.getConvention());
-    differentialParams.push_back({paramTanType, paramConv});
+    if (param.getInterfaceType()->getClassOrBoundGenericClass())
+      paramConv = ParameterConvention::Indirect_Inout;
+    differentialParams.emplace_back(paramTanType, paramConv);
   }
   SmallVector<SILResultInfo, 1> differentialResults;
   for (auto resultIndex : resultIndices->getIndices()) {
@@ -594,7 +596,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
               ->getAutoDiffTangentSpace(lookupConformance)
               ->getCanonicalType(),
           result.getConvention());
-      differentialResults.push_back({resultTanType, resultConv});
+      differentialResults.emplace_back(resultTanType, resultConv);
       continue;
     }
     // Handle original semantic result parameters.
