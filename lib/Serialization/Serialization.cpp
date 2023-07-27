@@ -3210,7 +3210,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       } else if (auto likeArrayTypeAndCount = attr->getResolvedArrayLikeTypeAndCount()) {
         typeID = S.addTypeRef(likeArrayTypeAndCount->first);
         rawSize = likeArrayTypeAndCount->second;
-        rawAlign = ~0u;
+        rawAlign = static_cast<uint8_t>(~0u);
       } else {
         llvm_unreachable("unhandled raw layout attribute, or trying to serialize unresolved attr!");
       }

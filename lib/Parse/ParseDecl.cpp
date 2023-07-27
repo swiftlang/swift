@@ -3663,7 +3663,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+    consumeToken(tok::l_paren);
 
     if (!Tok.canBeArgumentLabel()) {
       diagnose(Loc, diag::attr_rawlayout_expected_label, "'size', 'like', or 'likeArrayOf'");
@@ -3672,7 +3672,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     
     Identifier firstLabel;
-    SourceLoc firstLabelLoc = consumeArgumentLabel(firstLabel, true);
+    consumeArgumentLabel(firstLabel, true);
     if (!consumeIf(tok::colon)) {
       diagnose(Loc, diag::attr_expected_colon_after_label, firstLabel.str());
       return makeParserSuccess();
@@ -3700,7 +3700,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
 
       Identifier alignLabel;
-      SourceLoc alignLabelLoc = consumeArgumentLabel(alignLabel, true);
+      consumeArgumentLabel(alignLabel, true);
       if (!consumeIf(tok::colon)) {
         diagnose(Loc, diag::attr_expected_colon_after_label, "alignment");
         return makeParserSuccess();
@@ -3759,7 +3759,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
 
       Identifier countLabel;
-      SourceLoc countLabelLoc = consumeArgumentLabel(countLabel, true);
+      consumeArgumentLabel(countLabel, true);
       if (!consumeIf(tok::colon)) {
         diagnose(Loc, diag::attr_expected_colon_after_label, "count");
         return makeParserSuccess();
