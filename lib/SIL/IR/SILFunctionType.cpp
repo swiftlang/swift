@@ -368,9 +368,10 @@ getDifferentiabilityParameters(SILFunctionType *originalFnTy,
 
 /// Collects the semantic results of the given function type in
 /// `originalResults`. The semantic results are formal results followed by
-/// `inout` parameters, in type order.
+/// semantic result parameters, in type order.
 static void
-getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
+getSemanticResults(SILFunctionType *functionType,
+                   IndexSubset *parameterIndices,
                    SmallVectorImpl<SILResultInfo> &originalResults) {
   // Collect original formal results.
   originalResults.append(functionType->getResults().begin(),
@@ -4094,6 +4095,40 @@ static llvm::cl::opt<bool>
     DisableConstantInfoCache("sil-disable-typelowering-constantinfo-cache",
                              llvm::cl::init(false));
 
+static IndexSubset *
+getLoweredResultIndices(const SILFunctionType *functionType,
+                        const IndexSubset *parameterIndices) {
+  SmallVector<unsigned, 2> resultIndices;
+
+  // Check formal results.
+  for (auto resultAndIndex : enumerate(functionType->getResults()))
+    if (resultAndIndex.value().getDifferentiability() !=
+        SILResultDifferentiability::NotDifferentiable)
+      resultIndices.push_back(resultAndIndex.index());
+
+  auto numResults = functionType->getNumResults();
+  
+  // Collect semantic result parameters.
+  unsigned semResultParamIdx = 0;
+  for (auto resultParamAndIndex
+         : enumerate(functionType->getParameters())) {
+    if (!resultParamAndIndex.value().isAutoDiffSemanticResult())
+      continue;
+
+    if (resultParamAndIndex.value().getDifferentiability() !=
+        SILParameterDifferentiability::NotDifferentiable &&
+       parameterIndices->contains(resultParamAndIndex.index()))
+      resultIndices.push_back(numResults + semResultParamIdx);
+    semResultParamIdx += 1;
+  }
+  
+  numResults += semResultParamIdx;
+
+  return IndexSubset::get(functionType->getASTContext(),
+                          numResults, resultIndices);
+}
+
+
 const SILConstantInfo &
 TypeConverter::getConstantInfo(TypeExpansionContext expansion,
                                SILDeclRef constant) {
@@ -4152,9 +4187,9 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     // Use it to compute lowered derivative function type.
     auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         derivativeId->getParameterIndices(), formalInterfaceType);
-    auto numResults = origFnConstantInfo.SILFnType->getNumAutoDiffSemanticResults();
-    auto *loweredResultIndices = IndexSubset::getDefault(
-        M.getASTContext(), numResults, /*includeAll*/ true);
+    auto *loweredResultIndices
+      = getLoweredResultIndices(origFnConstantInfo.SILFnType, loweredParamIndices);
+
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
         loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
         *this, LookUpConformanceInModule(&M));
