@@ -697,13 +697,6 @@ protected:
     return var;
   }
 
-  // Helpers to guide the C++ type system into converting lambda arguments
-  // to llvm::Optional<function_ref>
-  llvm::GlobalVariable *emit(llvm::function_ref<GetAddrOfEntityFn> getAddr,
-                             const char *section) {
-    return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
-                section);
-  }
   llvm::GlobalVariable *emit(llvm::NoneType none, const char *section) {
     return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
                 section);
