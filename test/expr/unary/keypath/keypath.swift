@@ -228,7 +228,7 @@ func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
   let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}} 
+  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   _ = \A // expected-error {{key path must have at least one component}}
 }
