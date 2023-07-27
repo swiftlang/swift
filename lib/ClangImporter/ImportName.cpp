@@ -1921,7 +1921,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
         if (op == clang::OverloadedOperatorKind::OO_Star &&
             cxxMethod->param_empty()) {
-          if (cxxMethod->isConst())
+          auto returnType = functionDecl->getReturnType();
+          if ((!returnType->isReferenceType() &&
+               !returnType->isAnyPointerType()) ||
+              returnType->isAnyPointerType() ||
+              returnType->getPointeeType().isConstQualified())
             result.info.accessorKind = ImportedAccessorKind::DereferenceGetter;
           else
             result.info.accessorKind = ImportedAccessorKind::DereferenceSetter;

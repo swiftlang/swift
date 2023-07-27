@@ -1691,7 +1691,6 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
               getterImpl->getStartLoc(), ctx.getIdentifier("pointee"), dc);
   result->setInterfaceType(elementTy);
   result->setAccess(AccessLevel::Public);
-  result->setImplInfo(StorageImplInfo::getImmutableComputed());
 
   AccessorDecl *getterDecl = AccessorDecl::create(
       ctx, getterImpl->getLoc(), getterImpl->getLoc(), AccessorKind::Get,
@@ -1709,6 +1708,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
     result->setIsGetterMutating(true);
+  } else {
+    getterDecl->setSelfAccessKind(SelfAccessKind::NonMutating);
+    result->setIsGetterMutating(false);
   }
 
   AccessorDecl *setterDecl = nullptr;
@@ -1737,6 +1739,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
     if (setterImpl->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
       result->setIsSetterMutating(true);
+    } else {
+      setterDecl->setSelfAccessKind(SelfAccessKind::NonMutating);
+      result->setIsSetterMutating(false);
     }
   }
 

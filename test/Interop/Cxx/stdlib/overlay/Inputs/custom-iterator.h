@@ -839,14 +839,15 @@ public:
                              std::output_iterator_tag {};
   using value_type = int;
   using pointer = int *;
-  using reference = const int &;
+  using reference = int &;
+  using const_reference = const int &;
   using difference_type = int;
 
   InputOutputIterator(int value) : value(value) {}
   InputOutputIterator(const InputOutputIterator &other) = default;
 
-  const int &operator*() const { return value; }
-  int &operator*() { return value; }
+  const_reference operator*() const { return value; }
+  reference operator*() { return value; }
 
   InputOutputIterator &operator++() {
     value++;
@@ -862,6 +863,41 @@ public:
     return value == other.value;
   }
   bool operator!=(const InputOutputIterator &other) const {
+    return value != other.value;
+  }
+};
+
+struct InputOutputConstIterator {
+private:
+  int *value;
+
+public:
+  struct iterator_category : std::input_iterator_tag,
+                             std::output_iterator_tag {};
+  using value_type = int;
+  using pointer = int *;
+  using reference = int &;
+  using difference_type = int;
+
+  InputOutputConstIterator(int *value) : value(value) {}
+  InputOutputConstIterator(const InputOutputConstIterator &other) = default;
+
+  reference operator*() const { return *value; }
+
+  InputOutputConstIterator &operator++() {
+    value++;
+    return *this;
+  }
+  InputOutputConstIterator operator++(int) {
+    auto tmp = InputOutputConstIterator(value);
+    value++;
+    return tmp;
+  }
+
+  bool operator==(const InputOutputConstIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const InputOutputConstIterator &other) const {
     return value != other.value;
   }
 };
