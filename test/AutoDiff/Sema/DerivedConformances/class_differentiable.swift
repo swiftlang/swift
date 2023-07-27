@@ -553,7 +553,7 @@ class C_55238: Differentiable {
   func method() -> Float { x }
 
   @derivative(of: method)
-  func vjpMethod() -> (value: Float, pullback: (Float) -> TangentVector) { fatalError() }
+  func vjpMethod() -> (value: Float, pullback: (Float, inout TangentVector) -> ()) { fatalError() }
 
   // Test usage of synthesized `TangentVector` type.
   // This should not produce an error: "reference to invalid associated type 'TangentVector'".

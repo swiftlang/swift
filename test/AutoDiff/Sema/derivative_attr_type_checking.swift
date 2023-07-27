@@ -615,15 +615,15 @@ extension Class {
 }
 extension Class where T: Differentiable {
   @derivative(of: subscript.get)
-  func vjpSubscriptGetter() -> (value: Float, pullback: (Float) -> TangentVector) {
-    return (1, { _ in .zero })
+  func vjpSubscriptGetter() -> (value: Float, pullback: (Float, inout TangentVector) -> ()) {
+    return (1, { $1 = TangentVector.zero })
   }
 
   // expected-error @+2 {{a derivative already exists for getter for 'subscript()'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript)
-  func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
-    return (1, { _ in .zero })
+  func vjpSubscript() -> (value: Float, pullback: (Float, inout TangentVector) -> ()) {
+    return (1, { $1 = TangentVector.zero })
   }
 
   // FIXME: Enable derivative registration for class property/subscript setters (https://github.com/apple/swift/issues/55542).

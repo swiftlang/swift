@@ -761,10 +761,11 @@ ForwardModeTests.test("SimpleWrtSelf") {
       return (f(x), { (dself, dx) in dself.base * dx })
     }
     @derivative(of: f)
-    final func vjpf(_ x: Float) -> (value: Float, pullback: (Float) -> (TangentVector, Float)) {
+    final func vjpf(_ x: Float) -> (value: Float, pullback: (Float, inout TangentVector) -> Float) {
       let base = self.base
-      return (f(x), { v in
-        (TangentVector(base: v * x, _nontrivial: []), base * v)
+      return (f(x), { v, tv in
+          tv = TangentVector(base: v * x, _nontrivial: [])
+          return base * v
       })
     }
   }
