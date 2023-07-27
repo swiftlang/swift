@@ -851,20 +851,22 @@ the memory of the annotated type:
 
 - A value has a **stable address** until it is either consumed or moved.
   No value of any type in Swift can ever be moved while it is being borrowed or
-  mutated, so the address of `self` within a `borrowing` or `mutating` method,
-  or more generally the address of a `borrowing` or `inout` parameter to any
-  function, cannot change within the function body.  Values that appear in a
-  global variable or class stored property can never be moved, and can only be
-  consumed by the deallocation of the containing object instance, so
-  effectively has a stable address for their entire lifetime.
+  mutated, so for a `@_rawLayout` type, the address of `self` within a
+  `borrowing` or `mutating` method cannot change within the function body, and
+  the same is true more generally for the address of any `@_rawLayout` typed
+  parameter that is `borrowing` or `mutating` in any function or method.
+  Values that appear in a global variable or class stored property can never be
+  moved, and can only be consumed by the deallocation of the containing object
+  instance, so effectively has a stable address for their entire lifetime.
 - A value's memory **may be read and mutated at any time** independent of
   formal accesses. In particular, pointers into the storage may be "escaped"
-  outside of scopes where the address is statically guaranteed to be stable, and
-  those pointers may be used freely for as long as the storage dynamically
+  outside of scopes where the address is statically guaranteed to be stable,
+  and those pointers may be used freely for as long as the storage dynamically
   isn't consumed or moved. It becomes the programmer's responsibility in this
   case to ensure that reads and writes to the storage do not race across
   threads, writes don't overlap with reads or writes coming from the same
-  thread, and that the pointer is not used after the value is moved or consumed.
+  thread, and that the pointer is not used after the value is moved or
+  consumed.
 - When the value is moved, a bitwise copy of its memory is performed to the new
   address of the value in its new owner. As currently implemented, raw storage
   types are not suitable for storing values which are not bitwise-movable, such
