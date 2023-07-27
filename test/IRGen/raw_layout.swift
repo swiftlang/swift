@@ -2,6 +2,8 @@
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
 // RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir %t/raw_layout.sil | %FileCheck %t/raw_layout.sil
 
+// UNSUPPORTED: OS=watchos && (CPU=armv7k || CPU=arm64_32)
+
 import Swift
 
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}4LockVWV" = {{.*}} %swift.vwtable
