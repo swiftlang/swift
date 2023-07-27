@@ -132,6 +132,12 @@
 // CHECK:   typealias Pointee = Int32
 // CHECK: }
 
+// CHECK: struct InputOutputConstIterator : UnsafeCxxMutableInputIterator {
+// CHECK:   func successor() -> InputOutputConstIterator
+// CHECK:   var pointee: Int32 { get nonmutating set }
+// CHECK:   typealias Pointee = Int32
+// CHECK: }
+
 // CHECK: struct MutableRACIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {
 // CHECK:   func successor() -> MutableRACIterator
 // CHECK:   var pointee: Int32

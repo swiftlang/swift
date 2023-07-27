@@ -135,4 +135,13 @@ public:
 typedef HasInheritedTemplatedConstIterator<int>
     HasInheritedTemplatedConstIteratorInt;
 
+struct HasInputOutputConstIterator {
+  typedef InputOutputConstIterator iterator;
+
+  mutable int x[5] = {5, 4, 3, 2, 1};
+
+  iterator begin() const { return iterator(x); }
+  iterator end() const { return iterator(x + 5); }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_SEQUENCE_H
