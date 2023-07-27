@@ -579,9 +579,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     auto User = Op->getUser();
 
     // Lifetime endpoints that don't allow the address to escape.
-    if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User)) {
+    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -716,10 +715,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // per block, and all release points occur after all stores. Therefore we
     // can simply ask SSAUpdater for the reaching store.
     SILValue RelVal = SSAUp.getValueAtEndOfBlock(RelPoint->getParent());
-    if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
-      B.createStrongRelease(Loc, RelVal, B.getDefaultAtomicity());
-    else
-      B.createReleaseValue(Loc, RelVal, B.getDefaultAtomicity());
+    B.emitDestroyValueOperation(Loc, RelVal);
   }
 }
 
@@ -1008,10 +1004,11 @@ bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
 
   if (auto *ARI = dyn_cast<AllocRefInstBase>(Arg0)) {
     if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
-          if (Op->getUser() == AI)
+          auto *user = Op->getUser();
+          if (user == AI)
             return true;
-          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
-            ToDestroy.emplace_back(SRI);
+          if (isa<StrongReleaseInst>(user) || isa<DestroyValueInst>(user)) {
+            ToDestroy.emplace_back(user);
             return true;
           }
           return false;
@@ -1039,18 +1036,32 @@ bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
 // or we could also handle calls to array.init.
 bool DeadObjectElimination::removeAndReleaseArray(
     SingleValueInstruction *NewArrayValue, DeadEndBlocks &DEBlocks) {
-  TupleExtractInst *ArrayDef = nullptr;
-  TupleExtractInst *StorageAddress = nullptr;
-  for (auto *Op : NewArrayValue->getUses()) {
-    auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
-    if (!TupleElt)
+  SILValue ArrayDef = nullptr;
+  SILValue StorageAddress = nullptr;
+
+  if (NewArrayValue->getFunction()->hasOwnership()) {
+    auto *destructureTuple =
+        NewArrayValue->getSingleConsumingUserOfType<DestructureTupleInst>();
+    if (!destructureTuple) {
       return false;
-    if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
-      ArrayDef = TupleElt;
-    } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
-      StorageAddress = TupleElt;
-    } else {
+    }
+    if (destructureTuple->getNumResults() != 2) {
       return false;
+    }
+    ArrayDef = destructureTuple->getResult(0);
+    StorageAddress = destructureTuple->getResult(1);
+  } else {
+    for (auto *Op : NewArrayValue->getUses()) {
+      auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
+      if (!TupleElt)
+        return false;
+      if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
+        ArrayDef = TupleElt;
+      } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
+        StorageAddress = TupleElt;
+      } else {
+        return false;
+      }
     }
   }
   if (!ArrayDef)
