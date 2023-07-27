@@ -254,7 +254,7 @@ public:
 
   /// Determine whether given locator points to the keypath value
   bool isKeyPathValue() const;
-  
+
   /// Determine whether given locator points to the choice picked as
   /// as result of the key path dynamic member lookup operation.
   bool isResultOfKeyPathDynamicMemberLookup() const;
