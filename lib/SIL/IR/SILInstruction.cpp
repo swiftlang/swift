@@ -1322,6 +1322,10 @@ bool SILInstruction::mayRequirePackMetadata() const {
   {
     return getOperand(0)->getType().hasPack();
   }
+  case SILInstructionKind::AllocStackInst: {
+    auto *asi = cast<AllocStackInst>(this);
+    return asi->getType().hasPack();
+  }
   case SILInstructionKind::MetatypeInst: {
     auto *mi = cast<MetatypeInst>(this);
     return mi->getType().hasPack();
