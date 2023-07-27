@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir %t/raw_layout.sil | %FileCheck %t/raw_layout.sil
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Swift
 
@@ -45,8 +45,9 @@ struct LikePaddedStrideArray1: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 16
 // stride
 // CHECK-SAME:  , {{i64|i32}} 16
-// flags: alignment 3, noncopyable
-// CHECK-SAME:  , <i32 0x800003>
+// flags: alignment 3, noncopyable, (on 32-bit platforms) not storable inline
+// CHECK-64-SAME:  , <i32 0x800003>
+// CHECK-32-SAME:  , <i32 0x820003>
 @_rawLayout(likeArrayOf: PaddedStride, count: 2)
 struct LikePaddedStrideArray2: ~Copyable {}
 
