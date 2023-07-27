@@ -3704,7 +3704,7 @@ PackArchetypeType::PackArchetypeType(
     LayoutConstraint Layout, PackShape Shape)
     : ArchetypeType(TypeKind::PackArchetype, Ctx,
                     RecursiveTypeProperties::HasArchetype |
-                        RecursiveTypeProperties::HasConcretePack,
+                        RecursiveTypeProperties::HasPackArchetype,
                     InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;

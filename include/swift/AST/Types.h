@@ -180,10 +180,13 @@ public:
     /// they have a type variable originator.
     SolverAllocated = 0x8000,
 
-    /// This type contains a concrete pack.
-    HasConcretePack = 0x10000,
+    /// Contains a PackType.
+    HasPack = 0x10000,
 
-    Last_Property = HasConcretePack
+    /// Contains a PackArchetypeType.
+    HasPackArchetype = 0x20000,
+
+    Last_Property = HasPackArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -259,7 +262,9 @@ public:
 
   bool hasParameterPack() const { return Bits & HasParameterPack; }
 
-  bool hasConcretePack() const { return Bits & HasConcretePack; }
+  bool hasPack() const { return Bits & HasPack; }
+
+  bool hasPackArchetype() const { return Bits & HasPackArchetype; }
 
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
@@ -420,12 +425,12 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+30,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+29,
     /// Type variable options.
     Options : 7,
     : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 30
+    ID : 29
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
@@ -689,16 +694,26 @@ public:
     return getRecursiveProperties().hasLocalArchetype();
   }
 
+  /// Whether the type contains a generic parameter declared as a parameter
+  /// pack.
   bool hasParameterPack() const {
     return getRecursiveProperties().hasParameterPack();
   }
 
-  bool hasConcretePack() const {
-    return getRecursiveProperties().hasConcretePack();
+  /// Whether the type contains a PackType.
+  bool hasPack() const {
+    return getRecursiveProperties().hasPack();
   }
 
-  /// Whether the type has some flavor of pack.
-  bool hasPack() const { return hasParameterPack() || hasConcretePack(); }
+  /// Whether the type contains a PackArchetypeType.
+  bool hasPackArchetype() const {
+    return getRecursiveProperties().hasPackArchetype();
+  }
+
+  /// Whether the type has any flavor of pack.
+  bool hasAnyPack() const {
+    return hasParameterPack() || hasPack() || hasPackArchetype();
+  }
 
   /// Determine whether the type involves a parameterized existential type.
   bool hasParameterizedExistential() const {
