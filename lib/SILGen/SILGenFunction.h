@@ -802,6 +802,17 @@ public:
   void emitMemberInitializers(DeclContext *dc, VarDecl *selfDecl,
                               NominalTypeDecl *nominal);
 
+  /// Generates code to initialize stored property from its
+  /// initializer.
+  ///
+  /// \param dc The DeclContext containing the current function.
+  /// \param selfDecl The 'self' declaration within the current function.
+  /// \param field The stored property that has to be initialized.
+  /// \param substitutions The substitutions to apply to initializer and setter.
+  void emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
+                             PatternBindingDecl *field,
+                             SubstitutionMap substitutions);
+
   void emitMemberInitializationViaInitAccessor(DeclContext *dc,
                                                VarDecl *selfDecl,
                                                PatternBindingDecl *member,

@@ -1503,87 +1503,109 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
     B.createEndAccess(loc, selfRef.getValue(), /*aborted=*/false);
 }
 
+void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
+                                           PatternBindingDecl *field,
+                                           SubstitutionMap substitutions) {
+  assert(!field->isStatic());
+
+  for (auto i : range(field->getNumPatternEntries())) {
+    auto init = field->getExecutableInit(i);
+    if (!init)
+      continue;
+
+    auto *varPattern = field->getPattern(i);
+
+    // Cleanup after this initialization.
+    FullExpr scope(Cleanups, varPattern);
+
+    // Get the type of the initialization result, in terms
+    // of the constructor context's archetypes.
+    auto resultType =
+        getInitializationTypeInContext(field->getDeclContext(), dc, varPattern);
+    AbstractionPattern origType = resultType.first;
+    CanType substType = resultType.second;
+
+    // Figure out what we're initializing.
+    auto memberInit = emitMemberInit(*this, selfDecl, varPattern);
+
+    // This whole conversion thing is about eliminating the
+    // paired orig-to-subst subst-to-orig conversions that
+    // will happen if the storage is at a different abstraction
+    // level than the constructor. When emitApply() is used
+    // to call the stored property initializer, it naturally
+    // wants to convert the result back to the most substituted
+    // abstraction level. To undo this, we use a converting
+    // initialization and rely on the peephole that optimizes
+    // out the redundant conversion.
+    SILType loweredResultTy;
+    SILType loweredSubstTy;
+
+    // A converting initialization isn't necessary if the member is
+    // a property wrapper. Though the initial value can have a
+    // reabstractable type, the result of the initialization is
+    // always the property wrapper type, which is never reabstractable.
+    bool needsConvertingInit = false;
+    auto *singleVar = varPattern->getSingleVar();
+    if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
+      loweredResultTy = getLoweredType(origType, substType);
+      loweredSubstTy = getLoweredType(substType);
+      needsConvertingInit = loweredResultTy != loweredSubstTy;
+    }
+
+    if (needsConvertingInit) {
+      Conversion conversion =
+          Conversion::getSubstToOrig(origType, substType, loweredResultTy);
+
+      ConvertingInitialization convertingInit(conversion,
+                                              SGFContext(memberInit.get()));
+
+      emitAndStoreInitialValueInto(*this, varPattern, field, i, substitutions,
+                                   origType, substType, &convertingInit);
+
+      auto finalValue = convertingInit.finishEmission(
+          *this, varPattern, ManagedValue::forInContext());
+      if (!finalValue.isInContext())
+        finalValue.forwardInto(*this, varPattern, memberInit.get());
+    } else {
+      emitAndStoreInitialValueInto(*this, varPattern, field, i, substitutions,
+                                   origType, substType, memberInit.get());
+    }
+  }
+}
+
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
 
+  llvm::SmallPtrSet<PatternBindingDecl *, 4> alreadyInitialized;
   for (auto member : nominal->getImplementationContext()->getAllMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
+      if (alreadyInitialized.count(pbd))
+        continue;
+
       // Emit default initialization for an init accessor property.
       if (auto *var = pbd->getSingleVar()) {
         if (var->hasInitAccessor()) {
+          auto initAccessor = var->getAccessor(AccessorKind::Init);
+
+          // Make sure that initializations for the accessed properties
+          // are emitted before the init accessor that uses them.
+          for (auto *property : initAccessor->getAccessedProperties()) {
+            auto *PBD = property->getParentPatternBinding();
+            if (alreadyInitialized.insert(PBD).second)
+              emitMemberInitializer(dc, selfDecl, PBD, subs);
+          }
+
           emitMemberInitializationViaInitAccessor(dc, selfDecl, pbd, subs);
           continue;
         }
       }
 
-      for (auto i : range(pbd->getNumPatternEntries())) {
-        auto init = pbd->getExecutableInit(i);
-        if (!init) continue;
-
-        auto *varPattern = pbd->getPattern(i);
-
-        // Cleanup after this initialization.
-        FullExpr scope(Cleanups, varPattern);
-
-        // Get the type of the initialization result, in terms
-        // of the constructor context's archetypes.
-        auto resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, varPattern);
-        AbstractionPattern origType = resultType.first;
-        CanType substType = resultType.second;
-
-        // Figure out what we're initializing.
-        auto memberInit = emitMemberInit(*this, selfDecl, varPattern);
-
-        // This whole conversion thing is about eliminating the
-        // paired orig-to-subst subst-to-orig conversions that
-        // will happen if the storage is at a different abstraction
-        // level than the constructor. When emitApply() is used
-        // to call the stored property initializer, it naturally
-        // wants to convert the result back to the most substituted
-        // abstraction level. To undo this, we use a converting
-        // initialization and rely on the peephole that optimizes
-        // out the redundant conversion.
-        SILType loweredResultTy;
-        SILType loweredSubstTy;
-
-        // A converting initialization isn't necessary if the member is
-        // a property wrapper. Though the initial value can have a
-        // reabstractable type, the result of the initialization is
-        // always the property wrapper type, which is never reabstractable.
-        bool needsConvertingInit = false;
-        auto *singleVar = varPattern->getSingleVar();
-        if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
-          loweredResultTy = getLoweredType(origType, substType);
-          loweredSubstTy = getLoweredType(substType);
-          needsConvertingInit = loweredResultTy != loweredSubstTy;
-        }
-
-        if (needsConvertingInit) {
-          Conversion conversion = Conversion::getSubstToOrig(
-              origType, substType,
-              loweredResultTy);
-
-          ConvertingInitialization convertingInit(conversion,
-                                                  SGFContext(memberInit.get()));
-
-          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
-                                       origType, substType, &convertingInit);
-
-          auto finalValue = convertingInit.finishEmission(
-              *this, varPattern, ManagedValue::forInContext());
-          if (!finalValue.isInContext())
-            finalValue.forwardInto(*this, varPattern, memberInit.get());
-        } else {
-          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
-                                       origType, substType, memberInit.get());
-        }
-      }
+      emitMemberInitializer(dc, selfDecl, pbd, subs);
     }
   }
 }
