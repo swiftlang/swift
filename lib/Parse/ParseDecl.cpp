@@ -7281,7 +7281,7 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
              /*already*/ true);
 }
 
-static bool isAllowedInProtocolRequirement(AccessorKind kind, bool forSIL) {
+static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::Set:
@@ -7690,8 +7690,8 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
     // For now, immediately reject illegal accessors in protocols just to
     // avoid having to deal with them everywhere.
-    if (parsingLimitedSyntax &&
-        !isAllowedInProtocolRequirement(Kind, SF.Kind == SourceFileKind::SIL)) {
+    if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
+                                    Kind, SF.Kind == SourceFileKind::SIL)) {
       diagnose(Loc, diag::expected_getset_in_protocol);
       continue;
     }
