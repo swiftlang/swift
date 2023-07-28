@@ -1914,6 +1914,7 @@ public:
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
     if (CI->isExact())
       *this << "[exact] ";
+    *this << CI->getSourceFormalType() << " in ";
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());

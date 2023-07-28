@@ -600,6 +600,7 @@ ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
 
 void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             ManagedValue op,
+                                            CanType sourceFormalTy,
                                             SILType destLoweredTy,
                                             CanType destFormalTy,
                                             SILBasicBlock *trueBlock,
@@ -611,9 +612,8 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                          destFormalTy)) {
     op = op.ensurePlusOne(SGF, loc);
   }
-  createCheckedCastBranch(loc, isExact, op.forward(SGF),
-                          destLoweredTy, destFormalTy,
-                          trueBlock, falseBlock,
+  createCheckedCastBranch(loc, isExact, op.forward(SGF), sourceFormalTy,
+                          destLoweredTy, destFormalTy, trueBlock, falseBlock,
                           Target1Count, Target2Count);
 }
 
