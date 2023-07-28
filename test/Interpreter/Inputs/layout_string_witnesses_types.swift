@@ -276,6 +276,16 @@ public struct Wrapper<T> {
     }
 }
 
+public struct NestedWrapper<T> {
+    public let x: Wrapper<T>
+    public let y: Wrapper<T>
+
+    public init(x: Wrapper<T>, y: Wrapper<T>) {
+        self.x = x
+        self.y = y
+    }
+}
+
 struct InternalGeneric<T> {
     let x: T
     let y: Int
