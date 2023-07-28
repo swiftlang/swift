@@ -286,7 +286,7 @@ extension ObservableMacro: ExtensionMacro {
     let ext = decl.cast(ExtensionDeclSyntax.self)
 
     if let availability = declaration.availability {
-      return [ext.with(\.attributes, availability)]
+      return [ext.with(\.attributes, availability.with(\.trailingTrivia, .newline))]
     } else {
       return [ext]
     }
