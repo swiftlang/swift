@@ -13,12 +13,13 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 
+#include "swift/Basic/Nullability.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
