@@ -1318,6 +1318,27 @@ bool SILInstruction::mayRequirePackMetadata() const {
     return ty->hasAnyPack();
   }
   default:
+    // Instructions that deallocate stack must not result in pack metadata
+    // materialization.  If they did there would be no way to create the pack
+    // metadata on stack.
+    if (isDeallocatingStack())
+      return false;
+
+    // Check results and operands for packs.  If a pack appears, lowering the
+    // instruction might result in pack metadata emission.
+    for (auto result : getResults()) {
+      if (result->getType().hasAnyPack())
+        return true;
+    }
+    for (auto operandTy : getOperandTypes()) {
+      if (operandTy.hasAnyPack())
+        return true;
+    }
+    for (auto &tdo : getTypeDependentOperands()) {
+      if (tdo.get()->getType().hasAnyPack())
+        return true;
+    }
+
     return false;
   }
 }
