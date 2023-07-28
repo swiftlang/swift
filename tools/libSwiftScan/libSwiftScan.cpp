@@ -560,7 +560,7 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
                                   std::vector<std::string> &frontendOptions) {
   if (table.getOption(id).hasFlag(swift::options::FrontendOption)) {
     auto name = table.getOptionName(id);
-    if (strlen(name) > 0) {
+    if (!name.empty()) {
       frontendOptions.push_back(std::string(name));
     }
   }
