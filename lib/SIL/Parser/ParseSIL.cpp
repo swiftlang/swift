@@ -4489,6 +4489,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILOptional(isExact, *this, "exact"))
       return true;
 
+    if (parseASTType(SourceType) || parseVerbatim("in"))
+      return true;
+
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") ||
         parseASTType(TargetType) || parseConditionalBranchDestinations())
       return true;
@@ -4501,8 +4504,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createCheckedCastBranch(
-        InstLoc, isExact, Val, F->getLoweredType(opaque, TargetType),
-        TargetType, getBBForReference(SuccessBBName, SuccessBBLoc),
+        InstLoc, isExact, Val, SourceType,
+        F->getLoweredType(opaque, TargetType), TargetType,
+        getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc), forwardingOwnership);
     break;
   }

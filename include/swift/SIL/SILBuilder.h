@@ -2575,17 +2575,18 @@ public:
   }
 
   CheckedCastBranchInst *
-  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
-                          SILType destLoweredTy, CanType destFormalTy,
-                          SILBasicBlock *successBB,
+  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op, 
+                          CanType srcFormalTy, SILType destLoweredTy, 
+                          CanType destFormalTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastBranchInst *
-  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
-                          SILType destLoweredTy, CanType destFormalTy,
-                          SILBasicBlock *successBB, SILBasicBlock *failureBB,
+  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op, 
+                          CanType srcFormalTy, SILType destLoweredTy, 
+                          CanType destFormalTy, SILBasicBlock *successBB, 
+                          SILBasicBlock *failureBB,
                           ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
