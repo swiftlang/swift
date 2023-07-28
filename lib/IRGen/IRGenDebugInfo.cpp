@@ -415,7 +415,7 @@ public:
     // Pretend transparent functions don't exist.
     if (!Scope)
       return createInlinedAt(CS);
-    auto InlinedAt = llvm::DILocation::get(
+    auto InlinedAt = llvm::DILocation::getDistinct(
         IGM.getLLVMContext(), L.line, L.column, Scope, createInlinedAt(CS));
     InlinedAtCache.insert({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     return InlinedAt;
