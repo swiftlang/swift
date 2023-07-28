@@ -1885,6 +1885,14 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
                            ErrorType::get(ctx));
 }
 
+Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {
+  auto &ctx = sd->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveRawLayoutLikeTypeRequest{sd,
+                               const_cast<RawLayoutAttr *>(this)},
+                           ErrorType::get(ctx));
+}
+
 AvailableAttr *
 AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
