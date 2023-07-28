@@ -8093,6 +8093,7 @@ checked_cast_br
 ::
 
   sil-terminator ::= 'checked_cast_br' sil-checked-cast-exact?
+                      sil-type 'in'
                       sil-operand 'to' sil-type ','
                       sil-identifier ',' sil-identifier
   sil-checked-cast-exact ::= '[' 'exact' ']'
