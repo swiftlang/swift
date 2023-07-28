@@ -228,6 +228,9 @@ EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
 /// Enable the `@_rawLayout` attribute.
 EXPERIMENTAL_FEATURE(RawLayout, true)
 
+/// Enable noncopyable `Optional` types.
+EXPERIMENTAL_FEATURE(NonCopyableOptional, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

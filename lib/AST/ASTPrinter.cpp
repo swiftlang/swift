@@ -3467,6 +3467,11 @@ static bool usesFeatureRawLayout(Decl *decl) {
   return decl->getAttrs().hasAttribute<RawLayoutAttr>();
 }
 
+static bool usesFeatureNonCopyableOptional(Decl *decl) {
+  return false;
+  #warning "todo"
+}
+
 static bool hasParameterPacks(Decl *decl) {
   if (auto genericContext = decl->getAsGenericContext()) {
     auto sig = genericContext->getGenericSignature();

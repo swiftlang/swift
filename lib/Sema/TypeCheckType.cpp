@@ -1033,10 +1033,15 @@ Type TypeResolution::applyUnboundGenericArguments(
   // do it when missing types are deduced.
   bool skipRequirementsCheck = false;
 
-  // check for generic args that are move-only
   auto &ctx = getASTContext();
-  if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs))
-    return ErrorType::get(ctx);
+  if (!ctx.LangOpts.hasFeature(Feature::NonCopyableOptional)
+      || decl != ctx.getOptionalDecl()) {
+
+    // check for generic args that are move-only
+    if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs)) {
+      return ErrorType::get(ctx);
+    }
+  }
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -2304,7 +2309,8 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
                                               TypeResolutionOptions options) {
   // Though this is only required on function inputs... we can ignore
   // InoutFunctionInput since it's already got ownership.
-  if (!options.is(TypeResolverContext::FunctionInput))
+  if (!options.is(TypeResolverContext::FunctionInput)
+      && !options.is(TypeResolverContext::ImmediateOptionalTypeArgument))
     return false;
 
   // Enum cases don't need to specify ownership for associated values
@@ -4435,11 +4441,13 @@ NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
     return ErrorType::get(ctx);
   }
 
-  // do not allow move-only types in an optional
-  if (diagnoseMoveOnlyGeneric(repr,
+  if (!ctx.LangOpts.hasFeature(Feature::NonCopyableOptional)) {
+    // do not allow move-only types in an optional
+    if (diagnoseMoveOnlyGeneric(repr,
                               ctx.getOptionalDecl()->getDeclaredInterfaceType(),
                               baseTy)) {
-    return ErrorType::get(ctx);
+      return ErrorType::get(ctx);
+    }
   }
 
   return optionalTy;
@@ -4540,11 +4548,13 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     return ErrorType::get(ctx);
   }
 
-  // do not allow move-only types in an implicitly-unwrapped optional
-  if (diagnoseMoveOnlyGeneric(repr,
-                              ctx.getOptionalDecl()->getDeclaredInterfaceType(),
-                              baseTy)) {
-    return ErrorType::get(ctx);
+  if (!ctx.LangOpts.hasFeature(Feature::NonCopyableOptional)) {
+    // do not allow move-only types in an implicitly-unwrapped optional
+    if (diagnoseMoveOnlyGeneric(repr,
+                                ctx.getOptionalDecl()->getDeclaredInterfaceType(),
+                                baseTy)) {
+      return ErrorType::get(ctx);
+    }
   }
 
   return uncheckedOptionalTy;

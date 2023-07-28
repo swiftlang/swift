@@ -156,6 +156,11 @@ bool TypeBase::isMarkerExistential() {
 }
 
 bool TypeBase::isPureMoveOnly() {
+  // If `Optional` wraps a move-only type, it is also move-only.
+  if (auto wrappedTy = getOptionalObjectType()) {
+    return wrappedTy->isPureMoveOnly();
+  }
+
   if (auto *nom = getAnyNominal())
     return nom->isMoveOnly();
 
@@ -165,7 +170,7 @@ bool TypeBase::isPureMoveOnly() {
       if (eltTy->isPureMoveOnly())
         return true;
   }
-
+  
   return false;
 }
 

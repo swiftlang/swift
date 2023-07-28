@@ -2070,7 +2070,7 @@ LookupConformanceInModuleRequest::evaluate(
       }
     } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       // Only move-only nominals are not Copyable
-      if (nominal->isMoveOnly()) {
+      if (type->isPureMoveOnly()) {
         return ProtocolConformanceRef::forInvalid();
       } else {
         // Specifically do not create a concrete conformance to Copyable. At
