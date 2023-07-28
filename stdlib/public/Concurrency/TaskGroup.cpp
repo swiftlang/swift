@@ -65,6 +65,7 @@
 using namespace swift;
 
 #if 0
+#define SWIFT_TASK_GROUP_DEBUG_LOG_ENABLED 1
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...)                     \
 fprintf(stderr, "[%#lx] [%s:%d][group(%p%s)] (%s) " fmt "\n",           \
       (unsigned long)Thread::current().platformThreadId(),              \
@@ -81,6 +82,7 @@ fprintf(stderr, "[%#lx] [%s:%d][group(%p)] (%s) " fmt "\n",             \
       __FUNCTION__,                                                     \
       __VA_ARGS__)
 #else
+#define SWIFT_TASK_GROUP_DEBUG_LOG_ENABLED 0
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...) (void)0
 #define SWIFT_TASK_GROUP_DEBUG_LOG_0(group, fmt, ...) (void)0
 #endif
@@ -941,7 +943,7 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
 // ==== child task management --------------------------------------------------
 
 void TaskGroup::addChildTask(AsyncTask *child) {
-  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, this);
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "attach child task = %p", child);
 
   // Add the child task to this task group.  The corresponding removal
   // won't happen until the parent task successfully polls for this child
@@ -959,7 +961,7 @@ void TaskGroup::addChildTask(AsyncTask *child) {
 }
 
 void TaskGroup::removeChildTask(AsyncTask *child) {
-  SWIFT_TASK_DEBUG_LOG("detach child task = %p from group = %p", child, this);
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "detach child task = %p", child);
 
   auto groupRecord = asBaseImpl(this)->getTaskRecord();
 
@@ -979,7 +981,7 @@ static void swift_taskGroup_destroyImpl(TaskGroup *group) {
 }
 
 void AccumulatingTaskGroup::destroy() {
-#if SWIFT_TASK_DEBUG_LOG_ENABLED
+#if SWIFT_TASK_GROUP_DEBUG_LOG_ENABLED
   if (!this->isEmpty()) {
     auto status = this->statusLoadRelaxed();
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "destroy, tasks .ready = %d, .pending = %llu",
@@ -988,7 +990,10 @@ void AccumulatingTaskGroup::destroy() {
     SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
   }
 #endif
+  // Verify using the group's status that indeed we're expected to be empty
   assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
+  // Double check by inspecting the group record, it should contain no children
+  assert(getTaskRecord()->getFirstChild() == nullptr && "Task group record still has child task!");
 
   // First, remove the group from the task and deallocate the record
   removeStatusRecordFromSelf(getTaskRecord());
@@ -1002,7 +1007,7 @@ void AccumulatingTaskGroup::destroy() {
 }
 
 void DiscardingTaskGroup::destroy() {
-#if SWIFT_TASK_DEBUG_LOG_ENABLED
+#if SWIFT_TASK_GROUP_DEBUG_LOG_ENABLED
   if (!this->isEmpty()) {
     auto status = this->statusLoadRelaxed();
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "destroy, tasks .ready = %d, .pending = %llu",
@@ -1011,7 +1016,10 @@ void DiscardingTaskGroup::destroy() {
     SWIFT_TASK_DEBUG_LOG("destroying discarding task group = %p", this);
   }
 #endif
+  // Verify using the group's status that indeed we're expected to be empty
   assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
+  // Double check by inspecting the group record, it should contain no children
+  assert(getTaskRecord()->getFirstChild() == nullptr && "Task group record still has child task!");
 
   // First, remove the group from the task and deallocate the record
   removeStatusRecordFromSelf(getTaskRecord());
@@ -1249,7 +1257,12 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
                                        alreadyDecrementedStatus);
             break;
           case ReadyStatus::Error:
-            SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, resume with errorItem.task:%p", readyErrorItem.getTask());
+            // The completed task failed, but we already stored a different failed task.
+            // Thus we discard this error and complete with the previously stored.
+            SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, discard error completedTask %p, resume with errorItem.task:%p",
+                                       completedTask,
+                                       readyErrorItem.getTask());
+            _swift_taskGroup_detachChild(asAbstract(this), completedTask);
             resumeWaitingTask(readyErrorItem.getTask(), assumed,
                               /*hadErrorResult=*/true,
                               alreadyDecrementedStatus,
