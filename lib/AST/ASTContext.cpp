@@ -3415,7 +3415,7 @@ CanPackType CanPackType::get(const ASTContext &C,
 }
 
 PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasConcretePack;
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasPack;
   bool isCanonical = true;
   for (Type eltTy : elements) {
     assert(!eltTy->is<PackType>() &&
@@ -3455,7 +3455,7 @@ void PackType::Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements) {
 
 CanSILPackType SILPackType::get(const ASTContext &C, ExtInfo info,
                                 ArrayRef<CanType> elements) {
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasConcretePack;
+  RecursiveTypeProperties properties;
   for (CanType eltTy : elements) {
     assert(!isa<SILPackType>(eltTy) &&
            "Cannot have pack directly inside another pack");
@@ -4047,7 +4047,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 17,
+  static_assert(RecursiveTypeProperties::BitWidth == 18,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4689,7 +4689,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 17,
+  static_assert(RecursiveTypeProperties::BitWidth == 18,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
