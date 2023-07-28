@@ -545,7 +545,8 @@ func test_effects_are_still_supported() {
     var _b: Int
 
     var a: Int {
-      init(initialValue) initializes(_a) accesses(_b) {
+      @storageRestrictions(initializes: _a, accesses: _b)
+      init(initialValue) {
         _a = initialValue
         _b = 0
       }
