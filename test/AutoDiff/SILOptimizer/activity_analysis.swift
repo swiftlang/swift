@@ -701,7 +701,7 @@ class C: Differentiable {
     x * float
   }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}1CC6methodyS2fF at parameter indices (0, 1) and result indices (0)
+  // CHECK-LABEL: [AD] Activity info for ${{.*}}1CC6methodyS2fF at parameter indices (0, 1) and result indices (0, 1)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $C
@@ -714,8 +714,11 @@ class C: Differentiable {
 }
 
 // TF-1176: Test class property `modify` accessor.
+// expected-error @+1 {{function is not differentiable}}
 @differentiable(reverse)
+// expected-note @+1 {{when differentiating this function definition}}
 func testClassModifyAccessor(_ c: inout C) {
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
   c.float *= c.float
 }
 
@@ -724,9 +727,9 @@ func testClassModifyAccessor(_ c: inout C) {
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*C
 // CHECK: [NONE]   %2 = metatype $@thin Float.Type
 // CHECK: [ACTIVE]   %3 = begin_access [read] [static] %0 : $*C
-// CHECK: [VARIED]   %4 = load [copy] %3 : $*C
+// CHECK: [ACTIVE]   %4 = load [copy] %3 : $*C
 // CHECK: [ACTIVE]   %6 = begin_access [read] [static] %0 : $*C
-// CHECK: [VARIED]   %7 = load [copy] %6 : $*C
+// CHECK: [ACTIVE]   %7 = load [copy] %6 : $*C
 // CHECK: [VARIED]   %9 = class_method %7 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
 // CHECK: [VARIED]   %10 = apply %9(%7) : $@convention(method) (@guaranteed C) -> Float
 // CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
