@@ -2734,7 +2734,18 @@ void swift::swift_initStructMetadataWithLayoutString(
     } else if (fieldType->hasLayoutString()) {
       refCountBytes += *(const size_t *)(fieldType->getLayoutString() +
                                          sizeof(uint64_t));
-    } else if (fieldType->isClassObject() || fieldType->isAnyExistentialType()) {
+    } else if (auto *cls = fieldType->getClassObject()) {
+      if (cls->isTypeMetadata()) {
+        auto *vwt = cls->getValueWitnesses();
+        if (vwt != &VALUE_WITNESS_SYM(Bo) &&
+            vwt != &VALUE_WITNESS_SYM(BO) &&
+            vwt != &VALUE_WITNESS_SYM(Bb)) {
+          refCountBytes += sizeof(uint64_t) + sizeof(uintptr_t);
+          continue;
+        }
+      }
+      refCountBytes += sizeof(uint64_t);
+    } else if (fieldType->isAnyExistentialType()) {
       refCountBytes += sizeof(uint64_t);
     } else {
       refCountBytes += sizeof(uint64_t) + sizeof(uintptr_t);
