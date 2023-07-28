@@ -3480,7 +3480,7 @@ static bool usesFeatureParameterPacks(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureDeferredSendableChecking(Decl *decl) {
+static bool usesFeatureSendNonSendable(Decl *decl) {
   return false;
 }
 

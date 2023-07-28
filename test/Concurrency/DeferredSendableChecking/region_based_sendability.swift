@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature DeferredSendableChecking -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature SendNonSendable -disable-availability-checking
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
@@ -669,4 +669,45 @@ func many_consume_many_require_vararg(a : A) async {
     foo_noniso_vararg(ns0, ns6, ns7); //expected-note {{access here could race}}
     foo_noniso_vararg(ns6, ns1, ns7); //expected-note {{access here could race}}
     foo_noniso_vararg(ns7, ns6, ns2); //expected-note {{access here could race}}
+}
+
+enum E {
+    case E1(NonSendable)
+    case E2(NonSendable)
+    case E3(NonSendable)
+}
+
+func enum_test(a : A) async {
+    let e1 = E.E1(NonSendable())
+    let e2 = E.E2(NonSendable())
+    let e3 = E.E3(NonSendable())
+    let e4 = E.E1(NonSendable())
+
+    switch (e1) {
+
+    //this case merges e1 and e2
+    case let .E1(ns1):
+        switch (e2) {
+        case let .E2(ns2):
+            ns1.x = ns2.x
+        default: ()
+        }
+
+    //this case consumes e3
+    case .E2:
+        switch (e3) {
+        case let .E3(ns3):
+            await a.foo(ns3.x); //expected-warning{{passing argument of non-sendable type 'Any' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+        default: ()
+        }
+
+    //this case does nothing
+    case .E3:
+        foo_noniso(e4);
+    }
+
+    await a.foo(e1); //expected-warning{{passing argument of non-sendable type 'E' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    foo_noniso(e2); //expected-note{{access here could race}}
+    foo_noniso(e3); //expected-note{{access here could race}}
+    foo_noniso(e4);
 }
