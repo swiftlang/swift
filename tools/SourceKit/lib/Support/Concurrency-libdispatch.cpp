@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Config/config.h"
+#include "SourceKit/Support/Concurrency.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/thread.h"
