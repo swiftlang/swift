@@ -289,6 +289,7 @@ public:
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
                                ManagedValue op,
+                               CanType sourceFormalTy,
                                SILType destLoweredTy,
                                CanType destFormalTy,
                                SILBasicBlock *trueBlock,

@@ -2551,8 +2551,8 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
     SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
-    SILType DestLoweredTy, CanType DestFormalTy, SILBasicBlock *SuccessBB,
-    SILBasicBlock *FailureBB, SILFunction &F,
+    CanType SrcFormalTy, SILType DestLoweredTy, CanType DestFormalTy,
+    SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
     ProfileCounter Target1Count, ProfileCounter Target2Count,
     ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &module = F.getModule();
@@ -2561,12 +2561,12 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, DestFormalTy);
   unsigned size =
-      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+      totalSizeToAlloc<swift::Operand>(3 + TypeDependentOperands.size());
   void *Buffer = module.allocateInst(size, alignof(CheckedCastBranchInst));
   return ::new (Buffer) CheckedCastBranchInst(
-      DebugLoc, IsExact, Operand, TypeDependentOperands, DestLoweredTy,
-      DestFormalTy, SuccessBB, FailureBB, Target1Count, Target2Count,
-      forwardingOwnershipKind, preservesOwnership);
+      DebugLoc, IsExact, Operand, SrcFormalTy, TypeDependentOperands,
+      DestLoweredTy, DestFormalTy, SuccessBB, FailureBB, Target1Count,
+      Target2Count, forwardingOwnershipKind, preservesOwnership);
 }
 
 MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,

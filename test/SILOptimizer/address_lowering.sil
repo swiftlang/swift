@@ -2140,7 +2140,7 @@ sil [ossa] @use_T : $@convention(thin) <T> (@in T) -> ()
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br1'
 sil [ossa] @test_checked_cast_br1 : $@convention(method) <T> (@in Any) -> () {
 bb0(%0 : @owned $Any):
-   checked_cast_br %0 : $Any to T, bb1, bb2
+   checked_cast_br Any in %0 : $Any to T, bb1, bb2
 
 bb1(%3 : @owned $T):
   %f = function_ref @use_T : $@convention(thin) <T> (@in T) -> ()
@@ -2178,7 +2178,7 @@ sil [ossa] @use_C : $@convention(thin) (@owned C) -> ()
 // CHECK-LABEL: }
 sil [ossa] @test_checked_cast_br2 : $@convention(method) (@in Any) -> () {
 bb0(%0 : @owned $Any):
-   checked_cast_br %0 : $Any to C, bb1, bb2
+   checked_cast_br Any in %0 : $Any to C, bb1, bb2
 
 bb1(%3 : @owned $C):
   %f = function_ref @use_C : $@convention(thin) (@owned C) -> ()
@@ -2219,7 +2219,7 @@ sil @use_Any : $@convention(thin) (@in Any) -> ()
 // CHECK: }
 sil [ossa] @test_checked_cast_br3 : $@convention(method) (@owned C) -> () {
 bb0(%0 : @owned $C):
-   checked_cast_br %0 : $C to Any, bb1, bb2
+   checked_cast_br C in %0 : $C to Any, bb1, bb2
 
 bb1(%3 : @owned $Any):
   %f = function_ref @use_Any : $@convention(thin) (@in Any) -> ()
@@ -2250,7 +2250,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br4'
 sil [ossa] @test_checked_cast_br4 : $@convention(method) <Element><T> (@owned TestGeneric<Element>) -> @out Optional<T> {
 bb0(%3 : @owned $TestGeneric<Element>):
-  checked_cast_br %3 : $TestGeneric<Element> to T, bb1, bb2
+  checked_cast_br TestGeneric<Element> in %3 : $TestGeneric<Element> to T, bb1, bb2
 
 bb1(%5 : @owned $T):
   %6 = enum $Optional<T>, #Optional.some!enumelt, %5 : $T
@@ -2280,7 +2280,7 @@ bb3(%12 : @owned $Optional<T>):
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br5'
 sil [ossa] @test_checked_cast_br5 : $@convention(thin) (@owned AnyObject) -> () {
 entry(%instance : @owned $AnyObject):
-  checked_cast_br %instance : $AnyObject to any AnyObject.Type, success, failure
+  checked_cast_br AnyObject in %instance : $AnyObject to any AnyObject.Type, success, failure
 
 success(%metatype : $@thick any AnyObject.Type):
   br exit
@@ -2308,7 +2308,7 @@ exit:
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br6'
 sil [ossa] @test_checked_cast_br6 : $@convention(thin) <T> (@in T) -> () {
 entry(%instance : @owned $T):
-  checked_cast_br %instance : $T to any AnyObject.Type, success, failure
+  checked_cast_br T in %instance : $T to any AnyObject.Type, success, failure
 success(%metatype : $@thick any AnyObject.Type):
   br exit
 failure(%original : @owned $T):

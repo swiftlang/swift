@@ -2082,7 +2082,7 @@ derived from the ARC object. As an example, consider the following Swift/SIL::
 
     // Consume '%1'. This means '%1' can no longer be used after this point. We
     // rebind '%1' in the destination blocks (bbYes, bbNo).
-    checked_cast_br %1 : $Klass to $OtherKlass, bbYes, bbNo
+    checked_cast_br Klass in %1 : $Klass to $OtherKlass, bbYes, bbNo
 
   bbYes(%2 : @owned $OtherKlass): // On success, the checked_cast_br forwards
                                   // '%1' into '%2' after casting to OtherKlass.
@@ -8097,9 +8097,9 @@ checked_cast_br
                       sil-identifier ',' sil-identifier
   sil-checked-cast-exact ::= '[' 'exact' ']'
 
-  checked_cast_br %0 : $A to $B, bb1, bb2
-  checked_cast_br %0 : $*A to $*B, bb1, bb2
-  checked_cast_br [exact] %0 : $A to $A, bb1, bb2
+  checked_cast_br A in %0 : $A to $B, bb1, bb2
+  checked_cast_br *A in %0 : $*A to $*B, bb1, bb2
+  checked_cast_br [exact] A in %0 : $A to $A, bb1, bb2
   // $A and $B must be both object types or both address types
   // bb1 must take a single argument of type $B or $*B
   // bb2 must take no arguments

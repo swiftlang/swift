@@ -370,6 +370,7 @@ public:
     // Create a new `checked_cast_branch` instruction.
     getBuilder().createCheckedCastBranch(
         ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
+        getOpASTType(ccbi->getSourceFormalType()),
         getOpType(ccbi->getTargetLoweredType()),
         getOpASTType(ccbi->getTargetFormalType()),
         createTrampolineBasicBlock(ccbi, pbTupleVal, ccbi->getSuccessBB()),

@@ -80,7 +80,7 @@ func openExistBox(_ x: Error) -> String {
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen11condFromAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> () {
 // HECK: bb0([[ARG:%.*]] : $Any):
 // HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// HECK:   checked_cast_br [[COPY_ARG]] : $Any to $@callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int), bb2, bb1
+// HECK:   checked_cast_br Any in [[COPY_ARG]] : $Any to $@callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int), bb2, bb1
 // HECK: bb2([[THUNK_PARAM:%.*]] : $@callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
 // HECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
 // HECK:   partial_apply [callee_guaranteed] [[THUNK_REF]]([[THUNK_PARAM]])
@@ -394,7 +394,7 @@ func testEmptyReturnClosure() {
 //
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastClassToAnyObjectyyXlAA1CCF : $@convention(thin) (@guaranteed C) -> @owned AnyObject {
 // CHECK: bb0(%0 : @guaranteed $C):
-// CHECK:   checked_cast_br %0 : $C to AnyObject, bb2, bb1
+// CHECK:   checked_cast_br C in %0 : $C to AnyObject, bb2, bb1
 // CHECK: bb1(%{{.*}} : @guaranteed $C):
 // CHECK: bb2(%{{.*}} : @guaranteed $AnyObject):
 // CHECK-LABEL: } // end sil function
@@ -409,7 +409,7 @@ func testCastClassToAnyObject(_ c: C) -> AnyObject {
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF : $@convention(thin) (@guaranteed AnyObject) -> @owned C {
 // CHECK: bb0(%0 : @guaranteed $AnyObject):
 // CHECK:   [[CP:%.*]] = copy_value %0 : $AnyObject
-// CHECK:   checked_cast_br [[CP]] : $AnyObject to C, bb1, bb2
+// CHECK:   checked_cast_br AnyObject in [[CP]] : $AnyObject to C, bb1, bb2
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF'
 func testCastAnyObjectToClass(_ o: AnyObject) -> C {
   switch (o) {
@@ -424,7 +424,7 @@ func testCastAnyObjectToClass(_ o: AnyObject) -> C {
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned C {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK:   [[CP:%.*]] = copy_value %0 : $T
-// CHECK:   checked_cast_br [[CP]] : $T to C, bb1, bb2
+// CHECK:   checked_cast_br T in [[CP]] : $T to C, bb1, bb2
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF'
 func testCastClassArchetypeToClass<T : AnyObject>(_ o: T) -> C {
   switch (o) {
