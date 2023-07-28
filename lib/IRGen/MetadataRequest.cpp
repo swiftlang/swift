@@ -27,6 +27,7 @@
 #include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
+#include "GenTuple.h"
 #include "GenType.h"
 #include "GenericArguments.h"
 #include "GenericRequirement.h"
@@ -1135,31 +1136,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
   return MetadataAccessStrategy::NonUniqueAccessor;
 }
 
-/// Emit a string encoding the labels in the given tuple type.
-static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
-                                            CanTupleType type) {
-  bool hasLabels = false;
-  llvm::SmallString<128> buffer;
-  for (auto &elt : type->getElements()) {
-    if (elt.hasName()) {
-      hasLabels = true;
-      buffer.append(elt.getName().str());
-    }
-
-    // Each label is space-terminated.
-    buffer += ' ';
-  }
-
-  // If there are no labels, use a null pointer.
-  if (!hasLabels) {
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-  }
-
-  // Otherwise, create a new string literal.
-  // This method implicitly adds a null terminator.
-  return IGM.getAddrOfGlobalString(buffer);
-}
-
 static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
   llvm::Constant *fullMetadata = IGM.getEmptyTupleMetadata();
   llvm::Constant *indices[] = {
@@ -1188,6 +1164,8 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
   // "vanishes" and gets unwrapped. This behavior is implemented in both
   // compile-time type substitution, and runtime type metadata instantiation,
   // ensuring consistent behavior.
+  //
+  // FIXME: Inconsistent behavior with one-element labeled tuples.
   if (type->getNumScalarElements() <= 1) {
     ConditionalDominanceScope scope(IGF);
 
@@ -1231,6 +1209,9 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
   {
     ConditionalDominanceScope scope(IGF);
 
+    llvm::Optional<StackAddress> labelString = emitDynamicTupleTypeLabels(
+        IGF, type, packType, shapeExpression);
+
     // Otherwise, we know that either statically or dynamically, we have more than
     // one element. Emit the pack.
     llvm::Value *shape;
@@ -1241,12 +1222,20 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
     auto *pointerToFirst = IGF.Builder.CreatePointerCast(
         addr.getAddressPointer(), IGF.IGM.TypeMetadataPtrPtrTy);
 
+    auto *flags = shapeExpression;
+    if (labelString) {
+      flags = IGF.Builder.CreateOr(flags, llvm::ConstantInt::get(IGF.IGM.SizeTy,
+            TupleTypeFlags().withNonConstantLabels(true).getIntValue()));
+    }
+
     // Call swift_getTupleMetadata().
     llvm::Value *args[] = {
       request.get(IGF),
-      shapeExpression,
+      flags,
       pointerToFirst,
-      getTupleLabelsString(IGF.IGM, type),
+      (labelString
+       ? labelString->getAddress().getAddress()
+       : llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)),
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
     };
 
@@ -1256,6 +1245,9 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
     call->setDoesNotThrow();
 
     cleanupTypeMetadataPack(IGF, addr, shape);
+
+    if (labelString)
+      IGF.emitDeallocateDynamicAlloca(*labelString);
   }
 
   // Control flow join with the one-element case.
