@@ -2785,15 +2785,26 @@ size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
     size_t offset = sizeof(uint64_t);
     return LayoutStringReader{type->getLayoutString(), offset}
         .readBytes<size_t>();
-  } else if (type->isClassObject() || type->isAnyExistentialType()) {
-    return sizeof(uint64_t);
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(type)) {
     size_t res = 0;
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
       res += _swift_refCountBytesForMetatype(tuple->getElement(i).Type);
     }
     return res;
+  } else if (auto *cls = type->getClassObject()) {
+    if (cls->isTypeMetadata()) {
+      auto *vwt = cls->getValueWitnesses();
+      if (vwt != &VALUE_WITNESS_SYM(Bo) &&
+          vwt != &VALUE_WITNESS_SYM(BO) &&
+          vwt != &VALUE_WITNESS_SYM(Bb)) {
+        goto metadata;
+      }
+    }
+    return sizeof(uint64_t);
+  } else if (type->isAnyExistentialType()) {
+    return sizeof(uint64_t);
   } else {
+  metadata:
     return sizeof(uint64_t) + sizeof(uintptr_t);
   }
 }
