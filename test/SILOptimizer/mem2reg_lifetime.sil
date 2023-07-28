@@ -311,8 +311,9 @@ bb2:
 // CHECK: bb3([[ARG:%.*]] : @owned $@callee_owned () -> Int):
 bb3:
   %13 = load [copy] %1 : $*@callee_owned () -> Int
-// CHECK: [[COPY:%.*]] = copy_value [[ARG]]
-// CHECK: [[RESULT:%.*]] = apply [[COPY]]
+//      : [[COPY:%.*]] = copy_value [[ARG]]
+// The above copy is eliminated by owned value canonicalization.
+// CHECK: [[RESULT:%.*]] = apply [[ARG]]
   %15 = apply %13() : $@callee_owned () -> Int
   br bb4
 
@@ -321,7 +322,8 @@ bb3:
   //       block.
 // CHECK: bb4
 bb4:
-// CHECK: destroy_value [[ARG]]
+//      : destroy_value [[ARG]]
+// The above destroy is eliminated by owned value canonicalization.
   destroy_addr %1 : $*@callee_owned () -> Int
   dealloc_stack %1 : $*@callee_owned () -> Int
   return %15 : $Int
