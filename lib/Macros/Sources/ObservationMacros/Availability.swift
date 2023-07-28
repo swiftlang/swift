@@ -51,7 +51,7 @@ extension IfConfigClauseSyntax {
   }
   
   var clonedAsIf: IfConfigClauseSyntax {
-    detached.with(\.poundKeyword, .poundIfKeyword())
+    detach().with(\.poundKeyword, .poundIfKeyword())
   }
 }
 
