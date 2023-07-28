@@ -1287,11 +1287,11 @@ bool SILInstruction::mayRequirePackMetadata() const {
   case SILInstructionKind::TryApplyInst: {
     // Check the function type for packs.
     auto apply = ApplySite::isa(const_cast<SILInstruction *>(this));
-    if (apply.getCallee()->getType().hasPack())
+    if (apply.getCallee()->getType().hasAnyPack())
       return true;
     // Check the substituted types for packs.
     for (auto ty : apply.getSubstitutionMap().getReplacementTypes()) {
-      if (ty->hasPack())
+      if (ty->hasAnyPack())
         return true;
     }
     return false;
@@ -1302,16 +1302,20 @@ bool SILInstruction::mayRequirePackMetadata() const {
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.
   {
-    return getOperand(0)->getType().hasPack();
+    return getOperand(0)->getType().hasAnyPack();
+  }
+  case SILInstructionKind::AllocStackInst: {
+    auto *asi = cast<AllocStackInst>(this);
+    return asi->getType().hasAnyPack();
   }
   case SILInstructionKind::MetatypeInst: {
     auto *mi = cast<MetatypeInst>(this);
-    return mi->getType().hasPack();
+    return mi->getType().hasAnyPack();
   }
   case SILInstructionKind::WitnessMethodInst: {
     auto *wmi = cast<WitnessMethodInst>(this);
     auto ty = wmi->getLookupType();
-    return ty->hasPack();
+    return ty->hasAnyPack();
   }
   default:
     return false;

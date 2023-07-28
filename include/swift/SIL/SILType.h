@@ -377,11 +377,14 @@ public:
   /// pack.
   bool hasParameterPack() const { return getASTType()->hasParameterPack(); }
 
-  /// Whether the type contains a concrete pack.
-  bool hasConcretePack() const { return getASTType()->hasConcretePack(); }
-
-  /// Whether the type contains some flavor of pack.
+  /// Whether the type contains a PackType.
   bool hasPack() const { return getASTType()->hasPack(); }
+
+  /// Whether the type contains a PackArchetypeType.
+  bool hasPackArchetype() const { return getASTType()->hasPackArchetype(); }
+
+  /// Whether the type contains any flavor of pack.
+  bool hasAnyPack() const { return getASTType()->hasAnyPack(); }
 
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
