@@ -6605,6 +6605,22 @@ bool ConstraintSystem::repairFailures(
     conversionsOrFixes.push_back(fix);
     return true;
   }
+  case ConstraintLocator::KeyPathValue: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      break;
+
+    auto kpExpr = castToExpr<KeyPathExpr>(anchor);
+    auto i = kpExpr->getComponents().size() - 1;
+    auto lastCompLoc =
+        getConstraintLocator(kpExpr, LocatorPathElt::KeyPathComponent(i));
+    if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
+      return true;
+
+    conversionsOrFixes.push_back(IgnoreContextualType::create(
+        *this, lhs, rhs, getConstraintLocator(anchor)));
+  }
   default:
     break;
   }
