@@ -5855,6 +5855,7 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
   NamedPattern *NamingPattern = nullptr;
+  GenericEnvironment *OpenedElementEnvironment = nullptr;
 
 public:
   enum class Introducer : uint8_t {
@@ -5981,6 +5982,13 @@ public:
 
   NamedPattern *getNamingPattern() const;
   void setNamingPattern(NamedPattern *Pat);
+
+  GenericEnvironment *getOpenedElementEnvironment() const {
+    return OpenedElementEnvironment;
+  }
+  void setOpenedElementEnvironment(GenericEnvironment *Env) {
+    OpenedElementEnvironment = Env;
+  }
 
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
