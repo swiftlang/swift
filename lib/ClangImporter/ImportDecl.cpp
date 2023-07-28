@@ -2236,7 +2236,9 @@ namespace {
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
 
         if (!member) {
-          if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
+          if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd) &&
+              !isa<clang::TypeAliasTemplateDecl>(nd) &&
+              !isa<clang::FunctionTemplateDecl>(nd)) {
             // We don't know what this member is.
             // Assume it may be important in C.
             hasUnreferenceableStorage = true;
