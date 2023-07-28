@@ -929,7 +929,7 @@ endlocal
 setlocal enableextensions enabledelayedexpansion
 
 :: Package bld.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bld.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bld\bld.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\bld\ ^
@@ -941,7 +941,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bld.wixproj ^
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\bld\bld.msi
 
 :: Package cli.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\cli.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\cli\cli.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\cli\ ^
@@ -953,7 +953,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\cli.wixproj ^
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\cli\cli.msi
 
 :: Package dbg.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\dbg.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\dbg\dbg.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\dbg\ ^
@@ -965,7 +965,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\dbg.wixproj ^
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\dbg\dbg.msi
 
 :: Package ide.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\ide.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\ide\ide.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\ide\ ^
@@ -977,7 +977,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\ide.wixproj ^
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\ide\ide.msi
 
 :: Package sdk.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk\sdk.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
@@ -989,7 +989,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
 
 :: Package runtime.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime\runtime.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
@@ -1008,7 +1008,7 @@ move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
 move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
 
 :: Build Installer
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bundle\installer.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
