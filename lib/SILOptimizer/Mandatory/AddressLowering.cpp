@@ -3483,6 +3483,14 @@ protected:
     pass.deleter.forceDelete(sei);
   }
 
+  void visitStrongCopyWeakValueInst(StrongCopyWeakValueInst *scwvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadWeak(scwvi->getLoc(), sourceAddr, IsNotTake);
+    scwvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scwvi);
+  }
+
   // Extract from an opaque struct.
   void visitStructExtractInst(StructExtractInst *extractInst);
 
@@ -4093,6 +4101,15 @@ protected:
     assert(uncondCheckedCast->getType().isAddressOnly(*pass.function));
 
     rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass);
+  }
+
+  void visitWeakCopyValueInst(WeakCopyValueInst *wcsvi) {
+    auto &storage = pass.valueStorageMap.getStorage(wcsvi);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreWeak(wcsvi->getLoc(), wcsvi->getOperand(), destAddr,
+                            IsInitialization);
   }
 };
 } // end anonymous namespace
