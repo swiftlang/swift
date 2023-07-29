@@ -162,6 +162,7 @@ public:
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
   IGNORED_ATTR(NonEscapable)
+  IGNORED_ATTR(UnsafeNonEscapableResult)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
