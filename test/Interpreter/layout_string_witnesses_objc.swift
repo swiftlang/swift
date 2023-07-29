@@ -5,7 +5,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
+// RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -25,19 +25,19 @@ func testNestedResilientObjc() {
 
     do {
         let y = NestedWrapper<ObjCPrintOnDealloc>(x: .init(x: ObjCPrintOnDealloc()), y: .init(x: ObjCPrintOnDealloc()))
-        // CHECK-macosx: Before deinit
+        // CHECK: Before deinit
         print("Before deinit")
 
-        // CHECK-macosx-NEXT: ObjCPrintOnDealloc deinitialized!
-        // CHECK-macosx-NEXT: ObjCPrintOnDealloc deinitialized!
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
         testGenericAssign(ptr, from: y)
     }
 
-    // CHECK-macosx-NEXT: Before deinit
+    // CHECK-NEXT: Before deinit
     print("Before deinit")
 
-    // CHECK-macosx-NEXT: ObjCPrintOnDealloc deinitialized!
-    // CHECK-macosx-NEXT: ObjCPrintOnDealloc deinitialized!
+    // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+    // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
     testGenericDestroy(ptr, of: NestedWrapper<ObjCPrintOnDealloc>.self)
 
     ptr.deallocate()
