@@ -10,6 +10,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// rdar://113069151
+// UNSUPPORTED: OS=ios
+
 import Swift
 import layout_string_witnesses_types
 import ObjCClasses
