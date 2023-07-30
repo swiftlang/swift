@@ -2983,6 +2983,20 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
                                 IGM.getPointerSize() * numFields);
 }
 
+static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
+                                    Size count, SILType T,
+                                    llvm::Value *metadata,
+                                    MetadataDependencyCollector *collector) {
+  auto &IGM = IGF.IGM;
+  auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
+  StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
+
+  // Call swift_initRawStructMetadata().
+  IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
+                         {metadata, IGM.getSize(Size(uintptr_t(flags))),
+                          likeTypeLayout, IGM.getSize(count)});
+}
+
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         NominalTypeDecl *nominalDecl,
                                         llvm::Value *metadata,
@@ -2996,9 +3010,33 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
         IGM.getOptions().EnableLayoutStringValueWitnesses &&
         IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
 
-  if (isa<StructDecl>(nominalDecl)) {
+  if (auto sd = dyn_cast<StructDecl>(nominalDecl)) {
     auto &fixedTI = IGM.getTypeInfo(loweredTy);
     if (isa<FixedTypeInfo>(fixedTI)) return;
+
+    // Use a different runtime function to initialize the value witness table
+    // if the struct has a raw layout. The existing swift_initStructMetadata
+    // is the wrong thing for these types.
+    if (auto rawLayout = nominalDecl->getAttrs().getAttribute<RawLayoutAttr>()) {
+      SILType loweredLikeType;
+      Size count;
+
+      if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
+        loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                             *likeType);
+        count = Size(-1);
+      } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
+        auto likeType = likeArray->first;
+        loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                             likeType);
+
+        count = Size(likeArray->second);
+      }
+
+      emitInitializeRawLayout(IGF, loweredLikeType, count, loweredTy, metadata,
+                              collector);
+      return;
+    }
 
     if (useLayoutStrings) {
       emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,

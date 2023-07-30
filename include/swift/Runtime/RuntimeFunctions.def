@@ -2486,6 +2486,18 @@ FUNCTION(GenericInstantiateLayoutString,
          ATTRS(NoUnwind),
          EFFECT(MetaData))
 
+// void swift_initRawStructMetadata(Metadata *structType,
+//                                  StructLayoutFlags flags,
+//                                  const TypeLayout *likeType,
+//                                  size_t count);
+FUNCTION(InitRawStructMetadata,
+         swift_initRawStructMetadata,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy->getPointerTo(0), SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
