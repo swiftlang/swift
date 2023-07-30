@@ -1945,7 +1945,8 @@ struct ResponseSymbolInfo {
     }
     OS << ")" << '\n';
 
-    OS << Name << '\n';
+    if (Name)
+      OS << Name << '\n';
     if (USR)
       OS << USR << '\n';
     if (Lang)

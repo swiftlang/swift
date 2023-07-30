@@ -21,6 +21,15 @@ func foo2(_ a : inout [S1]) {
 import Swift
 func foo3(a: Float, b: Bool) {}
 
+import AppKit.NSColor
+let colorResource = #colorLiteral(red: 0.8549019694, green: 0.250980407, blue: 0.4784313738, alpha: 1)
+
+let arrLiteral = [1, 2, 3]
+let arrNonConst = [1, 2, d]
+
+let dictLiteral = [1:2, 3:4]
+let dictNonCost = [1:2, 3:d]
+
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
@@ -222,3 +231,59 @@ func foo3(a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=22:25 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-BOOL1 %s
 // CHECK-BOOL1: s:Sb
+
+// RUN: %sourcekitd-test_plain \
+// RUN:    -req=open -name %s %s -- %s -sdk %sdk == \
+// RUN:    -req=cursor -pos=25:29 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-OBJ-LITERAL %s
+// CHECK-OBJ-LITERAL: source.lang.swift.expr.object_literal
+// CHECK-OBJ-LITERAL-EMPTY:
+// CHECK-OBJ-LITERAL: c:objc(cs)NSColor
+// CHECK-OBJ-LITERAL: source.lang.objc
+// CHECK-OBJ-LITERAL: NSColor
+// CHECK-OBJ-LITERAL: $sSo7NSColorCD
+// CHECK-OBJ-LITERAL: AppKit.NSColor
+// CHECK-OBJ-LITERAL: SYSTEM
+
+// RUN: %sourcekitd-test_plain -req=cursor -pos=27:18 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-ARRAY1 %s
+// CHECK-ARRAY1: source.lang.swift.expr.literal
+// CHECK-ARRAY1-EMPTY:
+// CHECK-ARRAY1: s:Sa
+// CHECK-ARRAY1: source.lang.swift
+// CHECK-ARRAY1: [Int]
+// CHECK-ARRAY1: $sSiXSaD
+// CHECK-ARRAY1: Swift
+// CHECK-ARRAY1: <Group>Collection/Array</Group>
+// CHECK-ARRAY1: SYSTEM
+
+// RUN: %sourcekitd-test_plain -req=cursor -pos=28:19 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-ARRAY2 %s
+// CHECK-ARRAY2: source.lang.swift.expr.literal
+// CHECK-ARRAY2-EMPTY:
+// CHECK-ARRAY2: s:Sa
+// CHECK-ARRAY2: source.lang.swift
+// CHECK-ARRAY2: [Any]
+// CHECK-ARRAY2: $sypXSaD
+// CHECK-ARRAY2: Swift
+// CHECK-ARRAY2: <Group>Collection/Array</Group>
+// CHECK-ARRAY2: SYSTEM
+
+// RUN: %sourcekitd-test_plain -req=cursor -pos=30:19 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-DICT1 %s
+// CHECK-DICT1: source.lang.swift.expr.literal
+// CHECK-DICT1-EMPTY:
+// CHECK-DICT1: s:SD
+// CHECK-DICT1: source.lang.swift
+// CHECK-DICT1: [Int : Int]
+// CHECK-DICT1: $sS2iXSDD
+// CHECK-DICT1: Swift
+// CHECK-DICT1: <Group>Collection/HashedCollections</Group>
+// CHECK-DICT1: SYSTEM
+
+// RUN: %sourcekitd-test_plain -req=cursor -pos=31:19 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-DICT2 %s
+// CHECK-DICT2: source.lang.swift.expr.literal
+// CHECK-DICT2-EMPTY:
+// CHECK-DICT2: s:SD
+// CHECK-DICT2: source.lang.swift
+// CHECK-DICT2: [Int : Any]
+// CHECK-DICT2: $sSiypXSDD
+// CHECK-DICT2: Swift
+// CHECK-DICT2: <Group>Collection/HashedCollections</Group>
+// CHECK-DICT2: SYSTEM

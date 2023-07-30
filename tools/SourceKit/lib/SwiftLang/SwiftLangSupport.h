@@ -427,6 +427,7 @@ public:
   static SourceKit::UIdent getUIDForDeclLanguage(const swift::Decl *D);
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
+  static SourceKit::UIdent getUIDForLiteral(const swift::Expr *Lit);
   static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);
   static SourceKit::UIdent getUIDForLocalVar(bool IsRef = false);
   static SourceKit::UIdent getUIDForRefactoringKind(

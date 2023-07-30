@@ -405,6 +405,7 @@ UID_KINDS = [
     KIND('ExprArray', 'source.lang.swift.expr.array'),
     KIND('ExprDictionary', 'source.lang.swift.expr.dictionary'),
     KIND('ExprObjectLiteral', 'source.lang.swift.expr.object_literal'),
+    KIND('ExprLiteral', 'source.lang.swift.expr.literal'),
     KIND('ExprTuple', 'source.lang.swift.expr.tuple'),
     KIND('ExprClosure', 'source.lang.swift.expr.closure'),
     KIND('StructureElemId', 'source.lang.swift.structure.elem.id'),

@@ -776,6 +776,7 @@ struct DeclInfo {
   Type ContainerType;
   bool IsRef;
   bool IsDynamic;
+  Expr* LitExpr;
   ArrayRef<NominalTypeDecl *> ReceiverTypes;
 
   /// If VD is a synthesized property wrapper backing storage (_foo) or
@@ -788,10 +789,10 @@ struct DeclInfo {
   bool InSynthesizedExtension = false;
 
   DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
-           ArrayRef<NominalTypeDecl *> ReceiverTypes,
+           Expr *LitExpr, ArrayRef<NominalTypeDecl *> ReceiverTypes,
            const CompilerInvocation &Invoc)
       : VD(VD), ContainerType(ContainerType), IsRef(IsRef),
-        IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
+        IsDynamic(IsDynamic), LitExpr(LitExpr), ReceiverTypes(ReceiverTypes) {
     if (VD == nullptr)
       return;
 
@@ -944,12 +945,17 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   SmallString<256> Buffer;
   SmallVector<StringRef, 4> Strings;
   llvm::raw_svector_ostream OS(Buffer);
+  bool isLiteral = DInfo.LitExpr != nullptr;
 
   Symbol.DeclarationLang = SwiftLangSupport::getUIDForDeclLanguage(DInfo.VD);
-  Symbol.Kind = SwiftLangSupport::getUIDForDecl(DInfo.VD, DInfo.IsRef);
 
-  SwiftLangSupport::printDisplayName(DInfo.VD, OS);
-  Symbol.Name = copyAndClearString(Allocator, Buffer);
+  if (isLiteral) {
+    Symbol.Kind = SwiftLangSupport::getUIDForLiteral(DInfo.LitExpr);
+  } else {
+    Symbol.Kind = SwiftLangSupport::getUIDForDecl(DInfo.VD, DInfo.IsRef);
+    SwiftLangSupport::printDisplayName(DInfo.VD, OS);
+    Symbol.Name = copyAndClearString(Allocator, Buffer);
+  }
 
   SwiftLangSupport::printUSR(DInfo.OriginalProperty, OS);
   if (DInfo.InSynthesizedExtension) {
@@ -958,10 +964,17 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.USR = copyAndClearString(Allocator, Buffer);
 
+  Type InterfaceType;
+  if (isLiteral) {
+    InterfaceType = DInfo.LitExpr->getType();
+  } else {
+    InterfaceType = DInfo.VD->getInterfaceType();
+  }
+
   {
     PrintOptions Options;
     Options.PrintTypeAliasUnderlyingType = true;
-    DInfo.VD->getInterfaceType().print(OS, Options);
+    InterfaceType.print(OS, Options);
   }
   Symbol.TypeName = copyAndClearString(Allocator, Buffer);
 
@@ -970,7 +983,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   // But ParameterizedProtocolType can currently occur in 'typealias'
   // declarations. rdar://99176683
   // To avoid crashing in USR generation, return an error for now.
-  if (auto Ty = DInfo.VD->getInterfaceType()) {
+  if (Type Ty = InterfaceType) {
     while (auto MetaTy = Ty->getAs<MetatypeType>()) {
       Ty = MetaTy->getInstanceType();
     }
@@ -981,7 +994,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     }
   }
 
-  SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
+  if (isLiteral) {
+    SwiftLangSupport::printTypeUSR(DInfo.LitExpr->getType(), OS);
+  } else {
+    SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
+  }
   Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
 
   if (DInfo.ContainerType && !DInfo.ContainerType->hasArchetype()) {
@@ -1152,14 +1169,39 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 }
 
 static bool
+addCursorInfoForLiteral(CursorInfoData &Data, Expr *LitExpr,
+                        SwiftLangSupport &Lang,
+                        const CompilerInvocation &CompInvoc,
+                        SourceLoc CursorLoc,
+                        ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
+  Type LitType = LitExpr->getType();
+  if (!LitType || !LitType->getAnyNominal()) {
+    return false;
+  }
+  TypeDecl *Decl = LitType->getAnyNominal();
+  auto &Symbol = Data.Symbols.emplace_back();
+  DeclInfo Info(Decl, nullptr, false, false, LitExpr, {}, CompInvoc);
+  auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
+                            PreviousSnaps, Data.Allocator);
+  bool Success = true;
+  llvm::handleAllErrors(
+      std::move(Err), [&](const llvm::StringError &E) {
+        Data.InternalDiagnostic =
+            copyCString(E.getMessage(), Data.Allocator);
+        Success = false;
+      });
+  return Success;
+}
+
+static bool
 addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
                      bool AddRefactorings, bool AddSymbolGraph,
                      SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
                      std::string &Diagnostic,
                      ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
   DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
-                    Info->isDynamic(), Info->getReceiverTypes(), Invoc);
-  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
+                    Info->isDynamic(), nullptr, Info->getReceiverTypes(), Invoc);
+  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false, nullptr,
                         ArrayRef<NominalTypeDecl *>(), Invoc);
   DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
   if (MainInfo.Unavailable) {
@@ -1196,7 +1238,7 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   if (!Info->isRef()) {
     for (auto D : Info->getShorthandShadowedDecls()) {
       CursorSymbolInfo &SymbolInfo = Data.Symbols.emplace_back();
-      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false, nullptr,
                      ArrayRef<NominalTypeDecl *>(), Invoc);
       if (auto Err =
               fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
@@ -1630,21 +1672,54 @@ static void resolveCursor(
       }
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
+        // If code under cursor is literal expression returns Expr,
+        // otherwise nullptr
+        auto tryGetLiteralExpr = [](auto CI) -> Expr * {
+          auto *ExprInfo = dyn_cast<ResolvedExprStartCursorInfo>(CI);
+          if (!ExprInfo || !ExprInfo->getTrailingExpr()) {
+            return nullptr;
+          }
+          Expr* E = ExprInfo->getTrailingExpr();
+          if (dyn_cast<LiteralExpr>(E)) {
+              return E;
+          }
+          switch (E->getKind()) {
+          case ExprKind::Array:
+          case ExprKind::Dictionary:
+          case ExprKind::KeyPath: {
+            return E;
+          }
+          default:
+            return nullptr;
+          }
+        };
+
+        CursorInfoData Data;
+
         if (Actionables) {
           addRefactorings(
               Actions, collectRefactorings(CursorInfo, /*ExcludeRename=*/true));
-          if (!Actions.empty()) {
-            CursorInfoData Data;
-            Data.AvailableActions = Actions;
-            Receiver(RequestResult<CursorInfoData>::fromResult(Data));
-            return;
+          Data.AvailableActions = Actions;
+        }
+
+        // Handle literal expression
+        if (auto *LitExpr = tryGetLiteralExpr(CursorInfo)) {
+          bool Success = addCursorInfoForLiteral(Data, LitExpr, Lang, CompInvok,
+                                                 CursorInfo->getLoc(),
+                                                 getPreviousASTSnaps());
+          if (!Success) {
+            Data.Symbols.clear();
+            Data.AvailableActions.clear();
           }
         }
 
-        CursorInfoData Info;
-        Info.InternalDiagnostic =
-            "Resolved to incomplete expression or statement.";
-        Receiver(RequestResult<CursorInfoData>::fromResult(Info));
+        if (Data.InternalDiagnostic.empty() && Data.AvailableActions.empty() &&
+            Data.Symbols.empty()) {
+          Data.InternalDiagnostic =
+              "Resolved to incomplete expression or statement.";
+        }
+
+        Receiver(RequestResult<CursorInfoData>::fromResult(Data));
         return;
       }
       case CursorInfoKind::Invalid:
