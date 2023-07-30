@@ -11,10 +11,9 @@
 
 import SwiftSyntax
 import SwiftSyntaxMacros
-
-@_implementationOnly import SwiftDiagnostics
-@_implementationOnly import SwiftOperators
-@_implementationOnly import SwiftSyntaxBuilder
+import SwiftDiagnostics
+import SwiftOperators
+import SwiftSyntaxBuilder
 
 extension VariableDeclSyntax {
   var identifierPattern: IdentifierPatternSyntax? {
