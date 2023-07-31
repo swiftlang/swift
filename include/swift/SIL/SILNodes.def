@@ -453,10 +453,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // alone by OSSA optimizations.
   SINGLE_VALUE_INST(ExplicitCopyValueInst, explicit_copy_value,
                     SingleValueInstruction, None, DoesNotRelease)
-#define UNCHECKED_REF_STORAGE(Name, name, ...) \
-  SINGLE_VALUE_INST(StrongCopy##Name##ValueInst, strong_copy_##name##_value, \
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+#define REF_STORAGE(Name, name, ...) \
   SINGLE_VALUE_INST(StrongCopy##Name##ValueInst, strong_copy_##name##_value, \
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"

@@ -132,6 +132,10 @@ public:
   /// values.
   ManagedValue createExplicitCopyValue(SILLocation Loc, ManagedValue operand);
 
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
+                                             ManagedValue originalValue);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   using SILBuilder::createStrongCopy##Name##Value;                             \
   ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \

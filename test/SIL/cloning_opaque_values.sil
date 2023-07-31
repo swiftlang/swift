@@ -1,0 +1,30 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-opaque-values -inline %s | %FileCheck %s
+
+// Check cloning of instructions that are only legal in opaque values mode.
+
+import Swift
+
+struct WeakBox<T : AnyObject> {
+  weak var t: T?
+}
+
+
+// CHECK-LABEL: sil [ossa] @strong_copy_weak_value_caller : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
+// CHECK:         [[STRONG_OPTIONAL:%[^,]+]] = strong_copy_weak_value [[WEAK_OPTIONAL]]
+// CHECK:         return [[STRONG_OPTIONAL]]
+// CHECK-LABEL: } // end sil function 'strong_copy_weak_value_caller'
+sil [ossa] @strong_copy_weak_value_caller : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T> {
+bb0(%instance : @guaranteed $WeakBox<T>):
+  %callee = function_ref @strong_copy_weak_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T>
+  %retval = apply %callee<T>(%instance) : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T>
+  return %retval : $Optional<T>
+}
+
+sil [always_inline] [ossa] @strong_copy_weak_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T> {
+bb0(%instance : @guaranteed $WeakBox<T>):
+  %weak_optional = struct_extract %instance : $WeakBox<T>, #WeakBox.t
+  %strong_optional = strong_copy_weak_value %weak_optional : $@sil_weak Optional<T>
+  return %strong_optional : $Optional<T>
+}

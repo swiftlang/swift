@@ -3648,6 +3648,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     REFCOUNTING_INSTRUCTION(RetainValueAddr)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   UNARY_INSTRUCTION(StrongCopy##Name##Value)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   REFCOUNTING_INSTRUCTION(StrongRetain##Name)                                  \
   REFCOUNTING_INSTRUCTION(Name##Retain)                                        \

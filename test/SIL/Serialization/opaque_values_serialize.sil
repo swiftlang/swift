@@ -82,3 +82,19 @@ bb0(%0 : $S):
   return %t : $()
 }
 // CHECK-LABEL: } // end sil function 'serialize_mutating'
+
+struct WeakBox<T : AnyObject> {
+  weak var t: T?
+}
+
+// CHECK-LABEL: sil [ossa] @test_strong_copy_weak_value : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
+// CHECK:         strong_copy_weak_value [[WEAK_OPTIONAL]]
+// CHECK-LABEL: } // end sil function 'test_strong_copy_weak_value'
+sil [ossa] @test_strong_copy_weak_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T> {
+bb0(%instance : @guaranteed $WeakBox<T>):
+  %weak_optional = struct_extract %instance : $WeakBox<T>, #WeakBox.t
+  %strong_optional = strong_copy_weak_value %weak_optional : $@sil_weak Optional<T>
+  return %strong_optional : $Optional<T>
+}
