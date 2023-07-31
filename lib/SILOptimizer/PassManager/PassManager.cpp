@@ -1392,9 +1392,7 @@ irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
 
     irgen = new irgen::IRGenerator(*irgenOpts, *module);
     auto targetMachine = irgen->createTargetMachine();
-    if (!targetMachine)
-      return nullptr;
-
+    assert(targetMachine && "failed to create target");
     irgenModule = new irgen::IRGenModule(*irgen, std::move(targetMachine));
   }
   return irgenModule;
@@ -1409,14 +1407,6 @@ void SwiftPassInvocation::endPass() {
   if (ssaUpdater) {
     delete ssaUpdater;
     ssaUpdater = nullptr;
-  }
-  if (irgenModule) {
-    delete irgenModule;
-    irgenModule = nullptr;
-  }
-  if (irgen) {
-    delete irgen;
-    irgen = nullptr;
   }
 }
 
@@ -1436,6 +1426,17 @@ void SwiftPassInvocation::endTransformFunction() {
   function = nullptr;
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+}
+
+SwiftPassInvocation::~SwiftPassInvocation() {
+  if (irgenModule) {
+    delete irgenModule;
+    irgenModule = nullptr;
+  }
+  if (irgen) {
+    delete irgen;
+    irgen = nullptr;
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -102,6 +102,8 @@ public:
   SwiftPassInvocation(SILPassManager *passManager) :
     passManager(passManager) {}
 
+  ~SwiftPassInvocation();
+
   SILPassManager *getPassManager() const { return passManager; }
   
   SILTransform *getTransform() const { return transform; }
