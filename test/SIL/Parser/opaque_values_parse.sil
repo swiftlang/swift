@@ -114,3 +114,17 @@ bb0(%instance : @guaranteed $WeakBox<T>):
   %strong_optional = strong_copy_weak_value %weak_optional : $@sil_weak Optional<T>
   return %strong_optional : $Optional<T>
 }
+
+// Test weak_copy_value parsing.
+
+// CHECK-LABEL: sil [ossa] @test_weak_copy_value_1 : {{.*}} {
+// CHECK:       bb0([[VALUE:%[^,]+]] :
+// CHECK:         weak_copy_value [[VALUE]]
+// CHECK-LABEL: } // end sil function 'test_weak_copy_value_1'
+sil [ossa] @test_weak_copy_value_1 : $@convention(thin) <T where T : AnyObject> (@owned Optional<T>) -> @out WeakBox<T> {
+bb0(%value : @owned $Optional<T>):
+  %weak_value = weak_copy_value %value : $Optional<T>
+  destroy_value %value : $Optional<T>
+  %retval = struct $WeakBox<T> (%weak_value : $@sil_weak Optional<T>)
+  return %retval : $WeakBox<T>
+}

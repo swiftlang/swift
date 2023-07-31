@@ -1503,6 +1503,7 @@ public:
 
   void visitHasSymbolInst(HasSymbolInst *i);
 
+  void visitWeakCopyValueInst(swift::WeakCopyValueInst *i);
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
   void visit##Name##ToRefInst(Name##ToRefInst *i);
@@ -5354,6 +5355,10 @@ void IRGenSILFunction::visitStrongCopyWeakValueInst(
     swift::StrongCopyWeakValueInst *i) {
   llvm::report_fatal_error(
       "strong_copy_weak_value not lowered by AddressLowering!?");
+}
+
+void IRGenSILFunction::visitWeakCopyValueInst(swift::WeakCopyValueInst *i) {
+  llvm::report_fatal_error("weak_copy_value not lowered by AddressLowering!?");
 }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \

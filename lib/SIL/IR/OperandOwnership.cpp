@@ -220,6 +220,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
+OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"

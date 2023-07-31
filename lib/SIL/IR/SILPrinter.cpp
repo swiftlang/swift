@@ -2141,6 +2141,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitWeakCopyValueInst(WeakCopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
 #define REF_STORAGE(Name, ...)                                                 \
   void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \

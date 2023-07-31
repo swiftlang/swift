@@ -49,6 +49,7 @@ public:
     return OwnershipKind::OWNERSHIP;                                           \
   }
 
+CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)                      \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)

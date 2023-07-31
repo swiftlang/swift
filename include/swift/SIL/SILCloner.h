@@ -1407,6 +1407,14 @@ SILCloner<ImplClass>::visitDebugStepInst(DebugStepInst *Inst) {
   recordClonedInstruction(Inst, getBuilder().createDebugStep(Inst->getLoc()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitWeakCopyValueInst(WeakCopyValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createWeakCopyValue(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand())));
+}
+
 #define COPYABLE_STORAGE_HELPER(Name, name)                                    \
   template <typename ImplClass>                                                \
   void SILCloner<ImplClass>::visitStrongCopy##Name##ValueInst(                 \

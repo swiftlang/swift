@@ -1061,6 +1061,16 @@ public:
         getSILDebugLocation(Loc), ArgumentsSpecification, getModule()));
   }
 
+  WeakCopyValueInst *createWeakCopyValue(SILLocation Loc, SILValue operand) {
+    assert(!getFunction().getModule().useLoweredAddresses());
+    auto type = operand->getType()
+                    .getReferenceStorageType(getFunction().getASTContext(),
+                                             ReferenceOwnership::Weak)
+                    .getObjectType();
+    return insert(new (getModule()) WeakCopyValueInst(getSILDebugLocation(Loc),
+                                                      operand, type));
+  }
+
 #define COPYABLE_STORAGE_HELPER(Name)                                          \
   StrongCopy##Name##ValueInst *createStrongCopy##Name##Value(                  \
       SILLocation Loc, SILValue operand) {                                     \

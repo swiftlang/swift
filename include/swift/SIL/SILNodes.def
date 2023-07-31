@@ -453,6 +453,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // alone by OSSA optimizations.
   SINGLE_VALUE_INST(ExplicitCopyValueInst, explicit_copy_value,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(WeakCopyValueInst, weak_copy_value,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #define REF_STORAGE(Name, name, ...) \
   SINGLE_VALUE_INST(StrongCopy##Name##ValueInst, strong_copy_##name##_value, \
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)

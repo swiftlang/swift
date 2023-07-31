@@ -2975,6 +2975,13 @@ public:
             "'MoveOnly' types can only be copied in Raw SIL?!");
   }
 
+  void checkWeakCopyValueInst(WeakCopyValueInst *I) {
+    require(!F.getModule().useLoweredAddresses(),
+            "weak_copy_value is only valid in opaque values");
+    require(I->getType().isAddressOnly(F),
+            "weak_copy_value must produce an address-only value");
+  }
+
   void checkStrongCopyWeakValueInst(StrongCopyWeakValueInst *I) {
     require(!F.getModule().useLoweredAddresses(),
             "strong_copy_weak_value is only valid in opaque values");

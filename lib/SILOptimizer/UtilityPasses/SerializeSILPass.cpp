@@ -210,6 +210,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::WeakCopyValueInst:
 #define REF_STORAGE(Name, ...)                                                 \
   case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
