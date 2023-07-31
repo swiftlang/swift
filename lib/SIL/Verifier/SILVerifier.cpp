@@ -2736,7 +2736,7 @@ public:
       SILFunctionConventions initConv(initTy, AI->getModule());
 
       require(initConv.getNumIndirectSILResults() ==
-                  AI->getInitializedProperties().size(),
+                  AI->getNumInitializedProperties(),
               "init function has invalid number of indirect results");
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }

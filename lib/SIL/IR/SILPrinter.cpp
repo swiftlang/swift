@@ -1806,7 +1806,11 @@ public:
       }
     }
 
-    *this << "self " << getIDAndType(AI->getSelf());
+    *this << "#";
+    printFullContext(AI->getProperty()->getDeclContext(), PrintState.OS);
+    *this << AI->getPropertyName();
+
+    *this << ", self " << getIDAndType(AI->getSelf());
     *this << ", value " << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());

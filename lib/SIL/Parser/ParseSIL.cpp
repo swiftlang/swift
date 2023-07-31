@@ -4749,12 +4749,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::AssignOrInitInst: {
+    ValueDecl *Prop;
     SILValue Self, Src, InitFn, SetFn;
     AssignOrInitInst::Mode Mode;
     llvm::SmallVector<unsigned, 2> assignments;
 
     if (parseAssignOrInitMode(Mode, *this) ||
         parseAssignOrInitAssignments(assignments, *this) ||
+        parseSILDottedPath(Prop) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("self") || parseTypedValueRef(Self, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("value") || parseTypedValueRef(Src, B) ||
@@ -4765,7 +4768,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    auto *AI = B.createAssignOrInit(InstLoc, Self, Src, InitFn, SetFn, Mode);
+    auto *AI = B.createAssignOrInit(InstLoc, cast<VarDecl>(Prop), Self, Src,
+                                    InitFn, SetFn, Mode);
 
     for (unsigned index : assignments)
       AI->markAsInitialized(index);
