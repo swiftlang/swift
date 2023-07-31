@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
 
@@ -647,3 +647,21 @@ func giveKeyPathString() {
 @backDeployed(before: SwiftStdlib 5.8)
 public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }
 #endif
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen13UnownedVarBoxV5valuexvg : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[UNOWNED_VALUE:%[^,]+]] = struct_extract [[INSTANCE]]
+// CHECK:         [[STRONG_VALUE:%[^,]+]] = strong_copy_unowned_value [[UNOWNED_VALUE]]
+// CHECK:         return [[STRONG_VALUE]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen13UnownedVarBoxV5valuexvg'
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen13UnownedVarBoxV5valueACyxGx_tcfC : {{.*}} {
+// CHECK:       bb0([[STRONG_VALUE:%[^,]+]] :
+// CHECK:         [[UNOWNED_VALUE:%[^,]+]] = ref_to_unowned [[STRONG_VALUE]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[UNOWNED_VALUE]]
+// CHECK:         destroy_value [[STRONG_VALUE]]
+// CHECK:         [[RETVAL:%[^,]+]] = struct $UnownedVarBox<T> ([[COPY]] : $@sil_unowned T)
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen13UnownedVarBoxV5valueACyxGx_tcfC'
+struct UnownedVarBox<T : AnyObject> {
+  unowned var value: T
+}

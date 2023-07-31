@@ -4705,16 +4705,17 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.emitDestroyValueOperation(loc, semanticValue); \
     return value; \
   }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: { \
-    /* For loadable types, place into a box. */ \
-    auto type = storageType.castTo<Name##StorageType>(); \
-    assert(type->isLoadable(ResilienceExpansion::Maximal)); \
-    (void) type; \
-    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
-    value = B.createCopyValue(loc, value); \
-    B.emitDestroyValueOperation(loc, semanticValue); \
-    return value; \
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  case ReferenceOwnership::Name: {                                             \
+    /* For loadable types, place into a box. */                                \
+    auto type = storageType.castTo<Name##StorageType>();                       \
+    assert(type->isLoadable(ResilienceExpansion::Maximal) ||                   \
+           !useLoweredAddresses());                                            \
+    (void)type;                                                                \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType);     \
+    value = B.createCopyValue(loc, value);                                     \
+    B.emitDestroyValueOperation(loc, semanticValue);                           \
+    return value;                                                              \
   }
 #define UNCHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: { \
