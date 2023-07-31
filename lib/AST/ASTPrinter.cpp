@@ -309,6 +309,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+        if (accessor->isInitAccessor() && !options.PrintForSIL)
+          return false;
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
@@ -2259,8 +2264,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       accessorsToPrint.push_back(Accessor);
   };
 
+  if (ASD->hasInitAccessor())
+    AddAccessorToPrint(AccessorKind::Init);
+
   if (PrintAbstract) {
     AddAccessorToPrint(AccessorKind::Get);
+
     if (ASD->supportsMutation())
       AddAccessorToPrint(AccessorKind::Set);
   } else {

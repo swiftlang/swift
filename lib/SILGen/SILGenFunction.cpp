@@ -1859,6 +1859,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     setterFRef = SILUndef::get(initFRef->getType(), F);
   }
 
-  B.createAssignOrInit(loc, selfValue.getValue(), newValue.forward(*this),
-                       initFRef, setterFRef, AssignOrInitInst::Unknown);
+  B.createAssignOrInit(loc, field, selfValue.getValue(),
+                       newValue.forward(*this), initFRef, setterFRef,
+                       AssignOrInitInst::Unknown);
 }

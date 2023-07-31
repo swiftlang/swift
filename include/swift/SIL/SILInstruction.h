@@ -4820,6 +4820,9 @@ class AssignOrInitInst
 
   FixedOperandList<4> Operands;
 
+  /// Property the init accessor is associated with.
+  VarDecl *Property;
+
   /// Marks all of the properties in `initializes(...)` list that
   /// have been initialized before this intruction to help Raw SIL
   /// lowering to emit destroys.
@@ -4838,10 +4841,12 @@ public:
   };
 
 private:
-  AssignOrInitInst(SILDebugLocation DebugLoc, SILValue Self, SILValue Src,
-                   SILValue Initializer, SILValue Setter, Mode mode);
+  AssignOrInitInst(SILDebugLocation DebugLoc, VarDecl *P, SILValue Self,
+                   SILValue Src, SILValue Initializer, SILValue Setter,
+                   Mode mode);
 
 public:
+  VarDecl *getProperty() const { return Property; }
   SILValue getSelf() const { return Operands[0].get(); }
   SILValue getSrc() const { return Operands[1].get(); }
   SILValue getInitializer() const { return Operands[2].get(); }
