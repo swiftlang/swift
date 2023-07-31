@@ -270,11 +270,11 @@ public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
 // Utilities to get refcount(s) of class objects.
 public func _getRetainCount(_ Value: AnyObject) -> UInt {
-  return UInt(swift_retainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
+  return UInt(bitPattern: swift_retainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
 }
 public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt {
-  return UInt(swift_unownedRetainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
+  return UInt(bitPattern: swift_unownedRetainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
 }
 public func _getWeakRetainCount(_ Value: AnyObject) -> UInt {
-  return UInt(swift_weakRetainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
+  return UInt(bitPattern: swift_weakRetainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
 }
