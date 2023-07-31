@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature InitAccessors -Xllvm -sil-print-after=definite-init -emit-sil -module-name assign_or_init_lowering %s -o /dev/null 2>&1 | %FileCheck %s
-
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -Xllvm -sil-print-after=definite-init -emit-sil -module-name assign_or_init_lowering %s -o /dev/null 2>&1 | %FileCheck %s
 
 protocol Storage<T> {
   associatedtype T
