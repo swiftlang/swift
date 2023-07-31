@@ -1,8 +1,6 @@
-// RUN: %target-swift-frontend -enable-experimental-feature InitAccessors -primary-file %s -Onone -emit-sil \
+// RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil \
 // RUN:   -Xllvm -sil-print-after=raw-sil-inst-lowering \
 // RUN:   -o /dev/null -module-name init_accessors 2>&1 | %FileCheck %s
-
-// REQUIRES: asserts
 
 class NSObject {}
 
