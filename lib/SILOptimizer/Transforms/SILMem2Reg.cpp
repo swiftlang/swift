@@ -2195,6 +2195,8 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
       /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
       accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
   for (auto value : owned) {
+    if (isa<SILUndef>(value))
+      continue;
     auto root = CanonicalizeOSSALifetime::getCanonicalCopiedDef(value);
     if (auto *copy = dyn_cast<CopyValueInst>(root)) {
       if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
@@ -2207,6 +2209,8 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
   }
   CanonicalizeBorrowScope borrowCanonicalizer(&f, deleter);
   for (auto value : guaranteed) {
+    if (isa<SILUndef>(value))
+      continue;
     auto borrowee = CanonicalizeBorrowScope::getCanonicalBorrowedDef(value);
     if (!borrowee)
       continue;
