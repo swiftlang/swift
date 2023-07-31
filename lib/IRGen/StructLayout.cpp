@@ -74,6 +74,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
     rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
   }
   if (rawLayout) {
+    auto sd = cast<StructDecl>(decl);
     IsKnownTriviallyDestroyable = deinit;
     IsKnownBitwiseTakable = IsBitwiseTakable;
     SpareBits.clear();
@@ -98,7 +99,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
       SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
       IsFixedLayout = true;
       IsKnownAlwaysFixedSize = IsFixedSize;
-    } else if (auto likeType = rawLayout->getResolvedScalarLikeType()) {
+    } else if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
       const TypeInfo &likeTypeInfo
         = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(),
                                       *likeType);
@@ -116,7 +117,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
         IsFixedLayout = false;
         IsKnownAlwaysFixedSize = IsNotFixedSize;
       }
-    } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount()) {
+    } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
       auto elementType = likeArray->first;
       unsigned count = likeArray->second;
       
