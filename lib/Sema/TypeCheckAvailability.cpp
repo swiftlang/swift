@@ -679,13 +679,16 @@ private:
       // For a variable declaration (without accessors) we use the range of the
       // containing pattern binding declaration to make sure that we include
       // any type annotation in the type refinement context range. We also
-      // need to include any attached property wrappers.
+      // need to include any custom attributes that were written on the
+      // declaration.
       if (auto *varDecl = dyn_cast<VarDecl>(storageDecl)) {
         if (auto *PBD = varDecl->getParentPatternBinding())
           Range = PBD->getSourceRange();
 
-        for (auto *propertyWrapper : varDecl->getAttachedPropertyWrappers()) {
-          Range.widen(propertyWrapper->getRange());
+        for (auto attr : varDecl->getOriginalAttrs()) {
+          if (auto customAttr = dyn_cast<CustomAttr>(attr)) {
+            Range.widen(customAttr->getRange());
+          }
         }
       }
 
@@ -696,7 +699,7 @@ private:
       // locations and have callers of that method provide appropriate source
       // locations.
       SourceRange BracesRange = storageDecl->getBracesRange();
-      if (storageDecl->hasParsedAccessors() && BracesRange.isValid()) {
+      if (BracesRange.isValid()) {
         Range.widen(BracesRange);
       }
 
