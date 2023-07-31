@@ -72,6 +72,10 @@ indirect enum RE<T> {
    case other(AnyObject)
 }
 
+struct UnownedVarBox<T : AnyObject> {
+  unowned var value: T
+}
+
 class TestGeneric<T> {
   init()
   @_borrowed @_hasStorage var borrowedGeneric: T { get set }
@@ -2500,6 +2504,24 @@ bb0:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_ref_to_unowned : {{.*}} {
+// CHECK:       bb0([[INSTANCE_OUT:%[^,]+]] : {{.*}}, [[OWNED_VALUE:%[^,]+]] :
+// CHECK:         [[TMP:%[^,]+]] = alloc_stack $@sil_unowned T
+// CHECK:         store_unowned [[OWNED_VALUE]] to [init] [[TMP]]
+// CHECK:         [[FIELD_ADDR:%[^,]+]] = struct_element_addr [[INSTANCE_OUT]]
+// CHECK:         copy_addr [[TMP]] to [init] [[FIELD_ADDR]]
+// CHECK:         destroy_value [[OWNED_VALUE]]
+// CHECK:         dealloc_stack [[TMP]]
+// CHECK-LABEL: } // end sil function 'test_ref_to_unowned'
+sil [ossa] @test_ref_to_unowned : $@convention(thin) <T where T : AnyObject> (@owned T) -> @out UnownedVarBox<T> {
+bb0(%owned_value : @owned $T):
+  %unowned_value = ref_to_unowned %owned_value : $T to $@sil_unowned T
+  %unowned_copy = copy_value %unowned_value : $@sil_unowned T
+  destroy_value %owned_value : $T
+  %instance = struct $UnownedVarBox<T> (%unowned_copy : $@sil_unowned T)
+  return %instance : $UnownedVarBox<T>
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
 // CHECK:         [[LOAD_ADDR:%[^,]+]] = alloc_stack $Self
@@ -2551,6 +2573,19 @@ entry:
   destroy_value %instance : $T
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_strong_copy_unowned_value : {{.*}} {
+// CHECK:       bb0([[INSTANCE_ADDR:%[^,]+]] :
+// CHECK:         [[FIELD_ADDR:%[^,]+]] = struct_element_addr [[INSTANCE_ADDR]]
+// CHECK:         [[OWNED_VALUE:%[^,]+]] = load_unowned [[FIELD_ADDR]]
+// CHECK:         return [[OWNED_VALUE]]
+// CHECK-LABEL: } // end sil function 'test_strong_copy_unowned_value'
+sil [ossa] @test_strong_copy_unowned_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed UnownedVarBox<T>) -> @owned T {
+bb0(%instance : @guaranteed $UnownedVarBox<T>):
+  %unowned_value = struct_extract %instance : $UnownedVarBox<T>, #UnownedVarBox.value
+  %owned_value = strong_copy_unowned_value %unowned_value : $@sil_unowned T
+  return %owned_value : $T
 }
 
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :

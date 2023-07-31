@@ -3483,6 +3483,14 @@ protected:
     pass.deleter.forceDelete(sei);
   }
 
+  void visitStrongCopyUnownedValueInst(StrongCopyUnownedValueInst *scuvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadUnowned(scuvi->getLoc(), sourceAddr, IsNotTake);
+    scuvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scuvi);
+  }
+
   // Extract from an opaque struct.
   void visitStructExtractInst(StructExtractInst *extractInst);
 
@@ -4068,6 +4076,15 @@ protected:
 
   void visitLoadBorrowInst(LoadBorrowInst *lbi) {
     pass.valueStorageMap.setStorageAddress(lbi, lbi->getOperand());
+  }
+
+  void visitRefToUnownedInst(RefToUnownedInst *rtui) {
+    auto &storage = pass.valueStorageMap.getStorage(rtui);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreUnowned(rtui->getLoc(), rtui->getOperand(), destAddr,
+                               IsInitialization);
   }
 
   // Define an opaque struct.
