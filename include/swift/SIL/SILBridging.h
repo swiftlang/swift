@@ -124,6 +124,8 @@ struct BridgedOperand {
 
   bool isTypeDependent() const { return op->isTypeDependent(); }
 
+  bool isLifetimeEnding() const { return op->isLifetimeEnding(); }
+
   SWIFT_IMPORT_UNSAFE
   inline OptionalBridgedOperand getNextUse() const;
 
