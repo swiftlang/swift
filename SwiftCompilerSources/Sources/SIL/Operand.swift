@@ -35,7 +35,9 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   /// True if the operand is used to describe a type dependency, but it's not
   /// used as value.
   public var isTypeDependent: Bool { bridged.isTypeDependent() }
-  
+
+  public var endsLifetime: Bool { bridged.isLifetimeEnding() }
+
   public var description: String { "operand #\(index) of \(instruction)" }
 }
 
