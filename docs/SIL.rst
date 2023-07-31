@@ -5192,7 +5192,7 @@ weak reference count.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand heap object.  It need not be atomic with respect to ``store_weak``
-operations on the same address.
+or ``load_weak`` operations on the same address.
 
 store_weak
 ``````````
