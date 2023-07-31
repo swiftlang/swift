@@ -2153,6 +2153,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
 void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
                                             StackList<SILValue> &owned,
                                             StackList<SILValue> &guaranteed) {
+  if (!f.hasOwnership())
+    return;
   for (auto *use : asi->getUses()) {
     auto *user = use->getUser();
     if (auto *si = dyn_cast<StoreInst>(user)) {
@@ -2166,6 +2168,8 @@ void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
 void MemoryToRegisters::canonicalizeValueLifetimes(
     StackList<SILValue> &owned, StackList<SILValue> &guaranteed,
     BasicBlockSetVector &livePhiBlocks) {
+  if (!f.hasOwnership())
+    return;
   if (Mem2RegDisableLifetimeCanonicalization)
     return;
 
