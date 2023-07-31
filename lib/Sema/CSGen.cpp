@@ -3822,7 +3822,7 @@ namespace {
       // The type of key path depends on the overloads chosen for the key
       // path components.
       auto typeLoc =
-          CS.getConstraintLocator(locator, LocatorPathElt::KeyPathType(value));
+          CS.getConstraintLocator(locator, LocatorPathElt::KeyPathType());
 
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape |
                                                      TVO_CanBindToHole);
