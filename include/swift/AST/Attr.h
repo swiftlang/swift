@@ -2496,8 +2496,10 @@ class RawLayoutAttr final : public DeclAttribute {
   /// If `LikeType` is null, the alignment in bytes to use for the raw storage.
   unsigned Alignment;
   /// The resolved like type.
-  Type ResolvedLikeType = Type();
-  
+  mutable Type CachedResolvedLikeType = Type();
+
+  friend class ResolveRawLayoutLikeTypeRequest;
+
 public:
   /// Construct a `@_rawLayout(like: T)` attribute.
   RawLayoutAttr(TypeRepr *LikeType,
@@ -2553,32 +2555,29 @@ public:
     return std::make_pair(SizeOrCount, Alignment);
   }
   
-  /// Set the resolved type.
-  void setResolvedLikeType(Type ty) {
-    assert(LikeType && "doesn't have a like type");
-    ResolvedLikeType = ty;
-  }
-  
+  Type getResolvedLikeType(StructDecl *sd) const;
+
   /// Return the type whose single-element layout the attribute type should get
   /// its layout from. Returns None if the attribute specifies an array or manual
   /// layout.
-  llvm::Optional<Type> getResolvedScalarLikeType() const {
+  llvm::Optional<Type> getResolvedScalarLikeType(StructDecl *sd) const {
     if (!LikeType)
       return llvm::None;
     if (Alignment != ~0u)
       return llvm::None;
-    return ResolvedLikeType;
+    return getResolvedLikeType(sd);
   }
   
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  llvm::Optional<std::pair<Type, unsigned>> getResolvedArrayLikeTypeAndCount() const {
+  llvm::Optional<std::pair<Type, unsigned>>
+  getResolvedArrayLikeTypeAndCount(StructDecl *sd) const {
     if (!LikeType)
       return llvm::None;
     if (Alignment == ~0u)
       return llvm::None;
-    return std::make_pair(ResolvedLikeType, SizeOrCount);
+    return std::make_pair(getResolvedLikeType(sd), SizeOrCount);
   }
   
   static bool classof(const DeclAttribute *DA) {

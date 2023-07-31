@@ -3366,6 +3366,22 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
   }
 }
 
+Type
+ResolveRawLayoutLikeTypeRequest::evaluate(Evaluator &evaluator,
+                                          StructDecl *sd,
+                                          RawLayoutAttr *attr) const {
+  assert(attr->LikeType);
+  // Resolve the like type in the struct's context.
+  return TypeResolution::resolveContextualType(
+        attr->LikeType, sd, llvm::None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+}
+
 bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
@@ -7195,30 +7211,10 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
       diagnoseAndRemoveAttr(attr, diag::alignment_not_power_of_two);
       return;
     }
-  } else if (auto likeType = attr->getScalarLikeType()) {
-    // Resolve the like type in the struct's context.
-    auto resolvedType = TypeResolution::resolveContextualType(
-        likeType, sd, llvm::None,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
-        
-    attr->setResolvedLikeType(resolvedType);
-  } else if (auto arrayType = attr->getArrayLikeTypeAndCount()) {
-    // Resolve the like type in the struct's context.
-    auto resolvedType = TypeResolution::resolveContextualType(
-        arrayType->first, sd, llvm::None,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
-        
-    attr->setResolvedLikeType(resolvedType);
+  } else if (attr->getScalarLikeType()) {
+    (void)attr->getResolvedLikeType(sd);
+  } else if (attr->getArrayLikeTypeAndCount()) {
+    (void)attr->getResolvedLikeType(sd);
   } else {
     llvm_unreachable("new unhandled rawLayout attribute form?");
   }
