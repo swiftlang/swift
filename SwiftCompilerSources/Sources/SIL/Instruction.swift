@@ -971,8 +971,12 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
-
+  
   public var singleDirectResult: Value? { nil }
+  
+  public var yieldedValues: Results {
+    Results(inst: self, numResults: resultCount - 1)
+  }
 }
 
 //===----------------------------------------------------------------------===//
