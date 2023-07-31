@@ -4847,8 +4847,11 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
         B.emitDestroyValueOperation(loc, semanticValue);
         return value;
       }
-      case ReferenceOwnership::Unowned:
-        llvm_unreachable("unimplemented");
+      case ReferenceOwnership::Unowned: {
+        auto value = B.createUnownedCopyValue(loc, semanticValue);
+        B.emitDestroyValueOperation(loc, semanticValue);
+        return value;
+      }
     }
   }
   switch (swiftStorageType->getOwnership()) {
@@ -4864,16 +4867,16 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.emitDestroyValueOperation(loc, semanticValue); \
     return value; \
   }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: { \
-    /* For loadable types, place into a box. */ \
-    auto type = storageType.castTo<Name##StorageType>(); \
-    assert(type->isLoadable(ResilienceExpansion::Maximal)); \
-    (void) type; \
-    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
-    value = B.createCopyValue(loc, value); \
-    B.emitDestroyValueOperation(loc, semanticValue); \
-    return value; \
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  case ReferenceOwnership::Name: {                                             \
+    /* For loadable types, place into a box. */                                \
+    auto type = storageType.castTo<Name##StorageType>();                       \
+    assert(type->isLoadable(ResilienceExpansion::Maximal));                    \
+    (void)type;                                                                \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType);     \
+    value = B.createCopyValue(loc, value);                                     \
+    B.emitDestroyValueOperation(loc, semanticValue);                           \
+    return value;                                                              \
   }
 #define UNCHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: { \
