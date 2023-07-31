@@ -1058,22 +1058,6 @@ public:
   }
 };
 
-class LocatorPathElt::KeyPathType final
-    : public StoredPointerElement<TypeBase> {
-public:
-  KeyPathType(Type valueType)
-      : StoredPointerElement(PathElementKind::KeyPathType,
-                             valueType.getPointer()) {
-    assert(valueType);
-  }
-
-  Type getValueType() const { return getStoredPointer(); }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::KeyPathType;
-  }
-};
-
 class LocatorPathElt::ConstructorMemberType final
     : public StoredIntegerElement<1> {
 public:
