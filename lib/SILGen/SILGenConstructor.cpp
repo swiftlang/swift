@@ -722,9 +722,20 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     // DISCUSSION: This only happens with noncopyable types since the memory
     // lifetime checker doesn't seem to process trivial locations. But empty
     // move only structs are non-trivial, so we need to handle this here.
-    if (isa<StructDecl>(nominal) && nominal->isMoveOnly()
-        && !nominal->getAttrs().hasAttribute<RawLayoutAttr>()
-        && nominal->getStoredProperties().empty()) {
+    if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
+      // Raw memory is not directly decomposable, but we still want to mark
+      // it as initialized. Use a zero initializer.
+      auto &C = ctor->getASTContext();
+      auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+      B.createBuiltin(ctor, zeroInit->getBaseIdentifier(),
+                      SILType::getEmptyTupleType(C),
+                      SubstitutionMap::get(zeroInit->getInnermostDeclContext()
+                                               ->getGenericSignatureOfContext(),
+                                           {selfDecl->getType()},
+                                           {}),
+                      selfLV.getLValueAddress());
+    } else if (isa<StructDecl>(nominal) && nominal->isMoveOnly()
+               && nominal->getStoredProperties().empty()) {
       auto *si = B.createStruct(ctor, lowering.getLoweredType(), {});
       B.emitStoreValueOperation(ctor, si, selfLV.getLValueAddress(),
                                 StoreOwnershipQualifier::Init);
