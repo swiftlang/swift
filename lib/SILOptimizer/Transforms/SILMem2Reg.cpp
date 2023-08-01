@@ -2153,6 +2153,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
 void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
                                             StackList<SILValue> &owned,
                                             StackList<SILValue> &guaranteed) {
+  if (!f.hasOwnership())
+    return;
   for (auto *use : asi->getUses()) {
     auto *user = use->getUser();
     if (auto *si = dyn_cast<StoreInst>(user)) {
@@ -2166,6 +2168,8 @@ void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
 void MemoryToRegisters::canonicalizeValueLifetimes(
     StackList<SILValue> &owned, StackList<SILValue> &guaranteed,
     BasicBlockSetVector &livePhiBlocks) {
+  if (!f.hasOwnership())
+    return;
   if (Mem2RegDisableLifetimeCanonicalization)
     return;
 
@@ -2191,6 +2195,8 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
       /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
       accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
   for (auto value : owned) {
+    if (isa<SILUndef>(value))
+      continue;
     auto root = CanonicalizeOSSALifetime::getCanonicalCopiedDef(value);
     if (auto *copy = dyn_cast<CopyValueInst>(root)) {
       if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
@@ -2203,6 +2209,8 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
   }
   CanonicalizeBorrowScope borrowCanonicalizer(&f, deleter);
   for (auto value : guaranteed) {
+    if (isa<SILUndef>(value))
+      continue;
     auto borrowee = CanonicalizeBorrowScope::getCanonicalBorrowedDef(value);
     if (!borrowee)
       continue;
