@@ -2396,6 +2396,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         return false;
       }
     }
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+      if (AFD->hasBody() && !AFD->isBodyTypeChecked()) {
+        // Pre-check the function body if needed.
+        (void)evaluateOrDefault(evaluator, PreCheckFunctionBodyRequest{AFD},
+                                nullptr);
+      }
+    }
   }
 
   // Find innermost ASTNode at Loc from DC. Results the reference to the found
@@ -2519,6 +2526,11 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       if (isa<TapExpr>(E))
         return Action::SkipChildren(E);
 
+      // Don't walk into SingleValueStmtExprs, they should be type-checked as
+      // a whole.
+      if (isa<SingleValueStmtExpr>(E))
+        return Action::SkipChildren(E);
+
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         // NOTE: When a client wants to type check a closure signature, it
         // requests with closure's 'getLoc()' location.
@@ -2599,11 +2611,6 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         // thus the transform couldn't be applied. Perform code completion
         // pretending there was no result builder to recover.
       }
-    } else if (func->hasSingleExpressionBody() &&
-                func->getResultInterfaceType()->isVoid()) {
-       // The function returns void.  We don't need an explicit return, no matter
-       // what the type of the expression is.  Take the inserted return back out.
-      func->getBody()->setLastElement(func->getSingleExpressionBody());
     }
   }
 
