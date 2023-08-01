@@ -608,7 +608,7 @@ private:
         getCurrentTRC()->getAvailabilityInfo();
     AvailabilityContext EffectiveAvailability =
         getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
-    if (isa<VarDecl>(D) ||
+    if ((isa<VarDecl>(D) && refinementSourceRangeForDecl(D).isValid()) ||
         CurrentAvailability.isSupersetOf(EffectiveAvailability))
       return TypeRefinementContext::createForDeclImplicit(
           Context, D, getCurrentTRC(), EffectiveAvailability,
