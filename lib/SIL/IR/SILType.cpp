@@ -1030,7 +1030,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 
 bool SILType::isMoveOnly() const {
   // Nominal types are move-only if declared as such.
-  if (isMoveOnlyNominalType())
+  if (isPureMoveOnly())
     return true;
 
 
@@ -1048,19 +1048,11 @@ bool SILType::isMoveOnly() const {
   return isMoveOnlyWrapped();
 }
 
-bool SILType::isMoveOnlyNominalType() const {
-  if (auto *nom = getNominalOrBoundGenericNominal())
-    if (nom->isMoveOnly())
-      return true;
-  return false;
+bool SILType::isPureMoveOnly() const {
+  return getASTType()->isPureMoveOnly();
 }
 
-bool SILType::isPureMoveOnly() const {
-  if (auto *nom = getNominalOrBoundGenericNominal())
-    if (nom->isMoveOnly())
-      return true;
-  return false;
-}
+
 
 bool SILType::isValueTypeWithDeinit() const {
   // Do not look inside an aggregate type that has a user-deinit, for which
