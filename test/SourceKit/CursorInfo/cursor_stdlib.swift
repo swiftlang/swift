@@ -244,7 +244,6 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-OBJ-LITERAL-NEXT: AppKit
 // CHECK-OBJ-LITERAL-NEXT: SYSTEM
 
-
 // RUN: %sourcekitd-test_plain -req=cursor -pos=27:18 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-ARRAY1 %s
 // CHECK-ARRAY1: source.lang.swift.ref.function.constructor
 // CHECK-ARRAY1-NEXT: init(arrayLiteral:)

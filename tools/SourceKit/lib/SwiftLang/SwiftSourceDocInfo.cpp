@@ -1671,7 +1671,7 @@ static void resolveCursor(
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
         // If code under cursor is literal expression returns Expr,
-        // otherwise nullptr
+        // otherwise nullptr.
         auto tryGetLiteralExpr = [](auto CI) -> Expr * {
           auto *ExprInfo = dyn_cast<ResolvedExprStartCursorInfo>(CI);
           if (!ExprInfo || !ExprInfo->getTrailingExpr()) {
@@ -1700,7 +1700,7 @@ static void resolveCursor(
           Data.AvailableActions = Actions;
         }
 
-        // Handle literal expression
+        // Handle literal expression.
         if (auto *LitExpr = tryGetLiteralExpr(CursorInfo)) {
           bool Success = addCursorInfoForLiteral(Data, LitExpr, Lang, CompInvok,
                                                  CursorInfo->getLoc(),
