@@ -348,8 +348,8 @@ bool CursorInfoResolver::walkToExprPost(Expr *E) {
     return false;
 
   if (OutermostCursorExpr && isCursorOn(E, LocToResolve)) {
-    CursorInfo = new ResolvedExprStartCursorInfo(
-        CursorInfo->getSourceFile(), CursorInfo->getLoc(), E);
+    CursorInfo = new ResolvedExprStartCursorInfo(CursorInfo->getSourceFile(),
+                                                 CursorInfo->getLoc(), E);
     return false;
   }
 

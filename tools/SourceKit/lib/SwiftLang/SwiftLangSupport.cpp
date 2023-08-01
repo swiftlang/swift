@@ -333,13 +333,6 @@ UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
   return UIdentVisitor(IsRef).visit(const_cast<Decl*>(D));
 }
 
-UIdent SwiftLangSupport::getUIDForLiteral(const Expr *Lit) {
-  if (dyn_cast<ObjectLiteralExpr>(Lit)) {
-    return KindExprObjectLiteral;
-  }
-  return KindExprLiteral;
-}
-
 UIdent SwiftLangSupport::getUIDForExtensionOfDecl(const Decl *D) {
   switch (D->getKind()) {
     case swift::DeclKind::Struct:
