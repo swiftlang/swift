@@ -176,6 +176,13 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   for (auto elt : enumDecl->getAllElements()) {
     ++elementCount;
 
+    if (auto *unavailableElementCase =
+            DerivedConformance::unavailableEnumElementCaseStmt(
+                enumType, elt, eqDecl, /*subPatternCount=*/2)) {
+      cases.push_back(unavailableElementCase);
+      continue;
+    }
+
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
@@ -692,6 +699,13 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   // For each enum element, generate a case statement that binds the associated
   // values so that they can be fed to the hasher.
   for (auto elt : enumDecl->getAllElements()) {
+    if (auto *unavailableElementCase =
+            DerivedConformance::unavailableEnumElementCaseStmt(enumType, elt,
+                                                               hashIntoDecl)) {
+      cases.push_back(unavailableElementCase);
+      continue;
+    }
+
     // case .<elt>(let a0, let a1, ...):
     SmallVector<VarDecl*, 3> payloadVars;
     SmallVector<ASTNode, 3> statements;
