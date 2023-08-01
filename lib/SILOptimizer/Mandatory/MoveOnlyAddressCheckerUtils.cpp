@@ -952,13 +952,7 @@ void UseState::initializeLiveness(
     SILValue operand = address->getOperand();
     if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
       operand = c->getOperand();
-    // If the type uses raw layout, its initialization is unmanaged, so consider
-    // it always initialized.
-    auto s = operand->getType().getStructOrBoundGenericStruct();
-    if (s && s->getAttrs().hasAttribute<RawLayoutAttr>()) {
-      recordInitUse(address, address, liveness.getTopLevelSpan());
-      liveness.initializeDef(address, liveness.getTopLevelSpan());
-    } else if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
       switch (fArg->getArgumentConvention()) {
       case swift::SILArgumentConvention::Indirect_In:
       case swift::SILArgumentConvention::Indirect_In_Guaranteed:
