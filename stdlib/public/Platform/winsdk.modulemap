@@ -225,6 +225,13 @@ module WinSDK [system] {
 
       link "xinput.lib"
     }
+    
+    module DirectInput8 {
+      header "dinput.h"
+      export *
+
+      link "dinput.lib"
+    }
 
     link "dxguid.lib"
   }
@@ -442,6 +449,12 @@ module WinSDK [system] {
     }
   }
 
+  module URLMonikers {
+    header "urlmon.h"
+    export *
+    link "Urlmon.Lib"
+  }
+
   module User {
     header "WinUser.h"
     export *
@@ -458,6 +471,13 @@ module WinSDK [system] {
   module WinBase {
     header "winbase.h"
     export *
+  }
+
+  module WinCred {
+    header "wincred.h"
+    export *
+
+    link "AdvAPI32.lib"
   }
 
   module WinDNS {
