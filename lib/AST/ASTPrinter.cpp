@@ -5659,9 +5659,10 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
                [&] { Printer << ", "; });
   }
   Printer << ":";
-  Printer.printNewline();
 
-  printASTNodes((cast<BraceStmt>(CS->getBody())->getElements()));
+  if (!printASTNodes((cast<BraceStmt>(CS->getBody())->getElements())))
+    Printer.printNewline();
+  indent();
 }
 
 void PrintAST::visitFailStmt(FailStmt *stmt) {
