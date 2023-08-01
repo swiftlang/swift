@@ -1183,7 +1183,7 @@ public:
     if (!FailBBs.empty()) {
       // Move the trap basic blocks to the end of the function.
       for (auto *FailBB : FailBBs) {
-        CurFn->splice(CurFn->end(), CurFn, llvm::Function::iterator(FailBB));
+        CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
       }
     }
   }
