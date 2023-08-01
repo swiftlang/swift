@@ -16,7 +16,7 @@ import SIL
 ///
 /// Reachable blocks are all blocks which are reachable from the entry block of
 /// the function. All other blocks are dead blocks.
-struct ReachableBlocks : CustomStringConvertible, NoReflectionChildren {
+struct ReachableBlocks: CustomStringConvertible, NoReflectionChildren {
   private var worklist: BasicBlockWorklist
   private var function: Function
 

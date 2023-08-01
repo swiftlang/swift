@@ -12,22 +12,24 @@
 
 import SIL
 
-let rangeDumper = FunctionPass(name: "dump-ranges", {
-  (function: Function, context: FunctionPassContext) in
+let rangeDumper = FunctionPass(
+  name: "dump-ranges",
+  {
+    (function: Function, context: FunctionPassContext) in
 
-  var begin: Instruction?
-  var ends = Stack<Instruction>(context)
-  defer { ends.deinitialize() }
-  var interiors = Stack<Instruction>(context)
-  defer { interiors.deinitialize() }
-  var ins = Stack<Instruction>(context)
-  defer { ins.deinitialize() }
-  var outs = Stack<Instruction>(context)
-  defer { outs.deinitialize() }
+    var begin: Instruction?
+    var ends = Stack<Instruction>(context)
+    defer { ends.deinitialize() }
+    var interiors = Stack<Instruction>(context)
+    defer { interiors.deinitialize() }
+    var ins = Stack<Instruction>(context)
+    defer { ins.deinitialize() }
+    var outs = Stack<Instruction>(context)
+    defer { outs.deinitialize() }
 
-  for inst in function.instructions {
-    if let sli = inst as? StringLiteralInst {
-      switch sli.value {
+    for inst in function.instructions {
+      if let sli = inst as? StringLiteralInst {
+        switch sli.value {
         case "begin":
           assert(begin == nil, "more than one begin instruction")
           begin = sli
@@ -41,39 +43,40 @@ let rangeDumper = FunctionPass(name: "dump-ranges", {
           outs.append(sli)
         default:
           break
+        }
       }
     }
-  }
-  
-  guard let begin = begin else { return }
-  
-  var instRange = InstructionRange(begin: begin, context)
-  defer { instRange.deinitialize() }
 
-  instRange.insert(contentsOf: ends)
-  instRange.insert(contentsOf: interiors)
+    guard let begin = begin else { return }
 
-  print("Instruction range in \(function.name):")
-  print(instRange)
-  print("Block range in \(function.name):")
-  print(instRange.blockRange)
-  print("End function \(function.name)\n")
+    var instRange = InstructionRange(begin: begin, context)
+    defer { instRange.deinitialize() }
 
-  verify(instRange.blockRange, context)
-  
-  for i in ins {
-    assert(instRange.contains(i))
-    assert(instRange.inclusiveRangeContains(i))
+    instRange.insert(contentsOf: ends)
+    instRange.insert(contentsOf: interiors)
+
+    print("Instruction range in \(function.name):")
+    print(instRange)
+    print("Block range in \(function.name):")
+    print(instRange.blockRange)
+    print("End function \(function.name)\n")
+
+    verify(instRange.blockRange, context)
+
+    for i in ins {
+      assert(instRange.contains(i))
+      assert(instRange.inclusiveRangeContains(i))
+    }
+    for e in ends {
+      assert(!instRange.contains(e))
+      assert(instRange.inclusiveRangeContains(e))
+    }
+    for o in outs {
+      assert(!instRange.contains(o))
+      assert(!instRange.inclusiveRangeContains(o))
+    }
   }
-  for e in ends {
-    assert(!instRange.contains(e))
-    assert(instRange.inclusiveRangeContains(e))
-  }
-  for o in outs {
-    assert(!instRange.contains(o))
-    assert(!instRange.inclusiveRangeContains(o))
-  }
-})
+)
 
 private func verify(_ blockRange: BasicBlockRange, _ context: FunctionPassContext) {
   var inRange = BasicBlockSet(context)
@@ -93,4 +96,3 @@ private func verify(_ blockRange: BasicBlockRange, _ context: FunctionPassContex
     assert(blockRange.inclusiveRangeContains(b) == inInclusiveRange.contains(b))
   }
 }
-

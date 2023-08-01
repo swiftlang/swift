@@ -25,70 +25,87 @@ import SIL
 /// ```
 /// The pass does not try to change or re-compute _defined_ effects.
 ///
-let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
-  (function: Function, context: FunctionPassContext) in
+let computeEscapeEffects = FunctionPass(
+  name: "compute-escape-effects",
+  {
+    (function: Function, context: FunctionPassContext) in
 
-  var newEffects = function.effects.escapeEffects.arguments.filter {!$0.isDerived }
+    var newEffects = function.effects.escapeEffects.arguments.filter { !$0.isDerived }
 
-  let returnInst = function.returnInstruction
-  let argsWithDefinedEffects = getArgIndicesWithDefinedEscapingEffects(of: function)
+    let returnInst = function.returnInstruction
+    let argsWithDefinedEffects = getArgIndicesWithDefinedEscapingEffects(of: function)
 
-  for arg in function.arguments {
-    // We are not interested in arguments with trivial types.
-    if arg.hasTrivialNonPointerType { continue }
-    
-    // Also, we don't want to override defined effects.
-    if argsWithDefinedEffects.contains(arg.index) { continue }
+    for arg in function.arguments {
+      // We are not interested in arguments with trivial types.
+      if arg.hasTrivialNonPointerType { continue }
 
-    struct IgnoreRecursiveCallVisitor : EscapeVisitor {
-      func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-        return isOperandOfRecursiveCall(operand) ? .ignore : .continueWalk
+      // Also, we don't want to override defined effects.
+      if argsWithDefinedEffects.contains(arg.index) { continue }
+
+      struct IgnoreRecursiveCallVisitor: EscapeVisitor {
+        func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+          return isOperandOfRecursiveCall(operand) ? .ignore : .continueWalk
+        }
+      }
+
+      // First check: is the argument (or a projected value of it) escaping at all?
+      if !arg.at(.anything).isEscapingWhenWalkingDown(
+        using: IgnoreRecursiveCallVisitor(),
+        context
+      ) {
+        let effect = EscapeEffects.ArgumentEffect(
+          .notEscaping,
+          argumentIndex: arg.index,
+          pathPattern: SmallProjectionPath(.anything)
+        )
+        newEffects.append(effect)
+        continue
+      }
+
+      // Now compute effects for two important cases:
+      //   * the argument itself + any value projections, and...
+      if addArgEffects(arg, argPath: SmallProjectionPath(), to: &newEffects, returnInst, context) {
+        //   * single class indirections
+        _ = addArgEffects(
+          arg,
+          argPath: SmallProjectionPath(.anyValueFields).push(.anyClassField),
+          to: &newEffects,
+          returnInst,
+          context
+        )
       }
     }
 
-    // First check: is the argument (or a projected value of it) escaping at all?
-    if !arg.at(.anything).isEscapingWhenWalkingDown(using: IgnoreRecursiveCallVisitor(),
-                                                    context) {
-      let effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index,
-                                                pathPattern: SmallProjectionPath(.anything))
-      newEffects.append(effect)
-      continue
+    // Don't modify the effects if they didn't change. This avoids sending a change notification
+    // which can trigger unnecessary other invalidations.
+    if newEffects == function.effects.escapeEffects.arguments {
+      return
     }
-  
-    // Now compute effects for two important cases:
-    //   * the argument itself + any value projections, and...
-    if addArgEffects(arg, argPath: SmallProjectionPath(), to: &newEffects, returnInst, context) {
-      //   * single class indirections
-      _ = addArgEffects(arg, argPath: SmallProjectionPath(.anyValueFields).push(.anyClassField),
-                        to: &newEffects, returnInst, context)
+
+    context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
+      effects.escapeEffects.arguments = newEffects
     }
   }
-
-  // Don't modify the effects if they didn't change. This avoids sending a change notification
-  // which can trigger unnecessary other invalidations.
-  if newEffects == function.effects.escapeEffects.arguments {
-    return
-  }
-
-  context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.escapeEffects.arguments = newEffects
-  }
-})
-
+)
 
 /// Returns true if an argument effect was added.
 private
-func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
-                   to newEffects: inout [EscapeEffects.ArgumentEffect],
-                   _ returnInst: ReturnInst?, _ context: FunctionPassContext) -> Bool {
+  func addArgEffects(
+    _ arg: FunctionArgument,
+    argPath ap: SmallProjectionPath,
+    to newEffects: inout [EscapeEffects.ArgumentEffect],
+    _ returnInst: ReturnInst?,
+    _ context: FunctionPassContext
+  ) -> Bool
+{
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
-  
+
   guard let result = arg.at(argPath).visitByWalkingDown(using: ArgEffectsVisitor(), context) else {
     return false
   }
-  
+
   // If the function never returns, the argument can not escape to another arg/return.
   guard let returnInst = arg.parentFunction.returnInstruction else {
     return false
@@ -102,14 +119,20 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   case .toReturn(let toPath):
     let visitor = IsExclusiveReturnEscapeVisitor(argument: arg, argumentPath: argPath, returnPath: toPath)
     let exclusive = visitor.isExclusiveEscape(returnInst: returnInst, context)
-    effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
-                                          argumentIndex: arg.index, pathPattern: argPath)
+    effect = EscapeEffects.ArgumentEffect(
+      .escapingToReturn(toPath: toPath, isExclusive: exclusive),
+      argumentIndex: arg.index,
+      pathPattern: argPath
+    )
 
   case .toArgument(let toArgIdx, let toPath):
     // Exclusive argument -> argument effects cannot appear because such an effect would
     // involve a store which is not permitted for exclusive escapes.
-    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
-                                          argumentIndex: arg.index, pathPattern: argPath)
+    effect = EscapeEffects.ArgumentEffect(
+      .escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
+      argumentIndex: arg.index,
+      pathPattern: argPath
+    )
   }
   newEffects.append(effect)
   return true
@@ -138,20 +161,21 @@ private func getArgIndicesWithDefinedEscapingEffects(of function: Function) -> S
 private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
   let inst = op.instruction
   if let applySite = inst as? FullApplySite,
-     let callee = applySite.referencedFunction,
-     callee == inst.parentFunction,
-     let argIdx = applySite.argumentIndex(of: op),
-     op.value == callee.arguments[argIdx] {
+    let callee = applySite.referencedFunction,
+    callee == inst.parentFunction,
+    let argIdx = applySite.argumentIndex(of: op),
+    op.value == callee.arguments[argIdx]
+  {
     return true
   }
   return false
 }
 
-private struct ArgEffectsVisitor : EscapeVisitorWithResult {
+private struct ArgEffectsVisitor: EscapeVisitorWithResult {
   enum EscapeDestination {
     case notSet
     case toReturn(SmallProjectionPath)
-    case toArgument(Int, SmallProjectionPath) // argument index, path
+    case toArgument(Int, SmallProjectionPath)  // argument index, path
   }
   var result = EscapeDestination.notSet
 
@@ -163,12 +187,12 @@ private struct ArgEffectsVisitor : EscapeVisitorWithResult {
         return .abort
       }
       switch result {
-        case .notSet:
-          result = .toReturn(path.projectionPath)
-        case .toReturn(let oldPath):
-          result = .toReturn(oldPath.merge(with: path.projectionPath))
-        case .toArgument:
-          return .abort
+      case .notSet:
+        result = .toReturn(path.projectionPath)
+      case .toReturn(let oldPath):
+        result = .toReturn(oldPath.merge(with: path.projectionPath))
+      case .toArgument:
+        return .abort
       }
       return .ignore
     }
@@ -189,12 +213,12 @@ private struct ArgEffectsVisitor : EscapeVisitorWithResult {
     }
     let argIdx = destArg.index
     switch result {
-      case .notSet:
-        result = .toArgument(argIdx, path.projectionPath)
-      case .toArgument(let oldArgIdx, let oldPath) where oldArgIdx == argIdx:
-        result = .toArgument(argIdx, oldPath.merge(with: path.projectionPath))
-      default:
-        return .abort
+    case .notSet:
+      result = .toArgument(argIdx, path.projectionPath)
+    case .toArgument(let oldArgIdx, let oldPath) where oldArgIdx == argIdx:
+      result = .toArgument(argIdx, oldPath.merge(with: path.projectionPath))
+    default:
+      return .abort
     }
     return .walkDown
   }
@@ -202,7 +226,7 @@ private struct ArgEffectsVisitor : EscapeVisitorWithResult {
 
 /// Returns true if when walking up from the return instruction, the `fromArgument`
 /// is the one and only argument which is reached - with a matching `fromPath`.
-private struct IsExclusiveReturnEscapeVisitor : EscapeVisitorWithResult {
+private struct IsExclusiveReturnEscapeVisitor: EscapeVisitorWithResult {
   let argument: Argument
   let argumentPath: SmallProjectionPath
   let returnPath: SmallProjectionPath

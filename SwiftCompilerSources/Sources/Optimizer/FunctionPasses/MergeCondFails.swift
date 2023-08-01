@@ -41,8 +41,9 @@ private func runMergeCondFails(function: Function, context: FunctionPassContext)
       if let cfi = inst as? CondFailInst {
         // Do not process arithmetic overflow checks. We typically generate more
         // efficient code with separate jump-on-overflow.
-        if !hasOverflowConditionOperand(cfi) &&
-           (condFailToMerge.isEmpty || cfi.message == condFailToMerge.first!.message) {
+        if !hasOverflowConditionOperand(cfi)
+          && (condFailToMerge.isEmpty || cfi.message == condFailToMerge.first!.message)
+        {
           condFailToMerge.push(cfi)
         }
       } else if inst.mayHaveSideEffects || inst.mayReadFromMemory {
@@ -58,8 +59,10 @@ private func runMergeCondFails(function: Function, context: FunctionPassContext)
 
 /// Try to merge the cond_fail instructions. Returns true if any could
 /// be merge.
-private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
-                            context: FunctionPassContext) {
+private func mergeCondFails(
+  _ condFailToMerge: inout Stack<CondFailInst>,
+  context: FunctionPassContext
+) {
   guard let lastCFI = condFailToMerge.last else {
     return
   }
@@ -70,10 +73,12 @@ private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
   // Merge conditions and remove the merged cond_fail instructions.
   for cfi in condFailToMerge {
     if let prevCond = mergedCond {
-      mergedCond = builder.createBuiltinBinaryFunction(name: "or",
-                                        operandType: prevCond.type,
-                                        resultType: prevCond.type,
-                                        arguments: [prevCond, cfi.condition])
+      mergedCond = builder.createBuiltinBinaryFunction(
+        name: "or",
+        operandType: prevCond.type,
+        resultType: prevCond.type,
+        arguments: [prevCond, cfi.condition]
+      )
       didMerge = true
     } else {
       mergedCond = cfi.condition
@@ -85,8 +90,10 @@ private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
   }
 
   // Create a new cond_fail using the merged condition.
-  _ = builder.createCondFail(condition: mergedCond!,
-                             message: lastCFI.message)
+  _ = builder.createCondFail(
+    condition: mergedCond!,
+    message: lastCFI.message
+  )
 
   while let cfi = condFailToMerge.pop() {
     context.erase(instruction: cfi)

@@ -13,7 +13,7 @@
 /// All effects for a function.
 ///
 /// It consists of escape and side effects.
-public struct FunctionEffects : CustomStringConvertible, NoReflectionChildren {
+public struct FunctionEffects: CustomStringConvertible, NoReflectionChildren {
 
   public var escapeEffects = EscapeEffects(arguments: [])
 
@@ -24,9 +24,11 @@ public struct FunctionEffects : CustomStringConvertible, NoReflectionChildren {
   public init() {}
 
   public init(copiedFrom src: FunctionEffects, resultArgDelta: Int) {
-    self.escapeEffects = EscapeEffects(arguments: src.escapeEffects.arguments.compactMap {
+    self.escapeEffects = EscapeEffects(
+      arguments: src.escapeEffects.arguments.compactMap {
         EscapeEffects.ArgumentEffect(copiedFrom: $0, resultArgDelta: resultArgDelta)
-      })
+      }
+    )
     // Cannot copy side effects
     self.sideEffects = nil
   }
@@ -60,18 +62,18 @@ public struct FunctionEffects : CustomStringConvertible, NoReflectionChildren {
 }
 
 extension Function {
-  
+
   /// Returns the global side effects of the function.
   public func getSideEffects() -> SideEffects.GlobalEffects {
     if let sideEffects = effects.sideEffects {
       /// There are computed side effects.
       return sideEffects.accumulatedEffects
     } else {
-      
+
       var effects = definedGlobalEffects
 
       // Even a `[readnone]` function can read from indirect arguments.
-      if (0..<numArguments).contains(where: {getArgumentConvention(for: $0).isIndirectIn}) {
+      if (0..<numArguments).contains(where: { getArgumentConvention(for: $0).isIndirectIn }) {
         effects.memory.read = true
       }
       // Even `[readnone]` and `[readonly]` functions write to indirect results.
@@ -85,9 +87,11 @@ extension Function {
   /// Returns the side effects for a function argument.
   ///
   /// The `argument` can be a function argument in this function or an apply argument in a caller.
-  public func getSideEffects(forArgument argument: ProjectedValue,
-                             atIndex argumentIndex: Int,
-                             withConvention convention: ArgumentConvention) -> SideEffects.GlobalEffects {
+  public func getSideEffects(
+    forArgument argument: ProjectedValue,
+    atIndex argumentIndex: Int,
+    withConvention convention: ArgumentConvention
+  ) -> SideEffects.GlobalEffects {
     var result = SideEffects.GlobalEffects()
 
     // Effects are only defined for operations which don't involve a load.
@@ -193,7 +197,7 @@ extension Function {
 ///
 /// The escape effects describe which arguments are not escaping or escaping to
 /// the return value or other arguments.
-public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
+public struct EscapeEffects: CustomStringConvertible, NoReflectionChildren {
   public var arguments: [ArgumentEffect]
 
   public func canEscape(argumentIndex: Int, path: SmallProjectionPath) -> Bool {
@@ -223,9 +227,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// An escape effect on a function argument.
-  public struct ArgumentEffect : Equatable, CustomStringConvertible, NoReflectionChildren {
+  public struct ArgumentEffect: Equatable, CustomStringConvertible, NoReflectionChildren {
 
-    public enum Kind : Equatable {
+    public enum Kind: Equatable {
       /// The argument value does not escape.
       ///
       /// Syntax examples:
@@ -233,7 +237,7 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
       ///    [%0: noescape **]   // argument 0 and all transitively contained values do not escape
       ///
       case notEscaping
-      
+
       /// The argument value escapes to the function return value.
       ///
       /// Syntax examples:
@@ -292,13 +296,13 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
 
     /// To which argument does this effect apply to?
     public let argumentIndex: Int
-    
+
     /// To which projection(s) of the argument does this effect apply to?
     public let pathPattern: SmallProjectionPath
-    
+
     /// The kind of effect.
     public let kind: Kind
-    
+
     /// True, if this effect is derived in an optimization pass.
     /// False, if this effect is defined in the Swift source code.
     public let isDerived: Bool
@@ -359,14 +363,14 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
     public var bodyDescription: String {
       let patternStr = (isDerived ? "" : "!") + (pathPattern.isEmpty ? "" : " \(pathPattern)")
       switch kind {
-        case .notEscaping:
-          return "noescape\(patternStr)"
-        case .escapingToReturn(let toPath, let exclusive):
-          let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
-          return "escape\(patternStr) \(exclusive ? "=>" : "->") %r\(toPathStr)"
-        case .escapingToArgument(let toArgIdx, let toPath):
-          let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
-          return "escape\(patternStr) -> %\(toArgIdx)\(toPathStr)"
+      case .notEscaping:
+        return "noescape\(patternStr)"
+      case .escapingToReturn(let toPath, let exclusive):
+        let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
+        return "escape\(patternStr) \(exclusive ? "=>" : "->") %r\(toPathStr)"
+      case .escapingToArgument(let toArgIdx, let toPath):
+        let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
+        return "escape\(patternStr) -> %\(toArgIdx)\(toPathStr)"
       }
     }
 
@@ -380,16 +384,16 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
 ///
 /// Side effects describe the memory (read, write) and ownership (copy, destroy)
 /// of the function arguments and the function as a whole.
-public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
+public struct SideEffects: CustomStringConvertible, NoReflectionChildren {
   /// Effects, which can be attributed to a specific argument.
   ///
   /// This array is indexed by the argument index. Arguments which indices, which
   /// are not included in this array, are defined to have no effects.
   public let arguments: [ArgumentEffects]
-  
+
   /// Effects, which cannot be attributed to a specific argument.
   public let global: GlobalEffects
-  
+
   public init(arguments: [ArgumentEffects], global: GlobalEffects) {
     self.arguments = arguments
     self.global = global
@@ -411,9 +415,9 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   public var accumulatedEffects: GlobalEffects {
     var result = global
     for argEffect in arguments {
-      if argEffect.read != nil    { result.memory.read = true }
-      if argEffect.write != nil   { result.memory.write = true }
-      if argEffect.copy != nil    { result.ownership.copy = true }
+      if argEffect.read != nil { result.memory.read = true }
+      if argEffect.write != nil { result.memory.write = true }
+      if argEffect.copy != nil { result.ownership.copy = true }
       if argEffect.destroy != nil { result.ownership.destroy = true }
     }
     return result
@@ -430,7 +434,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     result += "[global: \(global)]\n"
     return result
   }
-  
+
   /// Side-effects of a specific function argument.
   ///
   /// The paths describe what (projeted) values of an argument are affected.
@@ -458,17 +462,17 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   ///     %3 = ref_element_addr %2, #f
   ///     store %x to %3                 // not covered by argument effects! -> goes to global effects
   /// ```
-  public struct ArgumentEffects : Equatable, CustomStringConvertible, NoReflectionChildren {
+  public struct ArgumentEffects: Equatable, CustomStringConvertible, NoReflectionChildren {
 
     /// If not nil, the function may read from the argument at the path.
     public var read: SmallProjectionPath?
 
     /// If not nil, the function may write to the argument at the path.
     public var write: SmallProjectionPath?
-    
+
     /// If not nil, the function may copy/retain the argument at the path (only non-trivial values).
     public var copy: SmallProjectionPath?
-    
+
     /// If not nil, the function may destroy/release the argument at the path (only non-trivial values).
     public var destroy: SmallProjectionPath?
 
@@ -479,9 +483,9 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     /// The `description` without the square brackets
     public var bodyDescription: String {
       var results: [String] = []
-      if let path = read    { results.append("read \(path)") }
-      if let path = write   { results.append("write \(path)") }
-      if let path = copy    { results.append("copy \(path)") }
+      if let path = read { results.append("read \(path)") }
+      if let path = write { results.append("write \(path)") }
+      if let path = copy { results.append("copy \(path)") }
       if let path = destroy { results.append("destroy \(path)") }
       return results.joined(separator: ", ")
     }
@@ -493,11 +497,11 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   ///
   /// Global effects are effects which cannot be associated with function arguments,
   /// for example reading from a global variable or reading from loaded value from an argument.
-  public struct GlobalEffects : Equatable, CustomStringConvertible, NoReflectionChildren {
+  public struct GlobalEffects: Equatable, CustomStringConvertible, NoReflectionChildren {
 
     /// Memory reads and writes.
     public var memory: Memory
-    
+
     /// Copies and destroys.
     public var ownership: Ownership
 
@@ -515,10 +519,12 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     public var isDeinitBarrier: Bool
 
     /// When called with default arguments, it creates an "effect-free" GlobalEffects.
-    public init(memory: Memory = Memory(read: false, write: false),
-                ownership: Ownership = Ownership(copy: false, destroy: false),
-                allocates: Bool = false,
-                isDeinitBarrier: Bool = false) {
+    public init(
+      memory: Memory = Memory(read: false, write: false),
+      ownership: Ownership = Ownership(copy: false, destroy: false),
+      allocates: Bool = false,
+      isDeinitBarrier: Bool = false
+    ) {
       self.memory = memory
       self.ownership = ownership
       self.allocates = allocates
@@ -583,7 +589,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Memory read and write effects.
-  public struct Memory : Equatable, CustomStringConvertible, NoReflectionChildren {
+  public struct Memory: Equatable, CustomStringConvertible, NoReflectionChildren {
     public var read: Bool
     public var write: Bool
 
@@ -594,10 +600,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
     public var description: String {
       switch (read, write) {
-        case (false, false): return ""
-        case (false, true):  return "write"
-        case (true, false):  return "read"
-        case (true, true):   return "read,write"
+      case (false, false): return ""
+      case (false, true): return "write"
+      case (true, false): return "read"
+      case (true, true): return "read,write"
       }
     }
 
@@ -612,7 +618,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Copy and destroy effects.
-  public struct Ownership : Equatable, CustomStringConvertible, NoReflectionChildren {
+  public struct Ownership: Equatable, CustomStringConvertible, NoReflectionChildren {
     public var copy: Bool
     public var destroy: Bool
 
@@ -623,10 +629,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
     public var description: String {
       switch (copy, destroy) {
-        case (false, false): return ""
-        case (false, true):  return "destroy"
-        case (true, false):  return "copy"
-        case (true, true):   return "copy,destroy"
+      case (false, false): return ""
+      case (false, true): return "destroy"
+      case (true, false): return "copy"
+      case (true, true): return "copy,destroy"
       }
     }
 
@@ -647,8 +653,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
 extension StringParser {
 
-  mutating func parseEffectFromSource(for function: Function,
-                            params: Dictionary<String, Int>) throws -> EscapeEffects.ArgumentEffect {
+  mutating func parseEffectFromSource(
+    for function: Function,
+    params: Dictionary<String, Int>
+  ) throws -> EscapeEffects.ArgumentEffect {
     if consume("notEscaping") {
       let argIdx = try parseArgumentIndexFromSource(for: function, params: params)
       let path = try parsePathPatternFromSource(for: function, type: function.argumentTypes[argIdx])
@@ -658,7 +666,7 @@ extension StringParser {
       let fromArgIdx = try parseArgumentIndexFromSource(for: function, params: params)
       let fromPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[fromArgIdx])
       let exclusive = try parseEscapingArrow()
-      
+
       if consume("return") {
         if function.numIndirectResultArguments > 0 {
           if function.numIndirectResultArguments != 1 {
@@ -667,26 +675,40 @@ extension StringParser {
           let toPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[0])
 
           // Exclusive escapes are ignored for indirect return values.
-          return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: 0, toPath: toPath),
-                                      argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
+          return EscapeEffects.ArgumentEffect(
+            .escapingToArgument(toArgumentIndex: 0, toPath: toPath),
+            argumentIndex: fromArgIdx,
+            pathPattern: fromPath,
+            isDerived: false
+          )
         }
         let toPath = try parsePathPatternFromSource(for: function, type: function.resultType)
-        return EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
-                                    argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
+        return EscapeEffects.ArgumentEffect(
+          .escapingToReturn(toPath: toPath, isExclusive: exclusive),
+          argumentIndex: fromArgIdx,
+          pathPattern: fromPath,
+          isDerived: false
+        )
       }
       if exclusive {
         try throwError("exclusive escapes to arguments are not supported")
       }
       let toArgIdx = try parseArgumentIndexFromSource(for: function, params: params)
       let toPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[toArgIdx])
-      return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
-                                  argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
+      return EscapeEffects.ArgumentEffect(
+        .escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
+        argumentIndex: fromArgIdx,
+        pathPattern: fromPath,
+        isDerived: false
+      )
     }
     try throwError("unknown effect")
   }
 
-  private mutating func parseArgumentIndexFromSource(for function: Function,
-                                             params: Dictionary<String, Int>) throws -> Int {
+  private mutating func parseArgumentIndexFromSource(
+    for function: Function,
+    params: Dictionary<String, Int>
+  ) throws -> Int {
     if consume("self") {
       if !function.hasSelfArgument {
         try throwError("function does not have a self argument")
@@ -701,7 +723,7 @@ extension StringParser {
     }
     try throwError("parameter name expected")
   }
-  
+
   private mutating func parsePathPatternFromSource(for function: Function, type: Type) throws -> SmallProjectionPath {
     if consume(".") {
       return try parseProjectionPathFromSource(for: function, type: type)
@@ -726,14 +748,18 @@ extension StringParser {
     }
     try parseEffectsFromSIL(argumentIndex: argumentIndex, to: &effects)
   }
-  
+
   mutating func parseEffectsFromSIL(argumentIndex: Int, to effects: inout FunctionEffects) throws {
     repeat {
       if consume("noescape") {
         let isDerived = !consume("!")
         let path = try parseProjectionPathFromSIL()
-        let effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: argumentIndex,
-                                                  pathPattern: path, isDerived: isDerived)
+        let effect = EscapeEffects.ArgumentEffect(
+          .notEscaping,
+          argumentIndex: argumentIndex,
+          pathPattern: path,
+          isDerived: isDerived
+        )
         effects.escapeEffects.arguments.append(effect)
 
       } else if consume("escape") {
@@ -743,16 +769,24 @@ extension StringParser {
         let effect: EscapeEffects.ArgumentEffect
         if consume("%r") {
           let toPath = consume(".") ? try parseProjectionPathFromSIL() : SmallProjectionPath()
-          effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
-                                                argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
+          effect = EscapeEffects.ArgumentEffect(
+            .escapingToReturn(toPath: toPath, isExclusive: exclusive),
+            argumentIndex: argumentIndex,
+            pathPattern: fromPath,
+            isDerived: isDerived
+          )
         } else {
           if exclusive {
             try throwError("exclusive escapes to arguments are not supported")
           }
           let toArgIdx = try parseArgumentIndexFromSIL()
           let toPath = consume(".") ? try parseProjectionPathFromSIL() : SmallProjectionPath()
-          effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
-                                                argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
+          effect = EscapeEffects.ArgumentEffect(
+            .escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
+            argumentIndex: argumentIndex,
+            pathPattern: fromPath,
+            isDerived: isDerived
+          )
         }
         effects.escapeEffects.arguments.append(effect)
 
@@ -769,7 +803,10 @@ extension StringParser {
       }
     } while consume(",")
 
-    func parseSideEffectPath(_ e: WritableKeyPath<SideEffects.ArgumentEffects, SmallProjectionPath?>, for argumentIndex: Int) throws {
+    func parseSideEffectPath(
+      _ e: WritableKeyPath<SideEffects.ArgumentEffects, SmallProjectionPath?>,
+      for argumentIndex: Int
+    ) throws {
       var arguments = effects.sideEffects?.arguments ?? []
       while arguments.count <= argumentIndex {
         arguments.append(SideEffects.ArgumentEffects())
@@ -783,13 +820,19 @@ extension StringParser {
   mutating func parseGlobalSideEffectsFromSIL(to effects: inout FunctionEffects) throws {
     var globalEffects = SideEffects.GlobalEffects()
     repeat {
-      if consume("read")          { globalEffects.memory.read = true }
-      else if consume("write")    { globalEffects.memory.write = true }
-      else if consume("copy")     { globalEffects.ownership.copy = true }
-      else if consume("destroy")  { globalEffects.ownership.destroy = true }
-      else if consume("allocate") { globalEffects.allocates = true }
-      else if consume("deinit_barrier") { globalEffects.isDeinitBarrier = true }
-      else {
+      if consume("read") {
+        globalEffects.memory.read = true
+      } else if consume("write") {
+        globalEffects.memory.write = true
+      } else if consume("copy") {
+        globalEffects.ownership.copy = true
+      } else if consume("destroy") {
+        globalEffects.ownership.destroy = true
+      } else if consume("allocate") {
+        globalEffects.allocates = true
+      } else if consume("deinit_barrier") {
+        globalEffects.isDeinitBarrier = true
+      } else {
         break
       }
     } while consume(",")

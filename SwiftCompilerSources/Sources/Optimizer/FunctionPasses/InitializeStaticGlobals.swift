@@ -93,8 +93,8 @@ private func getGlobalInitialization(of function: Function) -> (allocInst: Alloc
   for inst in block.instructions {
     switch inst {
     case is ReturnInst,
-         is DebugValueInst,
-         is DebugStepInst:
+      is DebugValueInst,
+      is DebugStepInst:
       break
     case let agi as AllocGlobalInst:
       if allocInst != nil {
@@ -180,10 +180,11 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
     switch inst {
     case let store as StoreInst:
       guard store.storeOwnership == .trivial,
-            let sea = store.destination as? StructElementAddrInst,
-            sea.struct == structAddr,
-            // Multiple stores to the same element?
-            elementStores[sea.fieldIndex] == nil else {
+        let sea = store.destination as? StructElementAddrInst,
+        sea.struct == structAddr,
+        // Multiple stores to the same element?
+        elementStores[sea.fieldIndex] == nil
+      else {
         return nil
       }
 

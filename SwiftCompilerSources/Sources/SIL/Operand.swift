@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, NoReflectionChildren {
+public struct Operand: CustomStringConvertible, NoReflectionChildren {
   fileprivate let bridged: BridgedOperand
 
   init(bridged: BridgedOperand) {
@@ -22,27 +22,27 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
 
   public var value: Value { bridged.getValue().value }
 
-  public static func ==(lhs: Operand, rhs: Operand) -> Bool {
+  public static func == (lhs: Operand, rhs: Operand) -> Bool {
     return lhs.bridged.op == rhs.bridged.op
   }
 
   public var instruction: Instruction {
     return bridged.getUser().instruction
   }
-  
+
   public var index: Int { instruction.operands.getIndex(of: self) }
-  
+
   /// True if the operand is used to describe a type dependency, but it's not
   /// used as value.
   public var isTypeDependent: Bool { bridged.isTypeDependent() }
-  
+
   public var description: String { "operand #\(index) of \(instruction)" }
 }
 
-public struct OperandArray : RandomAccessCollection, CustomReflectable {
+public struct OperandArray: RandomAccessCollection, CustomReflectable {
   private let base: OptionalBridgedOperand
   public let count: Int
-  
+
   init(base: OptionalBridgedOperand, count: Int) {
     self.base = base
     self.count = count
@@ -50,23 +50,23 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return count }
-  
+
   public subscript(_ index: Int) -> Operand {
     assert(index >= startIndex && index < endIndex)
     return Operand(bridged: base.advancedBy(index))
   }
-  
+
   public func getIndex(of operand: Operand) -> Int {
     let idx = base.distanceTo(operand.bridged)
     assert(self[idx].bridged.op == operand.bridged.op)
     return idx
   }
-  
+
   public var customMirror: Mirror {
     let c: [Mirror.Child] = map { (label: nil, value: $0.value) }
     return Mirror(self, children: c)
   }
-  
+
   /// Returns a sub-array defined by `bounds`.
   ///
   /// Note: this does not return a Slice. The first index of the returnd array is always 0.
@@ -74,7 +74,8 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     assert(bounds.lowerBound >= startIndex && bounds.upperBound <= endIndex)
     return OperandArray(
       base: OptionalBridgedOperand(op: base.advancedBy(bounds.lowerBound).op),
-      count: bounds.upperBound - bounds.lowerBound)
+      count: bounds.upperBound - bounds.lowerBound
+    )
   }
 
   public var values: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
@@ -82,10 +83,10 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   }
 }
 
-public struct UseList : CollectionLikeSequence {
-  public struct Iterator : IteratorProtocol {
+public struct UseList: CollectionLikeSequence {
+  public struct Iterator: IteratorProtocol {
     var currentOpPtr: OptionalBridgedOperand
-    
+
     public mutating func next() -> Operand? {
       if let op = currentOpPtr.operand {
         currentOpPtr = op.getNextUse()

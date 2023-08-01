@@ -40,7 +40,7 @@ import SIL
 /// Later optimizations can clean that up.
 let stackPromotion = FunctionPass(name: "stack-promotion") {
   (function: Function, context: FunctionPassContext) in
-  
+
   let deadEndBlocks = context.deadEndBlocks
 
   var needFixStackNesting = false
@@ -61,9 +61,11 @@ let stackPromotion = FunctionPass(name: "stack-promotion") {
 }
 
 // Returns true if the allocation is promoted.
-private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
-                             _ deadEndBlocks: DeadEndBlocksAnalysis,
-                             _ context: FunctionPassContext) -> Bool {
+private func tryPromoteAlloc(
+  _ allocRef: AllocRefInstBase,
+  _ deadEndBlocks: DeadEndBlocksAnalysis,
+  _ context: FunctionPassContext
+) -> Bool {
   if allocRef.isObjC || allocRef.canAllocOnStack {
     return false
   }
@@ -145,7 +147,10 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
 
   // The "outer" liferange contains all use points.
   // Same here: this `visit` cannot fail.
-  var outerBlockRange = allocRef.visit(using: ComputeOuterBlockrange(dominatedBy: outerDominatingBlock, context), context)!
+  var outerBlockRange = allocRef.visit(
+    using: ComputeOuterBlockrange(dominatedBy: outerDominatingBlock, context),
+    context
+  )!
   defer { outerBlockRange.deinitialize() }
 
   assert(innerRange.blockRange.isValid, "inner range should be valid because we did a dominance check")
@@ -212,10 +217,12 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   return true
 }
 
-private func getDominatingBlockOfAllUsePoints(context: FunctionPassContext,
-                                              _ value: SingleValueInstruction,
-                                              domTree: DominatorTree) -> BasicBlock {
-  struct FindDominatingBlock : EscapeVisitorWithResult {
+private func getDominatingBlockOfAllUsePoints(
+  context: FunctionPassContext,
+  _ value: SingleValueInstruction,
+  domTree: DominatorTree
+) -> BasicBlock {
+  struct FindDominatingBlock: EscapeVisitorWithResult {
     var result: BasicBlock
     let domTree: DominatorTree
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
@@ -226,11 +233,11 @@ private func getDominatingBlockOfAllUsePoints(context: FunctionPassContext,
       return .continueWalk
     }
   }
-  
+
   return value.visit(using: FindDominatingBlock(result: value.parentBlock, domTree: domTree), context)!
 }
 
-private struct ComputeInnerLiferange : EscapeVisitorWithResult {
+private struct ComputeInnerLiferange: EscapeVisitorWithResult {
   var result: InstructionRange
   let domTree: DominatorTree
 
@@ -249,7 +256,7 @@ private struct ComputeInnerLiferange : EscapeVisitorWithResult {
   }
 }
 
-private struct ComputeOuterBlockrange : EscapeVisitorWithResult {
+private struct ComputeOuterBlockrange: EscapeVisitorWithResult {
   var result: BasicBlockRange
 
   init(dominatedBy: BasicBlock, _ context: FunctionPassContext) {

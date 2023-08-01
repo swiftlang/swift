@@ -76,20 +76,20 @@ private func tryEliminate(store: StoreInst, _ context: FunctionPassContext) {
   }
 
   switch store.isDead(context) {
-    case .alive:
+  case .alive:
+    break
+  case .dead:
+    context.erase(instruction: store)
+  case .maybePartiallyDead(let subPath):
+    // Check if the a partial store would really be dead to avoid unnecessary splitting.
+    switch store.isDead(at: subPath, context) {
+    case .alive, .maybePartiallyDead:
       break
     case .dead:
-      context.erase(instruction: store)
-    case .maybePartiallyDead(let subPath):
-      // Check if the a partial store would really be dead to avoid unnecessary splitting.
-      switch store.isDead(at: subPath, context) {
-        case .alive, .maybePartiallyDead:
-          break
-        case .dead:
-          // The new individual stores are inserted right after the current store and
-          // will be optimized in the following loop iterations.
-          store.trySplit(context)
-      }
+      // The new individual stores are inserted right after the current store and
+      // will be optimized in the following loop iterations.
+      store.trySplit(context)
+    }
   }
 }
 
@@ -109,7 +109,7 @@ private extension StoreInst {
     }
   }
 
-  func isDead( _ context: FunctionPassContext) -> DataflowResult {
+  func isDead(_ context: FunctionPassContext) -> DataflowResult {
     return isDead(at: destination.accessPath, context)
   }
 
@@ -202,7 +202,8 @@ private struct InstructionScanner {
           return .dead
         }
         if potentiallyDeadSubpath == nil,
-           storePath.getMaterializableProjection(to: successivePath) != nil {
+          storePath.getMaterializableProjection(to: successivePath) != nil
+        {
           // Storing to a sub-field of the original store doesn't make the original store dead.
           // But when we split the original store, then one of the new individual stores might be
           // overwritten by this store.
@@ -233,8 +234,8 @@ private struct InstructionScanner {
         if inst.mayRead(fromAddress: storeAddress, aliasAnalysis) {
           return .alive
         }
-        // TODO: We might detect that this is a partial read of the original store which potentially
-        //       enables partial dead store elimination.
+      // TODO: We might detect that this is a partial read of the original store which potentially
+      //       enables partial dead store elimination.
       }
     }
     return .transparent
@@ -244,7 +245,8 @@ private struct InstructionScanner {
 private extension Deallocation {
   func isDeallocation(of base: AccessBase) -> Bool {
     if let accessReference = base.reference,
-       accessReference.referenceRoot == self.allocatedValue.referenceRoot {
+      accessReference.referenceRoot == self.allocatedValue.referenceRoot
+    {
       return true
     }
     return false

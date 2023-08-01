@@ -13,7 +13,7 @@
 import SIL
 import OptimizerBridging
 
-protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
+protocol IntrusiveSet: CustomStringConvertible, NoReflectionChildren {
   associatedtype Element
 
   init(_ context: some Context)
@@ -31,11 +31,11 @@ protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockSet : IntrusiveSet {
+struct BasicBlockSet: IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedBasicBlockSet
-    
+
   init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocBasicBlockSet()
@@ -58,7 +58,7 @@ struct BasicBlockSet : IntrusiveSet {
   var description: String {
     let function = bridged.getFunction().function
     let blockNames = function.blocks.enumerated().filter { contains($0.1) }
-                                                 .map { "bb\($0.0)"}
+      .map { "bb\($0.0)" }
     return "{" + blockNames.joined(separator: ", ") + "}"
   }
 
@@ -76,11 +76,11 @@ struct BasicBlockSet : IntrusiveSet {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct ValueSet : IntrusiveSet {
+struct ValueSet: IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
-    
+
   init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocNodeSet()
@@ -135,11 +135,11 @@ struct ValueSet : IntrusiveSet {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionSet : IntrusiveSet {
+struct InstructionSet: IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
-    
+
   init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocNodeSet()

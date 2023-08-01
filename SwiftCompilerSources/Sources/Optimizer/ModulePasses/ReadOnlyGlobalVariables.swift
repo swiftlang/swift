@@ -36,9 +36,10 @@ let readOnlyGlobalVariablesPass = ModulePass(name: "read-only-global-variables")
 
   for g in moduleContext.globalVariables {
     if !g.isAvailableExternally,
-       !g.isPossiblyUsedExternally,
-       !g.isLet,
-       !writtenGlobals.contains(g) {
+      !g.isPossiblyUsedExternally,
+      !g.isLet,
+      !writtenGlobals.contains(g)
+    {
       g.setIsLet(to: true, moduleContext)
     }
   }
@@ -49,7 +50,7 @@ private func findWrites(toAddress: Value) -> Bool {
   return walker.walkDownUses(ofAddress: toAddress, path: UnusedWalkingPath()) == .abortWalk
 }
 
-private struct FindWrites : AddressDefUseWalker {
+private struct FindWrites: AddressDefUseWalker {
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     switch address.instruction {
     case is LoadInst, is LoadBorrowInst:

@@ -62,14 +62,14 @@ import SIL
 /// is not replaced.
 ///
 let redundantLoadElimination = FunctionPass(name: "redundant-load-elimination") {
-    (function: Function, context: FunctionPassContext) in
+  (function: Function, context: FunctionPassContext) in
   eliminateRedundantLoads(in: function, ignoreArrays: false, context)
 }
 
 // Early RLE does not touch loads from Arrays. This is important because later array optimizations,
 // like ABCOpt, get confused if an array load in a loop is converted to a pattern with a phi argument.
 let earlyRedundantLoadElimination = FunctionPass(name: "early-redundant-load-elimination") {
-    (function: Function, context: FunctionPassContext) in
+  (function: Function, context: FunctionPassContext) in
   eliminateRedundantLoads(in: function, ignoreArrays: true, context)
 }
 
@@ -104,12 +104,12 @@ private func tryEliminate(load: LoadInst, _ context: FunctionPassContext) {
   case .maybePartiallyRedundant(let subPath):
     // Check if the a partial load would really be redundant to avoid unnecessary splitting.
     switch load.isRedundant(at: subPath, context) {
-      case .notRedundant, .maybePartiallyRedundant:
-        break
-      case .redundant:
-        // The new individual loads are inserted right before the current load and
-        // will be optimized in the following loop iterations.
-        load.trySplit(context)
+    case .notRedundant, .maybePartiallyRedundant:
+      break
+    case .redundant:
+      // The new individual loads are inserted right before the current load and
+      // will be optimized in the following loop iterations.
+      load.trySplit(context)
     }
   }
 }
@@ -172,7 +172,7 @@ private extension LoadInst {
     return .redundant(scanner.availableValues)
   }
 
-  func canReplaceWithoutInsertingCopies(liferange: Liferange,_ context: FunctionPassContext) -> Bool {
+  func canReplaceWithoutInsertingCopies(liferange: Liferange, _ context: FunctionPassContext) -> Bool {
     switch self.loadOwnership {
     case .trivial, .unqualified:
       return true
@@ -267,12 +267,16 @@ private func provideValue(
 
   switch load.loadOwnership {
   case .unqualified:
-    return availableValue.value.createProjection(path: projectionPath,
-                                                 builder: availableValue.getBuilderForProjections(context))
+    return availableValue.value.createProjection(
+      path: projectionPath,
+      builder: availableValue.getBuilderForProjections(context)
+    )
   case .copy, .trivial:
     // Note: even if the load is trivial, the available value may be projected out of a non-trivial value.
-    return availableValue.value.createProjectionAndCopy(path: projectionPath,
-                                                        builder: availableValue.getBuilderForProjections(context))
+    return availableValue.value.createProjectionAndCopy(
+      path: projectionPath,
+      builder: availableValue.getBuilderForProjections(context)
+    )
   case .take:
     if projectionPath.isEmpty {
       return shrinkMemoryLifetime(from: load, to: availableValue, context)
@@ -293,7 +297,11 @@ private func provideValue(
 ///     ...
 ///     // replace %2 with %1
 ///
-private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: AvailableValue, _ context: FunctionPassContext) -> Value {
+private func shrinkMemoryLifetime(
+  from load: LoadInst,
+  to availableValue: AvailableValue,
+  _ context: FunctionPassContext
+) -> Value {
   switch availableValue {
   case .viaLoad(let availableLoad):
     assert(availableLoad.loadOwnership == .copy)
@@ -336,7 +344,12 @@ private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: Availa
 ///     ...
 ///     // replace %3 with %1
 ///
-private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue: AvailableValue, projectionPath: SmallProjectionPath, _ context: FunctionPassContext) -> Value {
+private func shrinkMemoryLifetimeAndSplit(
+  from load: LoadInst,
+  to availableValue: AvailableValue,
+  projectionPath: SmallProjectionPath,
+  _ context: FunctionPassContext
+) -> Value {
   switch availableValue {
   case .viaLoad(let availableLoad):
     assert(availableLoad.loadOwnership == .copy)
@@ -361,28 +374,28 @@ private enum AvailableValue {
 
   var value: Value {
     switch self {
-    case .viaLoad(let load):   return load
+    case .viaLoad(let load): return load
     case .viaStore(let store): return store.source
     }
   }
 
   var address: Value {
     switch self {
-    case .viaLoad(let load):   return load.address
+    case .viaLoad(let load): return load.address
     case .viaStore(let store): return store.destination
     }
   }
 
   var instruction: Instruction {
     switch self {
-    case .viaLoad(let load):   return load
+    case .viaLoad(let load): return load
     case .viaStore(let store): return store
     }
   }
 
   func getBuilderForProjections(_ context: FunctionPassContext) -> Builder {
     switch self {
-    case .viaLoad(let load):   return Builder(after: load, context)
+    case .viaLoad(let load): return Builder(after: load, context)
     case .viaStore(let store): return Builder(before: store, context)
     }
   }
@@ -417,9 +430,9 @@ private struct InstructionScanner {
   mutating func scan(instructions: ReverseInstructionList, in block: BasicBlock) -> ScanResult {
     for inst in instructions {
       switch visit(instruction: inst) {
-        case .available:   return .available
-        case .overwritten: return .overwritten
-        case .transparent: break
+      case .available: return .available
+      case .overwritten: return .overwritten
+      case .transparent: break
       }
     }
 
@@ -434,7 +447,8 @@ private struct InstructionScanner {
     // The storage root is different in each loop iteration. Therefore the load in a
     // successive loop iteration does not load from the same address as in the previous iteration.
     if let storageDefBlock = storageDefBlock,
-       block == storageDefBlock {
+      block == storageDefBlock
+    {
       return .overwritten
     }
     if block.predecessors.isEmpty {
@@ -461,7 +475,8 @@ private struct InstructionScanner {
         return .available
       }
       if accessPath.getMaterializableProjection(to: precedingLoadPath) != nil,
-         potentiallyRedundantSubpath == nil {
+        potentiallyRedundantSubpath == nil
+      {
         potentiallyRedundantSubpath = precedingLoadPath
       }
       if load.loadOwnership != .take {
@@ -478,7 +493,8 @@ private struct InstructionScanner {
         return .available
       }
       if accessPath.getMaterializableProjection(to: precedingStorePath) != nil,
-         potentiallyRedundantSubpath == nil {
+        potentiallyRedundantSubpath == nil
+      {
         potentiallyRedundantSubpath = precedingStorePath
       }
 
@@ -520,7 +536,7 @@ private struct InstructionScanner {
 ///
 private struct Liferange {
   private var worklist: BasicBlockWorklist
-  private var containingBlocks: Stack<BasicBlock> // doesn't include the end-block
+  private var containingBlocks: Stack<BasicBlock>  // doesn't include the end-block
   private var beginBlocks: BasicBlockSet
   private let endBlock: BasicBlock
 
@@ -563,8 +579,9 @@ private struct Liferange {
     for block in containingBlocks {
       for succ in block.successors {
         if succ != endBlock,
-           (!worklist.hasBeenPushed(succ) || beginBlocks.contains(succ)),
-           !deadEndBlocks.isDeadEnd(succ) {
+          (!worklist.hasBeenPushed(succ) || beginBlocks.contains(succ)),
+          !deadEndBlocks.isDeadEnd(succ)
+        {
           return true
         }
       }

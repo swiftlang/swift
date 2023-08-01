@@ -12,7 +12,7 @@
 
 import SIL
 
-extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
+extension StrongRetainInst: Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
     if isNotReferenceCounted(value: instance) {
       context.erase(instruction: self)
@@ -44,7 +44,7 @@ extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
   }
 }
 
-extension StrongReleaseInst : Simplifyable, SILCombineSimplifyable {
+extension StrongReleaseInst: Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
     let op = instance
     if isNotReferenceCounted(value: op) {
@@ -71,45 +71,45 @@ private func isNotReferenceCounted(value: Value) -> Bool {
     return true
   }
   switch value {
-    case let cfi as ConvertFunctionInst:
-      return isNotReferenceCounted(value: cfi.fromFunction)
-    case let uci as UpcastInst:
-      return isNotReferenceCounted(value: uci.fromInstance)
-    case let urc as UncheckedRefCastInst:
-      return isNotReferenceCounted(value: urc.fromInstance)
-    case let gvi as GlobalValueInst:
-      // Since Swift 5.1, statically allocated objects have "immortal" reference
-      // counts. Therefore we can safely eliminate unbalanced retains and
-      // releases, because they are no-ops on immortal objects.
-      // Note that the `simplifyGlobalValuePass` pass is deleting balanced
-      // retains/releases, which doesn't require a Swift 5.1 minimum deployment
-      // target.
-      return gvi.parentFunction.isSwift51RuntimeAvailable
-    case let rptr as RawPointerToRefInst:
-      // Like `global_value` but for the empty collection singletons from the
-      // stdlib, e.g. the empty Array singleton.
-      if rptr.parentFunction.isSwift51RuntimeAvailable {
-        // The pattern generated for empty collection singletons is:
-        //     %0 = global_addr @_swiftEmptyArrayStorage
-        //     %1 = address_to_pointer %0
-        //     %2 = raw_pointer_to_ref %1
-        if let atp = rptr.pointer as? AddressToPointerInst {
-          return atp.address is GlobalAddrInst
-        }
+  case let cfi as ConvertFunctionInst:
+    return isNotReferenceCounted(value: cfi.fromFunction)
+  case let uci as UpcastInst:
+    return isNotReferenceCounted(value: uci.fromInstance)
+  case let urc as UncheckedRefCastInst:
+    return isNotReferenceCounted(value: urc.fromInstance)
+  case let gvi as GlobalValueInst:
+    // Since Swift 5.1, statically allocated objects have "immortal" reference
+    // counts. Therefore we can safely eliminate unbalanced retains and
+    // releases, because they are no-ops on immortal objects.
+    // Note that the `simplifyGlobalValuePass` pass is deleting balanced
+    // retains/releases, which doesn't require a Swift 5.1 minimum deployment
+    // target.
+    return gvi.parentFunction.isSwift51RuntimeAvailable
+  case let rptr as RawPointerToRefInst:
+    // Like `global_value` but for the empty collection singletons from the
+    // stdlib, e.g. the empty Array singleton.
+    if rptr.parentFunction.isSwift51RuntimeAvailable {
+      // The pattern generated for empty collection singletons is:
+      //     %0 = global_addr @_swiftEmptyArrayStorage
+      //     %1 = address_to_pointer %0
+      //     %2 = raw_pointer_to_ref %1
+      if let atp = rptr.pointer as? AddressToPointerInst {
+        return atp.address is GlobalAddrInst
       }
-      return false
-    case // Thin functions are not reference counted.
-         is ThinToThickFunctionInst,
-         // The same for meta types.
-         is ObjCExistentialMetatypeToObjectInst,
-         is ObjCMetatypeToObjectInst,
-         // Retain and Release of tagged strings is a no-op.
-         // The builtin code pattern to find tagged strings is:
-         // builtin "stringObjectOr_Int64" (or to tag the string)
-         // value_to_bridge_object (cast the UInt to bridge object)
-         is ValueToBridgeObjectInst:
-      return true
-    default:
-      return false
+    }
+    return false
+  case  // Thin functions are not reference counted.
+  is ThinToThickFunctionInst,
+    // The same for meta types.
+    is ObjCExistentialMetatypeToObjectInst,
+    is ObjCMetatypeToObjectInst,
+    // Retain and Release of tagged strings is a no-op.
+    // The builtin code pattern to find tagged strings is:
+    // builtin "stringObjectOr_Int64" (or to tag the string)
+    // value_to_bridge_object (cast the UInt to bridge object)
+    is ValueToBridgeObjectInst:
+    return true
+  default:
+    return false
   }
 }

@@ -12,7 +12,7 @@
 
 import SIL
 
-extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension LoadInst: OnoneSimplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
     if optimizeLoadOfAddrUpcast(context) {
       return
@@ -40,8 +40,9 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
   /// ```
   private func optimizeLoadOfAddrUpcast(_ context: SimplifyContext) -> Bool {
     if let uac = address as? UncheckedAddrCastInst,
-       uac.type.isExactSuperclass(of: uac.fromAddress.type),
-       uac.type != uac.fromAddress.type {
+      uac.type.isExactSuperclass(of: uac.fromAddress.type),
+      uac.type != uac.fromAddress.type
+    {
 
       operand.set(to: uac.fromAddress, context)
       let builder = Builder(before: self, context)
@@ -67,12 +68,13 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
   ///
   private func optimizeLoadFromStringLiteral(_ context: SimplifyContext) -> Bool {
     if self.type.isBuiltinInteger(withFixedWidth: 8),
-       let sea = self.address as? StructElementAddrInst,
-       let (baseAddr, index) = sea.struct.getBaseAddressAndOffset(),
-       let pta = baseAddr as? PointerToAddressInst,
-       let stringLiteral = pta.pointer as? StringLiteralInst,
-       stringLiteral.encoding == .UTF8,
-       index < stringLiteral.value.count {
+      let sea = self.address as? StructElementAddrInst,
+      let (baseAddr, index) = sea.struct.getBaseAddressAndOffset(),
+      let pta = baseAddr as? PointerToAddressInst,
+      let stringLiteral = pta.pointer as? StringLiteralInst,
+      stringLiteral.encoding == .UTF8,
+      index < stringLiteral.value.count
+    {
 
       let builder = Builder(before: self, context)
       let charLiteral = builder.createIntegerLiteral(Int(stringLiteral.value[index]), type: type)
@@ -126,8 +128,8 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
       case let ga as GlobalAddrInst:
         switch ga.global.name {
         case "_swiftEmptyArrayStorage",
-             "_swiftEmptyDictionarySingleton",
-             "_swiftEmptySetSingleton":
+          "_swiftEmptyDictionarySingleton",
+          "_swiftEmptySetSingleton":
           return true
         default:
           return false
@@ -151,7 +153,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         let classType = rea.instance.type
         switch classType.nominal.name {
         case "__RawDictionaryStorage",
-              "__RawSetStorage":
+          "__RawSetStorage":
           // For Dictionary and Set we support "count" and "capacity".
           switch classType.getNominalFields(in: parentFunction).getNameOfField(withIndex: rea.fieldIndex) {
           case "_count", "_capacity":
@@ -164,12 +166,12 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         }
         addr = rea.instance
       case is UncheckedRefCastInst,
-           is UpcastInst,
-           is RawPointerToRefInst,
-           is AddressToPointerInst,
-           is BeginBorrowInst,
-           is CopyValueInst,
-           is EndCOWMutationInst:
+        is UpcastInst,
+        is RawPointerToRefInst,
+        is AddressToPointerInst,
+        is BeginBorrowInst,
+        is CopyValueInst,
+        is EndCOWMutationInst:
         addr = (addr as! UnaryInstruction).operand.value
       case let mviResult as MultipleValueInstructionResult:
         guard let bci = mviResult.parentInstruction as? BeginCOWMutationInst else {
@@ -185,7 +187,8 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
   /// Removes the `load [copy]` if the loaded value is just destroyed.
   private func removeIfDead(_ context: SimplifyContext) {
     if loadOwnership == .copy,
-       loadedValueIsDead(context) {
+      loadedValueIsDead(context)
+    {
       for use in uses {
         context.erase(instruction: use.instruction)
       }
@@ -229,9 +232,10 @@ private func getGlobalInitValue(address: Value) -> Value? {
 
 private func globalLoadedViaAddressor(pointer: Value) -> GlobalVariable? {
   if let ai = pointer as? ApplyInst,
-     let callee = ai.referencedFunction,
-     let global = callee.globalOfGlobalInitFunction,
-     global.isLet {
+    let callee = ai.referencedFunction,
+    let global = callee.globalOfGlobalInitFunction,
+    global.isLet
+  {
     return global
   }
   return nil
@@ -284,7 +288,8 @@ private extension Value {
   func getBaseAddressAndOffset() -> (baseAddress: Value, offset: Int)? {
     if let indexAddr = self as? IndexAddrInst {
       guard let indexLiteral = indexAddr.index as? IntegerLiteralInst,
-            indexLiteral.value.getActiveBits() <= 32 else {
+        indexLiteral.value.getActiveBits() <= 32
+      else {
         return nil
       }
       return (baseAddress: indexAddr.base, offset: Int(indexLiteral.value.getZExtValue()))
@@ -296,8 +301,9 @@ private extension Value {
 private extension Instruction {
   var isShiftRightByAtLeastOne: Bool {
     guard let bi = self as? BuiltinInst,
-          bi.id == .LShr,
-          let shiftLiteral = bi.operands[1].value as? IntegerLiteralInst else {
+      bi.id == .LShr,
+      let shiftLiteral = bi.operands[1].value as? IntegerLiteralInst
+    else {
       return false
     }
     return shiftLiteral.value.isStrictlyPositive()

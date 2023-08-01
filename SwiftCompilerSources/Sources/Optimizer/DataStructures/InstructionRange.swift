@@ -38,11 +38,11 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
-  
+struct InstructionRange: CustomStringConvertible, NoReflectionChildren {
+
   /// The dominating begin instruction.
   let begin: Instruction
-  
+
   /// The underlying block range.
   private(set) var blockRange: BasicBlockRange
 
@@ -85,37 +85,53 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns true if the inclusive range contains `inst`.
-  func inclusiveRangeContains (_ inst: Instruction) -> Bool {
+  func inclusiveRangeContains(_ inst: Instruction) -> Bool {
     contains(inst) || insertedInsts.contains(inst)
   }
 
   /// Returns true if the range is valid and that's iff the begin instruction
   /// dominates all instructions of the range.
   var isValid: Bool {
-    blockRange.isValid &&
-    // Check if there are any inserted instructions before the begin instruction in its block.
-    !ReverseInstructionList(first: begin).dropFirst().contains { insertedInsts.contains($0) }
+    blockRange.isValid
+      // Check if there are any inserted instructions before the begin instruction in its block.
+      && !ReverseInstructionList(first: begin).dropFirst().contains { insertedInsts.contains($0) }
   }
 
   /// Returns the end instructions.
   var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
     blockRange.ends.map {
-      $0.instructions.reversed().first(where: { insertedInsts.contains($0)})!
+      $0.instructions.reversed().first(where: { insertedInsts.contains($0) })!
     }
   }
 
   /// Returns the exit instructions.
-  var exits: LazyMapSequence<LazySequence<FlattenSequence<
-                               LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
-                                               LazyFilterSequence<SuccessorArray>>>>,
-                             Instruction> {
+  var exits:
+    LazyMapSequence<
+      LazySequence<
+        FlattenSequence<
+          LazyMapSequence<
+            LazyFilterSequence<Stack<BasicBlock>>,
+            LazyFilterSequence<SuccessorArray>
+          >
+        >
+      >,
+      Instruction
+    >
+  {
     blockRange.exits.lazy.map { $0.instructions.first! }
   }
 
   /// Returns the interior instructions.
-  var interiors: LazySequence<FlattenSequence<
-                   LazyMapSequence<Stack<BasicBlock>,
-                                   LazyFilterSequence<ReverseInstructionList>>>> {
+  var interiors:
+    LazySequence<
+      FlattenSequence<
+        LazyMapSequence<
+          Stack<BasicBlock>,
+          LazyFilterSequence<ReverseInstructionList>
+        >
+      >
+    >
+  {
     blockRange.inserted.lazy.flatMap {
       var include = blockRange.contains($0)
       return $0.instructions.reversed().lazy.filter {
@@ -130,8 +146,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   var description: String {
-    return (isValid ? "" : "<invalid>\n") +
-      """
+    return (isValid ? "" : "<invalid>\n") + """
       begin:    \(begin)
       ends:     \(ends.map { $0.description }.joined(separator: "\n          "))
       exits:    \(exits.map { $0.description }.joined(separator: "\n          "))

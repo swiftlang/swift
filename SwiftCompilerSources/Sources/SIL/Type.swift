@@ -13,9 +13,9 @@
 import Basic
 import SILBridging
 
-public struct Type : CustomStringConvertible, NoReflectionChildren {
+public struct Type: CustomStringConvertible, NoReflectionChildren {
   public let bridged: swift.SILType
-  
+
   public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
@@ -107,12 +107,12 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 }
 
 extension Type: Equatable {
-  public static func ==(lhs: Type, rhs: Type) -> Bool { 
+  public static func == (lhs: Type, rhs: Type) -> Bool {
     lhs.bridged == rhs.bridged
   }
 }
 
-public struct TypeArray : RandomAccessCollection, CustomReflectable {
+public struct TypeArray: RandomAccessCollection, CustomReflectable {
   private let bridged: BridgedSILTypeArray
 
   public var startIndex: Int { return 0 }
@@ -132,7 +132,7 @@ public struct TypeArray : RandomAccessCollection, CustomReflectable {
   }
 }
 
-public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
+public struct OptionalTypeArray: RandomAccessCollection, CustomReflectable {
   private let bridged: BridgedTypeArray
 
   public var startIndex: Int { return 0 }
@@ -152,7 +152,7 @@ public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
   }
 }
 
-public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
+public struct NominalFieldsArray: RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
   fileprivate let function: Function
 
@@ -175,7 +175,7 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
-public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
+public struct TupleElementArray: RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
 
   public var startIndex: Int { return 0 }
@@ -192,7 +192,7 @@ extension swift.SILType {
 }
 
 // TODO: use an AST type for this once we have it
-public struct NominalTypeDecl : Equatable {
+public struct NominalTypeDecl: Equatable {
   private let bridged: BridgedNominalTypeDecl
 
   public init(_bridged: BridgedNominalTypeDecl) {
@@ -201,7 +201,7 @@ public struct NominalTypeDecl : Equatable {
 
   public var name: StringRef { StringRef(bridged: bridged.getName()) }
 
-  public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
+  public static func == (lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
     lhs.bridged.decl == rhs.bridged.decl
   }
 

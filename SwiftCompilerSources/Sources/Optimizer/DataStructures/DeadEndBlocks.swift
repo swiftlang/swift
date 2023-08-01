@@ -17,25 +17,25 @@ import SIL
 /// Dead-end blocks are blocks from which there is no path to the function exit
 /// (`return`, `throw` or unwind). These are blocks which end with an unreachable
 /// instruction and blocks from which all paths end in "unreachable" blocks.
-struct DeadEndBlocks : CustomStringConvertible, NoReflectionChildren {
+struct DeadEndBlocks: CustomStringConvertible, NoReflectionChildren {
   private var worklist: BasicBlockWorklist
   private var function: Function
-  
+
   init(function: Function, _ context: FunctionPassContext) {
     self.function = function
     self.worklist = BasicBlockWorklist(context)
-    
+
     // Initialize the worklist with all function-exiting blocks.
     for block in function.blocks where block.terminator.isFunctionExiting {
       worklist.pushIfNotVisited(block)
     }
-    
+
     // Propagate lifeness up the control flow.
     while let block = worklist.pop() {
       worklist.pushIfNotVisited(contentsOf: block.predecessors)
     }
   }
-  
+
   /// Returns true if `block` is a dead-end block.
   func isDeadEnd(block: BasicBlock) -> Bool {
     return !worklist.hasBeenPushed(block)

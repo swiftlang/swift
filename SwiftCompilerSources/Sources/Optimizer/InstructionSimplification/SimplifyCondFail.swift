@@ -12,7 +12,7 @@
 
 import SIL
 
-extension CondFailInst : OnoneSimplifyable {
+extension CondFailInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     /// Eliminates
@@ -21,7 +21,8 @@ extension CondFailInst : OnoneSimplifyable {
     ///   cond_fail %0, "message"
     /// ```
     if let literal = condition as? IntegerLiteralInst,
-       literal.value.isZero() {
+      literal.value.isZero()
+    {
 
       context.erase(instruction: self)
     }

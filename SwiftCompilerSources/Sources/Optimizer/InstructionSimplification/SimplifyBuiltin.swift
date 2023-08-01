@@ -12,31 +12,31 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifyable {
+extension BuiltinInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     switch id {
-      case .IsConcrete:
-        // Don't constant fold a Builtin.isConcrete of a type with archetypes in the middle
-        // of the pipeline, because a generic specializer might run afterwards which turns the
-        // type into a concrete type.
-        optimizeIsConcrete(allowArchetypes: false, context)
-      case .IsSameMetatype:
-        optimizeIsSameMetatype(context)
-      case .Once:
-        optimizeBuiltinOnce(context)
-      case .CanBeObjCClass:
-        optimizeCanBeClass(context)
-      case .AssertConf:
-        optimizeAssertConfig(context)
-      default:
-        if let literal = constantFold(context) {
-          uses.replaceAll(with: literal, context)
-        }
+    case .IsConcrete:
+      // Don't constant fold a Builtin.isConcrete of a type with archetypes in the middle
+      // of the pipeline, because a generic specializer might run afterwards which turns the
+      // type into a concrete type.
+      optimizeIsConcrete(allowArchetypes: false, context)
+    case .IsSameMetatype:
+      optimizeIsSameMetatype(context)
+    case .Once:
+      optimizeBuiltinOnce(context)
+    case .CanBeObjCClass:
+      optimizeCanBeClass(context)
+    case .AssertConf:
+      optimizeAssertConfig(context)
+    default:
+      if let literal = constantFold(context) {
+        uses.replaceAll(with: literal, context)
+      }
     }
   }
 }
 
-extension BuiltinInst : LateOnoneSimplifyable {
+extension BuiltinInst: LateOnoneSimplifyable {
   func simplifyLate(_ context: SimplifyContext) {
     if id == .IsConcrete {
       // At the end of the pipeline we can be sure that the isConcrete's type doesn't get "more" concrete.
@@ -103,10 +103,10 @@ private extension BuiltinInst {
     switch ty.canBeClass {
     case .IsNot:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(0,  type: type)
+      literal = builder.createIntegerLiteral(0, type: type)
     case .Is:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(1,  type: type)
+      literal = builder.createIntegerLiteral(1, type: type)
     case .CanBe:
       return
     default:
@@ -121,10 +121,10 @@ private extension BuiltinInst {
     switch context.options.assertConfiguration {
     case .enabled:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(1,  type: type)
+      literal = builder.createIntegerLiteral(1, type: type)
     case .disabled:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(0,  type: type)
+      literal = builder.createIntegerLiteral(0, type: type)
     default:
       return
     }
@@ -138,8 +138,7 @@ private func hasSideEffectForBuiltinOnce(_ instruction: Instruction) -> Bool {
   case is DebugStepInst, is DebugValueInst:
     return false
   default:
-    return instruction.mayReadOrWriteMemory ||
-           instruction.hasUnspecifiedSideEffects
+    return instruction.mayReadOrWriteMemory || instruction.hasUnspecifiedSideEffects
   }
 }
 
@@ -149,7 +148,8 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
   }
 
   guard let lhsExistential = lhs as? InitExistentialMetatypeInst,
-        let rhsExistential = rhs as? InitExistentialMetatypeInst else {
+    let rhsExistential = rhs as? InitExistentialMetatypeInst
+  else {
     return nil
   }
 
@@ -158,8 +158,7 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
-  let typesAreExact = lhsExistential.metatype is MetatypeInst &&
-                      rhsExistential.metatype is MetatypeInst
+  let typesAreExact = lhsExistential.metatype is MetatypeInst && rhsExistential.metatype is MetatypeInst
 
   switch (lhsTy.typeKind, rhsTy.typeKind) {
   case (_, .unknown), (.unknown, _):
@@ -211,10 +210,10 @@ private extension Type {
   }
 
   var typeKind: TypeKind {
-    if isStruct  { return .struct }
-    if isClass  { return .class }
-    if isEnum  { return .enum }
-    if isTuple    { return .tuple }
+    if isStruct { return .struct }
+    if isClass { return .class }
+    if isEnum { return .enum }
+    if isTuple { return .tuple }
     if isFunction { return .function }
     return .unknown
   }

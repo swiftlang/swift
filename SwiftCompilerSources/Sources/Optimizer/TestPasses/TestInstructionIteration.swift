@@ -54,21 +54,25 @@ private func handle(instruction: Instruction, _ context: FunctionPassContext) {
   print(instruction)
   if let sl = instruction as? StringLiteralInst {
     switch sl.value {
-      case "delete_strings":
-        deleteAllInstructions(ofType: StringLiteralInst.self, in: instruction.parentBlock, context)
-      case "delete_ints":
-        deleteAllInstructions(ofType: IntegerLiteralInst.self, in: instruction.parentBlock, context)
-      case "delete_branches":
-        deleteAllInstructions(ofType: BranchInst.self, in: instruction.parentBlock, context)
-      case "split_block":
-        _ = context.splitBlock(at: instruction)
-      default:
-        break
+    case "delete_strings":
+      deleteAllInstructions(ofType: StringLiteralInst.self, in: instruction.parentBlock, context)
+    case "delete_ints":
+      deleteAllInstructions(ofType: IntegerLiteralInst.self, in: instruction.parentBlock, context)
+    case "delete_branches":
+      deleteAllInstructions(ofType: BranchInst.self, in: instruction.parentBlock, context)
+    case "split_block":
+      _ = context.splitBlock(at: instruction)
+    default:
+      break
     }
   }
 }
 
-private func deleteAllInstructions<InstType: Instruction>(ofType: InstType.Type, in block: BasicBlock, _ context: FunctionPassContext) {
+private func deleteAllInstructions<InstType: Instruction>(
+  ofType: InstType.Type,
+  in block: BasicBlock,
+  _ context: FunctionPassContext
+) {
   for inst in block.instructions {
     if inst is InstType {
       context.erase(instruction: inst)

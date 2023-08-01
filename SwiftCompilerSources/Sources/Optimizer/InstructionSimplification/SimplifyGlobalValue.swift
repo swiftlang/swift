@@ -18,7 +18,7 @@ import SIL
 // Note that `simplifyStrongRetainPass` and `simplifyStrongReleasePass` can
 // even remove "unbalanced" retains/releases of a `global_value`, but this
 // requires a minimum deployment target.
-extension GlobalValueInst : Simplifyable, SILCombineSimplifyable {
+extension GlobalValueInst: Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
     var users = Stack<Instruction>(context)
     defer { users.deinitialize() }
@@ -37,18 +37,18 @@ private func checkUsers(of val: Value, users: inout Stack<Instruction>) -> Bool 
   for use in val.uses {
     let user = use.instruction
     switch user {
-      case is RefCountingInst, is DebugValueInst, is FixLifetimeInst:
-        users.push(user)
-      case let upCast as UpcastInst:
-        if !checkUsers(of: upCast, users: &users) {
-          return false
-        }
-      case is RefElementAddrInst, is RefTailAddrInst:
-        // Projection instructions don't access the object header, so they don't
-        // prevent deleting reference counting instructions.
-        break
-      default:
+    case is RefCountingInst, is DebugValueInst, is FixLifetimeInst:
+      users.push(user)
+    case let upCast as UpcastInst:
+      if !checkUsers(of: upCast, users: &users) {
         return false
+      }
+    case is RefElementAddrInst, is RefTailAddrInst:
+      // Projection instructions don't access the object header, so they don't
+      // prevent deleting reference counting instructions.
+      break
+    default:
+      return false
     }
   }
   return true

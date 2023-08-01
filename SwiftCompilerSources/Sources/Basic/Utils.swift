@@ -21,8 +21,12 @@ import CxxStdlib
 /// * We need to see the error message in crashlogs of release builds. This is even not the
 ///   case for `precondition`.
 @_transparent
-public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
-                   file: StaticString = #fileID, line: UInt = #line) {
+public func assert(
+  _ condition: Bool,
+  _ message: @autoclosure () -> String,
+  file: StaticString = #fileID,
+  line: UInt = #line
+) {
   if !condition {
     fatalError(message(), file: file, line: line)
   }
@@ -46,18 +50,17 @@ public func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt =
 /// Let's lldb's `po` command not print any "internal" properties of the conforming type.
 ///
 /// This is useful if the `description` already contains all the information of a type instance.
-public protocol NoReflectionChildren : CustomReflectable { }
+public protocol NoReflectionChildren: CustomReflectable {}
 
 public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
-
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, NoReflectionChildren {
+public struct StringRef: CustomStringConvertible, NoReflectionChildren {
   let _bridged: llvm.StringRef
 
   public init(bridged: llvm.StringRef) { self._bridged = bridged }
@@ -66,43 +69,49 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   public var description: String { string }
 
   public var count: Int {
-#if $NewCxxMethodSafetyHeuristics
+    #if $NewCxxMethodSafetyHeuristics
     Int(_bridged.bytes_end() - _bridged.bytes_begin())
-#else
+    #else
     Int(_bridged.__bytes_endUnsafe() - _bridged.__bytes_beginUnsafe())
-#endif
+    #endif
   }
 
   public subscript(index: Int) -> UInt8 {
-#if $NewCxxMethodSafetyHeuristics
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.bytes_begin(),
-                                            count: count)
-#else
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.__bytes_beginUnsafe(),
-                                            count: count)
-#endif
+    #if $NewCxxMethodSafetyHeuristics
+    let buffer = UnsafeBufferPointer<UInt8>(
+      start: _bridged.bytes_begin(),
+      count: count
+    )
+    #else
+    let buffer = UnsafeBufferPointer<UInt8>(
+      start: _bridged.__bytes_beginUnsafe(),
+      count: count
+    )
+    #endif
     return buffer[index]
   }
 
-  public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
-#if $NewCxxMethodSafetyHeuristics
+  public static func == (lhs: StringRef, rhs: StaticString) -> Bool {
+    #if $NewCxxMethodSafetyHeuristics
     let lhsBuffer = UnsafeBufferPointer<UInt8>(
       start: lhs._bridged.bytes_begin(),
-      count: lhs.count)
-#else
+      count: lhs.count
+    )
+    #else
     let lhsBuffer = UnsafeBufferPointer<UInt8>(
       start: lhs._bridged.__bytes_beginUnsafe(),
-      count: lhs.count)
-#endif
+      count: lhs.count
+    )
+    #endif
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
     }
   }
-  
-  public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
 
-  public static func ~=(pattern: StaticString, value: StringRef) -> Bool { value == pattern }
+  public static func != (lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+
+  public static func ~= (pattern: StaticString, value: StringRef) -> Bool { value == pattern }
 }
 
 //===----------------------------------------------------------------------===//

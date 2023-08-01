@@ -20,7 +20,7 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct Worklist<Set: IntrusiveSet> : CustomStringConvertible, NoReflectionChildren {
+struct Worklist<Set: IntrusiveSet>: CustomStringConvertible, NoReflectionChildren {
   typealias Element = Set.Element
   private var worklist: Stack<Element>
   private var pushedElements: Set
@@ -29,7 +29,7 @@ struct Worklist<Set: IntrusiveSet> : CustomStringConvertible, NoReflectionChildr
     self.worklist = Stack(context)
     self.pushedElements = Set(context)
   }
-  
+
   mutating func pop() -> Element? { return worklist.pop() }
 
   /// Pop and allow the popped element to be pushed again to the worklist.

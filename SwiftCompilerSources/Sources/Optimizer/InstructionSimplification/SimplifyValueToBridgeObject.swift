@@ -12,7 +12,7 @@
 
 import SIL
 
-extension ValueToBridgeObjectInst : OnoneSimplifyable {
+extension ValueToBridgeObjectInst: OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Optimize the sequence
@@ -30,8 +30,9 @@ extension ValueToBridgeObjectInst : OnoneSimplifyable {
     // This sequence comes up in the code for constructing an empty string literal.
     //
     if let se = self.value as? StructExtractInst,
-       let utbc = se.struct as? UncheckedTrivialBitCastInst,
-       let vtbo = utbc.fromValue as? ValueToBridgeObjectInst {
+      let utbc = se.struct as? UncheckedTrivialBitCastInst,
+      let vtbo = utbc.fromValue as? ValueToBridgeObjectInst
+    {
       self.operand.set(to: vtbo.value, context)
     }
   }

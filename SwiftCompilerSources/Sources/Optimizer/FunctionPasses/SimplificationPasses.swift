@@ -17,16 +17,16 @@ import SIL
 //===--------------------------------------------------------------------===//
 
 /// Instructions which can be simplified at all optimization levels
-protocol Simplifyable : Instruction {
+protocol Simplifyable: Instruction {
   func simplify(_ context: SimplifyContext)
 }
 
 /// Instructions which can be simplified at -Onone
-protocol OnoneSimplifyable : Simplifyable {
+protocol OnoneSimplifyable: Simplifyable {
 }
 
 /// Instructions which can only be simplified at the end of the -Onone pipeline
-protocol LateOnoneSimplifyable : Instruction {
+protocol LateOnoneSimplifyable: Instruction {
   func simplifyLate(_ context: SimplifyContext)
 }
 
@@ -70,19 +70,23 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
 //                         Pass implementation
 //===--------------------------------------------------------------------===//
 
-
-func runSimplification(on function: Function, _ context: FunctionPassContext,
-                       preserveDebugInfo: Bool,
-                       _ simplify: (Instruction, SimplifyContext) -> ()) -> Bool {
+func runSimplification(
+  on function: Function,
+  _ context: FunctionPassContext,
+  preserveDebugInfo: Bool,
+  _ simplify: (Instruction, SimplifyContext) -> ()
+) -> Bool {
   var worklist = InstructionWorklist(context)
   defer { worklist.deinitialize() }
 
   var changed = false
-  let simplifyCtxt = context.createSimplifyContext(preserveDebugInfo: preserveDebugInfo,
-                                                   notifyInstructionChanged: {
-    worklist.pushIfNotVisited($0)
-    changed = true
-  })
+  let simplifyCtxt = context.createSimplifyContext(
+    preserveDebugInfo: preserveDebugInfo,
+    notifyInstructionChanged: {
+      worklist.pushIfNotVisited($0)
+      changed = true
+    }
+  )
 
   // Push in reverse order so that popping from the tail of the worklist visits instruction in forward order again.
   worklist.pushIfNotVisited(contentsOf: function.reversedInstructions)
@@ -112,13 +116,15 @@ func runSimplification(on function: Function, _ context: FunctionPassContext,
   if context.needFixStackNesting {
     function.fixStackNesting(context)
   }
-  
+
   return changed
 }
 
-private func cleanupDeadInstructions(in function: Function,
-                                     _ preserveDebugInfo: Bool,
-                                     _ context: FunctionPassContext) {
+private func cleanupDeadInstructions(
+  in function: Function,
+  _ preserveDebugInfo: Bool,
+  _ context: FunctionPassContext
+) {
   if preserveDebugInfo {
     context.removeTriviallyDeadInstructionsPreservingDebugInfo(in: function)
   } else {
@@ -126,9 +132,11 @@ private func cleanupDeadInstructions(in function: Function,
   }
 }
 
-private func cleanupDeadBlocks(in function: Function,
-                               pushNewCandidatesTo worklist: inout InstructionWorklist,
-                               _ context: FunctionPassContext) {
+private func cleanupDeadBlocks(
+  in function: Function,
+  pushNewCandidatesTo worklist: inout InstructionWorklist,
+  _ context: FunctionPassContext
+) {
   if context.removeDeadBlocks(in: function) {
     // After deleting dead blocks their (still alive) successor blocks may become eligible for block merging.
     // Therefore we re-run simplification for all branch instructions.

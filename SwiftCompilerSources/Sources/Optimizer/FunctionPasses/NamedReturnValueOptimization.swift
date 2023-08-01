@@ -62,12 +62,15 @@ let namedReturnValueOptimization = FunctionPass(name: "named-return-value-optimi
 ///
 private func findCopyForNRVO(for outArg: FunctionArgument) -> CopyAddrInst? {
   guard let singleArgUse = outArg.uses.singleNonDebugUse,
-        let copyToArg = singleArgUse.instruction as? CopyAddrInst else {
+    let copyToArg = singleArgUse.instruction as? CopyAddrInst
+  else {
     return nil
   }
 
-  assert(singleArgUse == copyToArg.destinationOperand,
-         "single use of out-argument cannot be the source of a copy")
+  assert(
+    singleArgUse == copyToArg.destinationOperand,
+    "single use of out-argument cannot be the source of a copy"
+  )
 
   // Don't perform NRVO unless the copy is a [take]. This is the easiest way
   // to determine that the local variable has ownership of its value and ensures
@@ -124,7 +127,7 @@ private func isAnyInstructionWritingToMemory(after: Instruction) -> Bool {
 
 private extension UseList {
   func replaceAllExceptDealloc(with replacement: Value, _ context: some MutatingContext) {
-    for use in self where !(use.instruction is Deallocation)  {
+    for use in self where !(use.instruction is Deallocation) {
       use.set(to: replacement, context)
     }
   }

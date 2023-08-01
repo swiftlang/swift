@@ -46,7 +46,8 @@ public struct DiagnosticFixIt {
       let bridgedDiagnosticFixIt = swift.DiagnosticInfo.FixIt(
         swift.CharSourceRange(start.bridged, UInt32(byteLength)),
         bridgedTextRef,
-        ArrayRefOfDiagnosticArgument())
+        ArrayRefOfDiagnosticArgument()
+      )
       fn(bridgedDiagnosticFixIt)
     }
   }
@@ -65,11 +66,13 @@ public struct DiagnosticEngine {
     self.bridged = BridgedDiagnosticEngine(object: object)
   }
 
-  public func diagnose(_ position: SourceLoc?,
-                       _ id: DiagID,
-                       _ args: [DiagnosticArgument],
-                       highlight: CharSourceRange? = nil,
-                       fixIts: [DiagnosticFixIt] = []) {
+  public func diagnose(
+    _ position: SourceLoc?,
+    _ id: DiagID,
+    _ args: [DiagnosticArgument],
+    highlight: CharSourceRange? = nil,
+    fixIts: [DiagnosticFixIt] = []
+  ) {
 
     let bridgedSourceLoc: swift.SourceLoc = position.bridged
     let bridgedHighlightRange: swift.CharSourceRange = highlight.bridged
@@ -80,13 +83,18 @@ public struct DiagnosticEngine {
     // calls, so we don't escape anything from the closure. 'bridgedArgs' and
     // 'bridgedFixIts' are temporary storage to store bridged values. So they
     // should not be used after the closure is executed.
- 
+
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in
         bridgedFixIts.withBridgedArrayRef { bridgedFixItsRef in
-          DiagnosticEngine_diagnose(bridged, bridgedSourceLoc,
-                                    id, bridgedArgsRef,
-                                    bridgedHighlightRange, bridgedFixItsRef)
+          DiagnosticEngine_diagnose(
+            bridged,
+            bridgedSourceLoc,
+            id,
+            bridgedArgsRef,
+            bridgedHighlightRange,
+            bridgedFixItsRef
+          )
         }
       }
     }
@@ -112,11 +120,13 @@ public struct DiagnosticEngine {
     closure()
   }
 
-  public func diagnose(_ position: SourceLoc?,
-                       _ id: DiagID,
-                       _ args: DiagnosticArgument...,
-                       highlight: CharSourceRange? = nil,
-                       fixIts: DiagnosticFixIt...) {
+  public func diagnose(
+    _ position: SourceLoc?,
+    _ id: DiagID,
+    _ args: DiagnosticArgument...,
+    highlight: CharSourceRange? = nil,
+    fixIts: DiagnosticFixIt...
+  ) {
     diagnose(position, id, args, highlight: highlight, fixIts: fixIts)
   }
 }
