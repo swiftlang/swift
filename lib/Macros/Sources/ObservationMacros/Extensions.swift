@@ -46,13 +46,13 @@ extension VariableDeclSyntax {
       binding.as(PatternBindingSyntax.self)
     }
     let accessors: [AccessorListSyntax.Element] = patternBindings.compactMap { patternBinding in
-      switch patternBinding.accessor {
+      switch patternBinding.accessorBlock?.accessors {
       case .accessors(let accessors):
         return accessors
       default:
         return nil
       }
-    }.flatMap { $0.accessors }
+    }.flatMap { $0 }
     return accessors.compactMap { accessor in
       guard let decl = accessor.as(AccessorDeclSyntax.self) else {
         return nil
@@ -76,9 +76,14 @@ extension VariableDeclSyntax {
     if accessorsMatching({ $0 == .keyword(.get) }).count > 0 {
       return true
     } else {
-      return bindings.compactMap { binding in
-        binding.as(PatternBindingSyntax.self)?.accessor?.as(CodeBlockSyntax.self)
-      }.count > 0
+      print("else branch")
+      return bindings.contains { binding in
+        if case .getter = binding.accessorBlock?.accessors {
+          return true
+        } else {
+          return false
+        }
+      }
     }
   }
   
@@ -196,11 +201,11 @@ extension FunctionDeclSyntax {
   
   var signatureStandin: SignatureStandin {
     var parameters = [String]()
-    for parameter in signature.input.parameterList {
+    for parameter in signature.parameterClause.parameters {
       parameters.append(parameter.firstName.text + ":" + (parameter.type.genericSubstitution(genericParameterClause?.parameters) ?? "" ))
     }
-    let returnType = signature.output?.returnType.genericSubstitution(genericParameterClause?.parameters) ?? "Void"
-    return SignatureStandin(isInstance: isInstance, identifier: identifier.text, parameters: parameters, returnType: returnType)
+    let returnType = signature.returnClause?.type.genericSubstitution(genericParameterClause?.parameters) ?? "Void"
+    return SignatureStandin(isInstance: isInstance, identifier: name.text, parameters: parameters, returnType: returnType)
   }
   
   func isEquivalent(to other: FunctionDeclSyntax) -> Bool {
