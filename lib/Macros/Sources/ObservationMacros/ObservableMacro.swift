@@ -160,7 +160,7 @@ extension PatternBindingListSyntax {
           ),
           typeAnnotation: binding.typeAnnotation,
           initializer: binding.initializer,
-          accessor: binding.accessor,
+          accessorBlock: binding.accessorBlock,
           trailingComma: binding.trailingComma,
           trailingTrivia: binding.trailingTrivia)
         
@@ -199,11 +199,11 @@ extension ObservableMacro: MemberMacro {
     providingMembersOf declaration: Declaration,
     in context: Context
   ) throws -> [DeclSyntax] {
-    guard let identified = declaration.asProtocol(IdentifiedDeclSyntax.self) else {
+    guard let identified = declaration.asProtocol(NamedDeclSyntax.self) else {
       return []
     }
     
-    let observableType = identified.identifier
+    let observableType = identified.name
     
     if declaration.isEnum {
       // enumerations cannot store properties
