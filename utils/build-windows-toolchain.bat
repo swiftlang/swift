@@ -989,7 +989,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk\sdk.wixproj ^
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
 
 :: Package runtime.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime\runtime.wixproj ^
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtimemsi\runtimemsi.wixproj ^
   -restore ^
   -p:Configuration=Release ^
   -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
