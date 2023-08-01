@@ -2399,23 +2399,38 @@ static void addNamespaceMembers(Decl *decl,
         }
       }
 
+      auto lookupAndAddMembers = [&](DeclName name) {
+        auto allResults = evaluateOrDefault(
+            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+
+        for (auto found : allResults) {
+          auto clangMember = found.get<clang::NamedDecl *>();
+          if (auto importedDecl =
+                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
+            if (addedMembers.insert(importedDecl).second)
+              members.push_back(importedDecl);
+          }
+        }
+      };
+
       auto namedDecl = dyn_cast<clang::NamedDecl>(member);
       if (!namedDecl)
         continue;
-
       auto name = ctx.getClangModuleLoader()->importName(namedDecl);
       if (!name)
         continue;
+      lookupAndAddMembers(name);
 
-      auto allResults = evaluateOrDefault(
-          ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
-
-      for (auto found : allResults) {
-        auto clangMember = found.get<clang::NamedDecl *>();
-        if (auto importedDecl =
-                ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-          if (addedMembers.insert(importedDecl).second)
-            members.push_back(importedDecl);
+      // Unscoped enums could have their enumerators present
+      // in the parent namespace.
+      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
+        if (!ed->isScoped()) {
+          for (const auto *ecd : ed->enumerators()) {
+            auto name = ctx.getClangModuleLoader()->importName(ecd);
+            if (!name)
+              continue;
+            lookupAndAddMembers(name);
+          }
         }
       }
     }
