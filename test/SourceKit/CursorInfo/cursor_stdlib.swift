@@ -21,7 +21,11 @@ func foo2(_ a : inout [S1]) {
 import Swift
 func foo3(a: Float, b: Bool) {}
 
-import AppKit.NSColor
+struct MyColor: _ExpressibleByColorLiteral {
+    init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
+    var red: Float
+}
+public typealias _ColorLiteralType = MyColor
 let colorResource = #colorLiteral(red: 0.8549019694, green: 0.250980407, blue: 0.4784313738, alpha: 1)
 
 let arrLiteral = [1, 2, 3]
@@ -232,19 +236,18 @@ let dictNonCost = [1:2, 3:d]
 // RUN: %sourcekitd-test -req=cursor -pos=22:25 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-BOOL1 %s
 // CHECK-BOOL1: s:Sb
 
-// RUN: %sourcekitd-test_plain \
-// RUN:    -req=open -name %s %s -- %s -sdk %sdk == \
-// RUN:    -req=cursor -pos=25:29 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-OBJ-LITERAL %s
+// RUN: %sourcekitd-test \
+// RUN:    -req=open -name %s %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t == \
+// RUN:    -req=cursor -pos=29:29 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-OBJ-LITERAL %s
 // CHECK-OBJ-LITERAL: source.lang.swift.ref.function.constructor
 // CHECK-OBJ-LITERAL-NEXT: init(_colorLiteralRed:green:blue:alpha:)
-// CHECK-OBJ-LITERAL-NEXT: s:So7NSColorC6AppKitE16_colorLiteralRed5green4blue5alphaABSf_S3ftcfc
+// CHECK-OBJ-LITERAL-NEXT: s:13cursor_stdlib7MyColorV16_colorLiteralRed5green4blue5alphaACSf_S3ftcfc
 // CHECK-OBJ-LITERAL-NEXT: source.lang.swift
-// CHECK-OBJ-LITERAL-NEXT: (NSColor.Type) -> (Float, Float, Float, Float) -> NSColor
-// CHECK-OBJ-LITERAL-NEXT: $s16_colorLiteralRed5green4blue5alphaSo7NSColorCSf_S3ftcD
-// CHECK-OBJ-LITERAL-NEXT: AppKit
-// CHECK-OBJ-LITERAL-NEXT: SYSTEM
+// CHECK-OBJ-LITERAL-NEXT: (MyColor.Type) -> (Float, Float, Float, Float) -> MyColor
+// CHECK-OBJ-LITERAL-NEXT: $s16_colorLiteralRed5green4blue5alpha13cursor_stdlib7MyColorVSf_S3ftcD
+// CHECK-OBJ-LITERAL-NEXT: cursor_stdlib
 
-// RUN: %sourcekitd-test_plain -req=cursor -pos=27:18 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-ARRAY1 %s
+// RUN: %sourcekitd-test -req=cursor -pos=31:18 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-ARRAY1 %s
 // CHECK-ARRAY1: source.lang.swift.ref.function.constructor
 // CHECK-ARRAY1-NEXT: init(arrayLiteral:)
 // CHECK-ARRAY1-NEXT: s:Sa12arrayLiteralSayxGxd_tcfc
@@ -255,7 +258,7 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-ARRAY1-NEXT: <Group>Collection/Array</Group>
 // CHECK-ARRAY1-NEXT: SYSTEM
 
-// RUN: %sourcekitd-test_plain -req=cursor -pos=28:19 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-ARRAY2 %s
+// RUN: %sourcekitd-test -req=cursor -pos=32:19 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-ARRAY2 %s
 // CHECK-ARRAY2: source.lang.swift.ref.function.constructor
 // CHECK-ARRAY2-NEXT: init(arrayLiteral:)
 // CHECK-ARRAY2-NEXT: s:Sa12arrayLiteralSayxGxd_tcfc
@@ -266,7 +269,7 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-ARRAY2-NEXT: <Group>Collection/Array</Group>
 // CHECK-ARRAY2-NEXT: SYSTEM
 
-// RUN: %sourcekitd-test_plain -req=cursor -pos=30:19 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-DICT1 %s
+// RUN: %sourcekitd-test -req=cursor -pos=34:19 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-DICT1 %s
 // CHECK-DICT1: source.lang.swift.ref.function.constructor
 // CHECK-DICT1-NEXT: init(dictionaryLiteral:)
 // CHECK-DICT1-NEXT: s:SD17dictionaryLiteralSDyxq_Gx_q_td_tcfc
@@ -277,7 +280,7 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-DICT1-NEXT: <Group>Collection/HashedCollections</Group>
 // CHECK-DICT1-NEXT: SYSTEM
 
-// RUN: %sourcekitd-test_plain -req=cursor -pos=31:19 %s -- %s -sdk %sdk | %FileCheck -check-prefix=CHECK-DICT2 %s
+// RUN: %sourcekitd-test -req=cursor -pos=35:19 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-DICT2 %s
 // CHECK-DICT2: source.lang.swift.ref.function.constructor
 // CHECK-DICT2-NEXT: init(dictionaryLiteral:)
 // CHECK-DICT2-NEXT: s:SD17dictionaryLiteralSDyxq_Gx_q_td_tcfc
