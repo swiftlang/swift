@@ -2526,10 +2526,25 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       if (isa<TapExpr>(E))
         return Action::SkipChildren(E);
 
-      // Don't walk into SingleValueStmtExprs, they should be type-checked as
-      // a whole.
-      if (isa<SingleValueStmtExpr>(E))
-        return Action::SkipChildren(E);
+      // If the location is within a single-expression branch of a
+      // SingleValueStmtExpr, walk it directly rather than as part of the brace.
+      // This ensures we type-check it a part of the whole expression, unless it
+      // has an inner closure or SVE, in which case we can still pick up a
+      // better node to type-check.
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
+        SmallVector<Expr *> scratch;
+        for (auto *branch : SVE->getSingleExprBranches(scratch)) {
+          auto branchCharRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, branch->getSourceRange());
+          if (branchCharRange.contains(Loc)) {
+            if (!branch->walk(*this))
+              return Action::Stop();
+
+            return Action::SkipChildren(E);
+          }
+        }
+        return Action::Continue(E);
+      }
 
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         // NOTE: When a client wants to type check a closure signature, it
