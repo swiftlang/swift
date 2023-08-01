@@ -18,6 +18,11 @@ module StdSet {
   requires cplusplus
 }
 
+module StdSharedPtr {
+  header "std-shared-ptr.h"
+  requires cplusplus
+}
+
 module StdPair {
   header "std-pair.h"
   requires cplusplus
