@@ -467,11 +467,11 @@ extension PropertyWrapperMacro: PeerMacro {
   }
 }
 
-extension PatternBindingSyntax.Accessor {
+extension AccessorBlockSyntax {
   var hasGetter: Bool {
-    switch self {
+    switch self.accessors {
     case .accessors(let accessors):
-      for accessor in accessors.accessors {
+      for accessor in accessors {
         if accessor.accessorKind.text == "get" {
           return true
         }
@@ -769,12 +769,12 @@ extension VariableDeclSyntax {
     }
 
     let binding = bindings.first!
-    switch binding.accessor {
+    switch binding.accessorBlock?.accessors {
     case .none:
       return true
 
     case .accessors(let node):
-      for accessor in node.accessors {
+      for accessor in node {
         switch accessor.accessorKind.tokenKind {
         case .keyword(.willSet), .keyword(.didSet):
           // Observers can occur on a stored property.

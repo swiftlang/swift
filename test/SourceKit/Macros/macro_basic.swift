@@ -211,7 +211,6 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // NESTED_ATTACHED_EXPAND-NEXT:  get {
 // NESTED_ATTACHED_EXPAND-NEXT:    _storage.x
 // NESTED_ATTACHED_EXPAND-NEXT:  }
-// NESTED_ATTACHED_EXPAND-EMPTY:
 // NESTED_ATTACHED_EXPAND-NEXT:  set {
 // NESTED_ATTACHED_EXPAND-NEXT:    _storage.x = newValue
 // NESTED_ATTACHED_EXPAND-NEXT:  }
@@ -226,7 +225,6 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // ACCESSOR1_EXPAND-NEXT:  get {
 // ACCESSOR1_EXPAND-NEXT:    _storage.x
 // ACCESSOR1_EXPAND-NEXT:  }
-// ACCESSOR1_EXPAND-EMPTY:
 // ACCESSOR1_EXPAND-NEXT:  set {
 // ACCESSOR1_EXPAND-NEXT:    _storage.x = newValue
 // ACCESSOR1_EXPAND-NEXT:  }
@@ -241,7 +239,6 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // ACCESSOR2_EXPAND-NEXT:  get {
 // ACCESSOR2_EXPAND-NEXT:    _storage.y
 // ACCESSOR2_EXPAND-NEXT:  }
-// ACCESSOR2_EXPAND-EMPTY:
 // ACCESSOR2_EXPAND-NEXT:  set {
 // ACCESSOR2_EXPAND-NEXT:    _storage.y = newValue
 // ACCESSOR2_EXPAND-NEXT:  }
