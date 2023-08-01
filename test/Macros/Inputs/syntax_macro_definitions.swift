@@ -516,6 +516,27 @@ extension PropertyWrapperSkipsComputedMacro: AccessorMacro, Macro {
   }
 }
 
+public struct InitWithProjectedValueWrapperMacro: PeerMacro {
+    public static func expansion(
+        of node: AttributeSyntax,
+        providingPeersOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+    ) throws -> [DeclSyntax] {
+        return [
+        """
+        private var _value: Wrapper
+        var _$value: Wrapper {
+            @storageRestrictions(initializes: _value)
+            init {
+                self._value = newValue
+            }
+            get { _value }
+        }
+        """
+        ]
+    }
+}
+
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,

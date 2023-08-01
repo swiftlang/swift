@@ -849,14 +849,14 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
   decl->collectPropertiesInitializableByInitAccessors(
       initializedViaInitAccessor);
 
-  for (auto member : decl->getImplementationContext()->getMembers()) {
+  auto couldSynthesizeDefaultInitializer = [&](Decl *member) -> bool {
     // If a stored property lacks an initial value and if there is no way to
     // synthesize an initial value (e.g. for an optional) then we suppress
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       // Static variables are irrelevant.
       if (pbd->isStatic()) {
-        continue;
+        return true;
       }
 
       for (auto idx : range(pbd->getNumPatternEntries())) {
@@ -875,8 +875,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
               auto initAccessorProperties =
                   llvm::make_range(initializedViaInitAccessor.equal_range(VD));
               if (llvm::any_of(initAccessorProperties, [&](const auto &entry) {
-                    auto *property =
-                        entry.second->getParentPatternBinding();
+                    auto *property = entry.second->getParentPatternBinding();
                     return property->isInitialized(0);
                   }))
                 return;
@@ -885,9 +884,11 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
                 HasStorage = true;
             });
 
-        if (!HasStorage) continue;
+        if (!HasStorage)
+          return true;
 
-        if (pbd->isInitialized(idx)) continue;
+        if (pbd->isInitialized(idx))
+          return true;
 
         // If we cannot default initialize the property, we cannot
         // synthesize a default initializer for the class.
@@ -895,6 +896,20 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
           return false;
       }
     }
+    return true;
+  };
+
+  for (auto member : decl->getImplementationContext()->getMembers()) {
+    if (!couldSynthesizeDefaultInitializer(member))
+      return false;
+
+    bool cannotSynthesizeDefaultInitializer = false;
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (!couldSynthesizeDefaultInitializer(auxDecl))
+        cannotSynthesizeDefaultInitializer = true;
+    });
+    if (cannotSynthesizeDefaultInitializer)
+      return false;
   }
 
   return true;
@@ -1304,15 +1319,15 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   llvm::SmallPtrSet<VarDecl *, 4> initializedProperties;
   llvm::SmallVector<std::pair<VarDecl *, Identifier>> invalidOrderings;
 
-  for (auto *member : decl->getMembers()) {
+  auto couldHaveMemberwiseInit = [&](Decl *member) -> bool {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // If this is a backing storage property for a property wrapper,
       // skip it.
       if (var->getOriginalWrappedProperty())
-        continue;
+        return true;
 
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
+        return true;
 
       // Check whether use of init accessors results in access to uninitialized
       // properties.
@@ -1329,19 +1344,19 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
         auto properties = initAccessor->getInitializedProperties();
         initializedProperties.insert(var);
         initializedProperties.insert(properties.begin(), properties.end());
-        continue;
+        return true;
       }
 
       switch (initializedViaAccessor.count(var)) {
       // Not covered by an init accessor.
       case 0:
         initializedProperties.insert(var);
-        continue;
+        return true;
 
       // Covered by a single init accessor, we'll handle that
       // once we get to the property with init accessor.
       case 1:
-        continue;
+        return true;
 
       // Covered by more than one init accessor which means that we
       // cannot synthesize memberwise initializer due to intersecting
@@ -1350,6 +1365,20 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
         return false;
       }
     }
+    return true;
+  };
+
+  for (auto *member : decl->getMembers()) {
+    if (!couldHaveMemberwiseInit(member))
+      return false;
+
+    bool cannotSynthesizeMemberwiseInit = false;
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (!couldHaveMemberwiseInit(auxDecl))
+        cannotSynthesizeMemberwiseInit = true;
+    });
+    if (cannotSynthesizeMemberwiseInit)
+      return false;
   }
 
   if (invalidOrderings.empty())
