@@ -946,7 +946,8 @@ namespace {
              "base for open existential component must be an existential");
       assert((base.getType().isAddress() ||
               base.getType().getPreferredExistentialRepresentation() ==
-                  ExistentialRepresentation::Boxed) &&
+                  ExistentialRepresentation::Boxed ||
+              !SGF.useLoweredAddresses()) &&
              "base value of open-existential component was not an address or a "
              "boxed existential?");
       SILValue addr;
@@ -954,9 +955,22 @@ namespace {
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
       case ExistentialRepresentation::Opaque:
-        addr = SGF.B.createOpenExistentialAddr(
-          loc, base.getValue(), getTypeOfRValue().getAddressType(),
-          getOpenedExistentialAccessFor(getFormalAccessKind(getAccessKind())));
+        if (!base.getValue()->getType().isAddress()) {
+          assert(!SGF.useLoweredAddresses());
+          auto borrow =
+              SGF.B.createBeginBorrow(loc, base.getValue(), /*isLexical=*/false,
+                                      /*hasPointerEscape=*/false);
+          auto value =
+              SGF.B.createOpenExistentialValue(loc, borrow, getTypeOfRValue());
+
+          SGF.Cleanups.pushCleanup<EndBorrowCleanup>(borrow);
+          return ManagedValue::forForwardedRValue(SGF, value);
+        } else {
+          addr = SGF.B.createOpenExistentialAddr(
+              loc, base.getValue(), getTypeOfRValue().getAddressType(),
+              getOpenedExistentialAccessFor(
+                  getFormalAccessKind(getAccessKind())));
+        }
         break;
       case ExistentialRepresentation::Boxed: {
         ManagedValue error;

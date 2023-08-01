@@ -699,3 +699,47 @@ func FormClassKeyPath() {
 func getInout(_ i: inout MyInt) -> Int {
   return i[keyPath: \MyInt.int]
 }
+
+protocol IntValuable {
+  var value: Int { get }
+}
+// CHECK-LABEL: sil {{.*}}[ossa] @getFromSubscriptOnLValueArray : {{.*}} {
+// CHECK:       bb0([[ARRAY_ADDR:%[^,]+]] :
+// CHECK:         [[ARRAY_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[ARRAY_ADDR]]
+// CHECK:         [[ARRAY:%[^,]+]] = load_borrow [[ARRAY_ACCESS]]
+// CHECK:         [[SUBSCRIPT:%[^,]+]] = function_ref @$sSayxSicig
+// CHECK:         [[ELEMENT:%[^,]+]] = apply [[SUBSCRIPT]]<any IntValuable>({{%[^,]+}}, [[ARRAY]])
+// CHECK:         end_borrow [[ARRAY]]
+// CHECK:         [[ELEMENT_LIFETIME:%[^,]+]] = begin_borrow [[ELEMENT]]
+// CHECK:         [[OPEN_ELEMENT:%[^,]+]] = open_existential_value [[ELEMENT_LIFETIME]]
+// CHECK:         [[OPEN_ELEMENT_COPY:%[^,]+]] = copy_value [[OPEN_ELEMENT]]
+// CHECK:         end_access [[ARRAY_ACCESS]]
+// CHECK:         [[OPEN_ELEMENT_LIFETIME:%[^,]+]] = begin_borrow [[OPEN_ELEMENT_COPY]]
+// CHECK:         [[GETTER:%[^,]+]] = witness_method {{.*}}, #IntValuable.value!getter
+// CHECK:         apply [[GETTER]]<{{.*}}>([[OPEN_ELEMENT_LIFETIME]])
+// CHECK:         end_borrow [[OPEN_ELEMENT_LIFETIME]]
+// CHECK:         destroy_value [[OPEN_ELEMENT_COPY]]
+// CHECK:         end_borrow [[ELEMENT_LIFETIME]]
+// CHECK:         destroy_value [[ELEMENT]]
+// CHECK-LABEL: } // end sil function 'getFromSubscriptOnLValueArray'
+@_silgen_name("getFromSubscriptOnLValueArray")
+func getFromSubscriptOnLValueArray(_ array: inout [IntValuable]) {
+  _ = array[0].value
+}
+
+protocol MutatingFooable {
+  mutating func foo()
+}
+
+// CHECK-LABEL: sil {{.*}}@callMutatingFooOnInoutExistential : {{.*}} {
+// CHECK:       bb0([[EXISTENTIAL_ADDR:%[^,]+]] :
+// CHECK:         [[EXISTENTIAL_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[EXISTENTIAL_ADDR]]
+// CHECK:         [[OPEN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[EXISTENTIAL_ACCESS]]
+// CHECK:         [[FOO:%[^,]+]] = witness_method {{.*}}#MutatingFooable.foo
+// CHECK:         apply [[FOO]]<{{.*}}>([[OPEN_ADDR]])
+// CHECK:         end_access [[EXISTENTIAL_ACCESS]]
+// CHECK-LABEL: } // end sil function 'callMutatingFooOnInoutExistential'
+@_silgen_name("callMutatingFooOnInoutExistential")
+func callMutatingFooOnInoutExistential(_ i: inout any MutatingFooable) {
+  i.foo()
+}
