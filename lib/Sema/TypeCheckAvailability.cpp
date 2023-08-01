@@ -440,6 +440,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
     return "building type refinement context for";
   }
 
+  friend class swift::ExpandChildTypeRefinementContextsRequest;
+
 public:
   TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &Context)
       : Context(Context) {
@@ -576,9 +578,10 @@ private:
     // pattern. The context necessary for the pattern as a whole was already
     // introduced if necessary by the first var decl.
     if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (auto *PBD = VD->getParentPatternBinding())
+      if (auto *PBD = VD->getParentPatternBinding()) {
         if (VD != PBD->getAnchoringVarDecl(0))
           return nullptr;
+      }
     }
 
     // Declarations with an explicit availability attribute always get a TRC.
@@ -597,11 +600,16 @@ private:
     // internal property in a public struct can be effectively less available
     // than the containing struct decl because the internal property will only
     // be accessed by code running at the deployment target or later.
+    //
+    // For declarations that have their child construction delayed, always
+    // create this implicit declaration context. It will be used to trigger
+    // lazy creation of the child TRCs.
     AvailabilityContext CurrentAvailability =
         getCurrentTRC()->getAvailabilityInfo();
     AvailabilityContext EffectiveAvailability =
         getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
-    if (CurrentAvailability.isSupersetOf(EffectiveAvailability))
+    if (isa<VarDecl>(D) ||
+        CurrentAvailability.isSupersetOf(EffectiveAvailability))
       return TypeRefinementContext::createForDeclImplicit(
           Context, D, getCurrentTRC(), EffectiveAvailability,
           refinementSourceRangeForDecl(D));
@@ -709,28 +717,79 @@ private:
     return D->getSourceRange();
   }
 
+  // Creates an implicit decl TRC specifying the deployment
+  // target for `range` in decl `D`.
+  TypeRefinementContext *
+  createImplicitDeclContextForDeploymentTarget(Decl *D, SourceRange range){
+    AvailabilityContext Availability =
+        AvailabilityContext::forDeploymentTarget(Context);
+    Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
+    return TypeRefinementContext::createForDeclImplicit(
+        Context, D, getCurrentTRC(), Availability, range);
+  }
+
+  /// Build contexts for a VarDecl with the given initializer.
+  void buildContextsForPatternBindingDecl(PatternBindingDecl *pattern) {
+    // Build contexts for each of the pattern entries.
+    for (unsigned index : range(pattern->getNumPatternEntries())) {
+      auto var = pattern->getAnchoringVarDecl(index);
+      if (!var)
+        continue;
+
+      // Var decls may have associated pattern binding decls or property wrappers
+      // with init expressions. Those expressions need to be constrained to the
+      // deployment target unless they are exposed to clients.
+      if (!var->hasInitialValue() || var->isInitExposedToClients())
+        continue;
+
+      auto *initExpr = pattern->getInit(index);
+      if (initExpr && !initExpr->isImplicit()) {
+        assert(initExpr->getSourceRange().isValid());
+
+        // Create a TRC for the init written in the source. The ASTWalker
+        // won't visit these expressions so instead of pushing these onto the
+        // stack we build them directly.
+        auto *initTRC = createImplicitDeclContextForDeploymentTarget(
+            var, initExpr->getSourceRange());
+        TypeRefinementContextBuilder(initTRC, Context).build(initExpr);
+      }
+    }
+
+    // Ideally any init expression would be returned by `getInit()` above.
+    // However, for property wrappers it doesn't get populated until
+    // typechecking completes (which is too late). Instead, we find the
+    // the property wrapper attribute and use its source range to create a
+    // TRC for the initializer expression.
+    //
+    // FIXME: Since we don't have an expression here, we can't build out its
+    // TRC. If the Expr that will eventually be created contains a closure
+    // expression, then it might have AST nodes that need to be refined. For
+    // example, property wrapper initializers that takes block arguments
+    // are not handled correctly because of this (rdar://77841331).
+    if (auto firstVar = pattern->getAnchoringVarDecl(0)) {
+      if (firstVar->hasInitialValue() && !firstVar->isInitExposedToClients()) {
+        for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
+          createImplicitDeclContextForDeploymentTarget(
+              firstVar, wrapper->getRange());
+        }
+      }
+    }
+  }
+
   void buildContextsForBodyOfDecl(Decl *D) {
     // Are we already constrained by the deployment target? If not, adding
     // new contexts won't change availability.
     if (isCurrentTRCContainedByDeploymentTarget())
       return;
 
-    // A lambda that creates an implicit decl TRC specifying the deployment
-    // target for `range` in decl `D`.
-    auto createContext = [this](Decl *D, SourceRange range) {
-      AvailabilityContext Availability =
-          AvailabilityContext::forDeploymentTarget(Context);
-      Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
-
-      return TypeRefinementContext::createForDeclImplicit(
-          Context, D, getCurrentTRC(), Availability, range);
-    };
-
     // Top level code always uses the deployment target.
     if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
       if (auto bodyStmt = tlcd->getBody()) {
-        pushDeclBodyContext(createContext(tlcd, tlcd->getSourceRange()), tlcd,
-                            bodyStmt);
+        pushDeclBodyContext(
+            createImplicitDeclContextForDeploymentTarget(
+                tlcd, tlcd->getSourceRange()),
+            tlcd, bodyStmt);
       }
       return;
     }
@@ -741,49 +800,12 @@ private:
       if (!afd->isImplicit() &&
           afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
         if (auto body = afd->getBody(/*canSynthesize*/ false)) {
-          pushDeclBodyContext(createContext(afd, afd->getBodySourceRange()),
-                              afd, body);
+          pushDeclBodyContext(
+              createImplicitDeclContextForDeploymentTarget(
+                  afd, afd->getBodySourceRange()),
+              afd, body);
         }
       }
-      return;
-    }
-
-    // Var decls may have associated pattern binding decls or property wrappers
-    // with init expressions. Those expressions need to be constrained to the
-    // deployment target unless they are exposed to clients.
-    if (auto vd = dyn_cast<VarDecl>(D)) {
-      if (!vd->hasInitialValue() || vd->isInitExposedToClients())
-        return;
-
-      if (auto *pbd = vd->getParentPatternBinding()) {
-        int idx = pbd->getPatternEntryIndexForVarDecl(vd);
-        auto *initExpr = pbd->getInit(idx);
-        if (initExpr && !initExpr->isImplicit()) {
-          assert(initExpr->getSourceRange().isValid());
-
-          // Create a TRC for the init written in the source. The ASTWalker
-          // won't visit these expressions so instead of pushing these onto the
-          // stack we build them directly.
-          auto *initTRC = createContext(vd, initExpr->getSourceRange());
-          TypeRefinementContextBuilder(initTRC, Context).build(initExpr);
-        }
-
-        // Ideally any init expression would be returned by `getInit()` above.
-        // However, for property wrappers it doesn't get populated until
-        // typechecking completes (which is too late). Instead, we find the
-        // the property wrapper attribute and use its source range to create a
-        // TRC for the initializer expression.
-        //
-        // FIXME: Since we don't have an expression here, we can't build out its
-        // TRC. If the Expr that will eventually be created contains a closure
-        // expression, then it might have AST nodes that need to be refined. For
-        // example, property wrapper initializers that takes block arguments
-        // are not handled correctly because of this (rdar://77841331).
-        for (auto *wrapper : vd->getAttachedPropertyWrappers()) {
-          createContext(vd, wrapper->getRange());
-        }
-      }
-
       return;
     }
   }
@@ -1275,6 +1297,36 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   }
 
   return TRC;
+}
+
+bool ExpandChildTypeRefinementContextsRequest::evaluate(
+    Evaluator &evaluator, Decl *decl, TypeRefinementContext *parentTRC
+) const {
+  // If the parent TRC is already contained by the deployment target, there's
+  // nothing more to do.
+  ASTContext &ctx = decl->getASTContext();
+  if (computeContainedByDeploymentTarget(parentTRC, ctx))
+    return false;
+
+  // Variables can have children corresponding to property wrappers and
+  // the initial values provided in each pattern binding entry.
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (auto *pattern = var->getParentPatternBinding()) {
+      // Only do this for the first variable in the pattern binding declaration.
+      auto anchorVar = pattern->getAnchoringVarDecl(0);
+      if (anchorVar != var) {
+        return evaluateOrDefault(
+            evaluator,
+            ExpandChildTypeRefinementContextsRequest{anchorVar, parentTRC},
+            false);
+      }
+
+      TypeRefinementContextBuilder builder(parentTRC, ctx);
+      builder.buildContextsForPatternBindingDecl(pattern);
+    }
+  }
+
+  return false;
 }
 
 AvailabilityContext
