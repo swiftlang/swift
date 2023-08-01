@@ -28,6 +28,10 @@ extension BuiltinInst : OnoneSimplifyable {
         optimizeCanBeClass(context)
       case .AssertConf:
         optimizeAssertConfig(context)
+      case .Sizeof,
+           .Strideof,
+           .Alignof:
+        optimizeTargetTypeConst(context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -128,6 +132,33 @@ private extension BuiltinInst {
     default:
       return
     }
+    uses.replaceAll(with: literal, context)
+    context.erase(instruction: self)
+  }
+  
+  func optimizeTargetTypeConst(_ context: SimplifyContext) {
+    guard let ty = substitutionMap.replacementTypes[0] else {
+      return
+    }
+    
+    let value: Int?
+    switch id {
+    case .Sizeof:
+      value = ty.getStaticSize(context: context)
+    case .Strideof:
+      value = ty.getStaticStride(context: context)
+    case .Alignof:
+      value = ty.getStaticAlignment(context: context)
+    default:
+      fatalError()
+    }
+    
+    guard let value else {
+      return
+    }
+    
+    let builder = Builder(before: self, context)
+    let literal = builder.createIntegerLiteral(value, type: type)
     uses.replaceAll(with: literal, context)
     context.erase(instruction: self)
   }

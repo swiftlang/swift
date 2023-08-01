@@ -419,7 +419,7 @@ struct BridgedTypeArray {
 
   SWIFT_IMPORT_UNSAFE
   swift::SILType getAt(SwiftInt index) const {
-    auto ty = swift::CanType(typeArray[index]);
+    auto ty = typeArray[index]->getCanonicalType();
     if (ty->isLegalSILType())
       return swift::SILType::getPrimitiveObjectType(ty);
     return swift::SILType();
