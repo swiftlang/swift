@@ -3,15 +3,11 @@
 // RUN: %empty-directory(%t/sdk)
 // RUN: split-file %s %t/src
 
-// REQUIRES: asserts
-
 // RUN: %target-swift-frontend -emit-module %t/src/PublicModule.swift \
 // RUN:   -module-name PublicModule -swift-version 5 \
-// RUN:   -emit-module-path %t/sdk/PublicModule.swiftmodule \
-// RUN:   -enable-experimental-feature InitAccessors
+// RUN:   -emit-module-path %t/sdk/PublicModule.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/src/Client.swift \
-// RUN:   -enable-experimental-feature InitAccessors \
 // RUN:   -module-name Client -I %t/sdk
 
 //--- PublicModule.swift

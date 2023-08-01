@@ -7356,9 +7356,7 @@ static bool parseAccessorIntroducer(Parser &P,
     }
   }
 
-  bool isInitAccessor = (P.Context.LangOpts.hasFeature(Feature::InitAccessors)
-                         && P.Tok.is(tok::kw_init));
-  if (!(P.Tok.is(tok::identifier) || isInitAccessor) ||
+  if (!(P.Tok.is(tok::identifier) || P.Tok.is(tok::kw_init)) ||
       P.Tok.isEscapedIdentifier()) {
     return true;
   }

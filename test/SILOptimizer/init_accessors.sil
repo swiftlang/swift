@@ -1,6 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -definite-init -raw-sil-inst-lowering -enable-experimental-feature InitAccessors %s | %FileCheck %s
-
-// REQUIRES: asserts
+// RUN: %target-sil-opt -enable-sil-verify-all -definite-init -raw-sil-inst-lowering %s | %FileCheck %s
 
 import Builtin
 import Swift
