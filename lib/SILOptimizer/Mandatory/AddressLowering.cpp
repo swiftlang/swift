@@ -4169,19 +4169,19 @@ static void rewriteFunction(AddressLoweringState &pass) {
 
     // Collect end_borrows and rewrite them last so that when rewriting other
     // users the lifetime ends of a borrow introducer can be used.
-    StackList<EndBorrowInst *> endBorrows(pass.function);
+    StackList<Operand *> lifetimeEndingUses(pass.function);
     SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
     for (auto *oper : uses) {
       originalUses.insert(oper);
-      if (auto *ebi = dyn_cast<EndBorrowInst>(oper->getUser())) {
-        endBorrows.push_back(ebi);
+      if (oper->isLifetimeEnding()) {
+        lifetimeEndingUses.push_back(oper);
         continue;
       }
       UseRewriter::rewriteUse(oper, pass);
     }
-    for (auto *ebi : endBorrows) {
-      UseRewriter::rewriteUse(&ebi->getOperandRef(), pass);
+    for (auto *oper : lifetimeEndingUses) {
+      UseRewriter::rewriteUse(oper, pass);
     }
     // Rewrite every new use that was added.
     uses.clear();

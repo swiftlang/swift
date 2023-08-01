@@ -26,6 +26,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -119,6 +120,15 @@ void SILInstruction::moveFront(SILBasicBlock *Block) {
 void SILInstruction::moveBefore(SILInstruction *Later) {
   SILBasicBlock::moveInstruction(this, Later);
 }
+
+namespace swift::test {
+FunctionTest MoveBeforeTest("instruction-move-before",
+                            [](auto &function, auto &arguments, auto &test) {
+                              auto *inst = arguments.takeInstruction();
+                              auto *other = arguments.takeInstruction();
+                              inst->moveBefore(other);
+                            });
+} // end namespace swift::test
 
 /// Unlink this instruction from its current basic block and insert it into
 /// the basic block that Earlier lives in, right after Earlier.
