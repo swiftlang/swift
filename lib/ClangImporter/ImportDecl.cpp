@@ -2985,7 +2985,7 @@ namespace {
           return nullptr;
 
         // Create the global constant.
-        bool isStatic = enumKind != EnumKind::Unknown && dc->isTypeContext();
+        bool isStatic = dc->isTypeContext();
         auto result = synthesizer.createConstant(
             name, dc, type, clang::APValue(decl->getInitVal()),
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
