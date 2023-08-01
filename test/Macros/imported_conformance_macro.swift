@@ -16,3 +16,9 @@ struct S {}
 
 // CHECK-DUMP: extension S: Equatable  {
 // CHECK-DUMP: }
+
+@Hashable
+struct T {}
+
+// CHECK-DUMP: extension T: Hashable  {
+// CHECK-DUMP: }
