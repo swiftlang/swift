@@ -2834,8 +2834,10 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   }
 
   if (isReadOnlyFunction(f)) {
-    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
-                                 llvm::Attribute::ReadOnly);
+    auto &ctx = signature.getType()->getContext();
+    attrs =
+        attrs.addFnAttribute(ctx, llvm::Attribute::getWithMemoryEffects(
+                                      ctx, llvm::MemoryEffects::readOnly()));
   }
 }
 

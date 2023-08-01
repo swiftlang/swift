@@ -5903,7 +5903,7 @@ namespace {
             IGF.IGM.getGetForeignTypeMetadataFunctionPointer(),
             {request.get(IGF), candidate});
         call->addFnAttr(llvm::Attribute::NoUnwind);
-        call->addFnAttr(llvm::Attribute::ReadNone);
+        call->setDoesNotAccessMemory();
 
         return MetadataResponse::handle(IGF, request, call);
       });

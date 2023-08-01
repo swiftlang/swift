@@ -1983,7 +1983,7 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
   metadata->setName(object->getName() + ".Type");
   metadata->setCallingConv(IGF.IGM.getOptions().PlatformCCallingConvention);
   metadata->setDoesNotThrow();
-  metadata->addFnAttr(llvm::Attribute::ReadOnly);
+  metadata->setOnlyReadsMemory();
   return metadata;
 }
 

@@ -834,9 +834,9 @@ FUNCTION(GetFunctionMetadata0, swift_getFunctionTypeMetadata0,
          C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone),
+         ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata1(unsigned long flags,
 //                                          const Metadata *arg0,
@@ -845,9 +845,9 @@ FUNCTION(GetFunctionMetadata1, swift_getFunctionTypeMetadata1,
         C_CC, AlwaysAvailable,
         RETURNS(TypeMetadataPtrTy),
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy),
-        ATTRS(NoUnwind, ReadNone),
+        ATTRS(NoUnwind),
         EFFECT(MetaData),
-        NO_MEMEFFECTS)
+        MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata2(unsigned long flags,
 //                                          const Metadata *arg0,
@@ -857,9 +857,9 @@ FUNCTION(GetFunctionMetadata2, swift_getFunctionTypeMetadata2,
         C_CC, AlwaysAvailable,
         RETURNS(TypeMetadataPtrTy),
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy),
-        ATTRS(NoUnwind, ReadNone),
+        ATTRS(NoUnwind),
         EFFECT(MetaData),
-        NO_MEMEFFECTS)
+        MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata3(unsigned long flags,
 //                                          const Metadata *arg0,
@@ -871,18 +871,18 @@ FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3,
         RETURNS(TypeMetadataPtrTy),
         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
              TypeMetadataPtrTy),
-        ATTRS(NoUnwind, ReadNone),
+        ATTRS(NoUnwind),
         EFFECT(MetaData),
-        NO_MEMEFFECTS)
+        MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
 FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata,
          SwiftCC, AlwaysAvailable,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone), // only writes to runtime-private fields
+         ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone)) // only writes to runtime-private fields
 
 // SWIFT_RUNTIME_EXPORT
 // SWIFT_CC(swift)
@@ -894,9 +894,9 @@ FUNCTION(CompareTypeContextDescriptors,
          RETURNS(Int1Ty),
          ARGS(TypeContextDescriptorPtrTy, 
               TypeContextDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // MetadataResponse swift_getSingletonMetadata(MetadataRequest request,
 //                                             TypeContextDescriptor *type);
@@ -904,9 +904,9 @@ FUNCTION(GetSingletonMetadata, swift_getSingletonMetadata,
          SwiftCC, AlwaysAvailable,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, TypeContextDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone),
+         ATTRS(NoUnwind),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // MetadataResponse swift_getGenericMetadata(MetadataRequest request,
 //                                           const void * const *arguments,
@@ -1088,9 +1088,9 @@ FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness,
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 FUNCTION(GetAssociatedTypeWitnessRelative, swift_getAssociatedTypeWitnessRelative,
          SwiftCC, AlwaysAvailable,
          RETURNS(TypeMetadataResponseTy),
@@ -1099,9 +1099,9 @@ FUNCTION(GetAssociatedTypeWitnessRelative, swift_getAssociatedTypeWitnessRelativ
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 // const WitnessTable *swift_getAssociatedConformanceWitness(
@@ -1118,9 +1118,9 @@ FUNCTION(GetAssociatedConformanceWitness,
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 FUNCTION(GetAssociatedConformanceWitnessRelative,
          swift_getAssociatedConformanceWitnessRelative, SwiftCC, AlwaysAvailable,
          RETURNS(WitnessTablePtrTy),
@@ -1129,9 +1129,9 @@ FUNCTION(GetAssociatedConformanceWitnessRelative,
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // SWIFT_RUNTIME_EXPORT
 //     SWIFT_CC(swift) bool swift_compareProtocolConformanceDescriptors(
@@ -1143,9 +1143,9 @@ FUNCTION(CompareProtocolConformanceDescriptors,
          RETURNS(Int1Ty),
          ARGS(ProtocolConformanceDescriptorPtrTy, 
               ProtocolConformanceDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 // const Metadata * const *
@@ -1175,36 +1175,36 @@ FUNCTION(AllocateWitnessTablePack,
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getExistentialMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetExistentialMetatypeMetadata,
          swift_getExistentialMetatypeMetadata, C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getObjCClassMetadata(objc_class *theClass);
 FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata,
          C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(ObjCClassPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getObjCClassFromMetadata(objc_class *theClass);
 FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata,
          C_CC, AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect), // ?
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // Metadata *swift_getObjCClassFromObject(id object);
 // This reads object metadata so cannot be marked ReadNone.
@@ -1615,9 +1615,9 @@ FUNCTION(ObjectDispose, object_dispose, C_CC, AlwaysAvailable,
 FUNCTION(LookUpClass, objc_lookUpClass, C_CC, AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // Class objc_setSuperclass(Class cls, Class newSuper);
 FUNCTION(SetSuperclass, class_setSuperclass, C_CC, AlwaysAvailable,
@@ -1795,54 +1795,54 @@ FUNCTION(DynamicCastMetatypeToObjectUnconditional,
          swift_dynamicCastMetatypeToObjectUnconditional, C_CC, AlwaysAvailable,
          RETURNS(ObjCPtrTy),
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
-         ATTRS(NoUnwind, ReadNone),
+         ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // id swift_dynamicCastMetatypeToObjectConditional(type *type);
 FUNCTION(DynamicCastMetatypeToObjectConditional,
          swift_dynamicCastMetatypeToObjectConditional, C_CC, AlwaysAvailable,
          RETURNS(ObjCPtrTy),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // witness_table* swift_conformsToProtocol(type*, protocol*);
 FUNCTION(ConformsToProtocol,
          swift_conformsToProtocol, C_CC, AlwaysAvailable,
          RETURNS(WitnessTablePtrTy),
          ARGS(TypeMetadataPtrTy, ProtocolDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone),
+         ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // witness_table* swift_conformsToProtocol2(type*, protocol*);
 FUNCTION(ConformsToProtocol2,
          swift_conformsToProtocol2, C_CC, SignedConformsToProtocolAvailability,
          RETURNS(WitnessTablePtrTy),
          ARGS(TypeMetadataPtrTy, ProtocolDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone),
+         ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // bool swift_isClassType(type*);
 FUNCTION(IsClassType,
          swift_isClassType, C_CC, AlwaysAvailable,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(ZExt, NoUnwind, ReadNone, WillReturn),
+         ATTRS(ZExt, NoUnwind, WillReturn),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // bool swift_isOptionalType(type*);
 FUNCTION(IsOptionalType,
          swift_isOptionalType, C_CC, AlwaysAvailable,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(ZExt, NoUnwind, ReadNone, WillReturn),
+         ATTRS(ZExt, NoUnwind, WillReturn),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*),
@@ -1951,9 +1951,9 @@ FUNCTION(ObjCMsgSendSuperStret2, objc_msgSendSuper2_stret,
          NO_MEMEFFECTS)
 FUNCTION(ObjCSelRegisterName, sel_registerName,
          C_CC, AlwaysAvailable,
-         RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind, ReadNone),
+         RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 FUNCTION(ClassReplaceMethod, class_replaceMethod,
          C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
@@ -2228,9 +2228,9 @@ FUNCTION(GetCurrentTask,
          ConcurrencyAvailability,
          RETURNS(SwiftTaskPtrTy),
          ARGS(),
-         ATTRS(NoUnwind, ReadNone, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         MEMEFFECTS(ReadNone))
 
 // void *swift_task_alloc(size_t size);
 FUNCTION(TaskAlloc,

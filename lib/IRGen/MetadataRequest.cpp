@@ -2376,7 +2376,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     }
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);
-    call->addFnAttr(llvm::Attribute::ReadOnly);
+    call->setOnlyReadsMemory();
     result = call;
   } else {
     static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
