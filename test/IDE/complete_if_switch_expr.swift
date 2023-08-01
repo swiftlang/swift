@@ -335,6 +335,14 @@ func testSkipTypeChecking14() -> E {
   }
 }
 
+func testSkipTypechecking15(_ x: inout Int) -> E {
+  switch Bool.random() {
+  case true:
+    .#^DOT27?check=DOT^#
+  case false:
+    x = 0
+  }
+}
 
 // DOT:     Begin completions, 2 items
 // DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: e[#E#]; name=e

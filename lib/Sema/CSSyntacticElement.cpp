@@ -1141,9 +1141,13 @@ private:
 
     for (auto element : braceStmt->getElements()) {
       if (cs.isForCodeCompletion() &&
-          !cs.containsIDEInspectionTarget(element)) {
+          !cs.containsIDEInspectionTarget(element) &&
+          !(braceStmt->getSingleActiveExpression() &&
+            locator->isForSingleValueStmtConjunctionOrBrace())) {
         // To improve performance, skip type checking elements that can't
-        // influence the code completion token.
+        // influence the code completion token. Note we don't do this for
+        // single expression SingleValueStmtExpr branches, as they're needed to
+        // infer the type.
         if (element.is<Stmt *>() && !element.isStmt(StmtKind::Guard) && !element.isStmt(StmtKind::Return)) {
           // Statements can't influence the expresion that contains the code
           // completion token.
