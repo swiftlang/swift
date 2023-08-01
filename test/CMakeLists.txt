@@ -152,8 +152,14 @@ if(NOT SWIFT_INCLUDE_TOOLS)
       )
   endif()
   if(SWIFT_BUILD_STDLIB)
-    list(APPEND SWIFT_LIT_ARGS
-         "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+    # If building only static stdlib, use `swift_static` resources directory.
+    if(NOT SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_BUILD_STATIC_STDLIB)
+      list(APPEND SWIFT_LIT_ARGS
+           "--param" "test_resource_dir=${SWIFTSTATICLIB_DIR}")
+    else()
+      list(APPEND SWIFT_LIT_ARGS
+           "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+    endif()
   endif()
 endif()
 
