@@ -105,6 +105,7 @@ LANGUAGE_FEATURE(
     FreestandingExpressionMacros, 382, "Expression macros",
         hasSwiftSwiftParser)
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
+LANGUAGE_FEATURE(ExtensionMacros, 402, "Extension macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
 LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros", true)
