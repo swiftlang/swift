@@ -4541,7 +4541,8 @@ lookupInClassTemplateSpecialization(
   return found;
 }
 
-static bool isDirectLookupMemberContext(const clang::Decl *memberContext,
+static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
+                                        const clang::Decl *memberContext,
                                         const clang::Decl *parent) {
   if (memberContext->getCanonicalDecl() == parent->getCanonicalDecl())
     return true;
@@ -4549,7 +4550,15 @@ static bool isDirectLookupMemberContext(const clang::Decl *memberContext,
     if (namespaceDecl->isInline()) {
       if (auto memberCtxParent =
               dyn_cast<clang::Decl>(namespaceDecl->getParent()))
-        return isDirectLookupMemberContext(memberCtxParent, parent);
+        return isDirectLookupMemberContext(foundClangDecl, memberCtxParent,
+                                           parent);
+    }
+  }
+  // Enum constant decl can be found in the parent context of the enum decl.
+  if (auto *ED = dyn_cast<clang::EnumDecl>(memberContext)) {
+    if (isa<clang::EnumConstantDecl>(foundClangDecl)) {
+      if (auto *firstDecl = dyn_cast<clang::Decl>(ED->getDeclContext()))
+        return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
     }
   }
   return false;
@@ -4587,7 +4596,8 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
                   auto second = cast<clang::DeclContext>(clangDecl);
                   if (auto firstDecl = dyn_cast<clang::Decl>(first)) {
                     if (auto secondDecl = dyn_cast<clang::Decl>(second))
-                      return isDirectLookupMemberContext(firstDecl, secondDecl);
+                      return isDirectLookupMemberContext(foundClangDecl,
+                                                         firstDecl, secondDecl);
                     else
                       return false;
                   }
