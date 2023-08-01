@@ -342,5 +342,7 @@ void DerivedConformance::tryDiagnoseFailedComparableDerivation(
                          rawType, nominal->getDeclaredInterfaceType(),
                          comparableProto->getDeclaredInterfaceType());
     }
+    // FIXME: Diagnose potentially unavailable enum elements that are preventing
+    // Comparable synthesis.
   }
 }
