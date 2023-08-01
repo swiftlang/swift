@@ -269,9 +269,12 @@ public func _stringForPrintObject(_ value: Any) -> String {
 public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
 // Utilities to get refcount(s) of class objects.
-@_silgen_name("swift_retainCount")
-public func _getRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_unownedRetainCount")
-public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_weakRetainCount")
-public func _getWeakRetainCount(_ Value: AnyObject) -> UInt
+public func _getRetainCount(_ Value: AnyObject) -> UInt {
+  return UInt(bitPattern: swift_retainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
+}
+public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt {
+  return UInt(bitPattern: swift_unownedRetainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
+}
+public func _getWeakRetainCount(_ Value: AnyObject) -> UInt {
+  return UInt(bitPattern: swift_weakRetainCount(unsafeBitCast(Value, to: UnsafeMutablePointer<HeapObject>.self)))
+}
