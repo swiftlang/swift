@@ -600,7 +600,7 @@ void IRGenModule::emitLazyObjCProtocolDefinition(ProtocolDecl *proto) {
 
   // Move the new record to the placeholder's position.
   Module.removeGlobalVariable(record);
-  Module.insertGlobalVariable(placeholder->getIterator(), record);
+  Module.insertGlobalVariable(std::next(placeholder->getIterator()), record);
   // Replace and destroy the placeholder.
   placeholder->replaceAllUsesWith(
                             llvm::ConstantExpr::getBitCast(record, Int8PtrTy));
