@@ -20,6 +20,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -191,6 +192,18 @@ TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
   if (SrcRange.isValid() &&
       !rangeContainsTokenLocWithGeneratedSource(SM, SrcRange, Loc))
     return nullptr;
+
+  // If this context is for a declaration, ensure that we've expanded the
+  // children of the declaration.
+  if (Node.getReason() == Reason::Decl ||
+      Node.getReason() == Reason::DeclImplicit) {
+    if (auto decl = Node.getAsDecl()) {
+      ASTContext &ctx = decl->getASTContext();
+      (void)evaluateOrDefault(
+          ctx.evaluator, ExpandChildTypeRefinementContextsRequest{decl, this},
+          false);
+    }
+  }
 
   // For the moment, we perform a linear search here, but we can and should
   // do something more efficient.
@@ -410,4 +423,9 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   }
 
   llvm_unreachable("Unhandled Reason in switch.");
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out, const TypeRefinementContext *trc) {
+  out << "TRC @" << trc;
 }
