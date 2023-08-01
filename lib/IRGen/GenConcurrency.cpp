@@ -301,9 +301,15 @@ void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
                                         SubstitutionMap subs,
                                         llvm::Value *groupFlags) {
-  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
-  auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));
-  auto group = IGF.Builder.CreateBitCast(address.getAddress(),
+  // heap-allocate the task group
+  auto alignMask = Alignment(Alignment_TaskGroup).getMaskValue();
+  auto alignMask_size_t = IGF.IGM.getSize(Size(alignMask));
+  auto groupSizeBytes =
+      IGF.IGM.getSize(NumWords_TaskGroup * IGF.IGM.getPointerSize());
+  auto heapAddress =
+      IGF.emitAllocRawCall(groupSizeBytes, alignMask_size_t, "groupHeapAlloc");
+
+  auto group = IGF.Builder.CreateBitCast(heapAddress,
                                          IGF.IGM.Int8PtrTy);
   IGF.Builder.CreateLifetimeStart(group);
   assert(subs.getReplacementTypes().size() == 1 &&
@@ -332,6 +338,13 @@ void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   IGF.Builder.CreateLifetimeEnd(group);
+
+  // free the heap-allocated task group
+  auto alignMask = Alignment(Alignment_TaskGroup).getMaskValue();
+  auto alignMask_size_t = IGF.IGM.getSize(Size(alignMask));
+  auto groupSizeBytes =
+      IGF.IGM.getSize(NumWords_TaskGroup * IGF.IGM.getPointerSize());
+  IGF.emitDeallocRawCall(group, groupSizeBytes, alignMask_size_t);
 }
 
 llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
