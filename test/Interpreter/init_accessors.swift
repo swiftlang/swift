@@ -1,8 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend InitAccessors) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -enable-experimental-feature -Xfrontend InitAccessors) | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-O) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: asserts
 
 struct TestInit {
   var x: Int
