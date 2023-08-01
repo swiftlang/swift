@@ -42,6 +42,7 @@ class SILCombiner;
 
 namespace irgen {
 class IRGenModule;
+class IRGenerator;
 }
 
 /// The main entrypoint for executing a pipeline pass on a SIL module.
@@ -72,6 +73,12 @@ class SwiftPassInvocation {
 
   SILSSAUpdater *ssaUpdater = nullptr;
 
+  /// IRGen module for passes that request it (e.g. simplification pass)
+  irgen::IRGenModule *irgenModule = nullptr;
+
+  /// IRGenerator used by IRGenModule above
+  irgen::IRGenerator *irgen = nullptr;
+
   static constexpr int BlockSetCapacity = 8;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
@@ -96,11 +103,15 @@ public:
   SwiftPassInvocation(SILPassManager *passManager) :
     passManager(passManager) {}
 
+  ~SwiftPassInvocation();
+
   SILPassManager *getPassManager() const { return passManager; }
   
   SILTransform *getTransform() const { return transform; }
 
   SILFunction *getFunction() const { return function; }
+
+  irgen::IRGenModule *getIRGenModule();
 
   FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
 

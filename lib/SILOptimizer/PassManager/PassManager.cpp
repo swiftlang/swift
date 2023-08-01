@@ -17,6 +17,7 @@
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/Demangling/Demangle.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -1378,6 +1379,25 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
   endPass();
 }
 
+irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
+  // We need an IRGenModule to get the actual sizes from type lowering.
+  // Creating an IRGenModule involves some effort, let's cache it for the
+  // whole pass.
+  if (irgenModule == nullptr && irgen == nullptr) {
+    SILModule *module = getPassManager()->getModule();
+
+    auto *irgenOpts = module->getIRGenOptionsOrNull();
+    if (!irgenOpts)
+      return nullptr;
+
+    irgen = new irgen::IRGenerator(*irgenOpts, *module);
+    auto targetMachine = irgen->createTargetMachine();
+    assert(targetMachine && "failed to create target");
+    irgenModule = new irgen::IRGenModule(*irgen, std::move(targetMachine));
+  }
+  return irgenModule;
+}
+
 void SwiftPassInvocation::endPass() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
@@ -1406,6 +1426,17 @@ void SwiftPassInvocation::endTransformFunction() {
   function = nullptr;
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+}
+
+SwiftPassInvocation::~SwiftPassInvocation() {
+  if (irgenModule) {
+    delete irgenModule;
+    irgenModule = nullptr;
+  }
+  if (irgen) {
+    delete irgen;
+    irgen = nullptr;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1472,6 +1503,46 @@ void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatory
                                               : SILInliner::InlineKind::PerformanceInline,
                               funcBuilder,
                               deleter);
+}
+
+static const irgen::TypeInfo &getTypeInfoOfBuiltin(swift::SILType type, irgen::IRGenModule &IGM) {
+  SILType lowered = IGM.getLoweredType(swift::Lowering::AbstractionPattern::getOpaque(), type.getASTType());
+  return IGM.getTypeInfo(lowered);
+}
+
+static SwiftInt integerValueFromConstant(llvm::Constant *c, SwiftInt add = 0) {
+  auto *intConst = dyn_cast_or_null<llvm::ConstantInt>(c);
+  if (!intConst)
+    return -1;
+  APInt value = intConst->getValue();
+  return value.getLimitedValue() + add;
+}
+
+SwiftInt BridgedPassContext::getStaticSize(swift::SILType type) const {
+  irgen::IRGenModule *IGM = invocation->getIRGenModule();
+  if (!IGM)
+    return -1;
+  auto &ti = getTypeInfoOfBuiltin(type, *IGM);
+  llvm::Constant *c = ti.getStaticSize(*IGM);
+  return integerValueFromConstant(c);
+}
+
+SwiftInt BridgedPassContext::getStaticAlignment(swift::SILType type) const {
+  irgen::IRGenModule *IGM = invocation->getIRGenModule();
+  if (!IGM)
+    return -1;
+  auto &ti = getTypeInfoOfBuiltin(type, *IGM);
+  llvm::Constant *c = ti.getStaticAlignmentMask(*IGM);
+  return integerValueFromConstant(c, 1);
+}
+
+SwiftInt BridgedPassContext::getStaticStride(swift::SILType type) const {
+  irgen::IRGenModule *IGM = invocation->getIRGenModule();
+  if (!IGM)
+    return -1;
+  auto &ti = getTypeInfoOfBuiltin(type, *IGM);
+  llvm::Constant *c = ti.getStaticStride(*IGM);
+  return integerValueFromConstant(c);
 }
 
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {

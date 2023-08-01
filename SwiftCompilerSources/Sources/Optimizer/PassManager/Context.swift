@@ -279,6 +279,23 @@ struct SimplifyContext : MutatingContext {
   let preserveDebugInfo: Bool
 }
 
+extension Type {
+  func getStaticSize(context: SimplifyContext) -> Int? {
+    let v = context._bridged.getStaticSize(self.bridged)
+    return v == -1 ? nil : v
+  }
+  
+  func getStaticAlignment(context: SimplifyContext) -> Int? {
+    let v = context._bridged.getStaticAlignment(self.bridged)
+    return v == -1 ? nil : v
+  }
+  
+  func getStaticStride(context: SimplifyContext) -> Int? {
+    let v = context._bridged.getStaticStride(self.bridged)
+    return v == -1 ? nil : v
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                          Builder initialization
 //===----------------------------------------------------------------------===//
