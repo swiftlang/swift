@@ -589,9 +589,8 @@ public:
 
   const SILOptions &getOptions() const { return Options; }
   const IRGenOptions *getIRGenOptionsOrNull() const {
-    // We don't want to serialize target specific SIL.
-    assert(isSerialized() &&
-           "Target specific options must not be used before serialization");
+    // This exposes target specific information, therefore serialized SIL
+    // is also target specific.
     return irgenOptions;
   }
 
