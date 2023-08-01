@@ -236,9 +236,7 @@ let dictNonCost = [1:2, 3:d]
 // RUN: %sourcekitd-test -req=cursor -pos=22:25 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-BOOL1 %s
 // CHECK-BOOL1: s:Sb
 
-// RUN: %sourcekitd-test \
-// RUN:    -req=open -name %s %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t == \
-// RUN:    -req=cursor -pos=29:29 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-OBJ-LITERAL %s
+// RUN: %sourcekitd-test -req=cursor -pos=29:29 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-OBJ-LITERAL %s
 // CHECK-OBJ-LITERAL: source.lang.swift.ref.function.constructor
 // CHECK-OBJ-LITERAL-NEXT: init(_colorLiteralRed:green:blue:alpha:)
 // CHECK-OBJ-LITERAL-NEXT: s:13cursor_stdlib7MyColorV16_colorLiteralRed5green4blue5alphaACSf_S3ftcfc
