@@ -152,7 +152,7 @@ private extension TupleExtractInst {
        bi.id == .USubOver,
        bi.operands[1].value is IntegerLiteralInst,
        let overFlowFlag = bi.operands[2].value as? IntegerLiteralInst,
-       overFlowFlag.value.isNullValue() {
+       overFlowFlag.value.isZero() {
       return true
     }
     return false
