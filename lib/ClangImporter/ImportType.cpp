@@ -2609,6 +2609,9 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
+  if (auto elaboratedTy = type->getAs<clang::ElaboratedType>())
+    type = elaboratedTy->desugar();
+
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
     // Nullable trailing closure parameters default to 'nil'.
@@ -2660,6 +2663,8 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
         if (camel_case::sameWordIgnoreFirstCase(word, "domain"))
           return argumentAttrs;
         if (camel_case::sameWordIgnoreFirstCase(word, "action"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "event"))
           return argumentAttrs;
         if (camel_case::sameWordIgnoreFirstCase(word, "events") &&
             next != camelCaseWords.rend() &&
