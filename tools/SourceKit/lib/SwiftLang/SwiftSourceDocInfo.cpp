@@ -1151,6 +1151,39 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   return llvm::Error::success();
 }
 
+// If E is a literal, returns the declaration that should be reported by
+// cursor info for that initializer.
+static ValueDecl *getCursorInfoDeclForLiteral(Expr *E) {
+  if (auto *CollectionLit = dyn_cast<CollectionExpr>(E)) {
+    return CollectionLit->getInitializer().getDecl();
+  }
+
+  LiteralExpr* LitExpr = dyn_cast<LiteralExpr>(E);
+  if (!LitExpr) {
+    return nullptr;
+  }
+
+  bool IsObjectLiteral = dyn_cast<ObjectLiteralExpr>(E);
+  if (!IsObjectLiteral && LitExpr->getInitializer().getDecl()) {
+    return LitExpr->getInitializer().getDecl();
+  }
+
+  // We shouldn’t report the builtin initializer to the user because it’s
+  // underscored and not visible. Instead, return the type of the literal.
+  if (IsObjectLiteral || dyn_cast<BuiltinLiteralExpr>(E)) {
+    Type Ty = E->getType();
+    if (!Ty) {
+      return nullptr;
+    }
+    auto NominalTy = Ty->getAs<NominalOrBoundGenericNominalType>();
+    if (!NominalTy) {
+      return nullptr;
+    }
+    return NominalTy->getDecl();
+  }
+  return nullptr;
+}
+
 static bool addCursorInfoForLiteral(
     CursorInfoData &Data, Expr *LitExpr, SwiftLangSupport &Lang,
     const CompilerInvocation &CompInvoc, SourceLoc CursorLoc,
@@ -1159,22 +1192,7 @@ static bool addCursorInfoForLiteral(
     return false;
   }
 
-  // Tries to retrieve the referenced initializer.
-  auto getInitializer = [](auto *Expr) -> ValueDecl * {
-    if (auto *LitExpr = dyn_cast<LiteralExpr>(Expr)) {
-      if (LitExpr->getInitializer().getDecl()) {
-        return LitExpr->getInitializer().getDecl();
-      }
-      if (auto *BuiltinLit = dyn_cast<BuiltinLiteralExpr>(LitExpr)) {
-        return BuiltinLit->getBuiltinInitializer().getDecl();
-      }
-    } else if (auto *CollectionLit = dyn_cast<CollectionExpr>(Expr)) {
-      return CollectionLit->getInitializer().getDecl();
-    }
-    return nullptr;
-  };
-
-  ValueDecl *InitDecl = getInitializer(LitExpr);
+  ValueDecl *InitDecl = getCursorInfoDeclForLiteral(LitExpr);
   if (!InitDecl) {
     return false;
   }
@@ -1183,9 +1201,11 @@ static bool addCursorInfoForLiteral(
   DeclInfo Info(InitDecl, nullptr, true, false, {}, CompInvoc);
   auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
                             PreviousSnaps, Data.Allocator);
+
   bool Success = true;
   llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
     Data.InternalDiagnostic = copyCString(E.getMessage(), Data.Allocator);
+    Data.Symbols.pop_back();
     Success = false;
   });
   return Success;
@@ -1678,18 +1698,10 @@ static void resolveCursor(
             return nullptr;
           }
           Expr *E = ExprInfo->getTrailingExpr();
-          if (dyn_cast<LiteralExpr>(E)) {
+          if (dyn_cast<LiteralExpr>(E) || dyn_cast<CollectionExpr>(E)) {
             return E;
           }
-          switch (E->getKind()) {
-          case ExprKind::Array:
-          case ExprKind::Dictionary:
-          case ExprKind::KeyPath: {
-            return E;
-          }
-          default:
-            return nullptr;
-          }
+          return nullptr;
         };
 
         CursorInfoData Data;
@@ -1702,17 +1714,11 @@ static void resolveCursor(
 
         // Handle literal expression.
         if (auto *LitExpr = tryGetLiteralExpr(CursorInfo)) {
-          bool Success = addCursorInfoForLiteral(Data, LitExpr, Lang, CompInvok,
-                                                 CursorInfo->getLoc(),
-                                                 getPreviousASTSnaps());
-          if (!Success) {
-            Data.Symbols.clear();
-            Data.AvailableActions.clear();
-          }
+          addCursorInfoForLiteral(Data, LitExpr, Lang, CompInvok,
+                                  CursorInfo->getLoc(), getPreviousASTSnaps());
         }
 
-        if (Data.InternalDiagnostic.empty() && Data.AvailableActions.empty() &&
-            Data.Symbols.empty()) {
+        if (Data.isEmpty()) {
           Data.InternalDiagnostic =
               "Resolved to incomplete expression or statement.";
         }

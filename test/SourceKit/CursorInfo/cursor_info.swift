@@ -814,38 +814,40 @@ var a: A = 42
 // CHECK93-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name> = <syntaxtype.string>&quot;f&quot;</syntaxtype.string></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=227:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK94 %s
-// CHECK94: source.lang.swift.ref.function.constructor
-// CHECK94-NEXT: init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-// CHECK94-NEXT: s:SS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfc
+// CHECK94: source.lang.swift.ref.struct
+// CHECK94-NEXT: String
+// CHECK94-NEXT: s:SS
 // CHECK94-NEXT: source.lang.swift
-// CHECK94-NEXT: (String.Type) -> (Builtin.RawPointer, Builtin.Word, Builtin.Int1) -> String
-// CHECK94-NEXT: $s21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcD
+// CHECK94-NEXT: String.Type
+// CHECK94-NEXT: $sSSmD
 // CHECK94-NEXT: Swift
 // CHECK94-NEXT: <Group>String</Group>
 // CHECK94-NEXT: SYSTEM
+// CHECK94-NEXT: <Declaration>@frozen @_eagerMove struct String</Declaration>
 
 // RUN:  %sourcekitd-test -req=cursor -pos=231:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK95 %s
 // CHECK95: <Declaration>func checkAnyIsAKeyword(x: Any)</Declaration>
 // CHECK95-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>checkAnyIsAKeyword</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><syntaxtype.keyword>Any</syntaxtype.keyword></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=23:23 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK96 %s
-// CHECK96: source.lang.swift.ref.function.constructor
-// CHECK96-NEXT: init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-// CHECK96-NEXT: s:SS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfc
+// CHECK96: source.lang.swift.ref.struct
+// CHECK96-NEXT: String
+// CHECK96-NEXT: s:SS
 // CHECK96-NEXT: source.lang.swift
-// CHECK96-NEXT: (String.Type) -> (Builtin.RawPointer, Builtin.Word, Builtin.Int1) -> String
-// CHECK96-NEXT: $s21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcD
+// CHECK96-NEXT: String.Type
+// CHECK96-NEXT: $sSSmD
 // CHECK96-NEXT: Swift
 // CHECK96-NEXT: <Group>String</Group>
 // CHECK96-NEXT: SYSTEM
+// CHECK96-NEXT: <Declaration>@frozen @_eagerMove struct String</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=233:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK97 %s
-// CHECK97: source.lang.swift.ref.function.constructor
-// CHECK97-NEXT: init(_builtinIntegerLiteral:)
-// CHECK97-NEXT: s:Si22_builtinIntegerLiteralSiBI_tcfc
+// CHECK97: source.lang.swift.ref.struct
+// CHECK97-NEXT: Int
+// CHECK97-NEXT: s:Si
 // CHECK97-NEXT: source.lang.swift
-// CHECK97-NEXT: (Int.Type) -> (Builtin.IntLiteral) -> Int
-// CHECK97-NEXT: $s22_builtinIntegerLiteralSiBI_tcD
+// CHECK97-NEXT: Int.Type
+// CHECK97-NEXT: $sSimD
 // CHECK97-NEXT: Swift
 // CHECK97-NEXT: <Group>Math/Integers</Group>
 // CHECK97-NEXT: SYSTEM

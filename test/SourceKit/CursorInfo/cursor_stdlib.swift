@@ -237,13 +237,15 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-BOOL1: s:Sb
 
 // RUN: %sourcekitd-test -req=cursor -pos=29:29 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-OBJ-LITERAL %s
-// CHECK-OBJ-LITERAL: source.lang.swift.ref.function.constructor
-// CHECK-OBJ-LITERAL-NEXT: init(_colorLiteralRed:green:blue:alpha:)
-// CHECK-OBJ-LITERAL-NEXT: s:13cursor_stdlib7MyColorV16_colorLiteralRed5green4blue5alphaACSf_S3ftcfc
+// CHECK-OBJ-LITERAL: source.lang.swift.ref.struct (24:8-24:15)
+// CHECK-OBJ-LITERAL-NEXT: MyColor
+// CHECK-OBJ-LITERAL-NEXT: s:13cursor_stdlib7MyColorV
 // CHECK-OBJ-LITERAL-NEXT: source.lang.swift
-// CHECK-OBJ-LITERAL-NEXT: (MyColor.Type) -> (Float, Float, Float, Float) -> MyColor
-// CHECK-OBJ-LITERAL-NEXT: $s16_colorLiteralRed5green4blue5alpha13cursor_stdlib7MyColorVSf_S3ftcD
+// CHECK-OBJ-LITERAL-NEXT: MyColor.Type
+// CHECK-OBJ-LITERAL-NEXT: $s13cursor_stdlib7MyColorVmD
 // CHECK-OBJ-LITERAL-NEXT: cursor_stdlib
+// CHECK-OBJ-LITERAL-NEXT: <Declaration>struct MyColor : <Type usr="s:s26_ExpressibleByColorLiteralP">_ExpressibleByColorLiteral</Type></Declaration>
+// CHECK-OBJ-LITERAL-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>MyColor</decl.name> : <ref.protocol usr="s:s26_ExpressibleByColorLiteralP">_ExpressibleByColorLiteral</ref.protocol></decl.struct>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:18 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-ARRAY1 %s
 // CHECK-ARRAY1: source.lang.swift.ref.function.constructor
