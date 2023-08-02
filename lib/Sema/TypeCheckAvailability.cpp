@@ -308,6 +308,8 @@ ExportContext::getExportabilityReason() const {
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
                                                         ASTContext &AC) {
+  D = abstractSyntaxDeclForAvailableAttribute(D);
+
   for (auto Attr : D->getAttrs())
     if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
@@ -494,7 +496,10 @@ private:
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
-    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<MacroExpansionDecl>(D))
+    if (!isa<ValueDecl>(D) &&
+        !isa<ExtensionDecl>(D) &&
+        !isa<MacroExpansionDecl>(D) &&
+        !isa<PatternBindingDecl>(D))
       return nullptr;
 
     // Only introduce for an AbstractStorageDecl if it is not local. We
@@ -503,19 +508,16 @@ private:
     if (isa<AbstractStorageDecl>(D) && D->getDeclContext()->isLocalContext())
       return nullptr;
 
+    // Don't introduce for variable declarations that have a parent pattern
+    // binding; all of the relevant information is on the pattern binding.
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      if (var->getParentPatternBinding())
+        return nullptr;
+    }
+
     // Ignore implicit declarations (mainly skips over `DeferStmt` functions).
     if (D->isImplicit())
       return nullptr;
-
-    // Skip introducing additional contexts for var decls past the first in a
-    // pattern. The context necessary for the pattern as a whole was already
-    // introduced if necessary by the first var decl.
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (auto *PBD = VD->getParentPatternBinding()) {
-        if (VD != PBD->getAnchoringVarDecl(0))
-          return nullptr;
-      }
-    }
 
     // Declarations with an explicit availability attribute always get a TRC.
     if (hasActiveAvailableAttribute(D, Context)) {
@@ -541,7 +543,8 @@ private:
         getCurrentTRC()->getAvailabilityInfo();
     AvailabilityContext EffectiveAvailability =
         getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
-    if ((isa<VarDecl>(D) && refinementSourceRangeForDecl(D).isValid()) ||
+    if ((isa<PatternBindingDecl>(D) &&
+         refinementSourceRangeForDecl(D).isValid()) ||
         CurrentAvailability.isSupersetOf(EffectiveAvailability))
       return TypeRefinementContext::createForDeclImplicit(
           Context, D, getCurrentTRC(), EffectiveAvailability,
@@ -617,22 +620,6 @@ private:
       // the bodies of its accessors.
       SourceRange Range = storageDecl->getSourceRange();
 
-      // For a variable declaration (without accessors) we use the range of the
-      // containing pattern binding declaration to make sure that we include
-      // any type annotation in the type refinement context range. We also
-      // need to include any custom attributes that were written on the
-      // declaration.
-      if (auto *varDecl = dyn_cast<VarDecl>(storageDecl)) {
-        if (auto *PBD = varDecl->getParentPatternBinding())
-          Range = PBD->getSourceRange();
-
-        for (auto attr : varDecl->getOriginalAttrs()) {
-          if (auto customAttr = dyn_cast<CustomAttr>(attr)) {
-            Range.widen(customAttr->getRange());
-          }
-        }
-      }
-
       // HACK: For synthesized trivial accessors we may have not a valid
       // location for the end of the braces, so in that case we will fall back
       // to using the range for the storage declaration. The right fix here is
@@ -646,7 +633,13 @@ private:
 
       return Range;
     }
-    
+
+    // For pattern binding declarations, include the attributes in the source
+    // range so that we're sure to cover any property wrappers.
+    if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
+      return D->getSourceRangeIncludingAttrs();
+    }
+
     return D->getSourceRange();
   }
 
@@ -662,7 +655,7 @@ private:
         Context, D, getCurrentTRC(), Availability, range);
   }
 
-  /// Build contexts for a VarDecl with the given initializer.
+  /// Build contexts for a pattern binding declaration.
   void buildContextsForPatternBindingDecl(PatternBindingDecl *pattern) {
     // Build contexts for each of the pattern entries.
     for (unsigned index : range(pattern->getNumPatternEntries())) {
@@ -1241,22 +1234,11 @@ bool ExpandChildTypeRefinementContextsRequest::evaluate(
   if (computeContainedByDeploymentTarget(parentTRC, ctx))
     return false;
 
-  // Variables can have children corresponding to property wrappers and
-  // the initial values provided in each pattern binding entry.
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (auto *pattern = var->getParentPatternBinding()) {
-      // Only do this for the first variable in the pattern binding declaration.
-      auto anchorVar = pattern->getAnchoringVarDecl(0);
-      if (anchorVar != var) {
-        return evaluateOrDefault(
-            evaluator,
-            ExpandChildTypeRefinementContextsRequest{anchorVar, parentTRC},
-            false);
-      }
-
-      TypeRefinementContextBuilder builder(parentTRC, ctx);
-      builder.buildContextsForPatternBindingDecl(pattern);
-    }
+  // Pattern binding declarations can have children corresponding to property
+  // wrappers and the initial values provided in each pattern binding entry.
+  if (auto *binding = dyn_cast<PatternBindingDecl>(decl)) {
+    TypeRefinementContextBuilder builder(parentTRC, ctx);
+    builder.buildContextsForPatternBindingDecl(binding);
   }
 
   return false;
@@ -1594,38 +1576,6 @@ concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl) {
   }
 
   return AbstractSyntaxDecl;
-}
-
-/// Given a declaration upon which an availability attribute would appear in
-/// concrete syntax, return a declaration to which the parser
-/// actually attaches the attribute in the abstract syntax tree. We use this
-/// function to determine whether the concrete syntax already has an
-/// availability attribute.
-static const Decl *
-abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // concreteSyntaxDeclForAvailableAttribute().
-
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(ConcreteSyntaxDecl)) {
-    // Existing @available attributes in the AST are attached to VarDecls
-    // rather than PatternBindingDecls, so we return the first VarDecl for
-    // the pattern binding declaration.
-    // This is safe, even though there may be multiple VarDecls, because
-    // all parsed attribute that appear in the concrete syntax upon on the
-    // PatternBindingDecl are added to all of the VarDecls for the pattern
-    // binding.
-    if (PBD->getNumPatternEntries() != 0) {
-      return PBD->getAnchoringVarDecl(0);
-    }
-  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
-    // Similar to the PatternBindingDecl case above, we return the
-    // first EnumElementDecl.
-    if (auto *Elem = ECD->getFirstElement()) {
-      return Elem;
-    }
-  }
-
-  return ConcreteSyntaxDecl;
 }
 
 /// Given a declaration, return a better related declaration for which

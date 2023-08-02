@@ -367,6 +367,10 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
       OS << "extension." << ED->getExtendedType().getString();
     } else if (isa<TopLevelCodeDecl>(D)) {
       OS << "<top-level-code>";
+    } else if (auto PBD = dyn_cast<PatternBindingDecl>(D)) {
+      if (auto VD = PBD->getAnchoringVarDecl(0)) {
+        OS << VD->getName();
+      }
     }
   }
 
