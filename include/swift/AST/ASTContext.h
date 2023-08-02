@@ -898,6 +898,10 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the runtime availability of the `DiscardingTaskGroup`,
+  /// and supporting runtime functions function
+  AvailabilityContext getConcurrencyDiscardingTaskGroupAvailability();
+
   /// Get the back-deployed availability for concurrency.
   AvailabilityContext getBackDeployedConcurrencyAvailability();
 
