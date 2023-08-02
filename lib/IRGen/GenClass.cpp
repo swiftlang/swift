@@ -1259,7 +1259,8 @@ namespace {
 
       visitConformances(theExtension);
 
-      for (Decl *member : TheExtension->getImplementationContext()->getMembers())
+      for (Decl *member :
+           TheExtension->getImplementationContext()->getAllMembers())
         visit(member);
     }
 
