@@ -5187,18 +5187,12 @@ bool ConstraintSystem::repairFailures(
     // fix-up here unless last component has already a invalid type or
     // instance fix recorded.
     if (auto *kpExpr = getAsExpr<KeyPathExpr>(anchor)) {
-      auto i = kpExpr->getComponents().size() - 1;
-      auto lastCompLoc = getConstraintLocator(
-          locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
-      if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
-        return true;
-
-      auto lastComponentType = lhs->lookThroughAllOptionalTypes();
-      auto keyPathResultType = rhs->lookThroughAllOptionalTypes();
-
-      // Propagate contextual information from/to keypath result type.
-      (void)matchTypes(lastComponentType, keyPathResultType, matchKind,
-                       TMF_ApplyingFix, getConstraintLocator(locator));
+      if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
+        // If we have keypath capabilities for both sides and one of the bases
+        // is unresolved, it is too early to record fix.
+        if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+          return false;
+      }
 
       conversionsOrFixes.push_back(IgnoreContextualType::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6610,6 +6604,22 @@ bool ConstraintSystem::repairFailures(
                                            getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
     return true;
+  }
+  case ConstraintLocator::KeyPathValue: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      break;
+
+    auto kpExpr = castToExpr<KeyPathExpr>(anchor);
+    auto i = kpExpr->getComponents().size() - 1;
+    auto lastCompLoc =
+        getConstraintLocator(kpExpr, LocatorPathElt::KeyPathComponent(i));
+    if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
+      return true;
+
+    conversionsOrFixes.push_back(IgnoreContextualType::create(
+        *this, lhs, rhs, getConstraintLocator(anchor)));
   }
   default:
     break;
