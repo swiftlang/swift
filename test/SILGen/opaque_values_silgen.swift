@@ -647,3 +647,18 @@ func giveKeyPathString() {
 @backDeployed(before: SwiftStdlib 5.8)
 public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }
 #endif
+
+// CHECK-LABEL: sil {{.*}}[ossa] @SetIntoContainerAtKeyPath : {{.*}} {
+// CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] : {{.*}}, [[KP:%[^,]+]] : {{.*}}, [[VALUE:%[^,]+]] :
+// CHECK:         [[KP_COPY:%[^,]+]] = copy_value [[KP]] : $WritableKeyPath<Container, Field>
+// CHECK:         [[VALUE_COPY:%[^,]+]] = copy_value [[VALUE]] : $Field
+// CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[CONTAINER_ADDR]] : $*Container
+// CHECK:         [[SETTER:%[^,]+]] = function_ref @swift_setAtWritableKeyPath
+// CHECK:         apply [[SETTER]]<Container, Field>([[CONTAINER_ACCESS]], [[KP_COPY]], [[VALUE_COPY]])
+// CHECK:         end_access [[CONTAINER_ACCESS]] : $*Container
+// CHECK:         destroy_value [[KP_COPY]]
+// CHECK-LABEL: } // end sil function 'SetIntoContainerAtKeyPath'
+@_silgen_name("SetIntoContainerAtKeyPath")
+func set<Container, Field>(into container: inout Container, at keyPath: WritableKeyPath<Container, Field>, _ value: Field) {
+  container[keyPath: keyPath] = value
+}
