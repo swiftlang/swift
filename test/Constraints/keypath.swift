@@ -236,3 +236,30 @@ func issue_65965() {
   writeKP = \.v
   // expected-error@-1 {{key path value type 'KeyPath<S, String>' cannot be converted to contextual type 'WritableKeyPath<S, String>'}}
 }
+
+func test_any_key_path() {
+  struct S {
+    var v: String
+  }
+  
+  var anyKP: AnyKeyPath
+  anyKP = \S.v
+  anyKP = \.v
+  // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
+}
+
+// rdar://problem/32101765 - Keypath diagnostics are not actionable/helpful
+func rdar32101765() {
+  struct R32101765 {
+    let prop32101765 = 0
+  }
+  
+  let _: KeyPath<R32101765, Float> = \.prop32101765
+  // expected-error@-1 {{key path value type 'Int' cannot be converted to contextual type 'Float'}}
+  let _: KeyPath<R32101765, Float> = \R32101765.prop32101765
+  // expected-error@-1 {{key path value type 'Int' cannot be converted to contextual type 'Float'}}
+  let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
+  // expected-error@-1 {{type 'Int' has no member 'unknown'}}
+  let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
+  // expected-error@-1 {{type 'Int' has no member 'unknown'}}
+}

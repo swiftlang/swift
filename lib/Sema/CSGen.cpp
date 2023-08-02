@@ -3815,7 +3815,7 @@ namespace {
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
       auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
                                                             TVO_CanBindToHole);
-      CS.addConstraint(ConstraintKind::Equal, base, value, locator);
+      CS.addConstraint(ConstraintKind::Equal, base, value, valueLocator);
       CS.recordKeyPath(E, root, value, CurDC);
 
       // The result is a KeyPath from the root to the end component.
