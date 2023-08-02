@@ -42,7 +42,7 @@
 ///     ATTRS
 ///     NO_ATTRS
 ///     MEMEFFECTS
-///     NO_MEMEFFECTS
+///     UNKNOWN_MEMEFFECTS
 
 #ifndef FUNCTION
 #define FUNCTION(Id, Name, CC, Availability, ReturnTys, ArgTys, Attrs, Effect, MemEffects) \
@@ -54,7 +54,7 @@ FUNCTION(AllocBox, swift_allocBox, SwiftCC, AlwaysAvailable,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 //  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
 FUNCTION(MakeBoxUnique,
@@ -64,14 +64,14 @@ FUNCTION(MakeBoxUnique,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(DeallocBox, swift_deallocBox, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // swift_projectBox reads object metadata so cannot be marked ReadNone.
 FUNCTION(ProjectBox, swift_projectBox, C_CC, AlwaysAvailable,
@@ -86,7 +86,7 @@ FUNCTION(AllocEmptyBox, swift_allocEmptyBox, C_CC, AlwaysAvailable,
          ARGS(),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION(AllocObject, swift_allocObject, C_CC,  AlwaysAvailable,
@@ -94,7 +94,7 @@ FUNCTION(AllocObject, swift_allocObject, C_CC,  AlwaysAvailable,
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // HeapObject *swift_initStackObject(HeapMetadata const *metadata,
 //                                   HeapObject *object);
@@ -103,7 +103,7 @@ FUNCTION(InitStackObject, swift_initStackObject, C_CC, AlwaysAvailable,
          ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
 //                                    HeapObject *object);
@@ -112,7 +112,7 @@ FUNCTION(InitStaticObject, swift_initStaticObject, C_CC, AlwaysAvailable,
          ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(Locking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_verifyEndOfLifetime(HeapObject *object);
 FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, C_CC, AlwaysAvailable,
@@ -120,7 +120,7 @@ FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_deallocObject(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocObject, swift_deallocObject, C_CC, AlwaysAvailable,
@@ -128,7 +128,7 @@ FUNCTION(DeallocObject, swift_deallocObject, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_deallocUninitializedObject(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocUninitializedObject, swift_deallocUninitializedObject,
@@ -137,7 +137,7 @@ FUNCTION(DeallocUninitializedObject, swift_deallocUninitializedObject,
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_deallocClassInstance(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocClassInstance, swift_deallocClassInstance, C_CC, AlwaysAvailable,
@@ -145,7 +145,7 @@ FUNCTION(DeallocClassInstance, swift_deallocClassInstance, C_CC, AlwaysAvailable
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_deallocPartialClassInstance(HeapObject *obj, HeapMetadata *type, size_t size, size_t alignMask);
 FUNCTION(DeallocPartialClassInstance, swift_deallocPartialClassInstance,
@@ -154,7 +154,7 @@ FUNCTION(DeallocPartialClassInstance, swift_deallocPartialClassInstance,
          ARGS(RefCountedPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_slowAlloc(size_t size, size_t alignMask);
 FUNCTION(SlowAlloc, swift_slowAlloc, C_CC, AlwaysAvailable,
@@ -162,7 +162,7 @@ FUNCTION(SlowAlloc, swift_slowAlloc, C_CC, AlwaysAvailable,
          ARGS(SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_slowDealloc(void *ptr, size_t size, size_t alignMask);
 FUNCTION(SlowDealloc, swift_slowDealloc, C_CC, AlwaysAvailable,
@@ -170,7 +170,7 @@ FUNCTION(SlowDealloc, swift_slowDealloc, C_CC, AlwaysAvailable,
          ARGS(Int8PtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_willThrow(error *ptr);
 FUNCTION(WillThrow, swift_willThrow, SwiftCC,  AlwaysAvailable,
@@ -178,7 +178,7 @@ FUNCTION(WillThrow, swift_willThrow, SwiftCC,  AlwaysAvailable,
          ARGS(Int8PtrTy, ErrorPtrTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_errorInMain(error *ptr);
 FUNCTION(ErrorInMain, swift_errorInMain, SwiftCC, AlwaysAvailable,
@@ -186,7 +186,7 @@ FUNCTION(ErrorInMain, swift_errorInMain, SwiftCC, AlwaysAvailable,
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_unexpectedError(error *ptr);
 FUNCTION(UnexpectedError, swift_unexpectedError, SwiftCC, AlwaysAvailable,
@@ -194,7 +194,7 @@ FUNCTION(UnexpectedError, swift_unexpectedError, SwiftCC, AlwaysAvailable,
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind, NoReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_copyPOD(void *dest, void *src, Metadata *self);
 FUNCTION(CopyPOD, swift_copyPOD, C_CC, AlwaysAvailable,
@@ -202,7 +202,7 @@ FUNCTION(CopyPOD, swift_copyPOD, C_CC, AlwaysAvailable,
          ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_retain(void *ptr);
 FUNCTION(NativeStrongRetain, swift_retain, C_CC, AlwaysAvailable,
@@ -210,7 +210,7 @@ FUNCTION(NativeStrongRetain, swift_retain, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_release(void *ptr);
 FUNCTION(NativeStrongRelease, swift_release, C_CC, AlwaysAvailable,
@@ -218,7 +218,7 @@ FUNCTION(NativeStrongRelease, swift_release, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_retain_n(void *ptr, int32_t n);
 FUNCTION(NativeStrongRetainN, swift_retain_n, C_CC, AlwaysAvailable,
@@ -226,7 +226,7 @@ FUNCTION(NativeStrongRetainN, swift_retain_n, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_release_n(void *ptr, int32_t n);
 FUNCTION(NativeStrongReleaseN, swift_release_n, C_CC, AlwaysAvailable,
@@ -234,7 +234,7 @@ FUNCTION(NativeStrongReleaseN, swift_release_n, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_setDeallocating(void *ptr);
 FUNCTION(NativeSetDeallocating, swift_setDeallocating,
@@ -243,7 +243,7 @@ FUNCTION(NativeSetDeallocating, swift_setDeallocating,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_nonatomic_retain_n(void *ptr, int32_t n);
 FUNCTION(NativeNonAtomicStrongRetainN, swift_nonatomic_retain_n, C_CC, AlwaysAvailable,
@@ -251,7 +251,7 @@ FUNCTION(NativeNonAtomicStrongRetainN, swift_nonatomic_retain_n, C_CC, AlwaysAva
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_release_n(void *ptr, int32_t n);
 FUNCTION(NativeNonAtomicStrongReleaseN, swift_nonatomic_release_n, C_CC, AlwaysAvailable,
@@ -259,7 +259,7 @@ FUNCTION(NativeNonAtomicStrongReleaseN, swift_nonatomic_release_n, C_CC, AlwaysA
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_unknownObjectRetain_n(void *ptr, int32_t n);
 FUNCTION(UnknownObjectRetainN, swift_unknownObjectRetain_n,
@@ -268,7 +268,7 @@ FUNCTION(UnknownObjectRetainN, swift_unknownObjectRetain_n,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_unknownObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(UnknownObjectReleaseN, swift_unknownObjectRelease_n,
@@ -277,7 +277,7 @@ FUNCTION(UnknownObjectReleaseN, swift_unknownObjectRelease_n,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_nonatomic_unknownObjectRetain_n(void *ptr, int32_t n);
 FUNCTION(NonAtomicUnknownObjectRetainN, swift_nonatomic_unknownObjectRetain_n,
@@ -286,7 +286,7 @@ FUNCTION(NonAtomicUnknownObjectRetainN, swift_nonatomic_unknownObjectRetain_n,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_unknownObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(NonAtomicUnknownObjectReleaseN, swift_nonatomic_unknownObjectRelease_n,
@@ -295,7 +295,7 @@ FUNCTION(NonAtomicUnknownObjectReleaseN, swift_nonatomic_unknownObjectRelease_n,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_bridgeObjectRetain_n(void *ptr, int32_t n);
 FUNCTION(BridgeObjectRetainN, swift_bridgeObjectRetain_n,
@@ -304,7 +304,7 @@ FUNCTION(BridgeObjectRetainN, swift_bridgeObjectRetain_n,
          ARGS(BridgeObjectPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_bridgeObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(BridgeObjectReleaseN, swift_bridgeObjectRelease_n,
@@ -313,7 +313,7 @@ FUNCTION(BridgeObjectReleaseN, swift_bridgeObjectRelease_n,
          ARGS(BridgeObjectPtrTy, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_bridgeObjectRetain_n(void *ptr, int32_t n);
 FUNCTION(NonAtomicBridgeObjectRetainN, swift_nonatomic_bridgeObjectRetain_n,
@@ -322,7 +322,7 @@ FUNCTION(NonAtomicBridgeObjectRetainN, swift_nonatomic_bridgeObjectRetain_n,
          ARGS(BridgeObjectPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_bridgeObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
@@ -331,7 +331,7 @@ FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
          ARGS(BridgeObjectPtrTy, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_nonatomic_retain(void *ptr);
 FUNCTION(NativeNonAtomicStrongRetain, swift_nonatomic_retain,
@@ -340,7 +340,7 @@ FUNCTION(NativeNonAtomicStrongRetain, swift_nonatomic_retain,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_release(void *ptr);
 FUNCTION(NativeNonAtomicStrongRelease, swift_nonatomic_release,
@@ -349,7 +349,7 @@ FUNCTION(NativeNonAtomicStrongRelease, swift_nonatomic_release,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_tryRetain(void *ptr);
 FUNCTION(NativeTryRetain, swift_tryRetain, C_CC, AlwaysAvailable,
@@ -357,7 +357,7 @@ FUNCTION(NativeTryRetain, swift_tryRetain, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(RefCounting, Locking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isDeallocating(void *ptr);
 FUNCTION(IsDeallocating, swift_isDeallocating, C_CC, AlwaysAvailable,
@@ -365,7 +365,7 @@ FUNCTION(IsDeallocating, swift_isDeallocating, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_unknownObjectRetain(void *ptr);
 FUNCTION(UnknownObjectRetain, swift_unknownObjectRetain, C_CC, AlwaysAvailable,
@@ -373,7 +373,7 @@ FUNCTION(UnknownObjectRetain, swift_unknownObjectRetain, C_CC, AlwaysAvailable,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_unknownObjectRelease(void *ptr);
 FUNCTION(UnknownObjectRelease, swift_unknownObjectRelease,
@@ -382,7 +382,7 @@ FUNCTION(UnknownObjectRelease, swift_unknownObjectRelease,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_nonatomic_unknownObjectRetain(void *ptr);
 FUNCTION(NonAtomicUnknownObjectRetain, swift_nonatomic_unknownObjectRetain,
@@ -391,7 +391,7 @@ FUNCTION(NonAtomicUnknownObjectRetain, swift_nonatomic_unknownObjectRetain,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_unknownObjectRelease(void *ptr);
 FUNCTION(NonAtomicUnknownObjectRelease, swift_nonatomic_unknownObjectRelease,
@@ -400,7 +400,7 @@ FUNCTION(NonAtomicUnknownObjectRelease, swift_nonatomic_unknownObjectRelease,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_bridgeObjectRetain(void *ptr);
 FUNCTION(BridgeObjectStrongRetain, swift_bridgeObjectRetain,
@@ -409,7 +409,7 @@ FUNCTION(BridgeObjectStrongRetain, swift_bridgeObjectRetain,
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_bridgeRelease(void *ptr);
 FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease,
@@ -418,7 +418,7 @@ FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease,
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_nonatomic_bridgeObjectRetain(void *ptr);
 FUNCTION(NonAtomicBridgeObjectStrongRetain, swift_nonatomic_bridgeObjectRetain,
@@ -427,7 +427,7 @@ FUNCTION(NonAtomicBridgeObjectStrongRetain, swift_nonatomic_bridgeObjectRetain,
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonatomic_bridgeRelease(void *ptr);
 FUNCTION(NonAtomicBridgeObjectStrongRelease,
@@ -437,7 +437,7 @@ FUNCTION(NonAtomicBridgeObjectStrongRelease,
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 
 // error *swift_errorRetain(error *ptr);
@@ -447,7 +447,7 @@ FUNCTION(ErrorStrongRetain, swift_errorRetain,
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_errorRelease(void *ptr);
 FUNCTION(ErrorStrongRelease, swift_errorRelease,
@@ -456,7 +456,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness, SymName, UnknownPrefix) \
   /* void swift_##SymName##Destroy(Name##Reference *object); */ \
@@ -466,7 +466,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind), \
            EFFECT(RefCounting, Deallocating), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void swift_##SymName##Init(Name##Reference *object, void *value); */ \
   FUNCTION(Nativeness##Name##Init, swift_##SymName##Init, \
            C_CC, AlwaysAvailable, \
@@ -474,7 +474,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy, UnknownPrefix##RefCountedPtrTy), \
            ATTRS(NoUnwind, FirstParamReturned, WillReturn), \
            EFFECT(NoEffect), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* Name##Reference *swift_##SymName##Assign(Name##Reference *object, void *value); */ \
   FUNCTION(Nativeness##Name##Assign, swift_##SymName##Assign, \
            C_CC, AlwaysAvailable, \
@@ -482,7 +482,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy, UnknownPrefix##RefCountedPtrTy), \
            ATTRS(NoUnwind, FirstParamReturned), \
            EFFECT(RefCounting, Deallocating), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void *swift_##SymName##Load(Name##Reference *object); */ \
   FUNCTION(Nativeness##Name##LoadStrong, swift_##SymName##LoadStrong, \
            C_CC, AlwaysAvailable, \
@@ -490,7 +490,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind, WillReturn), \
            EFFECT(NoEffect), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void *swift_##SymName##Take(Name##Reference *object); */ \
   FUNCTION(Nativeness##Name##TakeStrong, swift_##SymName##TakeStrong, \
            C_CC, AlwaysAvailable, \
@@ -498,7 +498,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy), \
            ATTRS(NoUnwind, WillReturn), \
            EFFECT(NoEffect), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* Name##Reference *swift_##SymName##CopyInit(Name##Reference *dest, Name##Reference *src); */ \
   FUNCTION(Nativeness##Name##CopyInit, swift_##SymName##CopyInit, \
            C_CC, AlwaysAvailable, \
@@ -506,7 +506,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy, Name##ReferencePtrTy), \
            ATTRS(NoUnwind, FirstParamReturned, WillReturn), \
            EFFECT(RefCounting), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void *swift_##SymName##TakeInit(Name##Reference *dest, Name##Reference *src); */ \
   FUNCTION(Nativeness##Name##TakeInit, swift_##SymName##TakeInit, \
            C_CC, AlwaysAvailable, \
@@ -514,7 +514,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy, Name##ReferencePtrTy), \
            ATTRS(NoUnwind, FirstParamReturned, WillReturn), \
            EFFECT(NoEffect), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* Name##Reference *swift_##SymName##CopyAssign(Name##Reference *dest, Name##Reference *src); */ \
   FUNCTION(Nativeness##Name##CopyAssign, swift_##SymName##CopyAssign, \
            C_CC, AlwaysAvailable, \
@@ -522,7 +522,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy, Name##ReferencePtrTy), \
            ATTRS(NoUnwind, FirstParamReturned), \
            EFFECT(RefCounting, Deallocating), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* Name##Reference *swift_##SymName##TakeAssign(Name##Reference *dest, Name##Reference *src); */ \
   FUNCTION(Nativeness##Name##TakeAssign, swift_##SymName##TakeAssign, \
            C_CC, AlwaysAvailable, \
@@ -530,7 +530,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(Name##ReferencePtrTy, Name##ReferencePtrTy), \
            ATTRS(NoUnwind, FirstParamReturned), \
            EFFECT(RefCounting, Deallocating), \
-           NO_MEMEFFECTS)
+           UNKNOWN_MEMEFFECTS)
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native, name, ) \
@@ -543,7 +543,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(RefCountedPtrTy), \
            ATTRS(NoUnwind, FirstParamReturned, WillReturn), \
            EFFECT(RefCounting), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void swift_##prefix##name##Release(void *ptr); */ \
   FUNCTION(Prefix##Name##Release, swift_##prefix##name##Release, \
            C_CC, AlwaysAvailable, \
@@ -551,7 +551,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(RefCountedPtrTy), \
            ATTRS(NoUnwind), \
            EFFECT(RefCounting, Deallocating), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void *swift_##prefix##name##RetainStrong(void *ptr); */ \
   FUNCTION(Prefix##StrongRetain##Name, swift_##prefix##name##RetainStrong, \
            C_CC, AlwaysAvailable, \
@@ -559,7 +559,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(RefCountedPtrTy), \
            ATTRS(NoUnwind, FirstParamReturned, WillReturn), \
            EFFECT(RefCounting), \
-           NO_MEMEFFECTS) \
+           UNKNOWN_MEMEFFECTS) \
   /* void swift_##prefix##name##RetainStrongAndRelease(void *ptr); */ \
   FUNCTION(Prefix##StrongRetainAnd##Name##Release, \
            swift_##prefix##name##RetainStrongAndRelease, \
@@ -568,7 +568,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease,
            ARGS(RefCountedPtrTy), \
            ATTRS(NoUnwind), \
            EFFECT(RefCounting), \
-           NO_MEMEFFECTS)
+           UNKNOWN_MEMEFFECTS)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown, unknownObject##Name, Unknown) \
   LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, Native, ) \
@@ -587,7 +587,7 @@ FUNCTION(IsUniquelyReferencedNonObjC, swift_isUniquelyReferencedNonObjC,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferencedNonObjC_nonNull(const void *);
 FUNCTION(IsUniquelyReferencedNonObjC_nonNull,
@@ -597,7 +597,7 @@ FUNCTION(IsUniquelyReferencedNonObjC_nonNull,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 //   uintptr_t bits);
@@ -608,7 +608,7 @@ FUNCTION(IsUniquelyReferencedNonObjC_nonNull_bridgeObject,
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferenced(const void *);
 FUNCTION(IsUniquelyReferenced, swift_isUniquelyReferenced,
@@ -617,7 +617,7 @@ FUNCTION(IsUniquelyReferenced, swift_isUniquelyReferenced,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferenced_nonNull(const void *);
 FUNCTION(IsUniquelyReferenced_nonNull,
@@ -627,7 +627,7 @@ FUNCTION(IsUniquelyReferenced_nonNull,
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferenced_nonNull_bridgeObject(
 //   uintptr_t bits);
@@ -638,7 +638,7 @@ FUNCTION(IsUniquelyReferenced_nonNull_bridgeObject,
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferenced_native(const struct HeapObject *);
 FUNCTION(IsUniquelyReferenced_native, swift_isUniquelyReferenced_native,
@@ -647,7 +647,7 @@ FUNCTION(IsUniquelyReferenced_native, swift_isUniquelyReferenced_native,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 FUNCTION(IsUniquelyReferenced_nonNull_native,
@@ -657,7 +657,7 @@ FUNCTION(IsUniquelyReferenced_nonNull_native,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
 //                                            const unsigned char *filename,
@@ -671,7 +671,7 @@ FUNCTION(IsEscapingClosureAtFileLocation, swift_isEscapingClosureAtFileLocation,
          ARGS(RefCountedPtrTy, Int8PtrTy, Int32Ty, Int32Ty, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ZExt),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayInitWithCopy(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayInitWithCopy, swift_arrayInitWithCopy,
@@ -680,7 +680,7 @@ FUNCTION(ArrayInitWithCopy, swift_arrayInitWithCopy,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayInitWithTakeNoAlias(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayInitWithTakeNoAlias, swift_arrayInitWithTakeNoAlias,
@@ -689,7 +689,7 @@ FUNCTION(ArrayInitWithTakeNoAlias, swift_arrayInitWithTakeNoAlias,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayInitWithTakeFrontToBack(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayInitWithTakeFrontToBack, swift_arrayInitWithTakeFrontToBack,
@@ -698,7 +698,7 @@ FUNCTION(ArrayInitWithTakeFrontToBack, swift_arrayInitWithTakeFrontToBack,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayInitWithTakeBackToFront(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayInitWithTakeBackToFront, swift_arrayInitWithTakeBackToFront,
@@ -707,7 +707,7 @@ FUNCTION(ArrayInitWithTakeBackToFront, swift_arrayInitWithTakeBackToFront,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayAssignWithCopyNoAlias(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayAssignWithCopyNoAlias, swift_arrayAssignWithCopyNoAlias,
@@ -716,7 +716,7 @@ FUNCTION(ArrayAssignWithCopyNoAlias, swift_arrayAssignWithCopyNoAlias,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayAssignWithCopyFrontToBack(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayAssignWithCopyFrontToBack, swift_arrayAssignWithCopyFrontToBack,
@@ -725,7 +725,7 @@ FUNCTION(ArrayAssignWithCopyFrontToBack, swift_arrayAssignWithCopyFrontToBack,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayAssignWithCopyBackToFront(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayAssignWithCopyBackToFront, swift_arrayAssignWithCopyBackToFront,
@@ -734,7 +734,7 @@ FUNCTION(ArrayAssignWithCopyBackToFront, swift_arrayAssignWithCopyBackToFront,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayAssignWithTake(opaque*, opaque*, size_t, type*);
 FUNCTION(ArrayAssignWithTake, swift_arrayAssignWithTake, C_CC, AlwaysAvailable,
@@ -742,7 +742,7 @@ FUNCTION(ArrayAssignWithTake, swift_arrayAssignWithTake, C_CC, AlwaysAvailable,
          ARGS(OpaquePtrTy, OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_arrayDestroy(opaque*, size_t, type*);
 FUNCTION(ArrayDestroy, swift_arrayDestroy, C_CC, AlwaysAvailable,
@@ -750,7 +750,7 @@ FUNCTION(ArrayDestroy, swift_arrayDestroy, C_CC, AlwaysAvailable,
          ARGS(OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RefCounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_getFunctionTypeMetadata(unsigned long flags,
 //                                         const Metadata **parameters,
@@ -1000,7 +1000,7 @@ FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_allocateGenericClassMetadataWithLayoutString(
 //     ClassDescriptor *type,
@@ -1013,7 +1013,7 @@ FUNCTION(AllocateGenericClassMetadataWithLayoutString,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
 //                                              const void * const *arguments,
@@ -1025,7 +1025,7 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_allocateGenericValueMetadataWithLayoutString(
 //     ValueTypeDescriptor *type,
@@ -1039,7 +1039,7 @@ FUNCTION(AllocateGenericValueMetadataWithLayoutString,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // MetadataResponse swift_checkMetadataState(MetadataRequest request,
 //                                           const Metadata *type);
@@ -1157,7 +1157,7 @@ FUNCTION(AllocateMetadataPack,
          ARGS(TypeMetadataPtrPtrTy, SizeTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 // const WitnessTable * const *
@@ -1169,7 +1169,7 @@ FUNCTION(AllocateWitnessTablePack,
          ARGS(WitnessTablePtrPtrTy, SizeTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData), // ?
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC, AlwaysAvailable,
@@ -1264,7 +1264,7 @@ FUNCTION(GetTupleLayout, swift_getTupleTypeLayout, SwiftCC, AlwaysAvailable,
               SizeTy, Int8PtrPtrTy->getPointerTo(0)),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // size_t swift_getTupleTypeLayout2(TypeLayout *layout,
 //                                  const TypeLayout *elt0,
@@ -1274,7 +1274,7 @@ FUNCTION(GetTupleLayout2, swift_getTupleTypeLayout2, SwiftCC, AlwaysAvailable,
          ARGS(FullTypeLayoutTy->getPointerTo(0), Int8PtrPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // OffsetPair swift_getTupleTypeLayout3(TypeLayout *layout,
 //                                      const TypeLayout *elt0,
@@ -1286,7 +1286,7 @@ FUNCTION(GetTupleLayout3, swift_getTupleTypeLayout3, SwiftCC, AlwaysAvailable,
               Int8PtrPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_getExistentialTypeMetadata(
 //                              ProtocolClassConstraint classConstraint,
@@ -1347,7 +1347,7 @@ FUNCTION(RelocateClassMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initClassMetadata(Metadata *self,
 //                              ClassLayoutFlags flags,
@@ -1362,7 +1362,7 @@ FUNCTION(InitClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_updateClassMetadata(Metadata *self,
 //                                ClassLayoutFlags flags,
@@ -1377,7 +1377,7 @@ FUNCTION(UpdateClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // MetadataDependency swift_initClassMetadata2(Metadata *self,
 //                                             ClassLayoutFlags flags,
@@ -1392,7 +1392,7 @@ FUNCTION(InitClassMetadata2,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // MetadataDependency swift_updateClassMetadata2(Metadata *self,
 //                                               ClassLayoutFlags flags,
@@ -1407,7 +1407,7 @@ FUNCTION(UpdateClassMetadata2,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_lookUpClassMethod(Metadata *metadata,
 //                               ClassDescriptor *description,
@@ -1420,7 +1420,7 @@ FUNCTION(LookUpClassMethod,
               TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initStructMetadata(Metadata *structType,
 //                               StructLayoutFlags flags,
@@ -1435,7 +1435,7 @@ FUNCTION(InitStructMetadata,
               Int32Ty->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initStructMetadataWithLayoutString(Metadata *structType,
 //                                               StructLayoutFlags flags,
@@ -1452,7 +1452,7 @@ FUNCTION(InitStructMetadataWithLayoutString,
               Int32Ty->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initEnumMetadataSingleCase(Metadata *enumType,
 //                                       EnumLayoutFlags flags,
@@ -1464,7 +1464,7 @@ FUNCTION(InitEnumMetadataSingleCase,
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initEnumMetadataSingleCaseWithLayoutString(Metadata *enumType,
 //                                                       EnumLayoutFlags flags,
@@ -1476,7 +1476,7 @@ FUNCTION(InitEnumMetadataSingleCaseWithLayoutString,
          ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initEnumMetadataSinglePayload(Metadata *enumType,
 //                                          EnumLayoutFlags flags,
@@ -1489,7 +1489,7 @@ FUNCTION(InitEnumMetadataSinglePayload,
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy, Int32Ty),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initEnumMetadataSinglePayloadWithLayoutString(Metadata *enumType,
 //                                                        EnumLayoutFlags flags,
@@ -1502,7 +1502,7 @@ FUNCTION(InitEnumMetadataSinglePayloadWithLayoutString,
          ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_initEnumMetadataMultiPayload(Metadata *enumType,
 //                                         EnumLayoutFlags layoutFlags,
@@ -1515,7 +1515,7 @@ FUNCTION(InitEnumMetadataMultiPayload,
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0)),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void
 // swift_initEnumMetadataMultiPayloadWithLayoutString(Metadata *enumType,
@@ -1529,7 +1529,7 @@ FUNCTION(InitEnumMetadataMultiPayloadWithLayoutString,
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, TypeMetadataPtrPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // int swift_getEnumCaseMultiPayload(opaque_t *obj, Metadata *enumTy);
 FUNCTION(GetEnumCaseMultiPayload,
@@ -1578,7 +1578,7 @@ FUNCTION(StoreEnumTagSinglePayloadGeneric,
                                       false)->getPointerTo()),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_storeEnumTagMultiPayload(opaque_t *obj, Metadata *enumTy,
 //                                     int case_index);
@@ -1589,7 +1589,7 @@ FUNCTION(StoreEnumTagMultiPayload,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Class object_getClass(id object);
 //
@@ -1609,7 +1609,7 @@ FUNCTION(ObjectDispose, object_dispose, C_CC, AlwaysAvailable,
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Class objc_lookUpClass(const char *name);
 FUNCTION(LookUpClass, objc_lookUpClass, C_CC, AlwaysAvailable,
@@ -1625,7 +1625,7 @@ FUNCTION(SetSuperclass, class_setSuperclass, C_CC, AlwaysAvailable,
          ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // Metadata *swift_getObjectType(id object);
 FUNCTION(GetObjectType, swift_getObjectType, C_CC, AlwaysAvailable,
@@ -1742,7 +1742,7 @@ FUNCTION(DynamicCast, swift_dynamicCast, C_CC, AlwaysAvailable,
               SizeTy),
          ATTRS(ZExt, NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // type* swift_dynamicCastTypeToObjCProtocolUnconditional(type* object,
 //                                               size_t numProtocols,
@@ -1754,7 +1754,7 @@ FUNCTION(DynamicCastTypeToObjCProtocolUnconditional,
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // type* swift_dynamicCastTypeToObjCProtocolConditional(type* object,
 //                                             size_t numProtocols,
@@ -1766,7 +1766,7 @@ FUNCTION(DynamicCastTypeToObjCProtocolConditional,
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // id swift_dynamicCastObjCProtocolUnconditional(id object,
 //                                               size_t numProtocols,
@@ -1777,7 +1777,7 @@ FUNCTION(DynamicCastObjCProtocolUnconditional,
          ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // id swift_dynamicCastObjCProtocolConditional(id object,
 //                                             size_t numProtocols,
@@ -1788,7 +1788,7 @@ FUNCTION(DynamicCastObjCProtocolConditional,
          ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Casting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // id swift_dynamicCastMetatypeToObjectUnconditional(type *type);
 FUNCTION(DynamicCastMetatypeToObjectUnconditional,
@@ -1852,7 +1852,7 @@ FUNCTION(Once, swift_once, C_CC, AlwaysAvailable,
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(Locking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_registerProtocols(const ProtocolRecord *begin,
 //                              const ProtocolRecord *end)
@@ -1862,7 +1862,7 @@ FUNCTION(RegisterProtocols,
          ARGS(ProtocolRecordPtrTy, ProtocolRecordPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Locking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
 //                                         const ProtocolConformanceRecord *end)
@@ -1872,14 +1872,14 @@ FUNCTION(RegisterProtocolConformances,
          ARGS(RelativeAddressPtrTy, RelativeAddressPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Locking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(RegisterTypeMetadataRecords,
          swift_registerTypeMetadataRecords, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Locking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
 FUNCTION(BeginAccess, swift_beginAccess, C_CC, AlwaysAvailable,
@@ -1887,7 +1887,7 @@ FUNCTION(BeginAccess, swift_beginAccess, C_CC, AlwaysAvailable,
          ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ExclusivityChecking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_endAccess(ValueBuffer *scratch);
 FUNCTION(EndAccess, swift_endAccess, C_CC, AlwaysAvailable,
@@ -1895,7 +1895,7 @@ FUNCTION(EndAccess, swift_endAccess, C_CC, AlwaysAvailable,
          ARGS(getFixedBufferTy()->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(ExclusivityChecking),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(GetOrigOfReplaceable, swift_getOrigOfReplaceable, C_CC,
          DynamicReplacementAvailability,
@@ -1903,7 +1903,7 @@ FUNCTION(GetOrigOfReplaceable, swift_getOrigOfReplaceable, C_CC,
          ARGS(FunctionPtrTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(GetReplacement, swift_getFunctionReplacement, C_CC,
          DynamicReplacementAvailability,
@@ -1911,7 +1911,7 @@ FUNCTION(GetReplacement, swift_getFunctionReplacement, C_CC,
          ARGS(FunctionPtrTy->getPointerTo(), FunctionPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass,
          C_CC, AlwaysAvailable,
@@ -1919,36 +1919,36 @@ FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCAllocWithZone, objc_allocWithZone,
          C_CC, AlwaysAvailable,
          RETURNS(ObjCPtrTy), ARGS(ObjCClassPtrTy), ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCMsgSend, objc_msgSend,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS, EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCMsgSendStret, objc_msgSend_stret,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS, EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCMsgSendSuper, objc_msgSendSuper,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS, EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCMsgSendSuperStret, objc_msgSendSuper_stret,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS, EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCMsgSendSuper2, objc_msgSendSuper2,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS, EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCMsgSendSuperStret2, objc_msgSendSuper2_stret,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS, EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCSelRegisterName, sel_registerName,
          C_CC, AlwaysAvailable,
          RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind),
@@ -1960,57 +1960,57 @@ FUNCTION(ClassReplaceMethod, class_replaceMethod,
          ARGS(ObjCClassPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ClassAddProtocol, class_addProtocol,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ObjCClassPtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCGetClass, objc_getClass, C_CC,  AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCGetRequiredClass, objc_getRequiredClass, C_CC,  AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCGetMetaClass, objc_getMetaClass, C_CC, AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ObjCClassGetName, class_getName, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(GetObjCProtocol, objc_getProtocol, C_CC, AlwaysAvailable,
          RETURNS(ProtocolDescriptorPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(AllocateObjCProtocol, objc_allocateProtocol, C_CC, AlwaysAvailable,
          RETURNS(ProtocolDescriptorPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC, Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(RegisterObjCProtocol, objc_registerProtocol, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ProtocolAddMethodDescription, protocol_addMethodDescription,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
@@ -2018,14 +2018,14 @@ FUNCTION(ProtocolAddMethodDescription, protocol_addMethodDescription,
               ObjCBoolTy, ObjCBoolTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(ProtocolAddProtocol, protocol_addProtocol,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ProtocolDescriptorPtrTy, ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(ObjCOptSelf, objc_opt_self,
          C_CC, AlwaysAvailable,
@@ -2033,20 +2033,20 @@ FUNCTION(ObjCOptSelf, objc_opt_self,
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(Malloc, malloc, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(SizeTy),
          NO_ATTRS,
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(Free, free, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          NO_ATTRS,
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, _Block_copy, C_CC, AlwaysAvailable,
@@ -2054,14 +2054,14 @@ FUNCTION(BlockCopy, _Block_copy, C_CC, AlwaysAvailable,
          ARGS(ObjCBlockPtrTy),
          NO_ATTRS,
          EFFECT(RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 // void _Block_release(void *block);
 FUNCTION(BlockRelease, _Block_release, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ObjCBlockPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating, RefCounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_deletedMethodError();
 FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC, AlwaysAvailable,
@@ -2069,26 +2069,26 @@ FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC, AlwaysAvailable,
         ARGS(),
         ATTRS(NoUnwind),
         EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(AllocError, swift_allocError, SwiftCC, AlwaysAvailable,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
          ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(DeallocError, swift_deallocError, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(GetErrorValue, swift_getErrorValue, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void __tsan_external_write(void *addr, void *caller_pc, void *tag);
 // This is a Thread Sanitizer instrumentation entry point in compiler-rt.
@@ -2097,7 +2097,7 @@ FUNCTION(TSanInoutAccess, __tsan_external_write, C_CC, AlwaysAvailable,
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // int32 __isPlatformVersionAtLeast(uint32_t platform, uint32_t major,
 //                                  uint32_t minor, uint32_t patch);
@@ -2108,21 +2108,21 @@ FUNCTION(PlatformVersionAtLeast, __isPlatformVersionAtLeast,
          ARGS(Int32Ty, Int32Ty, Int32Ty, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(GetKeyPath, swift_getKeyPath, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(CopyKeyPathTrivialIndices, swift_copyKeyPathTrivialIndices,
          C_CC,  AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass,
          C_CC, AlwaysAvailable,
@@ -2130,7 +2130,7 @@ FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass,
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector)
 FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
@@ -2139,7 +2139,7 @@ FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
          ARGS(ObjCPtrTy, ObjCSELTy, Int8PtrTy, SizeTy, SizeTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(ObjectiveC, Allocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          C_CC, AlwaysAvailable,
@@ -2147,7 +2147,7 @@ FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // float swift_intToFloat32(const size_t *data, IntegerLiteralFlags flags);
 FUNCTION(IntToFloat32, swift_intToFloat32, SwiftCC, AlwaysAvailable,
@@ -2290,7 +2290,7 @@ FUNCTION(TaskSwitchFunc,
          ARGS(SwiftContextPtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // AsyncTask *swift_continuation_init(AsyncContext *continuationContext,
 //                                    AsyncContinuationFlags);
@@ -2301,7 +2301,7 @@ FUNCTION(ContinuationInit,
          ARGS(ContinuationAsyncContextPtrTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_continuation_await(AsyncContext *continuationContext);
 FUNCTION(ContinuationAwait,
@@ -2311,7 +2311,7 @@ FUNCTION(ContinuationAwait,
          ARGS(ContinuationAsyncContextPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_continuation_resume(AsyncTask *continuation);
 FUNCTION(ContinuationResume,
@@ -2321,7 +2321,7 @@ FUNCTION(ContinuationResume,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_continuation_throwingResume(AsyncTask *continuation);
 FUNCTION(ContinuationThrowingResume,
@@ -2331,7 +2331,7 @@ FUNCTION(ContinuationThrowingResume,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
 //                                                 SwiftError *error);
@@ -2342,7 +2342,7 @@ FUNCTION(ContinuationThrowingResumeWithError,
          ARGS(SwiftTaskPtrTy, ErrorPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // ExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
@@ -2372,7 +2372,7 @@ FUNCTION(DefaultActorInitialize,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_defaultActor_destroy(DefaultActor *actor);
 FUNCTION(DefaultActorDestroy,
@@ -2382,7 +2382,7 @@ FUNCTION(DefaultActorDestroy,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_defaultActor_deallocate(DefaultActor *actor);
 FUNCTION(DefaultActorDeallocate,
@@ -2392,7 +2392,7 @@ FUNCTION(DefaultActorDeallocate,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_defaultActor_deallocateResilient(HeapObject *actor);
 FUNCTION(DefaultActorDeallocateResilient,
@@ -2402,7 +2402,7 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
 FUNCTION(NonDefaultDistributedActorInitialize,
@@ -2412,7 +2412,7 @@ FUNCTION(NonDefaultDistributedActorInitialize,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // OpaqueValue* swift_distributedActor_remote_initialize(
 //    const Metadata *actorType
@@ -2424,7 +2424,7 @@ FUNCTION(DistributedActorInitializeRemote,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 /// void swift_asyncLet_start(
 ///     AsyncLet *alet,
@@ -2478,7 +2478,7 @@ FUNCTION(EndAsyncLet,
          ARGS(SwiftAsyncLetPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 /// void swift_task_run_inline(
 ///     OpaqueValue *result,
@@ -2497,7 +2497,7 @@ FUNCTION(TaskRunInline,
          ),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_taskGroup_initialize(TaskGroup *group);
 FUNCTION(TaskGroupInitialize,
@@ -2507,7 +2507,7 @@ FUNCTION(TaskGroupInitialize,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_taskGroup_initializeWithFlags(size_t flags, TaskGroup *group);
 FUNCTION(TaskGroupInitializeWithFlags,
@@ -2520,7 +2520,7 @@ FUNCTION(TaskGroupInitializeWithFlags,
          ),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_taskGroup_destroy(TaskGroup *group);
 FUNCTION(TaskGroupDestroy,
@@ -2530,7 +2530,7 @@ FUNCTION(TaskGroupDestroy,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,
@@ -2573,7 +2573,7 @@ FUNCTION(GetMultiPayloadEnumTagSinglePayload,
          ARGS(OpaquePtrTy, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // SWIFT_RUNTIME_EXPORT 
 // void swift_storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
@@ -2587,7 +2587,7 @@ FUNCTION(StoreMultiPayloadEnumTagSinglePayload,
          ARGS(OpaquePtrTy, Int32Ty, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_generic_destroy(opaque*, const Metadata* type);
 FUNCTION(GenericDestroy,
@@ -2597,7 +2597,7 @@ FUNCTION(GenericDestroy,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 
 // void *swift_generic_assignWithCopy(opaque* dest, opaque* src, const Metadata* type);
@@ -2608,7 +2608,7 @@ FUNCTION(GenericAssignWithCopy,
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericAssignWithTake,
@@ -2618,7 +2618,7 @@ FUNCTION(GenericAssignWithTake,
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting, Deallocating),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericInitWithCopy,
@@ -2628,7 +2628,7 @@ FUNCTION(GenericInitWithCopy,
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initWithTake(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericInitWithTake,
@@ -2638,7 +2638,7 @@ FUNCTION(GenericInitWithTake,
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initializeBufferWithCopyOfBuffer(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
 FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
@@ -2650,7 +2650,7 @@ FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
               TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
 //                                         const Metadata *metadata);
@@ -2661,7 +2661,7 @@ FUNCTION(SingletonEnumGetEnumTag,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_singletonEnum_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                   unsigned tag,
@@ -2673,7 +2673,7 @@ FUNCTION(SingletonEnumDestructiveInjectEnumTag,
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
 //                                      const Metadata *metadata);
@@ -2684,7 +2684,7 @@ FUNCTION(EnumSimpleGetEnumTag,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_enumSimple_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                    unsigned tag,
@@ -2696,7 +2696,7 @@ FUNCTION(EnumSimpleDestructiveInjectEnumTag,
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
 //                                  const Metadata *metadata);
@@ -2707,7 +2707,7 @@ FUNCTION(EnumFnGetEnumTag,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_multiPayloadEnumGeneric_getEnumTag(opaque* address,
 //                                                   const Metadata *type);
@@ -2718,7 +2718,7 @@ FUNCTION(MultiPayloadEnumGenericGetEnumTag,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                             unsigned tag,
@@ -2730,7 +2730,7 @@ FUNCTION(MultiPayloadEnumGenericDestructiveInjectEnumTag,
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
 //                                                    const Metadata *metadata);
@@ -2741,7 +2741,7 @@ FUNCTION(SinglePayloadEnumGenericGetEnumTag,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                              unsigned tag,
@@ -2753,7 +2753,7 @@ FUNCTION(SinglePayloadEnumGenericDestructiveInjectEnumTag,
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 // void swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 //                                            Metadata* type);
@@ -2764,7 +2764,7 @@ FUNCTION(GenericInstantiateLayoutString,
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
-         NO_MEMEFFECTS)
+         UNKNOWN_MEMEFFECTS)
 
 #undef RETURNS
 #undef ARGS

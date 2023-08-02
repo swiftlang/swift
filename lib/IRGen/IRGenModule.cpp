@@ -1103,7 +1103,7 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
-#define NO_MEMEFFECTS                                                          \
+#define UNKNOWN_MEMEFFECTS                                                          \
   { llvm::MemoryEffects::unknown() }
 #define MEMEFFECTS(...)                                                        \
   { __VA_ARGS__ }
