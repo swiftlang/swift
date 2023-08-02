@@ -492,6 +492,10 @@ AvailabilityContext ASTContext::getConcurrencyAvailability() {
   return getSwift55Availability();
 }
 
+AvailabilityContext ASTContext::getConcurrencyDiscardingTaskGroupAvailability() {
+  return getSwift59Availability();
+}
+
 AvailabilityContext ASTContext::getBackDeployedConcurrencyAvailability() {
   return getSwift51Availability();
 }
