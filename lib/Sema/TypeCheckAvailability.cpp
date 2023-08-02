@@ -388,20 +388,6 @@ class TypeRefinementContextBuilder : private ASTWalker {
   };
   std::vector<DeclBodyContextInfo> DeclBodyContextStack;
 
-  /// A mapping from abstract storage declarations with accessors to
-  /// to the type refinement contexts for those declarations. We refer to
-  /// this map to determine the appropriate parent TRC to use when
-  /// walking the accessor function.
-  llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
-      StorageContexts;
-
-  /// A mapping from pattern binding storage declarations to the type refinement
-  /// contexts for those declarations. We refer to this map to determine the
-  /// appropriate parent TRC to use when walking a var decl that belongs to a
-  /// pattern containing multiple vars.
-  llvm::DenseMap<PatternBindingDecl *, TypeRefinementContext *>
-      PatternBindingContexts;
-
   TypeRefinementContext *getCurrentTRC() {
     return ContextStack.back().TRC;
   }
@@ -482,19 +468,9 @@ private:
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
-    // Adds in a parent TRC for decls which are syntactically nested but are not
-    // represented that way in the AST. (Particularly, AbstractStorageDecl
-    // parents for AccessorDecl children.)
-    if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
-      pushContext(ParentTRC, D);
-    }
-
     // Adds in a TRC that covers the entire declaration.
     if (auto DeclTRC = getNewContextForSignatureOfDecl(D)) {
       pushContext(DeclTRC, D);
-
-      // Possibly use this as an effective parent context later.
-      recordEffectiveParentContext(D, DeclTRC);
     }
 
     // Create TRCs that cover only the body of the declaration.
@@ -513,49 +489,6 @@ private:
     }
 
     return Action::Continue();
-  }
-
-  TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
-    // FIXME: Can we assert that we won't walk parent decls later that should
-    //        have been returned here?
-    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-      // Use TRC of the storage rather the current TRC when walking this
-      // function.
-      auto it = StorageContexts.find(accessor->getStorage());
-      if (it != StorageContexts.end()) {
-        return it->second;
-      }
-    } else if (auto *VD = dyn_cast<VarDecl>(D)) {
-      // Use the TRC of the pattern binding decl as the parent for var decls.
-      if (auto *PBD = VD->getParentPatternBinding()) {
-        auto it = PatternBindingContexts.find(PBD);
-        if (it != PatternBindingContexts.end()) {
-          return it->second;
-        }
-      }
-    }
-
-    return nullptr;
-  }
-
-  /// If necessary, records a TRC so it can be returned by subsequent calls to
-  /// `getEffectiveParentContextForDecl()`.
-  void recordEffectiveParentContext(Decl *D, TypeRefinementContext *NewTRC) {
-    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      // Stash the TRC for the storage declaration to use as the parent of
-      // accessor decls later.
-      if (StorageDecl->hasParsedAccessors())
-        StorageContexts[StorageDecl] = NewTRC;
-    }
-
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
-      // Stash the TRC for the var decl if its parent pattern binding decl has
-      // more than one entry so that the sibling var decls can reuse it.
-      if (auto *PBD = VD->getParentPatternBinding()) {
-        if (PBD->getNumPatternEntries() > 1)
-          PatternBindingContexts[PBD] = NewTRC;
-      }
-    }
   }
 
   /// Returns a new context to be introduced for the declaration, or nullptr
