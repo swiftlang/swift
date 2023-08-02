@@ -82,7 +82,7 @@ class Sub: Super {
   @differentiable(reverse)
   override var property: Float { base }
   @derivative(of: property)
-  final func vjpProperty() -> (value: Float, pullback: (Float) -> TangentVector) {
+  final func vjpProperty() -> (value: Float, pullback: (Float, inout TangentVector) -> ()) {
     fatalError()
   }
 

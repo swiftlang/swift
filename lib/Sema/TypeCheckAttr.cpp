@@ -5780,18 +5780,9 @@ resolveDifferentiableAccessors(DifferentiableAttr *attr,
   if (!typecheckAccessor(asd->getSynthesizedAccessor(AccessorKind::Get)))
     return nullptr;
 
-  if (asd->supportsMutation()) {
-    // FIXME: Class-typed values have reference semantics and can be freely
-    // mutated. Thus, they should be treated like inout parameters for the
-    // purposes of @differentiable and @derivative type-checking.  Until
-    // https://github.com/apple/swift/issues/55542 is fixed, check if setter has
-    // computed semantic results and do not typecheck if they are none
-    // (class-typed `self' parameter is not treated as a "semantic result"
-    // currently)
-    if (!asd->getDeclContext()->getSelfClassDecl())
-      if (!typecheckAccessor(asd->getSynthesizedAccessor(AccessorKind::Set)))
-        return nullptr;
-  }
+  if (asd->supportsMutation())
+    if (!typecheckAccessor(asd->getSynthesizedAccessor(AccessorKind::Set)))
+      return nullptr;
 
   // Remove `@differentiable` attribute from storage declaration to prevent
   // duplicate attribute registration during SILGen.

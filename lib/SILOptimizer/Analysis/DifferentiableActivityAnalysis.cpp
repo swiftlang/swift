@@ -133,13 +133,13 @@ void DifferentiableActivityInfo::propagateVaried(
     // Skip non-varying callees.
     if (isWithoutDerivative(applySite.getCallee()))
       return;
-    // If operand is varied, set all direct/indirect results and inout arguments
-    // as varied.
+    // If operand is varied, set all direct/indirect results and semantic result
+    // arguments as varied.
     if (isVaried(operand->get(), i)) {
       for (auto indRes : applySite.getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : applySite.getInoutArguments())
-        propagateVariedInwardsThroughProjections(inoutArg, i);
+      for (auto semresArg : applySite.getAutoDiffSemanticResultArguments())
+        propagateVariedInwardsThroughProjections(semresArg, i);
       // Propagate variedness to apply site direct results.
       forEachApplyDirectResult(applySite, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
@@ -297,6 +297,7 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;
+
   if (value->getType().isAddress() ||
       value->getType().getClassOrBoundGenericClass()) {
     propagateUsefulThroughAddress(value, dependentVariableIndex);
@@ -333,12 +334,15 @@ void DifferentiableActivityInfo::propagateUseful(
   // Propagate usefulness for the given instruction: mark operands as useful and
   // recursively propagate usefulness to defining instructions of operands.
   auto i = dependentVariableIndex;
+
   // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
   if (FullApplySite::isa(inst)) {
     FullApplySite applySite(inst);
+
     // If callee is non-varying, skip.
     if (isWithoutDerivative(applySite.getCallee()))
       return;
+
     // If callee is a `modify` accessor, propagate usefulness through yielded
     // addresses. Semantically, yielded addresses can be viewed as a projection
     // into the `inout` argument.
@@ -350,10 +354,12 @@ void DifferentiableActivityInfo::propagateUseful(
           for (auto yield : bai->getYieldedValues())
             setUsefulAndPropagateToOperands(yield, i);
     }
+
     // Propagate usefulness through apply site arguments.
     for (auto arg : applySite.getArgumentsWithoutIndirectResults())
       setUsefulAndPropagateToOperands(arg, i);
   }
+
   // Handle store-like instructions:
   //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
 #define PROPAGATE_USEFUL_THROUGH_STORE(INST)                                   \
@@ -390,14 +396,17 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;
+
   setUseful(value, dependentVariableIndex);
   if (auto *inst = value->getDefiningInstruction())
     propagateUseful(inst, dependentVariableIndex);
+
   // Recursively propagate usefulness through users that are projections or
   // `begin_access` instructions.
   for (auto use : value->getUses()) {
     // Propagate usefulness through user's operands.
     propagateUseful(use->getUser(), dependentVariableIndex);
+
     for (auto res : use->getUser()->getResults()) {
 #define SKIP_NODERIVATIVE(INST)                                                \
   if (auto *projInst = dyn_cast<INST##Inst>(res))                              \
@@ -410,6 +419,12 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
       if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
           isa<BeginBorrowInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
+      // class values have reference semantics. Therefore load / load_borrow of
+      // useful $*Class should produce useful value
+      else if (auto *li = dyn_cast<LoadInst>(res)) {
+        if (li->getType().getClassOrBoundGenericClass())
+          propagateUsefulThroughAddress(li, dependentVariableIndex);
+      }
     }
   }
 }

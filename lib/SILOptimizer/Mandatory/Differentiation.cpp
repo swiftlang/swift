@@ -544,11 +544,11 @@ emitDerivativeFunctionReference(
       for (auto resultIndex : desiredResultIndices->getIndices()) {
         SILType resultType;
         if (resultIndex >= originalFnTy->getNumResults()) {
-          auto inoutParamIdx = resultIndex - originalFnTy->getNumResults();
-          auto inoutParam =
-              *std::next(originalFnTy->getIndirectMutatingParameters().begin(),
-                         inoutParamIdx);
-          resultType = inoutParam.getSILStorageInterfaceType();
+          auto semanticResultParamIdx = resultIndex - originalFnTy->getNumResults();
+          auto semanticResultParam =
+              *std::next(originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+                         semanticResultParamIdx);
+          resultType = semanticResultParam.getSILStorageInterfaceType();
         } else {
           resultType = originalFnTy->getResults()[resultIndex]
                            .getSILStorageInterfaceType();
@@ -785,6 +785,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
       original->isDistributed(),
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
+  vjp->setInlineStrategy(original->getInlineStrategy());
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
                           << "\n");

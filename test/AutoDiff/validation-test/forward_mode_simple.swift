@@ -761,10 +761,11 @@ ForwardModeTests.test("SimpleWrtSelf") {
       return (f(x), { (dself, dx) in dself.base * dx })
     }
     @derivative(of: f)
-    final func vjpf(_ x: Float) -> (value: Float, pullback: (Float) -> (TangentVector, Float)) {
+    final func vjpf(_ x: Float) -> (value: Float, pullback: (Float, inout TangentVector) -> Float) {
       let base = self.base
-      return (f(x), { v in
-        (TangentVector(base: v * x, _nontrivial: []), base * v)
+      return (f(x), { v, tv in
+          tv = TangentVector(base: v * x, _nontrivial: [])
+          return base * v
       })
     }
   }
@@ -1320,28 +1321,13 @@ ForwardModeTests.test("ForceUnwrapping") {
 }
 
 ForwardModeTests.test("NonVariedResult") {
-  @differentiable(reverse, wrt: x)
-  func nonWrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
-    y = x
-  }
-
   @differentiable(reverse)
   func wrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
     y = x
   }
 
-  @differentiable(reverse, wrt: x)
-  func nonWrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
-
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (x, y))
   func wrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
-
-  @differentiable(reverse)
-  func variedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
-    var result: Tracked<Float> = 0
-    nonWrtInoutParam(x, &result)
-    return result
-  }
 
   @differentiable(reverse)
   func variedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
@@ -1352,13 +1338,6 @@ ForwardModeTests.test("NonVariedResult") {
 
   @differentiable(reverse)
   func nonVariedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
-    var result: Tracked<Float> = 0
-    nonWrtInoutParamNonVaried(x, &result)
-    return result
-  }
-
-  @differentiable(reverse)
-  func nonVariedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
     // expected-warning @+1 {{variable 'result' was never mutated}}
     var result: Tracked<Float> = 0
     return result

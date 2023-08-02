@@ -681,6 +681,18 @@ public:
     llvm_unreachable("invalid apply kind");
   }
 
+  AutoDiffSemanticResultArgumentRange getAutoDiffSemanticResultArguments() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(getInstruction())->getAutoDiffSemanticResultArguments();
+    case FullApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(getInstruction())->getAutoDiffSemanticResultArguments();
+    case FullApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(getInstruction())->getAutoDiffSemanticResultArguments();
+    }
+    llvm_unreachable("invalid apply kind");
+  }
+
   /// Returns true if \p op is the callee operand of this apply site
   /// and not an argument operand.
   bool isCalleeOperand(const Operand &op) const {

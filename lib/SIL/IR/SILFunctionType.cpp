@@ -237,30 +237,29 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
     if (resultAndIndex.value().getDifferentiability() !=
         SILResultDifferentiability::NotDifferentiable)
       resultIndices.push_back(resultAndIndex.index());
+
+  auto numSemanticResults = getNumResults();
   
-  // Check `inout` parameters.
-  for (auto inoutParamAndIndex : enumerate(getIndirectMutatingParameters()))
-    // Currently, an `inout` parameter can either be:
+  // Check semantic results (`inout` or class-bound) parameters.
+  for (auto resultParamAndIndex : enumerate(getAutoDiffSemanticResultsParameters()))
+    // Currently, a semantic result parameter can either be:
     // 1. Both a differentiability parameter and a differentiability result.
     // 2. `@noDerivative`: neither a differentiability parameter nor a
     //    differentiability result.
-    // However, there is no way to represent an `inout` parameter that:
+    // However, there is no way to represent a semantic result parameter that:
     // 3. Is a differentiability result but not a differentiability parameter.
     // 4. Is a differentiability parameter but not a differentiability result.
     //    This case is not currently expressible and does not yet have clear use
     //    cases, so supporting it is a non-goal.
     //
-    // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
-    // parameters are not treated as differentiability results, unless the
-    // original function has no formal results, in which case all `inout`
-    // parameters are treated as differentiability results.
-    if (resultIndices.empty() ||
-        inoutParamAndIndex.value().getDifferentiability() !=
+    // See TF-1305 for solution ideas. For now, `@noDerivative` semantic result
+    // parameters are not treated as differentiability results.
+    if (resultParamAndIndex.value().getDifferentiability() !=
         SILParameterDifferentiability::NotDifferentiable)
-      resultIndices.push_back(getNumResults() + inoutParamAndIndex.index());
+      resultIndices.push_back(getNumResults() + resultParamAndIndex.index());
 
-  auto numSemanticResults =
-      getNumResults() + getNumIndirectMutatingParameters();
+  numSemanticResults += getNumAutoDiffSemanticResultsParameters();
+
   return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
 
@@ -369,18 +368,19 @@ getDifferentiabilityParameters(SILFunctionType *originalFnTy,
 
 /// Collects the semantic results of the given function type in
 /// `originalResults`. The semantic results are formal results followed by
-/// `inout` parameters, in type order.
+/// semantic result parameters, in type order.
 static void
-getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
+getSemanticResults(SILFunctionType *functionType,
+                   IndexSubset *parameterIndices,
                    SmallVectorImpl<SILResultInfo> &originalResults) {
   // Collect original formal results.
   originalResults.append(functionType->getResults().begin(),
                          functionType->getResults().end());
 
-  // Collect original `inout` parameters.
+  // Collect original semantic result parameters.
   for (auto i : range(functionType->getNumParameters())) {
     auto param = functionType->getParameters()[i];
-    if (!param.isIndirectMutating())
+    if (!param.isAutoDiffSemanticResult())
       continue;
     if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable)
       originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
@@ -578,7 +578,9 @@ static CanSILFunctionType getAutoDiffDifferentialType(
             ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         param.getConvention());
-    differentialParams.push_back({paramTanType, paramConv});
+    if (param.getInterfaceType()->getClassOrBoundGenericClass())
+      paramConv = ParameterConvention::Indirect_Inout;
+    differentialParams.emplace_back(paramTanType, paramConv);
   }
   SmallVector<SILResultInfo, 1> differentialResults;
   for (auto resultIndex : resultIndices->getIndices()) {
@@ -594,26 +596,28 @@ static CanSILFunctionType getAutoDiffDifferentialType(
               ->getAutoDiffTangentSpace(lookupConformance)
               ->getCanonicalType(),
           result.getConvention());
-      differentialResults.push_back({resultTanType, resultConv});
+      differentialResults.emplace_back(resultTanType, resultConv);
       continue;
     }
-    // Handle original `inout` parameters.
-    auto inoutParamIndex = resultIndex - originalFnTy->getNumResults();
-    auto inoutParamIt = std::next(
-        originalFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    // Handle original semantic result parameters.
+    auto resultParamIndex = resultIndex - originalFnTy->getNumResults();
+    auto resultParamIt = std::next(
+        originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+        resultParamIndex);
     auto paramIndex =
-        std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
-    // If the original `inout` parameter is a differentiability parameter, then
-    // it already has a corresponding differential parameter. Skip adding a
-    // corresponding differential result.
+      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+    // If the original semantic result parameter is a differentiability
+    // parameter, then it already has a corresponding differential
+    // parameter. Skip adding a corresponding differential result.
     if (parameterIndices->contains(paramIndex))
       continue;
-    auto inoutParam = originalFnTy->getParameters()[paramIndex];
-    auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(
-        inoutParam.getInterfaceType(), lookupConformance,
+
+    auto resultParam = originalFnTy->getParameters()[paramIndex];
+    auto resultParamTanType = getAutoDiffTangentTypeForLinearMap(
+      resultParam.getInterfaceType(), lookupConformance,
         substGenericParams, substReplacements, ctx);
-    differentialResults.push_back(
-        {inoutParamTanType, ResultConvention::Indirect});
+    differentialResults.emplace_back(resultParamTanType,
+                                     ResultConvention::Indirect);
   }
 
   SubstitutionMap substitutions;
@@ -734,28 +738,41 @@ static CanSILFunctionType getAutoDiffPullbackType(
               ->getAutoDiffTangentSpace(lookupConformance)
               ->getCanonicalType(),
           origRes.getConvention());
-      pullbackParams.push_back({resultTanType, paramConv});
+      if (origRes.getInterfaceType().getClassOrBoundGenericClass())
+        paramConv = ParameterConvention::Indirect_In_Guaranteed;
+
+      pullbackParams.emplace_back(resultTanType, paramConv);
       continue;
     }
-    // Handle `inout` parameters.
-    auto inoutParamIndex = resultIndex - originalFnTy->getNumResults();
-    auto inoutParamIt = std::next(
-        originalFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    // Handle original semantic result parameters.
+    auto resultParamIndex = resultIndex - originalFnTy->getNumResults();
+    auto resultParamIt = std::next(
+      originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+      resultParamIndex);
     auto paramIndex =
-        std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
-    auto inoutParam = originalFnTy->getParameters()[paramIndex];
+      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+    auto resultParam = originalFnTy->getParameters()[paramIndex];
     // The pullback parameter convention depends on whether the original `inout`
     // parameter is a differentiability parameter.
     // - If yes, the pullback parameter convention is `@inout`.
     // - If no, the pullback parameter convention is `@in_guaranteed`.
-    auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(
-        inoutParam.getInterfaceType(), lookupConformance,
-        substGenericParams, substReplacements, ctx);
-    bool isWrtInoutParameter = parameterIndices->contains(paramIndex);
-    auto paramTanConvention = isWrtInoutParameter
-        ? inoutParam.getConvention()
-        : ParameterConvention::Indirect_In_Guaranteed;
-    pullbackParams.push_back({inoutParamTanType, paramTanConvention});
+    auto resultParamTanType = getAutoDiffTangentTypeForLinearMap(
+      resultParam.getInterfaceType(), lookupConformance,
+      substGenericParams, substReplacements, ctx);
+    ParameterConvention paramTanConvention = resultParam.getConvention();
+    if (resultParam.isIndirectMutating()) {
+      if (!parameterIndices->contains(paramIndex))
+        paramTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+    } else {
+      assert(resultParam.getInterfaceType().getClassOrBoundGenericClass() &&
+             "expected class bound parameter");
+      if (!parameterIndices->contains(paramIndex))
+        paramTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+      else
+        paramTanConvention = ParameterConvention::Indirect_Inout;
+    }
+
+    pullbackParams.emplace_back(resultParamTanType, paramTanConvention);
   }
 
   // Collect pullback results.
@@ -763,9 +780,9 @@ static CanSILFunctionType getAutoDiffPullbackType(
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
   SmallVector<SILResultInfo, 8> pullbackResults;
   for (auto &param : diffParams) {
-    // Skip `inout` parameters, which semantically behave as original results
-    // and always appear as pullback parameters.
-    if (param.isIndirectMutating())
+    // Skip semantic result parameters, which semantically behave as original
+    // results and always appear as pullback parameters.
+    if (param.isAutoDiffSemanticResult())
       continue;
     auto paramTanType = getAutoDiffTangentTypeForLinearMap(
         param.getInterfaceType(), lookupConformance,
@@ -898,6 +915,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
                                 origTypeOfAbstraction, TC);
     break;
   }
+  
   // Compute the derivative function parameters.
   SmallVector<SILParameterInfo, 4> newParameters;
   newParameters.reserve(constrainedOriginalFnTy->getNumParameters());
@@ -4091,6 +4109,40 @@ static llvm::cl::opt<bool>
     DisableConstantInfoCache("sil-disable-typelowering-constantinfo-cache",
                              llvm::cl::init(false));
 
+static IndexSubset *
+getLoweredResultIndices(const SILFunctionType *functionType,
+                        const IndexSubset *parameterIndices) {
+  SmallVector<unsigned, 2> resultIndices;
+
+  // Check formal results.
+  for (auto resultAndIndex : enumerate(functionType->getResults()))
+    if (resultAndIndex.value().getDifferentiability() !=
+        SILResultDifferentiability::NotDifferentiable)
+      resultIndices.push_back(resultAndIndex.index());
+
+  auto numResults = functionType->getNumResults();
+  
+  // Collect semantic result parameters.
+  unsigned semResultParamIdx = 0;
+  for (auto resultParamAndIndex
+         : enumerate(functionType->getParameters())) {
+    if (!resultParamAndIndex.value().isAutoDiffSemanticResult())
+      continue;
+
+    if (resultParamAndIndex.value().getDifferentiability() !=
+        SILParameterDifferentiability::NotDifferentiable &&
+       parameterIndices->contains(resultParamAndIndex.index()))
+      resultIndices.push_back(numResults + semResultParamIdx);
+    semResultParamIdx += 1;
+  }
+  
+  numResults += semResultParamIdx;
+
+  return IndexSubset::get(functionType->getASTContext(),
+                          numResults, resultIndices);
+}
+
+
 const SILConstantInfo &
 TypeConverter::getConstantInfo(TypeExpansionContext expansion,
                                SILDeclRef constant) {
@@ -4149,11 +4201,9 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     // Use it to compute lowered derivative function type.
     auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         derivativeId->getParameterIndices(), formalInterfaceType);
-    auto numResults =
-        origFnConstantInfo.SILFnType->getNumResults() +
-        origFnConstantInfo.SILFnType->getNumIndirectMutatingParameters();
-    auto *loweredResultIndices = IndexSubset::getDefault(
-        M.getASTContext(), numResults, /*includeAll*/ true);
+    auto *loweredResultIndices
+      = getLoweredResultIndices(origFnConstantInfo.SILFnType, loweredParamIndices);
+
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
         loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
         *this, LookUpConformanceInModule(&M));

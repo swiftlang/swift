@@ -260,10 +260,11 @@ ClassTests.test("ClassMethods - wrt self") {
     @derivative(of: f)
     final func vjpf(
       _ x: Tracked<Float>
-    ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+    ) -> (value: Tracked<Float>, pullback: (Tracked<Float>, inout TangentVector) -> Tracked<Float>) {
       let base = self.base
-      return (f(x), { v in
-        (TangentVector(base: v * x), base * v)
+      return (f(x), { v, tv in
+          tv = TangentVector(base: v * x)
+          return base * v
       })
     }
   }
@@ -504,9 +505,9 @@ ClassTests.test("ClassProperties") {
     var squared: Tracked<Float> { base * base }
 
     @derivative(of: squared)
-    final func vjpSquared() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> TangentVector) {
+    final func vjpSquared() -> (value: Tracked<Float>, pullback: (Tracked<Float>, inout TangentVector) -> ()) {
       let base = self.base
-      return (base * base, { v in TangentVector(base: 2 * base * v) })
+        return (base * base, { v, tv in tv = TangentVector(base: 2 * base * v) })
     }
   }
 

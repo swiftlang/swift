@@ -5275,11 +5275,13 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       .getIdentifier(
           mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
       .str();
-
   auto loc = customDerivativeFn->getLocation();
+
   SILGenFunctionBuilder fb(*this);
   // Derivative thunks have the same linkage as the original function, stripping
   // external.
+  // FIXME: Currently class-scoped thunks are not allowed. Do we need to
+  // introduce special "derivative thunk" to allow this?
   auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
@@ -5287,8 +5289,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),
-      customDerivativeFn->getEntryCount(), IsThunk,
-      customDerivativeFn->getClassSubclassScope());
+      customDerivativeFn->getEntryCount(),
+      IsThunk, SubclassScope::NotApplicable);
   // This thunk may be publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
   thunk->setInlineStrategy(AlwaysInline);

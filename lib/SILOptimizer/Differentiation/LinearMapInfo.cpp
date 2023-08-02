@@ -177,7 +177,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
     return activityInfo.isActive(res, config);
   });
-  bool hasActiveInoutArgument = false;
+  bool hasActiveSemanticResultArgument = false;
   bool hasActiveArguments = false;
   auto numIndirectResults = ai->getNumIndirectResults();
   for (auto argIdx : range(ai->getSubstCalleeConv().getNumParameters())) {
@@ -186,13 +186,13 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
       hasActiveArguments = true;
       auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
           numIndirectResults + argIdx);
-      if (paramInfo.isIndirectMutating())
-        hasActiveInoutArgument = true;
+      if (paramInfo.isAutoDiffSemanticResult())
+        hasActiveSemanticResultArgument = true;
     }
   }
   if (!hasActiveArguments)
     return {};
-  if (!hasActiveResults && !hasActiveInoutArgument)
+  if (!hasActiveResults && !hasActiveSemanticResultArgument)
     return {};
 
   // Compute differentiability parameters.
@@ -213,9 +213,8 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
         ai->getArgumentsWithoutIndirectResults().size(), activeParamIndices);
   }
   // Compute differentiability results.
-  auto numResults = remappedOrigFnSubstTy->getNumResults() +
-                    remappedOrigFnSubstTy->getNumIndirectMutatingParameters();
-  auto *results = IndexSubset::get(original->getASTContext(), numResults,
+  auto *results = IndexSubset::get(original->getASTContext(),
+                                   remappedOrigFnSubstTy->getNumAutoDiffSemanticResults(),
                                    activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
   AutoDiffConfig applyConfig(parameters, results);
@@ -234,10 +233,11 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
     for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
       SILType remappedResultType;
       if (resultIndex >= origFnTy->getNumResults()) {
-        auto inoutArgIdx = resultIndex - origFnTy->getNumResults();
-        auto inoutArg =
-            *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
-        remappedResultType = inoutArg->getType();
+        auto semanticResultArgIdx = resultIndex - origFnTy->getNumResults();
+        auto semanticResultArg =
+            *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                       semanticResultArgIdx);
+        remappedResultType = semanticResultArg->getType();
       } else {
         remappedResultType =
             origFnTy->getResults()[resultIndex].getSILStorageInterfaceType();
@@ -277,8 +277,9 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   SmallVector<AnyFunctionType::Param, 8> params;
   for (auto &param : silFnTy->getParameters()) {
     ParameterTypeFlags flags;
-    if (param.isIndirectMutating())
+    if (param.isAutoDiffSemanticResult())
       flags = flags.withInOut(true);
+
     params.push_back(
         AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
   }
@@ -398,17 +399,17 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 /// differentiated, given the differentiation indices of the instruction's
 /// parent function. Whether the `apply` should be differentiated is determined
 /// sequentially from the following conditions:
-/// 1. The instruction has an active `inout` argument.
+/// 1. The instruction has an active semantic result argument.
 /// 2. The instruction is a call to the array literal initialization intrinsic
 ///    ("array.uninitialized_intrinsic"), where the result is active and where
 ///    there is a `store` of an active value into the array's buffer.
 /// 3. The instruction has both an active result (direct or indirect) and an
 ///    active argument.
 bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
-  // Function applications with an active inout argument should be
+  // Function applications with an active semantic result argument should be
   // differentiated.
-  for (auto inoutArg : applySite.getInoutArguments())
-    if (activityInfo.isActive(inoutArg, config))
+  for (auto semanticResArg : applySite.getAutoDiffSemanticResultArguments())
+    if (activityInfo.isActive(semanticResArg, config))
       return true;
 
   bool hasActiveDirectResults = false;

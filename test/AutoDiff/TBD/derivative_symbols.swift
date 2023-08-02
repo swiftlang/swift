@@ -141,7 +141,7 @@ public final class Class: Differentiable {
 
   @derivative(of: subscript)
   public func vjpSubscript(_ x: Float) -> (
-    value: Float, pullback: (Float) -> (TangentVector, Float)
+    value: Float, pullback: (Float, inout TangentVector) -> Float
   ) {
     fatalError()
   }

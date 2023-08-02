@@ -174,43 +174,62 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
   }
 
   do {
-    func squaredViaModifyAccessor(_ c: inout Class) {
-      // The line below calls `Class.x.modify`.
-      c.x *= c.x
+    func squaredViaGetSetAccessors(_ c: inout Class) {
+      // The code below crafted not to call `Class.x.modify`.
+      //  `Class.x.get` /  `Class.x.set` are called instead
+      let a = c.x * c.x
+      c.x = a
     }
     func squared(_ x: Float) -> Float {
       var c = Class(x)
-      squaredViaModifyAccessor(&c)
+      squaredViaGetSetAccessors(&c)
       return c.x
     }
-    // FIXME(TF-1080): Fix incorrect class property `modify` accessor derivative values.
-    // expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
-    // expectEqual(200, pullback(at: 10, of: squared)(10))
-    expectEqual((100, 1), valueWithGradient(at: 10, of: squared))
-    expectEqual(10, pullback(at: 10, of: squared)(10))
+    expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
+    expectEqual(200, pullback(at: 10, of: squared)(10))
   }
+  
+  // FIXME: Support differentiation of `modify` accessors:
+  // https://github.com/apple/swift/issues/54401
+  //do {
+  //  func squaredViaModifyAccessor(_ c: inout Class) {
+  //    // The line below calls `Class.x.modify`.
+  //    c.x *= c.x
+  //  }
+  //  func squared(_ x: Float) -> Float {
+  //    var c = Class(x)
+  //    squaredViaModifyAccessor(&c)
+  //    return c.x
+  //  }
+  //  // FIXME(TF-1080): Fix incorrect class property `modify` accessor derivative values.
+  //  // expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
+  //  // expectEqual(200, pullback(at: 10, of: squared)(10))
+  //  expectEqual((100, 1), valueWithGradient(at: 10, of: squared))
+  //  expectEqual(10, pullback(at: 10, of: squared)(10))
+  //}
 }
 
-// https://github.com/apple/swift/issues/55745
-// Test function with non-wrt `inout` parameter, which should be
-// treated as a differentiability result.
+// Test function with wrt `inout` parameter, which should be treated as a differentiability result.
+// Original issue https://github.com/apple/swift/issues/55745 deals with non-wrt `inout` which
+// we explicitly disallow now
+
 
 protocol P_55745 {
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (x, y))
   func method(_ x: Float, _ y: inout Float)
 
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (x, y))
   func genericMethod<T: Differentiable>(_ x: T, _ y: inout T)
 }
 
 InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
   struct Struct: P_55745 {
-    @differentiable(reverse, wrt: x)
+    @differentiable(reverse, wrt: (x, y))
     func method(_ x: Float, _ y: inout Float) {
       y = y * x
     }
 
-    @differentiable(reverse, wrt: x)
+    @differentiable(reverse, wrt: (x, y))
     func genericMethod<T: Differentiable>(_ x: T, _ y: inout T) {
       y = x
     }

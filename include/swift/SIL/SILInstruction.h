@@ -2785,6 +2785,25 @@ struct OperandToInoutArgument {
 using InoutArgumentRange =
     OptionalTransformRange<IntRange<size_t>, OperandToInoutArgument>;
 
+/// Predicate used to filter AutoDiffSemanticResultArgumentRange.
+struct OperandToAutoDiffSemanticResultArgument {
+  ArrayRef<SILParameterInfo> paramInfos;
+  OperandValueArrayRef arguments;
+  OperandToAutoDiffSemanticResultArgument(ArrayRef<SILParameterInfo> paramInfos,
+                                  OperandValueArrayRef arguments)
+      : paramInfos(paramInfos), arguments(arguments) {
+    assert(paramInfos.size() == arguments.size());
+  }
+  llvm::Optional<SILValue> operator()(size_t i) const {
+    if (paramInfos[i].isAutoDiffSemanticResult())
+      return arguments[i];
+    return llvm::None;
+  }
+};
+
+using AutoDiffSemanticResultArgumentRange =
+    OptionalTransformRange<IntRange<size_t>, OperandToAutoDiffSemanticResultArgument>;
+
 /// The partial specialization of ApplyInstBase for full applications.
 /// Adds some methods relating to 'self' and to result types that don't
 /// make sense for partial applications.
@@ -2892,6 +2911,16 @@ public:
         indices(getArgumentsWithoutIndirectResults()),
         OperandToInoutArgument(impl.getSubstCalleeConv().getParameters(),
                                impl.getArgumentsWithoutIndirectResults()));
+  }
+
+  /// Returns all autodiff semantic result (`@inout`, `@inout_aliasable`)
+  /// arguments passed to the instruction.
+  AutoDiffSemanticResultArgumentRange getAutoDiffSemanticResultArguments() const {
+    auto &impl = asImpl();
+    return AutoDiffSemanticResultArgumentRange(
+        indices(getArgumentsWithoutIndirectResults()),
+        OperandToAutoDiffSemanticResultArgument(impl.getSubstCalleeConv().getParameters(),
+                                                impl.getArgumentsWithoutIndirectResults()));
   }
 
   bool hasSemantics(StringRef semanticsString) const {

@@ -681,7 +681,7 @@ struct InoutParameters: Differentiable {
 }
 
 extension NonDiffableStruct {
-  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'NonDiffableStruct' does not conform to 'Differentiable'}}
+  // expected-error @+1 {{cannot differentiate void function 'nondiffResult(x:y:z:)'}}
   @differentiable(reverse)
   static func nondiffResult(x: Int, y: inout NonDiffableStruct, z: Float) {}
 
