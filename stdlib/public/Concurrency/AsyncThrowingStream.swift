@@ -253,9 +253,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   }
 
   final class _Backing {
-    let storage: _BackPressuredStorage<Element, Failure>
+    let storage: _BackpressuredStorage<Element, Failure>
 
-    init(storage: _BackPressuredStorage<Element, Failure>) {
+    init(storage: _BackpressuredStorage<Element, Failure>) {
       self.storage = storage
     }
 
@@ -421,9 +421,9 @@ extension AsyncThrowingStream: AsyncSequence {
   /// results in a call to `fatalError()`.
   public struct Iterator: AsyncIteratorProtocol {
     final class _Backing {
-      let _storage: _BackPressuredStorage<Element, Failure>
+      let _storage: _BackpressuredStorage<Element, Failure>
 
-      init(storage: _BackPressuredStorage<Element, Failure>) {
+      init(storage: _BackpressuredStorage<Element, Failure>) {
         self._storage = storage
         self._storage.iteratorInitialized()
       }

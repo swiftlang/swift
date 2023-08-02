@@ -229,9 +229,9 @@ public struct AsyncStream<Element> {
   }
 
   final class _Backing {
-    let storage: _BackPressuredStorage<Element, Never>
+    let storage: _BackpressuredStorage<Element, Never>
 
-    init(storage: _BackPressuredStorage<Element, Never>) {
+    init(storage: _BackpressuredStorage<Element, Never>) {
       self.storage = storage
     }
 
@@ -384,9 +384,9 @@ extension AsyncStream: AsyncSequence {
   /// results in a call to `fatalError()`.
   public struct Iterator: AsyncIteratorProtocol {
     final class _Backing {
-      let _storage: _BackPressuredStorage<Element, Never>
+      let _storage: _BackpressuredStorage<Element, Never>
 
-      init(storage: _BackPressuredStorage<Element, Never>) {
+      init(storage: _BackpressuredStorage<Element, Never>) {
         self._storage = storage
         self._storage.iteratorInitialized()
       }
@@ -429,12 +429,12 @@ extension AsyncStream: AsyncSequence {
         case .contextBased(let context):
           return await context.produce()
         case .backpressured(let backing):
-        if #available(SwiftStdlib 9999, *) {
-          // The only error that can be thrown here is the `CancellationError` which we convert to nil
-          return try? await backing._storage.next()
-        } else {
-          fatalError("Internal inconsistency")
-        }
+          if #available(SwiftStdlib 9999, *) {
+            // The only error that can be thrown here is the `CancellationError` which we convert to nil
+            return try? await backing._storage.next()
+          } else {
+            fatalError("Internal inconsistency")
+          }
       }
     }
   }
