@@ -310,6 +310,10 @@ public:
   /// SingleValueStmtExpr.
   bool isForSingleValueStmtConjunction() const;
 
+  /// Whether this locator identifies a conjunction for the branches of a
+  /// SingleValueStmtExpr, or a conjunction for one of the BraceStmts itself.
+  bool isForSingleValueStmtConjunctionOrBrace() const;
+
   /// Whether this locator identifies a conversion for a SingleValueStmtExpr
   /// branch, and if so, the kind of branch.
   llvm::Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
