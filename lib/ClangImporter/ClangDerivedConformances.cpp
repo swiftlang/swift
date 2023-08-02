@@ -86,6 +86,31 @@ static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
                       });
 }
 
+static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
+                               TypeAliasDecl *valueType) {
+  ASTContext &ctx = decl->getASTContext();
+
+  auto insertId = ctx.getIdentifier("__insertUnsafe");
+  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
+  FuncDecl *insert = nullptr;
+  for (auto candidate : inserts) {
+    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
+      if (!candidateMethod->hasParameterList())
+        continue;
+      auto params = candidateMethod->getParameters();
+      if (params->size() != 1)
+        continue;
+      auto param = params->front();
+      if (param->getType()->getCanonicalType() !=
+          valueType->getUnderlyingType()->getCanonicalType())
+        continue;
+      insert = candidateMethod;
+      break;
+    }
+  }
+  return insert;
+}
+
 static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
                       llvm::ArrayRef<StringRef> names) {
   if (!clangDecl->isInStdNamespace())
@@ -713,12 +738,16 @@ static bool isStdSetType(const clang::CXXRecordDecl *clangDecl) {
   return isStdDecl(clangDecl, {"set", "unordered_set", "multiset"});
 }
 
+static bool isStdMapType(const clang::CXXRecordDecl *clangDecl) {
+  return isStdDecl(clangDecl, {"map", "unordered_map", "multimap"});
+}
+
 bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
   auto parentDecl =
       dyn_cast<clang::CXXRecordDecl>(methodDecl->getDeclContext());
   if (!parentDecl)
     return false;
-  if (!isStdSetType(parentDecl))
+  if (!isStdSetType(parentDecl) && !isStdMapType(parentDecl))
     return false;
   if (methodDecl->getDeclName().isIdentifier() &&
       methodDecl->getName() == "insert")
@@ -747,24 +776,7 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
   if (!valueType || !sizeType)
     return;
 
-  auto insertId = ctx.getIdentifier("__insertUnsafe");
-  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
-  FuncDecl *insert = nullptr;
-  for (auto candidate : inserts) {
-    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
-      if (!candidateMethod->hasParameterList())
-        continue;
-      auto params = candidateMethod->getParameters();
-      if (params->size() != 1)
-        continue;
-      auto param = params->front();
-      if (param->getType()->getCanonicalType() !=
-          valueType->getUnderlyingType()->getCanonicalType())
-        continue;
-      insert = candidateMethod;
-      break;
-    }
-  }
+  auto insert = getInsertFunc(decl, valueType);
   if (!insert)
     return;
 
@@ -844,7 +856,7 @@ void swift::conformToCxxDictionaryIfNeeded(
 
   // Only auto-conform types from the C++ standard library. Custom user types
   // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"map", "unordered_map"}))
+  if (!isStdMapType(clangDecl))
     return;
 
   auto keyType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
@@ -853,7 +865,41 @@ void swift::conformToCxxDictionaryIfNeeded(
       decl, ctx.getIdentifier("mapped_type"));
   auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("const_iterator"));
-  if (!keyType || !valueType || !iterType)
+  auto mutableIterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("iterator"));
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+  auto keyValuePairType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("value_type"));
+  if (!keyType || !valueType || !iterType || !mutableIterType || !sizeType ||
+      !keyValuePairType)
+    return;
+
+  auto insert = getInsertFunc(decl, keyValuePairType);
+  if (!insert)
+    return;
+
+  ProtocolDecl *cxxInputIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxMutableInputIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator);
+  if (!cxxInputIteratorProto || !cxxMutableInputIteratorProto)
+    return;
+
+  auto rawIteratorTy = iterType->getUnderlyingType();
+  auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
+
+  // Check if RawIterator conforms to UnsafeCxxInputIterator.
+  ModuleDecl *module = decl->getModuleContext();
+  auto rawIteratorConformanceRef =
+      module->lookupConformance(rawIteratorTy, cxxInputIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+    return;
+
+  // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
+  auto rawMutableIteratorConformanceRef = module->lookupConformance(
+      rawMutableIteratorTy, cxxMutableInputIteratorProto);
+  if (!isConcreteAndValid(rawMutableIteratorConformanceRef, module))
     return;
 
   // Make the original subscript that returns a non-optional value unavailable.
@@ -869,7 +915,15 @@ void swift::conformToCxxDictionaryIfNeeded(
   impl.addSynthesizedTypealias(decl, ctx.Id_Key, keyType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_Value,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               keyValuePairType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               iterType->getUnderlyingType());
+                               rawIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                               rawMutableIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+                               insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
 }
