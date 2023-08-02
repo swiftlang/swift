@@ -1262,7 +1262,8 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
               fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
                              Lang, Invoc, PreviousSnaps, Data.Allocator)) {
         // Ignore but make sure to remove the partially-filled symbol
-        llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
+        llvm::handleAllErrors(std::move(Err),
+                              [](const llvm::StringError &E) {});
         Data.Symbols.pop_back();
       }
     }
