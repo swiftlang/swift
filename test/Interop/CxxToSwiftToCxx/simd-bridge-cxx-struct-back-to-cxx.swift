@@ -12,6 +12,7 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/full-cxx-swift-cxx-bridging.h -Wno-reserved-identifier -DSIMD_NO_CODE)
 
 // This is required to verify that `Struct` is returned and passed directly.
+// REQUIRES: OS=macosx
 // REQUIRES: PTRSIZE=64
 
 //--- header.h
