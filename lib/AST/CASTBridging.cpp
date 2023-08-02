@@ -20,6 +20,10 @@ struct BridgedDiagnosticImpl {
   InFlightDiagnostic inFlight;
   std::vector<StringRef> textBlobs;
 
+  BridgedDiagnosticImpl(InFlightDiagnostic inFlight,
+                        std::vector<StringRef> textBlobs)
+      : inFlight(std::move(inFlight)), textBlobs(std::move(textBlobs)) {}
+
   BridgedDiagnosticImpl(const BridgedDiagnosticImpl &) = delete;
   BridgedDiagnosticImpl(BridgedDiagnosticImpl &&) = delete;
   BridgedDiagnosticImpl &operator=(const BridgedDiagnosticImpl &) = delete;
