@@ -702,6 +702,11 @@ module std [system] {
   module _Private [system] {
     requires cplusplus
 
+    explicit module __msvc_iter_core {
+      header "__msvc_iter_core.hpp"
+      export *
+    }
+
     explicit module xmemory {
       header "xmemory"
       export *
