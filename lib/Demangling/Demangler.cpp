@@ -2141,7 +2141,8 @@ NodePointer Demangler::demangleImplFunctionType() {
       return nullptr;
 
     auto subsNode = createNode(Node::Kind::ImplInvocationSubstitutions);
-    assert(Substitutions.size() == 1);
+    if (Substitutions.size() != 1)
+      return nullptr;
     subsNode->addChild(Substitutions[0], *this);
     if (SubstitutionRetroConformances)
       subsNode->addChild(SubstitutionRetroConformances, *this);
