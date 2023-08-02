@@ -33,7 +33,7 @@ struct A : MyProto {
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "v1",
 // CHECK-NEXT:        "type": "Swift.String",
-// CHECK-NEXT:        "mangledTypeName": "SS", 
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated", 
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractRuntimeMetadataAttr.swift",
