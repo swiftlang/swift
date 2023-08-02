@@ -3950,7 +3950,7 @@ namespace {
           IGM.getGetEnumCaseMultiPayloadFunctionPointer(),
           {addr.getAddress(), metadata});
       call->setDoesNotThrow();
-      call->addFnAttr(llvm::Attribute::ReadOnly);
+      call->setOnlyReadsMemory();
 
       return call;
     }

@@ -750,7 +750,7 @@ IRGenModule::~IRGenModule() {
 // They have to be non-local because otherwise we'll get warnings when
 // a particular x-macro expansion doesn't use one.
 namespace RuntimeConstants {
-  const auto ReadNone = llvm::Attribute::ReadNone;
+  const auto ReadNone = llvm::MemoryEffects::none();
   const auto ReadOnly = llvm::MemoryEffects::readOnly();
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
@@ -1112,8 +1112,8 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
-#define NO_MEMEFFECTS                                                          \
-  { llvm::MemoryEffects::none() }
+#define UNKNOWN_MEMEFFECTS                                                          \
+  { llvm::MemoryEffects::unknown() }
 #define MEMEFFECTS(...)                                                        \
   { __VA_ARGS__ }
 
