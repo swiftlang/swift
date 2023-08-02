@@ -1804,6 +1804,11 @@ bool PullbackCloner::Implementation::run() {
   DominanceOrder domOrder(original.getEntryBlock(), domInfo);
   // Keep track of visited values.
   SmallPtrSet<SILValue, 8> visited;
+  // Also check for differentiable for all active values
+  auto *diffProto =
+      builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto *swiftModule = getModule().getSwiftModule();
+
   while (auto *bb = domOrder.getNext()) {
     auto &bbActiveValues = activeValues[bb];
     // If the current block has an immediate dominator, append the immediate
@@ -1863,6 +1868,16 @@ bool PullbackCloner::Implementation::run() {
       // become projections into their adjoint base buffer.
       if (Projection::isAddressProjection(v))
         return false;
+
+      auto diffConf =
+          swiftModule->lookupConformance(type.getASTType(), diffProto);
+      if (diffConf.isInvalid()) {
+        getContext().emitNondifferentiabilityError(
+            v, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+        errorOccurred = true;
+        return true;
+      }
+
       // Record active value.
       bbActiveValues.push_back(v);
       return false;
