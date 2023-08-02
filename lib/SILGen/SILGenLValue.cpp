@@ -2303,7 +2303,7 @@ namespace {
 
       auto setValue =
         std::move(value).getAsSingleValue(SGF, origType, loweredTy);
-      if (!setValue.getType().isAddress()) {
+      if (SGF.useLoweredAddresses() && !setValue.getType().isAddress()) {
         setValue = setValue.materialize(SGF, loc);
       }
 
