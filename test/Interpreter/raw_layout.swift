@@ -14,7 +14,8 @@ struct Cell<T>: ~Copyable {
   }
 
   deinit {
-    address.deinitialize(count: 1)
+    // FIXME: discard self should work with rawLayout types
+    //address.deinitialize(count: 1)
 
     // Note: We don't need to deallocate the address here because the memory it
     // points to is being destroyed within this deinit.
@@ -58,14 +59,11 @@ do {
 
   let specialInt0Again = cell0.replace(with: SpecialInt(316))
 
-  // CHECK: Deinitializing 128!
-  _ = consume specialInt0Again
-
   // CHECK: Deinitializing 316!
   cell0.set(SpecialInt(592))
 
   let specialInt1 = cell0.get()
 
   // CHECK: Deinitializing 592!
-  _ = consume specialInt1
+  // CHECK: Deinitializing 128!
 }

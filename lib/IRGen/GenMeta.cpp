@@ -2983,10 +2983,106 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
                                 IGM.getPointerSize() * numFields);
 }
 
+static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
+                                       Size count, SILType T,
+                                       llvm::Value *metadata,
+                                       MetadataDependencyCollector *collector) {
+  auto &IGM = IGF.IGM;
+
+  // This is the list of field type layouts that we're going to pass to the init
+  // function. This will only ever hold 1 field which is the temporary one we're
+  // going to build up from our like type's layout.
+  auto fieldLayouts = IGF.createAlloca(
+                          llvm::ArrayType::get(IGM.TypeLayoutTy->getPointerTo(), 1),
+                          IGM.getPointerAlignment(), "fieldLayouts");
+  IGF.Builder.CreateLifetimeStart(fieldLayouts, IGM.getPointerSize());
+
+  // We're going to pretend that this is our field offset vector for the init to
+  // write to. We don't actually have fields, so we don't want to write a field
+  // offset in our metadata.
+  auto fieldOffsets = IGF.createAlloca(IGM.Int32Ty, Alignment(4), "fieldOffsets");
+  IGF.Builder.CreateLifetimeStart(fieldOffsets, Size(4));
+
+  // We need to make a temporary type layout with most of the same information
+  // from the type we're like.
+  auto ourTypeLayout = IGF.createAlloca(IGM.TypeLayoutTy, 
+                                        IGM.getPointerAlignment(),
+                                        "ourTypeLayout");
+  IGF.Builder.CreateLifetimeStart(ourTypeLayout, IGM.getPointerSize());
+
+  // Put our temporary type layout in the list of layouts we're using to
+  // initialize.
+  IGF.Builder.CreateStore(ourTypeLayout.getAddress(), fieldLayouts);
+
+  // Get the like type's type layout.
+  auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
+
+  // Grab the size, stride, and alignmentMask out of the layout.
+  auto loadedTyLayout = IGF.Builder.CreateLoad(
+      Address(likeTypeLayout, IGM.TypeLayoutTy, IGM.getPointerAlignment()),
+      "typeLayout");
+  auto size = IGF.Builder.CreateExtractValue(loadedTyLayout, 0, "size");
+  auto stride = IGF.Builder.CreateExtractValue(loadedTyLayout, 1, "stride");
+  auto flags = IGF.Builder.CreateExtractValue(loadedTyLayout, 2, "flags");
+  auto xi = IGF.Builder.CreateExtractValue(loadedTyLayout, 3, "xi");
+
+  // This will zero out the other bits.
+  auto alignMask = IGF.Builder.CreateAnd(flags,
+                                         ValueWitnessFlags::AlignmentMask,
+                                         "alignMask");
+
+  // Set the isNonPOD bit. This is important because older runtimes will attempt
+  // to replace various vwt functions with more optimized ones. In this case, we
+  // want to preserve the fact that noncopyable types have unreachable copy vwt
+  // functions.
+  auto vwtFlags = IGF.Builder.CreateOr(alignMask,
+                                       ValueWitnessFlags::IsNonPOD,
+                                       "vwtFlags");
+
+  // Count is only ever -1 if we're not an array like layout.
+  if (count != Size(-1)) {
+    stride = IGF.Builder.CreateMul(stride, IGM.getSize(count));
+    size = stride;
+  }
+
+  llvm::Value *resultAgg = llvm::UndefValue::get(IGM.TypeLayoutTy);
+  resultAgg = IGF.Builder.CreateInsertValue(resultAgg, size, 0);
+  resultAgg = IGF.Builder.CreateInsertValue(resultAgg, stride, 1);
+  resultAgg = IGF.Builder.CreateInsertValue(resultAgg, vwtFlags, 2);
+  resultAgg = IGF.Builder.CreateInsertValue(resultAgg, xi, 3);
+
+  IGF.Builder.CreateStore(resultAgg, ourTypeLayout);
+
+  StructLayoutFlags fnFlags = StructLayoutFlags::Swift5Algorithm;
+
+  // Call swift_initStructMetadata().
+  IGF.Builder.CreateCall(IGM.getInitStructMetadataFunctionPointer(),
+                         {metadata, IGM.getSize(Size(uintptr_t(fnFlags))),
+                          IGM.getSize(Size(1)), fieldLayouts.getAddress(),
+                          fieldOffsets.getAddress()});
+
+  IGF.Builder.CreateLifetimeEnd(ourTypeLayout, IGM.getPointerSize());
+  IGF.Builder.CreateLifetimeEnd(fieldOffsets, Size(4));
+  IGF.Builder.CreateLifetimeEnd(fieldLayouts, IGM.getPointerSize());
+}
+
 static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                                     Size count, SILType T,
                                     llvm::Value *metadata,
                                     MetadataDependencyCollector *collector) {
+  // If our deployment target doesn't contain the new swift_initRawStructMetadata,
+  // emit a call to the swift_initStructMetadata tricking it into thinking
+  // we have a single field.
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+  auto initRawAvail = IGF.IGM.Context.getInitRawStructMetadataAvailability();
+
+  if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
+      !deploymentAvailability.isContainedIn(initRawAvail)) {
+    emitInitializeRawLayoutOld(IGF, likeType, count, T, metadata, collector);
+    return;
+  }
+
   auto &IGM = IGF.IGM;
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
   StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
