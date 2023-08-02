@@ -881,7 +881,7 @@ void writeProperties(llvm::json::OStream &JSON,
         const auto *decl = PropertyInfo.VarDecl;
         JSON.attribute("label", decl->getName().str().str());
         JSON.attribute("type", toFullyQualifiedTypeNameString(decl->getType()));
-        JSON.attribute("mangledTypeName", toMangledTypeNameString(decl->getType()));
+        JSON.attribute("mangledTypeName", "n/a - deprecated");
         JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
         JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
         writeLocationInformation(JSON, decl->getLoc(),
