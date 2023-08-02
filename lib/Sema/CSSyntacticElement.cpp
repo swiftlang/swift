@@ -242,7 +242,9 @@ private:
 // MARK: Constraint generation
 
 /// Check whether it makes sense to convert this element into a constraint.
-static bool isViableElement(ASTNode element) {
+static bool isViableElement(ASTNode element,
+                            bool isForSingleValueStmtCompletion,
+                            ConstraintSystem &cs) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;
     // - Ignore #if, the chosen children should appear in the
@@ -255,10 +257,21 @@ static bool isViableElement(ASTNode element) {
   }
 
   if (auto *stmt = element.dyn_cast<Stmt *>()) {
-    // Empty brace statements are now viable because they do not require
-    // inference.
     if (auto *braceStmt = dyn_cast<BraceStmt>(stmt)) {
-      return braceStmt->getNumElements() > 0;
+      // Empty brace statements are not viable because they do not require
+      // inference.
+      if (braceStmt->empty())
+        return false;
+
+      // Skip if we're doing completion for a SingleValueStmtExpr, and have a
+      // brace that doesn't involve a single expression, and doesn't have a
+      // code completion token, as it won't contribute to the type of the
+      // SingleValueStmtExpr.
+      if (isForSingleValueStmtCompletion &&
+          !braceStmt->getSingleActiveExpression() &&
+          !cs.containsIDEInspectionTarget(braceStmt)) {
+        return false;
+      }
     }
   }
 
@@ -324,13 +337,19 @@ static void createConjunction(ConstraintSystem &cs,
 
   VarRefCollector paramCollector(cs);
 
+  // Whether we're doing completion, and the conjunction is for a
+  // SingleValueStmtExpr, or one of its braces.
+  const auto isForSingleValueStmtCompletion =
+      cs.isForCodeCompletion() &&
+      locator->isForSingleValueStmtConjunctionOrBrace();
+
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
     ContextualTypeInfo context = std::get<1>(entry);
     bool isDiscarded = std::get<2>(entry);
     ConstraintLocator *elementLoc = std::get<3>(entry);
 
-    if (!isViableElement(element))
+    if (!isViableElement(element, isForSingleValueStmtCompletion, cs))
       continue;
 
     // If this conjunction going to represent a body of a closure,
@@ -1122,9 +1141,13 @@ private:
 
     for (auto element : braceStmt->getElements()) {
       if (cs.isForCodeCompletion() &&
-          !cs.containsIDEInspectionTarget(element)) {
+          !cs.containsIDEInspectionTarget(element) &&
+          !(braceStmt->getSingleActiveExpression() &&
+            locator->isForSingleValueStmtConjunctionOrBrace())) {
         // To improve performance, skip type checking elements that can't
-        // influence the code completion token.
+        // influence the code completion token. Note we don't do this for
+        // single expression SingleValueStmtExpr branches, as they're needed to
+        // infer the type.
         if (element.is<Stmt *>() && !element.isStmt(StmtKind::Guard) && !element.isStmt(StmtKind::Return)) {
           // Statements can't influence the expresion that contains the code
           // completion token.

@@ -883,11 +883,15 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   assert(!ModifiedOptions.has_value() &&
          "Previously modified options should have been restored in resume");
   if (CS.isForCodeCompletion() &&
-      !element.mightContainCodeCompletionToken(CS)) {
+      !element.mightContainCodeCompletionToken(CS) &&
+      !getLocator()->isForSingleValueStmtConjunctionOrBrace()) {
     ModifiedOptions.emplace(CS.Options);
     // If we know that this conjunction element doesn't contain the code
     // completion token, type check it in normal mode without any special
     // behavior that is intended for the code completion token.
+    // Avoid doing this for SingleValueStmtExprs, because we can more eagerly
+    // prune branches in that case, which requires us to detect the code
+    // completion option while solving the conjunction.
     CS.Options -= ConstraintSystemFlags::ForCodeCompletion;
   }
 

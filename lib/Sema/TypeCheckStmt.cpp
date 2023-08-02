@@ -2396,6 +2396,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         return false;
       }
     }
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+      if (AFD->hasBody() && !AFD->isBodyTypeChecked()) {
+        // Pre-check the function body if needed.
+        (void)evaluateOrDefault(evaluator, PreCheckFunctionBodyRequest{AFD},
+                                nullptr);
+      }
+    }
   }
 
   // Find innermost ASTNode at Loc from DC. Results the reference to the found
@@ -2519,6 +2526,26 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       if (isa<TapExpr>(E))
         return Action::SkipChildren(E);
 
+      // If the location is within a single-expression branch of a
+      // SingleValueStmtExpr, walk it directly rather than as part of the brace.
+      // This ensures we type-check it a part of the whole expression, unless it
+      // has an inner closure or SVE, in which case we can still pick up a
+      // better node to type-check.
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
+        SmallVector<Expr *> scratch;
+        for (auto *branch : SVE->getSingleExprBranches(scratch)) {
+          auto branchCharRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, branch->getSourceRange());
+          if (branchCharRange.contains(Loc)) {
+            if (!branch->walk(*this))
+              return Action::Stop();
+
+            return Action::SkipChildren(E);
+          }
+        }
+        return Action::Continue(E);
+      }
+
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         // NOTE: When a client wants to type check a closure signature, it
         // requests with closure's 'getLoc()' location.
@@ -2599,11 +2626,6 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         // thus the transform couldn't be applied. Perform code completion
         // pretending there was no result builder to recover.
       }
-    } else if (func->hasSingleExpressionBody() &&
-                func->getResultInterfaceType()->isVoid()) {
-       // The function returns void.  We don't need an explicit return, no matter
-       // what the type of the expression is.  Take the inserted return back out.
-      func->getBody()->setLastElement(func->getSingleExpressionBody());
     }
   }
 
@@ -2641,7 +2663,60 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 }
 
 BraceStmt *
-TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
+PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
+                                      AbstractFunctionDecl *AFD) const {
+  auto &ctx = AFD->getASTContext();
+  auto *body = AFD->getBody();
+  assert(body && "Expected body");
+  assert(!AFD->isBodyTypeChecked() && "Body already type-checked?");
+
+  if (auto *func = dyn_cast<FuncDecl>(AFD)) {
+    // Don't apply this pre-checking to functions with result builders.
+    if (getResultBuilderType(func))
+      return body;
+
+    if (func->hasSingleExpressionBody() &&
+        func->getResultInterfaceType()->isVoid()) {
+      // The function returns void.  We don't need an explicit return, no
+      // matter what the type of the expression is. Take the inserted return
+      // back out.
+      body->setLastElement(func->getSingleExpressionBody());
+    }
+    // If there is a single statement in the body that can be turned into a
+    // single expression return, do so now.
+    if (!func->getResultInterfaceType()->isVoid()) {
+      if (auto *S = body->getSingleActiveStatement()) {
+        if (S->mayProduceSingleValue(evaluator)) {
+          auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+              ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
+          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
+          body->setLastElement(RS);
+          func->setHasSingleExpressionBody();
+          func->setSingleExpressionBody(SVE);
+        }
+      }
+    }
+  }
+
+  if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
+    if (body->empty() || !isKnownEndOfConstructor(body->getLastElement())) {
+      // For constructors, we make sure that the body ends with a "return"
+      // stmt, which we either implicitly synthesize, or the user can write.
+      // This simplifies SILGen.
+      SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
+                                   body->getElements().end());
+      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
+                                          /*value*/ nullptr,
+                                          /*implicit*/ true));
+      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
+                               body->getRBraceLoc(), body->isImplicit());
+    }
+  }
+  return body;
+}
+
+BraceStmt *
+TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
   ASTContext &ctx = AFD->getASTContext();
 
@@ -2672,6 +2747,12 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                              range.End);
   };
 
+  // First do a pre-check of the body.
+  body = evaluateOrDefault(eval, PreCheckFunctionBodyRequest{AFD}, nullptr);
+  assert(body);
+
+  // Then apply a result builder if we have one, which if successful will
+  // produce a type-checked body.
   bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getResultBuilderType(func)) {
@@ -2686,42 +2767,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
         body->walk(ContextualizeClosuresAndMacros(AFD));
       }
-    } else {
-      if (func->hasSingleExpressionBody() &&
-          func->getResultInterfaceType()->isVoid()) {
-        // The function returns void.  We don't need an explicit return, no
-        // matter what the type of the expression is. Take the inserted return
-        // back out.
-        body->setLastElement(func->getSingleExpressionBody());
-      }
-      // If there is a single statement in the body that can be turned into a
-      // single expression return, do so now.
-      if (!func->getResultInterfaceType()->isVoid()) {
-        if (auto *S = body->getSingleActiveStatement()) {
-          if (S->mayProduceSingleValue(evaluator)) {
-            auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-                ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
-            auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
-            body->setLastElement(RS);
-            func->setHasSingleExpressionBody();
-            func->setSingleExpressionBody(SVE);
-          }
-        }
-      }
-    }
-  } else if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
-    if (body->empty() ||
-        !isKnownEndOfConstructor(body->getLastElement())) {
-      // For constructors, we make sure that the body ends with a "return" stmt,
-      // which we either implicitly synthesize, or the user can write.  This
-      // simplifies SILGen.
-      SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
-                                   body->getElements().end());
-      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
-                                          /*value*/nullptr,
-                                          /*implicit*/true));
-      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
-                               body->getRBraceLoc(), body->isImplicit());
     }
   }
 
