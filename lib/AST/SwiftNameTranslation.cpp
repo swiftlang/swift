@@ -235,6 +235,11 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
       genericSignature =
           typeDecl->getGenericSignature().getCanonicalSignature();
     }
+    // Nested types are not yet supported.
+    if (!typeDecl->hasClangNode() &&
+        isa_and_nonnull<NominalTypeDecl>(
+            typeDecl->getDeclContext()->getAsDecl()))
+      return {Unsupported, UnrepresentableNested};
   }
   if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
     // Check if any property accessor throws, do not expose it in that case.
@@ -321,5 +326,7 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_protocol_to_cxx_unsupported, vd);
   case UnrepresentableMoveOnly:
     return Diagnostic(diag::expose_move_only_to_cxx, vd);
+  case UnrepresentableNested:
+    return Diagnostic(diag::expose_nested_type_to_cxx, vd);
   }
 }
