@@ -6620,6 +6620,7 @@ bool ConstraintSystem::repairFailures(
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(anchor)));
+    break;
   }
   default:
     break;
