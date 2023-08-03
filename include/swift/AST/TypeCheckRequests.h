@@ -63,6 +63,7 @@ class TypeAliasDecl;
 class TypeLoc;
 class Witness;
 class TypeResolution;
+class TypeRefinementContext;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -4428,6 +4429,25 @@ private:
   ArrayRef<VarDecl *> evaluate(Evaluator &evaluator, DeclAttribute *attr,
                                AccessorDecl *attachedTo,
                                ArrayRef<Identifier>) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand the children of the type refinement context for the given
+/// declaration.
+class ExpandChildTypeRefinementContextsRequest
+    : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
+                           bool(Decl *, TypeRefinementContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Decl *decl,
+                TypeRefinementContext *parentTRC) const;
 
 public:
   bool isCached() const { return true; }
