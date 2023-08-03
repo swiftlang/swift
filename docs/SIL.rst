@@ -5285,8 +5285,8 @@ positive.  Otherwise, traps.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_unowned`` or ``load_unowned``/``strong_copy_unowned_value`` operations
-on the same address.
+``store_unowned``/``unowned_copy_value`` or
+``load_unowned``/``strong_copy_unowned_value`` operations on the same address.
 
 store_unowned
 `````````````
@@ -5306,9 +5306,30 @@ The storage must be initialized iff ``[init]`` is not specified.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_unowned`` or ``load_unowned``/``strong_copy_unowned_value`` operations
-on the same address.
+``store_unowned``/``unowned_copy_value`` or
+``load_unowned``/``strong_copy_unowned_value`` operations on the same address.
 
+unowned_copy_value
+``````````````````
+::
+
+  sil-instruction ::= 'unowned_copy_value' sil-operand
+
+  %1 = unowned_copy_value %0 : $T
+  // %1 will be an @owned value of type $@sil_unowned T.
+  // $T must be a reference type
+  // $@sil_unowned T must be address-only
+
+Only valid in opaque values mode.  Lowered by AddressLowering to store_unowned.
+
+Increments the unowned reference count of the object at ``%0``.
+
+Wraps the operand in an instance of ``@sil_unowned``.
+
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand (source) heap object.  It need not be atomic with respect to
+``store_unowned``/``unowned_copy_value`` or
+``load_unowned``/``strong_copy_unowned_value`` operations on the same address.
 
 fix_lifetime
 ````````````
