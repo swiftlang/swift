@@ -2189,7 +2189,8 @@ class ParameterTypeFlags {
     NoDerivative = 1 << 6,
     Isolated     = 1 << 7,
     CompileTimeConst = 1 << 8,
-    NumBits = 9
+    ForwardedToC = 1 << 9,
+    NumBits = 10
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2204,20 +2205,21 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst)
+                     bool compileTimeConst, bool forwardedToC)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift |
               (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
-              (compileTimeConst ? CompileTimeConst : 0)){}
+              (compileTimeConst ? CompileTimeConst : 0) |
+              (forwardedToC ? ForwardedToC : 0)){}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative,
-                    bool compileTimeConst);
+                    bool compileTimeConst, bool forwardedToC);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2229,6 +2231,7 @@ public:
   bool isIsolated() const { return value.contains(Isolated); }
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
+  bool isForwardedToC() const { return value.contains(ForwardedToC); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2289,6 +2292,12 @@ public:
     return ParameterTypeFlags(noDerivative
                                   ? value | ParameterTypeFlags::NoDerivative
                                   : value - ParameterTypeFlags::NoDerivative);
+  }
+
+  ParameterTypeFlags withForwardedToC(bool forwardedToC) const {
+    return ParameterTypeFlags(forwardedToC
+                                  ? value | ParameterTypeFlags::ForwardedToC
+                                  : value - ParameterTypeFlags::ForwardedToC);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2383,7 +2392,8 @@ public:
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
-                              /*compileTimeConst*/false);
+                              /*compileTimeConst*/false,
+                              /*forwardedToC*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -7376,7 +7386,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst) {
+    bool compileTimeConst, bool forwardedToC) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -7387,7 +7397,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ParamSpecifier::InOut;
   }
   return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
-          isNoDerivative, compileTimeConst};
+          isNoDerivative, compileTimeConst, forwardedToC};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

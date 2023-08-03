@@ -516,6 +516,10 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   DeclModifier | OnClass | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   102)
 
+SIMPLE_DECL_ATTR(_forwardedToC, ForwardedToC,
+  OnParam | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  147)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

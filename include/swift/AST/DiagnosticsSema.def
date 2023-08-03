@@ -3789,9 +3789,9 @@ ERROR(optional_compilerinitialized,none,
 ERROR(instancemember_compilerinitialized,none,
       "'@_compilerInitialized' can only be applied to a non-static class or actor member", ())
 
-// @_nonEphemeral attribute
-ERROR(non_ephemeral_non_pointer_type,none,
-      "@_nonEphemeral attribute only applies to pointer types", ())
+// @_nonEphemeral and @forwardedToC attribute
+ERROR(attr_non_pointer_type,none,
+      "@%0 attribute only applies to pointer types", (StringRef))
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,

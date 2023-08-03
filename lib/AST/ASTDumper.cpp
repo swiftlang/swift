@@ -3796,6 +3796,7 @@ namespace {
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeConst(), "compileTimeConst");
+      printFlag(paramFlags.isForwardedToC(), "forwardedToC");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 

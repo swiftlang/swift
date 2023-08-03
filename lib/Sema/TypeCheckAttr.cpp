@@ -346,6 +346,8 @@ public:
   void visitMacroRoleAttr(MacroRoleAttr *attr);
   
   void visitRawLayoutAttr(RawLayoutAttr *attr);
+
+  void visitForwardedToCAttr(ForwardedToCAttr *attr);
 };
 
 } // end anonymous namespace
@@ -4152,7 +4154,7 @@ void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
     return;
   }
 
-  diagnose(attr->getLocation(), diag::non_ephemeral_non_pointer_type);
+  diagnose(attr->getLocation(), diag::attr_non_pointer_type, attr->getAttrName());
   attr->setInvalid();
 }
 
@@ -7042,6 +7044,25 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
   
   // The storage is not directly referenceable by stored properties.
   sd->setHasUnreferenceableStorage(true);
+}
+
+void AttributeChecker::visitForwardedToCAttr(ForwardedToCAttr *attr) {
+  auto *param = cast<ParamDecl>(D);
+  auto type = param->getInterfaceType()->lookThroughSingleOptionalType();
+
+  // Can only be applied to Unsafe[...]Pointer types
+  if (type->getAnyPointerElementType())
+    return;
+
+  // ... or the protocol Self type.
+  auto *outerDC = param->getDeclContext()->getParent();
+  if (outerDC->getSelfProtocolDecl() &&
+      type->isEqual(outerDC->getSelfInterfaceType())) {
+    return;
+  }
+
+  diagnose(attr->getLocation(), diag::attr_non_pointer_type, attr->getAttrName());
+  attr->setInvalid();
 }
 
 namespace {

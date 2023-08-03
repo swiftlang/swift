@@ -6510,6 +6510,10 @@ public:
   /// Attempt to apply an implicit `@_nonEphemeral` attribute to this parameter.
   void setNonEphemeralIfPossible();
 
+  /// Does this parameter allow the implicit conversion from native Swift types
+  /// like Array or String to any of the UnsafePointer types?
+  bool isForwardedToC() const;
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".

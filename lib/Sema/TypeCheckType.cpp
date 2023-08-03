@@ -3506,7 +3506,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst);
+        isolated, noDerivative, compileTimeConst, /*forwardedToC*/ false);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
