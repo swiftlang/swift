@@ -547,3 +547,23 @@ func testExpressionAsDeclarationMacro() {
   // expected-error@-1{{macro implementation type 'StringifyMacro' doesn't conform to required protocol 'DeclarationMacro' (from macro 'stringifyAsDeclMacro')}}
 #endif
 }
+
+// Deprecated macro
+@available(*, deprecated, message: "This macro is deprecated.")
+@freestanding(expression) macro deprecatedStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@available(*, deprecated, message: "This macro is deprecated.")
+@freestanding(declaration) macro deprecatedStringifyAsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+func testDeprecated() {
+  // expected-warning@+1{{'deprecatedStringify' is deprecated: This macro is deprecated.}}
+  _ = #deprecatedStringify(1 + 1)
+}
+
+#if TEST_DIAGNOSTICS
+struct DeprecatedStructWrapper {
+  // expected-error@+2{{macro implementation type 'StringifyMacro' doesn't conform to required protocol 'DeclarationMacro' (from macro 'deprecatedStringifyAsDeclMacro')}}
+  // expected-warning@+1{{'deprecatedStringifyAsDeclMacro' is deprecated: This macro is deprecated.}}
+  #deprecatedStringifyAsDeclMacro(1 + 1)
+}
+#endif
