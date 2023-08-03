@@ -11610,16 +11610,13 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
                                             Type contextualType) {
+  assert(typeVar->getImpl().isPackExpansion());
+
   auto *locator = typeVar->getImpl().getLocator();
 
-  Type openedExpansionType;
-  if (auto expansionElt =
-          locator->getLastElementAs<LocatorPathElt::PackExpansionType>()) {
-    openedExpansionType = expansionElt->getOpenedType();
-  }
-
-  if (!openedExpansionType)
-    return false;
+  Type openedExpansionType =
+      locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
+          .getOpenedType();
 
   assignFixedType(typeVar, openedExpansionType, locator);
 
