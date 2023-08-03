@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/LLVMExtras.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -181,22 +180,4 @@ TEST(RemoveAdjacentIf, MultipleRuns) {
                                    std::equal_to<int>());
     EXPECT_EQ(result, &items[0]);
   }
-}
-
-TEST(SmallSetVector, operator_equals) {
-
-  struct EquatableThing {
-    int value;
-    bool operator==(EquatableThing other) {
-      return value == other.value;
-    }
-  };
-
-  struct NonEquatableThing {
-    int value;
-    bool operator==() = delete;
-  };
-
-  EXPECT_TRUE(isEquatable<EquatableThing>());
-  EXPECT_FALSE(isEquatable<NonEquatableThing>());
 }
