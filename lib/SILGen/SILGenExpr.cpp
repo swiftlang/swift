@@ -3071,8 +3071,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
   if (!indexes.empty()) {
-    auto indexArgTy = signature->getParameters()[1].getSILStorageType(
-        SGM.M, signature, subSGF.F.getTypeExpansionContext());
+    auto indexArgTy =
+        subSGF.silConv.getSILType(signature->getParameters()[1], signature,
+                                  subSGF.F.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -3234,10 +3235,12 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     subSGF.F.getTypeExpansionContext());
 
   auto entry = thunk->begin();
-  auto valueArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature, subSGF.getTypeExpansionContext());
-  auto baseArgTy = signature->getParameters()[1].getSILStorageType(
-      SGM.M, signature, subSGF.getTypeExpansionContext());
+  auto valueArgTy =
+      subSGF.silConv.getSILType(signature->getParameters()[0], signature,
+                                subSGF.getTypeExpansionContext());
+  auto baseArgTy =
+      subSGF.silConv.getSILType(signature->getParameters()[1], signature,
+                                subSGF.getTypeExpansionContext());
   if (genericEnv) {
     valueArgTy = genericEnv->mapTypeIntoContext(SGM.M, valueArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -3247,8 +3250,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   SILValue indexPtrArg;
   
   if (!indexes.empty()) {
-    auto indexArgTy = signature->getParameters()[2].getSILStorageType(
-        SGM.M, signature, subSGF.getTypeExpansionContext());
+    auto indexArgTy =
+        subSGF.silConv.getSILType(signature->getParameters()[2], signature,
+                                  subSGF.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
 
@@ -3257,9 +3261,11 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto subscriptIndices =
     loadIndexValuesForKeyPathComponent(subSGF, loc, property,
                                        indexes, indexPtrArg);
-  
-  auto valueOrig = ManagedValue::forBorrowedRValue(valueArg)
-      .copy(subSGF, loc);
+
+  auto valueOrig = valueArgTy.isTrivial(subSGF.F)
+                       ? ManagedValue::forTrivialRValue(valueArg)
+                       : ManagedValue::forBorrowedRValue(valueArg);
+  valueOrig = valueOrig.copy(subSGF, loc);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
                                                 AbstractionPattern::getOpaque(),
                                                 propertyType);
@@ -3414,10 +3420,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
-    auto lhsPtr = entry->createFunctionArgument(params[0].getSILStorageType(
-        SGM.M, signature, subSGF.getTypeExpansionContext()));
-    auto rhsPtr = entry->createFunctionArgument(params[1].getSILStorageType(
-        SGM.M, signature, subSGF.getTypeExpansionContext()));
+    auto lhsPtr = entry->createFunctionArgument(subSGF.silConv.getSILType(
+        params[0], signature, subSGF.getTypeExpansionContext()));
+    auto rhsPtr = entry->createFunctionArgument(subSGF.silConv.getSILType(
+        params[1], signature, subSGF.getTypeExpansionContext()));
 
     Scope scope(subSGF, loc);
 
@@ -3588,8 +3594,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
-    auto indexPtr = entry->createFunctionArgument(params[0].getSILStorageType(
-        SGM.M, signature, subSGF.getTypeExpansionContext()));
+    auto indexPtr = entry->createFunctionArgument(subSGF.silConv.getSILType(
+        params[0], signature, subSGF.getTypeExpansionContext()));
 
     SILValue hashCode;
 
