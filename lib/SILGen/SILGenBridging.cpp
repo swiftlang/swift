@@ -2242,13 +2242,15 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         auto bridged = emitNativeToBridgedValue(fd, param, nativeFormalType,
                                                 foreignFormalType,
                                                 foreignLoweredTy);
-        if (foreignParam.getConvention() == ParameterConvention::Indirect_In ||
-            foreignParam.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
+        if (useLoweredAddresses() &&
+            (foreignParam.getConvention() == ParameterConvention::Indirect_In ||
+             foreignParam.getConvention() ==
+                 ParameterConvention::Indirect_In_Guaranteed)) {
           auto temp = emitTemporaryAllocation(fd, bridged.getType());
           bridged.forwardInto(*this, fd, temp);
           bridged = emitManagedBufferWithCleanup(temp);
         }
-        
+
         if (memberStatus.isInstance() && isSelf) {
           // Fill in the `self` space.
           args[memberStatus.getSelfIndex()] = bridged;

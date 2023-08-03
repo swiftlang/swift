@@ -371,7 +371,7 @@ ManagedValue Transform::transform(ManagedValue v,
   // expect this.
   if (v.getType().isAddress()) {
     auto &inputTL = SGF.getTypeLowering(v.getType());
-    if (!inputTL.isAddressOnly()) {
+    if (!inputTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) {
       v = emitManagedLoad(SGF, Loc, v, inputTL);
     }
   }
