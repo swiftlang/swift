@@ -3068,7 +3068,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         ListOfValues.slice(numParamIndices, numResultIndices),
         [](uint64_t i) { return (unsigned)i; });
     auto *resultIndices =
-        IndexSubset::get(MF->getContext(), numResults, rawResultIndices);
+        IndexSubset::get(MF->getContext(), numParams + numResults, rawResultIndices);
     SmallVector<SILValue, 3> operands;
     for (auto i = numParamIndices + numResultIndices;
          i < numParamIndices + numOperands * 3; i += 3) {
@@ -4206,10 +4206,10 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       IndexSubset::get(MF->getContext(), originalFnType->getNumParameters(),
                        ArrayRef<unsigned>(parameterAndResultIndices)
                            .take_front(numParameterIndices));
-  auto numResults = originalFnType->getNumResults() +
-                    originalFnType->getNumIndirectMutatingParameters();
+  auto numSemanticResults = originalFnType->getNumResults() +
+                            originalFnType->getNumParameters();
   auto *resultIndices =
-      IndexSubset::get(MF->getContext(), numResults,
+      IndexSubset::get(MF->getContext(), numSemanticResults,
                        ArrayRef<unsigned>(parameterAndResultIndices)
                            .take_back(numResultIndices));
 

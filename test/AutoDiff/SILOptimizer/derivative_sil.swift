@@ -32,7 +32,7 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL-LABEL: enum _AD__fooMethod_bb0__Pred__src_0_wrt_0 {
 // CHECK-SIL-NEXT:  }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @fooTJfSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @fooTJfSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[X:%.*]] : $Float):
 // CHECK-SIL:   [[ADD_ORIG_REF:%.*]] = function_ref @add : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK-SIL:   [[ADD_JVP_REF:%.*]] = differentiability_witness_function [jvp] [reverse] [parameters 0 1] [results 0] @add
@@ -42,13 +42,13 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   [[ADD_RESULT:%.*]] = apply [[ADD_JVP_FN]]([[X]], [[X]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RES:%.*]], [[ADD_DF:%.*]]) = destructure_tuple [[ADD_RESULT]]
 // CHECK-SIL:   [[DF_STRUCT:%.*]] = tuple ([[ADD_DF]] : $@callee_guaranteed (Float, Float) -> Float)
-// CHECK-SIL:   [[DF_REF:%.*]] = function_ref @fooTJdSpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float
+// CHECK-SIL:   [[DF_REF:%.*]] = function_ref @fooTJdSpSUr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float
 // CHECK-SIL:   [[DF_FN:%.*]] = partial_apply [callee_guaranteed] [[DF_REF]]([[DF_STRUCT]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[DF_FN]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 
-// CHECK-SIL-LABEL: sil private [ossa] @fooTJdSpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooTJdSpSUr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float {
 // CHECK-SIL: bb0([[DX:%.*]] : $Float, [[DF_STRUCT:%.*]] : @owned $(_: @callee_guaranteed (Float, Float) -> Float)):
 // CHECK-SIL:   [[ADD_DF:%.*]] = destructure_tuple [[DF_STRUCT]] : $(_: @callee_guaranteed (Float, Float) -> Float)
 // CHECK-SIL:   [[DY:%.*]] = apply [[ADD_DF]]([[DX]], [[DX]]) : $@callee_guaranteed (Float, Float) -> Float
@@ -56,7 +56,7 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   return [[DY]] : $Float
 // CHECK-SIL: }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @fooTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @fooTJrSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[X:%.*]] : $Float):
 // CHECK-SIL:   [[ADD_ORIG_REF:%.*]] = function_ref @add : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK-SIL:   [[ADD_JVP_REF:%.*]] = differentiability_witness_function [jvp] [reverse] [parameters 0 1] [results 0] @add
@@ -65,13 +65,13 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   [[ADD_VJP_FN:%.*]] = differentiable_function_extract [vjp] [[ADD_DIFF_FN]]
 // CHECK-SIL:   [[ADD_RESULT:%.*]] = apply [[ADD_VJP_FN]]([[X]], [[X]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RES:%.*]], [[ADD_PB:%.*]]) = destructure_tuple [[ADD_RESULT]]
-// CHECK-SIL:   [[PB_REF:%.*]] = function_ref @fooTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
+// CHECK-SIL:   [[PB_REF:%.*]] = function_ref @fooTJpSpSUr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
 // CHECK-SIL:   [[PB_FN:%.*]] = partial_apply [callee_guaranteed] [[PB_REF]]([[ADD_PB]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB_FN]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 
-// CHECK-SIL-LABEL: sil private [ossa] @fooTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooTJpSpSUr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
 // CHECK-SIL: bb0([[DY:%.*]] : $Float, [[ADD_PB:%.*]] : @owned $@callee_guaranteed (Float) -> (Float, Float)):
 // CHECK-SIL:   debug_value [[DY]] : $Float, let, name "y"
 // CHECK-SIL:   [[ADD_PB_RES:%.*]] = apply [[ADD_PB]]([[DY]]) : $@callee_guaranteed (Float) -> (Float, Float)
@@ -104,10 +104,10 @@ struct ExampleStruct {
   }
 }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJfSUpSr  : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJfSUpSUUr  : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 
-// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJdSUpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJdSUpSUUr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float {
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJrSUpSr : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJrSUpSUUr : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 
-// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJpSUpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJpSUpSUUr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {

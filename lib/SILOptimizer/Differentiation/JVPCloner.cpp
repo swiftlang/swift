@@ -489,11 +489,10 @@ public:
                s << "}\n";);
 
     // Form expected indices.
-    auto numResults =  ai->getSubstCalleeType()->getNumAutoDiffSemanticResults();
+    auto numParams = ai->getArgumentsWithoutIndirectResults().size();
+    auto numResults =  ai->getSubstCalleeType()->getNumResults() + numParams;
     AutoDiffConfig config(
-        IndexSubset::get(getASTContext(),
-                         ai->getArgumentsWithoutIndirectResults().size(),
-                         activeParamIndices),
+        IndexSubset::get(getASTContext(), numParams,  activeParamIndices),
         IndexSubset::get(getASTContext(), numResults, activeResultIndices));
 
     // Emit the JVP.
@@ -577,9 +576,7 @@ public:
               SILType remappedResultType;
               if (resultIndex >= originalFnTy->getNumResults()) {
                 auto semanticResArgIdx = resultIndex - originalFnTy->getNumResults();
-                auto semanticResArg =
-                    *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
-                               semanticResArgIdx);
+                auto semanticResArg = ai->getArgumentsWithoutIndirectResults()[semanticResArgIdx];
                 remappedResultType = semanticResArg->getType();
               } else {
                 remappedResultType = originalFnTy->getResults()[resultIndex]
@@ -1342,38 +1339,40 @@ public:
     }
 
     // Call the differential.
-    differential->dump();
     auto *differentialCall =
         diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs);
-    differentialCall->dump();
     diffBuilder.emitDestroyValueOperation(loc, differential);
 
-    // Get the original `apply` results.
+    // Get the original `apply` results in result indices order
     SmallVector<SILValue, 8> origDirectResults;
     forEachApplyDirectResult(ai, [&](SILValue directResult) {
       origDirectResults.push_back(directResult);
     });
     SmallVector<SILValue, 8> origAllResults;
     collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
-
-    // Get the callee differential `apply` results.
+    for (auto i : range(ai->getSubstCalleeConv().getNumParameters())) {
+      auto paramInfo = ai->getSubstCalleeConv().getParameters()[i];
+      origAllResults.push_back(paramInfo.isAutoDiffSemanticResult() ?
+                               ai->getArgumentsWithoutIndirectResults()[i] : SILValue());
+    }
+    
+    // Get the callee differential `apply` results in type order
     SmallVector<SILValue, 8> differentialDirectResults;
     extractAllElements(differentialCall, getDifferentialBuilder(),
                        differentialDirectResults);
     SmallVector<SILValue, 8> differentialAllResults;
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirectResults, differentialAllResults);
-    for (auto semResultArg : ai->getAutoDiffSemanticResultArguments())
-      origAllResults.push_back(semResultArg);
     for (auto semResultArg : differentialCall->getAutoDiffSemanticResultArguments())
       differentialAllResults.push_back(semResultArg);
-    assert(applyConfig.resultIndices->getNumIndices() ==
-           differentialAllResults.size());
+    assert(applyConfig.resultIndices->getNumIndices() == differentialAllResults.size());
 
     // Set tangent values for original `apply` results.
     unsigned differentialResultIndex = 0;
     for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
+      assert(resultIndex < origAllResults.size());
       auto origResult = origAllResults[resultIndex];
+      assert(origResult && "expected non-trivial result");
       auto differentialResult =
           differentialAllResults[differentialResultIndex++];
       if (origResult->getType().isObject() &&
@@ -1646,11 +1645,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     // Handle original non-wrt semantic result parameter.
     // Only original *non-wrt* semantic result parameters have corresponding
     // differential indirect results.
-    auto resultParamIndex = resultIndex - origFnTy->getNumResults();
-    auto resultParamIt = std::next(
-        origFnTy->getAutoDiffSemanticResultsParameters().begin(), resultParamIndex);
-    auto paramIndex =
-        std::distance(origFnTy->getParameters().begin(), &*resultParamIt);
+    auto paramIndex = resultIndex - origFnTy->getNumResults();
     if (getConfig().parameterIndices->contains(paramIndex))
       continue;
     auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
@@ -1701,12 +1696,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                         origResult.getConvention()));
     } else {
       // Handle semantic result parameter.
-      auto resultParamIndex = resultIndex - origTy->getNumResults();
-      auto resultParamIt = std::next(
-          origTy->getAutoDiffSemanticResultsParameters().begin(),
-          resultParamIndex);
-      auto paramIndex =
-          std::distance(origTy->getParameters().begin(), &*resultParamIt);
+      auto paramIndex = resultIndex - origTy->getNumResults();
       // If the original semantic result parameter is a differentiability parameter,
       // then it already has a corresponding differential parameter. Do not add
       // a corresponding differential result.

@@ -37,7 +37,7 @@ bb0(%0 : $Float):
   // CHECK: differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
 
   %3 = differentiability_witness_function [vjp] [reverse] [parameters 0 1] [results 0] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
-  // CHECK: function_ref @$sSf1poiyS2f_SftFZTJrSSUpSr : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))
+  // CHECK: function_ref @$sSf1poiyS2f_SftFZTJrSSUpSUUUr : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))
 
   return undef : $()
 }

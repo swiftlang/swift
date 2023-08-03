@@ -2515,7 +2515,7 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
       P.Context, origFnType->getNumParameters(), rawParameterIndices);
   auto *resultIndices = IndexSubset::get(P.Context,
                                          origFnType->getNumResults() +
-                                         origFnType->getNumIndirectMutatingParameters(),
+                                         origFnType->getNumParameters(),
                                          rawResultIndices);
   resultConfig = AutoDiffConfig(parameterIndices, resultIndices, witnessGenSig);
   return false;
@@ -6398,7 +6398,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           P.Context, fnType->getNumParameters(), rawParameterIndices);
       auto *resultIndices = IndexSubset::get(
           P.Context,
-          fnType->getNumResults() + fnType->getNumIndirectMutatingParameters(),
+          fnType->getNumResults() + fnType->getNumParameters(),
           rawResultIndices);
       if (forwardingOwnership != OwnershipKind::None) {
         ResultVal = B.createDifferentiableFunction(

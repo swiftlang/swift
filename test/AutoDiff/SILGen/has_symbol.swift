@@ -34,8 +34,8 @@ func testGlobalFunctions() {
 
 // --- foo(_:) ---
 // CHECK: sil @$s7Library3fooyS2fF : $@convention(thin) (Float) -> Float
-// CHECK: sil @$s7Library3fooyS2fFTJfSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK: sil @$s7Library3fooyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK: sil @$s7Library3fooyS2fFTJfSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK: sil @$s7Library3fooyS2fFTJrSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // FIXME: missing reverse-mode differentiability witness for foo(_:)
 
 // --- bar(_:) ---

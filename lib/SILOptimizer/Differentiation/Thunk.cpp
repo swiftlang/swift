@@ -591,11 +591,15 @@ getOrCreateSubsetParametersThunkForLinearMap(
     extractAllElements(ai, builder, differentialDirectResults);
     SmallVector<SILValue, 8> allResults;
     collectAllActualResultsInTypeOrder(ai, differentialDirectResults, allResults);
-    unsigned numResults = thunk->getConventions().getNumDirectSILResults() +
-     thunk->getConventions().getNumDirectSILResults();
     SmallVector<SILValue, 8> results;
+
     for (unsigned idx : *actualConfig.resultIndices) {
-      if (idx >= numResults)
+      // Skip indirect results, they were handled previously (either forwarded
+      // or function local temporary was passed)
+      if (idx < ai->getSubstCalleeConv().getNumIndirectSILResults())
+        continue;
+      // Larger indices are reserved for semantic result parameters
+      if (idx >= allResults.size())
         break;
 
       auto result = allResults[idx];
@@ -838,6 +842,9 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   } else {
     builder.createReturn(loc, thunkedLinearMap);
   }
+
+  LLVM_DEBUG(getADDebugStream() <<
+             "Generated thunk:\n" << *thunk);
 
   return {thunk, interfaceSubs};
 }

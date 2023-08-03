@@ -214,7 +214,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   }
   // Compute differentiability results.
   auto *results = IndexSubset::get(original->getASTContext(),
-                                   remappedOrigFnSubstTy->getNumAutoDiffSemanticResults(),
+                                   remappedOrigFnSubstTy->getNumParameters() + remappedOrigFnSubstTy->getNumResults(),
                                    activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
   AutoDiffConfig applyConfig(parameters, results);
@@ -234,10 +234,9 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
       SILType remappedResultType;
       if (resultIndex >= origFnTy->getNumResults()) {
         auto semanticResultArgIdx = resultIndex - origFnTy->getNumResults();
-        auto semanticResultArg =
-            *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
-                       semanticResultArgIdx);
-        remappedResultType = semanticResultArg->getType();
+        const auto &param = origFnTy->getParameters()[semanticResultArgIdx];
+        assert(param.isAutoDiffSemanticResult() && "expected autodiff semantic result parameter");
+        remappedResultType = param.getSILStorageInterfaceType();
       } else {
         remappedResultType =
             origFnTy->getResults()[resultIndex].getSILStorageInterfaceType();

@@ -239,9 +239,12 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
       resultIndices.push_back(resultAndIndex.index());
 
   auto numSemanticResults = getNumResults();
-  
+
   // Check semantic results (`inout` or class-bound) parameters.
-  for (auto resultParamAndIndex : enumerate(getAutoDiffSemanticResultsParameters()))
+  for (auto resultParamAndIndex : enumerate(getParameters())) {
+    if (!resultParamAndIndex.value().isAutoDiffSemanticResult())
+      continue;
+
     // Currently, a semantic result parameter can either be:
     // 1. Both a differentiability parameter and a differentiability result.
     // 2. `@noDerivative`: neither a differentiability parameter nor a
@@ -257,8 +260,9 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
     if (resultParamAndIndex.value().getDifferentiability() !=
         SILParameterDifferentiability::NotDifferentiable)
       resultIndices.push_back(getNumResults() + resultParamAndIndex.index());
+  }
 
-  numSemanticResults += getNumAutoDiffSemanticResultsParameters();
+  numSemanticResults += getNumParameters();
 
   return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
@@ -382,8 +386,10 @@ getSemanticResults(SILFunctionType *functionType,
     auto param = functionType->getParameters()[i];
     if (!param.isAutoDiffSemanticResult())
       continue;
-    if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable)
-      originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
+    if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable &&
+       parameterIndices->contains(i))
+      originalResults.emplace_back(param.getInterfaceType(),
+                                   ResultConvention::Indirect);
   }
 }
 
@@ -600,12 +606,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
       continue;
     }
     // Handle original semantic result parameters.
-    auto resultParamIndex = resultIndex - originalFnTy->getNumResults();
-    auto resultParamIt = std::next(
-        originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
-        resultParamIndex);
-    auto paramIndex =
-      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+    auto paramIndex = resultIndex - originalFnTy->getNumResults();
     // If the original semantic result parameter is a differentiability
     // parameter, then it already has a corresponding differential
     // parameter. Skip adding a corresponding differential result.
@@ -744,16 +745,12 @@ static CanSILFunctionType getAutoDiffPullbackType(
       pullbackParams.emplace_back(resultTanType, paramConv);
       continue;
     }
+
     // Handle original semantic result parameters.
-    auto resultParamIndex = resultIndex - originalFnTy->getNumResults();
-    auto resultParamIt = std::next(
-      originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
-      resultParamIndex);
-    auto paramIndex =
-      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+    auto paramIndex = resultIndex - originalFnTy->getNumResults();
     auto resultParam = originalFnTy->getParameters()[paramIndex];
-    // The pullback parameter convention depends on whether the original `inout`
-    // parameter is a differentiability parameter.
+    // The pullback parameter convention depends on whether the original
+    // semantic result parameter is a differentiability parameter.
     // - If yes, the pullback parameter convention is `@inout`.
     // - If no, the pullback parameter convention is `@in_guaranteed`.
     auto resultParamTanType = getAutoDiffTangentTypeForLinearMap(
@@ -4123,7 +4120,6 @@ getLoweredResultIndices(const SILFunctionType *functionType,
   auto numResults = functionType->getNumResults();
   
   // Collect semantic result parameters.
-  unsigned semResultParamIdx = 0;
   for (auto resultParamAndIndex
          : enumerate(functionType->getParameters())) {
     if (!resultParamAndIndex.value().isAutoDiffSemanticResult())
@@ -4132,11 +4128,10 @@ getLoweredResultIndices(const SILFunctionType *functionType,
     if (resultParamAndIndex.value().getDifferentiability() !=
         SILParameterDifferentiability::NotDifferentiable &&
        parameterIndices->contains(resultParamAndIndex.index()))
-      resultIndices.push_back(numResults + semResultParamIdx);
-    semResultParamIdx += 1;
+      resultIndices.push_back(numResults + resultParamAndIndex.index());
   }
   
-  numResults += semResultParamIdx;
+  numResults += functionType->getNumParameters();
 
   return IndexSubset::get(functionType->getASTContext(),
                           numResults, resultIndices);

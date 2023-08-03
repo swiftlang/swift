@@ -83,26 +83,26 @@ bb0:
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [reverse] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
 // CHECK: }
 
-// IRGEN: @fooWJrSUUpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT:[0-9]+]]
-// IRGEN: @fooWJrSSUpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @barWJrSUUpSUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @barWJrSSUpSSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @generic16_Differentiation14DifferentiableRzlWJrSUpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @fooWJrSUUpSUUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT:[0-9]+]]
+// IRGEN: @fooWJrSSUpSUUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @barWJrSUUpSUUUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @barWJrSSUpSSUUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @generic16_Differentiation14DifferentiableRzlWJrSUpSUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSUUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
 
 // IRGEN-LABEL: define {{.*}} @test_derivative_witnesses()
 
-// IRGEN: [[PTR1:%.*]] = load ptr, ptr @fooWJrSUUpSr, align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR1:%.*]] = load ptr, ptr @fooWJrSUUpSUUUr, align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR2:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @fooWJrSSUpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR2:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @fooWJrSSUpSUUUr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR3:%.*]] = load ptr, ptr @barWJrSUUpSUr, align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR3:%.*]] = load ptr, ptr @barWJrSUUpSUUUUr, align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR4:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @barWJrSSUpSSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR4:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @barWJrSSUpSSUUUr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR5:%.*]] = load ptr, ptr @generic16_Differentiation14DifferentiableRzlWJrSUpSr, align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR5:%.*]] = load ptr, ptr @generic16_Differentiation14DifferentiableRzlWJrSUpSUUr, align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR6:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR6:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSUUr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR7:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR7:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSUUr, i32 0, i32 1), align [[PTR_ALIGNMENT]]

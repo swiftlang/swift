@@ -15,8 +15,8 @@ func basic(_ x: Float) -> Float { x }
 // CHECK-SILGEN-NEXT: }
 
 // CHECK-SIL-LABEL: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @basic : $@convention(thin) (Float) -> Float {
-// CHECK-SIL-NEXT:   jvp: @basicTJfSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK-SIL-NEXT:   vjp: @basicTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-SIL-NEXT:   jvp: @basicTJfSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-SIL-NEXT:   vjp: @basicTJrSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-SIL-NEXT: }
 
 // Test `differentiable_function` instructions.

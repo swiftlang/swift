@@ -445,8 +445,8 @@ public:
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
     collectMinimalIndicesForFunctionCall(ai, getConfig(), activityInfo,
-                                         allResults, activeParamIndices,
-                                         activeResultIndices);
+                                         allResults,
+                                         activeParamIndices, activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
     assert(!activeResultIndices.empty() && "Result indices cannot be empty");
     LLVM_DEBUG(auto &s = getADDebugStream() << "Active indices: params=(";
@@ -459,13 +459,11 @@ public:
                s << ")\n";);
 
     // Form expected indices.
+    auto numParams = ai->getArgumentsWithoutIndirectResults().size();
+    auto numResults = ai->getSubstCalleeType()->getNumResults() + numParams;
     AutoDiffConfig config(
-        IndexSubset::get(getASTContext(),
-                         ai->getArgumentsWithoutIndirectResults().size(),
-                         activeParamIndices),
-        IndexSubset::get(getASTContext(),
-                         ai->getSubstCalleeType()->getNumAutoDiffSemanticResults(),
-                         activeResultIndices));
+        IndexSubset::get(getASTContext(), numParams, activeParamIndices),
+        IndexSubset::get(getASTContext(), numResults, activeResultIndices));
 
     // Emit the VJP.
     SILValue vjpValue;
@@ -536,10 +534,9 @@ public:
             SILType remappedResultType;
             if (resultIndex >= originalFnTy->getNumResults()) {
               auto semanticResultArgIdx = resultIndex - originalFnTy->getNumResults();
-              auto semanticResultArg =
-                  *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
-                             semanticResultArgIdx);
-              remappedResultType = semanticResultArg->getType();
+              const auto &param = originalFnTy->getParameters()[semanticResultArgIdx];
+              assert(param.isAutoDiffSemanticResult() && "expected autodiff semantic result parameter");
+              remappedResultType = param.getSILStorageInterfaceType();
             } else {
               remappedResultType = originalFnTy->getResults()[resultIndex]
                                        .getSILStorageInterfaceType();
@@ -917,31 +914,20 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     }
 
     // Handle semantic result parameter.
-    unsigned paramIndex = 0;
-    unsigned resultParamIndex = 0;
-    for (auto i : range(origTy->getNumParameters())) {
-      auto origParam = origTy->getParameters()[i];
-      if (!origParam.isAutoDiffSemanticResult()) {
-        ++paramIndex;
-        continue;
-      }
-      if (resultParamIndex == resultIndex - origTy->getNumResults())
-        break;
-      ++paramIndex;
-      ++resultParamIndex;
-    }
-    auto resultParam = origParams[paramIndex];
+    unsigned resultParamIndex = resultIndex - origTy->getNumResults();
+    auto resultParam = origParams[resultParamIndex];
+    assert(resultParam.isAutoDiffSemanticResult() && "expected autodiff semantic result parameter");
+
     auto origResult = resultParam.getWithInterfaceType(
       resultParam.getInterfaceType()->getReducedType(witnessCanGenSig));
-
     auto resultParamTanConvention = resultParam.getConvention();
     if (resultParam.isIndirectMutating()) {
-      if (!config.isWrtParameter(paramIndex))
+      if (!config.isWrtParameter(resultParamIndex))
         resultParamTanConvention = ParameterConvention::Indirect_In_Guaranteed;
     } else {
       assert(resultParam.getInterfaceType()->getClassOrBoundGenericClass() &&
              "expected class-bound semantic result param");
-      if (config.isWrtParameter(paramIndex))
+      if (config.isWrtParameter(resultParamIndex))
         resultParamTanConvention = ParameterConvention::Indirect_Inout;
       else
         resultParamTanConvention = ParameterConvention::Indirect_In_Guaranteed;

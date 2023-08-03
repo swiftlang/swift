@@ -180,10 +180,9 @@ void AnyFunctionType::getSubsetParameters(
   }
 }
 
-void autodiff::getFunctionSemanticResults(
-    const AnyFunctionType *functionType,
-    const IndexSubset *parameterIndices,
-    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &resultTypes) {
+static void getFunctionFormalResults(
+  const AnyFunctionType *functionType,
+  SmallVectorImpl<AutoDiffSemanticFunctionResultType> &resultTypes) {
   auto &ctx = functionType->getASTContext();
 
   // Collect formal result type as a semantic result, unless it is
@@ -206,7 +205,15 @@ void autodiff::getFunctionSemanticResults(
                                /*isParameter*/ false);
     }
   }
+}
 
+void autodiff::getFunctionSemanticResults(
+    const AnyFunctionType *functionType,
+    const IndexSubset *parameterIndices,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &resultTypes) {
+  getFunctionFormalResults(functionType, resultTypes);
+  unsigned numResults = resultTypes.size();
+  
   // Collect wrt semantic result (`inout` and class references) parameters as
   // semantic results
   auto collectSemanticResults = [&](const AnyFunctionType *functionType,
@@ -220,8 +227,7 @@ void autodiff::getFunctionSemanticResults(
              "invalid parameter index");
       if (parameterIndices->contains(idx))
         resultTypes.emplace_back(paramAndIndex.value().getPlainType(),
-                                 resultIdx, /*isParameter*/ true);
-      resultIdx += 1;
+                                 numResults + idx, /*isParameter*/ true);
     }
   };
 
@@ -241,17 +247,26 @@ autodiff::getFunctionSemanticResultIndices(const AnyFunctionType *functionType,
                                            const IndexSubset *parameterIndices) {
   auto &ctx = functionType->getASTContext();
 
-  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> formalResults, semanticResults;
+  getFunctionFormalResults(functionType, formalResults);
   autodiff::getFunctionSemanticResults(functionType, parameterIndices,
                                        semanticResults);
-  SmallVector<unsigned> resultIndices;
-  unsigned cap = 0;
-  for (const auto& result : semanticResults) {
-    resultIndices.push_back(result.index);
-    cap = std::max(cap, result.index + 1U);
+  unsigned numSemanticResults = formalResults.size();
+  if (auto *resultFnType =
+      functionType->getResult()->getAs<AnyFunctionType>()) {
+    assert(functionType->getNumParams() == 1 && "unexpected function type");
+    numSemanticResults += 1 + resultFnType->getNumParams();
+  } else {
+    numSemanticResults += functionType->getNumParams();
   }
 
-  return IndexSubset::get(ctx, cap, resultIndices);
+  SmallVector<unsigned> resultIndices;
+  for (const auto& result : semanticResults) {
+    assert(result.index < numSemanticResults);
+    resultIndices.push_back(result.index);
+  }
+
+  return IndexSubset::get(ctx, numSemanticResults, resultIndices);
 }
 
 IndexSubset *

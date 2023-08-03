@@ -39,7 +39,7 @@ func cond(_ x: Float) -> Float {
 // CHECK-DATA-STRUCTURES:   case bb1((predecessor: _AD__cond_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
 // CHECK-DATA-STRUCTURES: }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @condTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @condTJrSpSUr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[INPUT_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = tuple ()
 // CHECK-SIL:   cond_br {{%.*}}, bb1, bb2
@@ -57,13 +57,13 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL:   br bb3({{.*}} : $Float, [[BB3_PRED_PRED2]] : $_AD__cond_bb3__Pred__src_0_wrt_0)
 
 // CHECK-SIL: bb3([[ORIG_RES:%.*]] : $Float, [[BB3_PRED_ARG:%.*]] : $_AD__cond_bb3__Pred__src_0_wrt_0)
-// CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @condTJpSpSr
+// CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @condTJpSpSUr
 // CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PRED_ARG]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]]
 
 
-// CHECK-SIL-LABEL: sil private [ossa] @condTJpSpSr : $@convention(thin) (Float, @owned _AD__cond_bb3__Pred__src_0_wrt_0) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @condTJpSpSUr : $@convention(thin) (Float, @owned _AD__cond_bb3__Pred__src_0_wrt_0) -> Float {
 // CHECK-SIL: bb0([[SEED:%.*]] : $Float, [[BB3_PRED:%.*]] : $_AD__cond_bb3__Pred__src_0_wrt_0):
 // CHECK-SIL:   switch_enum [[BB3_PRED]] : $_AD__cond_bb3__Pred__src_0_wrt_0, case #_AD__cond_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__cond_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb3
 
@@ -147,7 +147,7 @@ func enum_notactive(_ e: Enum, _ x: Float) -> Float {
   }
 }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @enum_notactiveTJrUSpSr : $@convention(thin) (Enum, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @enum_notactiveTJrUSpSUUr : $@convention(thin) (Enum, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[ENUM_ARG:%.*]] : $Enum, [[X_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = tuple ()
 // CHECK-SIL:   switch_enum [[ENUM_ARG]] : $Enum, case #Enum.a!enumelt: bb1, case #Enum.b!enumelt: bb2
@@ -165,7 +165,7 @@ func enum_notactive(_ e: Enum, _ x: Float) -> Float {
 // CHECK-SIL:   br bb3({{.*}} : $Float, [[BB3_PRED_PRED2]] : $_AD__enum_notactive_bb3__Pred__src_0_wrt_1)
 
 // CHECK-SIL: bb3([[ORIG_RES:%.*]] : $Float, [[BB3_PRED_ARG:%.*]] : $_AD__enum_notactive_bb3__Pred__src_0_wrt_1)
-// CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @enum_notactiveTJpUSpSr
+// CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @enum_notactiveTJpUSpSUUr
 // CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PRED_ARG]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]]
@@ -187,7 +187,7 @@ func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
   return x
 }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @enum_addr_notactivelTJrUSpSr : $@convention(thin) <τ_0_0> (@in_guaranteed AddressOnlyEnum<τ_0_0>, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden [ossa] @enum_addr_notactivelTJrUSpSUUr : $@convention(thin) <τ_0_0> (@in_guaranteed AddressOnlyEnum<τ_0_0>, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[ENUM_ARG:%.*]] : $*AddressOnlyEnum<τ_0_0>, [[X_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[ENUM_ADDR:%.*]] = alloc_stack $AddressOnlyEnum<τ_0_0>
 // CHECK-SIL:   copy_addr [[ENUM_ARG]] to [init] [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
@@ -212,7 +212,7 @@ func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
 
 // CHECK-SIL: bb3([[BB3_PRED_ARG:%.*]] : $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1_l<τ_0_0>):
 
-// CHECK-SIL:   [[PB_FNREF:%.*]] = function_ref @enum_addr_notactivelTJpUSpSr : $@convention(thin) <τ_0_0> (Float, @owned _AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1_l<τ_0_0>) -> Float
+// CHECK-SIL:   [[PB_FNREF:%.*]] = function_ref @enum_addr_notactivelTJpUSpSUUr : $@convention(thin) <τ_0_0> (Float, @owned _AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1_l<τ_0_0>) -> Float
 // CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PB_FNREF]]<τ_0_0>([[BB3_PRED_ARG]]) : $@convention(thin) <τ_0_0> (Float, @owned _AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1_l<τ_0_0>) -> Float
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[X_ARG]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
@@ -231,7 +231,7 @@ func cond_tuple_var(_ x: Float) -> Float {
   return y.1
 }
 
-// CHECK-SIL-LABEL: sil private [ossa] @cond_tuple_varTJpSpSr : $@convention(thin) (Float, @owned _AD__cond_tuple_var_bb3__Pred__src_0_wrt_0) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @cond_tuple_varTJpSpSUr : $@convention(thin) (Float, @owned _AD__cond_tuple_var_bb3__Pred__src_0_wrt_0) -> Float {
 // CHECK-SIL: bb0([[SEED:%.*]] : $Float, [[BB3_PRED:%.*]] : $_AD__cond_tuple_var_bb3__Pred__src_0_wrt_0):
 // CHECK-SIL:   copy_addr {{%.*}} to {{%.*}} : $*(Float, Float)
 // CHECK-SIL-NOT:   copy_addr {{%.*}} to {{%.*}} : $*Float

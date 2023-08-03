@@ -8,7 +8,7 @@ struct Test: Differentiable {
 
     @differentiable(reverse)
     mutating func doSomething(input: Float) {
-// CHECK-SIL-LABEL: TestV11doSomething5inputySf_tFTJpSSpSr :
+// CHECK-SIL-LABEL: TestV11doSomething5inputySf_tFTJpSSpUSr :
 // Ensure that only two adjoint buffers will be propagated
 // CHECK-SIL: copy_addr %0 to %22 : $*Test.TangentVector
 // CHECK-SIL-NEXT: debug_value

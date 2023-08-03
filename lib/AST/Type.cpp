@@ -5587,11 +5587,12 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
   case AutoDiffLinearMapKind::Differential: {
     // Compute the differential type, returned by JVP functions.
     //
-    // Case 1: original function has no `inout` parameters.
+    // Case 1: original function has no semantic result parameters.
     // - Original:     `(T0, T1, ...) -> R`
     // - Differential: `(T0.Tan, T1.Tan, ...) -> R.Tan`
     //
-    // Case 2: original function has a wrt `inout` parameter.
+    // Case 2: original function has a wrt semantic result parameter
+    //                  (e.g. `inout`)
     // - Original:      `(T0, inout T1, ...) -> Void`
     // - Differential:  `(T0.Tan, inout T1.Tan, ...) -> Void`
     SmallVector<AnyFunctionType::Param, 4> differentialParams;
@@ -5634,11 +5635,12 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
   case AutoDiffLinearMapKind::Pullback: {
     // Compute the pullback type, returned by VJP functions.
     //
-    // Case 1: original function has no `inout` parameters.
+    // Case 1: original function has no semantic result parameters.
     // - Original: `(T0, T1, ...) -> R`
     // - Pullback: `R.Tan -> (T0.Tan, T1.Tan, ...)`
     //
-    // Case 2: original function has wrt `inout` parameters.
+    // Case 2: original function has wrt semantic result  parameters
+    //         (e.g. an `inout` one)
     // - Original: `(T0, inout T1, ...) -> R`
     // - Pullback: `(R.Tan, inout T1.Tan) -> (T0.Tan, ...)`
     SmallVector<TupleTypeElt, 4> pullbackResults;
@@ -5671,7 +5673,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     } else {
       pullbackResult = TupleType::get(pullbackResults, ctx);
     }
-    // First accumulate non-inout results as pullback parameters.
+    // First accumulate results as pullback parameters.
     SmallVector<FunctionType::Param, 2> pullbackParams;
     for (auto i : range(resultTanTypes.size())) {
       auto resultTanType = resultTanTypes[i];

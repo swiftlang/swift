@@ -545,10 +545,9 @@ emitDerivativeFunctionReference(
         SILType resultType;
         if (resultIndex >= originalFnTy->getNumResults()) {
           auto semanticResultParamIdx = resultIndex - originalFnTy->getNumResults();
-          auto semanticResultParam =
-              *std::next(originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
-                         semanticResultParamIdx);
-          resultType = semanticResultParam.getSILStorageInterfaceType();
+          const auto &param = originalFnTy->getParameters()[semanticResultParamIdx];
+          assert(param.isAutoDiffSemanticResult() && "expected autodiff semantic result parameter");
+          resultType = param.getSILStorageInterfaceType();
         } else {
           resultType = originalFnTy->getResults()[resultIndex]
                            .getSILStorageInterfaceType();
@@ -1106,6 +1105,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     // - For VJPs: the thunked VJP returns a pullback that drops the unused
     //   tangent values.
     auto actualConfig = derivativeFnAndIndices->second;
+
     // NOTE: `desiredIndices` may come from a partially-applied function and
     // have smaller capacity than `actualIndices`. We expect this logic to go
     // away when we support `@differentiable` partial apply.
@@ -1113,8 +1113,11 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     auto extendedDesiredParameterIndices =
         desiredConfig.parameterIndices->extendingCapacity(
             astCtx, actualConfig.parameterIndices->getCapacity());
+    auto extendedDesiredResultIndices =
+        desiredConfig.resultIndices->extendingCapacity(
+            astCtx, actualConfig.resultIndices->getCapacity());
     if (!actualConfig.parameterIndices->equals(extendedDesiredParameterIndices)
-        || !actualConfig.resultIndices->equals(desiredConfig.resultIndices)) {
+        || !actualConfig.resultIndices->equals(extendedDesiredResultIndices)) {
       // Destroy the already emitted derivative function reference because it
       // is no longer used.
       builder.emitDestroyValueOperation(loc, derivativeFn);
@@ -1140,6 +1143,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
       // Create the parameter subset thunk.
       assert(actualConfig.parameterIndices->isSupersetOf(
           extendedDesiredParameterIndices));
+      assert(actualConfig.resultIndices->isSupersetOf(
+          extendedDesiredResultIndices));
       SILFunction *thunk;
       SubstitutionMap interfaceSubs;
       SILOptFunctionBuilder fb(transform);

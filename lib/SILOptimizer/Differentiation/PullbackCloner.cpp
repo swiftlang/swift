@@ -907,14 +907,11 @@ public:
     });
     SmallVector<SILValue, 8> origAllResults;
     collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
-    // Append semantic result arguments after original results.
-    for (auto paramIdx : applyInfo.config.parameterIndices->getIndices()) {
-      auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
-          ai->getNumIndirectResults() + paramIdx);
-      if (!paramInfo.isAutoDiffSemanticResult())
-        continue;
-      origAllResults.push_back(
-          ai->getArgumentsWithoutIndirectResults()[paramIdx]);
+    // Append semantic result arguments after original results in result indices order
+    for (auto i : range(ai->getSubstCalleeConv().getNumParameters())) {
+      auto paramInfo = ai->getSubstCalleeConv().getParameters()[i];
+      origAllResults.push_back(paramInfo.isAutoDiffSemanticResult() ?
+                               ai->getArgumentsWithoutIndirectResults()[i] : SILValue());
     }
 
     // Get callee pullback arguments.
@@ -942,6 +939,7 @@ public:
     for (auto resultIndex : applyInfo.config.resultIndices->getIndices()) {
       assert(resultIndex < origAllResults.size());
       auto origResult = origAllResults[resultIndex];
+      assert(origResult && "expected non-trivial result");
       // Get the seed (i.e. adjoint value of the original result).
       SILValue seed;
       switch (getTangentValueCategory(origResult)) {
@@ -1750,6 +1748,7 @@ bool PullbackCloner::Implementation::run() {
   collectAllFormalResultsInTypeOrder(original, origFormalResults);
   for (auto resultIndex : getConfig().resultIndices->getIndices()) {
     auto origResult = origFormalResults[resultIndex];
+    assert(origResult && "expected result");
     // If original result is non-varied, it will always have a zero derivative.
     // Skip full pullback generation and simply emit zero derivatives for wrt
     // parameters.
@@ -2629,6 +2628,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
   assert(getConfig().resultIndices->getNumIndices() == 1 &&
          "Getter should have one semantic result");
   auto origResult = origFormalResults[*getConfig().resultIndices->begin()];
+  assert(origResult && "expected result");
 
   auto tangentVectorSILTy = pullback.getConventions().getResults().front()
       .getSILStorageType(getModule(),

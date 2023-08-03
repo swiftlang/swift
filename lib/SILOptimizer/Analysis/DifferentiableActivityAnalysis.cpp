@@ -85,8 +85,10 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Outputs in @" << function.getName() << ":\n";
-    for (auto val : outputValues)
-      s << val << '\n';
+    for (auto val : outputValues) {
+      if (val)
+        s << val << '\n';
+    }
   });
 
   // Propagate variedness starting from the inputs.
@@ -104,7 +106,8 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
     auto output = outputAndIdx.value();
     unsigned i = outputAndIdx.index();
     usefulValueSets.push_back({});
-    setUsefulAndPropagateToOperands(output, i);
+    if (output)
+      setUsefulAndPropagateToOperands(output, i);
   }
 }
 

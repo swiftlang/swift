@@ -149,13 +149,14 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
     results.push_back(resInfo.isFormalDirect() ? dirResults[dirResIdx++]
                                                : indResults[indResIdx++]);
   // Treat semantic result parameters as semantic results.
-  // Append them` parameters after formal results.
+  // Append them after formal results.
   for (auto i : range(convs.getNumParameters())) {
     auto paramInfo = convs.getParameters()[i];
-    if (!paramInfo.isAutoDiffSemanticResult())
-      continue;
-    auto *argument = function.getArgumentsWithoutIndirectResults()[i];
-    results.push_back(argument);
+    if (paramInfo.isAutoDiffSemanticResult()) {
+      auto *argument = function.getArgumentsWithoutIndirectResults()[i];
+      results.push_back(argument);
+    } else
+      results.push_back(SILValue());
   }
 }
 
@@ -231,14 +232,14 @@ void collectMinimalIndicesForFunctionCall(
   }
   
   // Record all semantic result parameters as results.
-  auto semanticResultParamResultIndex = calleeFnTy->getNumResults();
+  auto semanticResultParamOffset = calleeFnTy->getNumResults();
   for (auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
     auto &param = paramAndIdx.value();
     if (!param.isAutoDiffSemanticResult())
       continue;
     unsigned idx = paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();
     results.push_back(ai->getArgument(idx));
-    resultIndices.push_back(semanticResultParamResultIndex++);
+    resultIndices.push_back(semanticResultParamOffset + paramAndIdx.index());
   }
 
   // Make sure the function call has active results.
