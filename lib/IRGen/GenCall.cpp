@@ -1424,22 +1424,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
                                   attrKindForExtending(signExt));
   }
 
-  // If we return indirectly, that is the first parameter type.
-  if (returnInfo.isIndirect()) {
-    addIndirectResult();
-  }
-
-  size_t firstParamToLowerNormally = 0;
-
-  // Use a special IR type for passing block pointers.
-  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Block) {
-    assert(FI.arg_begin()[0].info.isDirect() &&
-           "block pointer not passed directly?");
-    ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
-    firstParamToLowerNormally = 1;
-  }
-
-  for (auto i : indices(paramTys).slice(firstParamToLowerNormally)) {
+  auto emitArg = [&](size_t i) {
     auto &AI = FI.arg_begin()[i].info;
 
     // Add a padding argument if required.
@@ -1528,7 +1513,34 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::InAlloca:
       llvm_unreachable("Need to handle InAlloca during signature expansion");
     }
+  };
+
+  size_t firstParamToLowerNormally = 0;
+
+  // If we return indirectly, that is the first parameter type.
+  if (returnInfo.isIndirect()) {
+    if (IGM.Triple.isWindowsMSVCEnvironment() &&
+        FnType->getRepresentation() ==
+            SILFunctionTypeRepresentation::CXXMethod) {
+      // Windows ABI places `this` before the
+      // returned indirect values.
+      emitArg(0);
+      firstParamToLowerNormally = 1;
+      addIndirectResult();
+    } else
+      addIndirectResult();
   }
+
+  // Use a special IR type for passing block pointers.
+  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Block) {
+    assert(FI.arg_begin()[0].info.isDirect() &&
+           "block pointer not passed directly?");
+    ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
+    firstParamToLowerNormally = 1;
+  }
+
+  for (auto i : indices(paramTys).slice(firstParamToLowerNormally))
+    emitArg(i);
 
   if (returnInfo.isIndirect() || returnInfo.isIgnore()) {
     ResultIRType = IGM.VoidTy;
