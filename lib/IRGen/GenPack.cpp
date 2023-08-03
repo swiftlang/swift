@@ -1349,3 +1349,63 @@ irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF,
 
   return labelString;
 }
+
+StackAddress
+irgen::emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
+                                         AnyFunctionType::CanParamArrayRef params,
+                                         CanPackType packType,
+                                         llvm::Value *shapeExpression) {
+  auto array =
+      IGF.emitDynamicAlloca(IGF.IGM.Int32Ty, shapeExpression,
+                            Alignment(4), /*allowTaskAlloc=*/true);
+
+  unsigned numExpansions = 0;
+
+  auto visitFn = [&](CanType eltTy,
+                     unsigned scalarIndex,
+                     llvm::Value *dynamicIndex,
+                     llvm::Value *dynamicLength) {
+    if (scalarIndex != 0 || dynamicIndex == nullptr) {
+      auto *constant = llvm::ConstantInt::get(IGF.IGM.SizeTy, scalarIndex);
+      accumulateSum(IGF, dynamicIndex, constant);
+    }
+
+    auto elt = params[scalarIndex + numExpansions];
+    auto flags = getABIParameterFlags(elt.getParameterFlags());
+    auto flagsVal = llvm::ConstantInt::get(
+        IGF.IGM.Int32Ty, flags.getIntValue());
+
+    assert(eltTy == elt.getPlainType());
+
+    // If we're looking at a pack expansion, insert the appropriate
+    // number of flags fields.
+    if (auto expansionTy = dyn_cast<PackExpansionType>(eltTy)) {
+      emitPackExpansionPack(IGF, array.getAddress(), expansionTy,
+                            dynamicIndex, dynamicLength,
+                            [&](llvm::Value *) -> llvm::Value * {
+                              return flagsVal;
+                            });
+
+      // We consumed an expansion.
+      numExpansions += 1;
+
+      return;
+    }
+
+    // The destination address, where we put the current element's flags field.
+    Address eltAddr(
+        IGF.Builder.CreateInBoundsGEP(array.getAddress().getElementType(),
+                                      array.getAddressPointer(),
+                                      dynamicIndex),
+        array.getAddress().getElementType(),
+        array.getAlignment());
+
+    // Otherwise, we have a single scalar element, which deposits a single
+    // flags field.
+    IGF.Builder.CreateStore(flagsVal, eltAddr);
+  };
+
+  (void) visitPackExplosion(IGF, packType, visitFn);
+
+  return array;
+}

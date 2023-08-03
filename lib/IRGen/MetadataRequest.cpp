@@ -1371,7 +1371,7 @@ static llvm::Value *getFunctionParameterRef(IRGenFunction &IGF,
 }
 
 /// Mapping type-level parameter flags to ABI parameter flags.
-static ParameterFlags getABIParameterFlags(ParameterTypeFlags flags) {
+ParameterFlags irgen::getABIParameterFlags(ParameterTypeFlags flags) {
   return ParameterFlags()
         .withValueOwnership(flags.getValueOwnership())
         .withVariadic(flags.isVariadic())
@@ -1489,7 +1489,27 @@ emitDynamicFunctionTypeMetadataParams(IRGenFunction &IGF,
                                       CanPackType packType,
                                       DynamicMetadataRequest request,
                                       SmallVectorImpl<llvm::Value *> &arguments) {
-  assert(false);
+  assert(!params.empty());
+
+  FunctionTypeMetadataParamInfo info;
+
+  llvm::Value *shape;
+  std::tie(info.parameters, shape) = emitTypeMetadataPack(
+      IGF, packType, MetadataState::Abstract);
+
+  arguments.push_back(info.parameters.getAddress().getAddress());
+
+  if (flags.hasParameterFlags()) {
+    info.paramFlags = emitDynamicFunctionParameterFlags(
+        IGF, params, packType, shape);
+
+    arguments.push_back(info.paramFlags.getAddress().getAddress());
+  } else {
+    arguments.push_back(llvm::ConstantPointerNull::get(
+        IGF.IGM.Int32Ty->getPointerTo()));
+  }
+
+  return info;
 }
 
 static void cleanupFunctionTypeMetadataParams(IRGenFunction &IGF,
