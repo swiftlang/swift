@@ -2655,6 +2655,10 @@ function(_add_swift_target_executable_single name)
     set_target_properties(${name} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES
       INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR};@executable_path/../../../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+    set_target_properties(${name} PROPERTIES
+      BUILD_WITH_INSTALL_RPATH YES
+      INSTALL_RPATH "$ORIGIN/../../../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
