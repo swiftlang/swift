@@ -1151,7 +1151,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   return llvm::Error::success();
 }
 
-// If E is a literal, returns the declaration that should be reported by
+// If \p E is a literal, returns the declaration that should be reported by
 // cursor info for that initializer.
 static ValueDecl *getCursorInfoDeclForLiteral(Expr *E) {
   if (auto *CollectionLit = dyn_cast<CollectionExpr>(E)) {
@@ -1163,7 +1163,7 @@ static ValueDecl *getCursorInfoDeclForLiteral(Expr *E) {
     return nullptr;
   }
 
-  bool IsObjectLiteral = dyn_cast<ObjectLiteralExpr>(E);
+  bool IsObjectLiteral = isa<ObjectLiteralExpr>(E);
   if (!IsObjectLiteral && LitExpr->getInitializer().getDecl()) {
     return LitExpr->getInitializer().getDecl();
   }
@@ -1192,13 +1192,13 @@ static bool addCursorInfoForLiteral(
     return false;
   }
 
-  ValueDecl *InitDecl = getCursorInfoDeclForLiteral(LitExpr);
-  if (!InitDecl) {
+  ValueDecl *Decl = getCursorInfoDeclForLiteral(LitExpr);
+  if (!Decl) {
     return false;
   }
 
   auto &Symbol = Data.Symbols.emplace_back();
-  DeclInfo Info(InitDecl, nullptr, true, false, {}, CompInvoc);
+  DeclInfo Info(Decl, nullptr, true, false, {}, CompInvoc);
   auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
                             PreviousSnaps, Data.Allocator);
 
