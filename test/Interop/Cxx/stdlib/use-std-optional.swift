@@ -12,6 +12,10 @@ StdOptionalTestSuite.test("pointee") {
   let nonNilOpt = getNonNilOptional()
   let pointee = nonNilOpt.pointee
   expectEqual(123, pointee)
+
+  var modifiedOpt = getNilOptional()
+  modifiedOpt.pointee = 777
+  expectEqual(777, modifiedOpt.pointee)
 }
 
 StdOptionalTestSuite.test("std::optional => Swift.Optional") {
