@@ -8930,6 +8930,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       continue;
     }
 
+    // A friend C++ decl is not a member of the Swift type.
+    if (member->getClangDecl() &&
+        member->getClangDecl()->getFriendObjectKind() != clang::Decl::FOK_None)
+      continue;
+
     // FIXME: constructors are added eagerly, but shouldn't be
     // FIXME: subscripts are added eagerly, but shouldn't be
     if (!isa<AccessorDecl>(member) &&
