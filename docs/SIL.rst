@@ -5285,7 +5285,8 @@ positive.  Otherwise, traps.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_unowned`` or ``load_unowned`` operations on the same address.
+``store_unowned`` or ``load_unowned``/``strong_copy_unowned_value`` operations
+on the same address.
 
 store_unowned
 `````````````
@@ -5305,7 +5306,8 @@ The storage must be initialized iff ``[init]`` is not specified.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_unowned`` or ``load_unowned`` operations on the same address.
+``store_unowned`` or ``load_unowned``/``strong_copy_unowned_value`` operations
+on the same address.
 
 
 fix_lifetime
