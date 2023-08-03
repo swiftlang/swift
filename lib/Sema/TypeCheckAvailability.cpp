@@ -3285,6 +3285,11 @@ public:
       }
     }
 
+    if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
+      diagnoseDeclRefAvailability(
+          ME->getMacroRef(), ME->getMacroNameLoc().getSourceRange());
+    }
+
     return Action::Continue(E);
   }
 
