@@ -1490,6 +1490,12 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   if (hasUserDefinedDesignatedInit(evaluator, decl))
     return false;
 
+  // Regardless of whether all of the properties are initialized or
+  // not distributed actors always get a special "default" init based
+  // on `id` and `actorSystem` synthesized properties.
+  if (decl->isDistributedActor())
+    return true;
+
   // We can only synthesize a default init if all the stored properties have an
   // initial value.
   return areAllStoredPropertiesDefaultInitializable(evaluator, decl);

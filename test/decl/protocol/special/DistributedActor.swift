@@ -35,10 +35,8 @@ extension DAP where ActorSystem.ActorID == String {
 }
 
 distributed actor D2 {
-  // expected-error@-1{{actor 'D2' has no initializers}}
   let actorSystem: String
   // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-note@-2{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
 }
 
 distributed actor D3 {
@@ -49,14 +47,10 @@ distributed actor D3 {
 struct OtherActorIdentity: Sendable, Hashable, Codable {}
 
 distributed actor D4 {
-  // expected-error@-1{{actor 'D4' has no initializers}}
-
   let actorSystem: String
   // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-note@-2{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
   let id: OtherActorIdentity
   // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-note@-2{{stored property 'id' without initial value prevents synthesized initializers}}
 }
 
 protocol P1: DistributedActor {
