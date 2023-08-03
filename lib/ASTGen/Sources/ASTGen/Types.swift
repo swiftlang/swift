@@ -3,7 +3,7 @@ import SwiftParser
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func visit(_ node: SimpleTypeIdentifierSyntax) -> ASTNode {
+  public func visit(_ node: IdentifierTypeSyntax) -> ASTNode {
     let loc = bridgedSourceLoc(for: node)
 
     // If this is the bare 'Any' keyword, produce an empty composition type.
@@ -20,11 +20,11 @@ extension ASTGenVisitor {
       return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
     }
 
-    let lAngle = bridgedSourceLoc(for: generics.leftAngleBracket)
-    let rAngle = bridgedSourceLoc(for: generics.rightAngleBracket)
+    let lAngle = bridgedSourceLoc(for: generics.leftAngle)
+    let rAngle = bridgedSourceLoc(for: generics.rightAngle)
     return .type(
       generics.arguments.map({
-        self.visit($0.argumentType).rawValue
+        self.visit($0.argument).rawValue
       }).withBridgedArrayRef {
           genericArgs in
           GenericIdentTypeRepr_create(
@@ -32,12 +32,12 @@ extension ASTGenVisitor {
       })
   }
 
-  public func visit(_ node: MemberTypeIdentifierSyntax) -> ASTNode {
+  public func visit(_ node: MemberTypeSyntax) -> ASTNode {
     // Gather the member components, in decreasing depth order.
     var reverseMemberComponents = [UnsafeMutableRawPointer]()
 
     var baseType = Syntax(node)
-    while let memberType = baseType.as(MemberTypeIdentifierSyntax.self) {
+    while let memberType = baseType.as(MemberTypeSyntax.self) {
       let nameToken = memberType.name
       let generics = memberType.genericArgumentClause
 
@@ -48,10 +48,10 @@ extension ASTGenVisitor {
       let nameLoc = bridgedSourceLoc(for: nameToken)
 
       if let generics = generics {
-        let lAngle = bridgedSourceLoc(for: generics.leftAngleBracket)
-        let rAngle = bridgedSourceLoc(for: generics.rightAngleBracket)
+        let lAngle = bridgedSourceLoc(for: generics.leftAngle)
+        let rAngle = bridgedSourceLoc(for: generics.rightAngle)
         reverseMemberComponents.append(
-          generics.arguments.map({ self.visit($0.argumentType).rawValue }).withBridgedArrayRef {
+          generics.arguments.map({ self.visit($0.argument).rawValue }).withBridgedArrayRef {
             genericArgs in
             GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
           })
@@ -71,29 +71,29 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: ArrayTypeSyntax) -> ASTNode {
-    let elementType = visit(node.elementType).rawValue
-    let lSquareLoc = bridgedSourceLoc(for: node.leftSquareBracket)
-    let rSquareLoc = bridgedSourceLoc(for: node.rightSquareBracket)
+    let elementType = visit(node.element).rawValue
+    let lSquareLoc = bridgedSourceLoc(for: node.leftSquare)
+    let rSquareLoc = bridgedSourceLoc(for: node.rightSquare)
     return .type(ArrayTypeRepr_create(self.ctx, elementType, lSquareLoc, rSquareLoc))
   }
 
   public func visit(_ node: DictionaryTypeSyntax) -> ASTNode {
-    let keyType = visit(node.keyType).rawValue
-    let valueType = visit(node.valueType).rawValue
+    let keyType = visit(node.key).rawValue
+    let valueType = visit(node.value).rawValue
     let colonLoc = bridgedSourceLoc(for: node.colon)
-    let lSquareLoc = bridgedSourceLoc(for: node.leftSquareBracket)
-    let rSquareLoc = bridgedSourceLoc(for: node.rightSquareBracket)
+    let lSquareLoc = bridgedSourceLoc(for: node.leftSquare)
+    let rSquareLoc = bridgedSourceLoc(for: node.rightSquare)
     return .type(
       DictionaryTypeRepr_create(self.ctx, keyType, valueType, colonLoc, lSquareLoc, rSquareLoc))
   }
 
   public func visit(_ node: MetatypeTypeSyntax) -> ASTNode {
     let baseType = visit(node.baseType).rawValue
-    let tyLoc = bridgedSourceLoc(for: node.typeOrProtocol)
-    if node.typeOrProtocol.text == "Type" {
+    let tyLoc = bridgedSourceLoc(for: node.metatypeSpecifier)
+    if node.metatypeSpecifier.text == "Type" {
       return .type(MetatypeTypeRepr_create(self.ctx, baseType, tyLoc))
     } else {
-      assert(node.typeOrProtocol.text == "Protocol")
+      assert(node.metatypeSpecifier.text == "Protocol")
       return .type(ProtocolTypeRepr_create(self.ctx, baseType, tyLoc))
     }
   }
@@ -111,7 +111,7 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: PackExpansionTypeSyntax) -> ASTNode {
-    let base = visit(node.patternType).rawValue
+    let base = visit(node.repetitionPattern).rawValue
     let repeatLoc = bridgedSourceLoc(for: node.repeatKeyword)
     return .type(PackExpansionTypeRepr_create(self.ctx, base, repeatLoc))
   }
@@ -136,26 +136,26 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: FunctionTypeSyntax) -> ASTNode {
-    return self.withBridgedTupleElements(node.arguments) { elements in
+    return self.withBridgedTupleElements(node.parameters) { elements in
       let lParenLoc = bridgedSourceLoc(for: node.leftParen)
       let rParenLoc = bridgedSourceLoc(for: node.rightParen)
       let args = TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc)
       let asyncLoc = bridgedSourceLoc(for: node.effectSpecifiers?.asyncSpecifier)
       let throwsLoc = bridgedSourceLoc(for: node.effectSpecifiers?.throwsSpecifier)
-      let arrowLoc = bridgedSourceLoc(for: node.output.arrow)
-      let retTy = visit(node.output.returnType).rawValue
+      let arrowLoc = bridgedSourceLoc(for: node.returnClause.arrow)
+      let retTy = visit(node.returnClause.type).rawValue
       return .type(FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy))
     }
   }
 
   public func visit(_ node: NamedOpaqueReturnTypeSyntax) -> ASTNode {
-    let baseTy = visit(node.baseType).rawValue
+    let baseTy = visit(node.type).rawValue
     return .type(NamedOpaqueReturnTypeRepr_create(self.ctx, baseTy))
   }
 
-  public func visit(_ node: ConstrainedSugarTypeSyntax) -> ASTNode {
+  public func visit(_ node: SomeOrAnyTypeSyntax) -> ASTNode {
     let someOrAnyLoc = bridgedSourceLoc(for: node.someOrAnySpecifier)
-    let baseTy = visit(node.baseType).rawValue
+    let baseTy = visit(node.constraint).rawValue
     if node.someOrAnySpecifier.text == "some" {
       return .type(OpaqueReturnTypeRepr_create(self.ctx, someOrAnyLoc, baseTy))
     } else {
@@ -197,7 +197,7 @@ extension ASTGenVisitor {
         }
 
         // Only handle simple attribute names right now.
-        guard let identType = attribute.attributeName.as(SimpleTypeIdentifierSyntax.self) else {
+        guard let identType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
           continue
         }
 
@@ -206,7 +206,7 @@ extension ASTGenVisitor {
         let typeAttrKind = name.withBridgedString { bridgedName in
           TypeAttrKind_fromString(bridgedName)
         }
-        let atLoc = bridgedSourceLoc(for: attribute.atSignToken)
+        let atLoc = bridgedSourceLoc(for: attribute.atSign)
         let attrLoc = bridgedSourceLoc(for: nameSyntax)
         switch typeAttrKind {
           // SIL attributes
@@ -247,11 +247,11 @@ extension ASTGenVisitor {
   ) -> T {
     var elements = [BridgedTupleTypeElement]()
     for element in elementList {
-      var nameText = element.name?.text
+      var nameText = element.firstName?.text
       let name = nameText?.withBridgedString { bridgedName in
         return ASTContext_getIdentifier(ctx, bridgedName)
       } ?? nil
-      let nameLoc = bridgedSourceLoc(for: element.name)
+      let nameLoc = bridgedSourceLoc(for: element.firstName)
       var secondNameText = element.secondName?.text
       let secondName = secondNameText?.withBridgedString { bridgedName in
         return ASTContext_getIdentifier(ctx, bridgedName)
