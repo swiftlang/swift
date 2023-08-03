@@ -1170,7 +1170,7 @@ static ValueDecl *getCursorInfoDeclForLiteral(Expr *E) {
 
   // We shouldn’t report the builtin initializer to the user because it’s
   // underscored and not visible. Instead, return the type of the literal.
-  if (IsObjectLiteral || dyn_cast<BuiltinLiteralExpr>(E)) {
+  if (IsObjectLiteral || isa<BuiltinLiteralExpr>(E)) {
     Type Ty = E->getType();
     if (!Ty) {
       return nullptr;
