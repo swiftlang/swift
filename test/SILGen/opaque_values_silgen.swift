@@ -662,3 +662,19 @@ public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }
 func set<Container, Field>(into container: inout Container, at keyPath: WritableKeyPath<Container, Field>, _ value: Field) {
   container[keyPath: keyPath] = value
 }
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk : {{.*}} {
+// CHECK:       bb0([[VALUE:%[^,]+]] :
+// CHECK-SAME:      [[CONTAINER:%[^,]+]] :
+// CHECK:         [[CONTAINER_COPY:%[^,]+]] = copy_value [[CONTAINER]]
+// CHECK:         [[SETTER:%[^,]+]] = class_method [[CONTAINER_COPY]]
+// CHECK:         [[REGISTER_4:%[^,]+]] = apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
+// CHECK:         destroy_value [[CONTAINER_COPY]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk'
+@_silgen_name("FormClassKeyPath")
+func FormClassKeyPath() {
+  class Q {
+    var q: Int = 0
+  }
+  _ = \Q.q
+}
