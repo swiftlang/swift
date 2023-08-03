@@ -1838,6 +1838,9 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
+def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Specifies the Clang dependency scanner module cache path">;
 
 // END ONLY SUPPORTED IN NEW DRIVER
 

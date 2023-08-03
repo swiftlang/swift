@@ -811,6 +811,9 @@ namespace swift {
     /// The module cache path which the Clang importer should use.
     std::string ModuleCachePath;
 
+    /// The Scanning module cache path which the Clang Dependency Scanner should use.
+    std::string ClangScannerModuleCachePath;
+
     /// Extra arguments which should be passed to the Clang importer.
     std::vector<std::string> ExtraArgs;
 
