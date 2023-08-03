@@ -76,7 +76,6 @@ extension VariableDeclSyntax {
     if accessorsMatching({ $0 == .keyword(.get) }).count > 0 {
       return true
     } else {
-      print("else branch")
       return bindings.contains { binding in
         if case .getter = binding.accessorBlock?.accessors {
           return true
