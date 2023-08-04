@@ -1094,6 +1094,13 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
 
+    // If there are no bindings for the closure yet we cannot prioritize
+    // it because that runs into risk of missing a result builder transform.
+    if (TypeVar->getImpl().isClosureType()) {
+      if (Bindings.empty())
+        return false;
+    }
+
     if (auto transform = CS.getAppliedResultBuilderTransform(closure)) {
       // Conjunctions that represent closures with result builder transformed
       // bodies could be attempted right after their resolution if they meet
