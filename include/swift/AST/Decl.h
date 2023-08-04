@@ -8701,6 +8701,7 @@ public:
   /// be added if this macro does not contain an extension role.
   void getIntroducedConformances(
       NominalTypeDecl *attachedTo,
+      MacroRole role,
       SmallVectorImpl<ProtocolDecl *> &conformances) const;
 
   /// Returns a DeclName that represents arbitrary names.
