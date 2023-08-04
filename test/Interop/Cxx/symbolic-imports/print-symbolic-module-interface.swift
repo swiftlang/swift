@@ -45,6 +45,20 @@ namespace ns {
 
 using MyType = ns::TemplateRecord<int>;
 
+template<class X>
+class OuterTemp2 {
+public:
+    template<class T, class G>
+    class InnerTemp2 {
+    public:
+        void testMe(const T& p, const X& x);
+
+        X x2;
+
+        using Y = X;
+    };
+};
+
 // CHECK:     enum ns {
 // CHECK-NEXT: struct B {
 // CHECK-NEXT:    init()
@@ -64,3 +78,11 @@ using MyType = ns::TemplateRecord<int>;
 // CHECK-NEXT:  static func freeFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: typealias MyType = ns.TemplateRecord
+// CHECK-NEXT: struct OuterTemp2 {
+// CHECK-NEXT:   struct InnerTemp2 {
+// CHECK-NEXT:     init(x2: Any)
+// CHECK-NEXT:     mutating func testMe(_ p: Any, _ x: Any)
+// CHECK-NEXT:     var x2: Any
+// CHECK-NEXT:     typealias Y = Any
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
