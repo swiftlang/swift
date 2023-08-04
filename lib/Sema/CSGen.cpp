@@ -933,6 +933,7 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
 
 namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
+    friend class ConstraintSystem;
     ConstraintSystem &CS;
     DeclContext *CurDC;
     ConstraintSystemPhase CurrPhase;
@@ -1047,130 +1048,6 @@ namespace {
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
-    }
-
-    /// Add constraints for a subscript operation.
-    Type addSubscriptConstraints(
-        Expr *anchor, Type baseTy, ValueDecl *declOrNull, ArgumentList *argList,
-        ConstraintLocator *locator = nullptr,
-        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
-      // Locators used in this expression.
-      if (locator == nullptr)
-        locator = CS.getConstraintLocator(anchor);
-
-      auto fnLocator =
-        CS.getConstraintLocator(locator,
-                                ConstraintLocator::ApplyFunction);
-      auto memberLocator =
-        CS.getConstraintLocator(locator,
-                                ConstraintLocator::SubscriptMember);
-      auto resultLocator =
-        CS.getConstraintLocator(locator,
-                                ConstraintLocator::FunctionResult);
-
-      CS.associateArgumentList(memberLocator, argList);
-
-      Type outputTy;
-
-      // For an integer subscript expression on an array slice type, instead of
-      // introducing a new type variable we can easily obtain the element type.
-      if (isa<SubscriptExpr>(anchor)) {
-
-        auto isLValueBase = false;
-        auto baseObjTy = baseTy;
-        if (baseObjTy->is<LValueType>()) {
-          isLValueBase = true;
-          baseObjTy = baseObjTy->getWithoutSpecifierType();
-        }
-
-        if (baseObjTy->isArrayType()) {
-
-          if (auto arraySliceTy = 
-                dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
-            baseObjTy = arraySliceTy->getDesugaredType();
-          }
-
-          if (argList->isUnlabeledUnary() &&
-              isa<IntegerLiteralExpr>(argList->getExpr(0))) {
-
-            outputTy = baseObjTy->getAs<BoundGenericType>()->getGenericArgs()[0];
-            
-            if (isLValueBase)
-              outputTy = LValueType::get(outputTy);
-          }
-        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
-          auto keyTy = dictTy->first;
-          auto valueTy = dictTy->second;
-
-          if (argList->isUnlabeledUnary()) {
-            auto argTy = CS.getType(argList->getExpr(0));
-            if (isFavoredParamAndArg(CS, keyTy, argTy)) {
-              outputTy = OptionalType::get(valueTy);
-              if (isLValueBase)
-                outputTy = LValueType::get(outputTy);
-            }
-          }
-        }
-      }
-      
-      if (outputTy.isNull()) {
-        outputTy = CS.createTypeVariable(resultLocator,
-                                         TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-        if (addedTypeVars)
-          addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
-      }
-
-      // FIXME: This can only happen when diagnostics successfully type-checked
-      // sub-expression of the subscript and mutated AST, but under normal
-      // circumstances subscript should never have InOutExpr as a direct child
-      // until type checking is complete and expression is re-written.
-      // Proper fix for such situation requires preventing diagnostics from
-      // re-writing AST after successful type checking of the sub-expressions.
-      if (auto inoutTy = baseTy->getAs<InOutType>()) {
-        baseTy = LValueType::get(inoutTy->getObjectType());
-      }
-
-      // Add the member constraint for a subscript declaration.
-      // FIXME: weak name!
-      auto memberTy = CS.createTypeVariable(
-          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-      if (addedTypeVars)
-        addedTypeVars->push_back(memberTy);
-
-      // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
-      // a known subscript here. This might be cleaner if we split off a new
-      // UnresolvedSubscriptExpr from SubscriptExpr.
-      if (auto decl = declOrNull) {
-        OverloadChoice choice =
-            OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
-        CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
-                                     CurDC);
-      } else {
-        CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
-                                    memberTy, CurDC,
-                                    FunctionRefKind::DoubleApply,
-                                    /*outerAlternatives=*/{},
-                                    memberLocator);
-      }
-
-      SmallVector<AnyFunctionType::Param, 8> params;
-      getMatchingParams(argList, params);
-
-      // Add the constraint that the index expression's type be convertible
-      // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy),
-                       memberTy,
-                       fnLocator);
-
-      Type fixedOutputType =
-          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
-      if (!fixedOutputType->isTypeVariableOrMember()) {
-        CS.setFavoredType(anchor, fixedOutputType.getPointer());
-        outputTy = fixedOutputType;
-      }
-
-      return outputTy;
     }
 
     Type openPackElement(Type packType, ConstraintLocator *locator,
@@ -2073,6 +1950,125 @@ namespace {
       }
 
       return TupleType::get(elements, CS.getASTContext());
+    }
+
+    /// Add constraints for a subscript operation.
+    Type addSubscriptConstraints(
+        Expr *anchor, Type baseTy, ValueDecl *declOrNull, ArgumentList *argList,
+        ConstraintLocator *locator = nullptr,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
+      // Locators used in this expression.
+      if (locator == nullptr)
+        locator = CS.getConstraintLocator(anchor);
+
+      auto fnLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::ApplyFunction);
+      auto memberLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::SubscriptMember);
+      auto resultLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult);
+
+      CS.associateArgumentList(memberLocator, argList);
+
+      Type outputTy;
+
+      // For an integer subscript expression on an array slice type, instead of
+      // introducing a new type variable we can easily obtain the element type.
+      if (isa<SubscriptExpr>(anchor)) {
+
+        auto isLValueBase = false;
+        auto baseObjTy = baseTy;
+        if (baseObjTy->is<LValueType>()) {
+          isLValueBase = true;
+          baseObjTy = baseObjTy->getWithoutSpecifierType();
+        }
+
+        if (baseObjTy->isArrayType()) {
+
+          if (auto arraySliceTy =
+                  dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
+            baseObjTy = arraySliceTy->getDesugaredType();
+          }
+
+          if (argList->isUnlabeledUnary() &&
+              isa<IntegerLiteralExpr>(argList->getExpr(0))) {
+
+            outputTy =
+                baseObjTy->getAs<BoundGenericType>()->getGenericArgs()[0];
+
+            if (isLValueBase)
+              outputTy = LValueType::get(outputTy);
+          }
+        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
+          auto keyTy = dictTy->first;
+          auto valueTy = dictTy->second;
+
+          if (argList->isUnlabeledUnary()) {
+            auto argTy = CS.getType(argList->getExpr(0));
+            if (isFavoredParamAndArg(CS, keyTy, argTy)) {
+              outputTy = OptionalType::get(valueTy);
+              if (isLValueBase)
+                outputTy = LValueType::get(outputTy);
+            }
+          }
+        }
+      }
+
+      if (outputTy.isNull()) {
+        outputTy = CS.createTypeVariable(
+            resultLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+        if (addedTypeVars)
+          addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
+      }
+
+      // FIXME: This can only happen when diagnostics successfully type-checked
+      // sub-expression of the subscript and mutated AST, but under normal
+      // circumstances subscript should never have InOutExpr as a direct child
+      // until type checking is complete and expression is re-written.
+      // Proper fix for such situation requires preventing diagnostics from
+      // re-writing AST after successful type checking of the sub-expressions.
+      if (auto inoutTy = baseTy->getAs<InOutType>()) {
+        baseTy = LValueType::get(inoutTy->getObjectType());
+      }
+
+      // Add the member constraint for a subscript declaration.
+      // FIXME: weak name!
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(memberTy);
+
+      // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
+      // a known subscript here. This might be cleaner if we split off a new
+      // UnresolvedSubscriptExpr from SubscriptExpr.
+      if (auto decl = declOrNull) {
+        OverloadChoice choice =
+            OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
+        CS.addBindOverloadConstraint(memberTy, choice, memberLocator, CurDC);
+      } else {
+        CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
+                                    memberTy, CurDC,
+                                    FunctionRefKind::DoubleApply,
+                                    /*outerAlternatives=*/{}, memberLocator);
+      }
+
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addConstraint(ConstraintKind::ApplicableFunction,
+                       FunctionType::get(params, outputTy), memberTy,
+                       fnLocator);
+
+      Type fixedOutputType =
+          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+      if (!fixedOutputType->isTypeVariableOrMember()) {
+        CS.setFavoredType(anchor, fixedOutputType.getPointer());
+        outputTy = fixedOutputType;
+      }
+
+      return outputTy;
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
