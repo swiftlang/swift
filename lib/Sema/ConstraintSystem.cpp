@@ -38,6 +38,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
+#include <cmath>
 
 using namespace swift;
 using namespace constraints;

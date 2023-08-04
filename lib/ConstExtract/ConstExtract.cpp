@@ -85,7 +85,10 @@ std::string toFullyQualifiedProtocolNameString(const swift::ProtocolDecl &Protoc
 }
 
 std::string toMangledTypeNameString(const swift::Type &Type) {
-  return Mangle::ASTMangler().mangleTypeWithoutPrefix(Type->getCanonicalType());
+  auto PrintingType = Type;
+  if (Type->hasArchetype())
+    PrintingType = Type->mapTypeOutOfContext();
+  return Mangle::ASTMangler().mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
 } // namespace

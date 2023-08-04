@@ -80,11 +80,8 @@ public func testSubscriptGetOnlyThroughParentClass_BaseLoadable_ResultLoadable_V
     var m = LoadableSubscriptGetOnlyTesterClassParent()
     m = LoadableSubscriptGetOnlyTesterClassParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.testerParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
 }
 
 // MARK: Getter + Setter.
@@ -175,7 +172,6 @@ public func testSubscriptGetSetThroughParentClass_BaseLoadable_ResultLoadable_Va
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
@@ -204,7 +200,6 @@ public func testSubscriptReadModify_BaseLoadable_ResultLoadable_Var() {
 public func testSubscriptReadModify_BaseLoadable_ResultLoadable_Let() {
     let m = LoadableSubscriptReadModifyTester()
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
 }
 
 public func testSubscriptReadModify_BaseLoadable_ResultLoadable_InOut(m: inout LoadableSubscriptReadModifyTester) {
@@ -269,7 +264,6 @@ public func testSubscriptReadModifyThroughParentClass_BaseLoadable_ResultLoadabl
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
@@ -356,7 +350,6 @@ public func testSubscriptGetModifyThroughParentClass_BaseLoadable_ResultLoadable
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }

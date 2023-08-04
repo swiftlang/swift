@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_OUTLINING_H
 #define SWIFT_IRGEN_OUTLINING_H
 
+#include "LocalTypeDataKind.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include "LocalTypeDataKind.h"
