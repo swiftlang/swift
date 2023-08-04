@@ -7,6 +7,7 @@
 
 using Map = std::map<int, int>;
 using MapStrings = std::map<std::string, std::string>;
+using NestedMap = std::map<int, Map>;
 using UnorderedMap = std::unordered_map<int, int>;
 
 inline Map initMap() { return {{1, 3}, {2, 2}, {3, 3}}; }
