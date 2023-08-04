@@ -818,13 +818,10 @@ func enumSwitchTest1(_ e: borrowing EnumSwitchTests.E) {
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
-// FIXME: this copy probably shouldn't be here when accessing through the letGlobal, but maybe it's cleaned up?
-// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]] : $*NonTrivialStruct
-// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
-// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]] : $NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]] : $*NonTrivialStruct
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_VAL]] : $NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
 // CHECK: apply {{%.*}}([[LOADED_GEP]])
-// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
-// CHECK: destroy_value [[LOADED_VAL]]
+// CHECK: end_borrow [[LOADED_VAL]]
 // CHECK: } // end sil function '$s8moveonly16testGlobalBorrowyyF'
 func testGlobalBorrow() {
     borrowVal(varGlobal)
@@ -856,13 +853,11 @@ func testGlobalBorrow() {
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
-// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
-// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
-// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_VAL]]
 // CHECK: [[LOADED_GEP_COPY:%.*]] = copy_value [[LOADED_GEP]]
-// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
-// CHECK: destroy_value [[LOADED_VAL]]
 // CHECK: apply {{%.*}}([[LOADED_GEP_COPY]])
+// CHECK: end_borrow [[LOADED_VAL]]
 //
 // CHECK: } // end sil function '$s8moveonly17testGlobalConsumeyyF'
 func testGlobalConsume() {
@@ -1170,17 +1165,17 @@ public struct LoadableSubscriptGetOnlyTesterNonCopyableStructParent : ~Copyable 
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
-// CHECK: end_borrow [[LOAD_BORROW]]
-// CHECK: end_access [[ACCESS]]
 //
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[BORROWED_VALUE]])
 // CHECK: end_borrow [[BORROWED_VALUE]]
-// CHECK: destroy_value [[VALUE]]
+// CHECK: end_borrow [[LOAD_BORROW]]
+// CHECK: end_access [[ACCESS]]
 // CHECK: apply {{%.*}}([[TEMP_MARK]])
 // CHECK: destroy_addr [[TEMP_MARK]]
+// CHECK: destroy_value [[VALUE]]
 // } // end sil function '$s8moveonly077testSubscriptGetOnlyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressE4_VaryyF'
 public func testSubscriptGetOnlyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_Var() {
     var m = LoadableSubscriptGetOnlyTesterNonCopyableStructParent()
@@ -1197,13 +1192,9 @@ public func testSubscriptGetOnlyThroughNonCopyableParentStruct_BaseLoadable_Resu
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[MARK]]
 // CHECK: [[EXT:%.*]] = struct_extract [[LOAD]]
-// CHECK: [[COPY:%.*]] = copy_value [[EXT]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[COPY]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[COPY]]
+// CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[EXT]])
 // CHECK: apply {{%.*}}([[TEMP_MARK]])
 // CHECK: destroy_addr [[TEMP_MARK]]
 // CHECK: end_borrow [[LOAD]]
@@ -1257,11 +1248,6 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
     var testerParent = LoadableSubscriptGetOnlyTesterNonCopyableStructParent()
 }
 
-// TODO(MG): I am preparing a small pass that cleans up the copy_value
-// below. The code in SILGen is in some very generic code that changing could
-// have other unintentional side-effects, so it makes sense to instead just add
-// a small cleanup transform before we do move checking to cleanup this pattern.
-//
 // CHECK-LABEL: sil [ossa] @$s8moveonly065testSubscriptGetOnlyThroughParentClass_BaseLoadable_ResultAddressE4_VaryyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box $
 // CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
@@ -1274,10 +1260,9 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $LoadableSubscriptGetOnlyTester
-// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: store [[CORO_RESULT_COPY]] to [init] [[TEMP_MARK]]
-// CHECK: [[LOAD:%.*]] = load_borrow [[TEMP_MARK]]
+// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[TEMP]]
+// CHECK: [[TEMP_MARK_BORROW:%.*]] = store_borrow [[CORO_RESULT]] to [[TEMP_MARK]]
+// CHECK: [[LOAD:%.*]] = load_borrow [[TEMP_MARK_BORROW]]
 // CHECK: [[TEMP2:%.*]] = alloc_stack $
 // CHECK: [[TEMP2_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP2]]
 // CHECK: apply {{%.*}}([[TEMP2_MARK]], {{%.*}}, [[LOAD]])
@@ -1293,10 +1278,9 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $LoadableSubscriptGetOnlyTester
-// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: store [[CORO_RESULT_COPY]] to [init] [[TEMP_MARK]]
-// CHECK: [[GEP:%.*]] = struct_element_addr [[TEMP_MARK]]
+// CHECK: [[TEMP_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[TEMP]]
+// CHECK: [[TEMP_MARK_BORROW:%.*]] = store_borrow [[CORO_RESULT]] to [[TEMP_MARK]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[TEMP_MARK_BORROW]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[GEP]]
 // CHECK: [[TEMP2:%.*]] = alloc_stack $
 // CHECK: [[TEMP2_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP2]]
@@ -1306,34 +1290,17 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: apply {{%.*}}([[TEMP2_MARK]])
 // CHECK: destroy_addr [[TEMP2_MARK]]
 //
-// Third read. This is a case that we can't handle today due to the way the AST
-// looks:
-//
-// (subscript_expr type='AddressOnlyProtocol'
-//   (member_ref_expr type='LoadableSubscriptGetOnlyTester'
-//     (load_expr implicit type='LoadableSubscriptGetOnlyTesterClassParent'
-//       (declref_expr type='@lvalue LoadableSubscriptGetOnlyTesterClassParent'
-//   (argument_list
-//     (argument
-//       (integer_literal_expr type='Int'
-//
-// due to the load_expr in the subscript base, SILGen emits a base rvalue for
-// the load_expr and copies it, ending the coroutine. What we need is the
-// ability to have an lvalue pseudo-component that treats the declref_expr (and
-// any member_ref_expr) as a base and allows for a load_expr to be followed by N
-// member_ref_expr.
+// Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
-// CHECK: end_access [[ACCESS]]
-// CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[CORO_RESULT_COPY]]
+// CHECK: [[LOAD:%.*]] = load_borrow [[ACCESS]]
+// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[LOAD]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $
 // CHECK: [[TEMP_MARK:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[BORROW]])
+// CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[CORO_RESULT]])
+// CHECK: end_apply [[CORO_TOKEN]]
+// CHECK: end_borrow [[LOAD]]
+// CHECK: apply {{%.*}}([[TEMP_MARK]])
 // CHECK: destroy_addr [[TEMP_MARK]]
 
 // CHECK: } // end sil function '$s8moveonly065testSubscriptGetOnlyThroughParentClass_BaseLoadable_ResultAddressE4_VaryyF'
@@ -1554,16 +1521,16 @@ public struct LoadableSubscriptGetSetTesterNonCopyableStructParent : ~Copyable {
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
-// CHECK: end_borrow [[LOAD_BORROW]]
-// CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[MARK_TEMP:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[BORROWED_VALUE]])
 // CHECK: end_borrow [[BORROWED_VALUE]]
-// CHECK: destroy_value [[VALUE]]
+// CHECK: end_borrow [[LOAD_BORROW]]
+// CHECK: end_access [[ACCESS]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]])
 // CHECK: destroy_addr [[MARK_TEMP]]
+// CHECK: destroy_value [[VALUE]]
 // } // end sil function '$s8moveonly077testSubscriptGetSetThroughNonCopyableParentStruct_BaseLoadable_ResultAddressE4_VaryyF'
 public func testSubscriptGetSetThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_Var() {
     var m = LoadableSubscriptGetSetTesterNonCopyableStructParent()
@@ -1581,13 +1548,9 @@ public func testSubscriptGetSetThroughNonCopyableParentStruct_BaseLoadable_Resul
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[MARK]]
 // CHECK: [[EXT:%.*]] = struct_extract [[LOAD]]
-// CHECK: [[COPY:%.*]] = copy_value [[EXT]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[COPY]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[MARK_TEMP:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[COPY]]
+// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[EXT]])
 // CHECK: apply {{%.*}}([[MARK_TEMP]])
 // CHECK: destroy_addr [[MARK_TEMP]]
 // CHECK: end_borrow [[LOAD]]
@@ -1742,36 +1705,17 @@ public class LoadableSubscriptGetSetTesterClassParent {
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[GEP]])
 // CHECK: end_apply [[CORO_TOKEN]]
 //
-// Third read. This is a case that we can't handle today due to the way the AST
-// looks:
-//
-// (subscript_expr type='AddressOnlyProtocol'
-//   (member_ref_expr type='LoadableSubscriptGetSetTester'
-//     (load_expr implicit type='LoadableSubscriptGetSetTesterClassParent'
-//       (declref_expr type='@lvalue LoadableSubscriptGetSetTesterClassParent'
-//   (argument_list
-//     (argument
-//       (integer_literal_expr type='Int'
-//
-// due to the load_expr in the subscript base, SILGen emits a base rvalue for
-// the load_expr and copies it, ending the coroutine. What we need is the
-// ability to have an lvalue pseudo-component that treats the declref_expr (and
-// any member_ref_expr) as a base and allows for a load_expr to be followed by N
-// member_ref_expr.
+// Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
-// CHECK: end_access [[ACCESS]]
-// CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[CORO_RESULT_COPY]]
+// CHECK: [[CLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[CLASS]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $
 // CHECK: [[MARK_TEMP:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[CORO_RESULT_COPY]]
+// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[CORO_RESULT]])
+// CHECK: end_apply [[CORO_TOKEN]]
+// CHECK: end_borrow [[CLASS]]
+// CHECK: end_access [[ACCESS]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]])
 // CHECK: destroy_addr [[MARK_TEMP]]
 //
@@ -1884,11 +1828,8 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Var() {
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[LOAD_BORROW]])
-// CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
-// CHECK: copy_addr [[CORO_RESULT]] to [init] [[TEMP]]
+// CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: apply {{%.*}}([[TEMP]])
-// CHECK: destroy_addr [[TEMP]]
 // CHECK: end_borrow [[LOAD_BORROW]]
 // CHECK: } // end sil function '$s8moveonly58testSubscriptReadModify_BaseLoadable_ResultAddressOnly_LetyyF'
 public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Let() {
@@ -2009,14 +1950,14 @@ public struct LoadableSubscriptReadModifyTesterNonCopyableStructParent : ~Copyab
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
-// CHECK: end_borrow [[LOAD_BORROW]]
-// CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[BORROWED_VALUE]])
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_borrow [[BORROWED_VALUE]]
-// } // end sil function '$s8moveonly077testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressE4_VaryyF'
+// CHECK: end_borrow [[LOAD_BORROW]]
+// CHECK: end_access [[ACCESS]]
+// } // end sil function '$s8moveonly88testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_VaryyF'
 public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_Var() {
     var m = LoadableSubscriptReadModifyTesterNonCopyableStructParent()
     m = LoadableSubscriptReadModifyTesterNonCopyableStructParent()
@@ -2034,13 +1975,9 @@ public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_R
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[MARK]]
 // CHECK: [[EXT:%.*]] = struct_extract [[LOAD]]
-// CHECK: [[COPY:%.*]] = copy_value [[EXT]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[BORROW]])
+// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[EXT]])
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[COPY]]
 // CHECK: end_borrow [[LOAD]]
 // CHECK: } // end sil function '$s8moveonly88testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_LetyyF'
 public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_Let() {
@@ -2171,36 +2108,17 @@ public class LoadableSubscriptReadModifyTesterClassParent {
 // CHECK: end_borrow [[BORROW_COPYABLE_CLASS]]
 // CHECK: destroy_value [[COPYABLE_CLASS]]
 //
-// Third read. This is a case that we can't handle today due to the way the AST
-// looks:
-//
-// (subscript_expr type='AddressOnlyProtocol'
-//   (member_ref_expr type='LoadableSubscriptReadModifyTester'
-//     (load_expr implicit type='LoadableSubscriptReadModifyTesterClassParent'
-//       (declref_expr type='@lvalue LoadableSubscriptReadModifyTesterClassParent'
-//   (argument_list
-//     (argument
-//       (integer_literal_expr type='Int'
-//
-// due to the load_expr in the subscript base, SILGen emits a base rvalue for
-// the load_expr and copies it, ending the coroutine. What we need is the
-// ability to have an lvalue pseudo-component that treats the declref_expr (and
-// any member_ref_expr) as a base and allows for a load_expr to be followed by N
-// member_ref_expr.
+// Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
-// CHECK: end_access [[ACCESS]]
-// CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[CORO_RESULT_COPY]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[BORROW]])
-// CHECK: apply {{%.*}}([[CORO_RESULT]])
+// CHECK: [[CLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[CLASS]])
+// CHECK: ([[CORO_RESULT2:%.*]], [[CORO_TOKEN2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: apply {{%.*}}([[CORO_RESULT2]])
+// CHECK: end_apply [[CORO_TOKEN2]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[CORO_RESULT_COPY]]
+// CHECK: end_access [[ACCESS]]
 //
 // First read
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
@@ -2434,16 +2352,16 @@ public struct LoadableSubscriptGetModifyTesterNonCopyableStructParent : ~Copyabl
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
-// CHECK: end_borrow [[LOAD_BORROW]]
-// CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[MARK_TEMP:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[BORROWED_VALUE]])
 // CHECK: end_borrow [[BORROWED_VALUE]]
-// CHECK: destroy_value [[VALUE]]
+// CHECK: end_borrow [[LOAD_BORROW]]
+// CHECK: end_access [[ACCESS]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]])
 // CHECK: destroy_addr [[MARK_TEMP]]
+// CHECK: destroy_value [[VALUE]]
 // } // end sil function '$s8moveonly077testSubscriptGetModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressE4_VaryyF'
 public func testSubscriptGetModifyThroughNonCopyableParentStruct_BaseLoadable_ResultAddressOnly_Var() {
     var m = LoadableSubscriptGetModifyTesterNonCopyableStructParent()
@@ -2461,13 +2379,9 @@ public func testSubscriptGetModifyThroughNonCopyableParentStruct_BaseLoadable_Re
 // CHECK: [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[MARK]]
 // CHECK: [[EXT:%.*]] = struct_extract [[LOAD]]
-// CHECK: [[COPY:%.*]] = copy_value [[EXT]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[COPY]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[MARK_TEMP:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[COPY]]
+// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[EXT]])
 // CHECK: apply {{%.*}}([[MARK_TEMP]])
 // CHECK: destroy_addr [[MARK_TEMP]]
 // CHECK: end_borrow [[LOAD]]
@@ -2576,36 +2490,17 @@ public class LoadableSubscriptGetModifyTesterClassParent {
 // CHECK: end_apply [[CORO_TOKEN_2]]
 // CHECK: end_apply [[CORO_TOKEN]]
 //
-// Third read. This is a case that we can't handle today due to the way the AST
-// looks:
-//
-// (subscript_expr type='AddressOnlyProtocol'
-//   (member_ref_expr type='LoadableSubscriptGetModifyTester'
-//     (load_expr implicit type='LoadableSubscriptGetModifyTesterClassParent'
-//       (declref_expr type='@lvalue LoadableSubscriptGetModifyTesterClassParent'
-//   (argument_list
-//     (argument
-//       (integer_literal_expr type='Int'
-//
-// due to the load_expr in the subscript base, SILGen emits a base rvalue for
-// the load_expr and copies it, ending the coroutine. What we need is the
-// ability to have an lvalue pseudo-component that treats the declref_expr (and
-// any member_ref_expr) as a base and allows for a load_expr to be followed by N
-// member_ref_expr.
+// Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
-// CHECK: end_access [[ACCESS]]
-// CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: [[CORO_RESULT_COPY:%.*]] = copy_value [[CORO_RESULT]]
-// CHECK: end_apply [[CORO_TOKEN]]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[CORO_RESULT_COPY]]
+// CHECK: [[CLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[CLASS]])
 // CHECK: [[TEMP:%.*]] = alloc_stack $
 // CHECK: [[MARK_TEMP:%.*]] = mark_must_check [consumable_and_assignable] [[TEMP]]
-// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: destroy_value [[CORO_RESULT_COPY]]
+// CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}, [[CORO_RESULT]])
+// CHECK: end_apply [[CORO_TOKEN]]
+// CHECK: end_borrow [[CLASS]]
+// CHECK: end_access [[ACCESS]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]])
 // CHECK: destroy_addr [[MARK_TEMP]]
 //
