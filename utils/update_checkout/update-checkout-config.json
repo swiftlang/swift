@@ -135,7 +135,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch"],
+            "aliases": ["rebranch", "stable/20230725"],
             "repos": {
                 "llvm-project": "stable/20230725",
                 "swift-llvm-bindings": "stable/20230725",
