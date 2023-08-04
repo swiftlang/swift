@@ -4779,7 +4779,7 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   for (auto param : *funcDecl->getParameters()) {
     auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
                                               /*Implicit=*/true);
-    paramRefExpr->setType(param->getType());
+    paramRefExpr->setType(param->getTypeInContext());
     forwardingParams.push_back(paramRefExpr);
   }
 
@@ -4791,7 +4791,7 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
     auto *selfDecl = funcDecl->getImplicitSelfDecl();
     auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                           /*implicit*/ true);
-    selfExpr->setType(selfDecl->getType());
+    selfExpr->setType(selfDecl->getTypeInContext());
 
     auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
         ctx, baseStruct->getClangDecl()->getOwningModule(), baseType,
@@ -4845,7 +4845,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto selfDecl = getterDecl->getImplicitSelfDecl();
   auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                         /*implicit*/ true);
-  selfExpr->setType(selfDecl->getType());
+  selfExpr->setType(selfDecl->getTypeInContext());
 
   auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
       ctx, baseStruct->getClangDecl()->getOwningModule(),
@@ -4863,7 +4863,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
     auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl,
                                               DeclNameLoc(),
                                               /*Implicit=*/ true);
-    paramRefExpr->setType(paramDecl->getType());
+    paramRefExpr->setType(paramDecl->getTypeInContext());
 
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {paramRefExpr});
     baseMember = SubscriptExpr::create(ctx, casted, argList, subscript);
@@ -4878,7 +4878,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
     baseMember =
         new (ctx) MemberRefExpr(casted, SourceLoc(), baseClassVar, DeclNameLoc(),
                                 /*Implicit=*/true, accessKind);
-    baseMember->setType(cast<VarDecl>(baseClassVar)->getType());
+    baseMember->setType(cast<VarDecl>(baseClassVar)->getTypeInContext());
   }
 
   auto ret = new (ctx) ReturnStmt(SourceLoc(), baseMember);
@@ -4914,7 +4914,7 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
     auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl,
                                               DeclNameLoc(),
                                               /*Implicit=*/ true);
-    paramRefExpr->setType(paramDecl->getType());
+    paramRefExpr->setType(paramDecl->getTypeInContext());
 
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {paramRefExpr});
     storedRef = SubscriptExpr::create(ctx, pointeePropertyRefExpr, argList, subscript);
@@ -4930,13 +4930,13 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
     storedRef =
         new (ctx) MemberRefExpr(pointeePropertyRefExpr, SourceLoc(), baseClassVar,
                                 DeclNameLoc(), /*Implicit=*/true, accessKind);
-    storedRef->setType(LValueType::get(cast<VarDecl>(baseClassVar)->getType()));
+    storedRef->setType(LValueType::get(cast<VarDecl>(baseClassVar)->getTypeInContext()));
   }
 
   auto newValueParamRefExpr =
       new (ctx) DeclRefExpr(setterDecl->getParameters()->get(0), DeclNameLoc(),
                             /*Implicit=*/true);
-  newValueParamRefExpr->setType(setterDecl->getParameters()->get(0)->getType());
+  newValueParamRefExpr->setType(setterDecl->getParameters()->get(0)->getTypeInContext());
 
   auto assignExpr =
       new (ctx) AssignExpr(storedRef, SourceLoc(), newValueParamRefExpr,
@@ -5998,14 +5998,15 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
   SmallVector<Argument, 8> forwardingParams;
   unsigned paramIndex = 0;
   for (auto param : *thunkDecl->getParameters()) {
-    if (isa<MetatypeType>(param->getType().getPointer())) {
+    if (isa<MetatypeType>(param->getInterfaceType().getPointer())) {
       paramIndex++;
       continue;
     }
-    auto paramTy = param->getType();
+    auto paramTy = param->getTypeInContext();
     auto isInOut = param->isInOut();
     auto specParamTy =
-        specializedFuncDecl->getParameters()->get(paramIndex)->getType();
+        specializedFuncDecl->getParameters()->get(paramIndex)
+          ->getTypeInContext();
 
     Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
                                                /*Implicit=*/true);
@@ -6059,7 +6060,8 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
   specializedFuncCallExpr->setThrows(false);
 
   Expr *resultExpr = nullptr;
-  if (specializedFuncCallExpr->getType()->isEqual(thunkDecl->getResultInterfaceType())) {
+  if (specializedFuncCallExpr->getType()->isEqual(
+        thunkDecl->getResultInterfaceType())) {
     resultExpr = specializedFuncCallExpr;
   } else {
     resultExpr = ForcedCheckedCastExpr::createImplicit(
@@ -6085,7 +6087,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   for (auto *newFnParam : *newDecl->getParameters()) {
     // If the un-specialized function had a parameter with type "Any" preserve
     // that parameter. Otherwise, use the new function parameter.
-    auto oldParamType = oldDecl->getParameters()->get(parameterIndex)->getType();
+    auto oldParamType = oldDecl->getParameters()->get(parameterIndex)->getInterfaceType();
     if (oldParamType->isEqual(newDecl->getASTContext().getAnyExistentialType())) {
       updatedAnyParams = true;
       auto newParam =
@@ -6144,10 +6146,10 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
 
   SmallVector<Argument, 8> forwardingParams;
   for (auto param : *thunkDecl->getParameters()) {
-    if (isa<MetatypeType>(param->getType().getPointer())) {
+    if (isa<MetatypeType>(param->getInterfaceType().getPointer())) {
       continue;
     }
-    auto paramTy = param->getType();
+    auto paramTy = param->getTypeInContext();
     auto isInOut = param->isInOut();
 
     Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),

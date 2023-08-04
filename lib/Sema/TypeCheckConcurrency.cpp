@@ -1043,7 +1043,7 @@ bool swift::diagnoseNonSendableTypesInReference(
 
   if (auto var = dyn_cast<VarDecl>(declRef.getDecl())) {
     Type propertyType = var->isLocalCapture()
-        ? var->getType()
+        ? var->getTypeInContext()
         : var->getValueInterfaceType().subst(subs);
     if (diagnoseNonSendableTypes(
             propertyType, fromDC, refLoc,
@@ -1300,13 +1300,13 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       StructDecl *legacyJobDecl = C.getJobDecl();
       StructDecl *unownedJobDecl = C.getUnownedJobDecl();
 
-      if (executorJobDecl && param->getType()->isEqual(executorJobDecl->getDeclaredInterfaceType())) {
+      if (executorJobDecl && param->getInterfaceType()->isEqual(executorJobDecl->getDeclaredInterfaceType())) {
         assert(moveOnlyEnqueueRequirement == nullptr);
         moveOnlyEnqueueRequirement = funcDecl;
-      } else if (legacyJobDecl && param->getType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
+      } else if (legacyJobDecl && param->getInterfaceType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
         assert(legacyMoveOnlyEnqueueRequirement == nullptr);
         legacyMoveOnlyEnqueueRequirement = funcDecl;
-      } else if (unownedJobDecl && param->getType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
+      } else if (unownedJobDecl && param->getInterfaceType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
         assert(unownedEnqueueRequirement == nullptr);
         unownedEnqueueRequirement = funcDecl;
       }

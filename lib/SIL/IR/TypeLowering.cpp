@@ -117,7 +117,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
          "should not have attempted to directly capture this variable");
 
   auto &lowering = getTypeLowering(
-      var->getType(), TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+      var->getTypeInContext(), TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                           expansion.getResilienceExpansion()));
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
@@ -149,14 +149,14 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // have the same lifetime as the closure itself, so we must capture
   // the box itself and not the payload, even if the closure is noescape,
   // otherwise they will be destroyed when the closure is formed.
-  if (var->getType()->is<ReferenceStorageType>()) {
+  if (var->getInterfaceType()->is<ReferenceStorageType>()) {
     return CaptureKind::Box;
   }
 
   // For 'let' constants
   if (!var->supportsMutation()) {
     assert(getTypeLowering(
-               var->getType(),
+               var->getTypeInContext(),
                TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                    expansion.getResilienceExpansion()))
                .isAddressOnly());
@@ -3939,7 +3939,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           continue;
 
         // We can always capture the storage in these cases.
-        Type captureType = capturedVar->getType()->getMetatypeInstanceType();
+        Type captureType = capturedVar->getTypeInContext()->getMetatypeInstanceType();
 
         if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
           captureType = selfType->getSelfType();

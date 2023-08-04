@@ -7385,7 +7385,7 @@ static llvm::Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
   // doesn't matter which declaration we use).
   for (ValueDecl *ValDecl : CurModuleResults) {
     auto *VD = cast<VarDecl>(ValDecl);
-    CanType DeclTy = VD->getType()->getCanonicalType();
+    CanType DeclTy = VD->getTypeInContext()->getCanonicalType();
     if (DeclTy == GlobalType.getASTType()
         && getDeclSILLinkage(VD) == GlobalLinkage) {
       return VD;

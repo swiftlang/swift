@@ -399,7 +399,7 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
   auto DC = VD->getDeclContext();
   
   // Make sure property is of same type as the type it is declared in
-  if (!VD->getType()->isEqual(DC->getSelfTypeInContext()))
+  if (!VD->getInterfaceType()->isEqual(DC->getSelfInterfaceType()))
     return;
   
   // Make sure this type conforms to OptionSet
@@ -1131,7 +1131,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   }
 
   auto &ctx = param->getASTContext();
-  auto paramTy = param->getType();
+  auto paramTy = param->getTypeInContext();
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
@@ -2268,7 +2268,7 @@ public:
     // NOTE: We do this here instead of TypeCheckAttr since types are not
     // completely type checked at that point.
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = VD->getType()->getCanonicalType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
         if (nom->isMoveOnly()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
@@ -3965,7 +3965,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // If we have a noimplicitcopy parameter, make sure that the underlying type
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = param->getType()->getCanonicalType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
         if (nom->isMoveOnly()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());

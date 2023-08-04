@@ -855,7 +855,7 @@ public:
         PrintOptions Options;
         Options.SynthesizeSugarOnTypes = true;
         Options.FullyQualifiedTypes = FullyQualified;
-        auto Ty = VD->getType();
+        auto Ty = VD->getInterfaceType();
         // Skip this declaration and its children if the type is an error type.
         if (Ty->is<ErrorType>()) {
           return false;

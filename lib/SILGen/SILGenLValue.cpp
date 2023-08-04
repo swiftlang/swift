@@ -3090,7 +3090,7 @@ void LValue::addNonMemberVarComponent(
                             LValueTypeData typeData) {
       assert(!ActorIso);
       SILType storageType =
-        SGF.getLoweredType(Storage->getType()).getAddressType();
+        SGF.getLoweredType(Storage->getTypeInContext()).getAddressType();
       LV.add<AddressorComponent>(Storage, addressor,
                                  /*isSuper=*/false, isDirect, Subs,
                                  CanType(), typeData, storageType, nullptr,

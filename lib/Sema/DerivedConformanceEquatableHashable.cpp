@@ -70,7 +70,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  assert(!cast<EnumDecl>(aParam->getType()->getAnyNominal())->hasCases());
+  assert(!cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal())->hasCases());
 
   SmallVector<ASTNode, 1> statements;
   SmallVector<ASTNode, 0> cases;
@@ -78,11 +78,11 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   // switch (a, b) { }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
                                   AccessSemantics::Ordinary,
-                                  aParam->getType());
+                                  aParam->getTypeInContext());
   auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
                                   AccessSemantics::Ordinary,
-                                  bParam->getType());
-  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
+                                  bParam->getTypeInContext());
+  TupleTypeElt abTupleElts[2] = { aParam->getTypeInContext(), bParam->getTypeInContext() };
   auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
   abExpr->setType(TupleType::get(abTupleElts, C));
   auto switchStmt =
@@ -106,7 +106,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
@@ -163,8 +163,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  Type enumType = aParam->getType();
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  Type enumType = aParam->getTypeInContext();
+  auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
   SmallVector<ASTNode, 4> cases;
@@ -299,7 +299,7 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto structDecl = cast<StructDecl>(aParam->getType()->getAnyNominal());
+  auto structDecl = cast<StructDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
 
@@ -688,7 +688,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto enumDecl = parentDC->getSelfEnumDecl();
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
-  Type enumType = selfDecl->getType();
+  Type enumType = selfDecl->getTypeInContext();
 
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
@@ -828,7 +828,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // 'self'
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
-  Type selfType = selfDecl->getType();
+  Type selfType = selfDecl->getTypeInContext();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true,
                                      AccessSemantics::Ordinary,

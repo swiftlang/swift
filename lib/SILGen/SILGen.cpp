@@ -1522,7 +1522,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     if (!vd || !vd->hasStorage()) continue;
 
     auto &ti = Types.getTypeLowering(
-        vd->getType(), TypeExpansionContext::maximalResilienceExpansionOnly());
+        vd->getTypeInContext(),
+        TypeExpansionContext::maximalResilienceExpansionOnly());
     if (!ti.isTrivial())
       return true;
   }
@@ -1666,7 +1667,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *onceBuiltin =
       cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("once")));
   auto blockParam = onceBuiltin->getParameters()->get(1);
-  auto *initType = blockParam->getType()->castTo<FunctionType>();
+  auto *initType = blockParam->getTypeInContext()->castTo<FunctionType>();
   auto initSILType = cast<SILFunctionType>(
       Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));
 

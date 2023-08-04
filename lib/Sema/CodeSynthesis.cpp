@@ -46,7 +46,7 @@ Expr *swift::buildSelfReference(VarDecl *selfDecl,
                                 SelfAccessorKind selfAccessorKind,
                                 bool isLValue, Type convertTy) {
   auto &ctx = selfDecl->getASTContext();
-  auto selfTy = selfDecl->getType();
+  auto selfTy = selfDecl->getTypeInContext();
 
   switch (selfAccessorKind) {
   case SelfAccessorKind::Peer:
@@ -112,7 +112,7 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
                                                  ASTContext &ctx) {
   SmallVector<Argument, 4> args;
   for (auto *param : params) {
-    auto type = param->getType();
+    auto type = param->getTypeInContext();
 
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
     ref->setType(param->isInOut() ? LValueType::get(type) : type);
