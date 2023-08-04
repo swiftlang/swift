@@ -3419,6 +3419,9 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   if (shouldImplicitImportAsSPI(targetDecl->getSPIGroups()))
     return true;
 
+  if (hasTestableOrPrivateImport(AccessLevel::Public, targetDecl, PrivateOnly))
+    return true;
+
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty())
     return false;

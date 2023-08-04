@@ -83,11 +83,8 @@ public func testSubscriptGetOnlyThroughParentClass_BaseLoadable_ResultAddressOnl
     var m = LoadableSubscriptGetOnlyTesterClassParent()
     m = LoadableSubscriptGetOnlyTesterClassParent()
     m.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.testerParent.tester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
 }
 
 // MARK: Getter + Setter.
@@ -178,7 +175,6 @@ public func testSubscriptGetSetThroughParentClass_BaseLoadable_ResultAddressOnly
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
@@ -207,7 +203,6 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Var() {
 public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Let() {
     let m = LoadableSubscriptReadModifyTester()
     m[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
 }
 
 public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_InOut(m: inout LoadableSubscriptReadModifyTester) {
@@ -272,7 +267,6 @@ public func testSubscriptReadModifyThroughParentClass_BaseLoadable_ResultAddress
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
@@ -359,7 +353,6 @@ public func testSubscriptGetModifyThroughParentClass_BaseLoadable_ResultAddressO
     m.testerParent.tester[0].nonMutatingFunc()
     m.testerParent.tester[0].mutatingFunc()
     m.computedTester[0].nonMutatingFunc()
-    // expected-error @-1 {{copy of noncopyable typed value}}
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
