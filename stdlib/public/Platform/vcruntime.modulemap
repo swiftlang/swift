@@ -105,7 +105,7 @@ module vcruntime [system] {
     export *
   }
 
-  explicit module stdint {
+  module stdint {
     header "stdint.h"
     export *
   }
