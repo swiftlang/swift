@@ -227,6 +227,9 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::Store##Name##Inst:                                  \
     return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
 #include "swift/AST/ReferenceStorage.def"
+
+  case SILInstructionKind::StoreBorrowInst:
+    return true;
   }
 }
 

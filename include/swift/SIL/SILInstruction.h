@@ -4421,7 +4421,17 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  using EndBorrowRange =
+      decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
+
+  /// Return a range over all EndBorrow instructions for this BeginBorrow.
+  EndBorrowRange getEndBorrows() const;
 };
+
+inline auto StoreBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return getUsersOfType<EndBorrowInst>();
+}
 
 /// Represents the end of a borrow scope of a value %val from a
 /// value or address %src.
