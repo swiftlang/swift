@@ -456,7 +456,7 @@ def localization_path : Separate<["-"], "localization-path">,
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
-  HelpText<"Specifies the Clang module cache path">;
+  HelpText<"Specifies the module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
