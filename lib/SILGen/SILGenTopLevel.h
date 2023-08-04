@@ -1,4 +1,4 @@
-//===--- SILGenToplevel.h - Function Specific AST lower context -*- C++ -*-===//
+//===--- SILGenTopLevel.h - Top-level Code Emission -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -22,7 +22,8 @@ namespace swift {
 
 namespace Lowering {
 
-/// Generates a `SILFunction` for toplevel code
+/// Generates a `SILFunction` for `TopLevelCodeDecl`s within a
+/// source file ran in script mode.
 class SILGenTopLevel : public ASTVisitor<SILGenTopLevel> {
 public:
   /// Generate SIL for toplevel code into `SGF`

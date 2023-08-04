@@ -133,24 +133,6 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
   return ManagedValue::forLValue(addr);
 }
 
-void SILGenFunction::emitMarkFunctionEscapeForTopLevelCodeGlobals(
-    SILLocation Loc, CaptureInfo CaptureInfo) {
-
-  llvm::SmallVector<SILValue, 4> Captures;
-
-  for (auto Capture : CaptureInfo.getCaptures()) {
-    // Decls captured by value don't escape.
-    auto It = VarLocs.find(Capture.getDecl());
-    if (It == VarLocs.end() || !It->getSecond().value->getType().isAddress())
-      continue;
-
-    Captures.push_back(It->second.value);
-  }
-
-  if (!Captures.empty())
-    B.createMarkFunctionEscape(Loc, Captures);
-}
-
 //===----------------------------------------------------------------------===//
 // Global initialization
 //===----------------------------------------------------------------------===//
