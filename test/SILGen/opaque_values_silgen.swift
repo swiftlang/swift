@@ -6,6 +6,10 @@
 
 class C {}
 
+struct MyInt {
+  var int: Int
+}
+
 func genericInout<T>(_: inout T) {}
 
 func hasVarArg(_ args: Any...) {}
@@ -677,4 +681,21 @@ func FormClassKeyPath() {
     var q: Int = 0
   }
   _ = \Q.q
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @UseGetterOnInout : {{.*}} {
+// CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] :
+// CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int) 
+// CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[CONTAINER_ADDR]]
+// CHECK:         [[KEYPATH_UP:%[^,]+]] = upcast [[KEYPATH]]
+// CHECK:         [[CONTAINER:%[^,]+]] = load [trivial] [[CONTAINER_ACCESS]]
+// CHECK:         [[GETTER:%[^,]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         [[VALUE:%[^,]+]] = apply [[GETTER]]<MyInt, Int>([[CONTAINER]], [[KEYPATH_UP]])
+// CHECK:         end_access [[CONTAINER_ACCESS]]
+// CHECK:         destroy_value [[KEYPATH_UP]]
+// CHECK:         return [[VALUE]] : $Int                                
+// CHECK-LABEL: } // end sil function 'UseGetterOnInout'
+@_silgen_name("UseGetterOnInout")
+func getInout(_ i: inout MyInt) -> Int {
+  return i[keyPath: \MyInt.int]
 }

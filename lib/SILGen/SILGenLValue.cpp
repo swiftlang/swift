@@ -2180,10 +2180,15 @@ static ManagedValue
 makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
                                      SILLocation loc, ManagedValue base) {
   if (base.isLValue()) {
-    auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
-    SGF.B.createCopyAddr(loc, base.getValue(), tmp,
-                         IsNotTake, IsInitialization);
-    return SGF.emitManagedBufferWithCleanup(tmp);
+    if (SGF.useLoweredAddresses()) {
+      auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
+      SGF.B.createCopyAddr(loc, base.getValue(), tmp, IsNotTake,
+                           IsInitialization);
+      return SGF.emitManagedBufferWithCleanup(tmp);
+    }
+    return SGF.emitLoad(loc, base.getValue(),
+                        SGF.getTypeLowering(base.getType()), SGFContext(),
+                        IsNotTake);
   }
 
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
