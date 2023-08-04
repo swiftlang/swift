@@ -1104,8 +1104,6 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       return;
     }
 
-    // TODO: Handle main SourceFile emission (currently done by
-    // SourceFileScope).
     auto loc = constant.getAsRegularLocation();
     preEmitFunction(constant, f, loc);
     auto *decl = constant.getDecl();
