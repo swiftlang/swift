@@ -456,7 +456,7 @@ public:
   }
 
   void noteLazyReemissionOfNominalTypeDescriptor(NominalTypeDecl *decl) {
-    assert(!Lowering::shouldSkipLowering(decl));
+    assert(decl->isAvailableDuringLowering());
     LazilyReemittedTypeContextDescriptors.insert(decl);
   }
 
@@ -466,7 +466,7 @@ public:
   }
 
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
-    assert(!Lowering::shouldSkipLowering(decl));
+    assert(decl->isAvailableDuringLowering());
     if (LazyMetadataAccessors.count(decl) == 0) {
       LazyMetadataAccessors.insert(decl);
     }
