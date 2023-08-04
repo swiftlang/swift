@@ -1834,6 +1834,18 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
   if (!fnExprType)
     return false;
 
+  // Check the 'self' argument.
+  if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn())) {
+    auto *base = selfApply->getBase();
+    if (diagnoseNonSendableTypes(
+            base->getType(),
+            declContext, base->getStartLoc(),
+            diag::non_sendable_call_argument,
+            isolationCrossing.value().exitsIsolation(),
+            isolationCrossing.value().getDiagnoseIsolation()))
+      return true;
+  }
+
   auto fnType = fnExprType->getAs<FunctionType>();
   if (!fnType)
     return false;

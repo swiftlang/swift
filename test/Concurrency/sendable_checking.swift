@@ -230,3 +230,29 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
   await a.f(s)
   await a.g(f)
 }
+
+@available(SwiftStdlib 5.1, *)
+final class NonSendable {
+  // expected-note@-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  var value = ""
+
+  @MainActor
+  func update() {
+    value = "update"
+  }
+
+  func call() async {
+    await update()
+    // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+
+    await self.update()
+    // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testNonSendableBaseArg() async {
+  let t = NonSendable()
+  await t.update()
+  // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+}
