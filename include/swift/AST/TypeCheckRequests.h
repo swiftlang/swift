@@ -3337,10 +3337,10 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Returns the resolved constraint types that an extension macro
-/// adds conformances to.
-class ResolveExtensionMacroConformances
-    : public SimpleRequest<ResolveExtensionMacroConformances,
+/// Returns the resolved constraint types that a macro references conformances
+/// to.
+class ResolveMacroConformances
+    : public SimpleRequest<ResolveMacroConformances,
                            ArrayRef<Type>(const MacroRoleAttr *, const Decl *),
                            RequestFlags::Cached> {
 public:

@@ -1533,12 +1533,56 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   return macroSourceFile->getBufferID();
 }
 
+// Collect the protocol conformances that the macro asked about but were
+// not already present on the declaration.
+static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
+    NominalTypeDecl *nominal, MacroRole role, MacroDecl *macro,
+    SmallVectorImpl<ProtocolDecl *> *potentialConformances = nullptr) {
+  SmallVector<ProtocolDecl *, 2> potentialConformancesBuffer;
+  if (!potentialConformances)
+    potentialConformances = &potentialConformancesBuffer;
+  macro->getIntroducedConformances(nominal, role, *potentialConformances);
+
+  TinyPtrVector<ProtocolDecl *> introducedConformances;
+  for (auto protocol : *potentialConformances) {
+    SmallVector<ProtocolConformance *, 2> existingConformances;
+    nominal->lookupConformance(protocol, existingConformances);
+
+    bool hasExistingConformance = llvm::any_of(
+        existingConformances,
+        [&](ProtocolConformance *conformance) {
+          return conformance->getSourceKind() !=
+              ConformanceEntryKind::PreMacroExpansion;
+        });
+
+    if (!hasExistingConformance) {
+      introducedConformances.push_back(protocol);
+    }
+  }
+
+  return introducedConformances;
+}
+
 llvm::Optional<unsigned> swift::expandMembers(CustomAttr *attr,
                                               MacroDecl *macro, Decl *decl) {
+  auto nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominal) {
+    auto ext = dyn_cast<ExtensionDecl>(decl);
+    if (!ext)
+      return llvm::None;
+
+    nominal = ext->getExtendedNominal();
+    if (!nominal)
+      return llvm::None;
+  }
+  auto introducedConformances = getIntroducedConformances(
+      nominal, MacroRole::Member, macro);
+
   // Evaluate the macro.
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
-                              /*passParentContext=*/false, MacroRole::Member);
+                              /*passParentContext=*/false, MacroRole::Member,
+                              introducedConformances);
   if (!macroSourceFile)
     return llvm::None;
 
@@ -1611,22 +1655,9 @@ llvm::Optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     return llvm::None;
   }
 
-  // Collect the protocol conformances that the macro can add. The
-  // macro should not add conformances that are already stated in
-  // the original source.
-
   SmallVector<ProtocolDecl *, 2> potentialConformances;
-  macro->getIntroducedConformances(nominal, potentialConformances);
-
-  SmallVector<ProtocolDecl *, 2> introducedConformances;
-  for (auto protocol : potentialConformances) {
-    SmallVector<ProtocolConformance *, 2> existingConformances;
-    nominal->lookupConformance(protocol, existingConformances);
-    if (existingConformances.empty()) {
-      introducedConformances.push_back(protocol);
-    }
-  }
-
+  auto introducedConformances = getIntroducedConformances(
+      nominal, MacroRole::Extension, macro, &potentialConformances);
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
                                                  role, introducedConformances);
@@ -1815,9 +1846,9 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
 }
 
 ArrayRef<Type>
-ResolveExtensionMacroConformances::evaluate(Evaluator &evaluator,
-                                            const MacroRoleAttr *attr,
-                                            const Decl *decl) const {
+ResolveMacroConformances::evaluate(Evaluator &evaluator,
+                                   const MacroRoleAttr *attr,
+                                   const Decl *decl) const {
   auto *dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
 
