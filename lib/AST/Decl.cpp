@@ -10044,10 +10044,9 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
     return {};
 
   // Underlying type is the type of rawValue
-  for (auto member : structDecl->getMembers())
-    if (auto varDecl = dyn_cast<VarDecl>(member))
-      if (varDecl->getName() == getASTContext().Id_rawValue)
-        return varDecl->getType();
+  auto results = structDecl->lookupDirect(getASTContext().Id_rawValue);
+  if (results.size() && isa<VarDecl>(results.front()))
+    return cast<VarDecl>(results.front())->getType();
 
   return {};
 }
