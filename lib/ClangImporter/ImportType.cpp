@@ -2179,6 +2179,10 @@ findGenericTypeInGenericDecls(ClangImporter::Implementation &impl,
       llvm::find_if(genericParams, [name](GenericTypeParamDecl *generic) {
         return generic->getName().str() == name;
       });
+  // We sometimes are unable compute the exact Swift type
+  // of symbolic declarations. Fallback to using `Any` in that case.
+  if (impl.importSymbolicCXXDecls && genericParamIter == genericParams.end())
+    return impl.SwiftContext.TheAnyType;
   // TODO: once we support generics in class types, replace this with
   // "return nullptr". Once support for template classes, this will need to
   // be updated, though. I'm leaving the assert here to make it easier to
