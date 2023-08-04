@@ -11501,17 +11501,6 @@ bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
           .getOpenedType();
 
   assignFixedType(typeVar, openedExpansionType, locator);
-
-  // We have a fully resolved contextual pack expansion type, let's
-  // apply it right away.
-  if (!contextualType->isEqual(openedExpansionType)) {
-    assert(contextualType->is<PackExpansionType>() &&
-           !contextualType->hasTypeVariable());
-    auto result = matchTypes(openedExpansionType, contextualType,
-                             ConstraintKind::Equal, {}, locator);
-    return !result.isFailure();
-  }
-
   return true;
 }
 
