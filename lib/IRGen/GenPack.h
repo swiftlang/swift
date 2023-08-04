@@ -120,6 +120,12 @@ emitDynamicTupleTypeLabels(IRGenFunction &IGF,
                            CanPackType packType,
                            llvm::Value *shapeExpression);
 
+StackAddress
+emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
+                                  AnyFunctionType::CanParamArrayRef params,
+                                  CanPackType packType,
+                                  llvm::Value *shapeExpression);
+
 } // end namespace irgen
 } // end namespace swift
 
