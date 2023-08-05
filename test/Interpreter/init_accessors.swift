@@ -749,3 +749,54 @@ func test_inheritance() {
 test_inheritance()
 // CHECK: test-inheritance-1: Person(firstName: <<unknown>>, age: 0)
 // CHECK-NEXT: test-inheritance-2: Person(firstName: Q, age: 42)
+
+do {
+  class BackingData<T> {
+    var data: [PartialKeyPath<T>: Any] = [:]
+
+    func get<V>(_ key: KeyPath<T, V>) -> V { data[key] as! V }
+    func set<V>(_ key: KeyPath<T, V>, _ value: V) {
+      data[key] = value
+    }
+  }
+
+  class Person : CustomStringConvertible {
+    var description: String {
+      "Person(name: \(name))"
+    }
+
+    private var backingData: BackingData<Person> = BackingData()
+
+    private var _name: Int
+
+    var name: String {
+      @storageRestrictions(accesses: backingData, initializes: _name)
+      init(newValue) {
+        self.backingData.set(\.name, newValue)
+        self._name = 0
+      }
+
+      get { self.backingData.get(\.name) }
+      set { self.backingData.set(\.name, newValue) }
+    }
+
+    init(name: String) {
+      self.name = name
+    }
+
+    init(backingData: BackingData<Person>) {
+      self.backingData = backingData
+      self._name = 0
+    }
+  }
+
+  let person = Person(name: "P")
+  print(person)
+
+  let localData = BackingData<Person>()
+  localData.set(\.name, "O")
+
+  print(Person(backingData: localData))
+}
+// CHECK: Person(name: P)
+// CHECK-NEXT: Person(name: O)
