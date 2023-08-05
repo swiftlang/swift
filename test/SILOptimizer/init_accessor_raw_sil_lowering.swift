@@ -46,11 +46,11 @@ final class TestIndirectionThroughStorage {
   // CHECK: [[STORAGE_INIT:%.*]] = function_ref @$s23assign_or_init_lowering29TestIndirectionThroughStorageC8_storage33_DE106275C2F16FB3D05881E72FBD87C8LLAA0H0_pAC1TAaFPRts_XPvpfi : $@convention(thin) () -> @out any Storage<TestIndirectionThroughStorage>
   // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT]]([[STORAGE_REF]]) : $@convention(thin) () -> @out any Storage<TestIndirectionThroughStorage>
   // Initialization:
-  // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.name, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $String, init {{.*}} : $@convention(thin) (@owned String, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (@owned String) -> ()
-  // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.age, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $Optional<Int>, init {{.*}} : $@convention(thin) (Optional<Int>, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (Optional<Int>) -> (
+  // CHECK: assign_or_init [init] #TestIndirectionThroughStorage.name, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $String, init {{.*}} : $@convention(thin) (@owned String, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (@owned String) -> ()
+  // CHECK: assign_or_init [init] #TestIndirectionThroughStorage.age, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $Optional<Int>, init {{.*}} : $@convention(thin) (Optional<Int>, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (Optional<Int>) -> ()
   // Explicit set:
   // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.name, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $String, init {{.*}} : $@convention(thin) (@owned String, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (@owned String) -> ()
-  // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.age, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $Optional<Int>, init {{.*}} : $@convention(thin) (Optional<Int>, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (Optional<Int>) -> (
+  // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.age, self %2 : $TestIndirectionThroughStorage, value {{.*}} : $Optional<Int>, init {{.*}} : $@convention(thin) (Optional<Int>, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (Optional<Int>) -> ()
   init(name: String, age: Int) {
     self.name = name
     self.age = age
@@ -61,8 +61,8 @@ final class TestIndirectionThroughStorage {
   // CHECK: [[STORAGE_INIT:%.*]] = function_ref @$s23assign_or_init_lowering29TestIndirectionThroughStorageC8_storage33_DE106275C2F16FB3D05881E72FBD87C8LLAA0H0_pAC1TAaFPRts_XPvpfi : $@convention(thin) () -> @out any Storage<TestIndirectionThroughStorage>
   // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT]]([[STORAGE_REF]]) : $@convention(thin) () -> @out any Storage<TestIndirectionThroughStorage>
   // Initialization:
-  // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.name, self %1 : $TestIndirectionThroughStorage, value {{.*}} : $String, init {{.*}} : $@convention(thin) (@owned String, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (@owned String) -> ()
-  // CHECK: assign_or_init [set] #TestIndirectionThroughStorage.age, self %1 : $TestIndirectionThroughStorage, value {{.*}} : $Optional<Int>, init {{.*}} : $@convention(thin) (Optional<Int>, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (Optional<Int>) -> ()
+  // CHECK: assign_or_init [init] #TestIndirectionThroughStorage.name, self %1 : $TestIndirectionThroughStorage, value {{.*}} : $String, init {{.*}} : $@convention(thin) (@owned String, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (@owned String) -> ()
+  // CHECK: assign_or_init [init] #TestIndirectionThroughStorage.age, self %1 : $TestIndirectionThroughStorage, value {{.*}} : $Optional<Int>, init {{.*}} : $@convention(thin) (Optional<Int>, @inout any Storage<TestIndirectionThroughStorage>) -> (), set {{.*}} : $@callee_guaranteed (Optional<Int>) -> ()
   // Explicit set:
   // CHECK: [[STORAGE_SETTER:%.*]] = function_ref @$s23assign_or_init_lowering29TestIndirectionThroughStorageC7storageAA0H0_pAC1TAaEPRts_XPvs : $@convention(method) (@in any Storage<TestIndirectionThroughStorage>, @guaranteed TestIndirectionThroughStorage) -> ()
   // CHECK-NEXT: {{.*}} = apply [[STORAGE_SETTER]]({{.*}}, %1) : $@convention(method) (@in any Storage<TestIndirectionThroughStorage>, @guaranteed TestIndirectionThroughStorage) -> ()
@@ -102,8 +102,8 @@ struct TestAccessOfOnePatternVars {
   // CHECK-NEXT: {{.*}} = apply [[Y_INIT]]() : $@convention(thin) () -> @owned String
   // CHECK-NOT: [[X_REF:%.*]] = struct_element_addr %3 : $*TestAccessOfOnePatternVars, #TestAccessOfOnePatternVars.x
   // CHECK-NOT: [[Y_REF:%.*]] = struct_element_addr {{.*}} : $*TestAccessOfOnePatternVars, #TestAccessOfOnePatternVars.y
-  // CHECK: assign_or_init [set] #TestAccessOfOnePatternVars.data, self {{.*}} : $*TestAccessOfOnePatternVars, value {{.*}} : $(Int, String), init {{.*}} : $@convention(thin) (Int, @owned String, @inout Int, @inout String) -> (), set {{.*}} : $@callee_guaranteed (Int, @owned String) -> ()
-  // CHECK: assign_or_init [set] #TestAccessOfOnePatternVars.other, self {{.*}} : $*TestAccessOfOnePatternVars, value {{.*}} : $Bool, init {{.*}} : $@convention(thin) (Bool, @inout Int) -> (), set {{.*}} : $@callee_guaranteed (Bool) -> ()
+  // CHECK: assign_or_init [init] #TestAccessOfOnePatternVars.data, self {{.*}} : $*TestAccessOfOnePatternVars, value {{.*}} : $(Int, String), init {{.*}} : $@convention(thin) (Int, @owned String, @inout Int, @inout String) -> (), set {{.*}} : $@callee_guaranteed (Int, @owned String) -> ()
+  // CHECK: assign_or_init [init] #TestAccessOfOnePatternVars.other, self {{.*}} : $*TestAccessOfOnePatternVars, value {{.*}} : $Bool, init {{.*}} : $@convention(thin) (Bool, @inout Int) -> (), set {{.*}} : $@callee_guaranteed (Bool) -> ()
   init(x: Int, y: String) {
     self.x = x
     self.y = y
@@ -196,7 +196,7 @@ struct Test {
   // CHECK-LABEL: sil hidden [ossa] @$s23assign_or_init_lowering4TestV1vACSi_tcfC : $@convention(method) (Int, @thin Test.Type) -> Test
   init(v: Int) {
     // CHECK: [[INIT_REF:%.*]] = function_ref @$s23assign_or_init_lowering4TestV4testSivi : $@convention(thin) (Int) -> ()
-    // CHECK: assign_or_init [set] #Test.test, self {{.*}}, value %0 : $Int, init [[INIT_REF]] : $@convention(thin) (Int) -> (), set {{.*}} : $@callee_guaranteed (Int) -> ()
+    // CHECK: assign_or_init [init] #Test.test, self {{.*}}, value %0 : $Int, init [[INIT_REF]] : $@convention(thin) (Int) -> (), set {{.*}} : $@callee_guaranteed (Int) -> ()
     self.test = v
   }
 }
