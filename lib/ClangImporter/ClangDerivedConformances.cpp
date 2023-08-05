@@ -101,7 +101,7 @@ static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
       if (params->size() != 1)
         continue;
       auto param = params->front();
-      if (param->getType()->getCanonicalType() !=
+      if (param->getTypeInContext()->getCanonicalType() !=
           valueType->getUnderlyingType()->getCanonicalType())
         continue;
       insert = candidateMethod;
@@ -167,8 +167,8 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
     auto rhs = params->get(1);
     if (lhs->isInOut() || rhs->isInOut())
       return false;
-    auto lhsTy = lhs->getType();
-    auto rhsTy = rhs->getType();
+    auto lhsTy = lhs->getTypeInContext();
+    auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
     auto lhsNominal = lhsTy->getAnyNominal();
@@ -197,8 +197,8 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     auto rhs = params->get(1);
     if (lhs->isInOut() || rhs->isInOut())
       return false;
-    auto lhsTy = lhs->getType();
-    auto rhsTy = rhs->getType();
+    auto lhsTy = lhs->getTypeInContext();
+    auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
     auto lhsNominal = lhsTy->getAnyNominal();
@@ -230,8 +230,8 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
     auto rhs = params->get(1);
     if (rhs->isInOut())
       return false;
-    auto lhsTy = lhs->getType();
-    auto rhsTy = rhs->getType();
+    auto lhsTy = lhs->getTypeInContext();
+    auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
     if (rhsTy->getCanonicalType() != distanceTy->getCanonicalType())
@@ -454,7 +454,7 @@ void swift::conformToCxxIteratorIfNeeded(
   // Check if present: `var pointee: Pointee { get }`
   auto pointeeId = ctx.getIdentifier("pointee");
   auto pointee = lookupDirectSingleWithoutExtensions<VarDecl>(decl, pointeeId);
-  if (!pointee || pointee->isGetterMutating() || pointee->getType()->hasError())
+  if (!pointee || pointee->isGetterMutating() || pointee->getTypeInContext()->hasError())
     return;
 
   // Check if `var pointee: Pointee` is settable. This is required for the
@@ -498,7 +498,7 @@ void swift::conformToCxxIteratorIfNeeded(
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),
-                               pointee->getType());
+                               pointee->getTypeInContext());
   if (pointeeSettable)
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxMutableInputIterator});

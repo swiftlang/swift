@@ -261,7 +261,7 @@ static bool enclosingInstanceTypeIsNever(ASTContext &ctx, SubscriptDecl *subscri
   if (param->getArgumentName() != ctx.Id_enclosingInstance)
     return false;
 
-  auto paramTy = param->getType();
+  auto paramTy = param->getTypeInContext();
   auto neverTy = ctx.getNeverType();
   return neverTy->isEqual(paramTy);
 }

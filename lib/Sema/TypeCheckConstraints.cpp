@@ -815,7 +815,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // Don't change the type of a variable that we've been able to
     // compute a type for.
     if (var->hasInterfaceType() &&
-        !var->getType()->hasUnboundGenericType() &&
+        !var->getTypeInContext()->hasUnboundGenericType() &&
         !var->isInvalid())
       return;
 

@@ -2116,7 +2116,7 @@ bool AssignmentFailure::diagnoseAsError() {
           if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
             return false;
 
-          if (!var->getType()->isEqual(VD->getType()))
+          if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
             return false;
 
           // Don't suggest a property if we're in one of its accessors.

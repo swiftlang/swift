@@ -1,4 +1,4 @@
-//===--- DeclSynthesizer.h - Synthesize helper Swift decls ----------------===//
+//===--- DeclSynthesizer.cpp - Synthesize helper Swift decls --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -72,7 +72,7 @@ static DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl,
   auto paramDecl = accessorDecl->getParameters()->get(index);
   auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl, DeclNameLoc(),
                                             /*Implicit*/ true);
-  paramRefExpr->setType(paramDecl->getType());
+  paramRefExpr->setType(paramDecl->getTypeInContext());
   return paramRefExpr;
 }
 
@@ -161,7 +161,7 @@ SwiftDeclSynthesizer::createVarWithPattern(DeclContext *dc, Identifier name,
 
 Pattern *SwiftDeclSynthesizer::createTypedNamedPattern(VarDecl *decl) {
   ASTContext &Ctx = decl->getASTContext();
-  Type ty = decl->getType();
+  Type ty = decl->getTypeInContext();
 
   Pattern *P = new (Ctx) NamedPattern(decl);
   P->setType(ty);
@@ -538,19 +538,19 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
       // Construct left-hand side.
       Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                         /*Implicit=*/true);
-      lhs->setType(LValueType::get(selfDecl->getType()));
+      lhs->setType(LValueType::get(selfDecl->getTypeInContext()));
 
       auto semantics = (var->hasStorage() ? AccessSemantics::DirectToStorage
                                           : AccessSemantics::Ordinary);
 
       lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), var, DeclNameLoc(),
                                     /*Implicit=*/true, semantics);
-      lhs->setType(LValueType::get(var->getType()));
+      lhs->setType(LValueType::get(var->getTypeInContext()));
 
       // Construct right-hand side.
       auto rhs = new (ctx) DeclRefExpr(parameters->get(paramPos), DeclNameLoc(),
                                        /*Implicit=*/true);
-      rhs->setType(parameters->get(paramPos)->getType());
+      rhs->setType(parameters->get(paramPos)->getTypeInContext());
 
       // Add assignment.
       auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
@@ -658,7 +658,7 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
   // Construct left-hand side.
   Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                     /*Implicit=*/true);
-  lhs->setType(LValueType::get(selfDecl->getType()));
+  lhs->setType(LValueType::get(selfDecl->getTypeInContext()));
 
   lhs = new (ctx)
       MemberRefExpr(lhs, SourceLoc(), storedRawValue, DeclNameLoc(),
@@ -670,10 +670,10 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
   auto *paramDecl = init->getParameters()->get(0);
   auto *paramRef =
       new (ctx) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit=*/true);
-  paramRef->setType(paramDecl->getType());
+  paramRef->setType(paramDecl->getTypeInContext());
 
   Expr *rhs = paramRef;
-  if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getType())) {
+  if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getInterfaceType())) {
     auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
     bridge->setType(storedType);
 
@@ -1207,12 +1207,12 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
   auto selfDecl = ctorDecl->getImplicitSelfDecl();
   auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
-  selfRef->setType(LValueType::get(selfDecl->getType()));
+  selfRef->setType(LValueType::get(selfDecl->getTypeInContext()));
 
   auto param = ctorDecl->getParameters()->get(0);
   auto paramRef = new (ctx) DeclRefExpr(param, DeclNameLoc(),
                                         /*implicit*/ true);
-  paramRef->setType(param->getType());
+  paramRef->setType(param->getTypeInContext());
 
   auto reinterpretCast = cast<FuncDecl>(
       getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
@@ -1284,7 +1284,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto *selfDecl = getterDecl->getImplicitSelfDecl();
   auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
-  selfRef->setType(selfDecl->getType());
+  selfRef->setType(selfDecl->getTypeInContext());
 
   auto reinterpretCast = cast<FuncDecl>(
       getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
@@ -1357,7 +1357,7 @@ synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto *selfDecl = getterDecl->getImplicitSelfDecl();
   auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
-  selfRef->setType(selfDecl->getType());
+  selfRef->setType(selfDecl->getTypeInContext());
 
   auto storedType = storedVar->getInterfaceType();
   auto storedRef = new (ctx)
@@ -1853,7 +1853,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
        itr != funcDecl->getParameters()->end(); itr++) {
     auto param = *itr;
     auto isInOut = param->isInOut();
-    auto paramTy = param->getType();
+    auto paramTy = param->getTypeInContext();
     Expr *paramRefExpr =
         new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit*/ true);
     paramRefExpr->setType(isInOut ? LValueType::get(paramTy) : paramTy);
@@ -1869,7 +1869,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 
   // Lhs parameter
   auto baseParam = funcDecl->getParameters()->front();
-  auto baseParamTy = baseParam->getType();
+  auto baseParamTy = baseParam->getTypeInContext();
   auto baseIsInOut = baseParam->isInOut();
 
   Expr *baseExpr =

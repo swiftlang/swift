@@ -971,7 +971,7 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   // If we have a normal self call, then use the emitRValueForDecl call. This
   // will emit self at +0 since it is guaranteed.
   ManagedValue Self =
-      SGF.emitRValueForDecl(E, E->getSelf(), E->getSelf()->getType(),
+      SGF.emitRValueForDecl(E, E->getSelf(), E->getSelf()->getTypeInContext(),
                             AccessSemantics::Ordinary)
           .getScalarValue();
 
@@ -4996,7 +4996,7 @@ namespace {
     }
 
     Type visitNamedPattern(NamedPattern *pattern) {
-      Type type = LValueType::get(pattern->getDecl()->getType());
+      Type type = LValueType::get(pattern->getDecl()->getTypeInContext());
       auto declRef = new (SGF.getASTContext()) DeclRefExpr(
           pattern->getDecl(), DeclNameLoc(), /*Implicit=*/true,
           AccessSemantics::Ordinary, type);

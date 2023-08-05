@@ -5666,9 +5666,10 @@ public:
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
-  /// Get the type of the variable within its context. If the context is generic,
-  /// this will use archetypes.
-  Type getType() const;
+  /// Maps the interface type of the variable declaration into the generic
+  /// environment of its parent DeclContext. Make sure this is what you want
+  /// and not just getInterfaceType().
+  Type getTypeInContext() const;
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.

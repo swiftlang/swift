@@ -940,10 +940,10 @@ static void checkFallthroughPatternBindingsAndTypes(
         continue;
       }
 
-      if (!previous->getType()->isEqual(expected->getType())) {
+      if (!previous->getTypeInContext()->isEqual(expected->getTypeInContext())) {
         ctx.Diags.diagnose(
             previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
-            previous->getType(), expected->getType());
+            previous->getTypeInContext(), expected->getTypeInContext());
         previous->setInvalid();
         expected->setInvalid();
       }
@@ -1544,10 +1544,10 @@ public:
       assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
       if (!initialCaseVarDecl->isInvalid() &&
-          !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
+          !vd->getInterfaceType()->isEqual(initialCaseVarDecl->getInterfaceType())) {
         getASTContext().Diags.diagnose(
             vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
-            vd->getType(), initialCaseVarDecl->getType());
+            vd->getInterfaceType(), initialCaseVarDecl->getInterfaceType());
         vd->setInvalid();
         initialCaseVarDecl->setInvalid();
       }

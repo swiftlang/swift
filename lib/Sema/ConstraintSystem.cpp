@@ -1407,7 +1407,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
           return ErrorType::get(getASTContext());
         }
 
-        return wantInterfaceType ? var->getInterfaceType() : var->getType();
+        return wantInterfaceType ? var->getInterfaceType() : var->getTypeInContext();
       },
       memberLocator, wantInterfaceType, adjustForPreconcurrency,
       GetClosureType{*this},
@@ -7202,7 +7202,7 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
 
 // Replace any error types encountered with placeholders.
 Type ConstraintSystem::getVarType(const VarDecl *var) {
-  auto type = var->getType();
+  auto type = var->getTypeInContext();
 
   // If this declaration is used as part of a code completion
   // expression, solver needs to glance over the fact that
