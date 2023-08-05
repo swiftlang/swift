@@ -1080,6 +1080,10 @@ function(add_swift_target_library_single target name)
       target_include_directories("${target}" SYSTEM PRIVATE
         ${SWIFTLIB_INCLUDE})
     endif()
+    if(libkind STREQUAL STATIC)
+      set_property(TARGET "${target}" PROPERTY
+        PREFIX lib)
+    endif()
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
