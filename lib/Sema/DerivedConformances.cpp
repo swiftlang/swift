@@ -755,7 +755,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                        AbstractFunctionDecl *funcDecl,
                                        const char *indexName) {
   ASTContext &C = enumDecl->getASTContext();
-  Type enumType = enumVarDecl->getType();
+  Type enumType = enumVarDecl->getTypeInContext();
   Type intType = C.getIntType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
@@ -812,7 +812,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
                                      /*implicit*/true,
                                      AccessSemantics::Ordinary,
-                                     enumVarDecl->getType());
+                                     enumVarDecl->getTypeInContext());
   auto switchStmt =
       SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
 

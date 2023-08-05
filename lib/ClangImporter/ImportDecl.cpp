@@ -2492,7 +2492,7 @@ namespace {
 
           // If we have a getter and a setter make sure the types line up.
           if (setter && !getter->getResultInterfaceType()->isEqual(
-                            setter->getParameters()->get(0)->getType()))
+                            setter->getParameters()->get(0)->getTypeInContext()))
             continue;
 
           // If the name that we would import this as already exists, then don't
@@ -3528,7 +3528,7 @@ namespace {
           assert(func->getParameters()->size() == 1);
           auto typeDecl = dc->getSelfNominalTypeDecl();
           auto parameter = func->getParameters()->get(0);
-          auto parameterType = parameter->getType();
+          auto parameterType = parameter->getTypeInContext();
           if (!typeDecl || !parameterType)
             return nullptr;
           if (parameter->isInOut())
@@ -6912,7 +6912,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
     // Make sure that the index types are equivalent.
     // FIXME: Rectify these the same way we do for element types.
-    if (!setterIndex->getType()->isEqual(getterIndex->getType())) {
+    if (!setterIndex->getInterfaceType()->isEqual(
+        getterIndex->getInterfaceType())) {
       // If there is an existing subscript operation, we're done.
       if (existingSubscript)
         return decl == getter ? existingSubscript : nullptr;

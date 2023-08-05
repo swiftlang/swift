@@ -792,7 +792,7 @@ void StmtEmitter::visitDiscardStmt(DiscardStmt *S) {
   // restriction until we get discard implemented the way we want.
   for (auto *varDecl : nominal->getStoredProperties()) {
     assert(varDecl->hasStorage());
-    auto varType = varDecl->getType();
+    auto varType = varDecl->getTypeInContext();
     auto &varTypeLowering = SGF.getTypeLowering(varType);
     if (!varTypeLowering.isTrivial()) {
       diagnose(getASTContext(),

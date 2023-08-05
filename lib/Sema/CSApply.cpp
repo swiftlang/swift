@@ -1083,7 +1083,7 @@ namespace {
 
         const auto calleeParam = calleeParams[idx];
         const auto calleeParamType = calleeParam.getParameterType();
-        const auto thunkParamType = thunkParamDecl->getType();
+        const auto thunkParamType = thunkParamDecl->getTypeInContext();
 
         Expr *paramRef = new (ctx)
             DeclRefExpr(thunkParamDecl, DeclNameLoc(), /*implicit*/ true);
@@ -6362,7 +6362,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
           ctx.Diags.diagnose(
               expr->getLoc(),
               diag::invalid_differentiable_function_conversion_expr);
-          if (paramDecl->getType()->is<AnyFunctionType>()) {
+          if (paramDecl->getInterfaceType()->is<AnyFunctionType>()) {
             auto *typeRepr = paramDecl->getTypeRepr();
             while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
               typeRepr = attributed->getTypeRepr();

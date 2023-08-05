@@ -616,7 +616,7 @@ public:
           DeclBaseName Name = PD->getName();
           Expr *PVVarRef = new (Context)
               DeclRefExpr(PD, DeclNameLoc(), /*implicit=*/true,
-                          AccessSemantics::Ordinary, PD->getType());
+                          AccessSemantics::Ordinary, PD->getTypeInContext());
           Added<Stmt *> Log(buildLoggerCall(PVVarRef, PD->getSourceRange(),
                                             Name.getIdentifier().str()));
           if (*Log) {
@@ -770,7 +770,7 @@ public:
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
-    NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getType());
+    NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getTypeInContext());
     PatternBindingDecl *PBD = PatternBindingDecl::createImplicit(
         Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 

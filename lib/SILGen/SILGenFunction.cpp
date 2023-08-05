@@ -1370,7 +1370,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
                             uint32_t paramIndex) -> SILValue {
-    Type parameterType = fd->getParameters()->get(paramIndex)->getType();
+    Type parameterType = fd->getParameters()->get(paramIndex)->getTypeInContext();
     SILType paramSILType = SILType::getPrimitiveObjectType(parameterType->getCanonicalType());
     // If the types are the same, we don't need to do anything!
     if (paramSILType == originalValue->getType())
