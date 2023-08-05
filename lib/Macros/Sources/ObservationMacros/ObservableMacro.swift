@@ -71,7 +71,7 @@ public struct ObservableMacro {
     AttributeSyntax(
       leadingTrivia: .space,
       atSign: .atSignToken(),
-      attributeName: SimpleTypeIdentifierSyntax(name: .identifier(ignoredMacroName)),
+      attributeName: IdentifierTypeSyntax(name: .identifier(ignoredMacroName)),
       trailingTrivia: .space
     )
   }
@@ -108,10 +108,10 @@ extension DiagnosticsError {
   }
 }
 
-extension ModifierListSyntax {
-  func privatePrefixed(_ prefix: String) -> ModifierListSyntax {
+extension DeclModifierListSyntax {
+  func privatePrefixed(_ prefix: String) -> DeclModifierListSyntax {
     let modifier: DeclModifierSyntax = DeclModifierSyntax(name: "private", trailingTrivia: .space)
-    return ModifierListSyntax([modifier] + filter {
+    return [modifier] + filter {
       switch $0.name.tokenKind {
       case .keyword(let keyword):
         switch keyword {
@@ -126,7 +126,7 @@ extension ModifierListSyntax {
       default:
         return true
       }
-    })
+    }
   }
   
   init(keyword: Keyword) {
@@ -178,7 +178,7 @@ extension VariableDeclSyntax {
     return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
-      modifiers: modifiers?.privatePrefixed(prefix) ?? ModifierListSyntax(keyword: .private),
+      modifiers: modifiers?.privatePrefixed(prefix) ?? DeclModifierListSyntax(keyword: .private),
       bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
       bindings: bindings.privatePrefixed(prefix),
       trailingTrivia: trailingTrivia
@@ -252,7 +252,7 @@ extension ObservableMacro: MemberAttributeMacro {
     
     
     return [
-      AttributeSyntax(attributeName: SimpleTypeIdentifierSyntax(name: .identifier(ObservableMacro.trackedMacroName)))
+      AttributeSyntax(attributeName: IdentifierTypeSyntax(name: .identifier(ObservableMacro.trackedMacroName)))
     ]
   }
 }

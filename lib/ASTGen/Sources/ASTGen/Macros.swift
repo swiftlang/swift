@@ -326,9 +326,9 @@ func checkMacroDefinition(
       return BridgedMacroDefinitionKind.externalMacro.rawValue
 
     case let .expansion(expansionSyntax, replacements: _)
-        where expansionSyntax.macro.text == "externalMacro":
+        where expansionSyntax.macroName.text == "externalMacro":
       // Extract the identifier from the "module" argument.
-      guard let firstArg = expansionSyntax.argumentList.first,
+      guard let firstArg = expansionSyntax.arguments.first,
             let firstArgLabel = firstArg.label?.text,
             firstArgLabel == "module",
             let module = identifierFromStringLiteral(firstArg.expression) else {
@@ -344,7 +344,7 @@ func checkMacroDefinition(
       }
 
       // Extract the identifier from the "type" argument.
-      guard let secondArg = expansionSyntax.argumentList.dropFirst().first,
+      guard let secondArg = expansionSyntax.arguments.dropFirst().first,
             let secondArgLabel = secondArg.label?.text,
             secondArgLabel == "type",
             let type = identifierFromStringLiteral(secondArg.expression) else {
@@ -514,9 +514,9 @@ func expandFreestandingMacroIPC(
 
   let macroName: String
   if let exprSyntax = expansionSyntax.as(MacroExpansionExprSyntax.self) {
-    macroName = exprSyntax.macro.text
+    macroName = exprSyntax.macroName.text
   } else if let declSyntax = expansionSyntax.as(MacroExpansionDeclSyntax.self) {
-    macroName = declSyntax.macro.text
+    macroName = declSyntax.macroName.text
   } else {
     fatalError("unknown syntax")
   }
@@ -1009,7 +1009,7 @@ func expandAttachedMacroInProcess(
       """
     let placeholderStruct = placeholderDecl.cast(StructDeclSyntax.self)
     if let inheritanceClause = placeholderStruct.inheritanceClause {
-      conformanceListSyntax = inheritanceClause.inheritedTypeCollection
+      conformanceListSyntax = inheritanceClause.inheritedTypes
     } else {
       conformanceListSyntax = nil
     }

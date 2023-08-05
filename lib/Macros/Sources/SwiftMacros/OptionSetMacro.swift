@@ -47,7 +47,7 @@ private let optionsEnumNameArgumentLabel = "optionsName"
 /// eventually be overridable.
 private let defaultOptionsEnumName = "Options"
 
-extension TupleExprElementListSyntax {
+extension LabeledExprListSyntax {
   /// Retrieve the first element with the given label.
   func first(labeled name: String) -> Element? {
     return first { element in
@@ -75,7 +75,7 @@ public struct OptionSetMacro {
   ) -> (StructDeclSyntax, EnumDeclSyntax, TypeSyntax)? {
     // Determine the name of the options enum.
     let optionsEnumName: String
-    if case let .argumentList(arguments) = attribute.argument,
+    if case let .argumentList(arguments) = attribute.arguments,
        let optionEnumNameArg = arguments.first(labeled: optionsEnumNameArgumentLabel) {
       // We have a options name; make sure it is a string literal.
       guard let stringLiteral = optionEnumNameArg.expression.as(StringLiteralExprSyntax.self),
@@ -99,7 +99,7 @@ public struct OptionSetMacro {
     // Find the option enum within the struct.
     let optionsEnums: [EnumDeclSyntax] = decl.memberBlock.members.compactMap({ member in
       if let enumDecl = member.decl.as(EnumDeclSyntax.self),
-         enumDecl.identifier.text == optionsEnumName {
+         enumDecl.name.text == optionsEnumName {
         return enumDecl
       }
 
@@ -112,8 +112,8 @@ public struct OptionSetMacro {
     }
 
     // Retrieve the raw type from the attribute.
-    guard let genericArgs = attribute.attributeName.as(SimpleTypeIdentifierSyntax.self)?.genericArgumentClause,
-          let rawType = genericArgs.arguments.first?.argumentType else {
+    guard let genericArgs = attribute.attributeName.as(IdentifierTypeSyntax.self)?.genericArgumentClause,
+          let rawType = genericArgs.arguments.first?.argument else {
       context.diagnose(OptionSetMacroDiagnostic.requiresOptionsEnumRawType.diagnose(at: attribute))
       return nil
     }
@@ -138,8 +138,8 @@ extension OptionSetMacro: ConformanceMacro {
     }
 
     // If there is an explicit conformance to OptionSet already, don't add one.
-    if let inheritedTypes = structDecl.inheritanceClause?.inheritedTypeCollection,
-       inheritedTypes.contains(where: { inherited in inherited.typeName.trimmedDescription == "OptionSet" }) {
+    if let inheritedTypes = structDecl.inheritanceClause?.inheritedTypes,
+       inheritedTypes.contains(where: { inherited in inherited.type.trimmedDescription == "OptionSet" }) {
       return []
     }
 
@@ -174,8 +174,8 @@ extension OptionSetMacro: MemberMacro {
 
     let staticVars = caseElements.map { (element) -> DeclSyntax in
       """
-      \(access) static let \(element.identifier): Self =
-        Self(rawValue: 1 << \(optionsEnum.identifier).\(element.identifier).rawValue)
+      \(access) static let \(element.name): Self =
+        Self(rawValue: 1 << \(optionsEnum.name).\(element.name).rawValue)
       """
     }
 
