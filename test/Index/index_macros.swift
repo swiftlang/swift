@@ -207,14 +207,16 @@ public struct SomeAccessorMacro: AccessorMacro {
   }
 }
 
-public struct SomeConformanceMacro: ConformanceMacro {
+public struct SomeConformanceMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    providingConformancesOf decl: some DeclGroupSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    let protocolName: TypeSyntax = "TestProto"
-    return [(protocolName, nil)]
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type.trimmed): TestProto {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }
 
