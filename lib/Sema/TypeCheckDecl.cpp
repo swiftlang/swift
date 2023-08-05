@@ -2029,10 +2029,13 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     return true;
 
   auto *DC = decl->getDeclContext();
+
   auto selfNominal = DC->getSelfNominalTypeDecl();
 
   // Check the parameters for a reference to 'Self'.
   bool isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
+  bool isTuple = isa_and_nonnull<BuiltinTupleDecl>(selfNominal);
+
   for (auto param : *decl->getParameters()) {
     // Look through a metatype reference, if there is one.
     auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
@@ -2057,11 +2060,12 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
         if (selfNominal == existential->getConstraintType()->getAnyNominal())
           return true;
       }
+    }
 
-      // For a protocol, is it the 'Self' type parameter?
-      if (auto genericParam = paramType->getAs<GenericTypeParamType>())
-        if (genericParam->isEqual(DC->getSelfInterfaceType()))
-          return true;
+    if (isProtocol || isTuple) {
+      // For a protocol or tuple extension, is it the 'Self' type parameter?
+      if (paramType->isEqual(DC->getSelfInterfaceType()))
+        return true;
     }
   }
 

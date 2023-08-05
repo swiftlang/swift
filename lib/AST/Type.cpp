@@ -261,6 +261,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::PackExpansion:
   case TypeKind::PackElement:
   case TypeKind::SILPack:
+  case TypeKind::BuiltinTuple:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -270,8 +271,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::DependentMember:
     assert(sig && "dependent types can't answer reference semantics query");
     return sig->requiresClass(type);
-  case TypeKind::BuiltinTuple:
-    llvm_unreachable("Should not get a BuiltinTupleType here");
   }
 
   llvm_unreachable("Unhandled type kind!");

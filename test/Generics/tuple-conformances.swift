@@ -34,3 +34,28 @@ func useConformance() {
 
   (1, 2, 3).f()
 }
+
+////
+
+extension Builtin.TheTupleType: Equatable where repeat each Elements: Equatable {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    var result = true
+    func update<E: Equatable>(lhs: E, rhs: E) {
+      result = result && (lhs == rhs)
+    }
+
+    repeat update(lhs: each lhs, rhs: each rhs)
+    return result
+  }
+}
+
+extension Builtin.TheTupleType: Hashable where repeat each Elements: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    repeat (each self).hash(into: &hasher)
+  }
+
+  // FIXME: This should be unnecessary
+  public var hashValue: Int {
+    return 0
+  }
+}
