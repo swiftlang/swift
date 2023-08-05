@@ -266,7 +266,7 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
 
     // Create reference to parameter member: `offset.<member>`.
     VarDecl *paramMember = nullptr;
-    auto *paramNominal = paramDecl->getType()->getAnyNominal();
+    auto *paramNominal = paramDecl->getTypeInContext()->getAnyNominal();
     assert(paramNominal && "Parameter should have a nominal type");
     // Find parameter member corresponding to returned nominal member.
     for (auto *candidate : paramNominal->getStoredProperties()) {
@@ -571,7 +571,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
           .diagnose(
               loc,
               diag::differentiable_nondiff_type_implicit_noderivative_fixit,
-              vd->getName(), vd->getType(), nominal->getName(),
+              vd->getName(), vd->getTypeInContext(), nominal->getName(),
               nominalCanDeriveAdditiveArithmetic)
           .fixItInsert(loc, "@noDerivative ");
       continue;

@@ -295,7 +295,7 @@ static void diagnoseFunctionParamNotRepresentable(
   } else {
     if (auto typeRepr = P->getTypeRepr())
       SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR, behavior);
+    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR, behavior);
   }
   Reason.describe(AFD);
 }
@@ -336,7 +336,7 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    if (param->getType()->hasError())
+    if (param->getTypeInContext()->hasError())
       return false;
 
     if (param->hasAttachedPropertyWrapper()) {
@@ -344,7 +344,7 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
           ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD)))
         continue;
-    } else if (param->getType()->isRepresentableIn(
+    } else if (param->getTypeInContext()->isRepresentableIn(
           ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD))) {
       continue;
@@ -354,7 +354,7 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
     AbstractFunctionDecl *overridden;
-    if (param->getType()->isVoid() && AFD->hasThrows() &&
+    if (param->getTypeInContext()->isVoid() && AFD->hasThrows() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
       if (foreignError &&
@@ -988,7 +988,7 @@ bool swift::isRepresentableInObjC(
 
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
-        auto type = paramList->get(errorParameterIndex - 1)->getType();
+        auto type = paramList->get(errorParameterIndex - 1)->getTypeInContext();
 
         // It can't be a trailing closure unless it has a specific form.
         // Only consider the rvalue type.

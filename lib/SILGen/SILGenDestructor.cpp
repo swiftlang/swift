@@ -300,7 +300,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
 
 void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
                                         ManagedValue selfValue, VarDecl *D) {
-  const TypeLowering &ti = getTypeLowering(D->getType());
+  const TypeLowering &ti = getTypeLowering(D->getTypeInContext());
   if (!ti.isTrivial()) {
     SILValue addr =
         B.createRefElementAddr(cleanupLoc, selfValue.getValue(), D,
@@ -509,7 +509,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
   }
   if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
     for (VarDecl *vd : nom->getStoredProperties()) {
-      const TypeLowering &ti = getTypeLowering(vd->getType());
+      const TypeLowering &ti = getTypeLowering(vd->getTypeInContext());
       if (ti.isTrivial())
         continue;
 

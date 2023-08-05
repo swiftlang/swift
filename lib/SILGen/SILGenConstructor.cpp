@@ -470,7 +470,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
-        assert(field->getType()->getReferenceStorageReferent()->isEqual(
+        assert(field->getTypeInContext()->getReferenceStorageReferent()->isEqual(
                    field->getParentExecutableInitializer()->getType()) &&
                "Initialization of field with mismatched type!");
 
@@ -617,7 +617,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto &lowering = getTypeLowering(selfDecl->getType());
+  auto &lowering = getTypeLowering(selfDecl->getTypeInContext());
 
   // Decide if we need to do extra work to warn on unsafe behavior in pre-Swift-5
   // modes.
@@ -731,7 +731,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                       SILType::getEmptyTupleType(C),
                       SubstitutionMap::get(zeroInit->getInnermostDeclContext()
                                                ->getGenericSignatureOfContext(),
-                                           {selfDecl->getType()},
+                                           {selfDecl->getTypeInContext()},
                                            {}),
                       selfLV.getLValueAddress());
     } else if (isa<StructDecl>(nominal) && nominal->isMoveOnly()
@@ -925,7 +925,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Allocate the "self" value.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  SILType selfTy = getLoweredType(selfDecl->getType());
+  SILType selfTy = getLoweredType(selfDecl->getTypeInContext());
   assert(selfTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
 
@@ -1094,7 +1094,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                    ctor->hasThrows(), ctor->getThrowsLoc(),
                                    /*ignored parameters*/ 1);
 
-  SILType selfTy = getLoweredLoadableType(selfDecl->getType());
+  SILType selfTy = getLoweredLoadableType(selfDecl->getTypeInContext());
   ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
   
   // is this a designated initializer for a distributed actor?
@@ -1328,7 +1328,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
 static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                           VarDecl *selfDecl) {
-  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
+  CanType selfFormalType = selfDecl->getTypeInContext()->getCanonicalType();
   if (selfFormalType->hasReferenceSemantics()) {
     return SGF.emitRValueForDecl(loc, selfDecl, selfFormalType,
                                  AccessSemantics::DirectToStorage,
@@ -1628,7 +1628,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
 
   // Emit 'self', then mark it uninitialized.
   auto selfDecl = cd->getDestructor()->getImplicitSelfDecl();
-  SILType selfTy = getLoweredLoadableType(selfDecl->getType());
+  SILType selfTy = getLoweredLoadableType(selfDecl->getTypeInContext());
   SILValue selfArg = F.begin()->createFunctionArgument(selfTy, selfDecl);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();

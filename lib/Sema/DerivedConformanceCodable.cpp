@@ -342,7 +342,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
             .isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
-          it->second->getType(),
+          it->second->getTypeInContext(),
       };
 
       auto var = it->second;

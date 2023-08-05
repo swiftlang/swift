@@ -7043,7 +7043,7 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
   
   // Load and reabstract the value if needed.
   auto genericSig = F.getLoweredFunctionType()->getInvocationGenericSignature();
-  auto substVarTy = var->getType()->getReducedType(genericSig);
+  auto substVarTy = var->getTypeInContext()->getCanonicalType();
   auto substAbstraction = AbstractionPattern(genericSig, substVarTy);
   return emitLoad(loc, visitor.varAddr, substAbstraction, substVarTy,
                   getTypeLowering(substAbstraction, substVarTy),

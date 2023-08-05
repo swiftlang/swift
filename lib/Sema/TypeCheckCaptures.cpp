@@ -206,7 +206,7 @@ public:
     if (VD->hasInterfaceType()
         && (!ObjC
             || !isa<VarDecl>(VD)
-            || !cast<VarDecl>(VD)->getType()->hasRetainablePointerRepresentation()))
+            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation()))
       checkType(VD->getInterfaceType(), VD->getLoc());
   }
 

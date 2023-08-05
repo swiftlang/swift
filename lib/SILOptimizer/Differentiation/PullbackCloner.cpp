@@ -1177,7 +1177,7 @@ public:
           } else {
             auto substMap = tangentVectorTy->getMemberSubstitutionMap(
                 field->getModuleContext(), field);
-            auto fieldTy = field->getType().subst(substMap);
+            auto fieldTy = field->getInterfaceType().subst(substMap);
             auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
             assert(fieldSILTy.isObject());
             eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
@@ -1253,7 +1253,7 @@ public:
         } else {
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
               field->getModuleContext(), field);
-          auto fieldTy = field->getType().subst(substMap);
+          auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
           eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
@@ -2701,7 +2701,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
         } else {
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
               field->getModuleContext(), field);
-          auto fieldTy = field->getType().subst(substMap);
+          auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
           eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
