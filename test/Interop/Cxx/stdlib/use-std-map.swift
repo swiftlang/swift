@@ -50,6 +50,24 @@ StdMapTestSuite.test("MapStrings.subscript") {
   expectEqual(m[std.string("abc")], std.string("qwe"))
 }
 
+StdMapTestSuite.test("NestedMap.subscript") {
+  var m = NestedMap()
+  expectNil(m[0])
+  expectNil(m[0])
+  m[1] = Map()
+  expectNotNil(m[1])
+
+  expectNil(m[1]![0])
+  m[1]![0] = 123
+  expectEqual(m[1]![0], 123)
+
+  m[1]![0] = nil
+  expectNil(m[1]![0])
+
+  m[1] = nil
+  expectNil(m[1])
+}
+
 StdMapTestSuite.test("UnorderedMap.subscript") {
   // This relies on the `std::unordered_map` conformance to `CxxDictionary` protocol.
   var m = initUnorderedMap()
