@@ -2906,6 +2906,15 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   assert(LastArgWritten == 1 && "emitting unnaturally to indirect result");
 
   Args[0] = result.getAddress();
+  if (IGF.IGM.Triple.isWindowsMSVCEnvironment() &&
+      getCallee().getRepresentation() ==
+          SILFunctionTypeRepresentation::CXXMethod &&
+      Args[1] == getCallee().getCXXMethodSelf()) {
+    // C++ methods in MSVC ABI pass `this` before the
+    // indirectly returned value.
+    std::swap(Args[0], Args[1]);
+    assert(!isa<llvm::UndefValue>(Args[1]));
+  }
   SILFunctionConventions FnConv(CurCallee.getSubstFunctionType(),
                                 IGF.getSILModule());
 
@@ -3275,6 +3284,37 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       }
       emitToMemory(temp, substResultTI, isOutlined);
       return;
+    }
+    if (IGF.IGM.Triple.isWindowsMSVCEnvironment() &&
+        getCallee().getRepresentation() ==
+            SILFunctionTypeRepresentation::CXXMethod &&
+        substResultType.isVoid()) {
+      // Some C++ methods return a value but are imported as
+      // returning `Void` (e.g. `operator +=`). In this case
+      // we should allocate the correct temp indirect return
+      // value for it.
+      // FIXME: MSVC ABI hits this as it makes some SIL direct
+      // returns as indirect at IR layer, so fix this for MSVC
+      // first to get this into Swfit 5.9. However, then investigate
+      // if this could also apply to Itanium ABI too.
+      auto fnType = getCallee().getFunctionPointer().getFunctionType();
+      assert(fnType->getNumParams() > 1);
+      auto func = dyn_cast<llvm::Function>(
+          getCallee().getFunctionPointer().getRawPointer());
+      if (func) {
+        // `this` comes before the returned value under the MSVC ABI
+        // so return value is parameter #1.
+        assert(func->hasParamAttribute(1, llvm::Attribute::StructRet));
+        auto resultTy = func->getParamStructRetType(1);
+        auto temp = IGF.createAlloca(resultTy, Alignment(/*safe alignment*/ 16),
+                                     "indirect.result");
+        if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+          temp = IGF.Builder.CreateElementBitCast(
+              temp, fnType->getParamType(1)->getNonOpaquePointerElementType());
+        }
+        emitToMemory(temp, substResultTI, isOutlined);
+        return;
+      }
     }
 
     StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
