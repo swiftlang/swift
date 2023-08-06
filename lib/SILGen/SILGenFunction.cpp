@@ -1017,7 +1017,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     prepareEpilog(fd->getResultInterfaceType(),
                   fd->hasThrows(), CleanupLocation(fd));
 
-    if (shouldLowerToUnavailableCodeStub(fd))
+    if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
 
     emitProfilerIncrement(fd->getTypecheckedBody());

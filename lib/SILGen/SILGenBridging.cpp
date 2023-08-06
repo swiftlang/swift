@@ -1553,7 +1553,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   SILDeclRef native = thunk.asForeign(false);
 
   if (thunk.hasDecl()) {
-    if (shouldLowerToUnavailableCodeStub(thunk.getDecl()))
+    if (thunk.getDecl()->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
   }
 
@@ -2068,7 +2068,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   auto nativeFnTy = F.getLoweredFunctionType();
   assert(nativeFnTy == nativeCI.SILFnType);
 
-  if (shouldLowerToUnavailableCodeStub(fd))
+  if (fd->requiresUnavailableDeclABICompatibilityStubs())
     emitApplyOfUnavailableCodeReached();
 
   // Use the same generic environment as the native entry point.

@@ -6025,7 +6025,7 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  if (shouldLowerToUnavailableCodeStub(witness.getDecl()))
+  if (witness.getDecl()->requiresUnavailableDeclABICompatibilityStubs())
     emitApplyOfUnavailableCodeReached();
 
   if (enterIsolation) {

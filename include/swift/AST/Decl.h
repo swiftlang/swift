@@ -1234,6 +1234,18 @@ public:
   llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr() const;
 
+  /// Returns true if this declaration should be considered available during
+  /// SIL/IR lowering. A declaration would not be available during lowering if,
+  /// for example, it is annotated as unavailable with \c @available and
+  /// optimization settings require that it be omitted.
+  bool isAvailableDuringLowering() const;
+
+  /// Returns true if ABI compatibility stubs must be emitted for the given
+  /// declaration. Decls marked unavailable with \c @available require these
+  /// stubs if the compiler flags have enabled unavailable declaration ABI
+  /// compatibility mode.
+  bool requiresUnavailableDeclABICompatibilityStubs() const;
+
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
   // SPI groups are inherited from the parent contexts only if the local decl

@@ -1563,7 +1563,7 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
   if (!type)
     return;
 
-  assert(!Lowering::shouldSkipLowering(type));
+  assert(type->isAvailableDuringLowering());
 
   // Force emission of ObjC protocol descriptors used by type refs.
   if (auto proto = dyn_cast<ProtocolDecl>(type)) {
@@ -2473,7 +2473,7 @@ void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariabl
 
 /// Emit a global declaration.
 void IRGenModule::emitGlobalDecl(Decl *D) {
-  if (Lowering::shouldSkipLowering(D))
+  if (!D->isAvailableDuringLowering())
     return;
 
   D->visitAuxiliaryDecls([&](Decl *decl) {
@@ -5550,7 +5550,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// The result is always a GlobalValue.
 Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
                                           ForDefinition_t forDefinition) {
-  assert(!Lowering::shouldSkipLowering(var));
+  assert(var->isAvailableDuringLowering());
 
   LinkEntity entity = LinkEntity::forFieldOffset(var);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
@@ -5559,7 +5559,7 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
                                        ForDefinition_t forDefinition) {
-  assert(!Lowering::shouldSkipLowering(Case));
+  assert(Case->isAvailableDuringLowering());
 
   LinkEntity entity = LinkEntity::forEnumCase(Case);
   auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, forDefinition);
@@ -5572,7 +5572,7 @@ Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   for (Decl *member : members) {
-    if (Lowering::shouldSkipLowering(member))
+    if (!member->isAvailableDuringLowering())
       continue;
 
     member->visitAuxiliaryDecls([&](Decl *decl) {
