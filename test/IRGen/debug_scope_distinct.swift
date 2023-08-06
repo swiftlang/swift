@@ -1,3 +1,5 @@
+// REQUIRES: differentiable_programming
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -DM -emit-module -emit-module-path %t/M.swiftmodule %s -module-name M
 // RUN: %target-swiftc_driver -O -g -I %t -c %s -emit-ir -o - | %FileCheck %s
