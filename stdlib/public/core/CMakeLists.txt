@@ -231,6 +231,7 @@ set(SWIFTLIB_SOURCES
   UnfoldSequence.swift
   UnsafeBufferPointerSlice.swift
   VarArgs.swift
+  With.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
   )

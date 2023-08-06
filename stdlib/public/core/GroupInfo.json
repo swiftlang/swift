@@ -105,7 +105,8 @@
         "DropWhile.swift",
         "PrefixWhile.swift",
         "LazyCollection.swift",
-        "LazySequence.swift"],
+        "LazySequence.swift"
+      ],
       "Array": [
         "Array.swift",
         "ArrayBody.swift",
@@ -121,7 +122,8 @@
         "ContiguouslyStored.swift",
         "FixedArray.swift",
         "SliceBuffer.swift",
-        "SwiftNativeNSArray.swift"],
+        "SwiftNativeNSArray.swift"
+      ],
       "HashedCollections": [
         "HashTable.swift",
         "Dictionary.swift",
@@ -164,20 +166,24 @@
     "SetAlgebra.swift",
     "BuiltinMath.swift",
     {
-    "Integers": [
-      "Integers.swift",
-      "IntegerTypes.swift",
-      "IntegerParsing.swift",
-      "StaticBigInt.swift"],
-    "Floating": [
-      "FloatingPoint.swift",
-      "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift",
-      "FloatingPointRandom.swift"],
-    "Vector": [
-      "SIMDConcreteOperations.swift",
-      "SIMDVector.swift",
-      "SIMDVectorTypes.swift"]}
+      "Integers": [
+        "Integers.swift",
+        "IntegerTypes.swift",
+        "IntegerParsing.swift",
+        "StaticBigInt.swift"
+      ],
+      "Floating": [
+        "FloatingPoint.swift",
+        "FloatingPointParsing.swift",
+        "FloatingPointTypes.swift",
+        "FloatingPointRandom.swift"
+      ],
+      "Vector": [
+        "SIMDConcreteOperations.swift",
+        "SIMDVector.swift",
+        "SIMDVectorTypes.swift"
+      ]
+    }
   ],
   "Optional": [
     "Optional.swift"
@@ -243,7 +249,8 @@
     "Int128.swift",
     "Duration.swift",
     "DurationProtocol.swift",
-    "Instant.swift"
+    "Instant.swift",
+    "With.swift"
   ],
   "Result": [
     "Result.swift"

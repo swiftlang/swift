@@ -10059,20 +10059,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial() &&
       memberName.getBaseIdentifier() == ctx.getIdentifier("with")) {
-    // In an actual implementation this would use `lookupInSwiftModule`,
-    // which would only perform lookup in the standard library module.
-    // While testing, use the current module instead.
-    auto _withModule = DC->getParentModule();
-    auto SF = DC->getParentSourceFile();
-
-    // Look up the decl for the global _with function
-    auto &ctx = DC->getASTContext();
-    auto _withName = ctx.getIdentifier("_with");
-
+    // Look up the decl for the global _with function defined
+    // in the standard library
     SmallVector<ValueDecl *, 1> decls;
-    namelookup::lookupInModule(
-        _withModule, _withName, decls, NLKind::QualifiedLookup,
-        namelookup::ResolutionKind::Overloadable, SF, NL_QualifiedDefault);
+    DC->getASTContext().lookupInSwiftModule("_with", decls);
 
     for (auto decl : decls) {
       result.addViable(getOverloadChoice(decl, /*isBridged=*/false,
