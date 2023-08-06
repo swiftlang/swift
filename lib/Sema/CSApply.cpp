@@ -1950,7 +1950,7 @@ namespace {
         cs.cacheType(result);
         closeExistentials(result, locator, /*force=*/openedExistential);
         return forceUnwrapIfExpected(result, memberLocator);
-      } else {
+      } else if (!baseIsInstance || member->isInstanceMember()) {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         ref = forceUnwrapIfExpected(ref, memberLocator);
@@ -1958,6 +1958,14 @@ namespace {
         if (Implicit) {
           apply->setImplicit();
         }
+      } else {
+        // If this wasn't an instance member, treat it as a standard CallExpr.
+        // This handles the implicit with function, which is spelled like an
+        // instance member in the surface syntax but actually refers to a global
+        // _with function defined in the standard library.
+        ref = forceUnwrapIfExpected(ref, memberLocator);
+        auto *argList = ArgumentList::forImplicitUnlabeled(context, {base});
+        apply = CallExpr::create(context, ref, argList, Implicit);
       }
 
       return finishApply(apply, adjustedOpenedType, locator, memberLocator);

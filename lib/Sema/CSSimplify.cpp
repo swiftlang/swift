@@ -23,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -166,8 +167,9 @@ bool constraints::containsPackExpansionType(TupleType *tuple) {
 
 bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
                                                 const ValueDecl *decl) {
-  assert(decl->getDeclContext()->isTypeContext() &&
-         "Expected a member reference");
+  if (!decl->getDeclContext()->isTypeContext()) {
+    return true;
+  }
 
   // For a reference to an instance method on a metatype, we want to keep the
   // curried self.
@@ -10050,6 +10052,31 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                                       /*isUnwrappedOptional=*/true,
                                       /*isUnwrapFallback=*/isFallback));
       }
+    }
+  }
+
+  // All types have an implicit `with` member
+  if (constraintKind == ConstraintKind::ValueMember &&
+      memberName.isSimpleName() && !memberName.isSpecial() &&
+      memberName.getBaseIdentifier() == ctx.getIdentifier("with")) {
+    // In an actual implementation this would use `lookupInSwiftModule`,
+    // which would only perform lookup in the standard library module.
+    // While testing, use the current module instead.
+    auto _withModule = DC->getParentModule();
+    auto SF = DC->getParentSourceFile();
+
+    // Look up the decl for the global _with function
+    auto &ctx = DC->getASTContext();
+    auto _withName = ctx.getIdentifier("_with");
+
+    SmallVector<ValueDecl *, 1> decls;
+    namelookup::lookupInModule(
+        _withModule, _withName, decls, NLKind::QualifiedLookup,
+        namelookup::ResolutionKind::Overloadable, SF, NL_QualifiedDefault);
+
+    for (auto decl : decls) {
+      result.addViable(getOverloadChoice(decl, /*isBridged=*/false,
+                                         /*isUnwrappedOptional=*/false));
     }
   }
 
