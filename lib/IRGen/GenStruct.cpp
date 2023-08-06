@@ -1578,7 +1578,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 
 void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
-  if (Lowering::shouldSkipLowering(opaque))
+  if (!opaque->isAvailableDuringLowering())
     return;
 
   if (IRGen.Opts.EnableAnonymousContextMangledNames) {

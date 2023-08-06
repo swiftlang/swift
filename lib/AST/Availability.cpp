@@ -298,6 +298,33 @@ llvm::Optional<AvailableAttrDeclPair> Decl::getSemanticUnavailableAttr() const {
                            llvm::None);
 }
 
+static bool isUnconditionallyUnavailable(const Decl *D) {
+  if (auto unavailableAttrAndDecl = D->getSemanticUnavailableAttr())
+    return unavailableAttrAndDecl->first->isUnconditionallyUnavailable();
+
+  return false;
+}
+
+bool Decl::isAvailableDuringLowering() const {
+  // Unconditionally unavailable declarations should be skipped during lowering
+  // when -unavailable-decl-optimization=complete is specified.
+  if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+      UnavailableDeclOptimization::Complete)
+    return true;
+
+  return !isUnconditionallyUnavailable(this);
+}
+
+bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
+  // Code associated with unavailable declarations should trap at runtime if
+  // -unavailable-decl-optimization=stub is specified.
+  if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+      UnavailableDeclOptimization::Stub)
+    return false;
+
+  return isUnconditionallyUnavailable(this);
+}
+
 bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
     ASTContext &Ctx) const {
   return RequiredDeploymentRange.getLowerEndpoint() <=
