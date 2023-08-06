@@ -853,9 +853,9 @@ private:
     if (hasPayload && (decl->isIndirect() || enumDecl->isIndirect()))
       flags.setIsIndirectCase();
 
-    Type interfaceType = Lowering::shouldSkipLowering(decl)
-                             ? nullptr
-                             : decl->getArgumentInterfaceType();
+    Type interfaceType = decl->isAvailableDuringLowering()
+                             ? decl->getArgumentInterfaceType()
+                             : nullptr;
 
     addField(flags, interfaceType, decl->getBaseIdentifier().str());
   }
