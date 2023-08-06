@@ -319,6 +319,9 @@ namespace swift {
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
 
+    /// Imports static arrays as collections.
+    bool CxxInteropStaticArrayAsCollection = false;
+
     /// Should the compiler require C++ interoperability to be enabled
     /// when importing Swift modules that enable C++ interoperability.
     bool RequireCxxInteropToImportCxxInteropModule = true;

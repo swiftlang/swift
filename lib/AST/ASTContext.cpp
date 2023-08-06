@@ -1142,6 +1142,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
+  case KnownProtocolKind::_UnsafeCxxStaticArray:
     M = getLoadedModule(Id_Cxx);
     break;
   default:

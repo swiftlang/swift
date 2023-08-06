@@ -1104,6 +1104,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_experimental_c_foreign_reference_types);
 
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
+  Opts.CxxInteropStaticArrayAsCollection =
+      Args.hasArg(OPT_cxx_interop_static_array_as_collection);
   Opts.RequireCxxInteropToImportCxxInteropModule =
       !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
 

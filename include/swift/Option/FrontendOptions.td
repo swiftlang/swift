@@ -868,6 +868,11 @@ def cxx_interop_getters_setters_as_properties :
   Flag<["-"], "cxx-interop-getters-setters-as-properties">,
   HelpText<"Import getters and setters as computed properties in Swift">,
   Flags<[FrontendOption, HelpHidden]>;
+  
+def cxx_interop_static_array_as_collection :
+  Flag<["-"], "cxx-interop-static-array-as-collection">,
+  HelpText<"Import static arrays as RandomAccessCollections; source breaking">,
+  Flags<[FrontendOption, HelpHidden]>;
 
 def cxx_interop_disable_requirement_at_import :
   Flag<["-"], "disable-cxx-interop-requirement-at-import">,

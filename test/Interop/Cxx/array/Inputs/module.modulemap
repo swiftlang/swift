@@ -1,0 +1,4 @@
+module StaticArrayCollection {
+  header "static-array-collection.h"
+  requires cplusplus
+}
