@@ -14,7 +14,7 @@
 ///
 /// C++ standard library types such as `std::map` and `std::unordered_map`
 /// conform to this protocol.
-public protocol CxxDictionary<Key, Value> {
+public protocol CxxDictionary where Key: Hashable {
   associatedtype Key
   associatedtype Value
   associatedtype Element: CxxPair<Key, Value>
@@ -59,20 +59,22 @@ extension CxxDictionary {
   }
   
   func filter(
-    _ isIncluded: (Key, Value) throws -> Bool
-  ) rethrows -> [Key: Value] {
+    _ isIncluded: (_ key: Key, _ value: Value) throws -> Bool
+) rethrows -> [Key: Value] {
     var filteredDictionary: [Key: Value] = [:]
-    let iterator = __findUnsafe(Key)
+    var iterator = __findUnsafe(Key) 
     let endIterator = __endUnsafe()
 
     while iterator != endIterator {
-      let pair = iterator.pointee
-      if try isIncluded(pair.first, pair.second) {
-        filteredDictionary[pair.first] = pair.second
-      }
-      iterator.successor()
+        let pair = iterator.pointee
+        if try isIncluded(pair.first, pair.second) {
+            filteredDictionary[pair.first] = pair.second
+        }
+        iterator = iterator.successor() 
     }
-  }
+
+    return filteredDictionary
+}
 }
 
 extension CxxDictionary {
