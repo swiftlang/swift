@@ -423,8 +423,8 @@ public:
 
   /// Create a CMV for a value of trivial type.
   static ConsumableManagedValue forUnmanaged(SILValue value) {
-    return { ManagedValue::forUnmanaged(value),
-             CastConsumptionKind::TakeAlways };
+    return {ManagedValue::forObjectRValueWithoutOwnership(value),
+            CastConsumptionKind::TakeAlways};
   }
 
   /// Create a CMV for an owned value.

@@ -895,8 +895,8 @@ public:
             loc, SILType::getPrimitiveObjectType(continuationTy),
             {continuation});
 
-        auto continuationMV =
-            ManagedValue::forUnmanaged(SILValue(wrappedContinuation));
+        auto continuationMV = ManagedValue::forObjectRValueWithoutOwnership(
+            SILValue(wrappedContinuation));
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,
             {continuationMV,
