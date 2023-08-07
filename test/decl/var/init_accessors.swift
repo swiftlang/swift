@@ -530,7 +530,7 @@ extension TestStructPropWithoutSetter {
 }
 
 do {
-  class TestClassPropWithoutSetter {
+  class TestClassPropWithoutSetter { // expected-error {{class 'TestClassPropWithoutSetter' has no initializers}}
     var x: Int {
       init {
       }
@@ -538,6 +538,44 @@ do {
       get { 0 }
     }
   }
+
+  // This should generate only memberwise initializer because `a` doesn't have a default
+  struct TestStructWithoutSetter { // expected-note {{'init(a:)' declared here}}
+    var a: Int {
+      init {
+      }
+      get { 0 }
+    }
+  }
+
+  _ = TestStructWithoutSetter() // expected-error {{missing argument for parameter 'a' in call}}
+  _ = TestStructWithoutSetter(a: 42) // Ok
+
+  struct TestDefaultInitializable {
+    var a: Int? {
+      init {}
+      get { nil }
+    }
+  }
+
+  _ = TestDefaultInitializable() // Ok (`a` is initialized to `nil`)
+
+  struct TestMixedDefaultInitializable {
+    var a: Int? {
+      init {}
+      get { nil }
+    }
+
+    var _b: String
+    var b: String? {
+      @storageRestrictions(initializes: _b)
+      init { _b = newValue ?? "" }
+      get { _b }
+      set { _b = newValue ?? "" }
+    }
+  }
+
+  _ = TestMixedDefaultInitializable() // Ok (both `a` and `b` are initialized to `nil`)
 
   class SubTestPropWithoutSetter : TestClassPropWithoutSetter {
     init(otherV: Int) {

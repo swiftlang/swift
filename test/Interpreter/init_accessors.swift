@@ -801,3 +801,49 @@ do {
 }
 // CHECK: Person(name: P)
 // CHECK-NEXT: Person(name: O)
+
+do {
+  struct TestDefaultInitializable : CustomStringConvertible {
+    var description: String {
+      "TestDefaultInitializable(a: \(a))"
+    }
+
+    var _a: Int?
+    var a: Int? {
+      @storageRestrictions(initializes: _a)
+      init { _a = newValue }
+      get { _a }
+    }
+  }
+
+  print(TestDefaultInitializable())
+  print(TestDefaultInitializable(a: 42))
+
+  struct TestMixedDefaultInitalizable : CustomStringConvertible {
+    var description: String {
+      "TestMixedDefaultInitalizable(a: \(a), b: \(b))"
+    }
+
+    var a: Int? {
+      init {}
+      get { nil }
+    }
+
+    var _b: String
+    var b: String? {
+      @storageRestrictions(initializes: _b)
+      init { self._b = (newValue ?? "") }
+      get { _b }
+      set { _b = newValue ?? "" }
+    }
+  }
+
+  print(TestMixedDefaultInitalizable())
+  print(TestMixedDefaultInitalizable(b: "Hello"))
+  print(TestMixedDefaultInitalizable(a: 42))
+}
+// CHECK: TestDefaultInitializable(a: nil)
+// CHECK-NEXT: TestDefaultInitializable(a: Optional(42))
+// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
+// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional("Hello"))
+// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
