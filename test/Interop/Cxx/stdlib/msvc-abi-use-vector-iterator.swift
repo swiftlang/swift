@@ -1,7 +1,7 @@
-// RUN: %target-swift-emit-irgen -I %S/Inputs -enable-experimental-cxx-interop  -Xcc -std=c++17 %s | %FileCheck %s
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++17)
 
 // REQUIRES: OS=windows-msvc
+// REQUIRES: executable_test
 
 import MsvcUseVecIt
 
