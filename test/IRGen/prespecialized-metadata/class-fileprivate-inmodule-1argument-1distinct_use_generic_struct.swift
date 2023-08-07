@@ -107,7 +107,7 @@ doit()
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 //      CHECK: }
 
-//         CHECK: ; Function Attrs: noinline nounwind readnone
+//         CHECK: ; Function Attrs: noinline nounwind memory(none)
 //         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CyAA4LeftACLLVySiGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
 // CHECK-unknown: ret
 //   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
