@@ -1341,6 +1341,12 @@ bool SILInstruction::mayRequirePackMetadata() const {
     if (isDeallocatingStack())
       return false;
 
+    // Terminators that exit the function must not result in pack metadata
+    // materialization.
+    auto *ti = dyn_cast<TermInst>(this);
+    if (ti && ti->isFunctionExiting())
+      return false;
+
     // Check results and operands for packs.  If a pack appears, lowering the
     // instruction might result in pack metadata emission.
     for (auto result : getResults()) {
