@@ -620,3 +620,33 @@ func test_invalid_storage_restrictions() {
     init() {}
   }
 }
+
+do {
+  struct Test1 {
+    var q: String
+    var a: Int? {
+      init {}
+      get { 42 }
+    }
+  }
+
+  _ = Test1(q: "some question") // Ok `a` is default initialized to `nil`
+  _ = Test1(q: "ultimate question", a: 42)
+
+  struct Test2 {
+    var q: String
+
+    var _a: Int?
+    var a: Int? {
+      @storageRestrictions(initializes: _a)
+      init {
+        _a = newValue
+      }
+      get { _a }
+      set { _a = newValue }
+    }
+  }
+
+  _ = Test2(q: "some question") // Ok `a` is default initialized to `nil`
+  _ = Test2(q: "ultimate question", a: 42)
+}
