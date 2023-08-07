@@ -24,7 +24,7 @@ import SIL
 /// ```
 /// are computed.
 ///
-let computeSideEffects = FunctionPass(name: "compute-side-effects", {
+let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   (function: Function, context: FunctionPassContext) in
 
   if function.isAvailableExternally {
@@ -71,7 +71,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
     effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
   }
-})
+}
 
 /// The collected argument and global side effects of the function.
 private struct CollectedEffects {
