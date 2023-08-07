@@ -899,8 +899,9 @@ public:
             SILValue(wrappedContinuation));
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,
-            {continuationMV,
-             ManagedValue::forUnmanaged(bridgedForeignError).copy(SGF, loc)},
+            {continuationMV, ManagedValue::forCopyOwnedObjectRValue(
+                                 SGF, loc, bridgedForeignError,
+                                 ManagedValue::ScopeKind::Lexical)},
             SGFContext());
 
         // Second, emit a branch from the end of the foreign error block to the

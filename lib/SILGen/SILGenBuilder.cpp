@@ -525,7 +525,8 @@ static ManagedValue createInputFunctionArgument(
     //
     // NOTE: If we have a trivial value, the copy will do nothing, so this is
     // just a convenient way to avoid writing conditional code.
-    return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
+    return ManagedValue::forCopyOwnedObjectRValue(
+        SGF, loc, arg, ManagedValue::ScopeKind::Lexical);
 
   case SILArgumentConvention::Direct_Owned:
     return SGF.emitManagedRValueWithCleanup(arg);
@@ -712,7 +713,8 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
   // identity implying that we need a copy of the casted value to be returned so
   // that the inputs/outputs of the case have separate ownership.
   if (isa<UncheckedBitwiseCastInst>(cast)) {
-    return ManagedValue::forUnmanaged(cast).copy(SGF, loc);
+    return ManagedValue::forCopyOwnedObjectRValue(
+        SGF, loc, cast, ManagedValue::ScopeKind::Lexical);
   }
 
   // Otherwise, we forward the cleanup of the input value and place the cleanup

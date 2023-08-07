@@ -92,6 +92,24 @@ public:
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
+  enum class ScopeKind {
+    Lexical,
+    FormalAccess,
+  };
+
+  /// Given a value \p value, create a copy of it and return the relevant
+  /// ManagedValue.
+  static ManagedValue forCopyOwnedObjectRValue(SILGenFunction &SGF,
+                                               SILLocation loc, SILValue value,
+                                               ScopeKind kind) {
+    assert(value && "No value specified");
+    assert(value->getType().isObject());
+    auto mv = ManagedValue::forUnmanaged(value);
+    if (kind == ScopeKind::Lexical)
+      return mv.copy(SGF, loc);
+    return mv.formalAccessCopy(SGF, loc);
+  }
+
   /// Create a managed value for a SILValue whose ownership is
   /// forwarded. Creates a new cleanup for +1 values. Forwarded +0 values
   /// require no cleanup.
