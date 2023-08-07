@@ -2797,6 +2797,7 @@ namespace {
         conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
         conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
         conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
       }
 
       if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
