@@ -764,7 +764,7 @@ ManagedValue SILGenBuilder::createOpenExistentialMetatype(SILLocation loc,
                                                           SILType openedType) {
   SILValue result = SILGenBuilder::createOpenExistentialMetatype(
       loc, value.getValue(), openedType);
-  return ManagedValue::forTrivialRValue(result);
+  return ManagedValue::forRValueWithoutOwnership(result);
 }
 
 ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,

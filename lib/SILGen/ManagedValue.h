@@ -196,8 +196,9 @@ public:
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
-  /// Create a managed value for a +0 trivial rvalue.
-  static ManagedValue forTrivialRValue(SILValue value) {
+  /// Create a managed value for a trivial address rvalue or an object rvalue
+  /// that has .none ownership.
+  static ManagedValue forRValueWithoutOwnership(SILValue value) {
     if (value->getType().isObject())
       return ManagedValue::forObjectRValueWithoutOwnership(value);
     return ManagedValue::forTrivialAddressRValue(value);
