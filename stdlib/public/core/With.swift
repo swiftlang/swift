@@ -12,6 +12,7 @@
 
 /// Private compiler-internal implementation of the `with` function
 /// that is implicitly available on all values.
+@_disfavoredOverload
 public func _with<T>(_ value: T) -> ((inout T) -> Void) -> T {
   { modify in
     var copy = value

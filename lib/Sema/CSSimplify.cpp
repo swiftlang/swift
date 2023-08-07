@@ -10055,21 +10055,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
-  // All types have an implicit `with` member
-  if (constraintKind == ConstraintKind::ValueMember &&
-      memberName.isSimpleName() && !memberName.isSpecial() &&
-      memberName.getBaseIdentifier() == ctx.getIdentifier("with")) {
-    // Look up the decl for the global _with function defined
-    // in the standard library
-    SmallVector<ValueDecl *, 1> decls;
-    DC->getASTContext().lookupInSwiftModule("_with", decls);
-
-    for (auto decl : decls) {
-      result.addViable(getOverloadChoice(decl, /*isBridged=*/false,
-                                         /*isUnwrappedOptional=*/false));
-    }
-  }
-
   // If we're about to fail lookup because there are no viable candidates
   // or if all of the candidates come from conditional conformances (which
   // might not be applicable), and we are looking for members in a type with
@@ -10113,6 +10098,23 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
             baseTy, SD, name, isValidKeyPathDynamicMemberLookup(SD));
         result.addUnviable(choice, subscripts.UnviableReasons[index]);
       }
+    }
+  }
+  
+  // All types have an implicit `with` member.
+  // To maximize source compatibility this is a disfavored overload,
+  // and doesn't suppress `@dynamicMemberLookup`.
+  if (constraintKind == ConstraintKind::ValueMember &&
+      memberName.isSimpleName() && !memberName.isSpecial() &&
+      memberName.getBaseIdentifier() == ctx.getIdentifier("with")) {
+    // Look up the decl for the global _with function defined
+    // in the standard library
+    SmallVector<ValueDecl *, 1> decls;
+    DC->getASTContext().lookupInSwiftModule("_with", decls);
+
+    for (auto decl : decls) {
+      result.addViable(getOverloadChoice(decl, /*isBridged=*/false,
+                                         /*isUnwrappedOptional=*/false));
     }
   }
 
