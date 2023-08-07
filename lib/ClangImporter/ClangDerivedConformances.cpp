@@ -335,11 +335,18 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 
   // Lookup the `operator==` function that will be called under the hood.
   clang::UnresolvedSet<16> operators;
+  clang::sema::DelayedDiagnosticPool diagPool{
+      impl.getClangSema().DelayedDiagnostics.getCurrentPool()};
+  auto diagState = impl.getClangSema().DelayedDiagnostics.push(diagPool);
   // Note: calling `CreateOverloadedBinOp` emits an error if the looked up
   // function is unavailable for the current target.
   auto underlyingCallResult = clangSema.CreateOverloadedBinOp(
       clang::SourceLocation(), operatorKind, operators, lhsParamRefExpr,
       rhsParamRefExpr);
+  impl.getClangSema().DelayedDiagnostics.popWithoutEmitting(diagState);
+
+  if (!diagPool.empty())
+    return false;
   if (!underlyingCallResult.isUsable())
     return false;
   auto underlyingCall = underlyingCallResult.get();
