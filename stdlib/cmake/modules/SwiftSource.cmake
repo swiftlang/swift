@@ -455,6 +455,10 @@ function(_compile_swift_files
       MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
       )
 
+  if(SWIFTFILE_STATIC)
+    list(APPEND swift_flags -static)
+  endif()
+
   # Determine the subdirectory where the binary should be placed.
   set(library_subdir_sdk "${SWIFTFILE_SDK}")
   if(maccatalyst_build_flavor STREQUAL "ios-like")
