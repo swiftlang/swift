@@ -190,6 +190,17 @@ class TestInitWithGuard {
 }
 
 do {
+  struct TestPropertyInitWithUnreachableBlocks {
+    var _a: Int
+    var a: Int? {
+      @storageRestrictions(initializes: _a)
+      init { _a = newValue ?? 0 } // Ok
+      get { 42 }
+    }
+  }
+}
+
+do {
   class Base<T: Collection> {
     private var _v: T
 
