@@ -49,7 +49,7 @@ func doit() {
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main9NamespaceO5ValueOMa"([[INT]] %0, ptr %1, ptr %2) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:      call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
