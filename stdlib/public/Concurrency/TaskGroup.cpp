@@ -1810,9 +1810,12 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
       swift_release(completedTask);
     }
 
-    waitingTask->runInFullyEstablishedContext();
-
+    // We MUST release the lock before we resume the waiting task, because the resumption
+    // will allow it to destroy the task group, in which case the unlock()
+    // would be performed on freed memory (!)
     unlock();
+
+    waitingTask->runInFullyEstablishedContext();
     return;
   }
 
