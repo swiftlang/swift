@@ -1804,7 +1804,7 @@ bool PullbackCloner::Implementation::run() {
   DominanceOrder domOrder(original.getEntryBlock(), domInfo);
   // Keep track of visited values.
   SmallPtrSet<SILValue, 8> visited;
-  // Also check for differentiable for all active values
+
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
   auto *swiftModule = getModule().getSwiftModule();
@@ -1869,6 +1869,7 @@ bool PullbackCloner::Implementation::run() {
       if (Projection::isAddressProjection(v))
         return false;
 
+      // Make sure that all active values are differentiable.
       auto diffConf =
           swiftModule->lookupConformance(type.getASTType(), diffProto);
       if (diffConf.isInvalid()) {
