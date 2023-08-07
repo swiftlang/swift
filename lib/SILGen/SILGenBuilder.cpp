@@ -707,7 +707,7 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
 
   // If we have a trivial inst, just return early.
   if (isa<UncheckedTrivialBitCastInst>(cast))
-    return ManagedValue::forUnmanaged(cast);
+    return ManagedValue::forObjectRValueWithoutOwnership(cast);
 
   // If we perform an unchecked bitwise case, then we are producing a new RC
   // identity implying that we need a copy of the casted value to be returned so
