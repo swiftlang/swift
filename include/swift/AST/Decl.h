@@ -1288,6 +1288,17 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
   return mem;
 }
 
+/// A convenience function object for filtering out decls that are not available
+/// during lowering.
+template <typename T>
+struct AvailableDuringLoweringDeclFilter {
+  llvm::Optional<T *> operator()(T *decl) const {
+    if (decl->isAvailableDuringLowering())
+      return decl;
+    return llvm::None;
+  }
+};
+
 // A private class for forcing exact field layout.
 class alignas(8) _GenericContext {
 // Not really public. See GenericContext.

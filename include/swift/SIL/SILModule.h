@@ -1079,16 +1079,6 @@ namespace Lowering {
 /// Objective-C runtime, i.e., +alloc and -dealloc.
 LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
 } // namespace Lowering
-
-/// Apply the given function to each ABI member of \c D skipping the members
-/// that should be skipped according to \c shouldSkipLowering()
-template <typename F>
-void forEachMemberToLower(IterableDeclContext *D, F &&f) {
-  for (auto *member : D->getABIMembers()) {
-    if (member->isAvailableDuringLowering())
-      f(member);
-  }
-}
 } // namespace swift
 
 #endif
