@@ -491,13 +491,32 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     if (!getSwiftModule()->getName().is("Cxx"))
       this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
 
-    // Only link with CxxStdlib on platforms where the overlay is available.
-    // Do not try to link CxxStdlib with itself.
-    if ((target.isOSDarwin() || (target.isOSLinux() && !target.isAndroid())) &&
-        !getSwiftModule()->getName().is("Cxx") &&
-        !getSwiftModule()->getName().is("CxxStdlib") &&
-        !getSwiftModule()->getName().is("std")) {
-      this->addLinkLibrary(LinkLibrary("swiftCxxStdlib", LibraryKind::Library));
+    // Do not try to link CxxStdlib with the C++ standard library, Cxx or
+    // itself.
+    if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
+                      [M = getSwiftModule()->getName().str()](StringRef Name) {
+                        return M == Name;
+                      })) {
+      // Only link with CxxStdlib on platforms where the overlay is available.
+      switch (target.getOS()) {
+      case llvm::Triple::Linux:
+        if (!target.isAndroid())
+          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
+                                           LibraryKind::Library));
+        break;
+      case llvm::Triple::Win32: {
+        bool isStatic = Context.getModuleByName("CxxStdlib")->isStaticLibrary();
+        this->addLinkLibrary(
+            LinkLibrary(isStatic ? "libswiftCxxStdlib" : "swiftCxxStdlib",
+                        LibraryKind::Library));
+        break;
+      }
+      default:
+        if (target.isOSDarwin())
+          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
+                                           LibraryKind::Library));
+        break;
+      }
     }
   }
 

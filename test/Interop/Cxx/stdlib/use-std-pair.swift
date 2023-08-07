@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-//
+
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -15,7 +15,6 @@ StdPairTestSuite.test("StdPairInts.init") {
   expectEqual(pi.second, 2)
 }
 
-#if !os(Windows) // FIXME: enable once swiftCxxStdlib is built on Windows (https://github.com/apple/swift/issues/67649)
 StdPairTestSuite.test("StdPairStrings.init") {
   let ps = PairStrings(first: std.string(), second: std.string())
   expectEqual(ps.first, std.string())
@@ -25,7 +24,6 @@ StdPairTestSuite.test("StdPairStrings.init") {
   expectEqual(ps2.first, std.string("abc"))
   expectEqual(ps2.second, std.string("123"))
 }
-#endif
 
 StdPairTestSuite.test("StdPair.elements") {
   var pi = getIntPair()
