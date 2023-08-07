@@ -554,14 +554,10 @@ public:
     // Now we must register all other public symbols defined by
     // the module with the JIT
     llvm::orc::SymbolFlagsMap Symbols;
-    // Register all global objects, including global
+    // Register all global values, including global
     // variables and functions
-    for (const auto &Global : Module->global_objects()) {
-      addGlobal(Symbols, Global);
-    }
-    // Register all global aliases
-    for (const auto &Global : Module->aliases()) {
-      addGlobal(Symbols, Global);
+    for (const auto &GV : Module->global_values()) {
+      addGlobal(Symbols, GV);
     }
     // Register the symbols we have discovered with the JIT
     if (auto Err = R->defineMaterializing(Symbols)) {
