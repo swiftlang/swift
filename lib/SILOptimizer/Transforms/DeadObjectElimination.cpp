@@ -289,11 +289,17 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
-  // If we see a store here, we have already checked that we are storing into
-  // the pointer before we added it to the worklist, so we can skip it.
+  // We have already checked that we are storing into the pointer before we
+  // added it to the worklist. Here, in the case we are allowing non-trivial
+  // stores, check if the store's source is lexical, if so return false.
+  // Deleting a dead object with non-trivial stores, will need compensating
+  // destroys at the store for it's source, which will shorten the lifetime of
+  // the store's source.
   if (auto *store = dyn_cast<StoreInst>(Inst)) {
-    return !onlyAcceptTrivialStores ||
-           store->getSrc()->getType().isTrivial(*store->getFunction());
+    auto storeSrc = store->getSrc();
+    return storeSrc->getType().isTrivial(*store->getFunction()) ||
+           (!onlyAcceptTrivialStores &&
+            (!store->getFunction()->hasOwnership() || !storeSrc->isLexical()));
   }
 
   // Conceptually this instruction has no side-effects.
@@ -943,11 +949,18 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
     return false;
   }
 
-  // In non-ossa, bail out if we have non-trivial pattern operands
-  if (!KPI->getFunction()->hasOwnership()) {
-    for (const Operand &Op : KPI->getPatternOperands()) {
-      if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+  bool hasOwnership = KPI->getFunction()->hasOwnership();
+  for (const Operand &Op : KPI->getPatternOperands()) {
+    // In non-ossa, bail out if we have non-trivial pattern operands.
+    if (!hasOwnership) {
+      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
         return false;
+      continue;
+    }
+    // In ossa, bail out if we have non-trivial pattern operand values that are
+    // lexical.
+    if (Op.get()->isLexical()) {
+      return false;
     }
   }
 
