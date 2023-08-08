@@ -4915,14 +4915,14 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
       !useLoweredAddresses && value->getType().isTrivial(getFunction())
-          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
           : yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isGuaranteed()) {
       !useLoweredAddresses && value->getType().isTrivial(getFunction())
-          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
           : yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
-      yields.push_back(ManagedValue::forTrivialRValue(value));
+      yields.push_back(ManagedValue::forRValueWithoutOwnership(value));
     }
   }
 
