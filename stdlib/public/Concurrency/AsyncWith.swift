@@ -1,4 +1,4 @@
-//===--- With.swift -------------------------------------------------------===//
+//===--- AsyncWith.swift --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,28 +10,32 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Implementation of the `with` function that is implicitly available on all values.
+import Swift
+
+// Non-async implementations defined in public/Core/With.swift
+
+/// Async implemtation of the `with` function that is implicitly available on all values.
 @inlinable
 @_disfavoredOverload
+@available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 5.10)
-public func _with<T>(_ value: T) -> ((inout T) -> Void) -> T {
+public func _with<T>(_ value: T) -> ((inout T) async -> Void) async -> T {
   { modify in
     var copy = value
-    modify(&copy)
+    await modify(&copy)
     return copy
   }
 }
 
-/// Throwing implementation of the `with` function that is implicitly available on all values.
+/// Async and throwing implementation of the `with` function that is implicitly available on all values.
 @inlinable
 @_disfavoredOverload
+@available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 5.10)
-public func _with_throws<T>(_ value: T) -> ((inout T) throws -> Void) throws -> T {
+public func _with_throws<T>(_ value: T) -> ((inout T) async throws -> Void) async throws -> T {
   { modify in
     var copy = value
-    try modify(&copy)
+    try await modify(&copy)
     return copy
   }
 }
-
-// Async implementations defined in public/Concurrency/AsyncWith.swift

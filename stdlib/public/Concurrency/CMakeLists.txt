@@ -126,6 +126,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncStream.swift
   AsyncThrowingStream.swift
   AsyncStream.cpp
+  AsyncWith.swift
   Deque/_DequeBuffer.swift
   Deque/_DequeBufferHeader.swift
   Deque/_DequeSlot.swift

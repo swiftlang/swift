@@ -10107,13 +10107,35 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial() &&
       memberName.getBaseIdentifier() == ctx.getIdentifier("with")) {
-    // Look up the decl for the global _with function defined
-    // in the standard library
-    SmallVector<ValueDecl *, 1> decls;
-    DC->getASTContext().lookupInSwiftModule("_with", decls);
 
-    for (auto decl : decls) {
-      result.addViable(getOverloadChoice(decl, /*isBridged=*/false,
+    // Look up the global _with decls defined in the standard library
+    SmallVector<ValueDecl *, 1> withDecls;
+    DC->getASTContext().lookupInSwiftModule("_with", withDecls);
+
+    SmallVector<ValueDecl *, 1> withThrowsDecls;
+    DC->getASTContext().lookupInSwiftModule("_with_throws", withThrowsDecls);
+
+    // Async variants are defined in the concurrency module
+    if (auto concurrency = ctx.getLoadedModule(ctx.Id_Concurrency)) {
+      DC->getASTContext().lookupInModule(concurrency, "_with", withDecls);
+      DC->getASTContext().lookupInModule(concurrency, "_with_throws",
+                                         withThrowsDecls);
+    }
+
+    for (auto withDecl : withDecls) {
+      result.addViable(getOverloadChoice(withDecl, /*isBridged=*/false,
+                                         /*isUnwrappedOptional=*/false));
+    }
+
+    for (auto withThrowsDecl : withThrowsDecls) {
+      // The _with and _with_throws decls have the same type signature,
+      // except _with_throws is also throwing. Overload resolution doesn't
+      // handle this by default, so we have to set the throwing decl
+      // as disfavored. We can't simply use `@_disfavoredOverload` because
+      // the non-throwing decl is already marked with `@_disfavoredOverload`.
+      withThrowsDecl->setDisfavorValue(true);
+
+      result.addViable(getOverloadChoice(withThrowsDecl, /*isBridged=*/false,
                                          /*isUnwrappedOptional=*/false));
     }
   }

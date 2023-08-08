@@ -3812,6 +3812,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If this overload is disfavored, note that.
     if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
       increaseScore(SK_DisfavoredOverload, locator);
+
+    // If the overload decl has its `Disfavor` value set, note that as well.
+    if (decl->getDisfavorValue())
+      increaseScore(SK_DisfavoredOverload, locator);
   }
 
   if (choice.isFallbackMemberOnUnwrappedBase()) {

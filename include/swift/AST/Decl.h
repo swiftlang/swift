@@ -344,7 +344,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -367,7 +367,12 @@ protected:
     /// a local context, but should behave like a top-level
     /// declaration for name lookup purposes. This is used by
     /// lldb.
-    Hoisted : 1
+    Hoisted : 1,
+                 
+    /// Whether this declaration should be disfavored with respect
+    /// to other potential overloads. This increases the overload score
+    /// in addition to the separate `@_disfavoredOverload` attr.
+    Disfavor : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -817,6 +822,7 @@ protected:
     Bits.Decl.FromClang = false;
     Bits.Decl.EscapedFromIfConfig = false;
     Bits.Decl.Hoisted = false;
+    Bits.Decl.Disfavor = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -1254,6 +1260,13 @@ public:
   /// Retrieve the diagnostic engine for diagnostics emission.
   LLVM_READONLY
   DiagnosticEngine &getDiags() const;
+
+  /// Whether this declaration should be disfavored with respect
+  /// to other potential overloads. This increases the overload score
+  /// in addition to the separate `@_disfavoredOverload` attr.
+  bool getDisfavorValue() const { return Bits.Decl.Disfavor; }
+
+  void setDisfavorValue(bool Disfavor) { Bits.Decl.Disfavor = Disfavor; }
 };
 
 /// Allocates memory for a Decl with the given \p baseSize. If necessary,
