@@ -1293,10 +1293,10 @@ public:
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
     // uninitialized uses.
-    if (&SGF == SGF.SGM.TopLevelSGF) {
-      SGF.SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(e,e->getCaptureInfo());
+    if (SGF.isEmittingTopLevelCode()) {
+      SGF.emitMarkFunctionEscapeForTopLevelCodeGlobals(e, e->getCaptureInfo());
     }
-    
+
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
 

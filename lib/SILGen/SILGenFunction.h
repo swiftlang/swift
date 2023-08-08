@@ -594,7 +594,8 @@ public:
   /// Tracer object for counting SIL (and other events) caused by this instance.
   FrontendStatsTracer StatsTracer;
 
-  SILGenFunction(SILGenModule &SGM, SILFunction &F, DeclContext *DC);
+  SILGenFunction(SILGenModule &SGM, SILFunction &F, DeclContext *DC,
+                 bool IsEmittingTopLevelCode = false);
   ~SILGenFunction();
   
   /// Return a stable reference to the current cleanup.
@@ -693,6 +694,9 @@ public:
     return SGM.Types.getConstantInfo(context, constant);
   }
 
+  bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
+  void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }
+
   llvm::Optional<SILAccessEnforcement>
   getStaticEnforcement(VarDecl *var = nullptr);
   llvm::Optional<SILAccessEnforcement>
@@ -714,6 +718,8 @@ public:
                                       bool ForMetaInstruction = false);
 
 private:
+  bool IsEmittingTopLevelCode;
+
   const SILDebugScope *getOrCreateScope(SourceLoc SLoc);
   const SILDebugScope *getMacroScope(SourceLoc SLoc);
   const SILDebugScope *
@@ -916,6 +922,9 @@ public:
   /// Generate code to obtain the address of the given global variable.
   ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var,
                                      llvm::Optional<ActorIsolation> actorIso);
+
+  void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation Loc,
+                                                    CaptureInfo CaptureInfo);
 
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
