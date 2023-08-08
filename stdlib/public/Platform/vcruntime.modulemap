@@ -667,7 +667,7 @@ module std [system] {
   }
 
   module unordered_set {
-    requires unordered_set
+    requires cplusplus11
     header "unordered_set"
     export *
   }
