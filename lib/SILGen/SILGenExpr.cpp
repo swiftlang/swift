@@ -152,10 +152,10 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
   assert(lowering.getLoweredType().getObjectType() ==
          v->getType().getObjectType());
   if (lowering.isTrivial())
-    return ManagedValue::forUnmanaged(v);
+    return ManagedValue::forRValueWithoutOwnership(v);
 
   if (v->getOwnershipKind() == OwnershipKind::None)
-    return ManagedValue::forUnmanaged(v);
+    return ManagedValue::forRValueWithoutOwnership(v);
 
   if (v->getOwnershipKind() == OwnershipKind::Guaranteed)
     return ManagedValue::forUnmanaged(v);
@@ -2867,7 +2867,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     return ManagedValue();
 
   auto paramOrigValue = paramArg->getType().isTrivial(subSGF.F)
-                            ? ManagedValue::forTrivialRValue(paramArg)
+                            ? ManagedValue::forRValueWithoutOwnership(paramArg)
                             : ManagedValue::forBorrowedRValue(paramArg);
   paramOrigValue = paramOrigValue.copy(subSGF, loc);
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
@@ -3273,7 +3273,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                        indexes, indexPtrArg);
 
   auto valueOrig = valueArgTy.isTrivial(subSGF.F)
-                       ? ManagedValue::forTrivialRValue(valueArg)
+                       ? ManagedValue::forRValueWithoutOwnership(valueArg)
                        : ManagedValue::forBorrowedRValue(valueArg);
   valueOrig = valueOrig.copy(subSGF, loc);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
