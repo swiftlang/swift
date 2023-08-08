@@ -1,4 +1,4 @@
-// swift-tools-version:5.4
+// swift-tools-version:5.9
 //===--- Package.swift.in - SwiftCompiler SwiftPM package -----------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -15,6 +15,7 @@ import PackageDescription
 
 private extension Target {
   static let defaultSwiftSettings: [SwiftSetting] = [
+    .interoperabilityMode(.Cxx),
     .unsafeFlags([
       "-Xfrontend", "-validate-tbd-against-ir=none",
       "-Xfrontend", "-enable-experimental-cxx-interop",
