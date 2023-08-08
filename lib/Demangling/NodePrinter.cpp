@@ -295,6 +295,7 @@ private:
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericFunction:
     case Node::Kind::BuiltinTypeName:
+    case Node::Kind::BuiltinTupleType:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
     case Node::Kind::DependentMemberType:
@@ -1847,6 +1848,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::BuiltinTypeName:
     Printer << Node->getText();
+    return nullptr;
+  case Node::Kind::BuiltinTupleType:
+    Printer << "Builtin.TheTupleType";
     return nullptr;
   case Node::Kind::Number:
     Printer << Node->getIndex();
