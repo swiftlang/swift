@@ -267,7 +267,7 @@ bool isPrivileged() {
 } // namespace
 
 BacktraceInitializer::BacktraceInitializer() {
-  const char *backtracing = "enable=yes,color=yes";// swift::runtime::environment::SWIFT_BACKTRACE();
+  const char *backtracing = swift::runtime::environment::SWIFT_BACKTRACE();
 
   // Force off for setuid processes.
   if (isPrivileged()) {

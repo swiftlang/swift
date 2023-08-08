@@ -64,7 +64,7 @@
 
 using namespace swift;
 
-#if 1
+#if 0
 #define SWIFT_TASK_GROUP_DEBUG_LOG_ENABLED 1
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...)                     \
 fprintf(stderr, "[%#lx] [%s:%d][group(%p%s)] (%s) " fmt "\n",           \
