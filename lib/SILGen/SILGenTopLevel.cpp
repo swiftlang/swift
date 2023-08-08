@@ -36,7 +36,8 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
 
   TopLevel->createProfiler(EntryRef);
 
-  SILGenFunction TopLevelSGF(*this, *TopLevel, SF, true);
+  SILGenFunction TopLevelSGF(*this, *TopLevel, SF,
+                             /* IsEmittingTopLevelCode */ true);
   TopLevelSGF.MagicFunctionName = SwiftModule->getName();
   auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
 

@@ -1099,7 +1099,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       auto *File = constant.getFileUnit();
       // In script mode
       assert(isa<SourceFile>(File) && "Emitting entry-point of non source file?!");
-      auto *SF = dyn_cast<SourceFile>(File);
+      auto *SF = cast<SourceFile>(File);
       emitEntryPoint(SF, f);
       return;
     }

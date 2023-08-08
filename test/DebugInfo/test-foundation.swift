@@ -12,8 +12,6 @@ import ObjectiveC
 import Foundation
 
 class MyObject : NSObject {
-
-  
   // Ensure we don't emit linetable entries for ObjC thunks.
   // LOC-CHECK: define {{.*}} @"$s4main8MyObjectC0B3ArrSo7NSArrayCvgTo"
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
