@@ -743,7 +743,7 @@ public struct PropertyWrapper<T> {
   public init(_ value: T) { self.wrappedValue = value }
 }
 
-public struct PublicStruct { // expected-note 13 {{add @available attribute}}
+public struct PublicStruct { // expected-note 15 {{add @available attribute}}
   // Public property declarations are exposed.
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
@@ -759,6 +759,44 @@ public struct PublicStruct { // expected-note 13 {{add @available attribute}}
              dPublicAvailBetween: BetweenTargets,
              ePublicAvailBetween: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
              fPublicAvailBetween: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+
+  @_spi(Private)
+  public var aSPI: NoAvailable,
+             bSPI: BeforeInliningTarget,
+             cSPI: AtInliningTarget,
+             dSPI: BetweenTargets,
+             eSPI: AtDeploymentTarget,
+             fSPI: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+
+  @available(macOS, unavailable)
+  public var aUnavailable: NoAvailable {
+    NoAvailable()
+  }
+
+  @available(macOS, unavailable)
+  public var bUnavailable: BeforeInliningTarget {
+    BeforeInliningTarget()
+  }
+
+  @available(macOS, unavailable)
+  public var cUnavailable: AtInliningTarget {
+    AtInliningTarget()
+  }
+
+  @available(macOS, unavailable)
+  public var dUnavailable: BetweenTargets {
+    BetweenTargets()
+  }
+
+  @available(macOS, unavailable)
+  public var eUnavailable: AtDeploymentTarget {
+    AtDeploymentTarget()
+  }
+
+  @available(macOS, unavailable)
+  public var fUnavailable: AfterDeploymentTarget {
+    AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
+  }
 
   // The inferred types of public properties are exposed.
   public var aPublicInferred = NoAvailable(),
@@ -1355,6 +1393,41 @@ enum InternalNoAvailableEnumWithTypeAliases { // expected-note {{add @available 
   public typealias D = BetweenTargets
   public typealias E = AtDeploymentTarget
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing type alias}}
+}
+
+// MARK: - Enums with payloads
+
+public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add @available attribute to enclosing enum}}
+  case aNoAvailable(NoAvailable),
+       bNoAvailable(BeforeInliningTarget),
+       cNoAvailable(AtInliningTarget),
+       dNoAvailable(BetweenTargets), // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+       eNoAvailable(AtDeploymentTarget), // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+       fNoAvailable(AfterDeploymentTarget) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+
+  @available(macOS, introduced: 10.15)
+  case aAtDeploymentTarget(NoAvailable),
+       bAtDeploymentTarget(BeforeInliningTarget),
+       cAtDeploymentTarget(AtInliningTarget),
+       dAtDeploymentTarget(BetweenTargets),
+       eAtDeploymentTarget(AtDeploymentTarget),
+       fAtDeploymentTarget(AfterDeploymentTarget) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+
+  @_spi(Private)
+  case aSPI(NoAvailable),
+       bSPI(BeforeInliningTarget),
+       cSPI(AtInliningTarget),
+       dSPI(BetweenTargets),
+       eSPI(AtDeploymentTarget),
+       fSPI(AfterDeploymentTarget) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+
+  @available(macOS, unavailable)
+  case aUnavailable(NoAvailable),
+       bUnavailable(BeforeInliningTarget),
+       cUnavailable(AtInliningTarget),
+       dUnavailable(BetweenTargets),
+       eUnavailable(AtDeploymentTarget),
+       fUnavailable(AfterDeploymentTarget)
 }
 
 // MARK: - Class inheritance
