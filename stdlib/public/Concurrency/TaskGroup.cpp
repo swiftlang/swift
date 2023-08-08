@@ -1182,8 +1182,8 @@ void AccumulatingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *contex
 
   // ==== a) has waiting task, so let us complete it right away
   if (assumed.hasWaitingTask()) {
+    unlock();
     resumeWaitingTask(completedTask, assumed, hadErrorResult);
-    unlock(); // TODO: remove fragment lock, and use status for synchronization
     return;
   } else {
     // ==== b) enqueue completion ------------------------------------------------
