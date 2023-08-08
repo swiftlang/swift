@@ -610,7 +610,7 @@ public:
     return cast<T>(getDesugaredType());
   }
 
-  /// getRecursiveProperties - Returns the properties defined on the
+  /// getLayoutInfo - Returns the properties defined on the
   /// structure of this type.
   RecursiveTypeProperties getRecursiveProperties() const {
     return RecursiveTypeProperties(Bits.TypeBase.Properties);
