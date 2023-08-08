@@ -5222,13 +5222,45 @@ the operand (source) heap object.  It need not be atomic with respect to
 
 load_unowned
 ````````````
+::
 
-TODO: Fill this in
+  sil-instruction ::= 'load_unowned' '[take]'? sil-operand
+
+  %1 = load_unowned [take] %0 : $*@sil_unowned T
+  // T must be a reference type
+
+Increments the strong reference count of the object stored at ``%0``.  
+
+Decrements the unowned reference count of the object stored at ``%0`` if
+``[take]`` is specified.  Additionally, the storage is invalidated.
+
+Requires that the strong reference count of the heap object stored at ``%0`` is
+positive.  Otherwise, traps.
+
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand (source) heap object.  It need not be atomic with respect to
+``store_unowned`` or ``load_unowned`` operations on the same address.
 
 store_unowned
 `````````````
+::
 
-TODO: Fill this in
+  sil-instruction ::= 'store_unowned' sil-value 'to' '[init]'? sil-operand
+
+  store_unowned %0 to [init] %1 : $*@sil_unowned T
+  // T must be a reference type
+
+Increments the unowned reference count of the object at ``%0``.
+
+Decrements the unowned reference count of the object previously stored at ``%1``
+if ``[init]`` is not specified.
+
+The storage must be initialized iff ``[init]`` is not specified.
+
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand (source) heap object.  It need not be atomic with respect to
+``store_unowned`` or ``load_unowned`` operations on the same address.
+
 
 fix_lifetime
 ````````````
