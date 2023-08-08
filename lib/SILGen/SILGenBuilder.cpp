@@ -233,6 +233,8 @@ ManagedValue SILGenBuilder::createPhi(SILType type,
     return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
 
   case OwnershipKind::None:
+    return ManagedValue::forObjectRValueWithoutOwnership(arg);
+
   case OwnershipKind::Unowned:
     return ManagedValue::forUnmanaged(arg);
   }
@@ -387,7 +389,7 @@ SILGenBuilder::bufferForExpr(SILLocation loc, SILType ty,
 
   // Add a cleanup for the temporary we allocated.
   if (lowering.isTrivial())
-    return ManagedValue::forUnmanaged(address);
+    return ManagedValue::forTrivialAddressRValue(address);
 
   return SGF.emitManagedBufferWithCleanup(address);
 }
@@ -415,7 +417,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
 
   // Add a cleanup for the temporary we allocated.
   if (lowering.isTrivial())
-    return ManagedValue::forUnmanaged(address);
+    return ManagedValue::forTrivialAddressRValue(address);
 
   return SGF.emitFormalAccessManagedBufferWithCleanup(loc, address);
 }
@@ -465,7 +467,7 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
   SILValue result =
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
   if (lowering.isTrivial())
-    return ManagedValue::forUnmanaged(result);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
   assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
          "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
@@ -482,7 +484,7 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
   SILValue result =
       lowering.emitLoadOfCopy(*this, loc, v.getValue(), IsNotTake);
   if (lowering.isTrivial())
-    return ManagedValue::forUnmanaged(result);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
   assert((!lowering.isAddressOnly()
           || !SGF.silConv.useLoweredAddresses()) &&
          "cannot retain an unloadable type");
@@ -649,7 +651,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
   if (!type.isAddressOnly(getFunction()) ||
       !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = createOptionalNone(loc, type);
-    return ManagedValue::forUnmanaged(noneValue);
+    return ManagedValue::forObjectRValueWithoutOwnership(noneValue);
   }
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);

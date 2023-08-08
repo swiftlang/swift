@@ -521,8 +521,8 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   methodTy =
       methodTy.substGenericArgs(SGM.M, subMap, getTypeExpansionContext());
 
-  return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
-                         methodTy);
+  return std::make_tuple(
+      ManagedValue::forObjectRValueWithoutOwnership(methodValue), methodTy);
 }
 
 void SILGenFunction::emitCaptures(SILLocation loc,
@@ -563,7 +563,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       SILType dynamicSILType = getLoweredType(dynamicSelfMetatype);
 
       SILValue value = B.createMetatype(loc, dynamicSILType);
-      capturedArgs.push_back(ManagedValue::forUnmanaged(value));
+      capturedArgs.push_back(
+          ManagedValue::forObjectRValueWithoutOwnership(value));
       continue;
     }
 
@@ -964,7 +965,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   }
   
   if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
-    auto result = ManagedValue::forUnmanaged(functionRef);
+    auto result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
     if (!alreadyConverted)
       result = emitOrigToSubstValue(loc, result,
                                     AbstractionPattern(expectedType),
@@ -1396,10 +1397,11 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
                              taskCreationFlagMask.getOpaqueValue());
 
   SILValue task =
-      emitBuiltinCreateAsyncTask(*this, moduleLoc, subs,
-                                 {ManagedValue::forUnmanaged(taskFlags),
-                                  ManagedValue::forUnmanaged(mainFunctionRef)},
-                                 {})
+      emitBuiltinCreateAsyncTask(
+          *this, moduleLoc, subs,
+          {ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
+           ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef)},
+          {})
           .forward(*this);
   DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
   task = structure->getResult(0);

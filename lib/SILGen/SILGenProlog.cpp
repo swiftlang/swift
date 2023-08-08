@@ -1471,8 +1471,8 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
 
   CanType actorMetaType = CanMetatypeType::get(actorType, metaRepr);
   ManagedValue actorMetaTypeValue =
-    ManagedValue::forUnmanaged(B.createMetatype(loc,
-      SILType::getPrimitiveObjectType(actorMetaType)));
+      ManagedValue::forObjectRValueWithoutOwnership(B.createMetatype(
+          loc, SILType::getPrimitiveObjectType(actorMetaType)));
 
   RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaTypeValue,
     actorMetaType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
@@ -1585,15 +1585,11 @@ void SILGenFunction::emitPreconditionCheckExpectedExecutor(
   // Call the library function that performs the checking.
   auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
 
-  emitApplyOfLibraryIntrinsic(loc, checkExecutor, SubstitutionMap(),
-                              {
-                                args.filenameStartPointer,
-                                args.filenameLength,
-                                args.filenameIsAscii,
-                                args.line,
-                                ManagedValue::forUnmanaged(executor)
-                              },
-                              SGFContext());
+  emitApplyOfLibraryIntrinsic(
+      loc, checkExecutor, SubstitutionMap(),
+      {args.filenameStartPointer, args.filenameLength, args.filenameIsAscii,
+       args.line, ManagedValue::forObjectRValueWithoutOwnership(executor)},
+      SGFContext());
 }
 
 bool SILGenFunction::unsafelyInheritsExecutor() {

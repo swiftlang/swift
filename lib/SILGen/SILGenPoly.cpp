@@ -660,7 +660,7 @@ ManagedValue Transform::transformMetatype(ManagedValue meta,
     result = SGF.B.createUpcast(Loc, meta.getUnmanagedValue(), expectedType);
   }
 
-  return ManagedValue::forUnmanaged(result);
+  return ManagedValue::forObjectRValueWithoutOwnership(result);
 }
 
 /// Explode a managed tuple into a bunch of managed elements.
@@ -2367,14 +2367,14 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Pack_Guaranteed:
     if (value->getOwnershipKind() == OwnershipKind::None)
-      return ManagedValue::forUnmanaged(value);
+      return ManagedValue::forObjectRValueWithoutOwnership(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed: {
     if (SGF.silConv.useLoweredAddresses()) {
       return ManagedValue::forBorrowedAddressRValue(value);
     }
     if (value->getType().isTrivial(SGF.F)) {
-      return ManagedValue::forTrivialObjectRValue(value);
+      return ManagedValue::forObjectRValueWithoutOwnership(value);
     }
     return ManagedValue::forBorrowedObjectRValue(value);
   }
@@ -4503,7 +4503,7 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
   if (dynamicSelfType) {
     SILType dynamicSILType = SGF.getLoweredType(dynamicSelfType);
     SILValue value = SGF.B.createMetatype(loc, dynamicSILType);
-    thunkArgs.push_back(ManagedValue::forUnmanaged(value));
+    thunkArgs.push_back(ManagedValue::forObjectRValueWithoutOwnership(value));
   }
 
   return
@@ -5336,7 +5336,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     auto canClassMetatype = classMetatype->getCanonicalType();
     auto *metatype = thunkSGF.B.createMetatype(
         loc, SILType::getPrimitiveObjectType(canClassMetatype));
-    params.push_back(ManagedValue::forUnmanaged(metatype));
+    params.push_back(ManagedValue::forObjectRValueWithoutOwnership(metatype));
   }
 
   // Collect thunk arguments, converting ownership.
