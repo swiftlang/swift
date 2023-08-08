@@ -49,6 +49,6 @@ extension ASTGenVisitor {
   }
 
   func visit(_ node: NilLiteralExprSyntax) -> ASTNode {
-    .expr(NilLiteralExpr_create(self.ctx, self.bridgedSourceLoc(for: node.nilKeyword)))
+    .expr(NilLiteralExpr_create(astContext: self.ctx, nilKeywordLoc: self.bridgedSourceLoc(for: node.nilKeyword)))
   }
 }

@@ -199,12 +199,12 @@ BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, SwiftInt len) {
 
 void *TopLevelCodeDecl_createStmt(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
-                                  BridgedSourceLoc cStartLoc, void *element,
+                                  BridgedSourceLoc cStartLoc, void *statement,
                                   BridgedSourceLoc cEndLoc) {
   ASTContext &context = convertASTContext(cContext);
   DeclContext *declContext = convertDeclContext(cDeclContext);
 
-  auto *S = static_cast<Stmt *>(element);
+  auto *S = static_cast<Stmt *>(statement);
   auto Brace = BraceStmt::create(context, convertSourceLoc(cStartLoc), {S},
                                  convertSourceLoc(cEndLoc),
                                  /*Implicit=*/true);
@@ -214,12 +214,12 @@ void *TopLevelCodeDecl_createStmt(BridgedASTContext cContext,
 
 void *TopLevelCodeDecl_createExpr(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
-                                  BridgedSourceLoc cStartLoc, void *element,
+                                  BridgedSourceLoc cStartLoc, void *expression,
                                   BridgedSourceLoc cEndLoc) {
   ASTContext &context = convertASTContext(cContext);
   DeclContext *declContext = convertDeclContext(cDeclContext);
 
-  auto *E = static_cast<Expr *>(element);
+  auto *E = static_cast<Expr *>(expression);
   auto Brace = BraceStmt::create(context, convertSourceLoc(cStartLoc), {E},
                                  convertSourceLoc(cEndLoc),
                                  /*Implicit=*/true);

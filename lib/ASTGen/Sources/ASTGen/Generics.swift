@@ -9,11 +9,11 @@ extension ASTGenVisitor {
   func visit(_ node: GenericParameterClauseSyntax) -> ASTNode {
     .misc(
       GenericParamList_create(
-        self.ctx,
-        bridgedSourceLoc(for: node.leftAngle),
-        node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
-        self.visit(node.genericWhereClause)?.rawValue,
-        bridgedSourceLoc(for: node.rightAngle)
+        astContext: self.ctx,
+        leftAngleLoc: bridgedSourceLoc(for: node.leftAngle),
+        parameters: node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
+        genericWhereClause: self.visit(node.genericWhereClause)?.rawValue,
+        rightAngleLoc: bridgedSourceLoc(for: node.rightAngle)
       )
     )
   }
@@ -34,13 +34,13 @@ extension ASTGenVisitor {
 
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx,
-        self.declContext,
-        self.bridgedSourceLoc(for: node.eachKeyword),
-        name,
-        nameLoc,
-        self.visit(node.inheritedType)?.rawValue,
-        SwiftInt(genericParameterIndex)
+        astContext: self.ctx,
+        declContext: self.declContext,
+        eachKeywordLoc: self.bridgedSourceLoc(for: node.eachKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        inheritedType: self.visit(node.inheritedType)?.rawValue,
+        index: SwiftInt(genericParameterIndex)
       )
     )
   }
@@ -70,9 +70,9 @@ extension ASTGenVisitor {
 
     return .misc(
       TrailingWhereClause_create(
-        self.ctx,
-        self.bridgedSourceLoc(for: node.whereKeyword),
-        requirements.bridgedArray(in: self)
+        astContext: self.ctx,
+        whereKeywordLoc: self.bridgedSourceLoc(for: node.whereKeyword),
+        requirements: requirements.bridgedArray(in: self)
       )
     )
   }

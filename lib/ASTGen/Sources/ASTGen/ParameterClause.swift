@@ -81,15 +81,15 @@ extension ASTGenVisitor {
 
     return .decl(
       ParamDecl_create(
-        self.ctx,
-        self.declContext,
-        specifierLoc,
-        firstName,
-        self.bridgedSourceLoc(for: node.optionalFirstName),
-        secondName,
-        secondNameLoc,
-        self.visit(node.optionalType)?.rawValue,
-        self.visit(node.defaultValue?.value)?.rawValue
+        astContext: self.ctx,
+        declContext: self.declContext,
+        specifierLoc: specifierLoc,
+        firstName: firstName,
+        firstNameLoc: self.bridgedSourceLoc(for: node.optionalFirstName),
+        secondName: secondName,
+        secondNameLoc: secondNameLoc,
+        type: self.visit(node.optionalType)?.rawValue,
+        defaultValue: self.visit(node.defaultValue?.value)?.rawValue
       )
     )
   }
@@ -101,10 +101,10 @@ extension ASTGenVisitor {
   func visit(_ node: FunctionParameterClauseSyntax) -> ASTNode {
     .misc(
       ParameterList_create(
-        self.ctx,
-        self.bridgedSourceLoc(for: node.leftParen),
-        self.visit(node.parameters),
-        self.bridgedSourceLoc(for: node.rightParen)
+        astContext: self.ctx,
+        leftParenLoc: self.bridgedSourceLoc(for: node.leftParen),
+        parameters: self.visit(node.parameters),
+        rightParenLoc: self.bridgedSourceLoc(for: node.rightParen)
       )
     )
   }
@@ -112,10 +112,10 @@ extension ASTGenVisitor {
   func visit(_ node: EnumCaseParameterClauseSyntax) -> ASTNode {
     .misc(
       ParameterList_create(
-        self.ctx,
-        self.bridgedSourceLoc(for: node.leftParen),
-        node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
-        self.bridgedSourceLoc(for: node.rightParen)
+        astContext: self.ctx,
+        leftParenLoc: self.bridgedSourceLoc(for: node.leftParen),
+        parameters: node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
+        rightParenLoc: self.bridgedSourceLoc(for: node.rightParen)
       )
     )
   }

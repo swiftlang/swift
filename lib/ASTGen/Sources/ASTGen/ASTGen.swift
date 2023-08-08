@@ -111,9 +111,9 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
       case .decl(let d):
         out.append(d)
       case .stmt(let s):
-        out.append(TopLevelCodeDecl_createStmt(ctx, declContext, loc, s, loc))
+        out.append(TopLevelCodeDecl_createStmt(astContext: self.ctx, declContext: self.declContext, startLoc: loc, statement: s, endLoc: loc))
       case .expr(let e):
-        out.append(TopLevelCodeDecl_createExpr(ctx, declContext, loc, e, loc))
+        out.append(TopLevelCodeDecl_createExpr(astContext: self.ctx, declContext: self.declContext, startLoc: loc, expression: e, endLoc: loc))
       default:
         fatalError("Top level nodes must be decls, stmts, or exprs.")
       }
