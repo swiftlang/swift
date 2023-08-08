@@ -798,7 +798,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       auto entryValue = getAddressValue(val, /*forceCopy=*/false);
       // LValues are captured as both the box owning the value and the
       // address of the value.
-      assert(entryValue->getType().isAddress() && "no address for captured var!");
+      assert(entryValue->getType().isAddress() &&
+             "no address for captured var!");
       // Boxes of opaque return values stay opaque.
       auto minimalLoweredType = SGM.Types.getLoweredRValueType(
           TypeExpansionContext::minimal(), type->getCanonicalType());
@@ -838,7 +839,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         // TODO: Use immutable box for immutable captures.
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(
-            vd, minimalLoweredType, FunctionDC->getGenericEnvironmentOfContext(),
+            vd, minimalLoweredType,
+            FunctionDC->getGenericEnvironmentOfContext(),
             /*mutable*/ true);
 
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
