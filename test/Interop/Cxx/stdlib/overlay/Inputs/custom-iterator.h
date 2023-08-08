@@ -958,4 +958,55 @@ public:
   }
 };
 
+/// clang::StmtIteratorBase
+class ProtectedIteratorBase {
+protected:
+  int value;
+  ProtectedIteratorBase() : value(0) {}
+};
+
+/// clang::StmtIteratorImpl
+template <typename DERIVED>
+class ProtectedIteratorImpl : public ProtectedIteratorBase {
+protected:
+  ProtectedIteratorImpl(const ProtectedIteratorBase& RHS) : ProtectedIteratorBase(RHS) {}
+
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = int;
+  using difference_type = std::ptrdiff_t;
+  using pointer = int *;
+  using reference = int &;
+
+  ProtectedIteratorImpl() = default;
+
+  DERIVED& operator++() {
+    value++;
+    return static_cast<DERIVED&>(*this);
+  }
+
+  DERIVED operator++(int) {
+    DERIVED tmp = static_cast<DERIVED&>(*this);
+    operator++();
+    return tmp;
+  }
+
+  friend bool operator==(const DERIVED &LHS, const DERIVED &RHS) {
+    return LHS.value == RHS.value;
+  }
+
+  reference operator*() const {
+    return value;
+  }
+};
+
+/// StmtIterator
+struct HasInheritedProtectedCopyConstructor : public ProtectedIteratorImpl<HasInheritedProtectedCopyConstructor> {
+  HasInheritedProtectedCopyConstructor() = default;
+
+private:
+  HasInheritedProtectedCopyConstructor(const ProtectedIteratorBase &other)
+      : ProtectedIteratorImpl<HasInheritedProtectedCopyConstructor>(other) {}
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H
