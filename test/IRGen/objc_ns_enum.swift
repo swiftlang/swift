@@ -124,5 +124,5 @@ func objc_enum_method_calls(_ x: ObjCEnumMethods) {
   x.prop = x.enumOut()
 }
 
-// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind memory(none) }
 
