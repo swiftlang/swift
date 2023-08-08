@@ -1,4 +1,4 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.4
 //===--- Package.swift.in - SwiftCompiler SwiftPM package -----------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -86,5 +86,6 @@ let package = Package(
     .compilerModuleTarget(
       name: "Optimizer",
       dependencies: ["Basic", "SIL", "Parse"]),
-  ]
+  ],
+  cxxLanguageStandard: .cxx17
 )
