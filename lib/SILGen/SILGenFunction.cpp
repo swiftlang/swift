@@ -795,15 +795,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Box: {
       assert(!isPack);
 
-      auto entryValue = getAddressValue(val, /*forceCopy=*/false);
-      assert(entryValue->getType().isAddress() &&
+      assert(val->getType().isAddress() &&
              "no address for captured var!");
       // Boxes of opaque return values stay opaque.
       auto minimalLoweredType = SGM.Types.getLoweredRValueType(
           TypeExpansionContext::minimal(), type->getCanonicalType());
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
-          entryValue->getType().getASTType() == minimalLoweredType) {
+          val->getType().getASTType() == minimalLoweredType) {
         auto box = ManagedValue::forBorrowedObjectRValue(Entry.box);
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
@@ -823,7 +822,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(box);
 
         if (captureCanEscape)
-          escapesToMark.push_back(entryValue);
+          escapesToMark.push_back(val);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -843,7 +842,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, entryValue, boxAddress, IsNotTake,
+        B.createCopyAddr(loc, val, boxAddress, IsNotTake,
                          IsInitialization);
         if (canGuarantee)
           capturedArgs.push_back(
@@ -857,15 +856,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::ImmutableBox: {
       assert(!isPack);
 
-      auto entryValue = getAddressValue(val, /*forceCopy=*/false);
-      assert(entryValue->getType().isAddress() &&
+      assert(val->getType().isAddress() &&
              "no address for captured var!");
       // Boxes of opaque return values stay opaque.
       auto minimalLoweredType = SGM.Types.getLoweredRValueType(
           TypeExpansionContext::minimal(), type->getCanonicalType());
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
-          entryValue->getType().getASTType() == minimalLoweredType) {
+          val->getType().getASTType() == minimalLoweredType) {
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
           capturedArgs.push_back(
@@ -874,7 +872,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
         }
         if (captureCanEscape)
-          escapesToMark.push_back(entryValue);
+          escapesToMark.push_back(val);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -894,7 +892,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, entryValue, boxAddress, IsNotTake,
+        B.createCopyAddr(loc, val, boxAddress, IsNotTake,
                          IsInitialization);
         if (canGuarantee)
           capturedArgs.push_back(
