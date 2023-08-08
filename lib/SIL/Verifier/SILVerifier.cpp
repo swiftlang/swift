@@ -2798,8 +2798,12 @@ public:
     requireReferenceStorageCapableValue(I->getOperand(),                       \
                                         "Operand of ref_to_" #name);           \
     auto operandType = I->getOperand()->getType().getASTType();                \
+    require(!I->getOperand()->getType().isAddressOnly(F),                      \
+            "ref_to_" #name " may not take an address-only operand");          \
     auto resultType =                                                          \
         requireObjectType(Name##StorageType, I, "Result of ref_to_" #name);    \
+    require(!I->getType().isAddressOnly(F),                                    \
+            "ref_to_" #name " must not produce an address-only value");        \
     requireSameType(resultType.getReferentType(), operandType,                 \
                     "Result of ref_to_" #name " does not have the "            \
                     "operand's type as its referent type");                    \
@@ -2807,8 +2811,12 @@ public:
   void check##Name##ToRefInst(Name##ToRefInst *I) {                            \
     auto operandType = requireObjectType(Name##StorageType, I->getOperand(),   \
                                          "Operand of " #name "_to_ref");       \
+    require(!I->getOperand()->getType().isAddressOnly(F),                      \
+            #name "_to_ref may not take an address-only operand");             \
     requireReferenceStorageCapableValue(I, "Result of " #name "_to_ref");      \
     auto resultType = I->getType().getASTType();                               \
+    require(!I->getType().isAddressOnly(F),                                    \
+            #name "_to_ref may not produce an address-only value");            \
     requireSameType(operandType.getReferentType(), resultType,                 \
                     "Operand of " #name "_to_ref does not have the "           \
                     "operand's type as its referent type");                    \
