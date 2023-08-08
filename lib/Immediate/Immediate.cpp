@@ -444,7 +444,7 @@ private:
           if (ToRename.count(Sym->getName())) {
             auto NewName =
                 G.allocateCString(Twine(mangleFunctionBody(Sym->getName())));
-            Sym->setName({NewName.data(), NewName.size()});
+            Sym->setName({NewName.data(), NewName.size() - 1});
           }
         }
       }
