@@ -166,11 +166,4 @@ target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)
 
-# intrinsics_gen is the LLVM tablegen target that generates the include files
-# where intrinsics and attributes are declared. swiftAST depends on these
-# headers.
-# For more information see the comment at the top of lib/CMakeLists.txt.
-add_dependencies(swift-ast-generated-headers intrinsics_gen clang-tablegen-targets)
-add_dependencies(swiftAST swift-ast-generated-headers)
-
 set_swift_llvm_is_available(swiftAST)
