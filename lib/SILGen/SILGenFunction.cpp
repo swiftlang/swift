@@ -805,8 +805,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
           entryValue->getType().getASTType() == minimalLoweredType) {
-        // If our captured value is a box with a moveonlywrapped type inside,
-        // unwrap it.
         auto box = ManagedValue::forBorrowedObjectRValue(Entry.box);
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
@@ -815,6 +813,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           box = box.copy(*this, loc);
         }
 
+        // If our captured value is a box with a moveonlywrapped type inside,
+        // unwrap it.
         if (box.getType().isBoxedMoveOnlyWrappedType(&F)) {
           CleanupCloner cloner(*this, box);
           box = cloner.clone(
