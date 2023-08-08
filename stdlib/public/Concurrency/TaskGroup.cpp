@@ -1349,8 +1349,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
       return unlock();
     }
-    swift_Concurrency_fatalError(0, "expected to early return from when "
-                                    "handling offer of last task in group");
+    swift_unreachable("expected to early return from when handling offer of last task in group");
   }
 
   assert(!hadErrorResult && "only successfully completed tasks can reach here");
@@ -1560,15 +1559,11 @@ AsyncTask* DiscardingTaskGroup::resumeWaitingTaskWithError(
                 waitingTask->ResumeContext);
 
         fillGroupNextResult(waitingContext, result);
-
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
-//        // TODO: allow the caller to suggest an executor
-//        waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
         return waitingTask;
       } // TODO: what in the else???
 #endif
-//    }
-//  }
+      return nullptr;
 }
 
 SWIFT_CC(swiftasync)
