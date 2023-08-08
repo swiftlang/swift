@@ -240,6 +240,9 @@ struct A: ExpressibleByIntegerLiteral {
 }
 var a: A = 42
 
+let stringStr = "str"
+let strInterpolation = "This is a \(stringStr + "ing") interpolation"
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -860,3 +863,25 @@ var a: A = 42
 // CHECK98-NEXT: (A.Type) -> (Int) -> A
 // CHECK98-NEXT: $s14integerLiteral11cursor_info1AVSi_tcD
 // CHECK98-NEXT: cursor_info
+
+// RUN: %sourcekitd-test -req=cursor -pos=244:51 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK99 %s
+// CHECK99: source.lang.swift.ref.struct ()
+// CHECK99-NEXT: String
+// CHECK99-NEXT: s:SS
+// CHECK99-NEXT: source.lang.swift
+// CHECK99-NEXT: String.Type
+// CHECK99-NEXT: $sSSmD
+// CHECK99-NEXT: Swift
+// CHECK99-NEXT: <Group>String</Group>
+// CHECK99-NEXT: SYSTEM
+
+// RUN: %sourcekitd-test -req=cursor -pos=244:61 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK100 %s
+// CHECK100: source.lang.swift.ref.function.constructor ()
+// CHECK100-NEXT: init(stringInterpolation:)
+// CHECK100-NEXT: s:SS19stringInterpolationSSs013DefaultStringB0V_tcfc
+// CHECK100-NEXT: source.lang.swift
+// CHECK100-NEXT: (String.Type) -> (DefaultStringInterpolation) -> String
+// CHECK100-NEXT: $s19stringInterpolationSSs013DefaultStringB0V_tcD
+// CHECK100-NEXT: Swift
+// CHECK100-NEXT: <Group>String</Group>
+// CHECK100-NEXT: SYSTEM
