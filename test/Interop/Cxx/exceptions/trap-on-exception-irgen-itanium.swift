@@ -282,23 +282,25 @@ func testStructWithDefaultDestructor() -> CInt {
   return result
 }
 
-let _ = testFreeFunctionNoThrowOnly()
-let _ = testFreeFunctionCalls()
-let _ = testMethodCalls()
-testTemplateCalls()
-testFuncPtrCall()
-testCFuncPtrCall()
-testProtocolConformanceThunkInvoke()
-let _ = testSubscriptThunkInvoke()
-testClassWithDestructor()
-testClassWithThrowingDestructor()
-let _ = testClassWithCopyConstructor()
-let _ = testClassWithThrowingCopyConstructor()
-let _ = testClassWithThrowingConstructor()
-let _ = testClassWithNoThrowingConstructor()
-let _ = testStructWithDefaultConstructor()
-let _ = testStructWithDefaultCopyConstructor()
-let _ = testStructWithDefaultDestructor()
+public func test() {
+  let _ = testFreeFunctionNoThrowOnly()
+  let _ = testFreeFunctionCalls()
+  let _ = testMethodCalls()
+  testTemplateCalls()
+  testFuncPtrCall()
+  testCFuncPtrCall()
+  testProtocolConformanceThunkInvoke()
+  let _ = testSubscriptThunkInvoke()
+  testClassWithDestructor()
+  testClassWithThrowingDestructor()
+  let _ = testClassWithCopyConstructor()
+  let _ = testClassWithThrowingCopyConstructor()
+  let _ = testClassWithThrowingConstructor()
+  let _ = testClassWithNoThrowingConstructor()
+  let _ = testStructWithDefaultConstructor()
+  let _ = testStructWithDefaultCopyConstructor()
+  let _ = testStructWithDefaultDestructor()
+}
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :

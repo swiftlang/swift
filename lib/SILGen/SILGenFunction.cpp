@@ -47,11 +47,12 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
-                               DeclContext *DC)
+                               DeclContext *DC, bool IsEmittingTopLevelCode)
     : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
       StartOfPostmatter(F.end()), B(*this),
       SF(DC ? DC->getParentSourceFile() : nullptr), Cleanups(*this),
-      StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F) {
+      StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F),
+      IsEmittingTopLevelCode(IsEmittingTopLevelCode) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
@@ -958,12 +959,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // If we're in top-level code, we don't need to physically capture script
   // globals, but we still need to mark them as escaping so that DI can flag
   // uninitialized uses.
-  if (this == SGM.TopLevelSGF) {
+  if (isEmittingTopLevelCode()) {
     auto captureInfo = closure.getCaptureInfo();
-    SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(
-        loc, captureInfo);
+    emitMarkFunctionEscapeForTopLevelCodeGlobals(loc, captureInfo);
   }
-  
+
   if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
     auto result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
     if (!alreadyConverted)
