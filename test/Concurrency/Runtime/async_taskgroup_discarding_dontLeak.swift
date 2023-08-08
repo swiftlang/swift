@@ -108,6 +108,8 @@ func testTwo() async {
   // CHECK-DAG: deinit, id: race-boom
   // CHECK-DAG: deinit, id: race-boom
   await latch.wait()
+  try? await Task.sleep(for: .milliseconds(300))
+
   print("done") // CHECK: done
 }
 
@@ -133,6 +135,8 @@ func manyOk() async {
   // CHECK-DAG: deinit, id: many-ok
 
   await latch.wait()
+  try? await Task.sleep(for: .milliseconds(300))
+
   print("done") // CHECK: done
 }
 
@@ -164,6 +168,8 @@ func manyThrows() async {
   }
 
   await latch.wait()
+  try? await Task.sleep(for: .milliseconds(300))
+
   print("done") // CHECK: done
 }
 
@@ -197,7 +203,6 @@ func manyValuesThrows() async {
       throw Boom(id: "mixed-error")
     }
 
-
     return 12
   }
 
@@ -212,6 +217,8 @@ func manyValuesThrows() async {
   // CHECK-DAG: deinit, id: mixed
 
   await latch.wait()
+  try? await Task.sleep(for: .milliseconds(300))
+
   print("done") // CHECK: done
 }
 
