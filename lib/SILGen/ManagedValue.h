@@ -165,7 +165,7 @@ public:
   }
 
   /// Create a managed value for a +0 trivial object rvalue.
-  static ManagedValue forTrivialObjectRValue(SILValue value) {
+  static ManagedValue forObjectRValueWithoutOwnership(SILValue value) {
     assert(value->getType().isObject() && "Expected an object");
     assert(value->getOwnershipKind() == OwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
@@ -181,7 +181,7 @@ public:
   /// Create a managed value for a +0 trivial rvalue.
   static ManagedValue forTrivialRValue(SILValue value) {
     if (value->getType().isObject())
-      return ManagedValue::forTrivialObjectRValue(value);
+      return ManagedValue::forObjectRValueWithoutOwnership(value);
     return ManagedValue::forTrivialAddressRValue(value);
   }
 
@@ -423,8 +423,8 @@ public:
 
   /// Create a CMV for a value of trivial type.
   static ConsumableManagedValue forUnmanaged(SILValue value) {
-    return { ManagedValue::forUnmanaged(value),
-             CastConsumptionKind::TakeAlways };
+    return {ManagedValue::forObjectRValueWithoutOwnership(value),
+            CastConsumptionKind::TakeAlways};
   }
 
   /// Create a CMV for an owned value.
