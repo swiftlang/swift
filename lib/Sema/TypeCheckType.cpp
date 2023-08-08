@@ -603,29 +603,43 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
     return true;
   }
 
+  // Protocols can't appear in constrained extensions, and their where
+  // clauses pertain to the requirement signature of the protocol and not
+  // its generic signature.
+  if (isa<ProtocolDecl>(decl))
+    return true;
+
+  auto *dc = decl->getDeclContext();
+
+  const auto genericSig = decl->getGenericSignature();
+
+  if (genericSig.getPointer() ==
+      dc->getSelfNominalTypeDecl()->getGenericSignature().getPointer()) {
+    return true;
+  }
+
+  // Otherwise, our decl has a where clause of its own, or its inside of a
+  // constrained extension.
   SourceLoc noteLoc;
   {
-    // We are interested in either a contextual where clause or
-    // a constrained extension context.
-    const auto ext = dyn_cast<ExtensionDecl>(decl->getDeclContext());
-    if (decl->getTrailingWhereClause())
-      noteLoc = decl->getLoc();
-    else if (ext && ext->isConstrainedExtension())
+    const auto ext = dyn_cast<ExtensionDecl>(dc);
+    if (ext && genericSig.getPointer() ==
+        ext->getGenericSignature().getPointer()) {
       noteLoc = ext->getLoc();
-    else
-      return true;
+    } else {
+      noteLoc = decl->getLoc();
+    }
 
     if (noteLoc.isInvalid())
       noteLoc = loc;
   }
 
-  const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
-  const auto genericSig = decl->getGenericSignature();
-
+  const auto subMap = parentTy->getContextSubstitutions(dc);
   const auto substitutions = [&](SubstitutableType *type) -> Type {
     auto result = QueryTypeSubstitutionMap{subMap}(type);
     if (result->hasTypeParameter()) {
       if (contextSig) {
+        // Avoid building this generic environment unless we need it.
         auto *genericEnv = contextSig.getGenericEnvironment();
         return genericEnv->mapTypeIntoContext(result);
       }
