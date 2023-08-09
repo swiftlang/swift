@@ -546,6 +546,9 @@ struct BridgedInstruction {
     return getAs<swift::BuiltinInst>()->getSubstitutions();
   }
 
+  bool PointerToAddressInst_isStrict() const {
+    return getAs<swift::PointerToAddressInst>()->isStrict();
+  }
 
   bool AddressToPointerInst_needsStackProtection() const {
     return getAs<swift::AddressToPointerInst>()->needsStackProtection();
