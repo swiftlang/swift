@@ -17,8 +17,6 @@ private extension Target {
   static let defaultSwiftSettings: [SwiftSetting] = [
     .interoperabilityMode(.Cxx),
     .unsafeFlags([
-      "-Xfrontend", "-validate-tbd-against-ir=none",
-      "-Xfrontend", "-enable-experimental-cxx-interop",
       // Bridging modules and headers
       "-Xcc", "-I", "-Xcc", "../include",
       // LLVM modules and headers
