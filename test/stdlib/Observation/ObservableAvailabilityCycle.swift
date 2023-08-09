@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: rdar113395709
 
 // RUN: %target-swift-frontend -typecheck -parse-as-library -enable-experimental-feature InitAccessors -external-plugin-path %swift-host-lib-dir/plugins#%swift-plugin-server -primary-file %s %S/Inputs/ObservableClass.swift
 

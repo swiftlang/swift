@@ -779,6 +779,8 @@ bool ASTContext::supportsVersionedAvailability() const {
   return minimumAvailableOSVersionForTriple(LangOpts.Target).has_value();
 }
 
+// FIXME: Rename abstractSyntaxDeclForAvailableAttribute since it's useful
+// for more attributes than `@available`.
 const Decl *
 swift::abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
   // This function needs to be kept in sync with its counterpart,
