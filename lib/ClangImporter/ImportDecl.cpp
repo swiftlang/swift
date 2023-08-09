@@ -4590,11 +4590,6 @@ namespace {
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
                                               std::move(objcClass));
 
-      // Determine the type and generic args of the extension.
-      if (objcClass->getGenericParams()) {
-        result->setGenericSignature(objcClass->getGenericSignature());
-      }
-
       // Create the extension declaration and record it.
       objcClass->addExtension(result);
       Impl.ImportedDecls[{decl, getVersion()}] = result;
