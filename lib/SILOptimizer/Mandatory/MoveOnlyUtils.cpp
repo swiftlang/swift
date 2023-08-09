@@ -258,7 +258,7 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
     FullApplySite applySite(memInst);
-    return applySite.getArgumentOperandConvention(*memOper).isInoutConvention();
+    return applySite.getCaptureConvention(*memOper).isInoutConvention();
   }
   case SILInstructionKind::StoreInst:
     return cast<StoreInst>(memInst)->getOwnershipQualifier() ==
@@ -295,7 +295,7 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
     FullApplySite applySite(memInst);
-    return applySite.getArgumentOperandConvention(*memOper).isOwnedConvention();
+    return applySite.getCaptureConvention(*memOper).isOwnedConvention();
   }
   case SILInstructionKind::PartialApplyInst: {
     // If we are on the stack or have an inout convention, we do not

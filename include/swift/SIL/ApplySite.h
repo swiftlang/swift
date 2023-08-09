@@ -375,9 +375,11 @@ public:
   ///
   /// For full applies, this is equivalent to `getArgumentConvention`. But for
   /// a partial_apply, the argument ownership convention at the partial_apply
-  /// instruction itself is different from the argument convention of the callee.
+  /// instruction itself is different from the argument convention of the
+  /// callee.
+  /// 
   /// For details see the partial_apply documentation in SIL.rst.
-  SILArgumentConvention getArgumentOperandConvention(const Operand &oper) const {
+  SILArgumentConvention getCaptureConvention(const Operand &oper) const {
     SILArgumentConvention conv = getArgumentConvention(oper);
     auto *pai = dyn_cast<PartialApplyInst>(Inst);
     if (!pai)
