@@ -495,6 +495,10 @@ struct SILOptOptions {
   llvm::cl::opt<bool> BypassResilienceChecks = llvm::cl::opt<bool>(
       "bypass-resilience-checks",
       llvm::cl::desc("Ignore all checks for module resilience."));
+
+  llvm::cl::opt<bool> DebugDiagnosticNames = llvm::cl::opt<bool>(
+      "debug-diagnostic-names",
+      llvm::cl::desc("Include diagnostic names when printing"));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -609,6 +613,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
+  Invocation.getDiagnosticOptions().PrintDiagnosticNames =
+      options.DebugDiagnosticNames;
   for (auto &featureName : options.ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().Features.insert(*feature);
