@@ -447,6 +447,10 @@ bool SourceRange::contains(SourceLoc Loc) const {
          Loc.Value.getPointer() <= End.Value.getPointer();
 }
 
+bool SourceRange::isBackwards() const {
+  return End.Value.getPointer() < Start.Value.getPointer();
+}
+
 bool SourceRange::overlaps(SourceRange Other) const {
   return contains(Other.Start) || Other.contains(Start);
 }

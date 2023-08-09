@@ -133,6 +133,10 @@ public:
   /// Checks whether this range overlaps with the given range.
   bool overlaps(SourceRange Other) const;
 
+  /// Whether or not this range is unexpectedly backwards
+  /// (i.e. End is unexpectedly before Start)
+  bool isBackwards() const;
+
   bool operator==(const SourceRange &other) const {
     return Start == other.Start && End == other.End;
   }

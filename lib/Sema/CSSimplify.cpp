@@ -10123,20 +10123,36 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
 
     for (auto withDecl : withDecls) {
-      result.addViable(getOverloadChoice(withDecl, /*isBridged=*/false,
-                                         /*isUnwrappedOptional=*/false));
+      auto choice = getOverloadChoice(withDecl, /*isBridged=*/false,
+                                      /*isUnwrappedOptional=*/false);
+
+      // When calling an instance member on an existential base,
+      // that existential is opened by default. Instead, we want
+      // the generic `T` type of the `_with` function to exactly
+      // match the base.
+      choice.setDisallowOpeningExistentialBase(true);
+
+      result.addViable(choice);
     }
 
     for (auto withThrowsDecl : withThrowsDecls) {
+      auto choice = getOverloadChoice(withThrowsDecl, /*isBridged=*/false,
+                                      /*isUnwrappedOptional=*/false);
+
+      // When calling an instance member on an existential base,
+      // that existential is opened by default. Instead, we want
+      // the generic `T` type of the `_with` function to exactly
+      // match the base.
+      choice.setDisallowOpeningExistentialBase(true);
+
       // The _with and _with_throws decls have the same type signature,
       // except _with_throws is also throwing. Overload resolution doesn't
       // handle this by default, so we have to set the throwing decl
       // as disfavored. We can't simply use `@_disfavoredOverload` because
-      // the non-throwing decl is already marked with `@_disfavoredOverload`.
-      withThrowsDecl->setDisfavorValue(true);
+      // the both decls are already marked with `@_disfavoredOverload`.
+      choice.setDisfavorValue(true);
 
-      result.addViable(getOverloadChoice(withThrowsDecl, /*isBridged=*/false,
-                                         /*isUnwrappedOptional=*/false));
+      result.addViable(choice);
     }
   }
 

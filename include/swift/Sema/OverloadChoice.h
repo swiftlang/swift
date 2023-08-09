@@ -124,15 +124,24 @@ class OverloadChoice {
   /// FIXME: This needs two bits. Can we pack them somewhere?
   FunctionRefKind TheFunctionRefKind;
 
+  /// When getting the type of the member reference,
+  /// whether to prevent the base from being opened if it is an existential.
+  bool DisallowOpeningExistentialBase;
+
+  /// Whether this overload choice should be disfavored with respect
+  /// to other potential overloads. This increases the overload score
+  /// in addition to the separate `@_disfavoredOverload` attr.
+  bool Disfavor;
+
 public:
   OverloadChoice()
-    : BaseAndDeclKind(nullptr, 0), DeclOrKind(),
-      TheFunctionRefKind(FunctionRefKind::Unapplied) {}
+      : BaseAndDeclKind(nullptr, 0), DeclOrKind(),
+        TheFunctionRefKind(FunctionRefKind::Unapplied),
+        DisallowOpeningExistentialBase(false), Disfavor(false) {}
 
-  OverloadChoice(Type base, ValueDecl *value,
-                 FunctionRefKind functionRefKind)
-    : BaseAndDeclKind(base, 0),
-      TheFunctionRefKind(functionRefKind) {
+  OverloadChoice(Type base, ValueDecl *value, FunctionRefKind functionRefKind)
+      : BaseAndDeclKind(base, 0), TheFunctionRefKind(functionRefKind),
+        DisallowOpeningExistentialBase(false), Disfavor(false) {
     assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
@@ -142,7 +151,8 @@ public:
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
       : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)),
-        TheFunctionRefKind(FunctionRefKind::Unapplied) {
+        TheFunctionRefKind(FunctionRefKind::Unapplied),
+        DisallowOpeningExistentialBase(false), Disfavor(false) {
     assert(base && "Must have a base type for overload choice");
     assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
@@ -154,8 +164,9 @@ public:
 
   OverloadChoice(Type base, unsigned index)
       : BaseAndDeclKind(base, 0),
-        DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex)+index),
-        TheFunctionRefKind(FunctionRefKind::Unapplied) {
+        DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex) + index),
+        TheFunctionRefKind(FunctionRefKind::Unapplied),
+        DisallowOpeningExistentialBase(false), Disfavor(false) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
@@ -312,6 +323,23 @@ public:
     assert(isDecl() && "only makes sense for declaration choices");
     return TheFunctionRefKind;
   }
+
+  /// When getting the type of the member reference,
+  /// whether to prevent the base from being opened if it is an existential.
+  bool shouldDisallowOpeningExistentialBase() const {
+    return DisallowOpeningExistentialBase;
+  }
+
+  void setDisallowOpeningExistentialBase(bool shouldDisallow) {
+    DisallowOpeningExistentialBase = shouldDisallow;
+  }
+
+  /// Whether this overload choice should be disfavored with respect
+  /// to other potential overloads. This increases the overload score
+  /// in addition to the separate `@_disfavoredOverload` attr.
+  bool getDisfavorValue() const { return Disfavor; }
+
+  void setDisfavorValue(bool ShouldDisfavor) { Disfavor = ShouldDisfavor; }
 
   /// Print selected overload choice kind found for Solution in debug output.
   void dump(Type adjustedOpenedType, SourceManager *sm, raw_ostream &out) const;

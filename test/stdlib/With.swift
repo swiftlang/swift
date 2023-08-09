@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// REQUIRES: concurrency
 
 let tuple: (a: String?, b: String?) = (a: nil, b: nil)
 
@@ -33,14 +34,6 @@ _ = tuple.a.with { $0 = "withA" }
 _ = tuple.a?.with { $0 = "withA?" }
 _ = tuple.b.with { $0 = "withB" }
 _ = tuple.b?.with { $0 = "withB?" }
-
-// Why doesn't this work? Does this need to be allowed in the first place?
-// TODO: Fix and uncomment
-// let any: Any = "string value"
-// any.with { any in
-  // unexpected error: cannot assign value of type 'Any' to type 'Any'
-  // any = "new string value"
-// }
 
 struct Test {
   var foo: String?
@@ -118,3 +111,47 @@ _ = DynamicMemberLookupTest().with { $0.foo = "withFoo" }
 
 let dynamicMemberString = DynamicMemberLookupTest().with
 _ = dynamicMemberString.uppercased()
+
+var anyValue: Any = 123
+_ = anyValue.with { $0 = "\($0)!" }
+_ = anyValue.with { $0 += 10 } // expected-error{{type of expression is ambiguous without a type annotation}}
+_ = anyValue.with { (int: inout Int) in int += 10 } // expected-error{{cannot convert value of type '(inout Int) -> ()' to expected argument type '(inout Any) -> Void'}}
+
+var voidValue: Void = ()
+_ = voidValue.with { $0 = () }
+
+_ = anyValue.with { value in
+  if let int = value as? Int {
+    value = int + 1
+  }
+}
+
+var existentialCollection: any MutableCollection & BidirectionalCollection = ["a", "b", "c"]
+
+_ = existentialCollection.with { $0.reverse() }
+_ = existentialCollection.with { $0 = ContiguousArray([1, 2]) }
+_ = existentialCollection.with { $0.shuffle() } // expected-error{{referencing instance method 'shuffle()' on 'MutableCollection' requires that 'Self' conform to 'RandomAccessCollection'}}
+
+extension Collection {
+  func `func`() { }
+  func throwingFunc() throws { }
+  func asyncFunc() async { }
+  func asyncThrowingFunc() async throws { }
+}
+
+_ = existentialCollection.with { $0.func() }
+_ = try existentialCollection.with { try $0.throwingFunc() }
+
+Task {
+  _ = await existentialCollection.with { await $0.asyncFunc() }
+  _ = try await existentialCollection.with { try await $0.asyncThrowingFunc() }
+}
+
+func genericFunc<T>(on t: T) -> T {
+  t.with { $0 = t }
+}
+
+_ = genericFunc(on: anyValue)
+_ = genericFunc(on: tuple)
+_ = genericFunc(on: Test())
+_ = genericFunc(on: existentialCollection)

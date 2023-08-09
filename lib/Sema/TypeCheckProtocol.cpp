@@ -1098,12 +1098,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     reqLocator = cs->getConstraintLocator(
         static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
     OpenedTypeMap reqReplacements;
-    reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
-                                           /*isDynamicResult=*/false,
-                                           FunctionRefKind::DoubleApply,
-                                           reqLocator,
-                                           &reqReplacements)
-        .adjustedReferenceType;
+    reqType = cs->getTypeOfMemberReference(
+                    selfTy, req, dc,
+                    /*isDynamicResult=*/false,
+                    /*disallowOpeningExistentialBase=*/false,
+                    FunctionRefKind::DoubleApply, reqLocator, &reqReplacements)
+                  .adjustedReferenceType;
     reqType = reqType->getRValueType();
 
     // For any type parameters we replaced in the witness, map them
@@ -1137,9 +1137,10 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                                               LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       openWitnessType = cs->getTypeOfMemberReference(
-          selfTy, witness, dc, /*isDynamicResult=*/false,
-          FunctionRefKind::DoubleApply, witnessLocator)
-        .adjustedReferenceType;
+                              selfTy, witness, dc, /*isDynamicResult=*/false,
+                              /*disallowOpeningExistentialBase=*/false,
+                              FunctionRefKind::DoubleApply, witnessLocator)
+                            .adjustedReferenceType;
     } else {
       openWitnessType = cs->getTypeOfReference(
           witness, FunctionRefKind::DoubleApply, witnessLocator,

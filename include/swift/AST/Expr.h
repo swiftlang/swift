@@ -4837,15 +4837,34 @@ public:
   /// \param fn The nullary function being called.
   static CallExpr *createImplicitEmpty(ASTContext &ctx, Expr *fn);
 
-  SourceLoc getStartLoc() const {
+  SourceRange getSourceRange() const {
     SourceLoc fnLoc = getFn()->getStartLoc();
-    return (fnLoc.isValid() ? fnLoc : getArgs()->getStartLoc());
-  }
-  SourceLoc getEndLoc() const {
+    auto start = (fnLoc.isValid() ? fnLoc : getArgs()->getStartLoc());
+
     SourceLoc argLoc = getArgs()->getEndLoc();
-    return (argLoc.isValid() ? argLoc : getFn()->getEndLoc());
+    auto end = (argLoc.isValid() ? argLoc : getFn()->getEndLoc());
+
+    SourceRange range = {start, end};
+
+    // If the range is backwards / invalid, recover by expanding it
+    // to include both of the subranges. This can happen if one
+    // of the subelements is implicit.
+    if (range.isBackwards() && getArgs()->isImplicit() &&
+        !getFn()->isImplicit()) {
+      auto fnRange = getFn()->getSourceRange();
+      if (fnRange.isValid()) {
+        range.widen(fnRange);
+      }
+
+      auto argRange = getArgs()->getSourceRange();
+      if (argRange.isValid()) {
+        range.widen(argRange);
+      }
+    }
+
+    return range;
   }
-  
+
   SourceLoc getLoc() const { 
     SourceLoc FnLoc = getFn()->getLoc(); 
     return FnLoc.isValid() ? FnLoc : getArgs()->getStartLoc();

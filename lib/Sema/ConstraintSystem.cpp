@@ -2412,13 +2412,10 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
-DeclReferenceType
-ConstraintSystem::getTypeOfMemberReference(
-    Type baseTy, ValueDecl *value, DeclContext *useDC,
-    bool isDynamicResult,
-    FunctionRefKind functionRefKind,
-    ConstraintLocator *locator,
-    OpenedTypeMap *replacementsPtr) {
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicResult,
+    bool disallowOpeningExistentialBase, FunctionRefKind functionRefKind,
+    ConstraintLocator *locator, OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
@@ -2576,7 +2573,8 @@ ConstraintSystem::getTypeOfMemberReference(
         baseObjTy = baseOpenedTy;
       }
     }
-  } else if (baseObjTy->isExistentialType()) {
+  } else if (baseObjTy->isExistentialType() &&
+             !disallowOpeningExistentialBase) {
     auto openedArchetype =
         OpenedArchetypeType::get(baseObjTy->getCanonicalType(),
                                  useDC->getGenericSignatureOfContext());
@@ -3585,6 +3583,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       declRefType = getTypeOfMemberReference(
           baseTy, choice.getDecl(), useDC,
           (kind == OverloadChoiceKind::DeclViaDynamic),
+          choice.shouldDisallowOpeningExistentialBase(),
           choice.getFunctionRefKind(), locator, nullptr);
     } else {
       declRefType = getTypeOfReference(
@@ -3813,8 +3812,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
       increaseScore(SK_DisfavoredOverload, locator);
 
-    // If the overload decl has its `Disfavor` value set, note that as well.
-    if (decl->getDisfavorValue())
+    // If the overload has its `Disfavor` value set, note that as well.
+    if (choice.getDisfavorValue())
       increaseScore(SK_DisfavoredOverload, locator);
   }
 

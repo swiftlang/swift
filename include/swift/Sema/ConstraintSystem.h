@@ -4280,13 +4280,14 @@ public:
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
+  /// \param disallowOpeningExistentialBase Whether to prevent
+  ///  the base from being opened if it is an existential.
+  ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
-                          Type baseTy, ValueDecl *decl, DeclContext *useDC,
-                          bool isDynamicResult,
-                          FunctionRefKind functionRefKind,
-                          ConstraintLocator *locator,
-                          OpenedTypeMap *replacements = nullptr);
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicResult,
+      bool disallowOpeningExistentialBase, FunctionRefKind functionRefKind,
+      ConstraintLocator *locator, OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
