@@ -703,7 +703,7 @@ module std [system] {
     requires cplusplus
 
     explicit module xhash {
-      header xhash
+      header "xhash"
       export *
     }
 
