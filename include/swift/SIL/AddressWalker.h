@@ -37,6 +37,7 @@ namespace swift {
 /// Validated by the SIL verifier as always being able to visit all addresses
 /// derived from alloc_stack, ref_element_addr, project_box, ref_tail_addr and
 /// all other address roots.
+template <typename Impl>
 class TransitiveAddressWalker {
   /// Whether we could tell if this address use didn't escape, did have a
   /// pointer escape, or unknown if we failed to understand something.
@@ -44,8 +45,8 @@ class TransitiveAddressWalker {
 
   unsigned didInvalidate = false;
 
-public:
-  virtual ~TransitiveAddressWalker() {}
+  Impl &asImpl() { return *reinterpret_cast<Impl *>(this); }
+  const Impl &asImpl() const { return *reinterpret_cast<const Impl *>(this); }
 
 protected:
   /// Customization point for visiting uses. Returns true if we should continue
@@ -54,9 +55,11 @@ protected:
   /// NOTE: Do not call this directly from within
   /// findTransitiveUsesForAddress. Please call callVisitUse. This is intended
   /// just for subclasses to override.
-  virtual bool visitUse(Operand *use) { return true; }
+  bool visitUse(Operand *use) { return true; }
 
-  virtual void onError(Operand *use) {}
+  /// Customization point for visiting operands that we were unable to
+  /// understand. These cause us to return AddressUseKind::Unknown.
+  void onError(Operand *use) {}
 
   void meet(AddressUseKind other) {
     assert(!didInvalidate);
@@ -67,7 +70,7 @@ private:
   /// Shim that actually calls visitUse and changes early exit.
   void callVisitUse(Operand *use) {
     assert(!didInvalidate);
-    if (!visitUse(use))
+    if (!asImpl().visitUse(use))
       result = AddressUseKind::Unknown;
   }
 
@@ -75,7 +78,9 @@ public:
   AddressUseKind walk(SILValue address) &&;
 };
 
-inline AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) && {
+template <typename Impl>
+inline AddressUseKind
+TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
   assert(!didInvalidate);
 
   // When we exit, set the result to be invalidated so we can't use this again.
@@ -269,7 +274,7 @@ inline AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) &
 
     // We were unable to recognize this user, so set AddressUseKind to unknown
     // and call onError with the specific user that caused the problem.
-    onError(op);
+    asImpl().onError(op);
     return AddressUseKind::Unknown;
   }
 
