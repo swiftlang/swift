@@ -975,12 +975,15 @@ llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
                                  /*isVararg*/ false);
 }
 
-llvm::Constant *swift::getRuntimeFn(
-    llvm::Module &Module, llvm::Constant *&cache, const char *name,
-    llvm::CallingConv::ID cc, RuntimeAvailability availability,
-    llvm::ArrayRef<llvm::Type *> retTypes,
-    llvm::ArrayRef<llvm::Type *> argTypes, ArrayRef<Attribute::AttrKind> attrs,
-    ArrayRef<llvm::MemoryEffects> memEffects, IRGenModule *IGM) {
+llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
+                      llvm::Constant *&cache,
+                      const char *name,
+                      llvm::CallingConv::ID cc,
+                      RuntimeAvailability availability,
+                      llvm::ArrayRef<llvm::Type*> retTypes,
+                      llvm::ArrayRef<llvm::Type*> argTypes,
+                      ArrayRef<Attribute::AttrKind> attrs,
+                      IRGenModule *IGM) {
 
   if (cache)
     return cache;
@@ -1033,7 +1036,7 @@ llvm::Constant *swift::getRuntimeFn(
     if (!isStandardLibrary(Module) && IsExternal &&
         ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-
+    
     if (IsExternal && isWeakLinked
         && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
@@ -1050,16 +1053,6 @@ llvm::Constant *swift::getRuntimeFn(
       else
         buildFnAttr.addAttribute(Attr);
     }
-
-    if (!memEffects.empty()) {
-      llvm::MemoryEffects mergedEffects = llvm::MemoryEffects::none();
-      for (auto effect : memEffects) {
-        mergedEffects |= effect;
-      }
-      buildFnAttr.addAttribute(llvm::Attribute::getWithMemoryEffects(
-          Module.getContext(), mergedEffects));
-    }
-
     fn->addFnAttrs(buildFnAttr);
     fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
@@ -1119,8 +1112,8 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
-#define UNKNOWN_MEMEFFECTS                                                     \
-  {}
+#define UNKNOWN_MEMEFFECTS                                                          \
+  { llvm::MemoryEffects::unknown() }
 #define MEMEFFECTS(...)                                                        \
   { __VA_ARGS__ }
 
@@ -1131,12 +1124,15 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
                         AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
-                        MEMEFFECTS, this);                                     \
+                        this);                                                 \
   }                                                                            \
   FunctionPointer IRGenModule::get##ID##FunctionPointer() {                    \
     using namespace RuntimeConstants;                                          \
     auto fn = get##ID##Fn();                                                   \
     auto fnTy = get##ID##FnType();                                             \
+    llvm::MemoryEffects effects = llvm::MemoryEffects::none();                 \
+    for (auto effect : MEMEFFECTS)                                             \
+      effects |= effect;                                                       \
     llvm::AttributeList attrs;                                                 \
     SmallVector<llvm::Attribute::AttrKind, 8> theAttrs(ATTRS);                 \
     for (auto Attr : theAttrs) {                                               \
@@ -1147,15 +1143,9 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
       else                                                                     \
         attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
     }                                                                          \
-    ArrayRef<llvm::MemoryEffects> memEffects(MEMEFFECTS);                      \
-    if (!memEffects.empty()) {                                                 \
-      llvm::MemoryEffects effects = llvm::MemoryEffects::none();               \
-      for (auto effect : memEffects)                                           \
-        effects |= effect;                                                     \
-      attrs = attrs.addFnAttribute(                                            \
-          getLLVMContext(),                                                    \
-          llvm::Attribute::getWithMemoryEffects(getLLVMContext(), effects));   \
-    }                                                                          \
+    attrs = attrs.addFnAttribute(                                              \
+        getLLVMContext(),                                                      \
+        llvm::Attribute::getWithMemoryEffects(getLLVMContext(), effects));     \
     auto sig = Signature(fnTy, attrs, CC);                                     \
     return FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn,     \
                                       nullptr, sig);                           \
