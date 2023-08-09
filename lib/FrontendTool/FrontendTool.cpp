@@ -843,10 +843,6 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     SILOptions SILOpts = getSILOptions(PSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
-    if (Invocation.getFrontendOptions().RequestedAction ==
-        FrontendOptions::ActionType::Immediate) {
-      return RunImmediatelyFromAST(Instance) != -1;
-    }
     auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
                                  &irgenOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
@@ -1368,13 +1364,15 @@ static bool performAction(CompilerInstance &Instance,
                                 [](CompilerInstance &Instance) {
                                   return Instance.getASTContext().hadError();
                                 });
+  case FrontendOptions::ActionType::Immediate: {
+    return RunImmediatelyFromAST(Instance) != -1;
+  }
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
-  case FrontendOptions::ActionType::Immediate:
   case FrontendOptions::ActionType::EmitAssembly:
   case FrontendOptions::ActionType::EmitIRGen:
   case FrontendOptions::ActionType::EmitIR:

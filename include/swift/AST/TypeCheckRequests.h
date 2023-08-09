@@ -2997,8 +2997,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *SF,
-                                 bool CheckFunctionBodies = true) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *SF) const;
 
 public:
   // Separate caching.

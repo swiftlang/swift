@@ -596,7 +596,15 @@ private:
     SILRefsToEmit Refs;
     for (auto &Sym : R->getRequestedSymbols()) {
       const auto &Source = Sources.storage->find(*Sym)->getValue();
-      Refs.push_back(Source.getSILDeclRef());
+      auto Ref = Source.getSILDeclRef();
+      if (auto *AFD = Ref.getAbstractFunctionDecl()) {
+        AFD->getTypecheckedBody();
+        if (CI.getASTContext().hadError()) {
+          R->failMaterialization();
+          return;
+        }
+      }
+      Refs.push_back(std::move(Ref));
     }
     auto SM = performASTLowering(CI, std::move(Refs));
     runSILDiagnosticPasses(*SM);
@@ -888,9 +896,11 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 }
 
 int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
-
+  CI.performSema();
   auto &Context = CI.getASTContext();
-
+  if (Context.hadError()) {
+    return -1;
+  }
   const auto &Invocation = CI.getInvocation();
   const auto &FrontendOpts = Invocation.getFrontendOptions();
 
