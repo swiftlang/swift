@@ -82,7 +82,7 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
     return SILLinkage::Shared;
 
-  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());
   switch (access) {

@@ -310,7 +310,7 @@ bool NormalProtocolConformance::isResilient() const {
   // FIXME: Looking at the type is not the right long-term solution. We need an
   // explicit mechanism for declaring conformances as 'fragile', or even
   // individual witnesses.
-  if (!getType()->getAnyNominal()->isResilient())
+  if (!getDeclContext()->getSelfNominalTypeDecl()->isResilient())
     return false;
 
   return getDeclContext()->getParentModule()->isResilient();
