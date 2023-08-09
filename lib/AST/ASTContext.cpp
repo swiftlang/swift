@@ -2638,12 +2638,12 @@ void ASTContext::setExternalSourceLocs(const Decl *D,
 }
 
 NormalProtocolConformance *
-ASTContext::getConformance(Type conformingType,
-                           ProtocolDecl *protocol,
-                           SourceLoc loc,
-                           DeclContext *dc,
-                           ProtocolConformanceState state,
-                           bool isUnchecked) {
+ASTContext::getNormalConformance(Type conformingType,
+                                 ProtocolDecl *protocol,
+                                 SourceLoc loc,
+                                 DeclContext *dc,
+                                 ProtocolConformanceState state,
+                                 bool isUnchecked) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;

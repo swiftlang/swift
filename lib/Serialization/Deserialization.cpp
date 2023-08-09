@@ -951,9 +951,10 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   PrettyStackTraceDecl traceTo("... to", proto);
 
-  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
-                                        ProtocolConformanceState::Incomplete,
-                                        isUnchecked);
+  auto conformance = ctx.getNormalConformance(
+      conformingType, proto, SourceLoc(), dc,
+      ProtocolConformanceState::Incomplete,
+      isUnchecked);
   // Record this conformance.
   if (conformanceEntry.isComplete()) {
     assert(conformanceEntry.get() == conformance);

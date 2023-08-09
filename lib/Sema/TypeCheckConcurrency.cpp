@@ -4914,7 +4914,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
       conformanceDC = extension;
     }
 
-    auto conformance = ctx.getConformance(
+    auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
         conformanceDC, ProtocolConformanceState::Complete,
         /*isUnchecked=*/attrMakingUnavailable != nullptr);

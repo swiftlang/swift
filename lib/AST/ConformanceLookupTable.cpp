@@ -928,9 +928,9 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
     // Create or find the normal conformance.
     auto normalConf =
-        ctx.getConformance(conformingType, protocol, conformanceLoc,
-                           conformingDC, ProtocolConformanceState::Incomplete,
-                           entry->Source.getUncheckedLoc().isValid());
+        ctx.getNormalConformance(conformingType, protocol, conformanceLoc,
+                                 conformingDC, ProtocolConformanceState::Incomplete,
+                                 entry->Source.getUncheckedLoc().isValid());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the
     // early return at the start of this function.
