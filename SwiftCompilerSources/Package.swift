@@ -14,19 +14,6 @@
 import PackageDescription
 
 private extension Target {
-  static let defaultSwiftSettings: [SwiftSetting] = [
-    .interoperabilityMode(.Cxx),
-    .unsafeFlags([
-      // Bridging modules and headers
-      "-Xcc", "-I", "-Xcc", "../include",
-      // LLVM modules and headers
-      "-Xcc", "-I", "-Xcc", "../../llvm-project/llvm/include",
-      // Clang modules and headers
-      "-Xcc", "-I", "-Xcc", "../../llvm-project/clang/include",
-      "-cross-module-optimization"
-    ]),
-  ]
-
   static func compilerModuleTarget(
     name: String,
     dependencies: [Dependency],
@@ -39,7 +26,15 @@ private extension Target {
         path: path ?? "Sources/\(name)",
         exclude: ["CMakeLists.txt"],
         sources: sources,
-        swiftSettings: defaultSwiftSettings + swiftSettings)
+        cxxSettings: [
+          .headerSearchPath("../include"),
+          .headerSearchPath("../../llvm-project/llvm/include"),
+          .headerSearchPath("../../llvm-project/clang/include"),
+        ],
+        swiftSettings: [
+          .interoperabilityMode(.Cxx),
+          .unsafeFlags(["-cross-module-optimization"]),
+        ] + swiftSettings)
     }
 }
 
