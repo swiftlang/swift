@@ -1823,8 +1823,8 @@ def load_plugin_library:
 def load_plugin_executable:
   Separate<["-"], "load-plugin-executable">, Group<plugin_search_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
-  HelpText<"Path to an executable compiler plugins and providing module names "
-           "such as macros">,
+  HelpText<"Path to a compiler plugin executable and a comma-separated list "
+           "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
 
 include "FrontendOptions.td"
