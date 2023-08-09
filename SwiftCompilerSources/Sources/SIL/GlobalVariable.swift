@@ -145,7 +145,9 @@ extension Instruction {
          is ObjectInst,
          is ValueToBridgeObjectInst,
          is ConvertFunctionInst,
-         is ThinToThickFunctionInst:
+         is ThinToThickFunctionInst,
+         is AddressToPointerInst,
+         is GlobalAddrInst:
       return true
     default:
       return false

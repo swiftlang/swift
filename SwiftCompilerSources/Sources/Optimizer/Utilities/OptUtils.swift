@@ -431,3 +431,31 @@ extension FullApplySite {
     return false
   }
 }
+
+extension GlobalVariable {
+  /// Removes all `begin_access` and `end_access` instructions from the initializer.
+  ///
+  /// Access instructions are not allowed in the initializer, because the initializer must not contain
+  /// instructions with side effects (initializer instructions are not executed).
+  /// Exclusivity checking does not make sense in the initializer.
+  ///
+  /// The initializer functions of globals, which reference other globals by address, contain access
+  /// instructions. After the initializing code is copied to the global's initializer, those access
+  /// instructions must be stripped.
+  func stripAccessInstructionFromInitializer(_ context: FunctionPassContext) {
+    guard let initInsts = staticInitializerInstructions else {
+      return
+    }
+    for initInst in initInsts {
+      switch initInst {
+      case let beginAccess as BeginAccessInst:
+        beginAccess.uses.replaceAll(with: beginAccess.address, context)
+        context.erase(instruction: beginAccess)
+      case let endAccess as EndAccessInst:
+        context.erase(instruction: endAccess)
+      default:
+        break
+      }
+    }
+  }
+}
