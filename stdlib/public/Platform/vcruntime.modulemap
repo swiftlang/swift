@@ -707,11 +707,6 @@ module std [system] {
       export *
     }
 
-    explicit module xstddef {
-      header "xstddef"
-      export *
-    }
-
     explicit module xstring {
       header "xstring"
       export *
