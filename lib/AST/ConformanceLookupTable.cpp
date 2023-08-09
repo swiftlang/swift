@@ -202,7 +202,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       for (auto conf : conformances) {
         protocols.push_back({conf->getProtocol(), SourceLoc(), SourceLoc()});
       }
-    } else if (next->getParentSourceFile()) {
+    } else if (next->getParentSourceFile() ||
+               next->getParentModule()->isBuiltinModule()) {
       bool anyObject = false;
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
@@ -418,8 +419,10 @@ void ConformanceLookupTable::loadAllConformances(
        ArrayRef<ProtocolConformance*> conformances) {
   // If this declaration context came from source, there's nothing to
   // do here.
-  if (dc->getParentSourceFile())
+  if (dc->getParentSourceFile() ||
+      dc->getParentModule()->isBuiltinModule()) {
     return;
+  }
 
   // Add entries for each loaded conformance.
   for (auto conformance : conformances) {
