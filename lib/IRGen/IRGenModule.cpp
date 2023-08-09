@@ -750,7 +750,7 @@ IRGenModule::~IRGenModule() {
 // They have to be non-local because otherwise we'll get warnings when
 // a particular x-macro expansion doesn't use one.
 namespace RuntimeConstants {
-  const auto ReadNone = llvm::MemoryEffects::none();
+  const auto ReadNone = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
   const auto ReadOnly = llvm::MemoryEffects::readOnly();
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
