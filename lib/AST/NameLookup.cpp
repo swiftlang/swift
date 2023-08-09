@@ -3190,12 +3190,6 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   if (nominalTypes.empty())
     return nullptr;
 
-  // Diagnose experimental tuple extensions.
-  if (isa<BuiltinTupleDecl>(nominalTypes[0]) &&
-      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
-    ext->diagnose(diag::experimental_tuple_extension);
-  }
-
   return nominalTypes[0];
 }
 
