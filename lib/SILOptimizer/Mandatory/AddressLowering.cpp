@@ -689,7 +689,9 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
 
   unsigned argIdx = 0;
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx)) {
-    auto bodyResultTy = pass.function->mapTypeIntoContext(resultTy);
+    auto resultTyInContext = pass.function->mapTypeIntoContext(resultTy);
+    auto bodyResultTy = pass.function->getModule().Types.getLoweredType(
+        resultTyInContext.getASTType(), *pass.function);
     auto var = new (astCtx) ParamDecl(
         SourceLoc(), SourceLoc(), astCtx.getIdentifier("$return_value"),
         SourceLoc(), astCtx.getIdentifier("$return_value"), declCtx);
