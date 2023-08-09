@@ -2410,7 +2410,7 @@ namespace {
                                             /*vararg*/ false);
 
         auto *accessor = llvm::Function::Create(
-            fnTy, llvm::GlobalValue::PrivateLinkage, symbol, IGM.getModule());
+            fnTy, IGM.getGenFuncLinkage(), symbol, IGM.getModule());
 
         accessor->setAttributes(IGM.constructInitialAttributes());
 

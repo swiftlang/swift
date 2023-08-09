@@ -1351,7 +1351,7 @@ irgen::getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
                                       false);
 
   // TODO: use a meaningful mangled name and internal/shared linkage.
-  auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
+  auto fn = llvm::Function::Create(fnTy, IGM.getGenFuncLinkage(),
                                    "__swift_get_extra_inhabitant_index",
                                    &IGM.Module);
   fn->setAttributes(IGM.constructInitialAttributes());
@@ -1435,7 +1435,7 @@ irgen::getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,
                                       false);
 
   // TODO: use a meaningful mangled name and internal/shared linkage.
-  auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
+  auto fn = llvm::Function::Create(fnTy, IGM.getGenFuncLinkage(),
                                    "__swift_store_extra_inhabitant_index",
                                    &IGM.Module);
   fn->setAttributes(IGM.constructInitialAttributes());

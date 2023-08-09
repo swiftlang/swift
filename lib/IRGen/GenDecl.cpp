@@ -701,7 +701,7 @@ void IRGenModule::emitRuntimeRegistration() {
   // Create a new function to contain our logic.
   auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
   auto RegistrationFunction = llvm::Function::Create(fnTy,
-                                           llvm::GlobalValue::PrivateLinkage,
+                                           getGenFuncLinkage(),
                                            "runtime_registration",
                                            getModule());
   RegistrationFunction->setAttributes(constructInitialAttributes());
@@ -1991,7 +1991,7 @@ void IRGenerator::emitEagerClassInitialization() {
 
   llvm::Function *RegisterFn = llvm::Function::Create(
                                 llvm::FunctionType::get(IGM->VoidTy, false),
-                                llvm::GlobalValue::PrivateLinkage,
+                                IGM->getGenFuncLinkage(),
                                 "_swift_eager_class_initialization");
   IGM->Module.getFunctionList().push_back(RegisterFn);
   IRGenFunction RegisterIGF(*IGM, RegisterFn);
@@ -2035,7 +2035,7 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
 
   llvm::Function *RegisterFn = llvm::Function::Create(
                                 llvm::FunctionType::get(IGM->VoidTy, false),
-                                llvm::GlobalValue::PrivateLinkage,
+                                IGM->getGenFuncLinkage(),
                                 "_swift_objc_actor_initialization");
   IGM->Module.getFunctionList().push_back(RegisterFn);
   IRGenFunction RegisterIGF(*IGM, RegisterFn);
@@ -3294,7 +3294,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   }
 
   llvm::Function *thunk = llvm::Function::Create(
-      assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
+      assumedFnType, IGM.getGenFuncLinkage(), name, &IGM.Module);
 
   thunk->setCallingConv(IGM.getOptions().PlatformCCallingConvention);
 

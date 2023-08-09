@@ -305,7 +305,7 @@ void IRGenModule::emitTypeVerifier() {
   // Create a new function to contain our logic.
   auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
   auto VerifierFunction = llvm::Function::Create(fnTy,
-                                             llvm::GlobalValue::PrivateLinkage,
+                                             getGenFuncLinkage(),
                                              "type_verifier",
                                              getModule());
   VerifierFunction->setAttributes(constructInitialAttributes());

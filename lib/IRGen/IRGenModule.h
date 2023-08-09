@@ -1874,6 +1874,14 @@ public:
   llvm::MDNode *createProfileWeights(uint64_t TrueCount,
                                      uint64_t FalseCount) const;
 
+  /// Return the linkage used for generated functions. It is
+  /// special-cased for Windows/AArch64 due to a linker relocation
+  /// limitation.
+  llvm::GlobalValue::LinkageTypes getGenFuncLinkage() const {
+    return (Triple.isOSWindows() && Triple.isAArch64()) ?
+        llvm::GlobalValue::InternalLinkage : llvm::GlobalValue::PrivateLinkage;
+  }
+
 private:
   void emitGlobalDecl(Decl *D);
 };

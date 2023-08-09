@@ -13,7 +13,7 @@ extension NSString {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{private|internal}} void @runtime_registration
 // CHECK:         [[NSOBJECT_UNINIT:%.*]] = load ptr, ptr @"OBJC_CLASS_REF_$_NSString"
 // CHECK:         [[NSOBJECT:%.*]] = call ptr @{{.*}}(ptr [[NSOBJECT_UNINIT]])
 // CHECK:         [[GET_CLASS_PROP:%.*]] = call ptr @sel_registerName({{.*}}(classProp)

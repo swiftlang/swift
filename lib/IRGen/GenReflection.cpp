@@ -244,7 +244,7 @@ getTypeRefByFunction(IRGenModule &IGM,
       auto fnTy = llvm::FunctionType::get(IGM.TypeMetadataPtrTy,
                                           {IGM.Int8PtrTy}, /*vararg*/ false);
       accessor =
-        llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
+        llvm::Function::Create(fnTy, IGM.getGenFuncLinkage(),
                                symbolName, IGM.getModule());
       accessor->setAttributes(IGM.constructInitialAttributes());
       
@@ -470,7 +470,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
         auto fnTy = llvm::FunctionType::get(WitnessTablePtrTy,
                                             {Int8PtrTy}, /*vararg*/ false);
         auto accessorThunk =
-          llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
+          llvm::Function::Create(fnTy, getGenFuncLinkage(),
                                  symbolName, getModule());
         accessorThunk->setAttributes(constructInitialAttributes());
         

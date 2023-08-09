@@ -176,7 +176,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
                                            /*vararg*/ false);
   
   auto accessorThunk = llvm::Function::Create(thunkType,
-    llvm::GlobalValue::PrivateLinkage, thunkName, IGM.getModule());
+    IGM.getGenFuncLinkage(), thunkName, IGM.getModule());
   accessorThunk->setAttributes(IGM.constructInitialAttributes());
   accessorThunk->setCallingConv(IGM.SwiftCC);
 
@@ -278,7 +278,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     retTy, { IGM.Int8PtrTy }, /*vararg*/ false);
     
   auto layoutFn = llvm::Function::Create(fnTy,
-    llvm::GlobalValue::PrivateLinkage, "keypath_get_arg_layout", IGM.getModule());
+    IGM.getGenFuncLinkage(), "keypath_get_arg_layout", IGM.getModule());
   layoutFn->setAttributes(IGM.constructInitialAttributes());
   layoutFn->setCallingConv(IGM.SwiftCC);
     
@@ -378,7 +378,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                                  {IGM.Int8PtrTy, IGM.SizeTy},
                                                  /*vararg*/ false);
       auto destroyFn = llvm::Function::Create(destroyType,
-        llvm::GlobalValue::PrivateLinkage, "keypath_destroy", IGM.getModule());
+        IGM.getGenFuncLinkage(), "keypath_destroy", IGM.getModule());
       destroy = destroyFn;
       destroyFn->setAttributes(IGM.constructInitialAttributes());
       destroyFn->setCallingConv(IGM.SwiftCC);
@@ -429,7 +429,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                                IGM.SizeTy},
                                               /*vararg*/ false);
       auto copyFn = llvm::Function::Create(copyType,
-        llvm::GlobalValue::PrivateLinkage, "keypath_copy", IGM.getModule());
+        IGM.getGenFuncLinkage(), "keypath_copy", IGM.getModule());
       copy = copyFn;
       copyFn->setAttributes(IGM.constructInitialAttributes());
       copyFn->setCallingConv(IGM.SwiftCC);
@@ -548,7 +548,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       /*dest*/ IGM.Int8PtrTy }, /*vararg*/ false);
       
   auto initFn = llvm::Function::Create(fnTy,
-    llvm::GlobalValue::PrivateLinkage, "keypath_arg_init", IGM.getModule());
+    IGM.getGenFuncLinkage(), "keypath_arg_init", IGM.getModule());
   initFn->setAttributes(IGM.constructInitialAttributes());
   initFn->setCallingConv(IGM.SwiftCC);
     

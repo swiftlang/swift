@@ -11,6 +11,6 @@ extension GenericClass {
   @objc func fn() {}
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{private|internal}} void @runtime_registration
 // CHECK-NOT: @__swift_instantiateConcreteTypeFromMangledName
 // CHECK: ret void

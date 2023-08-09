@@ -426,7 +426,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
                                     const HeapLayout &layout) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DeallocatingDtorTy,
-                           llvm::Function::PrivateLinkage,
+                           IGM.getGenFuncLinkage(),
                            "objectdestroy", &IGM.Module);
   auto attrs = IGM.constructInitialAttributes();
   IGM.addSwiftSelfAttributes(attrs, 0);
@@ -475,7 +475,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DeallocatingDtorTy,
-                           llvm::Function::PrivateLinkage,
+                           IGM.getGenFuncLinkage(),
                            "objectsize", &IGM.Module);
   fn->setAttributes(IGM.constructInitialAttributes());
 
@@ -1257,7 +1257,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   auto fixLifetimeTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy,
                                                /*isVarArg*/ false);
   auto fixLifetime = llvm::Function::Create(fixLifetimeTy,
-                                         llvm::GlobalValue::PrivateLinkage,
+                                         getGenFuncLinkage(),
                                          "__swift_fixLifetime",
                                          &Module);
   assert(fixLifetime->getName().equals("__swift_fixLifetime")
