@@ -247,6 +247,9 @@ void Diagnostic_finish(BridgedDiagnostic cDiag);
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
                                            BridgedString cStr);
 
+_Bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
+                                    BridgedFeature feature);
+
 void *ImportDecl_create(BridgedASTContext cContext,
                         BridgedDeclContext cDeclContext,
                         BridgedSourceLoc cImportLoc, char kind,

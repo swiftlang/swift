@@ -176,6 +176,11 @@ BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
   return {convertASTContext(cContext).getIdentifier(str).getAsOpaquePointer()};
 }
 
+bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
+                                   BridgedFeature feature) {
+  return convertASTContext(cContext).LangOpts.hasFeature((Feature)feature);
+}
+
 void *ImportDecl_create(BridgedASTContext cContext,
                         BridgedDeclContext cDeclContext,
                         BridgedSourceLoc cImportLoc, char kind,
