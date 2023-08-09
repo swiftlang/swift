@@ -21,10 +21,10 @@ swift::version::Version version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
   auto currentVersion = VersionParser::parseVersionString(
       SWIFT_COMPILER_VERSION, SourceLoc(), nullptr);
-  assert(currentVersion.hasValue() &&
+  assert(static_cast<bool>(currentVersion) &&
          "Embedded Swift language version couldn't be parsed: "
          "'" SWIFT_COMPILER_VERSION "'");
-  return currentVersion.getValue();
+  return *currentVersion;
 #else
   return Version();
 #endif
