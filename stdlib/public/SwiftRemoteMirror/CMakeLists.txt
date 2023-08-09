@@ -6,9 +6,9 @@ add_swift_target_library(swiftRemoteMirror
                          LINK_LIBRARIES
                            swiftRemoteInspection
                          C_COMPILE_FLAGS
+                           -I${SWIFT_SOURCE_DIR}/include/swift/RemoteInspection
                            ${SWIFT_RUNTIME_CXX_FLAGS}
                            -DswiftRemoteMirror_EXPORTS
-                           -I${SWIFT_SOURCE_DIR}/include/swift/RemoteInspection
                          LINK_FLAGS
                            ${SWIFT_RUNTIME_LINK_FLAGS}
                          INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
