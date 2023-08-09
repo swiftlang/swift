@@ -8,9 +8,10 @@ add_swift_target_library(swiftRemoteMirror
                          C_COMPILE_FLAGS
                            ${SWIFT_RUNTIME_CXX_FLAGS}
                            -DswiftRemoteMirror_EXPORTS
-                           -I${SWIFT_SOURCE_DIR}/include/swift/RemoteInspection
                          LINK_FLAGS
                            ${SWIFT_RUNTIME_LINK_FLAGS}
+                         PREFIX_INCLUDE_DIRS
+                           ${SWIFT_SOURCE_DIR}/include/swift/RemoteInspection
                          INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
                          SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                          DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
