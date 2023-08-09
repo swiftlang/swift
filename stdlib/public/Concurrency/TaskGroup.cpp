@@ -289,6 +289,12 @@ public:
     }
   };
 
+  /// Simple wrapper type to ensure we use the right methods to prepare and run a waiting tas.
+  /// Run it with `runWaitingTask`.
+  struct PreparedWaitingTask {
+    AsyncTask *waitingTask;
+  };
+
 protected:
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   // Synchronization is simple here. In a single threaded mode, all swift tasks
@@ -392,12 +398,19 @@ public:
   virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) = 0;
 
   /// Resume waiting task with result from `completedTask`
-  AsyncTask *resumeWaitingTask(AsyncTask *waitingTask,
+  PreparedWaitingTask prepareWaitingTaskWithTask(AsyncTask *waitingTask,
                          AsyncTask *completedTask,
                          TaskGroupStatus &assumed,
                          bool hadErrorResult,
                          bool alreadyDecremented = false,
                          bool taskWasRetained = false);
+
+  // NOTE: In today's implementation we MUST hold the group lock when claiming a task.
+  AsyncTask *claimWaitingTask();
+
+  /// Should be the final operation a group locking operation performs e.g. in waitAll or offer.
+  /// This resumes unlocks the group and resumes the waiting task.
+  void runWaitingTask(PreparedWaitingTask prepared);
 
   // ==== Status manipulation -------------------------------------------------
 
@@ -628,6 +641,34 @@ bool TaskGroupBase::statusCompletePendingReadyWaiting(TaskGroupStatus &old) {
       /*failure*/ std::memory_order_relaxed);
 }
 
+AsyncTask *TaskGroupBase::claimWaitingTask() {
+  assert(statusLoadRelaxed().hasWaitingTask() &&
+         "attempted to claim waiting task but status indicates no waiting "
+         "task is present!");
+
+  auto waitingTask = waitQueue.load(std::memory_order_acquire);
+  if (!waitQueue.compare_exchange_strong(waitingTask, nullptr)) {
+    swift_Concurrency_fatalError(0, "Failed to claim waitingTask!");
+  }
+  return waitingTask;
+}
+void TaskGroupBase::runWaitingTask(PreparedWaitingTask prepared) {
+  // The reason we might not have a task here to schedule is if we were running in the
+  // task-per-thread single threaded mode, which would have executed the task in-line
+  // and we must not schedule it here anymore.
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  assert(prepared.waitingTask == nullptr &&
+         "unexpected task to schedule in TASK_TO_THREAD_MODEL!"
+         "In this mode we should have run the task in-line, "
+         "rather than return it for scheduling.")
+#endif
+  if (auto waitingTask = prepared.waitingTask) {
+    // TODO: allow the caller to suggest an executor
+    waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
+  }
+}
+
+
 bool TaskGroupBase::isCancelled() const {
   auto old = TaskGroupStatus{status.load(std::memory_order_relaxed)};
   return old.isCancelled();
@@ -834,7 +875,7 @@ public:
 
 private:
   /// Resume waiting task with specified error
-  AsyncTask *resumeWaitingTaskWithError(AsyncTask* waitingTask,
+  PreparedWaitingTask prepareWaitingTaskWithError(AsyncTask* waitingTask,
                                   SwiftError *error,
                                   TaskGroupStatus &assumed,
                                   bool alreadyDecremented);
@@ -1193,22 +1234,12 @@ void AccumulatingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *contex
 
   // ==== a) has waiting task, so let us complete it right away
   if (assumed.hasWaitingTask()) {
-    auto waitingTask = waitQueue.load(std::memory_order_acquire);
-    SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, loaded waiting task:%p", waitingTask);
-    if (!waitQueue.compare_exchange_strong(waitingTask, nullptr)) {
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, FAILED CAS loaded waiting task:%p", waitingTask);
-      swift_Concurrency_fatalError(0, "Failed to claim waitingTask!");
-    }
-
-    auto task = resumeWaitingTask(/*complete=*/waitingTask, /*with=*/completedTask,
-                             assumed, hadErrorResult);
-    // Must unlock before we resume the waiting task
-    unlock();
-
-    if (task) {
-      task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-    }
-    return;
+    auto waitingTask = claimWaitingTask();
+    auto prepared = prepareWaitingTaskWithTask(
+        /*complete=*/waitingTask, /*with=*/completedTask,
+        assumed, hadErrorResult);
+    unlock(); // we MUST unlock before running the waiting task
+    return runWaitingTask(prepared);
   } else {
     // ==== b) enqueue completion ------------------------------------------------
     //
@@ -1264,13 +1295,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       // We grab the waiting task while holding the group lock, because this
       // allows a single task to get the waiting task and attempt to complete it.
       // As another offer gets to run, it will have either a different waiting task, or no waiting task at all.
-      auto waitingTask = waitQueue.load(std::memory_order_acquire); // FIXME: consume the task here!!!!!
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, loaded waiting task:%p", waitingTask);
-      if (!waitQueue.compare_exchange_strong(waitingTask, nullptr)) {
-        SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, FAILED CAS loaded waiting task:%p", waitingTask);
-        swift_Concurrency_fatalError(0, "Failed to claim waitingTask!");
-      }
-      assert(waitingTask && "status claimed to have waitingTask but waitQueue was empty!");
+      auto waitingTask = claimWaitingTask();
 
       // This is the last pending task, and we must resume the waiting task.
       // - if there already was a previous error stored, we resume using it,
@@ -1285,16 +1310,12 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
           SWIFT_TASK_GROUP_DEBUG_LOG(
               this, "offer, complete, resume waitingTask:%p, with raw error:%p",
               waitingTask, readyErrorItem.getRawError(this));
-          auto task = resumeWaitingTaskWithError(
+          auto prepared = prepareWaitingTaskWithError(
               /*complete=*/waitingTask,
               /*with=*/readyErrorItem.getRawError(this), assumed,
               alreadyDecrementedStatus);
-          unlock();
-          if (task) {
-            // TODO: allow the caller to suggest an executor
-            task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-          }
-          return;
+          unlock(); // we MUST unlock before running the waiting task
+          return runWaitingTask(prepared);
         }
         case ReadyStatus::Error: {
           // The completed task failed, but we already stored a different failed
@@ -1305,17 +1326,13 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
               "offer, complete waitingTask:%p, discard error completedTask:%p, "
               "resume with errorItem.task:%p",
               waitingTask, completedTask, readyErrorItem.getTask());
-          auto task = resumeWaitingTask(
+          auto prepared = prepareWaitingTaskWithTask(
               /*complete*/ waitingTask,
               /*with=*/readyErrorItem.getTask(), assumed,
               /*hadErrorResult=*/true, alreadyDecrementedStatus,
               /*taskWasRetained=*/true);
-          unlock();
-          if (task) {
-            // TODO: allow the caller to suggest an executor
-            task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-          }
-          return;
+          unlock(); // we MUST unlock before running the waiting task
+          return runWaitingTask(prepared);
         }
         default: {
           swift_Concurrency_fatalError(
@@ -1329,14 +1346,10 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
         // the group before we've given up the lock.
         _swift_taskGroup_detachChild(asAbstract(this), completedTask);
         // There was no prior failed task stored, so we should resume the waitingTask with this (failed) completedTask
-        auto task = resumeWaitingTask(/*complete=*/waitingTask, /*with=*/completedTask,
+        auto prepared = prepareWaitingTaskWithTask(/*complete=*/waitingTask, /*with=*/completedTask,
                                  assumed, hadErrorResult, alreadyDecrementedStatus);
-        unlock();
-        if (task) {
-            // TODO: allow the caller to suggest an executor
-            task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-        }
-        return;
+        unlock(); // we MUST unlock before running the waiting task
+        return runWaitingTask(prepared);
       }
     } else if (readyQueue.isEmpty()) {
       // There was no waiting task, or other tasks are still pending, so we cannot
@@ -1375,28 +1388,20 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
 
       switch (readyErrorItem.getStatus()) {
       case ReadyStatus::RawError: {
-        auto task = resumeWaitingTaskWithError(
+        auto task = prepareWaitingTaskWithError(
             /*complete=*/waitingTask, /*with=*/readyErrorItem.getRawError(this),
             assumed, alreadyDecrementedStatus);
-        unlock();
-        if (task) {
-            // TODO: allow the caller to suggest an executor
-            task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-        }
-        return;
+        unlock(); // we MUST unlock before running the waiting task
+        return runWaitingTask(task);
       }
       case ReadyStatus::Error: {
-        auto task = resumeWaitingTask(
+        auto preparedWaitingTask = prepareWaitingTaskWithTask(
             /*complete=*/waitingTask,
             /*with=*/readyErrorItem.getTask(), assumed,
             /*hadErrorResult=*/true, alreadyDecrementedStatus,
             /*taskWasRetained=*/true);
-        unlock();
-        if (task) {
-            // TODO: allow the caller to suggest an executor
-            task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-        }
-        return;
+        unlock(); // we MUST unlock before running the waiting task
+        return runWaitingTask(preparedWaitingTask);
       }
       default: {
         swift_Concurrency_fatalError(
@@ -1407,14 +1412,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     } else {
       // This is the last task, we have a waiting task and there was no error stored previously;
       // We must resume the waiting task with a success, so let us return here.
-      auto task = resumeWaitingTask(/*complete=*/waitingTask, /*with=*/completedTask,
-                               assumed, /*hadErrorResult=*/false, alreadyDecrementedStatus);
-      unlock();
-      if (task) {
-        // TODO: allow the caller to suggest an executor
-        task->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-      }
-      return;
+      auto prepared = prepareWaitingTaskWithTask(
+          /*complete=*/waitingTask, /*with=*/completedTask,
+          assumed, /*hadErrorResult=*/false, alreadyDecrementedStatus);
+      unlock(); // we MUST unlock before running the waiting task
+      return runWaitingTask(prepared);
     }
   } else {
     // it wasn't the last pending task, and there is no-one to resume;
@@ -1425,7 +1427,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
 }
 
 /// Must be called while holding the TaskGroup lock.
-AsyncTask *TaskGroupBase::resumeWaitingTask(
+TaskGroupBase::PreparedWaitingTask TaskGroupBase::prepareWaitingTaskWithTask(
     AsyncTask *waitingTask,
     AsyncTask *completedTask,
     TaskGroupStatus &assumed,
@@ -1434,23 +1436,8 @@ AsyncTask *TaskGroupBase::resumeWaitingTask(
     bool taskWasRetained) {
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "resume, waitingTask = %p, completedTask = %p, alreadyDecremented:%d, error:%d",
                        waitingTask, alreadyDecremented, hadErrorResult, completedTask);
-
-  // auto waitingTask = waitQueue.load(std::memory_order_acquire);
   assert(waitingTask && "waitingTask must not be null when attempting to resume it");
   assert(assumed.hasWaitingTask());
-//  while (true) {
-    SWIFT_TASK_GROUP_DEBUG_LOG(this, "resumeWaitingTask, attempt CAS, waiting task = %p, waitQueue.head = %p, error:%d, complete with = %p",
-                               waitingTask, waitQueue.load(std::memory_order_relaxed), hadErrorResult, completedTask);
-
-    // ==== a) run waiting task directly -------------------------------------
-//      // assert(assumed.pendingTasks(this) && "offered to group with no pending tasks!");
-//      // We are the "first" completed task to arrive,
-//      // and since there is a task waiting we immediately claim and complete it.
-//      if (waitQueue.compare_exchange_strong(
-//          waitingTask, nullptr,
-//          /*success*/ std::memory_order_release,
-//          /*failure*/ std::memory_order_acquire)) {
-
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
         // In the task-to-thread model, child tasks are always actually
         // run synchronously on the parent task's thread.  For task groups
@@ -1466,8 +1453,7 @@ AsyncTask *TaskGroupBase::resumeWaitingTask(
         // But since it's what we're doing, we basically take the same
         // path as we would if there wasn't a waiter.
         enqueueCompletedTask(completedTask, hadErrorResult);
-        return nullptr;
-
+        return {nullptr};
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
         if (!alreadyDecremented) {
           (void) statusCompletePendingReadyWaiting(assumed);
@@ -1500,70 +1486,53 @@ AsyncTask *TaskGroupBase::resumeWaitingTask(
         }
 
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
-//        // TODO: allow the caller to suggest an executor
-//         waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
-        return waitingTask;
+        return {waitingTask};
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
-//    } else {
-//      SWIFT_TASK_GROUP_DEBUG_LOG(this, "CAS failed, waitingTask = %p, complete with = %p, status = %s",
-//                                 waitingTask, completedTask, statusString().c_str());
-//    }
-//  }
 }
 
 /// Must be called while holding the TaskGroup lock.
-AsyncTask* DiscardingTaskGroup::resumeWaitingTaskWithError(
-    AsyncTask *waitingTask,
-    SwiftError *error,
-    TaskGroupStatus &assumed,
-    bool alreadyDecremented) {
-//  auto waitingTask = waitQueue.load(std::memory_order_acquire);
+TaskGroupBase::PreparedWaitingTask
+DiscardingTaskGroup::prepareWaitingTaskWithError(AsyncTask *waitingTask,
+                                                 SwiftError *error,
+                                                 TaskGroupStatus &assumed,
+                                                 bool alreadyDecremented) {
   assert(waitingTask && "cannot resume 'null' waiting task!");
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "resume waiting task = %p, with error = %p",
-                       waitingTask, error);
-//  while (true) {
-    // ==== a) run waiting task directly -------------------------------------
-    assert(assumed.hasWaitingTask());
-//    // assert(assumed.pendingTasks(this) && "offered to group with no pending tasks!");
-//    // We are the "first" completed task to arrive,
-//    // and since there is a task waiting we immediately claim and complete it.
-//    if (waitQueue.compare_exchange_strong(
-//        waitingTask, nullptr,
-//        /*success*/ std::memory_order_release,
-//        /*failure*/ std::memory_order_acquire)) {
+  SWIFT_TASK_GROUP_DEBUG_LOG(this,
+                             "resume waiting task = %p, with error = %p",
+                             waitingTask, error);
+  assert(assumed.hasWaitingTask());
 
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-      // In the task-to-thread model, child tasks are always actually
-      // run synchronously on the parent task's thread.  For task groups
-      // specifically, this means that poll() will pick a child task
-      // that was added to the group and run it to completion as a
-      // subroutine.  Therefore, when we enter offer(), we know that
-      // the parent task is waiting and we can just return to it.
+  // In the task-to-thread model, child tasks are always actually
+  // run synchronously on the parent task's thread.  For task groups
+  // specifically, this means that poll() will pick a child task
+  // that was added to the group and run it to completion as a
+  // subroutine.  Therefore, when we enter offer(), we know that
+  // the parent task is waiting and we can just return to it.
 
-      // The task-to-thread logic in poll() currently expects the child
-      // task to enqueue itself instead of just filling in the result in
-      // the waiting task.  This is a little wasteful; there's no reason
-      // we can't just have the parent task set itself up as a waiter.
-      // But since it's what we're doing, we basically take the same
-      // path as we would if there wasn't a waiter.
-      _enqueueRawError(this, &readyQueue, error);
-      return nullptr;
-
+  // The task-to-thread logic in poll() currently expects the child
+  // task to enqueue itself instead of just filling in the result in
+  // the waiting task.  This is a little wasteful; there's no reason
+  // we can't just have the parent task set itself up as a waiter.
+  // But since it's what we're doing, we basically take the same
+  // path as we would if there wasn't a waiter.
+  _enqueueRawError(this, &readyQueue, error);
+  return {nullptr};
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
-      if (alreadyDecremented || statusCompletePendingReadyWaiting(assumed)) {
-        // Run the task.
-        auto result = PollResult::getError(error);
+  if (!alreadyDecremented) {
+    statusCompletePendingReadyWaiting(assumed);
+  }
 
-        auto waitingContext =
-            static_cast<TaskFutureWaitAsyncContext *>(
-                waitingTask->ResumeContext);
+  // Run the task.
+  auto result = PollResult::getError(error);
 
-        fillGroupNextResult(waitingContext, result);
-        _swift_tsan_acquire(static_cast<Job *>(waitingTask));
-        return waitingTask;
-      } // TODO: what in the else???
-#endif
-      return nullptr;
+  auto waitingContext = static_cast<TaskFutureWaitAsyncContext *>(
+      waitingTask->ResumeContext);
+
+  fillGroupNextResult(waitingContext, result);
+  _swift_tsan_acquire(static_cast<Job *>(waitingTask));
+  return {waitingTask};
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
 SWIFT_CC(swiftasync)
@@ -1665,8 +1634,8 @@ static void swift_taskGroup_wait_next_throwingImpl(
 }
 
 PollResult AccumulatingTaskGroup::poll(AsyncTask *waitingTask) {
-  lock();
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "poll, waitingTask:%p", waitingTask);
+  lock();
   assert(isAccumulatingResults() &&
          "attempted to poll TaskGroup in discard-results mode!");
 
