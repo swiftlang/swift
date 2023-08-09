@@ -1899,7 +1899,8 @@ static ProtocolConformanceRef getPackTypeConformance(
       auto patternConformance =
           (patternType->isTypeParameter()
            ? ProtocolConformanceRef(protocol)
-           : mod->lookupConformance(patternType, protocol));
+           : mod->lookupConformance(patternType, protocol,
+                                    /*allowMissing=*/true));
       patternConformances.push_back(patternConformance);
       continue;
     }
@@ -1907,7 +1908,8 @@ static ProtocolConformanceRef getPackTypeConformance(
     auto patternConformance =
         (packElement->isTypeParameter()
          ? ProtocolConformanceRef(protocol)
-         : mod->lookupConformance(packElement, protocol));
+         : mod->lookupConformance(packElement, protocol,
+                                  /*allowMissing=*/true));
     patternConformances.push_back(patternConformance);
   }
 
