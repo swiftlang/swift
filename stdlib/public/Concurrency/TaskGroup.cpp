@@ -660,7 +660,7 @@ void TaskGroupBase::runWaitingTask(PreparedWaitingTask prepared) {
   assert(prepared.waitingTask == nullptr &&
          "unexpected task to schedule in TASK_TO_THREAD_MODEL!"
          "In this mode we should have run the task in-line, "
-         "rather than return it for scheduling.")
+         "rather than return it for scheduling.");
 #endif
   if (auto waitingTask = prepared.waitingTask) {
     // TODO: allow the caller to suggest an executor
