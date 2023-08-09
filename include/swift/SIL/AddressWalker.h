@@ -71,14 +71,6 @@ public:
   AddressUseKind walk(SILValue address) &&;
 };
 
-/// The algorithm that is used to determine what the verifier will consider to
-/// be transitive uses of the given address. Used to implement \see
-/// findTransitiveUses.
-///
-/// Returns \p AccessUseKind::Unknown on error.
-AddressUseKind findTransitiveUsesForAddress(SILValue address,
-                                            TransitiveAddressWalker &visitor);
-
 } // namespace swift
 
 #endif
