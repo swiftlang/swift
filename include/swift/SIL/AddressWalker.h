@@ -61,6 +61,12 @@ protected:
   /// understand. These cause us to return AddressUseKind::Unknown.
   void onError(Operand *use) {}
 
+  /// Customization point that causes the walker to treat a specific transitive
+  /// use as an end point use.
+  ///
+  /// Example: Visiting a mutable or immutable open_existential_addr.
+  bool visitTransitiveUseAsEndPointUse(Operand *use) { return false; }
+
   void meet(AddressUseKind other) {
     assert(!didInvalidate);
     result = swift::meet(result, other);
@@ -103,11 +109,14 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
   auto transitiveResultUses = [&](Operand *use) {
     auto *svi = cast<SingleValueInstruction>(use->getUser());
     if (svi->use_empty()) {
-      callVisitUse(use);
-    } else {
-      for (auto *use : svi->getUses())
-        addToWorklist(use);
+      return callVisitUse(use);
     }
+
+    if (asImpl().visitTransitiveUseAsEndPointUse(use))
+      return callVisitUse(use);
+
+    for (auto *use : svi->getUses())
+      addToWorklist(use);
   };
 
   while (!worklist.empty()) {
