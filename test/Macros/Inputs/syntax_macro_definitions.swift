@@ -900,18 +900,16 @@ public struct AddCompletionHandler: PeerMacro {
       """
 
     // Drop the @addCompletionHandler attribute from the new declaration.
-    let newAttributeList = AttributeListSyntax(
-      funcDecl.attributes?.filter {
-        guard case let .attribute(attribute) = $0,
-              let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
-              let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
-        else {
-          return true
-        }
+    let newAttributeList = funcDecl.attributes.filter {
+      guard case let .attribute(attribute) = $0,
+            let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
+            let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
+      else {
+        return true
+      }
 
-        return attributeType.name.text != nodeType.name.text
-      } ?? []
-    )
+      return attributeType.name.text != nodeType.name.text
+    }
 
     var newFunc = funcDecl
     newFunc.signature.effectSpecifiers?.asyncSpecifier = nil // drop async
@@ -1010,18 +1008,16 @@ public struct WrapInType: PeerMacro {
       """
 
     // Drop the peer macro attribute from the new declaration.
-    let newAttributeList = AttributeListSyntax(
-      funcDecl.attributes?.filter {
-        guard case let .attribute(attribute) = $0,
-              let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
-              let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
-        else {
-          return true
-        }
+    let newAttributeList = funcDecl.attributes.filter {
+      guard case let .attribute(attribute) = $0,
+            let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
+            let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
+      else {
+        return true
+      }
 
-        return attributeType.name.text != nodeType.name.text
-      } ?? []
-    )
+      return attributeType.name.text != nodeType.name.text
+    }
 
     var method = funcDecl
     method.name = "\(context.makeUniqueName(funcDecl.name.text))"
@@ -1251,7 +1247,7 @@ public struct NewTypeMacro: MemberMacro {
       throw CustomError.message("@NewType can only be applied to a struct declarations.")
     }
 
-    let access = declaration.modifiers?.first(where: \.isNeededAccessLevelModifier)
+    let access = declaration.modifiers.first(where: \.isNeededAccessLevelModifier)
 
     return [
       "\(access)typealias RawValue = \(rawType)",
