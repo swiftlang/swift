@@ -796,8 +796,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       assert(!isPack);
 
       auto entryValue = getAddressValue(val, /*forceCopy=*/false);
-      // LValues are captured as both the box owning the value and the
-      // address of the value.
       assert(entryValue->getType().isAddress() &&
              "no address for captured var!");
       // Boxes of opaque return values stay opaque.
@@ -860,8 +858,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       assert(!isPack);
 
       auto entryValue = getAddressValue(val, /*forceCopy=*/false);
-      // LValues are captured as both the box owning the value and the
-      // address of the value.
       assert(entryValue->getType().isAddress() &&
              "no address for captured var!");
       // Boxes of opaque return values stay opaque.
