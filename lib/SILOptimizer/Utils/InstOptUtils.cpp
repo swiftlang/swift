@@ -906,9 +906,10 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 // convention of the closed over function. All non-inout arguments to a
 // partial_apply are passed at +1 for regular escaping closures and +0 for
 // closures that have been promoted to partial_apply [on_stack]. An escaping
-// partial apply is building up a boxed aggregate to send off to the closed over
-// function, even for guaranteed and in_guaranteed convention. Of course, when
-// you call the function, the proper conventions will be used.
+// partial apply stores each capture in an owned box, even for guaranteed and
+// in_guaranteed argument convention. A non-escaping/on-stack closure either
+// borrows its arguments or takes an inout_aliasable address. Non-escaping
+// closures do not support owned arguments.
 void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILValue arg,
                                            SILParameterInfo paramInfo,
@@ -1492,7 +1493,7 @@ void swift::insertDestroyOfCapturedArguments(
     if (!argValue)
       continue;
 
-    assert(!argValue->getFunction()->hasOwnership()
+    assert(!pai->getFunction()->hasOwnership()
            || (argValue->getOwnershipKind().isCompatibleWith(
                  OwnershipKind::Owned)));
 

@@ -390,6 +390,9 @@ public:
     case SILArgumentConvention::Pack_Inout:
       return conv;
     case SILArgumentConvention::Direct_Owned:
+      assert(!pai->isOnStack() &&
+             "on-stack closures do not support owned arguments");
+      return conv;
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
       return pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
