@@ -38,6 +38,8 @@ func useConformance() {
 ////
 
 extension Builtin.TheTupleType: Equatable where repeat each Elements: Equatable {
+  // FIXME: Hack
+  @_disfavoredOverload
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     var result = true
     func update<E: Equatable>(lhs: E, rhs: E) {

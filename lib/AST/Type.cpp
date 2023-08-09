@@ -160,6 +160,10 @@ bool TypeBase::isPureMoveOnly() {
   if (auto *nom = getAnyNominal())
     return nom->isMoveOnly();
 
+  if (auto *expansion = getAs<PackExpansionType>()) {
+    return expansion->getPatternType()->isPureMoveOnly();
+  }
+
   // if any components of the tuple are move-only, then the tuple is move-only.
   if (auto *tupl = getCanonicalType()->getAs<TupleType>()) {
     for (auto eltTy : tupl->getElementTypes())

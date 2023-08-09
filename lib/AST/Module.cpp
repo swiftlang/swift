@@ -1949,18 +1949,6 @@ LookupConformanceInModuleRequest::evaluate(
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
   }
 
-  // Specific handling of Copyable and Sendable for pack expansions.
-  // FIXME: Remove.
-  if (auto packExpansion = type->getAs<PackExpansionType>()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
-        protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      auto patternType = packExpansion->getPatternType();
-      return (patternType->isTypeParameter()
-               ? ProtocolConformanceRef(protocol)
-               : mod->lookupConformance(patternType, protocol));
-    }
-  }
-
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
