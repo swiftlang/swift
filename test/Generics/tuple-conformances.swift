@@ -53,9 +53,4 @@ extension Builtin.TheTupleType: Hashable where repeat each Elements: Hashable {
   public func hash(into hasher: inout Hasher) {
     repeat (each self).hash(into: &hasher)
   }
-
-  // FIXME: This should be unnecessary
-  public var hashValue: Int {
-    return 0
-  }
 }
