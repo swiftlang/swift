@@ -1588,7 +1588,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // All existentials are Copyable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1670,8 +1670,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
   if (shouldCreateMissingConformances(type, proto)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
-          type, proto, GenericSignature(), { },
-          BuiltinConformanceKind::Missing));
+          type, proto, BuiltinConformanceKind::Missing));
   }
 
   return ProtocolConformanceRef::forInvalid();
@@ -1774,7 +1773,7 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
       isSendableFunctionType(functionType)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1782,7 +1781,7 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
   // that they capture, so it's safe to copy functions, like classes.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1799,14 +1798,14 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
       !metatypeType->getInstanceType()->isPureMoveOnly()) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
   // All metatypes are Sendable
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1822,7 +1821,7 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
       protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1951,6 +1950,7 @@ LookupConformanceInModuleRequest::evaluate(
   }
 
   // Specific handling of Copyable and Sendable for pack expansions.
+  // FIXME: Remove.
   if (auto packExpansion = type->getAs<PackExpansionType>()) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
         protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {

@@ -2681,23 +2681,15 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
 
 /// Produce the builtin conformance for some non-nominal to some protocol.
 BuiltinProtocolConformance *
-ASTContext::getBuiltinConformance(
-    Type type, ProtocolDecl *protocol,
-    GenericSignature genericSig,
-    ArrayRef<Requirement> conditionalRequirements,
-    BuiltinConformanceKind kind
-) {
+ASTContext::getBuiltinConformance(Type type, ProtocolDecl *protocol,
+                                  BuiltinConformanceKind kind) {
   auto key = std::make_pair(type, protocol);
   AllocationArena arena = getArena(type->getRecursiveProperties());
   auto &builtinConformances = getImpl().getArena(arena).BuiltinConformances;
 
   auto &entry = builtinConformances[key];
   if (!entry) {
-    auto size = BuiltinProtocolConformance::
-        totalSizeToAlloc<Requirement>(conditionalRequirements.size());
-    auto mem = this->Allocate(size, alignof(BuiltinProtocolConformance), arena);
-    entry = new (mem) BuiltinProtocolConformance(
-        type, protocol, genericSig, conditionalRequirements, kind);
+    entry = new (*this) BuiltinProtocolConformance(type, protocol, kind);
   }
   return entry;
 }
