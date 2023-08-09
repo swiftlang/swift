@@ -367,7 +367,7 @@ struct BridgedGlobalVar {
   }
 
   SWIFT_IMPORT_UNSAFE
-  inline OptionalBridgedInstruction getStaticInitializerValue() const;
+  inline OptionalBridgedInstruction getFirstStaticInitInst() const;
 
   bool canBeInitializedStatically() const;
   
@@ -466,6 +466,9 @@ struct BridgedInstruction {
 
   SWIFT_IMPORT_UNSAFE
   inline BridgedBasicBlock getParent() const;
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedInstruction getLastInstOfParent() const;
 
   bool isDeleted() const {
     return getInst()->isDeleted();
@@ -1416,11 +1419,12 @@ OptionalBridgedBasicBlock BridgedFunction::getLastBlock() const {
   return {getFunction()->empty() ? nullptr : &*getFunction()->rbegin()};
 }
 
-OptionalBridgedInstruction BridgedGlobalVar::getStaticInitializerValue() const {
-  if (swift::SILInstruction *inst = getGlobal()->getStaticInitializerValue()) {
-    return {inst->asSILNode()};
+OptionalBridgedInstruction BridgedGlobalVar::getFirstStaticInitInst() const {
+  if (getGlobal()->begin() == getGlobal()->end()) {
+    return {nullptr};
   }
-  return {nullptr};
+  swift::SILInstruction *firstInst = &*getGlobal()->begin();
+  return {firstInst->asSILNode()};
 }
 
 BridgedInstruction BridgedMultiValueResult::getParent() const {
@@ -1431,6 +1435,10 @@ BridgedBasicBlock BridgedInstruction::getParent() const {
   assert(!getInst()->isStaticInitializerInst() &&
          "cannot get the parent of a static initializer instruction");
   return {getInst()->getParent()};
+}
+
+inline BridgedInstruction BridgedInstruction::getLastInstOfParent() const {
+  return {getInst()->getParent()->back().asSILNode()};
 }
 
 BridgedSuccessorArray BridgedInstruction::TermInst_getSuccessors() const {
