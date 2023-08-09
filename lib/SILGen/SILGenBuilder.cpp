@@ -191,7 +191,8 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   ManagedValue SILGenBuilder::createStrongCopy##Name##Value(                   \
       SILLocation loc, ManagedValue originalValue) {                           \
     auto ty = originalValue.getType().castTo<Name##StorageType>();             \
-    assert(ty->isLoadable(ResilienceExpansion::Maximal));                      \
+    assert(ty->isLoadable(ResilienceExpansion::Maximal) ||                     \
+           !SGF.useLoweredAddresses());                                        \
     (void)ty;                                                                  \
     SILValue result =                                                          \
         createStrongCopy##Name##Value(loc, originalValue.getValue());          \

@@ -1442,6 +1442,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+  case SILInstructionKind::UnownedCopyValueInst:
   case SILInstructionKind::WeakCopyValueInst:
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::StrongCopy##Name##ValueInst:

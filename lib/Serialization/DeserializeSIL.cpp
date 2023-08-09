@@ -2082,6 +2082,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         (Atomicity)Attr);                                                      \
     break;
 
+    UNARY_INSTRUCTION(UnownedCopyValue)
     UNARY_INSTRUCTION(WeakCopyValue)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   UNARY_INSTRUCTION(StrongCopy##Name##Value)

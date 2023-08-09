@@ -8,7 +8,6 @@ struct WeakBox<T : AnyObject> {
   weak var t: T?
 }
 
-
 // CHECK-LABEL: sil [ossa] @strong_copy_weak_value_caller : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]

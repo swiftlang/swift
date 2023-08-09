@@ -8109,6 +8109,18 @@ class WeakCopyValueInst
   }
 };
 
+class UnownedCopyValueInst
+    : public UnaryInstructionBase<SILInstructionKind::UnownedCopyValueInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+  UnownedCopyValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       SILType type)
+      : UnaryInstructionBase(DebugLoc, operand, type) {
+    assert(type.getReferenceStorageOwnership() == ReferenceOwnership::Unowned);
+    assert(type.getReferenceStorageReferentType() == operand->getType());
+  }
+};
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   class StrongCopy##Name##ValueInst                                            \
       : public UnaryInstructionBase<                                           \

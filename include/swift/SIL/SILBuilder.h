@@ -1061,6 +1061,17 @@ public:
         getSILDebugLocation(Loc), ArgumentsSpecification, getModule()));
   }
 
+  UnownedCopyValueInst *createUnownedCopyValue(SILLocation Loc,
+                                               SILValue operand) {
+    assert(!getFunction().getModule().useLoweredAddresses());
+    auto type = operand->getType()
+                    .getReferenceStorageType(getFunction().getASTContext(),
+                                             ReferenceOwnership::Unowned)
+                    .getObjectType();
+    return insert(new (getModule()) UnownedCopyValueInst(
+        getSILDebugLocation(Loc), operand, type));
+  }
+
   WeakCopyValueInst *createWeakCopyValue(SILLocation Loc, SILValue operand) {
     assert(!getFunction().getModule().useLoweredAddresses());
     auto type = operand->getType()

@@ -2141,6 +2141,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitUnownedCopyValueInst(UnownedCopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitWeakCopyValueInst(WeakCopyValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }

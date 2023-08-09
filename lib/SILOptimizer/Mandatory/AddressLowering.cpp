@@ -3483,6 +3483,14 @@ protected:
     pass.deleter.forceDelete(sei);
   }
 
+  void visitStrongCopyUnownedValueInst(StrongCopyUnownedValueInst *scuvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadUnowned(scuvi->getLoc(), sourceAddr, IsNotTake);
+    scuvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scuvi);
+  }
+
   void visitStrongCopyWeakValueInst(StrongCopyWeakValueInst *scwvi) {
     auto sourceAddr = addrMat.materializeAddress(use->get());
     SILValue value =
@@ -4101,6 +4109,15 @@ protected:
     assert(uncondCheckedCast->getType().isAddressOnly(*pass.function));
 
     rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass);
+  }
+
+  void visitUnownedCopyValueInst(UnownedCopyValueInst *uci) {
+    auto &storage = pass.valueStorageMap.getStorage(uci);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreUnowned(uci->getLoc(), uci->getOperand(), destAddr,
+                               IsInitialization);
   }
 
   void visitWeakCopyValueInst(WeakCopyValueInst *wcsvi) {

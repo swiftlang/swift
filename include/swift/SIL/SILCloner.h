@@ -1408,6 +1408,15 @@ SILCloner<ImplClass>::visitDebugStepInst(DebugStepInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnownedCopyValueInst(
+    UnownedCopyValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUnownedCopyValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitWeakCopyValueInst(WeakCopyValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
