@@ -208,6 +208,10 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   } else {
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
+  if (LangOpts.ClangTarget) {
+    serializationOpts.ExtraClangOptions.push_back("-triple");
+    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTarget->str());
+  }
 
   serializationOpts.PluginSearchOptions =
       getSearchPathOptions().PluginSearchOpts;
