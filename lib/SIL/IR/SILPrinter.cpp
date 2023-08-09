@@ -2141,12 +2141,15 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
-    *this << getIDAndType(I->getOperand());                                    \
+  void visitUnownedCopyValueInst(UnownedCopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
   }
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  void visitWeakCopyValueInst(WeakCopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+#define REF_STORAGE(Name, ...)                                                 \
   void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \
   }

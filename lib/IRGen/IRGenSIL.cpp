@@ -1503,25 +1503,39 @@ public:
 
   void visitHasSymbolInst(HasSymbolInst *i);
 
+  void visitWeakCopyValueInst(swift::WeakCopyValueInst *i);
+  void visitUnownedCopyValueInst(swift::UnownedCopyValueInst *i);
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
-  void visit##Name##ToRefInst(Name##ToRefInst *i);                             \
+  void visit##Name##ToRefInst(Name##ToRefInst *i);
+#define COPYABLE_STORAGE_HELPER(Name)                                          \
   void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *i);
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  void visitLoad##Name##Inst(Load##Name##Inst *i); \
+#define LOADABLE_STORAGE_HELPER(Name)                                          \
+  void visitLoad##Name##Inst(Load##Name##Inst *i);                             \
   void visitStore##Name##Inst(Store##Name##Inst *i);
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
-  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  LOADABLE_STORAGE_HELPER(Name)                                                \
+  COPYABLE_STORAGE_HELPER(Name)
+#define RETAINABLE_STORAGE_HELPER(Name)                                        \
   void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i);             \
   void visit##Name##RetainInst(Name##RetainInst *i);                           \
   void visit##Name##ReleaseInst(Name##ReleaseInst *i);
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
-  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
-#define UNCHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+  RETAINABLE_STORAGE_HELPER(Name)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  LOADABLE_STORAGE_HELPER(Name)                                                \
+  COPYABLE_STORAGE_HELPER(Name)                                                \
+  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+  RETAINABLE_STORAGE_HELPER(Name)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  COPYABLE_STORAGE_HELPER(Name)                                                \
   LOADABLE_REF_STORAGE_HELPER(Name)
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
+#undef LOADABLE_STORAGE_HELPER
+#undef COPYABLE_STORAGE_HELPER
+#undef RETAINABLE_STORAGE_HELPER
 };
 
 } // end anonymous namespace
@@ -5336,6 +5350,22 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   if (auto ty = type->getOptionalObjectType())
     type = ty->getCanonicalType();
   return cast<ReferenceTypeInfo>(IGF.getTypeInfoForLowered(type));
+}
+
+void IRGenSILFunction::visitStrongCopyWeakValueInst(
+    swift::StrongCopyWeakValueInst *i) {
+  llvm::report_fatal_error(
+      "strong_copy_weak_value not lowered by AddressLowering!?");
+}
+
+void IRGenSILFunction::visitWeakCopyValueInst(swift::WeakCopyValueInst *i) {
+  llvm::report_fatal_error("weak_copy_value not lowered by AddressLowering!?");
+}
+
+void IRGenSILFunction::visitUnownedCopyValueInst(
+    swift::UnownedCopyValueInst *i) {
+  llvm::report_fatal_error(
+      "unowned_copy_value not lowered by AddressLowering!?");
 }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \

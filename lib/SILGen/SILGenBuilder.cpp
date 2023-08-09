@@ -175,11 +175,24 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  ManagedValue SILGenBuilder::createStrongCopy##Name##Value(                   \
+      SILLocation loc, ManagedValue originalValue) {                           \
+    assert(!SGF.useLoweredAddresses());                                        \
+    auto ty = originalValue.getType();                                         \
+    assert(ty.isAddressOnly(SGF.F));                                           \
+    auto storageTy = originalValue.getType().castTo<Name##StorageType>();      \
+    (void)storageTy;                                                           \
+    SILValue result =                                                          \
+        createStrongCopy##Name##Value(loc, originalValue.getValue());          \
+    return SGF.emitManagedRValueWithCleanup(result);                           \
+  }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   ManagedValue SILGenBuilder::createStrongCopy##Name##Value(                   \
       SILLocation loc, ManagedValue originalValue) {                           \
     auto ty = originalValue.getType().castTo<Name##StorageType>();             \
-    assert(ty->isLoadable(ResilienceExpansion::Maximal));                      \
+    assert(ty->isLoadable(ResilienceExpansion::Maximal) ||                     \
+           !SGF.useLoweredAddresses());                                        \
     (void)ty;                                                                  \
     SILValue result =                                                          \
         createStrongCopy##Name##Value(loc, originalValue.getValue());          \
