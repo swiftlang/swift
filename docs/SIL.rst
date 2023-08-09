@@ -5191,7 +5191,30 @@ case, the strong reference count will be incremented before any changes to the
 weak reference count.
 
 This operation must be atomic with respect to the final ``strong_release`` on
-the operand heap object.  It need not be atomic with respect to ``store_weak``
+the operand heap object.  It need not be atomic with respect to
+``store_weak``/``weak_copy_value`` or ``load_weak``/``strong_copy_weak_value``
+operations on the same address.
+
+strong_copy_weak_value
+``````````````````````
+::
+
+  sil-instruction ::= 'strong_copy_weak_value' sil-operand
+
+  %1 = strong_copy_weak_value %0 : $@sil_weak Optional<T>
+  // %1 will be a strong @owned value of type $Optional<T>.
+  // $T must be a reference type
+  // $@sil_weak Optional<T> must be address-only
+
+Only valid in opaque values mode.  Lowered by AddressLowering to load_weak.
+
+If the heap object referenced by ``%0`` has not begun deallocation, increments
+its strong reference count and produces the value ``Optional.some`` holding the
+object.  Otherwise, produces the value ``Optional.none``.
+
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand heap object.  It need not be atomic with respect to
+``store_weak``/``weak_copy_value`` or ``load_weak``/``strong_copy_weak_value``
 operations on the same address.
 
 store_weak
@@ -5218,7 +5241,30 @@ currently be initialized. After the evaluation:
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_weak`` or ``load_weak`` operations on the same address.
+``store_weak``/``weak_copy_value`` or ``load_weak``/``strong_copy_weak_value``
+operations on the same address.
+
+weak_copy_value
+```````````````
+::
+
+  sil-instruction ::= 'weak_copy_value' sil-operand
+
+  %1 = weak_copy_value %0 : $Optional<T>
+  // %1 will be an @owned value of type $@sil_weak Optional<T>.
+  // $T must be a reference type
+  // $@sil_weak Optional<T> must be address-only
+
+Only valid in opaque values mode.  Lowered by AddressLowering to store_weak.
+
+If ``%0`` is non-nil, produces the value ``@sil_weak Optional.some`` holding the
+object and increments the weak reference count by 1.  Otherwise, produces the
+value ``Optional.none`` wrapped in a ``@sil_weak`` box.
+
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand (source) heap object.  It need not be atomic with respect to
+``store_weak``/``weak_copy_value`` or ``load_weak``/``strong_copy_weak_value``
+operations on the same address.
 
 load_unowned
 ````````````
@@ -5239,7 +5285,8 @@ positive.  Otherwise, traps.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_unowned`` or ``load_unowned`` operations on the same address.
+``store_unowned``/``unowned_copy_value`` or
+``load_unowned``/``strong_copy_unowned_value`` operations on the same address.
 
 store_unowned
 `````````````
@@ -5259,8 +5306,30 @@ The storage must be initialized iff ``[init]`` is not specified.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
-``store_unowned`` or ``load_unowned`` operations on the same address.
+``store_unowned``/``unowned_copy_value`` or
+``load_unowned``/``strong_copy_unowned_value`` operations on the same address.
 
+unowned_copy_value
+``````````````````
+::
+
+  sil-instruction ::= 'unowned_copy_value' sil-operand
+
+  %1 = unowned_copy_value %0 : $T
+  // %1 will be an @owned value of type $@sil_unowned T.
+  // $T must be a reference type
+  // $@sil_unowned T must be address-only
+
+Only valid in opaque values mode.  Lowered by AddressLowering to store_unowned.
+
+Increments the unowned reference count of the object at ``%0``.
+
+Wraps the operand in an instance of ``@sil_unowned``.
+
+This operation must be atomic with respect to the final ``strong_release`` on
+the operand (source) heap object.  It need not be atomic with respect to
+``store_unowned``/``unowned_copy_value`` or
+``load_unowned``/``strong_copy_unowned_value`` operations on the same address.
 
 fix_lifetime
 ````````````

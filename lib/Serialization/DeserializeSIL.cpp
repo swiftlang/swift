@@ -2082,12 +2082,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         (Atomicity)Attr);                                                      \
     break;
 
+    UNARY_INSTRUCTION(UnownedCopyValue)
+    UNARY_INSTRUCTION(WeakCopyValue)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   REFCOUNTING_INSTRUCTION(Name##Retain)                                        \
   REFCOUNTING_INSTRUCTION(Name##Release)                                       \
   REFCOUNTING_INSTRUCTION(StrongRetain##Name)                                  \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
   REFCOUNTING_INSTRUCTION(RetainValue)

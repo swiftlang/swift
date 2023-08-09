@@ -848,10 +848,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 #include "swift/AST/ReferenceStorage.def"
 #undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
 
-#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
+  case SILInstructionKind::UnownedCopyValueInst:
+  case SILInstructionKind::WeakCopyValueInst:
     return RuntimeEffect::RefCounting;
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+#define REF_STORAGE(Name, ...)                                                 \
   case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
     return RuntimeEffect::RefCounting;
 #include "swift/AST/ReferenceStorage.def"

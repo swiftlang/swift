@@ -4544,9 +4544,18 @@ ManagedValue SILGenFunction::emitConversionToSemanticRValue(
   switch (swiftStorageType->getOwnership()) {
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: \
-    /* Address-only storage types are handled with their underlying type. */ \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  case ReferenceOwnership::Name:                                               \
+    if (!useLoweredAddresses()) {                                              \
+      auto refTy = src.getType();                                              \
+      auto ty = refTy.getReferenceStorageReferentType();                       \
+      assert(ty);                                                              \
+      assert(ty.getOptionalObjectType());                                      \
+      (void)ty;                                                                \
+      /* Copy the weak value, opening the @sil_weak box. */                    \
+      return B.createStrongCopy##Name##Value(loc, src);                        \
+    }                                                                          \
+    /* Address-only storage types are handled with their underlying type. */   \
     llvm_unreachable("address-only pointers are handled elsewhere");
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case ReferenceOwnership::Name:                                               \
@@ -4827,11 +4836,29 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   }
 
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
+  if (!useLoweredAddresses() && storageType.isAddressOnly(F)) {
+    switch (swiftStorageType->getOwnership()) {
+      case ReferenceOwnership::Strong:
+        llvm_unreachable("strong reference storage type should be impossible");
+      case ReferenceOwnership::Unmanaged:
+        llvm_unreachable("unimplemented");
+      case ReferenceOwnership::Weak: {
+        auto value = B.createWeakCopyValue(loc, semanticValue);
+        B.emitDestroyValueOperation(loc, semanticValue);
+        return value;
+      }
+      case ReferenceOwnership::Unowned: {
+        auto value = B.createUnownedCopyValue(loc, semanticValue);
+        B.emitDestroyValueOperation(loc, semanticValue);
+        return value;
+      }
+    }
+  }
   switch (swiftStorageType->getOwnership()) {
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  case ReferenceOwnership::Name:                                               \
     llvm_unreachable("address-only types are never loadable");
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: { \
@@ -4840,16 +4867,16 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.emitDestroyValueOperation(loc, semanticValue); \
     return value; \
   }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: { \
-    /* For loadable types, place into a box. */ \
-    auto type = storageType.castTo<Name##StorageType>(); \
-    assert(type->isLoadable(ResilienceExpansion::Maximal)); \
-    (void) type; \
-    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
-    value = B.createCopyValue(loc, value); \
-    B.emitDestroyValueOperation(loc, semanticValue); \
-    return value; \
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  case ReferenceOwnership::Name: {                                             \
+    /* For loadable types, place into a box. */                                \
+    auto type = storageType.castTo<Name##StorageType>();                       \
+    assert(type->isLoadable(ResilienceExpansion::Maximal));                    \
+    (void)type;                                                                \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType);     \
+    value = B.createCopyValue(loc, value);                                     \
+    B.emitDestroyValueOperation(loc, semanticValue);                           \
+    return value;                                                              \
   }
 #define UNCHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: { \

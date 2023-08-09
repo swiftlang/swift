@@ -8098,6 +8098,40 @@ class ExplicitCopyValueInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
+class WeakCopyValueInst
+    : public UnaryInstructionBase<SILInstructionKind::WeakCopyValueInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+  WeakCopyValueInst(SILDebugLocation DebugLoc, SILValue operand, SILType type)
+      : UnaryInstructionBase(DebugLoc, operand, type) {
+    assert(type.getReferenceStorageOwnership() == ReferenceOwnership::Weak);
+    assert(type.getReferenceStorageReferentType() == operand->getType());
+  }
+};
+
+class UnownedCopyValueInst
+    : public UnaryInstructionBase<SILInstructionKind::UnownedCopyValueInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+  UnownedCopyValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       SILType type)
+      : UnaryInstructionBase(DebugLoc, operand, type) {
+    assert(type.getReferenceStorageOwnership() == ReferenceOwnership::Unowned);
+    assert(type.getReferenceStorageReferentType() == operand->getType());
+  }
+};
+
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
+    friend class SILBuilder;                                                   \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
+        : UnaryInstructionBase(DebugLoc, operand,                              \
+                               type.getReferenceStorageReferentType()) {}      \
+  };
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   class StrongCopy##Name##ValueInst                                            \
       : public UnaryInstructionBase<                                           \
@@ -8108,7 +8142,6 @@ class ExplicitCopyValueInst
                                 SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
-
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   class StrongCopy##Name##ValueInst                                            \
       : public UnaryInstructionBase<                                           \
