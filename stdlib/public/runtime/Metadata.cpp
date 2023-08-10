@@ -510,9 +510,11 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   if (!oldClassMetadata->isTypeMetadata())
    return;
 
-  // Copy the value witness table pointer for pointer authentication.
+  // Copy the value witness table and pointer and heap object destroyer for
+  // pointer authentication.
   auto newClassMetadata = reinterpret_cast<ClassMetadata *>(newClass);
   newClassMetadata->setValueWitnesses(oldClassMetadata->getValueWitnesses());
+  newClassMetadata->setHeapObjectDestroyer(oldClassMetadata->getHeapObjectDestroyer());
 
  // Otherwise, re-sign v-table entries using the extra discriminators stored
  // in the v-table descriptor.
