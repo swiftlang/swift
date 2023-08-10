@@ -80,3 +80,7 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
 extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
 
 extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
+
+public protocol UnsafeCxxMutableRandomAccessIterator: UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
+
+extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}

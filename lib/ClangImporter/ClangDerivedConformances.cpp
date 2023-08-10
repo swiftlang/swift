@@ -563,8 +563,12 @@ void swift::conformToCxxIteratorIfNeeded(
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Distance"), distanceTy);
-  impl.addSynthesizedProtocolAttrs(
-      decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
+  if (pointeeSettable)
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator});
+  else
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
 }
 
 void swift::conformToCxxOptionalIfNeeded(
