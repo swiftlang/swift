@@ -119,27 +119,8 @@ llvm::Expected<int> SwiftJIT::runMain(llvm::ArrayRef<std::string> Args) {
   return Result;
 }
 
-llvm::orc::LLJIT &SwiftJIT::getJIT() { return *J; }
-
 llvm::orc::JITDylib &SwiftJIT::getMainJITDylib() {
   return J->getMainJITDylib();
-}
-
-llvm::Error SwiftJIT::initialize(llvm::orc::JITDylib &JD) {
-  return J->initialize(JD);
-}
-
-llvm::Error SwiftJIT::deinitialize(llvm::orc::JITDylib &JD) {
-  return J->deinitialize(JD);
-}
-
-llvm::Expected<llvm::orc::ExecutorAddr> SwiftJIT::lookup(llvm::StringRef Name) {
-  return J->lookup(Name);
-}
-
-llvm::Expected<llvm::orc::ExecutorAddr>
-SwiftJIT::lookupLinkerMangled(llvm::StringRef Name) {
-  return J->lookupLinkerMangled(Name);
 }
 
 std::string SwiftJIT::mangle(StringRef Name) { return J->mangle(Name); }

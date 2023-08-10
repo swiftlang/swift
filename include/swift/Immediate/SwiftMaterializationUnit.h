@@ -48,7 +48,6 @@ public:
   static llvm::Expected<std::unique_ptr<SwiftJIT>> Create(CompilerInstance &CI);
 
   ~SwiftJIT();
-  llvm::orc::LLJIT &getJIT();
 
   llvm::orc::JITDylib &getMainJITDylib();
 
@@ -56,15 +55,6 @@ public:
   /// create lazy reexports for all functions defined in the interface of `MU`
   llvm::Error addSwift(llvm::orc::JITDylib &JD,
                        std::unique_ptr<llvm::orc::MaterializationUnit> MU);
-
-  llvm::Error initialize(llvm::orc::JITDylib &JD);
-
-  llvm::Error deinitialize(llvm::orc::JITDylib &JD);
-
-  llvm::Expected<llvm::orc::ExecutorAddr> lookup(llvm::StringRef Name);
-
-  llvm::Expected<llvm::orc::ExecutorAddr>
-  lookupLinkerMangled(llvm::StringRef Name);
 
   std::string mangle(llvm::StringRef Name);
 
