@@ -49,7 +49,7 @@ using namespace swift;
 static const std::string ManglingSuffix = "$impl";
 
 /// Mangle a function for a lazy reexport
-static std::string mangleFunctionBody(const StringRef Unmangled) {
+static std::string mangle(const StringRef Unmangled) {
   return Unmangled.str() + ManglingSuffix;
 }
 
@@ -59,8 +59,9 @@ static bool isMangled(const StringRef Symbol) {
 }
 
 /// Demangle a lazy reexport
-static StringRef demangleFunctionBody(const StringRef Mangled) {
-  return Mangled.drop_back(ManglingSuffix.size());
+static StringRef demangle(const StringRef Mangled) {
+  return isMangled(Mangled) ? Mangled.drop_back(ManglingSuffix.size())
+                            : Mangled;
 }
 
 llvm::Expected<std::unique_ptr<SwiftJIT>>
@@ -113,6 +114,8 @@ llvm::Expected<llvm::orc::ExecutorAddr>
 SwiftJIT::lookupLinkerMangled(llvm::StringRef Name) {
   return J->lookupLinkerMangled(Name);
 }
+
+std::string SwiftJIT::mangle(StringRef Name) { return J->mangle(Name); }
 
 llvm::orc::SymbolStringPtr SwiftJIT::mangleAndIntern(StringRef Name) {
   return J->mangleAndIntern(Name);
@@ -167,13 +170,13 @@ renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
   using namespace llvm;
   using namespace llvm::orc;
 
-  llvm::DenseSet<StringRef> ToRename;
+  llvm::StringSet<> ToRename;
   for (auto &KV : MR.getSymbols()) {
-    const auto &Name = *KV.first;
+    StringRef Name = *KV.first;
     if (isMangled(Name))
       // All mangled functions we are responsible for
       // materializing must be mangled at the object levels
-      ToRename.insert(demangleFunctionBody(Name));
+      ToRename.insert(demangle(Name));
   }
   for (auto &Sec : G.sections()) {
     // Skip non-executable sections.
@@ -181,7 +184,6 @@ renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
       continue;
 
     for (auto *Sym : Sec.symbols()) {
-
       // Skip all anonymous and non-callables.
       if (!Sym->hasName() || !Sym->isCallable())
         continue;
@@ -189,7 +191,7 @@ renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
       if (ToRename.count(Sym->getName())) {
         // FIXME: Get rid of the temporary when Swift's llvm-project is
         // updated to LLVM 17.
-        auto NewName = G.allocateString(mangleFunctionBody(Sym->getName()));
+        auto NewName = G.allocateString(mangle(Sym->getName()));
         Sym->setName({NewName.data(), NewName.size()});
       }
     }
@@ -296,7 +298,8 @@ SwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
     const auto &SymbolName = Entry.getKey();
     const auto Flags =
         llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable;
-    PublicInterface[JIT.intern(SymbolName)] = Flags;
+    auto MangledName = mangle(SymbolName);
+    PublicInterface[JIT.intern(MangledName)] = Flags;
   }
   return std::unique_ptr<SwiftMaterializationUnit>(new SwiftMaterializationUnit(
       JIT, CI, std::move(Sources), std::move(PublicInterface)));
@@ -313,16 +316,17 @@ SwiftMaterializationUnit::SwiftMaterializationUnit(
       Sources(std::move(Sources)), JIT(JIT), CI(CI) {}
 
 void SwiftMaterializationUnit::materialize(
-    std::unique_ptr<llvm::orc::MaterializationResponsibility> R) {
+    std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) {
   SILRefsToEmit Refs;
-  const auto &RS = R->getRequestedSymbols();
+  const auto &RS = MR->getRequestedSymbols();
   for (auto &Sym : RS) {
-    const auto &Source = Sources.storage->find(*Sym)->getValue();
+    auto Name = demangle(*Sym);
+    const auto &Source = Sources.storage->find(Name)->getValue();
     auto Ref = Source.getSILDeclRef();
     if (auto *AFD = Ref.getAbstractFunctionDecl()) {
       AFD->getTypecheckedBody();
       if (CI.getASTContext().hadError()) {
-        R->failMaterialization();
+        MR->failMaterialization();
         return;
       }
     }
@@ -333,13 +337,23 @@ void SwiftMaterializationUnit::materialize(
   runSILLoweringPasses(*SM);
   auto GM = generateModule(CI, std::move(SM));
   if (!GM) {
-    R->failMaterialization();
+    MR->failMaterialization();
     return;
   }
   auto *Module = GM->getModule();
+
+  // All renamings defined by `MR`, e.g. "foo" -> "foo$impl"
+  llvm::StringMap<llvm::orc::SymbolStringPtr> Renamings;
+  for (auto &[Sym, Flags] : MR->getSymbols()) {
+    Renamings[demangle(*Sym)] = Sym;
+  }
   // Now we must register all other public symbols defined by
   // the module with the JIT
   llvm::orc::SymbolFlagsMap LazilyDiscoveredSymbols;
+
+  // All symbols defined by the compiled module in `MR`
+  llvm::DenseSet<llvm::orc::SymbolStringPtr> DefinedSymbols;
+
   // Register all global values, including global
   // variables and functions
   for (const auto &GV : Module->global_values()) {
@@ -348,35 +362,37 @@ void SwiftMaterializationUnit::materialize(
         GV.isDeclaration()) {
       continue;
     }
-    auto Name = GV.getName();
-    auto MangledName = JIT.mangleAndIntern(Name);
-    if (RS.contains(MangledName)) {
-      continue;
+    auto Name = JIT.mangle(GV.getName());
+    auto itr = Renamings.find(Name);
+    if (itr == Renamings.end()) {
+      LazilyDiscoveredSymbols[JIT.intern(Name)] =
+          llvm::JITSymbolFlags::fromGlobalValue(GV);
+    } else {
+      DefinedSymbols.insert(itr->getValue());
     }
-    LazilyDiscoveredSymbols[MangledName] =
-        llvm::JITSymbolFlags::fromGlobalValue(GV);
   }
+
   llvm::orc::SymbolFlagsMap UnrequestedSymbols;
-  for (auto &[Sym, Flags] : R->getSymbols()) {
-    if (!RS.contains(Sym) && !LazilyDiscoveredSymbols.count(Sym)) {
+  for (auto &[Sym, Flags] : MR->getSymbols()) {
+    if (!DefinedSymbols.contains(Sym)) {
       UnrequestedSymbols[Sym] = Flags;
     }
   }
   std::unique_ptr<MaterializationUnit> UnrequestedMU(
       new SwiftMaterializationUnit(JIT, CI, std::move(Sources),
                                    std::move(UnrequestedSymbols)));
-  if (auto Err = R->replace(std::move(UnrequestedMU))) {
+  if (auto Err = MR->replace(std::move(UnrequestedMU))) {
     logError(std::move(Err));
-    R->failMaterialization();
+    MR->failMaterialization();
     return;
   }
-  if (auto Err = R->defineMaterializing(std::move(LazilyDiscoveredSymbols))) {
+  if (auto Err = MR->defineMaterializing(std::move(LazilyDiscoveredSymbols))) {
     logError(std::move(Err));
-    R->failMaterialization();
+    MR->failMaterialization();
     return;
   }
   auto TSM = std::move(*GM).intoThreadSafeContext();
-  JIT.getIRCompileLayer().emit(std::move(R), std::move(TSM));
+  JIT.getIRCompileLayer().emit(std::move(MR), std::move(TSM));
 }
 
 llvm::Error
@@ -387,7 +403,7 @@ SwiftJIT::addSwift(llvm::orc::JITDylib &JD,
   for (auto &[Name, Flags] : MU->getSymbols()) {
     if (isMangled(*Name)) {
       // Create a stub for mangled functions
-      auto OriginalName = demangleFunctionBody(*Name);
+      auto OriginalName = demangle(*Name);
       Stubs.insert(
           {J->getExecutionSession().intern(OriginalName), {Name, Flags}});
     }

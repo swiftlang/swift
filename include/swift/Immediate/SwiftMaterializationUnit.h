@@ -66,6 +66,8 @@ public:
   llvm::Expected<llvm::orc::ExecutorAddr>
   lookupLinkerMangled(llvm::StringRef Name);
 
+  std::string mangle(llvm::StringRef Name);
+
   llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name);
 
   llvm::orc::SymbolStringPtr intern(llvm::StringRef Name);
