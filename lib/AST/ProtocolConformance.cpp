@@ -310,7 +310,7 @@ bool NormalProtocolConformance::isResilient() const {
   // FIXME: Looking at the type is not the right long-term solution. We need an
   // explicit mechanism for declaring conformances as 'fragile', or even
   // individual witnesses.
-  if (!getType()->getAnyNominal()->isResilient())
+  if (!getDeclContext()->getSelfNominalTypeDecl()->isResilient())
     return false;
 
   return getDeclContext()->getParentModule()->isResilient();
@@ -967,18 +967,11 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     if (substType.getPointer() == origType.getPointer())
       return const_cast<ProtocolConformance *>(this);
 
-    SmallVector<Requirement, 2> requirements;
-    for (auto req : getConditionalRequirements()) {
-      requirements.push_back(req.subst(IFS));
-    }
-
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
     return substType->getASTContext()
-        .getBuiltinConformance(substType,
-                               getProtocol(), getGenericSignature(),
-                               requirements, kind);
+        .getBuiltinConformance(substType, getProtocol(), kind);
   }
   case ProtocolConformanceKind::Self:
     return const_cast<ProtocolConformance*>(this);
@@ -1410,18 +1403,7 @@ bool ProtocolConformance::isCanonical() const {
     return true;
   }
   case ProtocolConformanceKind::Builtin: {
-    // Check that the generic signature of the conformance is canonical.
-    auto builtinConformance = cast<BuiltinProtocolConformance>(this);
-    if (builtinConformance->getGenericSignature()
-        && !builtinConformance->getGenericSignature()->isCanonical()) {
-      return false;
-    }
-    // Check that the satisfied conditional requirements are canonical.
-    for (auto &requirement : builtinConformance->getConditionalRequirements()) {
-      if (!requirement.isCanonical()) {
-        return false;
-      }
-    }
+    // FIXME: Not the conforming type?
     return true;
   }
   case ProtocolConformanceKind::Inherited: {
@@ -1458,15 +1440,9 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     // Canonicalize the subject type of the builtin conformance.
     auto &Ctx = getType()->getASTContext();
     auto builtinConformance = cast<BuiltinProtocolConformance>(this);
-    SmallVector<Requirement, 4> canonicalRequirements;
-    for (auto &reqt : builtinConformance->getConditionalRequirements()) {
-      canonicalRequirements.push_back(reqt.getCanonical());
-    }
     return Ctx.getBuiltinConformance(
       builtinConformance->getType()->getCanonicalType(),
       builtinConformance->getProtocol(),
-      builtinConformance->getGenericSignature().getCanonicalSignature(),
-      canonicalRequirements,
       builtinConformance->getBuiltinConformanceKind());
   }
 
@@ -1496,18 +1472,10 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 
 BuiltinProtocolConformance::BuiltinProtocolConformance(
     Type conformingType, ProtocolDecl *protocol,
-    GenericSignature genericSig,
-    ArrayRef<Requirement> conditionalRequirements,
     BuiltinConformanceKind kind
 ) : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
-    protocol(protocol), genericSig(genericSig),
-    numConditionalRequirements(conditionalRequirements.size()),
-    builtinConformanceKind(static_cast<unsigned>(kind))
-{
-  std::uninitialized_copy(conditionalRequirements.begin(),
-                          conditionalRequirements.end(),
-                          getTrailingObjects<Requirement>());
-}
+    protocol(protocol), builtinConformanceKind(static_cast<unsigned>(kind))
+{}
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing
 // ProtocolConformances, is defined here to avoid too much layering violation /

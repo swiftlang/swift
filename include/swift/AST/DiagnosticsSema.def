@@ -2335,6 +2335,9 @@ NOTE(composition_in_extended_type_alternative,none,
 ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
+ERROR(experimental_tuple_extension,none,
+      "tuple extensions are experimental",
+      ())
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_placeholder,none,

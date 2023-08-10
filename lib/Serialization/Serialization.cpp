@@ -1842,16 +1842,10 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
       DeclTypeAbbrCodes[BuiltinProtocolConformanceLayout::Code];
     auto typeID = addTypeRef(builtin->getType());
     auto protocolID = addDeclRef(builtin->getProtocol());
-    auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
-
-    SmallVector<uint64_t, 16> requirementData;
-    serializeGenericRequirements(builtin->getConditionalRequirements(),
-                                 requirementData);
 
     BuiltinProtocolConformanceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID,
-        static_cast<unsigned>(builtin->getBuiltinConformanceKind()),
-        requirementData);
+        Out, ScratchRecord, abbrCode, typeID, protocolID,
+        static_cast<unsigned>(builtin->getBuiltinConformanceKind()));
     break;
   }
 }

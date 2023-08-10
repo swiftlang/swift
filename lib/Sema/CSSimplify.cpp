@@ -8293,6 +8293,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Solved;
   }
 
+  // We sometimes get a pack expansion type here.
+  if (auto *expansionType = type->getAs<PackExpansionType>()) {
+    // FIXME: Locator
+    addConstraint(ConstraintKind::ConformsTo,
+                  expansionType->getPatternType(),
+                  protocol->getDeclaredInterfaceType(),
+                  locator);
+
+    return SolutionKind::Solved;
+  }
+
   // Copyable is checked structurally, so for better performance, split apart
   // this constraint into individual Copyable constraints on each tuple element.
   if (auto *tupleType = type->getAs<TupleType>()) {

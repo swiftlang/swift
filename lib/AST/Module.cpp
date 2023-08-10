@@ -1588,7 +1588,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // All existentials are Copyable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1670,8 +1670,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
   if (shouldCreateMissingConformances(type, proto)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
-          type, proto, GenericSignature(), { },
-          BuiltinConformanceKind::Missing));
+          type, proto, BuiltinConformanceKind::Missing));
   }
 
   return ProtocolConformanceRef::forInvalid();
@@ -1713,9 +1712,6 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     ModuleDecl *module) {
   ASTContext &ctx = protocol->getASTContext();
 
-  // This is the new code path.
-  //
-  // FIXME: Remove the Sendable stuff below.
   auto *tupleDecl = ctx.getBuiltinTupleDecl();
 
   // Find the (unspecialized) conformance.
@@ -1748,62 +1744,6 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     return ProtocolConformanceRef(specialized);
   }
 
-  /// For some known protocols (KPs) like Sendable and Copyable, a tuple type
-  /// conforms to the protocol KP when all of their element types conform to KP.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-
-    // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
-    // generic signature <T1, T2, ..., TN>.
-    SmallVector<GenericTypeParamType *, 4> genericParams;
-    SmallVector<Type, 4> typeSubstitutions;
-    SmallVector<TupleTypeElt, 4> genericElements;
-    SmallVector<Requirement, 4> conditionalRequirements;
-    for (const auto &elt : tupleType->getElements()) {
-      auto genericParam = GenericTypeParamType::get(/*isParameterPack*/ false, 0,
-                                                    genericParams.size(), ctx);
-      genericParams.push_back(genericParam);
-      typeSubstitutions.push_back(elt.getType());
-      genericElements.push_back(elt.getWithType(genericParam));
-      conditionalRequirements.push_back(
-          Requirement(RequirementKind::Conformance, genericParam,
-                      protocol->getDeclaredType()));
-    }
-
-    // If there were no generic parameters, just form the builtin conformance.
-    if (genericParams.empty()) {
-      return ProtocolConformanceRef(
-          ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
-                                    BuiltinConformanceKind::Synthesized));
-    }
-
-    // Form a generic conformance of (T1, T2, ..., TN): KP with signature
-    // <T1, T2, ..., TN> and conditional requirements T1: KP,
-    // T2: P, ..., TN: KP.
-    auto genericTupleType = TupleType::get(genericElements, ctx);
-    auto genericSig = GenericSignature::get(
-        genericParams, conditionalRequirements);
-    auto genericConformance = ctx.getBuiltinConformance(
-        genericTupleType, protocol, genericSig, conditionalRequirements,
-        BuiltinConformanceKind::Synthesized);
-
-    // Compute the substitution map from the generic parameters of the
-    // generic conformance to actual types that were in the tuple type.
-    // Form a specialized conformance from that.
-    auto subMap = SubstitutionMap::get(
-        genericSig, [&](SubstitutableType *type) {
-          if (auto gp = dyn_cast<GenericTypeParamType>(type)) {
-            if (gp->getDepth() == 0)
-              return typeSubstitutions[gp->getIndex()];
-          }
-
-          return Type(type);
-        },
-        LookUpConformanceInModule(module));
-    return ProtocolConformanceRef(
-        ctx.getSpecializedConformance(type, genericConformance, subMap));
-  }
-
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
@@ -1833,7 +1773,7 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
       isSendableFunctionType(functionType)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1841,7 +1781,7 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
   // that they capture, so it's safe to copy functions, like classes.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1858,14 +1798,14 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
       !metatypeType->getInstanceType()->isPureMoveOnly()) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
   // All metatypes are Sendable
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1881,7 +1821,7 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
       protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+        ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1899,7 +1839,8 @@ static ProtocolConformanceRef getPackTypeConformance(
       auto patternConformance =
           (patternType->isTypeParameter()
            ? ProtocolConformanceRef(protocol)
-           : mod->lookupConformance(patternType, protocol));
+           : mod->lookupConformance(patternType, protocol,
+                                    /*allowMissing=*/true));
       patternConformances.push_back(patternConformance);
       continue;
     }
@@ -1907,7 +1848,8 @@ static ProtocolConformanceRef getPackTypeConformance(
     auto patternConformance =
         (packElement->isTypeParameter()
          ? ProtocolConformanceRef(protocol)
-         : mod->lookupConformance(packElement, protocol));
+         : mod->lookupConformance(packElement, protocol,
+                                  /*allowMissing=*/true));
     patternConformances.push_back(patternConformance);
   }
 
@@ -2005,17 +1947,6 @@ LookupConformanceInModuleRequest::evaluate(
   // Builtin types can conform to protocols.
   if (auto builtinType = type->getAs<BuiltinType>()) {
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
-  }
-
-  // Specific handling of Copyable and Sendable for pack expansions.
-  if (auto packExpansion = type->getAs<PackExpansionType>()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
-        protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      auto patternType = packExpansion->getPatternType();
-      return (patternType->isTypeParameter()
-               ? ProtocolConformanceRef(protocol)
-               : mod->lookupConformance(patternType, protocol));
-    }
   }
 
   auto nominal = type->getAnyNominal();

@@ -1258,13 +1258,16 @@ public:
   unsigned bumpGeneration() { return CurrentGeneration++; }
 
   /// Produce a "normal" conformance for a nominal type.
+  ///
+  /// For ordinary conformance lookups, use ModuleDecl::lookupConformance()
+  /// instead.
   NormalProtocolConformance *
-  getConformance(Type conformingType,
-                 ProtocolDecl *protocol,
-                 SourceLoc loc,
-                 DeclContext *dc,
-                 ProtocolConformanceState state,
-                 bool isUnchecked);
+  getNormalConformance(Type conformingType,
+                       ProtocolDecl *protocol,
+                       SourceLoc loc,
+                       DeclContext *dc,
+                       ProtocolConformanceState state,
+                       bool isUnchecked);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *
@@ -1273,8 +1276,6 @@ public:
   /// Produce the builtin conformance for some structural type to some protocol.
   BuiltinProtocolConformance *
   getBuiltinConformance(Type type, ProtocolDecl *protocol,
-                        GenericSignature genericSig,
-                        ArrayRef<Requirement> conditionalRequirements,
                         BuiltinConformanceKind kind);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol

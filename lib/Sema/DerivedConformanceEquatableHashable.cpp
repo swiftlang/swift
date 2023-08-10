@@ -384,7 +384,7 @@ deriveEquatable_eq(
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
+  auto selfIfaceTy = parentDC->getSelfInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
     auto *param = new (C) ParamDecl(SourceLoc(),
@@ -970,8 +970,6 @@ getHashableConformance(const Decl *parentDecl) {
 }
 
 bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
-  if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
-    return false;
   // FIXME: This is not actually correct. We cannot promise to always
   // provide a witness here in all cases. Unfortunately, figuring out
   // whether this is actually possible requires a parent decl context.
