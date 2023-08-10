@@ -2059,10 +2059,10 @@ RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
   auto sourceOrigType = AbstractionPattern::getOpaque();
   auto subExpr = E->getSubExpr();
   auto &sourceOrigTL = SGF.getTypeLowering(sourceOrigType, subExpr->getType());
-  auto source =
-      SGF.silConv.useLoweredAddresses()
-          ? SGF.emitMaterializedRValueAsOrig(subExpr, sourceOrigType)
-          : SGF.emitRValueAsOrig(subExpr, sourceOrigType, sourceOrigTL, C);
+  auto source = SGF.silConv.useLoweredAddresses()
+                    ? SGF.emitMaterializedRValueAsOrig(subExpr, sourceOrigType)
+                    : SGF.emitRValueAsOrig(subExpr, sourceOrigType,
+                                           sourceOrigTL, SGFContext());
 
   return SGF.emitAnyHashableErasure(E, source, subExpr->getType(),
                                     E->getConformance(), C);
