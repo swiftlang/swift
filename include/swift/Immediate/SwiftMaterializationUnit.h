@@ -35,6 +35,7 @@ namespace swift {
 
 class CompilerInstance;
 
+/// A JIT stack able to lazily JIT Swift programs
 class SwiftJIT {
 public:
   SwiftJIT(const SwiftJIT &) = delete;
@@ -49,6 +50,7 @@ public:
 
   ~SwiftJIT();
 
+  /// Get the dylib associated with the main program
   llvm::orc::JITDylib &getMainJITDylib();
 
   /// Register a the materialization unit `MU` with the `JITDylib``JD` and
@@ -56,16 +58,25 @@ public:
   llvm::Error addSwift(llvm::orc::JITDylib &JD,
                        std::unique_ptr<llvm::orc::MaterializationUnit> MU);
 
+  /// Return a linker-mangled version of `Name`
   std::string mangle(llvm::StringRef Name);
 
-  llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name);
-
+  /// Add a symbol name to the underlying `SymbolStringPool` and return
+  /// a pointer to it
   llvm::orc::SymbolStringPtr intern(llvm::StringRef Name);
 
+  /// Return a linker-mangled version of `Name` and intern the result
+  llvm::orc::SymbolStringPtr mangleAndIntern(llvm::StringRef Name);
+
+  /// Get the `IRCompileLayer` associated with this `SwiftJIT`
   llvm::orc::IRCompileLayer &getIRCompileLayer();
 
+  /// Get the `ObjectTransformLayer` associated with this `SwiftJIT`
   llvm::orc::ObjectTransformLayer &getObjTransformLayer();
 
+  /// Initialize the main `JITDylib`, lookup the main symbol, execute it,
+  /// deinitialize the main `JITDylib`, and return the exit code of the
+  /// JIT'd program
   llvm::Expected<int> runMain(llvm::ArrayRef<std::string> Args);
 
 private:
@@ -100,10 +111,15 @@ private:
   std::unique_ptr<llvm::orc::IndirectStubsManager> ISM;
 };
 
+/// Lazily JITs a Swift AST using function at a time compilation
 class LazySwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
+
+  /// Create a new `LazySwiftMaterializationUnit` with the associated
+  /// JIT stack `JIT` and compiler instance `CI`
   static std::unique_ptr<LazySwiftMaterializationUnit>
   Create(SwiftJIT &JIT, CompilerInstance &CI);
+
   llvm::StringRef getName() const override;
 
 private:
@@ -112,15 +128,21 @@ private:
                                llvm::orc::SymbolFlagsMap Symbols);
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) override;
+
   void discard(const llvm::orc::JITDylib &JD,
                const llvm::orc::SymbolStringPtr &Sym) override;
+
   SymbolSourceMap Sources;
   SwiftJIT &JIT;
   CompilerInstance &CI;
 };
 
+/// Eagerly materializes a whole `SILModule`
 class EagerSwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
+
+  /// Create a new `EagerSwiftMaterializationUnit` with the JIT stack `JIT`
+  /// and provided compiler options
   EagerSwiftMaterializationUnit(SwiftJIT &JIT, const CompilerInstance &CI,
                                 const IRGenOptions &IRGenOpts,
                                 std::unique_ptr<SILModule> SM);
@@ -130,17 +152,22 @@ public:
 private:
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) override;
+
+  /// Get the linker-level interface defined by the `SILModule` being materialized
   static MaterializationUnit::Interface
   getInterface(SwiftJIT &JIT, const CompilerInstance &CI);
+
   void dumpJIT(const llvm::Module &Module);
+
   void discard(const llvm::orc::JITDylib &JD,
                const llvm::orc::SymbolStringPtr &Sym) override;
+
   SwiftJIT &JIT;
   const CompilerInstance &CI;
   const IRGenOptions &IRGenOpts;
   std::unique_ptr<SILModule> SM;
 };
 
-} // namespace swift
+} // end namespace swift
 
 #endif // SWIFT_IMMEDIATE_SWIFTMATERIALIZATIONUNIT_H
