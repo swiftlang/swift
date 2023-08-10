@@ -2381,8 +2381,12 @@ namespace {
         hasMemberwiseInitializer = false;
       }
 
-      if (hasZeroInitializableStorage &&
-          !(cxxRecordDecl && cxxRecordDecl->hasDefaultConstructor())) {
+      bool needsEmptyInitializer = true;
+      if (cxxRecordDecl) {
+        needsEmptyInitializer = !cxxRecordDecl->hasDefaultConstructor() ||
+                                cxxRecordDecl->ctors().empty();
+      }
+      if (hasZeroInitializableStorage && needsEmptyInitializer) {
         // Add default constructor for the struct if compiling in C mode.
         // If we're compiling for C++:
         // 1. If a default constructor is declared, don't synthesize one.
