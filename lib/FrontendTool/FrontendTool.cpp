@@ -1365,7 +1365,17 @@ static bool performAction(CompilerInstance &Instance,
                                   return Instance.getASTContext().hadError();
                                 });
   case FrontendOptions::ActionType::Immediate: {
-    return RunImmediatelyFromAST(Instance) != -1;
+    const auto &Ctx = Instance.getASTContext();
+    if (Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
+      ReturnValue = RunImmediatelyFromAST(Instance);
+      return Ctx.hadError();
+    }
+    return withSemanticAnalysis(
+        Instance, observer, [&](CompilerInstance &Instance) {
+          assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
+                 "All actions not requiring SILGen must have been handled!");
+          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+        });
   }
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:

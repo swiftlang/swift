@@ -114,7 +114,6 @@ private:
 /// Lazily JITs a Swift AST using function at a time compilation
 class LazySwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
-
   /// Create a new `LazySwiftMaterializationUnit` with the associated
   /// JIT stack `JIT` and compiler instance `CI`
   static std::unique_ptr<LazySwiftMaterializationUnit>
@@ -140,7 +139,6 @@ private:
 /// Eagerly materializes a whole `SILModule`
 class EagerSwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
-
   /// Create a new `EagerSwiftMaterializationUnit` with the JIT stack `JIT`
   /// and provided compiler options
   EagerSwiftMaterializationUnit(SwiftJIT &JIT, const CompilerInstance &CI,
@@ -153,7 +151,8 @@ private:
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) override;
 
-  /// Get the linker-level interface defined by the `SILModule` being materialized
+  /// Get the linker-level interface defined by the `SILModule` being
+  /// materialized
   static MaterializationUnit::Interface
   getInterface(SwiftJIT &JIT, const CompilerInstance &CI);
 

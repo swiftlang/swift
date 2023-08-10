@@ -3336,6 +3336,8 @@ static bool usesFeatureMoveOnly(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLazyImmediate(Decl *D) { return false; }
+
 static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }
