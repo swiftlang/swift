@@ -24,10 +24,12 @@
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
+#include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -770,9 +772,6 @@ class SwiftDependencyScanningService {
     /// encountered.
     std::vector<ModuleDependencyID> AllModules;
 
-    /// Set containing all of the Clang modules that have already been seen.
-    llvm::StringSet<> alreadySeenClangModules;
-
     /// Dependencies for modules that have already been computed.
     /// This maps a dependency kind to a map of a module's name to a Dependency
     /// object
@@ -842,10 +841,6 @@ public:
   getSharedFilesystemCache() {
     assert(SharedFilesystemCache && "Expected a shared cache");
     return *SharedFilesystemCache;
-  }
-
-  llvm::StringSet<>& getAlreadySeenClangModules(StringRef scanningContextHash) {
-    return getCacheForScanningContextHash(scanningContextHash)->alreadySeenClangModules;
   }
 
   bool usingCachingFS() const { return !UseClangIncludeTree && (bool)CacheFS; }
@@ -944,6 +939,8 @@ private:
   SwiftDependencyScanningService &globalScanningService;
   /// References to data in the `globalScanningService` for module dependencies
   ModuleDependenciesKindRefMap ModuleDependenciesMap;
+  /// Set containing all of the Clang modules that have already been seen.
+  llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
@@ -977,10 +974,13 @@ public:
   SwiftDependencyScanningService &getScanService() {
     return globalScanningService;
   }
-  llvm::StringSet<>& getAlreadySeenClangModules() {
-    return globalScanningService.getAlreadySeenClangModules(scannerContextHash);
+  llvm::DenseSet<clang::tooling::dependencies::ModuleID>& getAlreadySeenClangModules() {
+    return alreadySeenClangModules;
   }
-  
+  void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
+    alreadySeenClangModules.insert(newModule);
+  }
+
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
