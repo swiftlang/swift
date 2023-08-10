@@ -221,6 +221,7 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
       // `zeroInitializer` with an address operand zeroes out the address operand
       return true;
     }
+    return false;
   }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \

@@ -138,7 +138,7 @@
 // CHECK:   typealias Pointee = Int32
 // CHECK: }
 
-// CHECK: struct MutableRACIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {
+// CHECK: struct MutableRACIterator : UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
 // CHECK:   func successor() -> MutableRACIterator
 // CHECK:   var pointee: Int32
 // CHECK:   typealias Pointee = Int32
