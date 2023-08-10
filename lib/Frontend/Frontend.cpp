@@ -1576,7 +1576,9 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
       frontendOpts.ReuseFrontendForMultipleCompilations) {
     opts |= ParsingFlags::EnableInterfaceHash;
   }
-  if (action == ActionType::Immediate) {
+  const auto &LangOpts = Invocation.getLangOptions();
+  if (action == ActionType::Immediate &&
+      LangOpts.hasFeature(Feature::LazyImmediate)) {
     opts -= ParsingFlags::DisableDelayedBodies;
     opts -= ParsingFlags::ValidateNewParserDiagnostics;
   }

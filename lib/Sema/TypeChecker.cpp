@@ -306,7 +306,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
         }
       }
     }
-    if (!Ctx.TypeCheckerOpts.DeferToRuntime) {
+    if (!Ctx.TypeCheckerOpts.DeferToRuntime ||
+        !Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
       typeCheckDelayedFunctions(*SF);
     }
   }
