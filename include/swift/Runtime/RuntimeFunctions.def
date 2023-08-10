@@ -79,7 +79,7 @@ FUNCTION(ProjectBox, swift_projectBox, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect),
-         MEMEFFECTS(ReadOnly, ArgMemOnly))
+         MEMEFFECTS(ArgMemReadOnly))
 
 FUNCTION(AllocEmptyBox, swift_allocEmptyBox, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
@@ -1214,7 +1214,7 @@ FUNCTION(GetObjCClassFromObject, swift_getObjCClassFromObject,
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(NoEffect), // ?
-         MEMEFFECTS(ReadOnly, ArgMemOnly))
+         MEMEFFECTS(ArgMemReadOnly))
 
 // MetadataResponse swift_getTupleTypeMetadata(MetadataRequest request,
 //                                             TupleTypeFlags flags,
