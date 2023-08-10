@@ -1,3 +1,4 @@
+// REQUIRES: OS=macosx
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
 
 // Tests that parsing of function bodies is deferred

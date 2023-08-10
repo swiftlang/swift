@@ -1,3 +1,4 @@
+// REQUIRES: OS=macosx
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
 
 // Tests that type checking of function bodies is
