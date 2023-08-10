@@ -65,6 +65,12 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
 
   _ = cloner.clone(storeToGlobal.source)
 
+  // The initial value can contain a `begin_access` if it references another global variable by address, e.g.
+  //   var p = Point(x: 10, y: 20)
+  //   let o = UnsafePointer(&p)
+  //
+  allocInst.global.stripAccessInstructionFromInitializer(context)
+
   context.erase(instruction: allocInst)
   context.erase(instruction: storeToGlobal)
   context.removeTriviallyDeadInstructionsIgnoringDebugUses(in: function)
@@ -94,7 +100,9 @@ private func getGlobalInitialization(of function: Function) -> (allocInst: Alloc
     switch inst {
     case is ReturnInst,
          is DebugValueInst,
-         is DebugStepInst:
+         is DebugStepInst,
+         is BeginAccessInst,
+         is EndAccessInst:
       break
     case let agi as AllocGlobalInst:
       if allocInst != nil {
@@ -102,13 +110,9 @@ private func getGlobalInitialization(of function: Function) -> (allocInst: Alloc
       }
       allocInst = agi
     case let ga as GlobalAddrInst:
-      if globalAddr != nil {
-        return nil
+      if let agi = allocInst, agi.global == ga.global {
+        globalAddr = ga
       }
-      guard let agi = allocInst, agi.global == ga.global else {
-        return nil
-      }
-      globalAddr = ga
     case let si as StoreInst:
       if store != nil {
         return nil

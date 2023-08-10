@@ -377,3 +377,11 @@ func testNestedGenericStruct() -> NestedGenericStruct<Int> {
   return nestedGeneric
 }
 
+var x = 24
+let pointerToX = UnsafePointer(&x)
+
+@_noLocks
+func testPointerToX() -> UnsafePointer<Int> {
+  return pointerToX
+}
+
