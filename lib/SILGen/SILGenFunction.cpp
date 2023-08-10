@@ -797,18 +797,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Box: {
       assert(!isPack);
 
-      auto entryValue = getAddressValue(val, /*forceCopy=*/false);
-      // LValues are captured as both the box owning the value and the
-      // address of the value.
-      assert(entryValue->getType().isAddress() && "no address for captured var!");
+      assert(val->getType().isAddress() &&
+             "no address for captured var!");
       // Boxes of opaque return values stay opaque.
       auto minimalLoweredType = SGM.Types.getLoweredRValueType(
           TypeExpansionContext::minimal(), type->getCanonicalType());
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
-          entryValue->getType().getASTType() == minimalLoweredType) {
-        // If our captured value is a box with a moveonlywrapped type inside,
-        // unwrap it.
+          val->getType().getASTType() == minimalLoweredType) {
         auto box = ManagedValue::forBorrowedObjectRValue(Entry.box);
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
@@ -817,6 +813,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           box = box.copy(*this, loc);
         }
 
+        // If our captured value is a box with a moveonlywrapped type inside,
+        // unwrap it.
         if (box.getType().isBoxedMoveOnlyWrappedType(&F)) {
           CleanupCloner cloner(*this, box);
           box = cloner.clone(
@@ -826,7 +824,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(box);
 
         if (captureCanEscape)
-          escapesToMark.push_back(entryValue);
+          escapesToMark.push_back(val);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -840,12 +838,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         // TODO: Use immutable box for immutable captures.
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(
-            vd, minimalLoweredType, FunctionDC->getGenericEnvironmentOfContext(),
+            vd, minimalLoweredType,
+            FunctionDC->getGenericEnvironmentOfContext(),
             /*mutable*/ true);
 
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, entryValue, boxAddress, IsNotTake,
+        B.createCopyAddr(loc, val, boxAddress, IsNotTake,
                          IsInitialization);
         if (canGuarantee)
           capturedArgs.push_back(
@@ -859,17 +858,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::ImmutableBox: {
       assert(!isPack);
 
-      auto entryValue = getAddressValue(val, /*forceCopy=*/false);
-      // LValues are captured as both the box owning the value and the
-      // address of the value.
-      assert(entryValue->getType().isAddress() &&
+      assert(val->getType().isAddress() &&
              "no address for captured var!");
       // Boxes of opaque return values stay opaque.
       auto minimalLoweredType = SGM.Types.getLoweredRValueType(
           TypeExpansionContext::minimal(), type->getCanonicalType());
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
-          entryValue->getType().getASTType() == minimalLoweredType) {
+          val->getType().getASTType() == minimalLoweredType) {
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
           capturedArgs.push_back(
@@ -878,7 +874,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
         }
         if (captureCanEscape)
-          escapesToMark.push_back(entryValue);
+          escapesToMark.push_back(val);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -898,7 +894,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, entryValue, boxAddress, IsNotTake,
+        B.createCopyAddr(loc, val, boxAddress, IsNotTake,
                          IsInitialization);
         if (canGuarantee)
           capturedArgs.push_back(

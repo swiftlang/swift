@@ -760,3 +760,25 @@ func callMutatingFooOnInoutExistential(_ i: inout any MutatingFooable) {
 struct WeakBox<T : AnyObject> {
   weak var t: T?
 }
+
+// CHECK-LABEL: sil {{.*}}[ossa] @intIntoAnyHashableVar : {{.*}} {
+// CHECK:         [[VAR_BOX_ADDR:%[^,]+]] = project_box
+// CHECK:         [[INT:%[^,]+]] = apply
+// CHECK:         [[CONVERT:%[^,]+]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[CONVERT]]<Int>([[INT]])
+// CHECK:         store [[INSTANCE]] to [init] [[VAR_BOX_ADDR]]
+// CHECK-LABEL: } // end sil function 'intIntoAnyHashableVar'
+@_silgen_name("intIntoAnyHashableVar")
+func intIntoAnyHashableVar() {
+  var anyHashable: AnyHashable = 0
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @intIntoAnyHashableLet : {{.*}} {
+// CHECK:         [[INT:%[^,]+]] = apply
+// CHECK:         [[CONVERT:%[^,]+]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[CONVERT]]<Int>([[INT]])
+// CHECK-LABEL: } // end sil function 'intIntoAnyHashableLet'
+@_silgen_name("intIntoAnyHashableLet")
+func intIntoAnyHashableLet() {
+  let anyHashable: AnyHashable = 0
+}
