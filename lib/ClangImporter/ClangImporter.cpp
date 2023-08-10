@@ -667,7 +667,13 @@ importer::getNormalInvocationArguments(
   }
 
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
-  if (!moduleCachePath.empty() && !importerOpts.DisableImplicitClangModules) {
+  const std::string &scannerCachePath = importerOpts.ClangScannerModuleCachePath;
+  // If a scanner cache is specified, this must be a scanning action. Prefer this
+  // path for the Clang scanner to cache its Scanning PCMs.
+  if (!scannerCachePath.empty()) {
+    invocationArgStrs.push_back("-fmodules-cache-path=");
+    invocationArgStrs.back().append(scannerCachePath);
+  } else if (!moduleCachePath.empty() && !importerOpts.DisableImplicitClangModules) {
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }

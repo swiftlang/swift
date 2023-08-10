@@ -64,6 +64,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
     Opts.PrebuiltModuleCachePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
+    Opts.ExplicitModulesOutputPath = A->getValue();
+  }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
   }
