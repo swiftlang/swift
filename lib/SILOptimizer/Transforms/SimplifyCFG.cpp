@@ -3166,8 +3166,8 @@ RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
                             llvm::cl::init(true));
 
 bool ArgumentSplitter::split() {
-  if (!EnableOSSARewriteTerminator && Arg->getFunction()->hasOwnership()) {
-    // TODO: OSSA phi support
+  if (Arg->getFunction()->hasOwnership()) {
+    // TODO: Additional work is needed to create non-trivial projections in ossa
     if (!Arg->getType().isTrivial(*Arg->getFunction()))
       return false;
   }
