@@ -1636,6 +1636,10 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
   return false;
 }
 
+bool FullApplySite_canInline(BridgedInstruction apply) {
+  return swift::SILInliner::canInlineApplySite(swift::FullApplySite(apply.getInst()));
+}
+
 // TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
 CalleeList BridgedCalleeAnalysis::getCallees(BridgedValue callee) const {
   return ca->getCalleeListOfValue(callee.getSILValue());
