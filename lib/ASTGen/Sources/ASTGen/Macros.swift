@@ -14,11 +14,14 @@ import CASTBridging
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftParser
-import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 import SwiftSyntaxMacroExpansion
 import SwiftCompilerPluginMessageHandling
+
+// Needed to use SyntaxTransformVisitor's visit method.
+@_spi(SyntaxTransformVisitor)
+import SwiftSyntax
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
