@@ -526,6 +526,8 @@ static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
         "#pragma clang diagnostic ignored \"-Wnullability\"\n"
         "#pragma clang diagnostic ignored "
         "\"-Wdollar-in-identifier-extension\"\n"
+        "#pragma clang diagnostic ignored "
+        "\"-Wunsafe-buffer-usage\"\n"
         "\n"
         "#if __has_attribute(external_source_symbol)\n"
         "# pragma push_macro(\"any\")\n"
