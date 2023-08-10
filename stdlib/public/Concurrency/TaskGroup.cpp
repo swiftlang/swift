@@ -1238,7 +1238,11 @@ void AccumulatingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *contex
     auto prepared = prepareWaitingTaskWithTask(
         /*complete=*/waitingTask, /*with=*/completedTask,
         assumed, hadErrorResult);
-    unlock(); // we MUST unlock before running the waiting task
+    // we must unlock before running the waiting task,
+    // in order to avoid the potential for the resumed task
+    // to cause a group destroy, in which case the unlock might
+    // attempt memory in an invalid state.
+    unlock();
     return runWaitingTask(prepared);
   } else {
     // ==== b) enqueue completion ------------------------------------------------
@@ -1314,7 +1318,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
               /*complete=*/waitingTask,
               /*with=*/readyErrorItem.getRawError(this), assumed,
               alreadyDecrementedStatus);
-          unlock(); // we MUST unlock before running the waiting task
+          // we must unlock before running the waiting task,
+          // in order to avoid the potential for the resumed task
+          // to cause a group destroy, in which case the unlock might
+          // attempt memory in an invalid state.
+          unlock();
           return runWaitingTask(prepared);
         }
         case ReadyStatus::Error: {
@@ -1331,7 +1339,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
               /*with=*/readyErrorItem.getTask(), assumed,
               /*hadErrorResult=*/true, alreadyDecrementedStatus,
               /*taskWasRetained=*/true);
-          unlock(); // we MUST unlock before running the waiting task
+          // we must unlock before running the waiting task,
+          // in order to avoid the potential for the resumed task
+          // to cause a group destroy, in which case the unlock might
+          // attempt memory in an invalid state.
+          unlock();
           return runWaitingTask(prepared);
         }
         default: {
@@ -1348,7 +1360,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
         // There was no prior failed task stored, so we should resume the waitingTask with this (failed) completedTask
         auto prepared = prepareWaitingTaskWithTask(/*complete=*/waitingTask, /*with=*/completedTask,
                                  assumed, hadErrorResult, alreadyDecrementedStatus);
-        unlock(); // we MUST unlock before running the waiting task
+        // we must unlock before running the waiting task,
+        // in order to avoid the potential for the resumed task
+        // to cause a group destroy, in which case the unlock might
+        // attempt memory in an invalid state.
+        unlock();
         return runWaitingTask(prepared);
       }
     } else if (readyQueue.isEmpty()) {
@@ -1370,7 +1386,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     // We grab the waiting task while holding the group lock, because this
     // allows a single task to get the waiting task and attempt to complete it.
     // As another offer gets to run, it will have either a different waiting task, or no waiting task at all.
-     auto waitingTask = waitQueue.load(std::memory_order_acquire);
+    auto waitingTask = waitQueue.load(std::memory_order_acquire);
     if (!waitQueue.compare_exchange_strong(waitingTask, nullptr)) {
       swift_Concurrency_fatalError(0, "Failed to claim waitingTask!");
     }
@@ -1391,7 +1407,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
         auto task = prepareWaitingTaskWithError(
             /*complete=*/waitingTask, /*with=*/readyErrorItem.getRawError(this),
             assumed, alreadyDecrementedStatus);
-        unlock(); // we MUST unlock before running the waiting task
+        // we must unlock before running the waiting task,
+        // in order to avoid the potential for the resumed task
+        // to cause a group destroy, in which case the unlock might
+        // attempt memory in an invalid state.
+        unlock();
         return runWaitingTask(task);
       }
       case ReadyStatus::Error: {
@@ -1400,7 +1420,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
             /*with=*/readyErrorItem.getTask(), assumed,
             /*hadErrorResult=*/true, alreadyDecrementedStatus,
             /*taskWasRetained=*/true);
-        unlock(); // we MUST unlock before running the waiting task
+        // we must unlock before running the waiting task,
+        // in order to avoid the potential for the resumed task
+        // to cause a group destroy, in which case the unlock might
+        // attempt memory in an invalid state.
+        unlock();
         return runWaitingTask(preparedWaitingTask);
       }
       default: {
@@ -1415,7 +1439,11 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       auto prepared = prepareWaitingTaskWithTask(
           /*complete=*/waitingTask, /*with=*/completedTask,
           assumed, /*hadErrorResult=*/false, alreadyDecrementedStatus);
-      unlock(); // we MUST unlock before running the waiting task
+      // we must unlock before running the waiting task,
+      // in order to avoid the potential for the resumed task
+      // to cause a group destroy, in which case the unlock might
+      // attempt memory in an invalid state.
+      unlock();
       return runWaitingTask(prepared);
     }
   } else {
@@ -1459,7 +1487,7 @@ TaskGroupBase::PreparedWaitingTask TaskGroupBase::prepareWaitingTaskWithTask(
           (void) statusCompletePendingReadyWaiting(assumed);
         }
 
-        // Run the task.
+        // Populate the waiting task with value from completedTask.
         auto result = PollResult::get(completedTask, hadErrorResult);
         SWIFT_TASK_GROUP_DEBUG_LOG(this,
                                    "resume waiting DONE, task = %p, error:%d, complete with = %p, status = %s",
@@ -1759,7 +1787,11 @@ reevaluate_if_taskgroup_has_results:;
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
-      unlock(); // TODO: remove fragment lock, and use status for synchronization
+      // we must unlock before running the waiting task,
+      // in order to avoid the potential for the resumed task
+      // to cause a group destroy, in which case the unlock might
+      // attempt memory in an invalid state.
+      unlock();
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
       // The logic here is paired with the logic in TaskGroupBase::offer. Once
       // we run the
