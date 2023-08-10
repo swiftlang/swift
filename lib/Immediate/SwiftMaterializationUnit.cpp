@@ -97,7 +97,7 @@ SwiftJIT::~SwiftJIT() {
 
 llvm::Expected<int> SwiftJIT::runMain(llvm::ArrayRef<std::string> Args) {
   if (auto Err = J->initialize(J->getMainJITDylib())) {
-    return Err;
+    return std::move(Err);
   }
 
   auto MainSym = J->lookup("main");
@@ -113,7 +113,7 @@ llvm::Expected<int> SwiftJIT::runMain(llvm::ArrayRef<std::string> Args) {
 
   LLVM_DEBUG(llvm::dbgs() << "Running static destructors\n");
   if (auto Err = J->deinitialize(J->getMainJITDylib())) {
-    return Err;
+    return std::move(Err);
   }
 
   return Result;
