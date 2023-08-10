@@ -229,13 +229,6 @@ ERROR(ambiguous_macro_reference,none,
       "ambiguous reference to macro %0", (DeclName))
 
 //------------------------------------------------------------------------------
-// MARK: tuple conformances
-//------------------------------------------------------------------------------
-ERROR(experimental_tuple_extension,none,
-      "tuple extensions are experimental",
-      ())
-
-//------------------------------------------------------------------------------
 // MARK: bridged diagnostics
 //------------------------------------------------------------------------------
 

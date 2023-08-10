@@ -2371,7 +2371,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
-  case DeclKind::BuiltinTuple:
   case DeclKind::MacroExpansion:
     llvm_unreachable("should not get here");
     return Type();
@@ -2402,7 +2401,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
-  case DeclKind::Protocol: {
+  case DeclKind::Protocol:
+  case DeclKind::BuiltinTuple: {
     auto nominal = cast<NominalTypeDecl>(D);
     Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
     // FIXME: For a protocol, this returns a MetatypeType wrapping a ProtocolType, but should be a MetatypeType wrapping an ExistentialType ('(any P).Type', not 'P.Type').

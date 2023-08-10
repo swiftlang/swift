@@ -3505,6 +3505,13 @@ public:
     auto extType = ED->getExtendedType();
 
     auto *nominal = ED->getExtendedNominal();
+
+    // Diagnose experimental tuple extensions.
+    if (nominal && isa<BuiltinTupleDecl>(nominal) &&
+        !getASTContext().LangOpts.hasFeature(Feature::TupleConformances)) {
+      ED->diagnose(diag::experimental_tuple_extension);
+    }
+
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();

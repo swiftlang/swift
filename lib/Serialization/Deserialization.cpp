@@ -844,13 +844,9 @@ ProtocolConformanceDeserializer::readBuiltinProtocolConformance(
 
   TypeID conformingTypeID;
   DeclID protoID;
-  GenericSignatureID genericSigID;
   unsigned builtinConformanceKind;
-  ArrayRef<uint64_t> data;
   BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                               protoID, genericSigID,
-                                               builtinConformanceKind,
-                                               data);
+                                               protoID, builtinConformanceKind);
 
   Type conformingType = MF.getType(conformingTypeID);
 
@@ -859,22 +855,9 @@ ProtocolConformanceDeserializer::readBuiltinProtocolConformance(
     return decl.takeError();
 
   auto proto = cast<ProtocolDecl>(decl.get());
-  auto genericSig = MF.getGenericSignatureChecked(genericSigID);
-  if (!genericSig)
-    return genericSig.takeError();
-
-  // Read the conditional requirements.
-  SmallVector<Requirement, 4> conditionalRequirements;
-  unsigned nextDataIndex = 0;
-  auto error = MF.deserializeGenericRequirementsChecked(
-      data, nextDataIndex, conditionalRequirements);
-  if (error)
-    return std::move(error);
-  if (nextDataIndex != data.size())
-    return MF.diagnoseFatal();
 
   auto conformance = ctx.getBuiltinConformance(
-      conformingType, proto, *genericSig, conditionalRequirements,
+      conformingType, proto,
       static_cast<BuiltinConformanceKind>(builtinConformanceKind));
   return conformance;
 }
@@ -951,9 +934,10 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   PrettyStackTraceDecl traceTo("... to", proto);
 
-  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
-                                        ProtocolConformanceState::Incomplete,
-                                        isUnchecked);
+  auto conformance = ctx.getNormalConformance(
+      conformingType, proto, SourceLoc(), dc,
+      ProtocolConformanceState::Incomplete,
+      isUnchecked);
   // Record this conformance.
   if (conformanceEntry.isComplete()) {
     assert(conformanceEntry.get() == conformance);

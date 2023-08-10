@@ -867,6 +867,8 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
     Buffer << 'I';
   } else if (text == BUILTIN_TYPE_NAME_WORD) {
     Buffer << 'w';
+  } else if (text == BUILTIN_TYPE_NAME_PACKINDEX) {
+    Buffer << 'P';
   } else if (text.consume_front(BUILTIN_TYPE_NAME_INT)) {
     Buffer << 'i' << text << '_';
   } else if (text.consume_front(BUILTIN_TYPE_NAME_FLOAT)) {
@@ -889,6 +891,11 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   } else {
     return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
   }
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBuiltinTupleType(Node *node, unsigned depth) {
+  Buffer << "BT";
   return ManglingError::Success;
 }
 

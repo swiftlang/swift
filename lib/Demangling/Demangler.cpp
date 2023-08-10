@@ -61,6 +61,7 @@ static bool isAnyGeneric(Node::Kind kind) {
     case Node::Kind::OtherNominalType:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::BuiltinTupleType:
       return true;
     default:
       return false;
@@ -109,6 +110,8 @@ bool swift::Demangle::isContext(Node::Kind kind) {
 #define CONTEXT_NODE(ID)                                                \
     case Node::Kind::ID:
 #include "swift/Demangling/DemangleNodes.def"
+      return true;
+    case Node::Kind::BuiltinTupleType:
       return true;
     default:
       return false;
@@ -1425,6 +1428,13 @@ NodePointer Demangler::demangleBuiltinType() {
     case 'w':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_WORD);
+      break;
+    case 'P':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_PACKINDEX);
+      break;
+    case 'T':
+      Ty = createNode(Node::Kind::BuiltinTupleType);
       break;
     default:
       return nullptr;

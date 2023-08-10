@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 800; // added unowned_copy_value
+const uint16_t SWIFTMODULE_VERSION_MINOR = 801; // removing builtin tuple conformances
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1951,9 +1951,7 @@ namespace decls_block {
     BUILTIN_PROTOCOL_CONFORMANCE,
     TypeIDField, // the conforming type
     DeclIDField, // the protocol
-    GenericSignatureIDField, // the generic signature
-    BCFixed<2>, // the builtin conformance kind
-    BCArray<BCVBR<6>> // conditional requirements
+    BCFixed<2>  // the builtin conformance kind
   >;
 
   using PackConformanceLayout = BCRecordLayout<

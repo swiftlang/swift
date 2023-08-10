@@ -5700,8 +5700,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       return ProtocolConformanceRef(
           M->getASTContext().getBuiltinConformance(
-            T, Proto, GenericSignature(), { },
-            BuiltinConformanceKind::Missing));
+            T, Proto, BuiltinConformanceKind::Missing));
     }
 
     return ProtocolConformanceRef::forInvalid();
