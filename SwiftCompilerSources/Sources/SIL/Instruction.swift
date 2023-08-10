@@ -457,6 +457,7 @@ class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {
 final public
 class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {
   public var pointer: Value { operand.value }
+  public var isStrict: Bool { bridged.PointerToAddressInst_isStrict() }
 }
 
 final public

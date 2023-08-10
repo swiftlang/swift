@@ -131,6 +131,25 @@ enum AccessBase : CustomStringConvertible, Hashable {
         return nil
     }
   }
+
+  /// True if this access base may be derived from a reference that is only valid within a locally
+  /// scoped OSSA lifetime. For example:
+  ///
+  ///   %reference = begin_borrow %1
+  ///   %base = ref_tail_addr %reference     <- %base must not be used outside the borrow scope
+  ///   end_borrow %reference
+  ///
+  /// This is not true for scoped storage such as alloc_stack and @in arguments.
+  ///
+  var hasLocalOwnershipLifetime: Bool {
+    if let reference = reference {
+      // Conservatively assume that everything which is a ref-counted object is within an ownership scope.
+      // TODO: we could e.g. exclude guaranteed function arguments.
+      return reference.ownership != .none
+    }
+    return false
+  }
+
   /// True, if the baseAddress is of an immutable property or global variable
   var isLet: Bool {
     switch self {

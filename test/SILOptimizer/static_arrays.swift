@@ -202,6 +202,17 @@ func functionArray() -> [(Int) -> Int] {
   return [foo, bar, { $0 + 10 }]
 }
 
+var g1 = 1
+var g2 = 2
+
+// CHECK-LABEL: sil {{.*arrayOfGlobalPointers.*}} : $@convention(thin) () -> @owned Array<UnsafePointer<Int>> {
+// CHECK:         global_value @{{.*arrayOfGlobalPointers.*}}
+// CHECK:       } // end sil function '{{.*arrayOfGlobalPointers.*}}'
+@inline(never)
+public func arrayOfGlobalPointers() -> [UnsafePointer<Int>] {
+  return [UnsafePointer(&g1), UnsafePointer(&g2)]
+}
+
 public struct FStr {
   // Not an array, but also tested here.
   public static var globalFunc = foo
@@ -239,6 +250,9 @@ func testit() {
   let sdict = returnStringDictionary()
   // CHECK-OUTPUT-NEXT: sdict 3: 2, 4, 6
   print("sdict \(sdict.count): \(sdict["1"]!), \(sdict["3"]!), \(sdict["5"]!)")
+
+  // CHECK-OUTPUT-NEXT: globalpointers: [1, 2]
+  print("globalpointers: \(arrayOfGlobalPointers().map { $0.pointee })")
 }
 
 testit()
@@ -253,17 +267,15 @@ func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
 // This should be a single basic block, and the array should end up being stack
 // allocated.
 //
-// CHECK-LABEL: sil @{{.*}}passArrayOfClasses
-// CHECK: bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
-// CHECK-NOT: bb1(
-// CHECK: alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
-// CHECK-NOT: bb1(
-// CHECK:   return
+// CHECK-LABEL: sil [noinline] @{{.*passArrayOfClasses.*}} : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> () {
+// CHECK:       bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
+// CHECK-NOT:   bb1(
+// CHECK:         alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
+// CHECK-NOT:   bb1(
+// CHECK:       } // end sil function '{{.*passArrayOfClasses.*}}'
+@inline(never)
 public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
   let arr = [a, b, c]
   takeUnsafePointer(ptr: arr, len: arr.count)
 }
-
-
-
 
