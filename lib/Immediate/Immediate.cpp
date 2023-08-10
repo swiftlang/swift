@@ -532,39 +532,26 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   if (autolinkImportedModules(swiftModule, IRGenOpts))
     return -1;
 
-  auto &Target = swiftModule->getASTContext().LangOpts.Target;
-  if (Target.isMacOSX()) {
-    auto JIT = SwiftJIT::Create(CI);
-    if (auto Err = JIT.takeError()) {
-      logError(std::move(Err));
-      return -1;
-    }
-
-    auto MU = std::make_unique<SILMaterializationUnit>(**JIT, CI, IRGenOpts,
-                                                       std::move(SM));
-    if (auto Err = (*JIT)->addSwift((*JIT)->getMainJITDylib(), std::move(MU))) {
-      logError(std::move(Err));
-      return -1;
-    }
-
-    return runMain((*JIT)->getJIT(), CmdLine);
-  }
-  auto JIT = createLLJIT(IRGenOpts, swiftModule->getASTContext());
+  auto JIT = SwiftJIT::Create(CI);
   if (auto Err = JIT.takeError()) {
     logError(std::move(Err));
     return -1;
   }
-  auto GenModule = generateModule(CI, std::move(SM));
-  if (!GenModule)
-    return -1;
-  auto *Module = GenModule->getModule();
-  dumpJIT(**JIT, *Module, IRGenOpts);
-  auto TSM = std::move(*GenModule).intoThreadSafeContext();
-  if (auto Err = (*JIT)->addIRModule(std::move(TSM))) {
+
+  auto MU = std::make_unique<SILMaterializationUnit>(**JIT, CI, IRGenOpts,
+                                                     std::move(SM));
+  if (auto Err = (*JIT)->addSwift((*JIT)->getMainJITDylib(), std::move(MU))) {
     logError(std::move(Err));
     return -1;
   }
-  return runMain(**JIT, CmdLine);
+
+  auto Result = (*JIT)->runMain(CmdLine);
+
+  if (!Result) {
+    logError(Result.takeError());
+    return -1;
+  }
+  return *Result;
 }
 
 int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
@@ -642,11 +629,17 @@ int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
     return -1;
   }
 
-  auto MU = SwiftMaterializationUnit::Create(**JIT, CI);
+  auto MU = LazySwiftMaterializationUnit::Create(**JIT, CI);
   if (auto Err = (*JIT)->addSwift((*JIT)->getMainJITDylib(), std::move(MU))) {
     logError(std::move(Err));
     return -1;
   }
 
-  return runMain((*JIT)->getJIT(), CmdLine);
+  auto Result = (*JIT)->runMain(CmdLine);
+  if (!Result) {
+    logError(Result.takeError());
+    return -1;
+  }
+
+  return *Result;
 }

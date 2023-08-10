@@ -32,6 +32,7 @@
 #include "llvm/ExecutionEngine/Orc/ObjectTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h"
 #include "llvm/ExecutionEngine/Orc/Shared/MemoryFlags.h"
+#include "llvm/ExecutionEngine/Orc/TargetProcess/TargetExecutionUtils.h"
 #include "llvm/Support/Error.h"
 
 #include "swift/AST/IRGenRequests.h"
@@ -42,6 +43,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
+
+#define DEBUG_TYPE "swift-immediate"
 
 using namespace swift;
 
@@ -90,6 +93,30 @@ SwiftJIT::Create(CompilerInstance &CI) {
 SwiftJIT::~SwiftJIT() {
   if (auto Err = EPCIU->cleanup())
     J->getExecutionSession().reportError(std::move(Err));
+}
+
+llvm::Expected<int> SwiftJIT::runMain(llvm::ArrayRef<std::string> Args) {
+  if (auto Err = J->initialize(J->getMainJITDylib())) {
+    return Err;
+  }
+
+  auto MainSym = J->lookup("main");
+  if (!MainSym) {
+    return MainSym.takeError();
+  }
+
+  using MainFnTy = int (*)(int, char *[]);
+  MainFnTy JITMain = MainSym->toPtr<MainFnTy>();
+
+  LLVM_DEBUG(llvm::dbgs() << "Running main\n");
+  int Result = llvm::orc::runAsMain(JITMain, Args);
+
+  LLVM_DEBUG(llvm::dbgs() << "Running static destructors\n");
+  if (auto Err = J->deinitialize(J->getMainJITDylib())) {
+    return Err;
+  }
+
+  return Result;
 }
 
 llvm::orc::LLJIT &SwiftJIT::getJIT() { return *J; }
@@ -277,8 +304,8 @@ static void logError(llvm::Error Err) {
   logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
 }
 
-std::unique_ptr<SwiftMaterializationUnit>
-SwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
+std::unique_ptr<LazySwiftMaterializationUnit>
+LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
   auto *M = CI.getMainModule();
   TBDGenOptions Opts;
   Opts.PublicSymbolsOnly = false;
@@ -301,21 +328,22 @@ SwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
     auto MangledName = mangle(SymbolName);
     PublicInterface[JIT.intern(MangledName)] = Flags;
   }
-  return std::unique_ptr<SwiftMaterializationUnit>(new SwiftMaterializationUnit(
-      JIT, CI, std::move(Sources), std::move(PublicInterface)));
+  return std::unique_ptr<LazySwiftMaterializationUnit>(
+      new LazySwiftMaterializationUnit(JIT, CI, std::move(Sources),
+                                       std::move(PublicInterface)));
 }
 
-StringRef SwiftMaterializationUnit::getName() const {
+StringRef LazySwiftMaterializationUnit::getName() const {
   return "SwiftMaterializationUnit";
 }
 
-SwiftMaterializationUnit::SwiftMaterializationUnit(
+LazySwiftMaterializationUnit::LazySwiftMaterializationUnit(
     SwiftJIT &JIT, CompilerInstance &CI, SymbolSourceMap Sources,
     llvm::orc::SymbolFlagsMap Symbols)
     : MaterializationUnit({std::move(Symbols), nullptr}),
       Sources(std::move(Sources)), JIT(JIT), CI(CI) {}
 
-void SwiftMaterializationUnit::materialize(
+void LazySwiftMaterializationUnit::materialize(
     std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) {
   SILRefsToEmit Refs;
   const auto &RS = MR->getRequestedSymbols();
@@ -379,8 +407,8 @@ void SwiftMaterializationUnit::materialize(
     }
   }
   std::unique_ptr<MaterializationUnit> UnrequestedMU(
-      new SwiftMaterializationUnit(JIT, CI, std::move(Sources),
-                                   std::move(UnrequestedSymbols)));
+      new LazySwiftMaterializationUnit(JIT, CI, std::move(Sources),
+                                       std::move(UnrequestedSymbols)));
   if (auto Err = MR->replace(std::move(UnrequestedMU))) {
     logError(std::move(Err));
     MR->failMaterialization();
@@ -417,5 +445,95 @@ SwiftJIT::addSwift(llvm::orc::JITDylib &JD,
   return JD.define(std::move(MU));
 }
 
-void SwiftMaterializationUnit::discard(const llvm::orc::JITDylib &JD,
-                                       const llvm::orc::SymbolStringPtr &Sym) {}
+void LazySwiftMaterializationUnit::discard(
+    const llvm::orc::JITDylib &JD, const llvm::orc::SymbolStringPtr &Sym) {}
+
+EagerSwiftMaterializationUnit::EagerSwiftMaterializationUnit(
+    SwiftJIT &JIT, const CompilerInstance &CI, const IRGenOptions &IRGenOpts,
+    std::unique_ptr<SILModule> SM)
+    : MaterializationUnit(getInterface(JIT, CI)), JIT(JIT), CI(CI),
+      IRGenOpts(IRGenOpts), SM(std::move(SM)) {}
+
+StringRef EagerSwiftMaterializationUnit::getName() const {
+  return "EagerSwiftMaterializationUnit";
+}
+
+void EagerSwiftMaterializationUnit::materialize(
+    std::unique_ptr<llvm::orc::MaterializationResponsibility> R) {
+
+  auto GenModule = generateModule(CI, std::move(SM));
+
+  if (!GenModule) {
+    R->failMaterialization();
+    return;
+  }
+
+  auto *Module = GenModule->getModule();
+
+  // Dump IR if requested
+  dumpJIT(*Module);
+
+  // Now we must register all other public symbols defined by
+  // the module with the JIT
+  llvm::orc::SymbolFlagsMap Symbols;
+  // Register all global values, including global
+  // variables and functions
+  for (const auto &GV : Module->global_values()) {
+    // Ignore all symbols that will not appear in symbol table
+    if (GV.hasLocalLinkage() || GV.isDeclaration() || GV.hasAppendingLinkage())
+      continue;
+    auto Name = GV.getName();
+    // The entry point is already registered up front with the
+    // interface, so ignore it as well
+    if (Name == CI.getASTContext().getEntryPointFunctionName())
+      continue;
+    auto MangledName = JIT.mangleAndIntern(Name);
+    // Register this symbol with the proper flags
+    Symbols[MangledName] = llvm::JITSymbolFlags::fromGlobalValue(GV);
+  }
+  // Register the symbols we have discovered with the JIT
+  if (auto Err = R->defineMaterializing(Symbols)) {
+    logError(std::move(Err));
+  }
+  auto TSM = std::move(*GenModule).intoThreadSafeContext();
+  JIT.getIRCompileLayer().emit(std::move(R), std::move(TSM));
+}
+
+llvm::orc::MaterializationUnit::Interface
+EagerSwiftMaterializationUnit::getInterface(SwiftJIT &JIT,
+                                            const CompilerInstance &CI) {
+  const auto &EntryPoint = CI.getASTContext().getEntryPointFunctionName();
+  auto MangledEntryPoint = JIT.mangleAndIntern(EntryPoint);
+  auto Flags = llvm::JITSymbolFlags::Callable | llvm::JITSymbolFlags::Exported;
+  llvm::orc::SymbolFlagsMap Symbols{{MangledEntryPoint, Flags}};
+  return {std::move(Symbols), nullptr};
+}
+
+void EagerSwiftMaterializationUnit::discard(
+    const llvm::orc::JITDylib &JD, const llvm::orc::SymbolStringPtr &Sym) {}
+
+static void DumpLLVMIR(const llvm::Module &M) {
+  std::string path = (M.getName() + ".ll").str();
+  for (size_t count = 0; llvm::sys::fs::exists(path);)
+    path = (M.getName() + llvm::utostr(count++) + ".ll").str();
+
+  std::error_code error;
+  llvm::raw_fd_ostream stream(path, error);
+  if (error)
+    return;
+  M.print(stream, /*AssemblyAnnotationWriter=*/nullptr);
+}
+
+void EagerSwiftMaterializationUnit::dumpJIT(const llvm::Module &M) {
+  LLVM_DEBUG(llvm::dbgs() << "Module to be executed:\n"; M.dump());
+  switch (IRGenOpts.DumpJIT) {
+  case JITDebugArtifact::None:
+    break;
+  case JITDebugArtifact::LLVMIR:
+    DumpLLVMIR(M);
+    break;
+  case JITDebugArtifact::Object:
+    JIT.getObjTransformLayer().setTransform(llvm::orc::DumpObjects());
+    break;
+  }
+}

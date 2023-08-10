@@ -76,6 +76,8 @@ public:
 
   llvm::orc::ObjectTransformLayer &getObjTransformLayer();
 
+  llvm::Expected<int> runMain(llvm::ArrayRef<std::string> Args);
+
 private:
   static llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
   CreateLLJIT(CompilerInstance &CI);
@@ -108,16 +110,16 @@ private:
   std::unique_ptr<llvm::orc::IndirectStubsManager> ISM;
 };
 
-class SwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
+class LazySwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
 public:
-  static std::unique_ptr<SwiftMaterializationUnit> Create(SwiftJIT &JIT,
-                                                          CompilerInstance &CI);
+  static std::unique_ptr<LazySwiftMaterializationUnit>
+  Create(SwiftJIT &JIT, CompilerInstance &CI);
   llvm::StringRef getName() const override;
 
 private:
-  SwiftMaterializationUnit(SwiftJIT &JIT, CompilerInstance &CI,
-                           SymbolSourceMap Sources,
-                           llvm::orc::SymbolFlagsMap Symbols);
+  LazySwiftMaterializationUnit(SwiftJIT &JIT, CompilerInstance &CI,
+                               SymbolSourceMap Sources,
+                               llvm::orc::SymbolFlagsMap Symbols);
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) override;
   void discard(const llvm::orc::JITDylib &JD,
@@ -126,6 +128,29 @@ private:
   SwiftJIT &JIT;
   CompilerInstance &CI;
 };
+
+class EagerSwiftMaterializationUnit : public llvm::orc::MaterializationUnit {
+public:
+  EagerSwiftMaterializationUnit(SwiftJIT &JIT, const CompilerInstance &CI,
+                                const IRGenOptions &IRGenOpts,
+                                std::unique_ptr<SILModule> SM);
+
+  StringRef getName() const override;
+
+private:
+  void materialize(
+      std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) override;
+  static MaterializationUnit::Interface
+  getInterface(SwiftJIT &JIT, const CompilerInstance &CI);
+  void dumpJIT(const llvm::Module &Module);
+  void discard(const llvm::orc::JITDylib &JD,
+               const llvm::orc::SymbolStringPtr &Sym) override;
+  SwiftJIT &JIT;
+  const CompilerInstance &CI;
+  const IRGenOptions &IRGenOpts;
+  std::unique_ptr<SILModule> SM;
+};
+
 } // namespace swift
 
 #endif // SWIFT_IMMEDIATE_SWIFTMATERIALIZATIONUNIT_H
