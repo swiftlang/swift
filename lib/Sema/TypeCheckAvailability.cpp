@@ -598,7 +598,7 @@ private:
     // constrained to the deployment target. There's not much benefit to
     // checking these declarations at a lower availability version floor since
     // neither can be used by API clients.
-    if (D->isSPI() || AvailableAttr::isUnavailable(D))
+    if (D->isSPI() || D->getSemanticUnavailableAttr())
       return true;
 
     return !::isExported(D);
