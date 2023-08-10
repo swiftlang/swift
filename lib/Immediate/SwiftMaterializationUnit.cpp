@@ -295,7 +295,7 @@ LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
   auto Sources =
       llvm::cantFail(M->getASTContext().evaluator(std::move(SourceReq)));
   llvm::orc::SymbolFlagsMap PublicInterface;
-  for (const auto &Entry : *Sources.storage) {
+  for (const auto &Entry : Sources) {
     const auto &Source = Entry.getValue();
     if (Source.kind != SymbolSource::Kind::SIL) {
       continue;
@@ -330,8 +330,9 @@ void LazySwiftMaterializationUnit::materialize(
   const auto &RS = MR->getRequestedSymbols();
   for (auto &Sym : RS) {
     auto Name = demangle(*Sym);
-    const auto &Source = Sources.storage->find(Name)->getValue();
-    auto Ref = Source.getSILDeclRef();
+    auto Source = Sources.find(Name);
+    assert(Source && "Requested symbol doesn't have source?");
+    auto Ref = Source->getSILDeclRef();
     if (auto *AFD = Ref.getAbstractFunctionDecl()) {
       AFD->getTypecheckedBody();
       if (CI.getASTContext().hadError()) {
