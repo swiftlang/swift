@@ -945,6 +945,8 @@ private:
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
   std::string scannerContextHash;
+  /// The location of where the built modules will be output to
+  std::string moduleOutputPath;
   /// The Clang dependency scanner tool
   clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
 
@@ -958,6 +960,7 @@ private:
 public:
   ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
                           std::string mainScanModuleName,
+                          std::string moduleOutputPath,
                           std::string scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
@@ -979,6 +982,9 @@ public:
   }
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
+  }
+  std::string getModuleOutputPath() {
+    return moduleOutputPath;
   }
 
   /// Look for module dependencies for a module with the given name

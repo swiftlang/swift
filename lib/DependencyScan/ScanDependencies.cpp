@@ -1626,9 +1626,13 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
         return true;
       }
       auto mainModuleName = newInstance->getMainModule()->getNameStr();
-      auto scanContextHash = newInstance->getInvocation().getModuleScanningHash();
+      auto scanContextHash =
+          newInstance->getInvocation().getModuleScanningHash();
+      auto moduleOutputPath = newInstance->getInvocation()
+                                  .getFrontendOptions()
+                                  .ExplicitModulesOutputPath;
       auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
-          *newService, mainModuleName.str(), scanContextHash);
+          *newService, mainModuleName.str(), moduleOutputPath, scanContextHash);
       pInstance = newInstance.get();
       pCache = newLocalCache.get();
       subInstanceMap->insert(
@@ -1800,11 +1804,10 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   if (service.setupCachingDependencyScanningService(instance))
     return true;
 
-  ModuleDependenciesCache cache(service,
-                                instance.getMainModule()->getNameStr().str(),
-                                instance.getInvocation().getModuleScanningHash());
-  auto ModuleCachePath = getModuleCachePathFromClang(
-               Context.getClangModuleLoader()->getClangInstance());
+  ModuleDependenciesCache cache(
+      service, instance.getMainModule()->getNameStr().str(),
+      instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getModuleScanningHash());
 
   // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
@@ -1837,9 +1840,10 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   SwiftDependencyScanningService singleUseService;
-  ModuleDependenciesCache cache(singleUseService,
-                                instance.getMainModule()->getNameStr().str(),
-                                instance.getInvocation().getModuleScanningHash());
+  ModuleDependenciesCache cache(
+      singleUseService, instance.getMainModule()->getNameStr().str(),
+      instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getModuleScanningHash());
 
   // Execute import prescan, and write JSON output to the output stream
   auto importSetOrErr = performModulePrescan(instance);
@@ -1870,9 +1874,10 @@ bool swift::dependencies::batchScanDependencies(
   if (singleUseService.setupCachingDependencyScanningService(instance))
     return true;
 
-  ModuleDependenciesCache cache(singleUseService,
-                                instance.getMainModule()->getNameStr().str(),
-                                instance.getInvocation().getModuleScanningHash());
+  ModuleDependenciesCache cache(
+      singleUseService, instance.getMainModule()->getNameStr().str(),
+      instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getModuleScanningHash());
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1906,9 +1911,10 @@ bool swift::dependencies::batchPrescanDependencies(
   // The primary cache used for scans carried out with the compiler instance
   // we have created
   SwiftDependencyScanningService singleUseService;
-  ModuleDependenciesCache cache(singleUseService,
-                                instance.getMainModule()->getNameStr().str(),
-                                instance.getInvocation().getModuleScanningHash());
+  ModuleDependenciesCache cache(
+      singleUseService, instance.getMainModule()->getNameStr().str(),
+      instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getModuleScanningHash());
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1984,14 +1990,14 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
     cache.recordDependency(mainModuleName, std::move(*mainDependencies));
   }
 
-  auto ModuleCachePath = getModuleCachePathFromClang(
+  auto ClangModuleCachePath = getModuleCachePathFromClang(
       ctx.getClangModuleLoader()->getClangInstance());
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   InterfaceSubContextDelegateImpl ASTDelegate(
       ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
       ctx.ClangImporterOpts, LoaderOpts,
-      /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+      /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
       FEOpts.PrebuiltModuleCachePath,
       FEOpts.BackupModuleInterfaceDir,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
@@ -2114,14 +2120,14 @@ swift::dependencies::performBatchModuleScan(
         ASTContext &ctx = instance.getASTContext();
         auto &FEOpts = instance.getInvocation().getFrontendOptions();
         ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-        auto ModuleCachePath = getModuleCachePathFromClang(
+        auto ClangModuleCachePath = getModuleCachePathFromClang(
             ctx.getClangModuleLoader()->getClangInstance());
 
         ModuleDependencyIDSetVector allModules;
         InterfaceSubContextDelegateImpl ASTDelegate(
             ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
             ctx.ClangImporterOpts, LoaderOpts,
-            /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+            /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.BackupModuleInterfaceDir,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
@@ -2183,13 +2189,13 @@ swift::dependencies::performBatchModulePrescan(
         ASTContext &ctx = instance.getASTContext();
         auto &FEOpts = instance.getInvocation().getFrontendOptions();
         ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-        auto ModuleCachePath = getModuleCachePathFromClang(
+        auto ClangModuleCachePath = getModuleCachePathFromClang(
             ctx.getClangModuleLoader()->getClangInstance());
         ModuleDependencyIDSetVector allModules;
         InterfaceSubContextDelegateImpl ASTDelegate(
             ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
             ctx.ClangImporterOpts, LoaderOpts,
-            /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+            /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.BackupModuleInterfaceDir,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
