@@ -99,16 +99,14 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     return
   }
 
-  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions) {
-    simplifyCtxt.inlineFunction(apply: apply, mandatoryInline: true)
-
-    // In OSSA `partial_apply [on_stack]`s are represented as owned values rather than stack locations.
-    // It is possible for their destroys to violate stack discipline.
-    // When inlining into non-OSSA, those destroys are lowered to dealloc_stacks.
-    // This can result in invalid stack nesting.
-    if callee.hasOwnership && !apply.parentFunction.hasOwnership  {
+  if apply.canInline &&
+     shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions)
+  {
+    if apply.inliningCanInvalidateStackNesting  {
       simplifyCtxt.notifyInvalidatedStackNesting()
     }
+
+    simplifyCtxt.inlineFunction(apply: apply, mandatoryInline: true)
   }
 }
 
