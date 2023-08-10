@@ -45,14 +45,14 @@ extension VariableDeclSyntax {
     let patternBindings = bindings.compactMap { binding in
       binding.as(PatternBindingSyntax.self)
     }
-    let accessors: [AccessorListSyntax.Element] = patternBindings.compactMap { patternBinding in
-      switch patternBinding.accessor {
+    let accessors: [AccessorDeclListSyntax.Element] = patternBindings.compactMap { patternBinding in
+      switch patternBinding.accessorBlock?.accessors {
       case .accessors(let accessors):
         return accessors
       default:
         return nil
       }
-    }.flatMap { $0.accessors }
+    }.flatMap { $0 }
     return accessors.compactMap { accessor in
       guard let decl = accessor.as(AccessorDeclSyntax.self) else {
         return nil
@@ -76,9 +76,13 @@ extension VariableDeclSyntax {
     if accessorsMatching({ $0 == .keyword(.get) }).count > 0 {
       return true
     } else {
-      return bindings.compactMap { binding in
-        binding.as(PatternBindingSyntax.self)?.accessor?.as(CodeBlockSyntax.self)
-      }.count > 0
+      return bindings.contains { binding in
+        if case .getter = binding.accessorBlock?.accessors {
+          return true
+        } else {
+          return false
+        }
+      }
     }
   }
   
@@ -196,11 +200,11 @@ extension FunctionDeclSyntax {
   
   var signatureStandin: SignatureStandin {
     var parameters = [String]()
-    for parameter in signature.input.parameterList {
+    for parameter in signature.parameterClause.parameters {
       parameters.append(parameter.firstName.text + ":" + (parameter.type.genericSubstitution(genericParameterClause?.parameters) ?? "" ))
     }
-    let returnType = signature.output?.returnType.genericSubstitution(genericParameterClause?.parameters) ?? "Void"
-    return SignatureStandin(isInstance: isInstance, identifier: identifier.text, parameters: parameters, returnType: returnType)
+    let returnType = signature.returnClause?.type.genericSubstitution(genericParameterClause?.parameters) ?? "Void"
+    return SignatureStandin(isInstance: isInstance, identifier: name.text, parameters: parameters, returnType: returnType)
   }
   
   func isEquivalent(to other: FunctionDeclSyntax) -> Bool {
@@ -212,7 +216,7 @@ extension DeclGroupSyntax {
   var memberFunctionStandins: [FunctionDeclSyntax.SignatureStandin] {
     var standins = [FunctionDeclSyntax.SignatureStandin]()
     for member in memberBlock.members {
-      if let function = member.as(MemberDeclListItemSyntax.self)?.decl.as(FunctionDeclSyntax.self) {
+      if let function = member.as(MemberBlockItemSyntax.self)?.decl.as(FunctionDeclSyntax.self) {
         standins.append(function.signatureStandin)
       }
     }
@@ -221,7 +225,7 @@ extension DeclGroupSyntax {
   
   func hasMemberFunction(equvalentTo other: FunctionDeclSyntax) -> Bool {
     for member in memberBlock.members {
-      if let function = member.as(MemberDeclListItemSyntax.self)?.decl.as(FunctionDeclSyntax.self) {
+      if let function = member.as(MemberBlockItemSyntax.self)?.decl.as(FunctionDeclSyntax.self) {
         if function.isEquivalent(to: other) {
           return true
         }
@@ -232,7 +236,7 @@ extension DeclGroupSyntax {
   
   func hasMemberProperty(equivalentTo other: VariableDeclSyntax) -> Bool {
     for member in memberBlock.members {
-      if let variable = member.as(MemberDeclListItemSyntax.self)?.decl.as(VariableDeclSyntax.self) {
+      if let variable = member.as(MemberBlockItemSyntax.self)?.decl.as(VariableDeclSyntax.self) {
         if variable.isEquivalent(to: other) {
           return true
         }
@@ -243,7 +247,7 @@ extension DeclGroupSyntax {
   
   var definedVariables: [VariableDeclSyntax] {
     memberBlock.members.compactMap { member in
-      if let variableDecl = member.as(MemberDeclListItemSyntax.self)?.decl.as(VariableDeclSyntax.self) {
+      if let variableDecl = member.as(MemberBlockItemSyntax.self)?.decl.as(VariableDeclSyntax.self) {
         return variableDecl
       }
       return nil

@@ -61,6 +61,8 @@ public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
   override var pointee: Pointee { get set }
 }
 
+extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator {}
+
 /// Bridged C++ iterator that allows computing the distance between two of its
 /// instances, and advancing an instance by a given number of elements.
 ///

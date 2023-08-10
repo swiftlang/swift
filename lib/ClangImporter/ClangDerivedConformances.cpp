@@ -86,6 +86,31 @@ static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
                       });
 }
 
+static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
+                               TypeAliasDecl *valueType) {
+  ASTContext &ctx = decl->getASTContext();
+
+  auto insertId = ctx.getIdentifier("__insertUnsafe");
+  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
+  FuncDecl *insert = nullptr;
+  for (auto candidate : inserts) {
+    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
+      if (!candidateMethod->hasParameterList())
+        continue;
+      auto params = candidateMethod->getParameters();
+      if (params->size() != 1)
+        continue;
+      auto param = params->front();
+      if (param->getTypeInContext()->getCanonicalType() !=
+          valueType->getUnderlyingType()->getCanonicalType())
+        continue;
+      insert = candidateMethod;
+      break;
+    }
+  }
+  return insert;
+}
+
 static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
                       llvm::ArrayRef<StringRef> names) {
   if (!clangDecl->isInStdNamespace())
@@ -142,8 +167,8 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
     auto rhs = params->get(1);
     if (lhs->isInOut() || rhs->isInOut())
       return false;
-    auto lhsTy = lhs->getType();
-    auto rhsTy = rhs->getType();
+    auto lhsTy = lhs->getTypeInContext();
+    auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
     auto lhsNominal = lhsTy->getAnyNominal();
@@ -172,8 +197,8 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     auto rhs = params->get(1);
     if (lhs->isInOut() || rhs->isInOut())
       return false;
-    auto lhsTy = lhs->getType();
-    auto rhsTy = rhs->getType();
+    auto lhsTy = lhs->getTypeInContext();
+    auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
     auto lhsNominal = lhsTy->getAnyNominal();
@@ -205,8 +230,8 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
     auto rhs = params->get(1);
     if (rhs->isInOut())
       return false;
-    auto lhsTy = lhs->getType();
-    auto rhsTy = rhs->getType();
+    auto lhsTy = lhs->getTypeInContext();
+    auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
     if (rhsTy->getCanonicalType() != distanceTy->getCanonicalType())
@@ -335,11 +360,18 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 
   // Lookup the `operator==` function that will be called under the hood.
   clang::UnresolvedSet<16> operators;
+  clang::sema::DelayedDiagnosticPool diagPool{
+      impl.getClangSema().DelayedDiagnostics.getCurrentPool()};
+  auto diagState = impl.getClangSema().DelayedDiagnostics.push(diagPool);
   // Note: calling `CreateOverloadedBinOp` emits an error if the looked up
   // function is unavailable for the current target.
   auto underlyingCallResult = clangSema.CreateOverloadedBinOp(
       clang::SourceLocation(), operatorKind, operators, lhsParamRefExpr,
       rhsParamRefExpr);
+  impl.getClangSema().DelayedDiagnostics.popWithoutEmitting(diagState);
+
+  if (!diagPool.empty())
+    return false;
   if (!underlyingCallResult.isUsable())
     return false;
   auto underlyingCall = underlyingCallResult.get();
@@ -429,7 +461,7 @@ void swift::conformToCxxIteratorIfNeeded(
   // Check if present: `var pointee: Pointee { get }`
   auto pointeeId = ctx.getIdentifier("pointee");
   auto pointee = lookupDirectSingleWithoutExtensions<VarDecl>(decl, pointeeId);
-  if (!pointee || pointee->isGetterMutating() || pointee->getType()->hasError())
+  if (!pointee || pointee->isGetterMutating() || pointee->getTypeInContext()->hasError())
     return;
 
   // Check if `var pointee: Pointee` is settable. This is required for the
@@ -473,7 +505,7 @@ void swift::conformToCxxIteratorIfNeeded(
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),
-                               pointee->getType());
+                               pointee->getTypeInContext());
   if (pointeeSettable)
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxMutableInputIterator});
@@ -713,12 +745,16 @@ static bool isStdSetType(const clang::CXXRecordDecl *clangDecl) {
   return isStdDecl(clangDecl, {"set", "unordered_set", "multiset"});
 }
 
+static bool isStdMapType(const clang::CXXRecordDecl *clangDecl) {
+  return isStdDecl(clangDecl, {"map", "unordered_map", "multimap"});
+}
+
 bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
   auto parentDecl =
       dyn_cast<clang::CXXRecordDecl>(methodDecl->getDeclContext());
   if (!parentDecl)
     return false;
-  if (!isStdSetType(parentDecl))
+  if (!isStdSetType(parentDecl) && !isStdMapType(parentDecl))
     return false;
   if (methodDecl->getDeclName().isIdentifier() &&
       methodDecl->getName() == "insert")
@@ -747,24 +783,7 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
   if (!valueType || !sizeType)
     return;
 
-  auto insertId = ctx.getIdentifier("__insertUnsafe");
-  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
-  FuncDecl *insert = nullptr;
-  for (auto candidate : inserts) {
-    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
-      if (!candidateMethod->hasParameterList())
-        continue;
-      auto params = candidateMethod->getParameters();
-      if (params->size() != 1)
-        continue;
-      auto param = params->front();
-      if (param->getType()->getCanonicalType() !=
-          valueType->getUnderlyingType()->getCanonicalType())
-        continue;
-      insert = candidateMethod;
-      break;
-    }
-  }
+  auto insert = getInsertFunc(decl, valueType);
   if (!insert)
     return;
 
@@ -844,7 +863,7 @@ void swift::conformToCxxDictionaryIfNeeded(
 
   // Only auto-conform types from the C++ standard library. Custom user types
   // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"map", "unordered_map"}))
+  if (!isStdMapType(clangDecl))
     return;
 
   auto keyType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
@@ -853,7 +872,41 @@ void swift::conformToCxxDictionaryIfNeeded(
       decl, ctx.getIdentifier("mapped_type"));
   auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("const_iterator"));
-  if (!keyType || !valueType || !iterType)
+  auto mutableIterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("iterator"));
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+  auto keyValuePairType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("value_type"));
+  if (!keyType || !valueType || !iterType || !mutableIterType || !sizeType ||
+      !keyValuePairType)
+    return;
+
+  auto insert = getInsertFunc(decl, keyValuePairType);
+  if (!insert)
+    return;
+
+  ProtocolDecl *cxxInputIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxMutableInputIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator);
+  if (!cxxInputIteratorProto || !cxxMutableInputIteratorProto)
+    return;
+
+  auto rawIteratorTy = iterType->getUnderlyingType();
+  auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
+
+  // Check if RawIterator conforms to UnsafeCxxInputIterator.
+  ModuleDecl *module = decl->getModuleContext();
+  auto rawIteratorConformanceRef =
+      module->lookupConformance(rawIteratorTy, cxxInputIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+    return;
+
+  // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
+  auto rawMutableIteratorConformanceRef = module->lookupConformance(
+      rawMutableIteratorTy, cxxMutableInputIteratorProto);
+  if (!isConcreteAndValid(rawMutableIteratorConformanceRef, module))
     return;
 
   // Make the original subscript that returns a non-optional value unavailable.
@@ -869,7 +922,59 @@ void swift::conformToCxxDictionaryIfNeeded(
   impl.addSynthesizedTypealias(decl, ctx.Id_Key, keyType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_Value,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               keyValuePairType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               iterType->getUnderlyingType());
+                               rawIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                               rawMutableIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+                               insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
+}
+
+void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
+                                       NominalTypeDecl *decl,
+                                       const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxVector", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  // Only auto-conform types from the C++ standard library. Custom user types
+  // might have a similar interface but different semantics.
+  if (!isStdDecl(clangDecl, {"vector"}))
+    return;
+
+  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("value_type"));
+  auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("const_iterator"));
+  if (!valueType || !iterType)
+    return;
+
+  ProtocolDecl *cxxRandomAccessIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRandomAccessIteratorProto)
+    return;
+
+  auto rawIteratorTy = iterType->getUnderlyingType();
+
+  // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
+  ModuleDecl *module = decl->getModuleContext();
+  auto rawIteratorConformanceRef =
+      module->lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+    return;
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
+                               valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});
 }

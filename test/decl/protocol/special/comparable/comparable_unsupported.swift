@@ -24,6 +24,28 @@ enum NotComparableEnumOne: Int, Comparable {
   case value
 }
 
+// A potentially unavailable (or unconditionally unavailable) enum case prevents
+// automatic synthesis of Comparable requirements.
+// FIXME: This should be diagnosed explicitly.
+
+enum EnumWithUnavailableCase: Comparable {
+  // expected-error@-1 {{type 'EnumWithUnavailableCase' does not conform to protocol 'Comparable'}}
+  case available
+
+  @available(*, unavailable)
+  case unavailable
+}
+
+enum EnumWithUnavailableCaseAndAssociatedValue: Comparable {
+  // expected-error@-1 {{type 'EnumWithUnavailableCaseAndAssociatedValue' does not conform to protocol 'Comparable'}}
+  enum SomeComparable: Comparable {}
+
+  case none
+
+  @available(*, unavailable)
+  case some(SomeComparable)
+}
+
 // Automatic synthesis of Comparable requires associated values to be Comparable as well.
 
 enum NotComparableEnumTwo: Comparable {

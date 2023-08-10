@@ -310,6 +310,10 @@ public:
   /// SingleValueStmtExpr.
   bool isForSingleValueStmtConjunction() const;
 
+  /// Whether this locator identifies a conjunction for the branches of a
+  /// SingleValueStmtExpr, or a conjunction for one of the BraceStmts itself.
+  bool isForSingleValueStmtConjunctionOrBrace() const;
+
   /// Whether this locator identifies a conversion for a SingleValueStmtExpr
   /// branch, and if so, the kind of branch.
   llvm::Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
@@ -1055,22 +1059,6 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ContextualType;
-  }
-};
-
-class LocatorPathElt::KeyPathType final
-    : public StoredPointerElement<TypeBase> {
-public:
-  KeyPathType(Type valueType)
-      : StoredPointerElement(PathElementKind::KeyPathType,
-                             valueType.getPointer()) {
-    assert(valueType);
-  }
-
-  Type getValueType() const { return getStoredPointer(); }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::KeyPathType;
   }
 };
 

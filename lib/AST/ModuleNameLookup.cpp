@@ -78,7 +78,7 @@ public:
       lookupKind(lookupKind) {}
 
 private:
-  /// Returns whether it's okay to stop recursively searching imports, given 
+  /// Returns whether it's okay to stop recursively searching imports, given
   /// that we found something non-overloadable.
   static bool canReturnEarly() {
     return true;

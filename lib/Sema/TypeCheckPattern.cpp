@@ -1725,7 +1725,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
   // Local function to check whether type of given parameter
   // should be coerced to a given contextual type or not.
   auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
-    return !isValidType(param->getType());
+    return !isValidType(param->getTypeInContext());
   };
 
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {

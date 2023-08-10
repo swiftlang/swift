@@ -120,7 +120,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
   auto LowTy = GV->getLoweredType().getASTType();
   auto *Type = LowTy.getPointer();
   if (auto *Decl = GV->getDecl()) {
-    auto DeclType = Decl->getType();
+    auto DeclType = Decl->getTypeInContext();
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
@@ -141,7 +141,7 @@ DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
   auto LowTy = GV->getLoweredType().getASTType();
   auto *Type = LowTy.getPointer();
   if (auto *Decl = GV->getDecl()) {
-    auto DeclType = Decl->getType();
+    auto DeclType = Decl->getTypeInContext();
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }

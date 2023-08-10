@@ -63,6 +63,7 @@ class TypeAliasDecl;
 class TypeLoc;
 class Witness;
 class TypeResolution;
+class TypeRefinementContext;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -3376,6 +3377,28 @@ public:
   void cacheResult(Type value) const;
 };
 
+class ResolveRawLayoutLikeTypeRequest
+    : public SimpleRequest<ResolveRawLayoutLikeTypeRequest,
+                           Type (StructDecl*, RawLayoutAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator,
+                StructDecl *sd,
+                RawLayoutAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 /// Determines whether this is a "simple" didSet i.e one that either does not
 /// use the implicit oldValue parameter in the body or does not take an explicit
 /// parameter (ex: 'didSet(oldValue)').
@@ -3844,6 +3867,30 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+/// Performs some pre-checking of a function body, including inserting and
+/// removing implict returns where needed. This request is currently
+/// side-effectful, as it will mutate the body in-place.
+///
+/// Note this request is currently uncached as:
+/// - The result will ultimately be cached by TypeCheckFunctionBodyRequest.
+/// - When re-parsing function bodies in SourceKit, we can set a previously
+///   type-checked function body back to being parsed, so caching the result of
+///   this request would result in incorrectly attempting to restore the
+///   previous body. We either need to eliminate the mutation of the AST, or
+///   implement request cache invalidation through request dependencies.
+class PreCheckFunctionBodyRequest
+    : public SimpleRequest<PreCheckFunctionBodyRequest,
+                           BraceStmt *(AbstractFunctionDecl *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
 };
 
 /// The result of the query for whether a statement can produce a single value.
@@ -4382,6 +4429,25 @@ private:
   ArrayRef<VarDecl *> evaluate(Evaluator &evaluator, DeclAttribute *attr,
                                AccessorDecl *attachedTo,
                                ArrayRef<Identifier>) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand the children of the type refinement context for the given
+/// declaration.
+class ExpandChildTypeRefinementContextsRequest
+    : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
+                           bool(Decl *, TypeRefinementContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Decl *decl,
+                TypeRefinementContext *parentTRC) const;
 
 public:
   bool isCached() const { return true; }

@@ -1234,6 +1234,18 @@ public:
   llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr() const;
 
+  /// Returns true if this declaration should be considered available during
+  /// SIL/IR lowering. A declaration would not be available during lowering if,
+  /// for example, it is annotated as unavailable with `@available` and
+  /// optimization settings require that it be omitted.
+  bool isAvailableDuringLowering() const;
+
+  /// Returns true if ABI compatibility stubs must be emitted for the given
+  /// declaration. Decls marked unavailable with `@available` require these
+  /// stubs if the compiler flags have enabled unavailable declaration ABI
+  /// compatibility mode.
+  bool requiresUnavailableDeclABICompatibilityStubs() const;
+
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
   // SPI groups are inherited from the parent contexts only if the local decl
@@ -1275,6 +1287,17 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
     mem = reinterpret_cast<char *>(mem) + alignof(DeclTy);
   return mem;
 }
+
+/// A convenience function object for filtering out decls that are not available
+/// during lowering.
+template <typename T>
+struct AvailableDuringLoweringDeclFilter {
+  llvm::Optional<T *> operator()(T *decl) const {
+    if (decl->isAvailableDuringLowering())
+      return decl;
+    return llvm::None;
+  }
+};
 
 // A private class for forcing exact field layout.
 class alignas(8) _GenericContext {
@@ -5666,9 +5689,10 @@ public:
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
-  /// Get the type of the variable within its context. If the context is generic,
-  /// this will use archetypes.
-  Type getType() const;
+  /// Maps the interface type of the variable declaration into the generic
+  /// environment of its parent DeclContext. Make sure this is what you want
+  /// and not just getInterfaceType().
+  Type getTypeInContext() const;
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.

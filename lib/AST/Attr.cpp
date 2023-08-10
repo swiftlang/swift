@@ -1485,6 +1485,32 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_StorageRestrictions: {
+    auto *attr = cast<StorageRestrictionsAttr>(this);
+    Printer.printAttrName("@storageRestrictions");
+    Printer << "(";
+
+    auto initializes = attr->getInitializesNames();
+    auto accesses = attr->getAccessesNames();
+
+    bool needsComma = !initializes.empty() && !accesses.empty();
+
+    if (!initializes.empty()) {
+      Printer << "initializes: ";
+      interleave(initializes, Printer, ", ");
+    }
+
+    if (needsComma)
+      Printer << ", ";
+
+    if (!accesses.empty()) {
+      Printer << "accesses: ";
+      interleave(accesses, Printer, ", ");
+    }
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1882,6 +1908,14 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
                            ResolveTypeEraserTypeRequest{
                                const_cast<ProtocolDecl *>(PD),
                                const_cast<TypeEraserAttr *>(this)},
+                           ErrorType::get(ctx));
+}
+
+Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {
+  auto &ctx = sd->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveRawLayoutLikeTypeRequest{sd,
+                               const_cast<RawLayoutAttr *>(this)},
                            ErrorType::get(ctx));
 }
 

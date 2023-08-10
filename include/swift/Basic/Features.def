@@ -105,6 +105,7 @@ LANGUAGE_FEATURE(
     FreestandingExpressionMacros, 382, "Expression macros",
         hasSwiftSwiftParser)
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
+LANGUAGE_FEATURE(ExtensionMacros, 402, "Extension macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
 LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations", true)
@@ -122,7 +123,6 @@ EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
-EXPERIMENTAL_FEATURE(InitAccessors, false)
 
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", true)
 

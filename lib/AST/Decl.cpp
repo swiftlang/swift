@@ -2079,19 +2079,23 @@ bool VarDecl::isLayoutExposedToClients() const {
   if (!parent) return false;
   if (isStatic()) return false;
 
-  if (!hasStorage() &&
-      !getAttrs().hasAttribute<LazyAttr>() &&
-      !hasAttachedPropertyWrapper()) {
-    return false;
-  }
 
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
   if (!nominalAccess.isPublic()) return false;
 
-  return (parent->getAttrs().hasAttribute<FrozenAttr>() ||
-          parent->getAttrs().hasAttribute<FixedLayoutAttr>());
+  if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
+      !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
+    return false;
+
+  if (!hasStorage() &&
+      !getAttrs().hasAttribute<LazyAttr>() &&
+      !hasAttachedPropertyWrapper()) {
+    return false;
+  }
+
+  return true;
 }
 
 /// Check whether the given type representation will be
@@ -5480,7 +5484,7 @@ NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
 
       if ((params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned ||
           params->get(0)->getSpecifier() == ParamSpecifier::Consuming) &&
-          params->get(0)->getType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
+          params->get(0)->getInterfaceType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
         return funcDecl;
       }
     }
@@ -6816,7 +6820,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
   Bits.VarDecl.IsTopLevelGlobal = false;
 }
 
-Type VarDecl::getType() const {
+Type VarDecl::getTypeInContext() const {
   return getDeclContext()->mapTypeIntoContext(getInterfaceType());
 }
 
@@ -7383,7 +7387,7 @@ LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
   auto specifier = getSpecifier();
   // Copyable parameters which are consumed have eager-move semantics.
   if (specifier == ParamDecl::Specifier::Consuming &&
-      !getType()->isPureMoveOnly()) {
+      !getTypeInContext()->isPureMoveOnly()) {
     if (getAttrs().hasAttribute<NoEagerMoveAttr>())
       return LifetimeAnnotation::Lexical;
     return LifetimeAnnotation::EagerMove;
@@ -8633,10 +8637,10 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
 }
 
 static bool isPotentialCompletionHandler(const ParamDecl *param) {
-  if (!param->getType())
+  if (!param->getInterfaceType())
     return false;
 
-  const AnyFunctionType *paramType = param->getType()->getAs<AnyFunctionType>();
+  auto *paramType = param->getInterfaceType()->getAs<AnyFunctionType>();
   return paramType && paramType->getResult()->isVoid() &&
          !paramType->isNoEscape() && !param->isAutoClosure();
 }
@@ -8706,11 +8710,11 @@ AbstractFunctionDecl::findPotentialCompletionHandlerParam(
       }
 
       // Don't have types for some reason, just return no match
-      if (!param->getType() || !asyncParam->getType())
+      if (!param->getInterfaceType() || !asyncParam->getInterfaceType())
         return llvm::None;
 
-      paramMatches = param->getType()->matchesParameter(asyncParam->getType(),
-                                                        TypeMatchOptions());
+      paramMatches = param->getInterfaceType()->matchesParameter(
+          asyncParam->getInterfaceType(), TypeMatchOptions());
     }
 
     if (paramMatches) {
@@ -9614,7 +9618,7 @@ LifetimeAnnotation FuncDecl::getLifetimeAnnotation() const {
   // Copyable parameters which are consumed have eager-move semantics.
   if (getSelfAccessKind() == SelfAccessKind::Consuming) {
     auto *selfDecl = getImplicitSelfDecl();
-    if (selfDecl && !selfDecl->getType()->isPureMoveOnly()) {
+    if (selfDecl && !selfDecl->getTypeInContext()->isPureMoveOnly()) {
       if (getAttrs().hasAttribute<NoEagerMoveAttr>())
         return LifetimeAnnotation::Lexical;
       return LifetimeAnnotation::EagerMove;
@@ -10043,7 +10047,7 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
   for (auto member : structDecl->getMembers())
     if (auto varDecl = dyn_cast<VarDecl>(member))
       if (varDecl->getName() == getASTContext().Id_rawValue)
-        return varDecl->getType();
+        return varDecl->getInterfaceType();
 
   return {};
 }

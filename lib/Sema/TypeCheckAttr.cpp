@@ -854,7 +854,7 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   }
 
   // Verify that the field type is valid as an outlet.
-  auto type = VD->getType();
+  auto type = VD->getTypeInContext();
 
   if (VD->isInvalid())
     return;
@@ -1636,7 +1636,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
 
   auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
-  auto argType = paramList->get(0)->getType();
+  auto argType = paramList->get(0)->getTypeInContext();
 
   // If non-keyword (positional) arguments, check that argument type conforms to
   // `ExpressibleByArrayLiteral`.
@@ -1744,7 +1744,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   const auto *param = decl->getIndices()->get(0);
-  auto paramType = param->getType();
+  auto paramType = param->getTypeInContext();
 
   // If this is `subscript(dynamicMember: String*)`
   return TypeChecker::conformsToKnownProtocol(
@@ -3364,6 +3364,22 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
     }
     return ty;
   }
+}
+
+Type
+ResolveRawLayoutLikeTypeRequest::evaluate(Evaluator &evaluator,
+                                          StructDecl *sd,
+                                          RawLayoutAttr *attr) const {
+  assert(attr->LikeType);
+  // Resolve the like type in the struct's context.
+  return TypeResolution::resolveContextualType(
+        attr->LikeType, sd, llvm::None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
 }
 
 bool
@@ -6950,13 +6966,13 @@ void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
   }
   if (auto *func = dyn_cast<FuncDecl>(D)) {
     auto *self = func->getImplicitSelfDecl();
-    if (self && self->getType()->isPureMoveOnly()) {
+    if (self && self->getTypeInContext()->isPureMoveOnly()) {
       diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
       return;
     }
   }
   if (auto *pd = dyn_cast<ParamDecl>(D)) {
-    if (pd->getType()->isPureMoveOnly()) {
+    if (pd->getTypeInContext()->isPureMoveOnly()) {
       diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
       return;
     }
@@ -7001,7 +7017,7 @@ void AttributeChecker::visitCompilerInitializedAttr(
 
   // Because optionals are implicitly initialized to nil according to the
   // language, this attribute doesn't make sense on optionals.
-  if (var->getType()->isOptional()) {
+  if (var->getTypeInContext()->isOptional()) {
     diagnose(attr->getLocation(), diag::optional_compilerinitialized);
     return;
   }
@@ -7195,30 +7211,10 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
       diagnoseAndRemoveAttr(attr, diag::alignment_not_power_of_two);
       return;
     }
-  } else if (auto likeType = attr->getScalarLikeType()) {
-    // Resolve the like type in the struct's context.
-    auto resolvedType = TypeResolution::resolveContextualType(
-        likeType, sd, llvm::None,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
-        
-    attr->setResolvedLikeType(resolvedType);
-  } else if (auto arrayType = attr->getArrayLikeTypeAndCount()) {
-    // Resolve the like type in the struct's context.
-    auto resolvedType = TypeResolution::resolveContextualType(
-        arrayType->first, sd, llvm::None,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
-        
-    attr->setResolvedLikeType(resolvedType);
+  } else if (attr->getScalarLikeType()) {
+    (void)attr->getResolvedLikeType(sd);
+  } else if (attr->getArrayLikeTypeAndCount()) {
+    (void)attr->getResolvedLikeType(sd);
   } else {
     llvm_unreachable("new unhandled rawLayout attribute form?");
   }
@@ -7346,8 +7342,8 @@ static bool parametersMatch(const AbstractFunctionDecl *a,
     return false;
 
   for (auto index : indices(*aParams)) {
-    auto aParamType = aParams->get(index)->getType();
-    auto bParamType = bParams->get(index)->getType();
+    auto aParamType = aParams->get(index)->getTypeInContext();
+    auto bParamType = bParams->get(index)->getTypeInContext();
     if (!aParamType->matchesParameter(bParamType, TypeMatchOptions()))
       return false;
   }

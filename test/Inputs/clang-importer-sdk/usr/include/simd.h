@@ -39,6 +39,8 @@ typedef double __attribute__((ext_vector_type(3))) double3;
 typedef double __attribute__((ext_vector_type(4))) double4;
 typedef double __attribute__((ext_vector_type(8))) double8;
 
+typedef struct { float4 columns[4]; } float4x4;
+
 // Types that we should not be able to import.
 typedef char __attribute__((ext_vector_type(17))) char17;
 typedef unsigned char __attribute__((ext_vector_type(21))) uchar21;
@@ -89,6 +91,7 @@ ushort6 makes_ushort6();
 int128 makes_int128();
 uint20 makes_uint20();
 
+#ifndef SIMD_NO_CODE
 takes_char2(char2);
 takes_char64(char64);
 takes_uchar3(uchar3);
@@ -130,3 +133,4 @@ takes_short5(short5);
 takes_ushort6(ushort6);
 takes_int128(int128);
 takes_uint20(uint20);
+#endif

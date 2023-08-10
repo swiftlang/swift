@@ -26,6 +26,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -119,6 +120,15 @@ void SILInstruction::moveFront(SILBasicBlock *Block) {
 void SILInstruction::moveBefore(SILInstruction *Later) {
   SILBasicBlock::moveInstruction(this, Later);
 }
+
+namespace swift::test {
+FunctionTest MoveBeforeTest("instruction-move-before",
+                            [](auto &function, auto &arguments, auto &test) {
+                              auto *inst = arguments.takeInstruction();
+                              auto *other = arguments.takeInstruction();
+                              inst->moveBefore(other);
+                            });
+} // end namespace swift::test
 
 /// Unlink this instruction from its current basic block and insert it into
 /// the basic block that Earlier lives in, right after Earlier.
@@ -976,6 +986,13 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
     const BuiltinInfo &BInfo = BI->getBuiltinInfo();
+    if (BInfo.ID == BuiltinValueKind::ZeroInitializer) {
+      // The address form of `zeroInitializer` writes to its argument to
+      // initialize it. The value form has no side effects.
+      return BI->getArguments().size() > 0
+        ? MemoryBehavior::MayWrite
+        : MemoryBehavior::None;
+    }
     if (BInfo.ID != BuiltinValueKind::None)
       return BInfo.isReadNone() ? MemoryBehavior::None
                                 : MemoryBehavior::MayHaveSideEffects;
@@ -1322,6 +1339,12 @@ bool SILInstruction::mayRequirePackMetadata() const {
     // materialization.  If they did there would be no way to create the pack
     // metadata on stack.
     if (isDeallocatingStack())
+      return false;
+
+    // Terminators that exit the function must not result in pack metadata
+    // materialization.
+    auto *ti = dyn_cast<TermInst>(this);
+    if (ti && ti->isFunctionExiting())
       return false;
 
     // Check results and operands for packs.  If a pack appears, lowering the

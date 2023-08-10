@@ -730,3 +730,15 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_canonicalize_undef : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'dont_canonicalize_undef'
+sil [ossa] @dont_canonicalize_undef : $@convention(thin) () -> () {
+  %addr = alloc_stack $()
+  store undef to [trivial] %addr : $*()
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+}

@@ -7281,7 +7281,7 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
              /*already*/ true);
 }
 
-static bool isAllowedInProtocolRequirement(AccessorKind kind) {
+static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::Set:
@@ -7293,8 +7293,10 @@ static bool isAllowedInProtocolRequirement(AccessorKind kind) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
-  case AccessorKind::Init:
     return false;
+
+  case AccessorKind::Init:
+    return forSIL;
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -7354,9 +7356,7 @@ static bool parseAccessorIntroducer(Parser &P,
     }
   }
 
-  bool isInitAccessor = (P.Context.LangOpts.hasFeature(Feature::InitAccessors)
-                         && P.Tok.is(tok::kw_init));
-  if (!(P.Tok.is(tok::identifier) || isInitAccessor) ||
+  if (!(P.Tok.is(tok::identifier) || P.Tok.is(tok::kw_init)) ||
       P.Tok.isEscapedIdentifier()) {
     return true;
   }
@@ -7688,7 +7688,8 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
     // For now, immediately reject illegal accessors in protocols just to
     // avoid having to deal with them everywhere.
-    if (parsingLimitedSyntax && !isAllowedInProtocolRequirement(Kind)) {
+    if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
+                                    Kind, SF.Kind == SourceFileKind::SIL)) {
       diagnose(Loc, diag::expected_getset_in_protocol);
       continue;
     }

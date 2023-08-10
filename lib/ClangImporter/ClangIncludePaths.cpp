@@ -38,7 +38,7 @@ static llvm::Optional<Path> getActualModuleMapPath(
   if (!SDKPath.empty()) {
     result.append(SDKPath.begin(), SDKPath.end());
     llvm::sys::path::append(result, "usr", "lib", "swift");
-    llvm::sys::path::append(result, platform, arch);
+    llvm::sys::path::append(result, platform);
     if (isArchSpecific) {
       llvm::sys::path::append(result, arch);
     }

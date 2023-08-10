@@ -2720,6 +2720,7 @@ bb0(%instance : @owned $T):
   %retval = tuple ()
   return %retval : $()
 }
+
 // CHECK-LABEL: sil [ossa] @test_yield_1_two_values : {{.*}} {
 // CHECK:         tuple_element_addr
 // CHECK:         tuple_element_addr

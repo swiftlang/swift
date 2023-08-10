@@ -47,11 +47,12 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
-                               DeclContext *DC)
+                               DeclContext *DC, bool IsEmittingTopLevelCode)
     : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
       StartOfPostmatter(F.end()), B(*this),
       SF(DC ? DC->getParentSourceFile() : nullptr), Cleanups(*this),
-      StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F) {
+      StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F),
+      IsEmittingTopLevelCode(IsEmittingTopLevelCode) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
@@ -521,8 +522,8 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   methodTy =
       methodTy.substGenericArgs(SGM.M, subMap, getTypeExpansionContext());
 
-  return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
-                         methodTy);
+  return std::make_tuple(
+      ManagedValue::forObjectRValueWithoutOwnership(methodValue), methodTy);
 }
 
 void SILGenFunction::emitCaptures(SILLocation loc,
@@ -563,7 +564,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       SILType dynamicSILType = getLoweredType(dynamicSelfMetatype);
 
       SILValue value = B.createMetatype(loc, dynamicSILType);
-      capturedArgs.push_back(ManagedValue::forUnmanaged(value));
+      capturedArgs.push_back(
+          ManagedValue::forObjectRValueWithoutOwnership(value));
       continue;
     }
 
@@ -957,14 +959,13 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // If we're in top-level code, we don't need to physically capture script
   // globals, but we still need to mark them as escaping so that DI can flag
   // uninitialized uses.
-  if (this == SGM.TopLevelSGF) {
+  if (isEmittingTopLevelCode()) {
     auto captureInfo = closure.getCaptureInfo();
-    SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(
-        loc, captureInfo);
+    emitMarkFunctionEscapeForTopLevelCodeGlobals(loc, captureInfo);
   }
-  
+
   if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
-    auto result = ManagedValue::forUnmanaged(functionRef);
+    auto result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
     if (!alreadyConverted)
       result = emitOrigToSubstValue(loc, result,
                                     AbstractionPattern(expectedType),
@@ -1017,7 +1018,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     prepareEpilog(fd->getResultInterfaceType(),
                   fd->hasThrows(), CleanupLocation(fd));
 
-    if (shouldLowerToUnavailableCodeStub(fd))
+    if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
 
     emitProfilerIncrement(fd->getTypecheckedBody());
@@ -1370,7 +1371,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
                             uint32_t paramIndex) -> SILValue {
-    Type parameterType = fd->getParameters()->get(paramIndex)->getType();
+    Type parameterType = fd->getParameters()->get(paramIndex)->getTypeInContext();
     SILType paramSILType = SILType::getPrimitiveObjectType(parameterType->getCanonicalType());
     // If the types are the same, we don't need to do anything!
     if (paramSILType == originalValue->getType())
@@ -1396,10 +1397,11 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
                              taskCreationFlagMask.getOpaqueValue());
 
   SILValue task =
-      emitBuiltinCreateAsyncTask(*this, moduleLoc, subs,
-                                 {ManagedValue::forUnmanaged(taskFlags),
-                                  ManagedValue::forUnmanaged(mainFunctionRef)},
-                                 {})
+      emitBuiltinCreateAsyncTask(
+          *this, moduleLoc, subs,
+          {ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
+           ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef)},
+          {})
           .forward(*this);
   DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
   task = structure->getResult(0);
@@ -1859,6 +1861,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     setterFRef = SILUndef::get(initFRef->getType(), F);
   }
 
-  B.createAssignOrInit(loc, selfValue.getValue(), newValue.forward(*this),
-                       initFRef, setterFRef, AssignOrInitInst::Unknown);
+  B.createAssignOrInit(loc, field, selfValue.getValue(),
+                       newValue.forward(*this), initFRef, setterFRef,
+                       AssignOrInitInst::Unknown);
 }

@@ -3483,6 +3483,22 @@ protected:
     pass.deleter.forceDelete(sei);
   }
 
+  void visitStrongCopyUnownedValueInst(StrongCopyUnownedValueInst *scuvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadUnowned(scuvi->getLoc(), sourceAddr, IsNotTake);
+    scuvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scuvi);
+  }
+
+  void visitStrongCopyWeakValueInst(StrongCopyWeakValueInst *scwvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadWeak(scwvi->getLoc(), sourceAddr, IsNotTake);
+    scwvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scwvi);
+  }
+
   // Extract from an opaque struct.
   void visitStructExtractInst(StructExtractInst *extractInst);
 
@@ -4094,6 +4110,24 @@ protected:
 
     rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass);
   }
+
+  void visitUnownedCopyValueInst(UnownedCopyValueInst *uci) {
+    auto &storage = pass.valueStorageMap.getStorage(uci);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreUnowned(uci->getLoc(), uci->getOperand(), destAddr,
+                               IsInitialization);
+  }
+
+  void visitWeakCopyValueInst(WeakCopyValueInst *wcsvi) {
+    auto &storage = pass.valueStorageMap.getStorage(wcsvi);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreWeak(wcsvi->getLoc(), wcsvi->getOperand(), destAddr,
+                            IsInitialization);
+  }
 };
 } // end anonymous namespace
 
@@ -4169,19 +4203,19 @@ static void rewriteFunction(AddressLoweringState &pass) {
 
     // Collect end_borrows and rewrite them last so that when rewriting other
     // users the lifetime ends of a borrow introducer can be used.
-    StackList<EndBorrowInst *> endBorrows(pass.function);
+    StackList<Operand *> lifetimeEndingUses(pass.function);
     SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
     for (auto *oper : uses) {
       originalUses.insert(oper);
-      if (auto *ebi = dyn_cast<EndBorrowInst>(oper->getUser())) {
-        endBorrows.push_back(ebi);
+      if (oper->isLifetimeEnding()) {
+        lifetimeEndingUses.push_back(oper);
         continue;
       }
       UseRewriter::rewriteUse(oper, pass);
     }
-    for (auto *ebi : endBorrows) {
-      UseRewriter::rewriteUse(&ebi->getOperandRef(), pass);
+    for (auto *oper : lifetimeEndingUses) {
+      UseRewriter::rewriteUse(oper, pass);
     }
     // Rewrite every new use that was added.
     uses.clear();

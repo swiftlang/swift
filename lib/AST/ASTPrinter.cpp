@@ -309,6 +309,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+        if (accessor->isInitAccessor() && !options.PrintForSIL)
+          return false;
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
@@ -2259,8 +2264,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       accessorsToPrint.push_back(Accessor);
   };
 
+  if (ASD->hasInitAccessor())
+    AddAccessorToPrint(AccessorKind::Init);
+
   if (PrintAbstract) {
     AddAccessorToPrint(AccessorKind::Get);
+
     if (ASD->supportsMutation())
       AddAccessorToPrint(AccessorKind::Set);
   } else {
@@ -2390,23 +2399,38 @@ static void addNamespaceMembers(Decl *decl,
         }
       }
 
+      auto lookupAndAddMembers = [&](DeclName name) {
+        auto allResults = evaluateOrDefault(
+            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+
+        for (auto found : allResults) {
+          auto clangMember = found.get<clang::NamedDecl *>();
+          if (auto importedDecl =
+                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
+            if (addedMembers.insert(importedDecl).second)
+              members.push_back(importedDecl);
+          }
+        }
+      };
+
       auto namedDecl = dyn_cast<clang::NamedDecl>(member);
       if (!namedDecl)
         continue;
-
       auto name = ctx.getClangModuleLoader()->importName(namedDecl);
       if (!name)
         continue;
+      lookupAndAddMembers(name);
 
-      auto allResults = evaluateOrDefault(
-          ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
-
-      for (auto found : allResults) {
-        auto clangMember = found.get<clang::NamedDecl *>();
-        if (auto importedDecl =
-                ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-          if (addedMembers.insert(importedDecl).second)
-            members.push_back(importedDecl);
+      // Unscoped enums could have their enumerators present
+      // in the parent namespace.
+      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
+        if (!ed->isScoped()) {
+          for (const auto *ecd : ed->enumerators()) {
+            auto name = ctx.getClangModuleLoader()->importName(ecd);
+            if (!name)
+              continue;
+            lookupAndAddMembers(name);
+          }
         }
       }
     }
@@ -3251,10 +3275,6 @@ static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
       return true;
     return false;
   });
-}
-
-static bool usesFeatureInitAccessors(Decl *decl) {
-  return false;
 }
 
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
@@ -5639,9 +5659,10 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
                [&] { Printer << ", "; });
   }
   Printer << ":";
-  Printer.printNewline();
 
-  printASTNodes((cast<BraceStmt>(CS->getBody())->getElements()));
+  if (!printASTNodes((cast<BraceStmt>(CS->getBody())->getElements())))
+    Printer.printNewline();
+  indent();
 }
 
 void PrintAST::visitFailStmt(FailStmt *stmt) {

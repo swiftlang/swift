@@ -85,7 +85,10 @@ std::string toFullyQualifiedProtocolNameString(const swift::ProtocolDecl &Protoc
 }
 
 std::string toMangledTypeNameString(const swift::Type &Type) {
-  return Mangle::ASTMangler().mangleTypeWithoutPrefix(Type->getCanonicalType());
+  auto PrintingType = Type;
+  if (Type->hasArchetype())
+    PrintingType = Type->mapTypeOutOfContext();
+  return Mangle::ASTMangler().mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
 } // namespace
@@ -449,7 +452,7 @@ extractEnumCases(NominalTypeDecl *Decl) {
                     : llvm::Optional<std::string>(
                           Parameter->getParameterName().str().str());
 
-            Parameters.push_back({Label, Parameter->getType()});
+            Parameters.push_back({Label, Parameter->getInterfaceType()});
           }
         }
 
@@ -880,8 +883,9 @@ void writeProperties(llvm::json::OStream &JSON,
       JSON.object([&] {
         const auto *decl = PropertyInfo.VarDecl;
         JSON.attribute("label", decl->getName().str().str());
-        JSON.attribute("type", toFullyQualifiedTypeNameString(decl->getType()));
-        JSON.attribute("mangledTypeName", toMangledTypeNameString(decl->getType()));
+        JSON.attribute("type", toFullyQualifiedTypeNameString(
+            decl->getInterfaceType()));
+        JSON.attribute("mangledTypeName", "n/a - deprecated");
         JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
         JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
         writeLocationInformation(JSON, decl->getLoc(),

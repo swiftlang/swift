@@ -215,11 +215,21 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
     return qual == StoreOwnershipQualifier::Init ||
            qual == StoreOwnershipQualifier::Trivial;
   }
+  case SILInstructionKind::BuiltinInst: {
+    auto bi = cast<BuiltinInst>(memInst);
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+      // `zeroInitializer` with an address operand zeroes out the address operand
+      return true;
+    }
+  }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
   case SILInstructionKind::Store##Name##Inst:                                  \
     return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
 #include "swift/AST/ReferenceStorage.def"
+
+  case SILInstructionKind::StoreBorrowInst:
+    return true;
   }
 }
 

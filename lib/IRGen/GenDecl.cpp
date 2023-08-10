@@ -491,13 +491,32 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     if (!getSwiftModule()->getName().is("Cxx"))
       this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
 
-    // Only link with CxxStdlib on platforms where the overlay is available.
-    // Do not try to link CxxStdlib with itself.
-    if ((target.isOSDarwin() || (target.isOSLinux() && !target.isAndroid())) &&
-        !getSwiftModule()->getName().is("Cxx") &&
-        !getSwiftModule()->getName().is("CxxStdlib") &&
-        !getSwiftModule()->getName().is("std")) {
-      this->addLinkLibrary(LinkLibrary("swiftCxxStdlib", LibraryKind::Library));
+    // Do not try to link CxxStdlib with the C++ standard library, Cxx or
+    // itself.
+    if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
+                      [M = getSwiftModule()->getName().str()](StringRef Name) {
+                        return M == Name;
+                      })) {
+      // Only link with CxxStdlib on platforms where the overlay is available.
+      switch (target.getOS()) {
+      case llvm::Triple::Linux:
+        if (!target.isAndroid())
+          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
+                                           LibraryKind::Library));
+        break;
+      case llvm::Triple::Win32: {
+        bool isStatic = Context.getModuleByName("CxxStdlib")->isStaticLibrary();
+        this->addLinkLibrary(
+            LinkLibrary(isStatic ? "libswiftCxxStdlib" : "swiftCxxStdlib",
+                        LibraryKind::Library));
+        break;
+      }
+      default:
+        if (target.isOSDarwin())
+          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
+                                           LibraryKind::Library));
+        break;
+      }
     }
   }
 
@@ -1563,7 +1582,7 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
   if (!type)
     return;
 
-  assert(!Lowering::shouldSkipLowering(type));
+  assert(type->isAvailableDuringLowering());
 
   // Force emission of ObjC protocol descriptors used by type refs.
   if (auto proto = dyn_cast<ProtocolDecl>(type)) {
@@ -2473,7 +2492,7 @@ void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariabl
 
 /// Emit a global declaration.
 void IRGenModule::emitGlobalDecl(Decl *D) {
-  if (Lowering::shouldSkipLowering(D))
+  if (!D->isAvailableDuringLowering())
     return;
 
   D->visitAuxiliaryDecls([&](Decl *decl) {
@@ -5550,7 +5569,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// The result is always a GlobalValue.
 Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
                                           ForDefinition_t forDefinition) {
-  assert(!Lowering::shouldSkipLowering(var));
+  assert(var->isAvailableDuringLowering());
 
   LinkEntity entity = LinkEntity::forFieldOffset(var);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
@@ -5559,7 +5578,7 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
                                        ForDefinition_t forDefinition) {
-  assert(!Lowering::shouldSkipLowering(Case));
+  assert(Case->isAvailableDuringLowering());
 
   LinkEntity entity = LinkEntity::forEnumCase(Case);
   auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, forDefinition);
@@ -5572,7 +5591,7 @@ Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   for (Decl *member : members) {
-    if (Lowering::shouldSkipLowering(member))
+    if (!member->isAvailableDuringLowering())
       continue;
 
     member->visitAuxiliaryDecls([&](Decl *decl) {

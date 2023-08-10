@@ -1388,6 +1388,24 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
+// ResolveRawLayoutLikeTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+llvm::Optional<Type> ResolveRawLayoutLikeTypeRequest::getCachedResult() const {
+  auto Ty = std::get<1>(getStorage())->CachedResolvedLikeType;
+  if (!Ty) {
+    return llvm::None;
+  }
+  return Ty;
+}
+
+void ResolveRawLayoutLikeTypeRequest::cacheResult(Type value) const {
+  assert(value && "Resolved type erasure type to null type!");
+  auto *attr = std::get<1>(getStorage());
+  attr->CachedResolvedLikeType = value;
+}
+
+//----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 

@@ -1,4 +1,4 @@
-// RUN: %swift -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s | %FileCheck %s
+// RUN: %swift %target-swift-flags -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s | %FileCheck %s
 
 import Destructors
 

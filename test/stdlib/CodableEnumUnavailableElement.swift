@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift
-// RUN: %target-run-simple-swift(-unavailable-decl-optimization=complete)
+// RUN: %target-run-simple-swift(-Xfrontend -unavailable-decl-optimization=complete)
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 

@@ -1043,7 +1043,7 @@ bool swift::diagnoseNonSendableTypesInReference(
 
   if (auto var = dyn_cast<VarDecl>(declRef.getDecl())) {
     Type propertyType = var->isLocalCapture()
-        ? var->getType()
+        ? var->getTypeInContext()
         : var->getValueInterfaceType().subst(subs);
     if (diagnoseNonSendableTypes(
             propertyType, fromDC, refLoc,
@@ -1300,13 +1300,13 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       StructDecl *legacyJobDecl = C.getJobDecl();
       StructDecl *unownedJobDecl = C.getUnownedJobDecl();
 
-      if (executorJobDecl && param->getType()->isEqual(executorJobDecl->getDeclaredInterfaceType())) {
+      if (executorJobDecl && param->getInterfaceType()->isEqual(executorJobDecl->getDeclaredInterfaceType())) {
         assert(moveOnlyEnqueueRequirement == nullptr);
         moveOnlyEnqueueRequirement = funcDecl;
-      } else if (legacyJobDecl && param->getType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
+      } else if (legacyJobDecl && param->getInterfaceType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
         assert(legacyMoveOnlyEnqueueRequirement == nullptr);
         legacyMoveOnlyEnqueueRequirement = funcDecl;
-      } else if (unownedJobDecl && param->getType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
+      } else if (unownedJobDecl && param->getInterfaceType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
         assert(unownedEnqueueRequirement == nullptr);
         unownedEnqueueRequirement = funcDecl;
       }
@@ -1833,6 +1833,18 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
   auto fnExprType = apply->getFn()->getType();
   if (!fnExprType)
     return false;
+
+  // Check the 'self' argument.
+  if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn())) {
+    auto *base = selfApply->getBase();
+    if (diagnoseNonSendableTypes(
+            base->getType(),
+            declContext, base->getStartLoc(),
+            diag::non_sendable_call_argument,
+            isolationCrossing.value().exitsIsolation(),
+            isolationCrossing.value().getDiagnoseIsolation()))
+      return true;
+  }
 
   auto fnType = fnExprType->getAs<FunctionType>();
   if (!fnType)

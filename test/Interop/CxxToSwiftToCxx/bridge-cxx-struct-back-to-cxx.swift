@@ -80,6 +80,14 @@ namespace ns {
 
 using SimpleTypedef = int;
 
+typedef struct { float column; } anonymousStruct;
+
+namespace ns {
+
+using anonStructInNS = struct { float row; };
+
+}
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -147,6 +155,12 @@ public func takeTrivial(_ x: Trivial) {
 
 @_expose(Cxx)
 public func takeTrivialInout(_ x: inout Trivial) {
+}
+
+@_expose(Cxx)
+public struct Strct {
+    public let transform: anonymousStruct
+    public let transform2: ns.anonStructInNS
 }
 
 // CHECK: #if __has_feature(objc_modules)
@@ -284,3 +298,9 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK: SWIFT_INLINE_THUNK void takeTrivialInout(Trivial& x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   return _impl::$s8UseCxxTy16takeTrivialInoutyySo0E0VzF(swift::_impl::getOpaquePointer(x));
 // CHECK-NEXT: }
+
+// CHECK: SWIFT_INLINE_THUNK anonymousStruct Strct::getTransform() const {
+// CHECK-NEXT: alignas(alignof(anonymousStruct)) char storage[sizeof(anonymousStruct)];
+
+// CHECK: SWIFT_INLINE_THUNK ns::anonStructInNS Strct::getTransform2() const {
+// CHECK-NEXT: alignas(alignof(ns::anonStructInNS)) char storage[sizeof(ns::anonStructInNS)];

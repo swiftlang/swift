@@ -185,6 +185,7 @@ AddressUseKind TransitiveAddressWalker::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::GenericFRem:
         case BuiltinValueKind::GenericXor:
         case BuiltinValueKind::TaskRunInline:
+        case BuiltinValueKind::ZeroInitializer:
           callVisitUse(op);
           continue;
         default:

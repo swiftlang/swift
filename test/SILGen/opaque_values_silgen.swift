@@ -1,10 +1,14 @@
-// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
 
 // FIXME: "HECK" lines all need to be updated for OSSA.
 
 class C {}
+
+struct MyInt {
+  var int: Int
+}
 
 func genericInout<T>(_: inout T) {}
 
@@ -647,3 +651,112 @@ func giveKeyPathString() {
 @backDeployed(before: SwiftStdlib 5.8)
 public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }
 #endif
+
+// CHECK-LABEL: sil {{.*}}[ossa] @SetIntoContainerAtKeyPath : {{.*}} {
+// CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] : {{.*}}, [[KP:%[^,]+]] : {{.*}}, [[VALUE:%[^,]+]] :
+// CHECK:         [[KP_COPY:%[^,]+]] = copy_value [[KP]] : $WritableKeyPath<Container, Field>
+// CHECK:         [[VALUE_COPY:%[^,]+]] = copy_value [[VALUE]] : $Field
+// CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[CONTAINER_ADDR]] : $*Container
+// CHECK:         [[SETTER:%[^,]+]] = function_ref @swift_setAtWritableKeyPath
+// CHECK:         apply [[SETTER]]<Container, Field>([[CONTAINER_ACCESS]], [[KP_COPY]], [[VALUE_COPY]])
+// CHECK:         end_access [[CONTAINER_ACCESS]] : $*Container
+// CHECK:         destroy_value [[KP_COPY]]
+// CHECK-LABEL: } // end sil function 'SetIntoContainerAtKeyPath'
+@_silgen_name("SetIntoContainerAtKeyPath")
+func set<Container, Field>(into container: inout Container, at keyPath: WritableKeyPath<Container, Field>, _ value: Field) {
+  container[keyPath: keyPath] = value
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk : {{.*}} {
+// CHECK:       bb0([[VALUE:%[^,]+]] :
+// CHECK-SAME:      [[CONTAINER:%[^,]+]] :
+// CHECK:         [[CONTAINER_COPY:%[^,]+]] = copy_value [[CONTAINER]]
+// CHECK:         [[SETTER:%[^,]+]] = class_method [[CONTAINER_COPY]]
+// CHECK:         [[REGISTER_4:%[^,]+]] = apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
+// CHECK:         destroy_value [[CONTAINER_COPY]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk'
+@_silgen_name("FormClassKeyPath")
+func FormClassKeyPath() {
+  class Q {
+    var q: Int = 0
+  }
+  _ = \Q.q
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @UseGetterOnInout : {{.*}} {
+// CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] :
+// CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int) 
+// CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[CONTAINER_ADDR]]
+// CHECK:         [[KEYPATH_UP:%[^,]+]] = upcast [[KEYPATH]]
+// CHECK:         [[CONTAINER:%[^,]+]] = load [trivial] [[CONTAINER_ACCESS]]
+// CHECK:         [[GETTER:%[^,]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         [[VALUE:%[^,]+]] = apply [[GETTER]]<MyInt, Int>([[CONTAINER]], [[KEYPATH_UP]])
+// CHECK:         end_access [[CONTAINER_ACCESS]]
+// CHECK:         destroy_value [[KEYPATH_UP]]
+// CHECK:         return [[VALUE]] : $Int                                
+// CHECK-LABEL: } // end sil function 'UseGetterOnInout'
+@_silgen_name("UseGetterOnInout")
+func getInout(_ i: inout MyInt) -> Int {
+  return i[keyPath: \MyInt.int]
+}
+
+protocol IntValuable {
+  var value: Int { get }
+}
+// CHECK-LABEL: sil {{.*}}[ossa] @getFromSubscriptOnLValueArray : {{.*}} {
+// CHECK:       bb0([[ARRAY_ADDR:%[^,]+]] :
+// CHECK:         [[ARRAY_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[ARRAY_ADDR]]
+// CHECK:         [[ARRAY:%[^,]+]] = load_borrow [[ARRAY_ACCESS]]
+// CHECK:         [[SUBSCRIPT:%[^,]+]] = function_ref @$sSayxSicig
+// CHECK:         [[ELEMENT:%[^,]+]] = apply [[SUBSCRIPT]]<any IntValuable>({{%[^,]+}}, [[ARRAY]])
+// CHECK:         end_borrow [[ARRAY]]
+// CHECK:         [[ELEMENT_LIFETIME:%[^,]+]] = begin_borrow [[ELEMENT]]
+// CHECK:         [[OPEN_ELEMENT:%[^,]+]] = open_existential_value [[ELEMENT_LIFETIME]]
+// CHECK:         [[OPEN_ELEMENT_COPY:%[^,]+]] = copy_value [[OPEN_ELEMENT]]
+// CHECK:         end_access [[ARRAY_ACCESS]]
+// CHECK:         [[OPEN_ELEMENT_LIFETIME:%[^,]+]] = begin_borrow [[OPEN_ELEMENT_COPY]]
+// CHECK:         [[GETTER:%[^,]+]] = witness_method {{.*}}, #IntValuable.value!getter
+// CHECK:         apply [[GETTER]]<{{.*}}>([[OPEN_ELEMENT_LIFETIME]])
+// CHECK:         end_borrow [[OPEN_ELEMENT_LIFETIME]]
+// CHECK:         destroy_value [[OPEN_ELEMENT_COPY]]
+// CHECK:         end_borrow [[ELEMENT_LIFETIME]]
+// CHECK:         destroy_value [[ELEMENT]]
+// CHECK-LABEL: } // end sil function 'getFromSubscriptOnLValueArray'
+@_silgen_name("getFromSubscriptOnLValueArray")
+func getFromSubscriptOnLValueArray(_ array: inout [IntValuable]) {
+  _ = array[0].value
+}
+
+protocol MutatingFooable {
+  mutating func foo()
+}
+
+// CHECK-LABEL: sil {{.*}}@callMutatingFooOnInoutExistential : {{.*}} {
+// CHECK:       bb0([[EXISTENTIAL_ADDR:%[^,]+]] :
+// CHECK:         [[EXISTENTIAL_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[EXISTENTIAL_ADDR]]
+// CHECK:         [[OPEN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[EXISTENTIAL_ACCESS]]
+// CHECK:         [[FOO:%[^,]+]] = witness_method {{.*}}#MutatingFooable.foo
+// CHECK:         apply [[FOO]]<{{.*}}>([[OPEN_ADDR]])
+// CHECK:         end_access [[EXISTENTIAL_ACCESS]]
+// CHECK-LABEL: } // end sil function 'callMutatingFooOnInoutExistential'
+@_silgen_name("callMutatingFooOnInoutExistential")
+func callMutatingFooOnInoutExistential(_ i: inout any MutatingFooable) {
+  i.foo()
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen7WeakBoxV1txSgvg : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
+// CHECK:         [[STRONG_OPTIONAL:%[^,]+]] = strong_copy_weak_value [[WEAK_OPTIONAL]]
+// CHECK:         return [[STRONG_OPTIONAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen7WeakBoxV1txSgvg'
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen7WeakBoxV1tACyxGxSg_tcfC : {{.*}} {
+// CHECK:       bb0([[STRONG_OPTIONAL:%[^,]+]] :
+// CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = weak_copy_value [[STRONG_OPTIONAL]]
+// CHECK:         destroy_value [[STRONG_OPTIONAL]]
+// CHECK:         [[INSTANCE:%[^,]+]] = struct $WeakBox<T> ([[WEAK_OPTIONAL]] :
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen7WeakBoxV1tACyxGxSg_tcfC'
+struct WeakBox<T : AnyObject> {
+  weak var t: T?
+}

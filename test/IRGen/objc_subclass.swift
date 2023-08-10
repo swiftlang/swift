@@ -2,6 +2,8 @@
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
+// UNSUPPORTED: OS=watchos
+
 // REQUIRES: objc_interop
 
 // The order of the output seems to change between asserts/noasserts build of

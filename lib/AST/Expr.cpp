@@ -1887,7 +1887,7 @@ ActorIsolation ClosureActorIsolation::getActorIsolation() const {
   case ClosureActorIsolation::ActorInstance: {
     auto selfDecl = getActorInstance();
     auto actor =
-        selfDecl->getType()->getReferenceStorageReferent()->getAnyActor();
+        selfDecl->getTypeInContext()->getReferenceStorageReferent()->getAnyActor();
     assert(actor && "Bad closure actor isolation?");
     // FIXME: This could be a parameter... or a capture... hmmm.
     return ActorIsolation::forActorInstanceSelf(actor).withPreconcurrency(

@@ -2595,7 +2595,12 @@ public:
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
     // Note: This is the current implementation and the design is not final.
-    require(isa<AllocStackInst>(SI->getDest()),
+    auto isLegal = [](SILValue value) {
+      if (auto *mmci = dyn_cast<MarkMustCheckInst>(value))
+        value = mmci->getOperand();
+      return isa<AllocStackInst>(value);
+    };
+    require(isLegal(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
     requireSameType(SI->getDest()->getType().getObjectType(),
                     SI->getSrc()->getType(),
@@ -2736,7 +2741,7 @@ public:
       SILFunctionConventions initConv(initTy, AI->getModule());
 
       require(initConv.getNumIndirectSILResults() ==
-                  AI->getInitializedProperties().size(),
+                  AI->getNumInitializedProperties(),
               "init function has invalid number of indirect results");
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }
@@ -2793,8 +2798,12 @@ public:
     requireReferenceStorageCapableValue(I->getOperand(),                       \
                                         "Operand of ref_to_" #name);           \
     auto operandType = I->getOperand()->getType().getASTType();                \
+    require(!I->getOperand()->getType().isAddressOnly(F),                      \
+            "ref_to_" #name " may not take an address-only operand");          \
     auto resultType =                                                          \
         requireObjectType(Name##StorageType, I, "Result of ref_to_" #name);    \
+    require(!I->getType().isAddressOnly(F),                                    \
+            "ref_to_" #name " must not produce an address-only value");        \
     requireSameType(resultType.getReferentType(), operandType,                 \
                     "Result of ref_to_" #name " does not have the "            \
                     "operand's type as its referent type");                    \
@@ -2802,8 +2811,12 @@ public:
   void check##Name##ToRefInst(Name##ToRefInst *I) {                            \
     auto operandType = requireObjectType(Name##StorageType, I->getOperand(),   \
                                          "Operand of " #name "_to_ref");       \
+    require(!I->getOperand()->getType().isAddressOnly(F),                      \
+            #name "_to_ref may not take an address-only operand");             \
     requireReferenceStorageCapableValue(I, "Result of " #name "_to_ref");      \
     auto resultType = I->getType().getASTType();                               \
+    require(!I->getType().isAddressOnly(F),                                    \
+            #name "_to_ref may not produce an address-only value");            \
     requireSameType(operandType.getReferentType(), resultType,                 \
                     "Operand of " #name "_to_ref does not have the "           \
                     "operand's type as its referent type");                    \
@@ -2968,6 +2981,27 @@ public:
     require(I->getModule().getStage() == SILStage::Raw ||
                 !I->getOperand()->getType().isMoveOnly(),
             "'MoveOnly' types can only be copied in Raw SIL?!");
+  }
+
+  void checkUnownedCopyValueInst(UnownedCopyValueInst *I) {
+    require(!F.getModule().useLoweredAddresses(),
+            "unowned_copy_value is only valid in opaque values");
+    require(I->getType().isAddressOnly(F),
+            "unowned_copy_value must produce an address-only value");
+  }
+
+  void checkWeakCopyValueInst(WeakCopyValueInst *I) {
+    require(!F.getModule().useLoweredAddresses(),
+            "weak_copy_value is only valid in opaque values");
+    require(I->getType().isAddressOnly(F),
+            "weak_copy_value must produce an address-only value");
+  }
+
+  void checkStrongCopyWeakValueInst(StrongCopyWeakValueInst *I) {
+    require(!F.getModule().useLoweredAddresses(),
+            "strong_copy_weak_value is only valid in opaque values");
+    require(I->getOperand()->getType().isAddressOnly(F),
+            "strong_copy_weak_value requires an address-only operand");
   }
 
   void checkExplicitCopyValueInst(ExplicitCopyValueInst *I) {
@@ -6016,7 +6050,7 @@ public:
     auto type = ddi->getType();
     require(type == ddi->getOperand()->getType(),
             "Result and operand must have the same type.");
-    require(type.isMoveOnlyNominalType(),
+    require(type.isPureMoveOnly(),
             "drop_deinit only allowed for move-only types");
     require(type.getNominalOrBoundGenericNominal()
             ->getValueTypeDestructor(), "drop_deinit only allowed for "

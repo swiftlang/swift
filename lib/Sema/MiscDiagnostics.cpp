@@ -1589,7 +1589,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 static bool closureHasWeakSelfCapture(const AbstractClosureExpr *ACE) {
   if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
     if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-      return selfDecl->getType()->is<WeakStorageType>();
+      return selfDecl->getInterfaceType()->is<WeakStorageType>();
     }
   }
 
@@ -1932,7 +1932,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // If we've already captured something with the name "self" other than
       // the actual self param, offer special diagnostics.
       if (auto *VD = closureExpr->getCapturedSelfDecl()) {
-        if (!VD->getType()->is<WeakStorageType>()) {
+        if (!VD->getInterfaceType()->is<WeakStorageType>()) {
           Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
         }
         
@@ -3376,7 +3376,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this variable has WeakStorageType, then it can be mutated in ways we
     // don't know.
-    if (var->getType()->is<WeakStorageType>())
+    if (var->getInterfaceType()->is<WeakStorageType>())
       access |= RK_Written;
     
     // Diagnose variables that were never used (other than their

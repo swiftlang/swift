@@ -260,6 +260,14 @@ struct BridgedPassContext {
     return {swift::SILUndef::get(type, *invocation->getFunction())};
   }
 
+  // IRGen
+
+  SwiftInt getStaticSize(swift::SILType type) const;
+
+  SwiftInt getStaticAlignment(swift::SILType type) const;
+
+  SwiftInt getStaticStride(swift::SILType type) const;
+
   // Sets
 
   SWIFT_IMPORT_UNSAFE

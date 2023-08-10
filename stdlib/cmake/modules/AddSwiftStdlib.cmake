@@ -495,8 +495,10 @@ function(_add_target_variant_link_flags)
       # options. This causes conflicts.
       list(APPEND result "-nostdlib")
     endif()
-    swift_windows_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
-    list(APPEND library_search_directories ${${LFLAGS_ARCH}_LIB})
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+      swift_windows_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
+      list(APPEND library_search_directories ${${LFLAGS_ARCH}_LIB})
+    endif()
 
     # NOTE(compnerd) workaround incorrectly extensioned import libraries from
     # the Windows SDK on case sensitive file systems.
@@ -905,10 +907,12 @@ function(add_swift_target_library_single target name)
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
       -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
-    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    foreach(directory ${SWIFTLIB_INCLUDE})
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-isystem;-Xcc;${directory})
-    endforeach()
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+      swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
+      foreach(directory ${SWIFTLIB_INCLUDE})
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-isystem;-Xcc;${directory})
+      endforeach()
+    endif()
     if("${SWIFTLIB_SINGLE_ARCHITECTURE}" MATCHES arm)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE)
     endif()
@@ -1071,9 +1075,15 @@ function(add_swift_target_library_single target name)
                              SWIFT_INLINE_NAMESPACE=__runtime)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
-    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    target_include_directories("${target}" SYSTEM PRIVATE
-      ${SWIFTLIB_INCLUDE})
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+      swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
+      target_include_directories("${target}" SYSTEM PRIVATE
+        ${SWIFTLIB_INCLUDE})
+    endif()
+    if(libkind STREQUAL STATIC)
+      set_property(TARGET "${target}" PROPERTY
+        PREFIX lib)
+    endif()
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
@@ -1382,10 +1392,12 @@ function(add_swift_target_library_single target name)
 
   # Set compilation and link flags.
   if(SWIFTLIB_SINGLE_SDK STREQUAL "WINDOWS")
-    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE}
-      ${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE)
-    target_include_directories(${target} SYSTEM PRIVATE
-      ${${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE})
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+      swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE}
+        ${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE)
+      target_include_directories(${target} SYSTEM PRIVATE
+        ${${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE})
+    endif()
 
     if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
@@ -2626,10 +2638,12 @@ function(_add_swift_target_executable_single name)
   llvm_update_compile_flags("${name}")
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL "WINDOWS")
-    swift_windows_include_for_arch(${SWIFTEXE_SINGLE_ARCHITECTURE}
-      ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
-    target_include_directories(${name} SYSTEM PRIVATE
-      ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+      swift_windows_include_for_arch(${SWIFTEXE_SINGLE_ARCHITECTURE}
+        ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
+      target_include_directories(${name} SYSTEM PRIVATE
+        ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
+    endif()
     if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
@@ -2655,6 +2669,10 @@ function(_add_swift_target_executable_single name)
     set_target_properties(${name} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES
       INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR};@executable_path/../../../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+    set_target_properties(${name} PROPERTIES
+      BUILD_WITH_INSTALL_RPATH YES
+      INSTALL_RPATH "$ORIGIN/../../../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}

@@ -365,7 +365,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
     const AutoDiffConfig &desiredConfig, const AutoDiffConfig &actualConfig,
     ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
-             << "Getting a subset parameters thunk for " << linearMapType
+             << "Getting a subset parameters thunk for "
+             << (kind == AutoDiffDerivativeFunctionKind::JVP ? "jvp" : "vjp")
+             << " linear map " << linearMapType
              << " from " << actualConfig << " to " << desiredConfig << '\n');
 
   assert(!linearMapType->getCombinedSubstitutions());
@@ -539,10 +541,10 @@ getOrCreateSubsetParametersThunkForLinearMap(
     unsigned pullbackResultIndex = 0;
     for (unsigned i : actualConfig.parameterIndices->getIndices()) {
       auto origParamInfo = origFnType->getParameters()[i];
-      // Skip original `inout` parameters. All non-indirect-result pullback
-      // arguments (including `inout` arguments) are appended to `arguments`
+      // Skip original semantic result parameters. All non-indirect-result pullback
+      // arguments (including semantic result` arguments) are appended to `arguments`
       // later.
-      if (origParamInfo.isIndirectMutating())
+      if (origParamInfo.isAutoDiffSemanticResult())
         continue;
       auto resultInfo = linearMapType->getResults()[pullbackResultIndex];
       assert(pullbackResultIndex < linearMapType->getNumResults());
@@ -619,16 +621,18 @@ getOrCreateSubsetParametersThunkForLinearMap(
   extractAllElements(ai, builder, pullbackDirectResults);
   SmallVector<SILValue, 8> allResults;
   collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
-  // Collect pullback `inout` arguments in type order.
-  unsigned inoutArgIdx = 0;
+  // Collect pullback semantic result arguments in type order.
+  unsigned semanticResultArgIdx = 0;
   SILFunctionConventions origConv(origFnType, thunk->getModule());
   for (auto paramIdx : actualConfig.parameterIndices->getIndices()) {
     auto paramInfo = origConv.getParameters()[paramIdx];
-    if (!paramInfo.isIndirectMutating())
+    if (!paramInfo.isAutoDiffSemanticResult())
       continue;
-    auto inoutArg = *std::next(ai->getInoutArguments().begin(), inoutArgIdx++);
+    auto semanticResultArg =
+      *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                 semanticResultArgIdx++);
     unsigned mappedParamIdx = mapOriginalParameterIndex(paramIdx);
-    allResults.insert(allResults.begin() + mappedParamIdx, inoutArg);
+    allResults.insert(allResults.begin() + mappedParamIdx, semanticResultArg);
   }
   assert(allResults.size() == actualConfig.parameterIndices->getNumIndices() &&
          "Number of pullback results should match number of differentiability "
@@ -668,8 +672,10 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, const AutoDiffConfig &desiredConfig,
     const AutoDiffConfig &actualConfig, ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
-             << "Getting a subset parameters thunk for derivative function "
-             << derivativeFn << " of the original function " << origFnOperand
+             << "Getting a subset parameters thunk for derivative "
+             << (kind == AutoDiffDerivativeFunctionKind::JVP ? "jvp" : "vjp")
+             << " function " << derivativeFn
+             << " of the original function " << origFnOperand
              << " from " << actualConfig << " to " << desiredConfig << '\n');
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
@@ -823,9 +829,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
         SILType::getPrimitiveObjectType(linearMapTargetType),
         /*withoutActuallyEscaping*/ false);
   }
-  assert(origFnType->getNumResults() +
-             origFnType->getNumIndirectMutatingParameters() >
-         0);
+  assert(origFnType->getNumAutoDiffSemanticResults() > 0);
   if (origFnType->getNumResults() > 0 &&
       origFnType->getResults().front().isFormalDirect()) {
     directResults.push_back(thunkedLinearMap);

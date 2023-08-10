@@ -308,6 +308,8 @@ ExportContext::getExportabilityReason() const {
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
                                                         ASTContext &AC) {
+  D = abstractSyntaxDeclForAvailableAttribute(D);
+
   for (auto Attr : D->getAttrs())
     if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
@@ -388,20 +390,6 @@ class TypeRefinementContextBuilder : private ASTWalker {
   };
   std::vector<DeclBodyContextInfo> DeclBodyContextStack;
 
-  /// A mapping from abstract storage declarations with accessors to
-  /// to the type refinement contexts for those declarations. We refer to
-  /// this map to determine the appropriate parent TRC to use when
-  /// walking the accessor function.
-  llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
-      StorageContexts;
-
-  /// A mapping from pattern binding storage declarations to the type refinement
-  /// contexts for those declarations. We refer to this map to determine the
-  /// appropriate parent TRC to use when walking a var decl that belongs to a
-  /// pattern containing multiple vars.
-  llvm::DenseMap<PatternBindingDecl *, TypeRefinementContext *>
-      PatternBindingContexts;
-
   TypeRefinementContext *getCurrentTRC() {
     return ContextStack.back().TRC;
   }
@@ -439,6 +427,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
   const char *stackTraceAction() const {
     return "building type refinement context for";
   }
+
+  friend class swift::ExpandChildTypeRefinementContextsRequest;
 
 public:
   TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &Context)
@@ -480,19 +470,9 @@ private:
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
-    // Adds in a parent TRC for decls which are syntactically nested but are not
-    // represented that way in the AST. (Particularly, AbstractStorageDecl
-    // parents for AccessorDecl children.)
-    if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
-      pushContext(ParentTRC, D);
-    }
-
     // Adds in a TRC that covers the entire declaration.
     if (auto DeclTRC = getNewContextForSignatureOfDecl(D)) {
       pushContext(DeclTRC, D);
-
-      // Possibly use this as an effective parent context later.
-      recordEffectiveParentContext(D, DeclTRC);
     }
 
     // Create TRCs that cover only the body of the declaration.
@@ -513,53 +493,13 @@ private:
     return Action::Continue();
   }
 
-  TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
-    // FIXME: Can we assert that we won't walk parent decls later that should
-    //        have been returned here?
-    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-      // Use TRC of the storage rather the current TRC when walking this
-      // function.
-      auto it = StorageContexts.find(accessor->getStorage());
-      if (it != StorageContexts.end()) {
-        return it->second;
-      }
-    } else if (auto *VD = dyn_cast<VarDecl>(D)) {
-      // Use the TRC of the pattern binding decl as the parent for var decls.
-      if (auto *PBD = VD->getParentPatternBinding()) {
-        auto it = PatternBindingContexts.find(PBD);
-        if (it != PatternBindingContexts.end()) {
-          return it->second;
-        }
-      }
-    }
-
-    return nullptr;
-  }
-
-  /// If necessary, records a TRC so it can be returned by subsequent calls to
-  /// `getEffectiveParentContextForDecl()`.
-  void recordEffectiveParentContext(Decl *D, TypeRefinementContext *NewTRC) {
-    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      // Stash the TRC for the storage declaration to use as the parent of
-      // accessor decls later.
-      if (StorageDecl->hasParsedAccessors())
-        StorageContexts[StorageDecl] = NewTRC;
-    }
-
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
-      // Stash the TRC for the var decl if its parent pattern binding decl has
-      // more than one entry so that the sibling var decls can reuse it.
-      if (auto *PBD = VD->getParentPatternBinding()) {
-        if (PBD->getNumPatternEntries() > 1)
-          PatternBindingContexts[PBD] = NewTRC;
-      }
-    }
-  }
-
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
-    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<MacroExpansionDecl>(D))
+    if (!isa<ValueDecl>(D) &&
+        !isa<ExtensionDecl>(D) &&
+        !isa<MacroExpansionDecl>(D) &&
+        !isa<PatternBindingDecl>(D))
       return nullptr;
 
     // Only introduce for an AbstractStorageDecl if it is not local. We
@@ -568,18 +508,16 @@ private:
     if (isa<AbstractStorageDecl>(D) && D->getDeclContext()->isLocalContext())
       return nullptr;
 
+    // Don't introduce for variable declarations that have a parent pattern
+    // binding; all of the relevant information is on the pattern binding.
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      if (var->getParentPatternBinding())
+        return nullptr;
+    }
+
     // Ignore implicit declarations (mainly skips over `DeferStmt` functions).
     if (D->isImplicit())
       return nullptr;
-
-    // Skip introducing additional contexts for var decls past the first in a
-    // pattern. The context necessary for the pattern as a whole was already
-    // introduced if necessary by the first var decl.
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (auto *PBD = VD->getParentPatternBinding())
-        if (VD != PBD->getAnchoringVarDecl(0))
-          return nullptr;
-    }
 
     // Declarations with an explicit availability attribute always get a TRC.
     if (hasActiveAvailableAttribute(D, Context)) {
@@ -597,11 +535,17 @@ private:
     // internal property in a public struct can be effectively less available
     // than the containing struct decl because the internal property will only
     // be accessed by code running at the deployment target or later.
+    //
+    // For declarations that have their child construction delayed, always
+    // create this implicit declaration context. It will be used to trigger
+    // lazy creation of the child TRCs.
     AvailabilityContext CurrentAvailability =
         getCurrentTRC()->getAvailabilityInfo();
     AvailabilityContext EffectiveAvailability =
         getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
-    if (CurrentAvailability.isSupersetOf(EffectiveAvailability))
+    if ((isa<PatternBindingDecl>(D) &&
+         refinementSourceRangeForDecl(D).isValid()) ||
+        CurrentAvailability.isSupersetOf(EffectiveAvailability))
       return TypeRefinementContext::createForDeclImplicit(
           Context, D, getCurrentTRC(), EffectiveAvailability,
           refinementSourceRangeForDecl(D));
@@ -676,19 +620,6 @@ private:
       // the bodies of its accessors.
       SourceRange Range = storageDecl->getSourceRange();
 
-      // For a variable declaration (without accessors) we use the range of the
-      // containing pattern binding declaration to make sure that we include
-      // any type annotation in the type refinement context range. We also
-      // need to include any attached property wrappers.
-      if (auto *varDecl = dyn_cast<VarDecl>(storageDecl)) {
-        if (auto *PBD = varDecl->getParentPatternBinding())
-          Range = PBD->getSourceRange();
-
-        for (auto *propertyWrapper : varDecl->getAttachedPropertyWrappers()) {
-          Range.widen(propertyWrapper->getRange());
-        }
-      }
-
       // HACK: For synthesized trivial accessors we may have not a valid
       // location for the end of the braces, so in that case we will fall back
       // to using the range for the storage declaration. The right fix here is
@@ -696,14 +627,74 @@ private:
       // locations and have callers of that method provide appropriate source
       // locations.
       SourceRange BracesRange = storageDecl->getBracesRange();
-      if (storageDecl->hasParsedAccessors() && BracesRange.isValid()) {
+      if (BracesRange.isValid()) {
         Range.widen(BracesRange);
       }
 
       return Range;
     }
-    
-    return D->getSourceRange();
+
+    return D->getSourceRangeIncludingAttrs();
+  }
+
+  // Creates an implicit decl TRC specifying the deployment
+  // target for `range` in decl `D`.
+  TypeRefinementContext *
+  createImplicitDeclContextForDeploymentTarget(Decl *D, SourceRange range){
+    AvailabilityContext Availability =
+        AvailabilityContext::forDeploymentTarget(Context);
+    Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
+    return TypeRefinementContext::createForDeclImplicit(
+        Context, D, getCurrentTRC(), Availability, range);
+  }
+
+  /// Build contexts for a pattern binding declaration.
+  void buildContextsForPatternBindingDecl(PatternBindingDecl *pattern) {
+    // Build contexts for each of the pattern entries.
+    for (unsigned index : range(pattern->getNumPatternEntries())) {
+      auto var = pattern->getAnchoringVarDecl(index);
+      if (!var)
+        continue;
+
+      // Var decls may have associated pattern binding decls or property wrappers
+      // with init expressions. Those expressions need to be constrained to the
+      // deployment target unless they are exposed to clients.
+      if (!var->hasInitialValue() || var->isInitExposedToClients())
+        continue;
+
+      auto *initExpr = pattern->getInit(index);
+      if (initExpr && !initExpr->isImplicit()) {
+        assert(initExpr->getSourceRange().isValid());
+
+        // Create a TRC for the init written in the source. The ASTWalker
+        // won't visit these expressions so instead of pushing these onto the
+        // stack we build them directly.
+        auto *initTRC = createImplicitDeclContextForDeploymentTarget(
+            var, initExpr->getSourceRange());
+        TypeRefinementContextBuilder(initTRC, Context).build(initExpr);
+      }
+    }
+
+    // Ideally any init expression would be returned by `getInit()` above.
+    // However, for property wrappers it doesn't get populated until
+    // typechecking completes (which is too late). Instead, we find the
+    // the property wrapper attribute and use its source range to create a
+    // TRC for the initializer expression.
+    //
+    // FIXME: Since we don't have an expression here, we can't build out its
+    // TRC. If the Expr that will eventually be created contains a closure
+    // expression, then it might have AST nodes that need to be refined. For
+    // example, property wrapper initializers that takes block arguments
+    // are not handled correctly because of this (rdar://77841331).
+    if (auto firstVar = pattern->getAnchoringVarDecl(0)) {
+      if (firstVar->hasInitialValue() && !firstVar->isInitExposedToClients()) {
+        for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
+          createImplicitDeclContextForDeploymentTarget(
+              firstVar, wrapper->getRange());
+        }
+      }
+    }
   }
 
   void buildContextsForBodyOfDecl(Decl *D) {
@@ -712,22 +703,13 @@ private:
     if (isCurrentTRCContainedByDeploymentTarget())
       return;
 
-    // A lambda that creates an implicit decl TRC specifying the deployment
-    // target for `range` in decl `D`.
-    auto createContext = [this](Decl *D, SourceRange range) {
-      AvailabilityContext Availability =
-          AvailabilityContext::forDeploymentTarget(Context);
-      Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
-
-      return TypeRefinementContext::createForDeclImplicit(
-          Context, D, getCurrentTRC(), Availability, range);
-    };
-
     // Top level code always uses the deployment target.
     if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
       if (auto bodyStmt = tlcd->getBody()) {
-        pushDeclBodyContext(createContext(tlcd, tlcd->getSourceRange()), tlcd,
-                            bodyStmt);
+        pushDeclBodyContext(
+            createImplicitDeclContextForDeploymentTarget(
+                tlcd, tlcd->getSourceRange()),
+            tlcd, bodyStmt);
       }
       return;
     }
@@ -738,49 +720,12 @@ private:
       if (!afd->isImplicit() &&
           afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
         if (auto body = afd->getBody(/*canSynthesize*/ false)) {
-          pushDeclBodyContext(createContext(afd, afd->getBodySourceRange()),
-                              afd, body);
+          pushDeclBodyContext(
+              createImplicitDeclContextForDeploymentTarget(
+                  afd, afd->getBodySourceRange()),
+              afd, body);
         }
       }
-      return;
-    }
-
-    // Var decls may have associated pattern binding decls or property wrappers
-    // with init expressions. Those expressions need to be constrained to the
-    // deployment target unless they are exposed to clients.
-    if (auto vd = dyn_cast<VarDecl>(D)) {
-      if (!vd->hasInitialValue() || vd->isInitExposedToClients())
-        return;
-
-      if (auto *pbd = vd->getParentPatternBinding()) {
-        int idx = pbd->getPatternEntryIndexForVarDecl(vd);
-        auto *initExpr = pbd->getInit(idx);
-        if (initExpr && !initExpr->isImplicit()) {
-          assert(initExpr->getSourceRange().isValid());
-
-          // Create a TRC for the init written in the source. The ASTWalker
-          // won't visit these expressions so instead of pushing these onto the
-          // stack we build them directly.
-          auto *initTRC = createContext(vd, initExpr->getSourceRange());
-          TypeRefinementContextBuilder(initTRC, Context).build(initExpr);
-        }
-
-        // Ideally any init expression would be returned by `getInit()` above.
-        // However, for property wrappers it doesn't get populated until
-        // typechecking completes (which is too late). Instead, we find the
-        // the property wrapper attribute and use its source range to create a
-        // TRC for the initializer expression.
-        //
-        // FIXME: Since we don't have an expression here, we can't build out its
-        // TRC. If the Expr that will eventually be created contains a closure
-        // expression, then it might have AST nodes that need to be refined. For
-        // example, property wrapper initializers that takes block arguments
-        // are not handled correctly because of this (rdar://77841331).
-        for (auto *wrapper : vd->getAttachedPropertyWrappers()) {
-          createContext(vd, wrapper->getRange());
-        }
-      }
-
       return;
     }
   }
@@ -1274,6 +1219,25 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
+bool ExpandChildTypeRefinementContextsRequest::evaluate(
+    Evaluator &evaluator, Decl *decl, TypeRefinementContext *parentTRC
+) const {
+  // If the parent TRC is already contained by the deployment target, there's
+  // nothing more to do.
+  ASTContext &ctx = decl->getASTContext();
+  if (computeContainedByDeploymentTarget(parentTRC, ctx))
+    return false;
+
+  // Pattern binding declarations can have children corresponding to property
+  // wrappers and the initial values provided in each pattern binding entry.
+  if (auto *binding = dyn_cast<PatternBindingDecl>(decl)) {
+    TypeRefinementContextBuilder builder(parentTRC, ctx);
+    builder.buildContextsForPatternBindingDecl(binding);
+  }
+
+  return false;
+}
+
 AvailabilityContext
 TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
                                                    const DeclContext *DC,
@@ -1606,38 +1570,6 @@ concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl) {
   }
 
   return AbstractSyntaxDecl;
-}
-
-/// Given a declaration upon which an availability attribute would appear in
-/// concrete syntax, return a declaration to which the parser
-/// actually attaches the attribute in the abstract syntax tree. We use this
-/// function to determine whether the concrete syntax already has an
-/// availability attribute.
-static const Decl *
-abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // concreteSyntaxDeclForAvailableAttribute().
-
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(ConcreteSyntaxDecl)) {
-    // Existing @available attributes in the AST are attached to VarDecls
-    // rather than PatternBindingDecls, so we return the first VarDecl for
-    // the pattern binding declaration.
-    // This is safe, even though there may be multiple VarDecls, because
-    // all parsed attribute that appear in the concrete syntax upon on the
-    // PatternBindingDecl are added to all of the VarDecls for the pattern
-    // binding.
-    if (PBD->getNumPatternEntries() != 0) {
-      return PBD->getAnchoringVarDecl(0);
-    }
-  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
-    // Similar to the PatternBindingDecl case above, we return the
-    // first EnumElementDecl.
-    if (auto *Elem = ECD->getFirstElement()) {
-      return Elem;
-    }
-  }
-
-  return ConcreteSyntaxDecl;
 }
 
 /// Given a declaration, return a better related declaration for which
@@ -3283,6 +3215,11 @@ public:
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
                                         /*useConformanceAvailabilityErrorsOpt=*/true);
       }
+    }
+
+    if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
+      diagnoseDeclRefAvailability(
+          ME->getMacroRef(), ME->getMacroNameLoc().getSourceRange());
     }
 
     return Action::Continue(E);

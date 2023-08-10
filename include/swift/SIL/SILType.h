@@ -756,10 +756,6 @@ public:
   /// deinitialization beyond destruction of its members.
   bool isValueTypeWithDeinit() const;
 
-  /// Returns true if and only if this type is a first class move only
-  /// type. NOTE: Returns false if the type is a move only wrapped type.
-  bool isMoveOnlyNominalType() const;
-
   /// Returns true if this SILType is a move only wrapper type.
   ///
   /// Canonical way to check if a SILType is move only. Using is/getAs/castTo

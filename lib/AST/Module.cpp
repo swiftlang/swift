@@ -3419,6 +3419,9 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   if (shouldImplicitImportAsSPI(targetDecl->getSPIGroups()))
     return true;
 
+  if (hasTestableOrPrivateImport(AccessLevel::Public, targetDecl, PrivateOnly))
+    return true;
+
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty())
     return false;
@@ -3493,12 +3496,14 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  if (!isa<ValueDecl>(this) &&
-      !isa<ExtensionDecl>(this))
+  const Decl *D = abstractSyntaxDeclForAvailableAttribute(this);
+
+  if (!isa<ValueDecl>(D) &&
+      !isa<ExtensionDecl>(D))
     return ArrayRef<Identifier>();
 
   return evaluateOrDefault(getASTContext().evaluator,
-                           SPIGroupsRequest{ this },
+                           SPIGroupsRequest{ D },
                            ArrayRef<Identifier>());
 }
 

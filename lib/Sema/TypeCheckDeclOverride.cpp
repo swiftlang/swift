@@ -338,8 +338,8 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
 
   // Check the parameter types.
   auto checkParam = [&](const ParamDecl *decl, const ParamDecl *parentDecl) {
-    Type paramTy = decl->getType();
-    Type parentParamTy = parentDecl->getType();
+    Type paramTy = decl->getTypeInContext();
+    Type parentParamTy = parentDecl->getTypeInContext();
 
     auto *repr = decl->getTypeRepr();
     if (!repr)

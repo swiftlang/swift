@@ -3192,6 +3192,12 @@ public:
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
 
+    /// Whether the parameter might be a semantic result for autodiff purposes.
+    /// This includes inout parameters.
+    bool isAutoDiffSemanticResult() const {
+      return isInOut();
+    }
+
     ValueOwnership getValueOwnership() const {
       return Flags.getValueOwnership();
     }
@@ -3509,8 +3515,8 @@ public:
   /// Preconditions:
   /// - Parameters corresponding to parameter indices must conform to
   ///   `Differentiable`.
-  /// - There is one semantic function result type: either the formal original
-  ///   result or an `inout` parameter. It must conform to `Differentiable`.
+  /// - There are semantic function result type: either the formal original
+  ///   result or a "wrt" semantic result parameter.
   ///
   /// Differential typing rules: takes "wrt" parameter derivatives and returns a
   /// "wrt" result derivative.
@@ -3518,10 +3524,7 @@ public:
   /// - Case 1: original function has no `inout` parameters.
   ///   - Original:     `(T0, T1, ...) -> R`
   ///   - Differential: `(T0.Tan, T1.Tan, ...) -> R.Tan`
-  /// - Case 2: original function has a non-wrt `inout` parameter.
-  ///   - Original:     `(T0, inout T1, ...) -> Void`
-  ///   - Differential: `(T0.Tan, ...) -> T1.Tan`
-  /// - Case 3: original function has a wrt `inout` parameter.
+  /// - Case 2: original function has a wrt `inout` parameter.
   ///   - Original:     `(T0, inout T1, ...) -> Void`
   ///   - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
   ///
@@ -3531,10 +3534,7 @@ public:
   /// - Case 1: original function has no `inout` parameters.
   ///   - Original: `(T0, T1, ...) -> R`
   ///   - Pullback: `R.Tan -> (T0.Tan, T1.Tan, ...)`
-  /// - Case 2: original function has a non-wrt `inout` parameter.
-  ///   - Original: `(T0, inout T1, ...) -> Void`
-  ///   - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
-  /// - Case 3: original function has a wrt `inout` parameter.
+  /// - Case 2: original function has a wrt `inout` parameter.
   ///   - Original: `(T0, inout T1, ...) -> Void`
   ///   - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
   ///
@@ -4100,6 +4100,9 @@ public:
   bool isIndirectMutating() const {
     return getConvention() == ParameterConvention::Indirect_Inout
         || getConvention() == ParameterConvention::Indirect_InoutAliasable;
+  }
+  bool isAutoDiffSemanticResult() const {
+    return isIndirectMutating();
   }
 
   bool isPack() const {
@@ -4834,6 +4837,37 @@ public:
   /// Returns the number of indirect mutating parameters.
   unsigned getNumIndirectMutatingParameters() const {
     return llvm::count_if(getParameters(), IndirectMutatingParameterFilter());
+  }
+
+  struct AutoDiffSemanticResultsParameterFilter {
+    bool operator()(SILParameterInfo param) const {
+      return param.isAutoDiffSemanticResult();
+    }
+  };
+
+  using AutoDiffSemanticResultsParameterIter =
+    llvm::filter_iterator<const SILParameterInfo *,
+                          AutoDiffSemanticResultsParameterFilter>;
+  using AutoDiffSemanticResultsParameterRange =
+      iterator_range<AutoDiffSemanticResultsParameterIter>;
+
+  /// A range of SILParameterInfo for all semantic results parameters.
+  AutoDiffSemanticResultsParameterRange
+  getAutoDiffSemanticResultsParameters() const {
+    return llvm::make_filter_range(getParameters(),
+                                   AutoDiffSemanticResultsParameterFilter());
+  }
+
+  /// Returns the number of semantic results parameters.
+  unsigned getNumAutoDiffSemanticResultsParameters() const {
+    return llvm::count_if(getParameters(), AutoDiffSemanticResultsParameterFilter());
+  }
+
+  /// Returns the number of function potential semantic results:
+  ///  * Usual results
+  ///  * Inout parameters
+  unsigned getNumAutoDiffSemanticResults() const {
+    return getNumResults() + getNumAutoDiffSemanticResultsParameters();
   }
 
   /// Get the generic signature that the component types are specified

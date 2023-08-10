@@ -2407,13 +2407,20 @@ namespace {
         }
       }
 
+      bool forceMemberwiseInitializer = false;
+      if (cxxRecordDecl && cxxRecordDecl->isInStdNamespace() &&
+          cxxRecordDecl->getIdentifier() &&
+          cxxRecordDecl->getName() == "pair") {
+        forceMemberwiseInitializer = true;
+      }
       // We can assume that it is possible to correctly construct the object by
       // simply initializing its member variables to arbitrary supplied values
       // only when the same is possible in C++. While we could check for that
       // exactly, checking whether the C++ class is an aggregate
       // (C++ [dcl.init.aggr]) has the same effect.
       bool isAggregate = !cxxRecordDecl || cxxRecordDecl->isAggregate();
-      if (hasReferenceableFields && hasMemberwiseInitializer && isAggregate) {
+      if ((hasReferenceableFields && hasMemberwiseInitializer && isAggregate) ||
+          forceMemberwiseInitializer) {
         // The default zero initializer suppresses the implicit value
         // constructor that would normally be formed, so we have to add that
         // explicitly as well.
@@ -2485,7 +2492,7 @@ namespace {
 
           // If we have a getter and a setter make sure the types line up.
           if (setter && !getter->getResultInterfaceType()->isEqual(
-                            setter->getParameters()->get(0)->getType()))
+                            setter->getParameters()->get(0)->getTypeInContext()))
             continue;
 
           // If the name that we would import this as already exists, then don't
@@ -2790,6 +2797,7 @@ namespace {
         conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
         conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
         conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
       }
 
       if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
@@ -2985,7 +2993,7 @@ namespace {
           return nullptr;
 
         // Create the global constant.
-        bool isStatic = enumKind != EnumKind::Unknown && dc->isTypeContext();
+        bool isStatic = dc->isTypeContext();
         auto result = synthesizer.createConstant(
             name, dc, type, clang::APValue(decl->getInitVal()),
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
@@ -3521,7 +3529,7 @@ namespace {
           assert(func->getParameters()->size() == 1);
           auto typeDecl = dc->getSelfNominalTypeDecl();
           auto parameter = func->getParameters()->get(0);
-          auto parameterType = parameter->getType();
+          auto parameterType = parameter->getTypeInContext();
           if (!typeDecl || !parameterType)
             return nullptr;
           if (parameter->isInOut())
@@ -6906,7 +6914,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
     // Make sure that the index types are equivalent.
     // FIXME: Rectify these the same way we do for element types.
-    if (!setterIndex->getType()->isEqual(getterIndex->getType())) {
+    if (!setterIndex->getInterfaceType()->isEqual(
+        getterIndex->getInterfaceType())) {
       // If there is an existing subscript operation, we're done.
       if (existingSubscript)
         return decl == getter ? existingSubscript : nullptr;
@@ -8929,6 +8938,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       }
       continue;
     }
+
+    // A friend C++ decl is not a member of the Swift type.
+    if (member->getClangDecl() &&
+        member->getClangDecl()->getFriendObjectKind() != clang::Decl::FOK_None)
+      continue;
 
     // FIXME: constructors are added eagerly, but shouldn't be
     // FIXME: subscripts are added eagerly, but shouldn't be

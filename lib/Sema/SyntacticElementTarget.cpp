@@ -187,7 +187,7 @@ SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
 SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SyntacticElementTarget target(initializer, dc, CTP_Initialization,
-                                wrappedVar->getType(),
+                                wrappedVar->getTypeInContext(),
                                 /*isDiscarded=*/false);
   target.expression.propertyWrapper.wrappedVar = wrappedVar;
   if (auto *patternBinding = wrappedVar->getParentPatternBinding()) {

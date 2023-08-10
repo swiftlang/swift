@@ -3199,15 +3199,19 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       uint8_t rawAlign;
       TypeID typeID;
       
+      auto SD = const_cast<StructDecl*>(cast<StructDecl>(D));
+      
       if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
         typeID = 0;
         rawSize = sizeAndAlign->first;
         rawAlign = sizeAndAlign->second;
-      } else if (auto likeType = attr->getResolvedScalarLikeType()) {
+      } else if (auto likeType
+                   = attr->getResolvedScalarLikeType(SD)) {
         typeID = S.addTypeRef(*likeType);
         rawSize = 0;
         rawAlign = 0;
-      } else if (auto likeArrayTypeAndCount = attr->getResolvedArrayLikeTypeAndCount()) {
+      } else if (auto likeArrayTypeAndCount
+                   = attr->getResolvedArrayLikeTypeAndCount(SD)) {
         typeID = S.addTypeRef(likeArrayTypeAndCount->first);
         rawSize = likeArrayTypeAndCount->second;
         rawAlign = static_cast<uint8_t>(~0u);
