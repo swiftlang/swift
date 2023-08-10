@@ -3480,12 +3480,14 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  if (!isa<ValueDecl>(this) &&
-      !isa<ExtensionDecl>(this))
+  const Decl *D = abstractSyntaxDeclForAvailableAttribute(this);
+
+  if (!isa<ValueDecl>(D) &&
+      !isa<ExtensionDecl>(D))
     return ArrayRef<Identifier>();
 
   return evaluateOrDefault(getASTContext().evaluator,
-                           SPIGroupsRequest{ this },
+                           SPIGroupsRequest{ D },
                            ArrayRef<Identifier>());
 }
 

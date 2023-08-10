@@ -747,6 +747,8 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
       swiftVersion.getAsString());
 }
 
+// FIXME: Rename abstractSyntaxDeclForAvailableAttribute since it's useful
+// for more attributes than `@available`.
 const Decl *
 swift::abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
   // This function needs to be kept in sync with its counterpart,
