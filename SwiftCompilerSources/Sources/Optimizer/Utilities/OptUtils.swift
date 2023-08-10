@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
+import OptimizerBridging
 
 extension Value {
   var nonDebugUses: LazyFilterSequence<UseList> {
@@ -396,3 +397,37 @@ extension Function {
   }
 }
 
+extension FullApplySite {
+  var canInline: Bool {
+    // Some checks which are implemented in C++
+    if !FullApplySite_canInline(bridged) {
+      return false
+    }
+    // Cannot inline a non-inlinable function it an inlinable function.
+    if parentFunction.isSerialized,
+       let calleeFunction = referencedFunction,
+       !calleeFunction.isSerialized {
+      return false
+    }
+    return true
+  }
+
+  var inliningCanInvalidateStackNesting: Bool {
+    guard let calleeFunction = referencedFunction else {
+      return false
+    }
+
+    // In OSSA `partial_apply [on_stack]`s are represented as owned values rather than stack locations.
+    // It is possible for their destroys to violate stack discipline.
+    // When inlining into non-OSSA, those destroys are lowered to dealloc_stacks.
+    // This can result in invalid stack nesting.
+    if calleeFunction.hasOwnership && !parentFunction.hasOwnership {
+      return true
+    }
+    // Inlining of coroutines can result in improperly nested stack allocations.
+    if self is BeginApplyInst {
+      return true
+    }
+    return false
+  }
+}

@@ -513,6 +513,8 @@ struct BridgedPassContext {
   bool enableSimplificationFor(BridgedInstruction inst) const;
 };
 
+bool FullApplySite_canInline(BridgedInstruction apply);
+
 //===----------------------------------------------------------------------===//
 //                          Pass registration
 //===----------------------------------------------------------------------===//
