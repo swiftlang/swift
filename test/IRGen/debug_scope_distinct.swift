@@ -5,6 +5,8 @@
 // RUN: %target-swiftc_driver -O -g -I %t -c %s -emit-ir -o - | %FileCheck %s
 // RUN: %target-swiftc_driver -O -g -I %t -c %s -o /dev/null
 
+// REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=arm64e
+
 // CHECK: define {{.*}} void @"$s4main1TV4move2byyAC13TangentVectorV_tF"
 // CHECK-SAME: ptr {{.*}} %[[ARG_PTR:.*]],
 //
