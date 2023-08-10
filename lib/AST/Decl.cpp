@@ -2079,19 +2079,23 @@ bool VarDecl::isLayoutExposedToClients() const {
   if (!parent) return false;
   if (isStatic()) return false;
 
-  if (!hasStorage() &&
-      !getAttrs().hasAttribute<LazyAttr>() &&
-      !hasAttachedPropertyWrapper()) {
-    return false;
-  }
 
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
   if (!nominalAccess.isPublic()) return false;
 
-  return (parent->getAttrs().hasAttribute<FrozenAttr>() ||
-          parent->getAttrs().hasAttribute<FixedLayoutAttr>());
+  if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
+      !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
+    return false;
+
+  if (!hasStorage() &&
+      !getAttrs().hasAttribute<LazyAttr>() &&
+      !hasAttachedPropertyWrapper()) {
+    return false;
+  }
+
+  return true;
 }
 
 /// Check whether the given type representation will be
