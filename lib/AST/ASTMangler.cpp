@@ -2583,6 +2583,11 @@ void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
 }
 
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+
+  if (nominal && isa<BuiltinTupleDecl>(nominal))
+    return appendOperator("BT");
+
   // Check for certain standard types.
   if (tryAppendStandardSubstitution(decl))
     return;
@@ -2592,8 +2597,6 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     appendOpaqueDeclName(opaque);
     return;
   }
-  
-  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
 
   // For generic types, this uses the unbound type.
   if (nominal) {
@@ -2611,9 +2614,6 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     addTypeSubstitution(nominal->getDeclaredType(), nullptr);
     return;
   }
-
-  if (nominal && isa<BuiltinTupleDecl>(nominal))
-    return appendOperator("BT");
 
   appendContextOf(decl);
 

@@ -1555,6 +1555,10 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleBuiltinTupleType(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
+}
+
 ManglingError Remangler::mangleTypeAlias(Node *node, EntityContext &ctx,
                                          unsigned depth) {
   return mangleAnyNominalType(node, ctx, depth + 1);

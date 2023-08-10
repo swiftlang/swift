@@ -1019,23 +1019,13 @@ enum class BuiltinConformanceKind {
 
 /// A builtin conformance appears when a non-nominal type has a
 /// conformance that is synthesized by the implementation.
-class BuiltinProtocolConformance final : public RootProtocolConformance,
-      private llvm::TrailingObjects<BuiltinProtocolConformance, Requirement> {
+class BuiltinProtocolConformance final : public RootProtocolConformance {
   friend ASTContext;
-  friend TrailingObjects;
 
   ProtocolDecl *protocol;
-  GenericSignature genericSig;
-  size_t numConditionalRequirements : 31;
-  unsigned builtinConformanceKind : 1;
-
-  size_t numTrailingObjects(OverloadToken<Requirement>) const {
-    return numConditionalRequirements;
-  }
+  unsigned builtinConformanceKind;
 
   BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol,
-                             GenericSignature genericSig,
-                             ArrayRef<Requirement> conditionalRequirements,
                              BuiltinConformanceKind kind);
 
 public:
@@ -1044,14 +1034,12 @@ public:
     return protocol;
   }
 
-  /// Retrieve the generic signature that describes the type parameters used
-  /// within the conforming type.
-  GenericSignature getGenericSignature() const {
-    return genericSig;
-  }
-
   BuiltinConformanceKind getBuiltinConformanceKind() const {
     return static_cast<BuiltinConformanceKind>(builtinConformanceKind);
+  }
+
+  GenericSignature getGenericSignature() const {
+    return GenericSignature();
   }
 
   /// Whether this represents a "missing" conformance that should be diagnosed
@@ -1063,12 +1051,12 @@ public:
   /// Get any requirements that must be satisfied for this conformance to apply.
   llvm::Optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
-    return getConditionalRequirements();
+    return ArrayRef<Requirement>();
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
-    return {getTrailingObjects<Requirement>(), numConditionalRequirements};
+    return {};
   }
 
   /// Get the declaration context that contains the nominal type declaration.
