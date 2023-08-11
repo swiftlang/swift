@@ -1789,7 +1789,7 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
         Out, ScratchRecord,
         abbrCode,
         addDeclRef(normal->getProtocol()),
-        addDeclRef(normal->getType()->getAnyNominal()),
+        addDeclRef(normal->getDeclContext()->getSelfNominalTypeDecl()),
         addContainingModuleRef(normal->getDeclContext(),
                                /*ignoreExport=*/true));
     }
