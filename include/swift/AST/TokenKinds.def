@@ -257,7 +257,6 @@ MISC(raw_string_delimiter)
 MISC(string_segment)
 MISC(string_interpolation_anchor)
 MISC(kw_yield)
-MISC(kw_forget)
 MISC(kw_discard)
 
 // The following tokens are irrelevant for swiftSyntax and thus only declared 
