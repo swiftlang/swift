@@ -732,9 +732,9 @@ struct ImmutableAddressUseVerifier {
 };
 
 static void checkAddressWalkerCanVisitAllTransitiveUses(SILValue address) {
-  struct Visitor final : TransitiveAddressWalker {
-    bool visitUse(Operand *use) override { return true; }
-    void onError(Operand *use) override {}
+  struct Visitor : TransitiveAddressWalker<Visitor> {
+    bool visitUse(Operand *use) { return true; }
+    void onError(Operand *use) {}
   };
 
   Visitor visitor;
