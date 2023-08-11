@@ -386,6 +386,13 @@ protocol EmptySwiftProto {}
   func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be implicitly @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
+@_objcImplementation extension ObjCImplSubclass {
+    @objc(initFromProtocol1:)
+    required public init?(fromProtocol1: CInt) {
+      // OK
+    }
+}
+
 @_objcImplementation extension ObjCClass {}
 // expected-error@-1 {{duplicate implementation of Objective-C class 'ObjCClass'}}
 

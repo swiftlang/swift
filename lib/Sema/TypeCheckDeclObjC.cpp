@@ -3507,6 +3507,15 @@ public:
     for (auto &pair : unmatchedCandidates) {
       auto cand = pair.first;
 
+      // `isObjCMemberImplementation()` incorrectly returns true for required
+      // inits that are overrides because checking in that accessor would create
+      // a cycle between override computations and access control. Don't
+      // diagnose such candidates.
+      // FIXME: Refactor around this so these methods are never made candidates.
+      if (auto ctor = dyn_cast<ConstructorDecl>(cand))
+        if (ctor->isRequired() && !ctor->getOverriddenDecls().empty())
+          continue;
+
       diagnose(cand, diag::member_of_objc_implementation_not_objc_or_final,
                cand, cand->getDeclContext()->getSelfClassDecl());
 
