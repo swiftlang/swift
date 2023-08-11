@@ -736,7 +736,8 @@ inline AddressUseKind findTransitiveUsesForAddress(
   // guaranteed uses to determine if a load_borrow is an escape in OSSA. This
   // is OSSA specific behavior and we should probably create a different API
   // for that. But for now, this lets this APIs users stay the same.
-  struct BasicTransitiveAddressVisitor final : TransitiveAddressWalker {
+  struct BasicTransitiveAddressVisitor
+      : TransitiveAddressWalker<BasicTransitiveAddressVisitor> {
     SmallVectorImpl<Operand *> *foundUses;
     std::function<void(Operand *)> *onErrorFunc;
 
@@ -744,7 +745,7 @@ inline AddressUseKind findTransitiveUsesForAddress(
                                   std::function<void(Operand *)> *onErrorFunc)
         : foundUses(foundUses), onErrorFunc(onErrorFunc) {}
 
-    bool visitUse(Operand *use) override {
+    bool visitUse(Operand *use) {
       if (!foundUses)
         return true;
 
@@ -771,7 +772,7 @@ inline AddressUseKind findTransitiveUsesForAddress(
       return true;
     }
 
-    void onError(Operand *use) override {
+    void onError(Operand *use) {
       if (onErrorFunc)
         (*onErrorFunc)(use);
     }

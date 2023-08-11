@@ -1423,6 +1423,26 @@ public struct AlwaysAddConformance: ExtensionMacro {
   }
 }
 
+public struct ConditionallyAvailableConformance: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let decl: DeclSyntax =
+      """
+      @available(macOS 99, *)
+      extension \(raw: type.trimmedDescription): Equatable {}
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct AlwaysAddCodable: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,

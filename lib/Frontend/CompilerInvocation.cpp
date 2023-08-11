@@ -1461,6 +1461,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ModuleCachePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_clang_scanner_module_cache_path)) {
+    Opts.ClangScannerModuleCachePath = A->getValue();
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_target_cpu))
     Opts.TargetCPU = A->getValue();

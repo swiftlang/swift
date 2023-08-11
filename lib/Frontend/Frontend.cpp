@@ -751,30 +751,28 @@ bool CompilerInstance::setUpModuleLoaders() {
 
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
 
-  // When scanning for dependencies, we must add the scanner loaders in order to handle
-  // ASTContext operations such as canImportModule
+  // When scanning for dependencies, we must add the scanner loaders in order to
+  // handle ASTContext operations such as canImportModule
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::ScanDependencies) {
-    auto ModuleCachePath = getModuleCachePathFromClang(Context
-                                                       ->getClangModuleLoader()->getClangInstance());
+    auto ClangModuleCachePath = getModuleCachePathFromClang(
+        Context->getClangModuleLoader()->getClangInstance());
     auto &FEOpts = Invocation.getFrontendOptions();
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
         Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
-        /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
-        FEOpts.PrebuiltModuleCachePath,
-        FEOpts.BackupModuleInterfaceDir,
+        /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
+        FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
         RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
-      std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
-                                                      MLM,
-                                                      mainModuleName,
-                                                      Context->SearchPathOpts.PlaceholderDependencyModuleMap,
-                                                      ASTDelegate);
+        std::make_unique<PlaceholderSwiftModuleScanner>(
+            *Context, MLM, mainModuleName,
+            Context->SearchPathOpts.PlaceholderDependencyModuleMap, ASTDelegate,
+            getInvocation().getFrontendOptions().ExplicitModulesOutputPath);
     Context->addModuleLoader(std::move(PSMS));
   }
 
