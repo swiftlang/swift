@@ -18,6 +18,10 @@ protocol P {
   func foo()
 }
 
+struct S : P {
+  func foo()
+}
+
 enum Optional<T> {
   case none
   case some(T)
@@ -547,6 +551,23 @@ bb0(%0 : @owned $T, %1 : @owned $C):
   %f = function_ref @takeTuple : $@convention(thin) <τ_0_0> (@in_guaranteed (τ_0_0, C)) -> ()
   %c = apply %f<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed (τ_0_0, C)) -> ()
   return %2 : $(T, C)
+}
+
+// CHECK-LABEL: sil [ossa] @f076_opaqueResult : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[S_ADDR:%[^,]+]] : $*S):
+// CHECK:         [[GET:%[^,]+]] = function_ref @getT
+// CHECK:         [[TEMP:%[^,]+]] = alloc_stack $S
+// CHECK:         apply [[GET]]<S>([[TEMP]])
+// CHECK:         [[S:%[^,]+]] = load [trivial] [[TEMP]]
+// CHECK:         store [[S]] to [trivial] [[S_ADDR]]
+// CHECK:         dealloc_stack [[TEMP]]
+// CHECK-LABEL: } // end sil function 'f076_opaqueResult'
+// The following getS definition enables use of the type <<@_opaqueReturnTypeOf("$s5Swift4getSQryF", 0) opaque>>
+@_silgen_name("getS") public func getS() -> some P { return S() }
+sil [ossa] @f076_opaqueResult : $@convention(thin) <T> () -> @out @_opaqueReturnTypeOf("$s5Swift4getSQryF", 0) __<T> {
+  %get = function_ref @getT : $@convention(thin) <T> () -> (@out T)
+  %s = apply %get<S>() : $@convention(thin) <T> () -> (@out T)
+  return %s : $S
 }
 
 // CHECK-LABEL: sil [ossa] @f080_optional : $@convention(thin) <T> (@in T) -> @out Optional<T> {
