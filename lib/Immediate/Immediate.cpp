@@ -409,6 +409,9 @@ int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
     return -1;
   }
 
+  // We're compiling functions lazily, so need to rename
+  // symbols defining functions for lazy reexports
+  (*JIT)->addRenamer();
   auto MU = LazySwiftMaterializationUnit::Create(**JIT, CI);
   if (auto Err = (*JIT)->addSwift((*JIT)->getMainJITDylib(), std::move(MU))) {
     logError(std::move(Err));

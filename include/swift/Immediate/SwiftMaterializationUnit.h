@@ -48,6 +48,10 @@ public:
   /// current process.
   static llvm::Expected<std::unique_ptr<SwiftJIT>> Create(CompilerInstance &CI);
 
+  /// Adds a plugin that will rename function symbols for lazy reexports.
+  /// Should be called only once.
+  void addRenamer();
+
   ~SwiftJIT();
 
   /// Get the dylib associated with the main program
@@ -80,6 +84,10 @@ public:
   llvm::Expected<int> runMain(llvm::ArrayRef<std::string> Args);
 
 private:
+  static llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>>
+  CreateObjLinkingLayer(llvm::orc::ExecutionSession &ES,
+                        const llvm::Triple &TT);
+
   static llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
   CreateLLJIT(CompilerInstance &CI);
 

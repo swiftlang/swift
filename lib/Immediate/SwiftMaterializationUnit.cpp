@@ -141,6 +141,16 @@ llvm::orc::ObjectTransformLayer &SwiftJIT::getObjTransformLayer() {
   return J->getObjTransformLayer();
 }
 
+llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>>
+SwiftJIT::CreateObjLinkingLayer(llvm::orc::ExecutionSession &ES,
+                                const llvm::Triple &TT) {
+  auto MemMgr = llvm::jitlink::InProcessMemoryManager::Create();
+  if (!MemMgr)
+    return MemMgr.takeError();
+  return std::make_unique<llvm::orc::ObjectLinkingLayer>(ES,
+                                                         std::move(*MemMgr));
+}
+
 llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
 SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
   llvm::TargetOptions TargetOpt;
@@ -160,6 +170,7 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
                   .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
   auto J = llvm::orc::LLJITBuilder()
                .setJITTargetMachineBuilder(std::move(JTMB))
+               .setObjectLinkingLayerCreator(CreateObjLinkingLayer)
                .create();
   if (!J)
     return J.takeError();
@@ -237,8 +248,9 @@ SwiftJIT::SwiftJIT(std::unique_ptr<llvm::orc::LLJIT> J,
                    std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU)
     : J(std::move(J)), EPCIU(std::move(EPCIU)),
       LCTM(this->EPCIU->getLazyCallThroughManager()),
-      ISM(this->EPCIU->createIndirectStubsManager()) {
+      ISM(this->EPCIU->createIndirectStubsManager()) {}
 
+void SwiftJIT::addRenamer() {
   static_cast<llvm::orc::ObjectLinkingLayer &>(this->J->getObjLinkingLayer())
       .addPlugin(std::make_unique<Plugin>());
 }
