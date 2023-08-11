@@ -2438,25 +2438,31 @@ Constraint *ConstraintSystem::selectConjunction() {
 
   auto &SM = getASTContext().SourceMgr;
 
-  // All of the multi-statement closures should be solved in order of their
-  // apperance in the source.
-  llvm::sort(
-      conjunctions, [&](Constraint *conjunctionA, Constraint *conjunctionB) {
+  // Conjunctions should be solved in order of their apperance in the source.
+  // This is important because once a conjunction is solved, we don't re-visit
+  // it, so we need to make sure we don't solve it before another conjuntion
+  // that could provide it with necessary type information. Source order
+  // provides an easy to reason about and quick way of establishing this.
+  return *std::min_element(
+      conjunctions.begin(), conjunctions.end(),
+      [&](Constraint *conjunctionA, Constraint *conjunctionB) {
         auto *locA = conjunctionA->getLocator();
         auto *locB = conjunctionB->getLocator();
-
         if (!(locA && locB))
           return false;
 
-        auto *closureA = getAsExpr<ClosureExpr>(locA->getAnchor());
-        auto *closureB = getAsExpr<ClosureExpr>(locB->getAnchor());
+        auto anchorA = locA->getAnchor();
+        auto anchorB = locB->getAnchor();
+        if (!(anchorA && anchorB))
+          return false;
 
-        return closureA && closureB
-                   ? SM.isBeforeInBuffer(closureA->getLoc(), closureB->getLoc())
-                   : false;
+        auto slocA = anchorA.getStartLoc();
+        auto slocB = anchorB.getStartLoc();
+        if (!(slocA.isValid() && slocB.isValid()))
+          return false;
+
+        return SM.isBeforeInBuffer(slocA, slocB);
       });
-
-  return conjunctions.front();
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
