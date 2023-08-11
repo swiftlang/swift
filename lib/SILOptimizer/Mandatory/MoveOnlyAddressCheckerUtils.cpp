@@ -1469,14 +1469,14 @@ struct CopiedLoadBorrowEliminationState {
 /// An early transform that we run to convert any load_borrow that are copied
 /// directly or that have any subelement that is copied to a load [copy]. This
 /// lets the rest of the optimization handle these as appropriate.
-struct CopiedLoadBorrowEliminationVisitor final
-    : public TransitiveAddressWalker {
+struct CopiedLoadBorrowEliminationVisitor
+    : public TransitiveAddressWalker<CopiedLoadBorrowEliminationVisitor> {
   CopiedLoadBorrowEliminationState &state;
 
   CopiedLoadBorrowEliminationVisitor(CopiedLoadBorrowEliminationState &state)
       : state(state) {}
 
-  bool visitUse(Operand *op) override {
+  bool visitUse(Operand *op) {
     LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim visiting ";
                llvm::dbgs() << " User: " << *op->getUser());
     auto *lbi = dyn_cast<LoadBorrowInst>(op->getUser());
@@ -1857,7 +1857,7 @@ void PartialReinitChecker::performPartialReinitChecking(
 namespace {
 
 /// Visit all of the uses of value in preparation for running our algorithm.
-struct GatherUsesVisitor final : public TransitiveAddressWalker {
+struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkMustCheckInst *markedValue;
@@ -1873,7 +1873,7 @@ struct GatherUsesVisitor final : public TransitiveAddressWalker {
       : moveChecker(moveChecker), useState(useState), markedValue(markedValue),
         diagnosticEmitter(diagnosticEmitter) {}
 
-  bool visitUse(Operand *op) override;
+  bool visitUse(Operand *op);
   void reset(MarkMustCheckInst *address) { useState.address = address; }
   void clear() { useState.clear(); }
 

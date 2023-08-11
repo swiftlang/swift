@@ -826,9 +826,9 @@ static SILValue tryRewriteToPartialApplyStack(
                
     bool origIsUnusedDuringClosureLifetime = true;
 
-    class OrigUnusedDuringClosureLifetimeWalker final
-      : public TransitiveAddressWalker
-    {
+    class OrigUnusedDuringClosureLifetimeWalker
+        : public TransitiveAddressWalker<
+              OrigUnusedDuringClosureLifetimeWalker> {
       SSAPrunedLiveness &closureLiveness;
       bool &origIsUnusedDuringClosureLifetime;
     public:
@@ -837,8 +837,8 @@ static SILValue tryRewriteToPartialApplyStack(
         : closureLiveness(closureLiveness),
           origIsUnusedDuringClosureLifetime(origIsUnusedDuringClosureLifetime)
       {}
-    
-      virtual bool visitUse(Operand *origUse) override {
+
+      bool visitUse(Operand *origUse) {
         LLVM_DEBUG(llvm::dbgs() << "looking at use\n";
                    origUse->getUser()->printInContext(llvm::dbgs());
                    llvm::dbgs() << "\n");
@@ -857,7 +857,7 @@ static SILValue tryRewriteToPartialApplyStack(
         return true;
       }
     };
-    
+
     OrigUnusedDuringClosureLifetimeWalker origUseWalker(closureLiveness,
                                              origIsUnusedDuringClosureLifetime);
     auto walkResult = std::move(origUseWalker).walk(orig);
