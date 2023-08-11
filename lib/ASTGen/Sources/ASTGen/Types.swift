@@ -190,9 +190,9 @@ extension ASTGenVisitor {
     }
 
     // Handle type attributes.
-    if let attributes = node.attributes {
+    if !node.attributes.isEmpty {
       let typeAttributes = TypeAttributes_create()
-      for attributeElt in attributes {
+      for attributeElt in node.attributes {
         // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
         // but we don't have that ability right now.
         guard case let .attribute(attribute) = attributeElt else {
