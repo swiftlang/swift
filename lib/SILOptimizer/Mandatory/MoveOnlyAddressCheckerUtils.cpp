@@ -2378,7 +2378,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // either.
     if (auto *f = pas->getCalleeFunction()) {
       if (f->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
-        if (ApplySite(pas).getArgumentOperandConvention(*op).isInoutConvention()) {
+        if (ApplySite(pas).getCaptureConvention(*op).isInoutConvention()) {
           diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
           return false;
         }
