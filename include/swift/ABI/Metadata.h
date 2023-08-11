@@ -81,6 +81,9 @@ struct HeapObject;
 class WeakReference;
 struct UnownedReference;
 
+using HeapObjectDestroyer =
+  SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
+
 /// The result of requesting type metadata.  Generally the return value of
 /// a function.
 ///
@@ -514,9 +517,6 @@ struct TargetOpaqueMetadata {
   TargetMetadata<Runtime> base;
 };
 
-using HeapObjectDestroyer =
-  SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
-
 /// The prefix on a heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeaderPrefix {
@@ -561,6 +561,14 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
     : TargetMetadata<Runtime>(kind) {}
   constexpr TargetHeapMetadata(TargetAnyClassMetadataObjCInterop<Runtime> *isa)
     : TargetMetadata<Runtime>(isa) {}
+
+  HeapObjectDestroyer *getHeapObjectDestroyer() const {
+    return asFullMetadata(this)->destroy;
+  }
+
+  void setHeapObjectDestroyer(HeapObjectDestroyer *destroy) {
+    asFullMetadata(this)->destroy = destroy;
+  }
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
