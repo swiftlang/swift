@@ -1443,6 +1443,24 @@ public struct ConditionallyAvailableConformance: ExtensionMacro {
   }
 }
 
+public struct AddAllConformancesMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    protocols.map { proto in
+      let decl: DeclSyntax =
+        """
+        extension \(type): \(proto) {}
+        """
+      return decl.cast(ExtensionDeclSyntax.self)
+    }
+  }
+}
+
 public struct AlwaysAddCodable: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,

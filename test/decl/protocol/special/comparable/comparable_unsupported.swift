@@ -46,6 +46,16 @@ enum EnumWithUnavailableCaseAndAssociatedValue: Comparable {
   case some(SomeComparable)
 }
 
+enum EnumWithUnavailableCaseAndAssociatedValue2: Comparable {
+  // expected-error@-1 {{type 'EnumWithUnavailableCaseAndAssociatedValue2' does not conform to protocol 'Comparable'}}
+  enum SomeComparable: Comparable {}
+
+  case this(SomeComparable)
+
+  @available(*, unavailable)
+  case that(SomeComparable)
+}
+
 // Automatic synthesis of Comparable requires associated values to be Comparable as well.
 
 enum NotComparableEnumTwo: Comparable {
