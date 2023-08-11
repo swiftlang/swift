@@ -102,7 +102,8 @@ public:
 
     /// Construct a \c Compilation::Result from just an exit code.
     static Result code(int code) {
-      return Compilation::Result{false, code};
+      return Compilation::Result{false, code,
+                                 fine_grained_dependencies::ModuleDepGraph()};
     }
   };
 
