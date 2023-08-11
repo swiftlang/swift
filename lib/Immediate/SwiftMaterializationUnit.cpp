@@ -302,11 +302,11 @@ LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
       continue;
     }
     auto Ref = Source.getSILDeclRef();
-    if (Ref.getDefinitionLinkage() != SILLinkage::Public)
-      continue;
     const auto &SymbolName = Entry.getKey();
-    const auto Flags =
-        llvm::JITSymbolFlags::Exported | llvm::JITSymbolFlags::Callable;
+    auto Flags = llvm::JITSymbolFlags::Callable;
+    if (Ref.getDefinitionLinkage() == SILLinkage::Public) {
+      Flags |= llvm::JITSymbolFlags::Exported;
+    }
     auto MangledName = mangle(SymbolName);
     PublicInterface[JIT.intern(MangledName)] = Flags;
   }
@@ -368,22 +368,30 @@ void LazySwiftMaterializationUnit::materialize(
 
   // Register all global values, including global
   // variables and functions
-  for (const auto &GV : Module->global_values()) {
-    // Ignore all symbols that will not appear in symbol table
-    if (GV.hasLocalLinkage() || GV.hasAppendingLinkage() ||
-        GV.isDeclaration()) {
-      continue;
-    }
+  for (auto &GV : Module->global_values()) {
     auto Name = JIT.mangle(GV.getName());
     auto itr = Renamings.find(Name);
+    if (GV.hasAppendingLinkage() || GV.isDeclaration()) {
+      continue;
+    }
     if (itr == Renamings.end()) {
+      if (GV.hasLocalLinkage()) {
+        continue;
+      }
       LazilyDiscoveredSymbols[JIT.intern(Name)] =
           llvm::JITSymbolFlags::fromGlobalValue(GV);
+      // Ignore all symbols that will not appear in symbol table
     } else {
+      // Promote linkage of requested symbols that will
+      // not appear in symbol table otherwise
+      if (GV.hasLocalLinkage()) {
+        GV.setLinkage(llvm::GlobalValue::ExternalLinkage);
+        GV.setVisibility(llvm::GlobalValue::HiddenVisibility);
+      }
       DefinedSymbols.insert(itr->getValue());
     }
   }
-
+  
   llvm::orc::SymbolFlagsMap UnrequestedSymbols;
   for (auto &[Sym, Flags] : MR->getSymbols()) {
     if (!DefinedSymbols.contains(Sym)) {
