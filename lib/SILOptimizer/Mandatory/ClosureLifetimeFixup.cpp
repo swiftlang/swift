@@ -619,7 +619,6 @@ static SILValue tryRewriteToPartialApplyStack(
     if (!argTy.isAddress() && !argTy.isTrivial(*cvt->getFunction())) {
       SILValue argValue = arg.get();
       bool foundNoImplicitCopy = false;
-      //!!!
       if (auto *mmci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(argValue)) {
         if (mmci->hasOwnedInitialKind() && mmci->hasOneUse()) {
           foundNoImplicitCopy = true;

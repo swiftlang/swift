@@ -281,7 +281,14 @@ void releasePartialApplyCapturedArg(
     SILParameterInfo paramInfo,
     InstModCallbacks callbacks = InstModCallbacks());
 
-/// Insert destroys of captured arguments of partial_apply [stack].
+/// Insert destroys of captured arguments of partial_apply [stack]. \p builder
+/// indicates a position at which the closure's lifetime ends.
+///
+/// The \p getValueToDestroy callback allows the caller to handle some captured
+/// arguments specially. For example, ClosureLifetimeFixup generates borrow
+/// scopes for captured arguments; each getValueToDestroy callback then inserts
+/// the corresponding end_borrow and returns the owned operand of the borrow,
+/// which will then be destroyed as usual.
 void insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<SILValue(SILValue)> getValueToDestroy =
