@@ -568,20 +568,6 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                    ConformanceEntry *lhs,
                                    ConformanceEntry *rhs,
                                    bool &diagnoseSuperseded) {
-  // If only one of the conformances is unconditionally available on the
-  // current deployment target, pick that one.
-  //
-  // FIXME: Conformance lookup should really depend on source location for
-  // this to be 100% correct.
-  // FIXME: When a class and an extension with the same availability declare the
-  // same conformance, this silently takes the class and drops the extension.
-  if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
-      rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
-    return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
-            ? Ordering::Before
-            : Ordering::After);
-  }
-
   ConformanceEntryKind lhsKind = lhs->getRankingKind();
   ConformanceEntryKind rhsKind = rhs->getRankingKind();
 
@@ -597,6 +583,20 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
               ? Ordering::Before
               : Ordering::After);
     }
+  }
+
+  // If only one of the conformances is unconditionally available on the
+  // current deployment target, pick that one.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  // FIXME: When a class and an extension with the same availability declare the
+  // same conformance, this silently takes the class and drops the extension.
+  if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
+      rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
+    return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
+            ? Ordering::Before
+            : Ordering::After);
   }
 
   // If one entry is fixed and the other is not, we have our answer.
