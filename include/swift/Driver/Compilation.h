@@ -92,7 +92,7 @@ public:
     Result(bool hadAbnormalExit, int exitCode,
            fine_grained_dependencies::ModuleDepGraph depGraph)
         : hadAbnormalExit(hadAbnormalExit), exitCode(exitCode),
-          depGraph(depGraph) {}
+          depGraph(std::move(depGraph)) {}
 
     Result(const Result &) = delete;
     Result &operator=(const Result &) = delete;
