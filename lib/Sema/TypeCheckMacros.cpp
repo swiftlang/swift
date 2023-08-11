@@ -1235,9 +1235,13 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   {
     llvm::raw_string_ostream OS(conformanceList);
     if (role == MacroRole::Extension) {
-      for (auto *protocol : conformances) {
-        protocol->getDeclaredType()->print(OS);
-      }
+      llvm::interleave(
+          conformances,
+          [&](const ProtocolDecl *protocol) {
+            protocol->getDeclaredType()->print(OS);
+          },
+          [&] { OS << ", "; }
+      );
     } else {
       OS << "";
     }
