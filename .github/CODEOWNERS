@@ -7,6 +7,9 @@
 # order.
 
 # TODO: /.clang-format
+
+/.clang-tidy   @egorzhdan
+
 # TODO: /.dir-locals.el
 # TODO: /.flake8
 # TODO: /.gitattributes
