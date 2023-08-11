@@ -5851,6 +5851,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     // For the current module, consider both private and public imports.
     ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
     Filter |= ModuleDecl::ImportFilterKind::Default;
+
+    // For private swiftinterfaces, also look through @_spiOnly imports.
+    if (Options.PrintSPIs)
+      Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+
     SmallVector<ImportedModule, 4> Imports;
     Options.CurrentModule->getImportedModules(Imports, Filter);
 
