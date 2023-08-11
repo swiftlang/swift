@@ -105,7 +105,7 @@ module vcruntime [system] {
     export *
   }
 
-  explicit module stdint {
+  module stdint {
     header "stdint.h"
     export *
   }
@@ -667,7 +667,7 @@ module std [system] {
   }
 
   module unordered_set {
-    requires unordered_set
+    requires cplusplus11
     header "unordered_set"
     export *
   }
@@ -702,13 +702,13 @@ module std [system] {
   module _Private [system] {
     requires cplusplus
 
-    explicit module xmemory {
-      header "xmemory"
+    explicit module xhash {
+      header "xhash"
       export *
     }
 
-    explicit module xstddef {
-      header "xstddef"
+    explicit module xmemory {
+      header "xmemory"
       export *
     }
 
