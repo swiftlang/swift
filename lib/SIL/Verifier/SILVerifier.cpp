@@ -1956,6 +1956,11 @@ public:
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
     for (auto p : llvm::enumerate(PAI->getArguments())) {
+      if (PAI->isOnStack()) {
+        require(
+          substConv.getSILArgumentConvention(appliedArgStartIdx + p.index()),
+          "on-stack closures do not support owned arguments");
+      }
       requireSameType(
           p.value()->getType(),
           substConv.getSILArgumentType(appliedArgStartIdx + p.index(),
