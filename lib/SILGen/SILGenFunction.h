@@ -2252,7 +2252,7 @@ public:
   /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
-      SmallVectorImpl<SILArgument *> *indirectResultParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

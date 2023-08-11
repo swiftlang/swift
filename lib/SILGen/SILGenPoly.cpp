@@ -809,7 +809,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
-    SmallVectorImpl<SILArgument *> *indirectResults) {
+    SmallVectorImpl<ManagedValue> *indirectResults) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes(
            getTypeExpansionContext())) {
@@ -820,7 +820,7 @@ void SILGenFunction::collectThunkParams(
                                 .getCategoryType(paramTy.getCategory());
     SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);
     if (indirectResults)
-      indirectResults->push_back(arg);
+      indirectResults->push_back(ManagedValue::forLValue(arg));
   }
 
   // Add the parameters.
@@ -887,6 +887,24 @@ public:
   }
 };
 
+/// A CRTP helper class for classes that supervise a translation between
+/// inner and outer signatures.
+template <class Impl>
+class TranslatorBase {
+protected:
+  Impl &asImpl() { return static_cast<Impl&>(*this); }
+
+  SILGenFunction &SGF;
+  SILLocation Loc;
+  ArrayRefGenerator<ArrayRef<ManagedValue>> OuterArgs;
+
+public:
+  TranslatorBase(SILGenFunction &SGF, SILLocation loc,
+                 ArrayRef<ManagedValue> outerArgs)
+    : SGF(SGF), Loc(loc), OuterArgs(outerArgs) {}
+
+};
+
 /// Given a list of inputs that are suited to the parameters of one
 /// function, translate them into a list of outputs that are suited
 /// for the parameters of another function, given that the two
@@ -907,7 +925,7 @@ public:
 /// the exception of SE-0110's tuple-splat behavior).
 ///
 /// SIL functions have *lowered* parameters.  These correspond to the
-/// SIL values we receive in Inputs and must generate in Outputs.
+/// SIL values we receive in OuterArgs and must generate in InnerArgs.
 ///
 /// A single formal parameter can correspond to any number of
 /// lowered parameters because SIL function type lowering recursively
@@ -926,11 +944,11 @@ public:
 /// corresponding lowered parameter lists to match with the structure
 /// we see there.  When the walk reaches a non-tuple orig type on the
 /// input side, we know that the input function receives a lowered
-/// parameter and therefore there is a corresponding value in Inputs.
+/// parameter and therefore there is a corresponding value in OuterArgs.
 /// When the walk reaches a non-tuple orig type on the output side,
 /// we know that the output function receives a lowered parameter
 /// and therefore there is a corresponding type in OutputTypes (and
-/// a need to produce an argument value in Outputs).
+/// a need to produce an argument value in InnerArgs).
 ///
 /// Variadic generics complicate this because both tuple element
 /// lists and function formal parameter lists can contain pack
@@ -1004,20 +1022,17 @@ public:
 /// we are emitting the body of that closure, and therefore the inputs
 /// we receive are the parameters of that closure, matching the lowered
 /// signature of the second function type.)
-class TranslateArguments {
-  SILGenFunction &SGF;
-  SILLocation Loc;
-  ArrayRefGenerator<ArrayRef<ManagedValue>> Inputs;
-  SmallVectorImpl<ManagedValue> &Outputs;
+class TranslateArguments : public TranslatorBase<TranslateArguments> {
+  SmallVectorImpl<ManagedValue> &InnerArgs;
   CanSILFunctionType OutputTypesFuncTy;
   ArrayRef<SILParameterInfo> OutputTypes;
 public:
   TranslateArguments(SILGenFunction &SGF, SILLocation loc,
-                     ArrayRef<ManagedValue> inputs,
-                     SmallVectorImpl<ManagedValue> &outputs,
+                     ArrayRef<ManagedValue> outerArgs,
+                     SmallVectorImpl<ManagedValue> &innerArgs,
                      CanSILFunctionType outputTypesFuncTy,
                      ArrayRef<SILParameterInfo> outputTypes)
-    : SGF(SGF), Loc(loc), Inputs(inputs), Outputs(outputs),
+    : TranslatorBase(SGF, loc, outerArgs), InnerArgs(innerArgs),
       OutputTypesFuncTy(outputTypesFuncTy), OutputTypes(outputTypes) {}
 
   void translate(AbstractionPattern inputOrigFunctionType,
@@ -1060,7 +1075,7 @@ public:
       // parameters will be mapped one-to-one to the output parameters.
       translate(inputOrigType, inputSubstType,
                 outputOrigType, outputSubstType);
-      Inputs.finish();
+      OuterArgs.finish();
       return;
     }
 
@@ -1078,7 +1093,7 @@ public:
     // to invert control for the input sequence, pulling off one
     // component at a time while looping over the output sequence.
 
-    FunctionInputGenerator inputParams(SGF.getASTContext(), Inputs,
+    FunctionInputGenerator inputParams(SGF.getASTContext(), OuterArgs,
                                        inputOrigFunctionType,
                                        inputSubstTypes,
                                        ignoreFinalInputOrigParam);
@@ -1096,13 +1111,13 @@ public:
       // substituted output type.  translateToPackParam will pull off
       // N substituted formal parameters from the input type.
       if (outputParams.isOrigPackExpansion()) {
-        auto outputPackParam = claimNextOutputType();
+        auto outputPackParam = claimNextInnerParam();
         auto output =
           translateToPackParam(inputParams,
                                outputParams.getOrigType(),
                                outputParams.getSubstParams(),
                                outputPackParam);
-        Outputs.push_back(output);
+        InnerArgs.push_back(output);
 
       // Otherwise, we have a single, non-pack formal parameter
       // in the output type.  translateToSingleParam will pull
@@ -1116,7 +1131,7 @@ public:
     outputParams.finish();
     inputParams.finish();
 
-    Inputs.finish();
+    OuterArgs.finish();
   }
 
   /// This is used for translating yields.
@@ -1133,7 +1148,7 @@ public:
                 outputOrigTypes[i], outputSubstTypes[i]);
     }
 
-    Inputs.finish();
+    OuterArgs.finish();
   }
 
 private:
@@ -1146,14 +1161,14 @@ private:
     // scalar.
     if (outputSubstType.isInOut()) {
       assert(inputSubstType.isInOut());
-      auto inputValue = claimNextInput();
-      auto outputLoweredTy = claimNextOutputType();
+      auto inputValue = claimNextOuterArg();
+      auto outputLoweredTy = claimNextInnerParam();
 
       ManagedValue output =
         translateInOut(inputOrigType, inputSubstType.getParameterType(),
                        outputOrigType, outputSubstType.getParameterType(),
                        inputValue, outputLoweredTy);
-      Outputs.push_back(output);
+      InnerArgs.push_back(output);
     } else {
       translate(inputOrigType, inputSubstType.getParameterType(),
                 outputOrigType, outputSubstType.getParameterType());
@@ -1182,13 +1197,13 @@ private:
                                          outputTupleType);
       }
 
-      auto outputParam = claimNextOutputType();
+      auto outputParam = claimNextInnerParam();
       auto output = translateTupleIntoSingle(inputOrigType,
                                              inputTupleType,
                                              outputOrigType,
                                              outputSubstType,
                                              outputParam);
-      Outputs.push_back(output);
+      InnerArgs.push_back(output);
       return;
     }
 
@@ -1207,18 +1222,18 @@ private:
 
       translateAndExplodeOutOf(inputOrigType, inputTupleType,
                                outputOrigType, outputTupleType,
-                               claimNextInput());
+                               claimNextOuterArg());
       return;
     }
 
     // Okay, we are now working with a single value turning into a
     // single value.
-    auto inputElt = claimNextInput();
-    auto outputEltType = claimNextOutputType();
+    auto inputElt = claimNextOuterArg();
+    auto outputEltType = claimNextInnerParam();
     auto output = translateSingle(inputOrigType, inputSubstType,
                                   outputOrigType, outputSubstType,
                                   inputElt, outputEltType);
-    Outputs.push_back(output);
+    InnerArgs.push_back(output);
   }
 
   void translateToSingleParam(FunctionInputGenerator &inputParam,
@@ -1243,7 +1258,7 @@ private:
                                       outputParam);
     }
 
-    auto input = claimNextInput();
+    auto input = claimNextOuterArg();
     return translateSingle(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType,
                            input, outputParam);
@@ -1333,12 +1348,12 @@ private:
 
     if (outputSubstParam.isInOut()) {
       assert(inputSubstParam.isInOut());
-      auto outputLoweredTy = claimNextOutputType();
+      auto outputLoweredTy = claimNextInnerParam();
 
       ManagedValue output = translateInOut(inputOrigType, inputSubstType,
                                            outputOrigType, outputSubstType,
                                            inputValue, outputLoweredTy);
-      Outputs.push_back(output);
+      InnerArgs.push_back(output);
     } else if (outputOrigType.isTuple()) {
       translateAndExplodeOutOf(inputOrigType,
                                cast<TupleType>(inputSubstType),
@@ -1346,11 +1361,11 @@ private:
                                cast<TupleType>(outputSubstType),
                                inputValue);
     } else {
-      auto outputParam = claimNextOutputType();
+      auto outputParam = claimNextInnerParam();
       ManagedValue output = translateSingle(inputOrigType, inputSubstType,
                                             outputOrigType, outputSubstType,
                                             inputValue, outputParam);
-      Outputs.push_back(output);
+      InnerArgs.push_back(output);
     }
   }
 
@@ -1382,7 +1397,7 @@ private:
                                            cast<TupleType>(outputEltType),
                                            loweredOutputEltTy);
       } else {
-        elt = claimNextInput();
+        elt = claimNextOuterArg();
 
         // Load if necessary.
         if (elt.getType().isAddress()) {
@@ -1560,14 +1575,14 @@ private:
                                  outputEltTupleType,
                                  inputEltAddr);
       } else {
-        auto outputType = claimNextOutputType();
+        auto outputType = claimNextInnerParam();
         auto output = translateSingle(inputEltOrigType,
                                       inputEltSubstType,
                                       outputEltOrigType,
                                       outputEltSubstType,
                                       inputEltAddr,
                                       outputType);
-        Outputs.push_back(output);
+        InnerArgs.push_back(output);
       }
     }
   }
@@ -1611,7 +1626,7 @@ private:
                                 eltInit);
       } else {
         // Otherwise, we come from a single value.
-        auto input = claimNextInput();
+        auto input = claimNextOuterArg();
         translateSingleInto(inputEltOrigType, inputEltSubstType,
                             outputEltOrigType, outputEltSubstType,
                             input, eltAddr->getType(), eltInit);
@@ -1848,8 +1863,8 @@ private:
                                     loweredOutputTy, context);
   }
 
-  ManagedValue claimNextInput() {
-    return Inputs.claimNext();
+  ManagedValue claimNextOuterArg() {
+    return OuterArgs.claimNext();
   }
 
   /// Claim the next lowered parameter in the output.  The conventions in
@@ -1857,7 +1872,7 @@ private:
   /// is also responsible for adding the output to Outputs.  This allows
   /// readers to easily verify that this is done on all paths.  (It'd
   /// sure be nice if we had better language mode for that, though.)
-  SILParameterInfo claimNextOutputType() {
+  SILParameterInfo claimNextInnerParam() {
     return claimNext(OutputTypes);
   }
 };
@@ -2453,10 +2468,7 @@ namespace {
 ///   - building a list of SILValues for each of the inner indirect results
 ///   - building a list of Operations to perform which will reabstract
 ///     the inner results to match the outer.
-class ResultPlanner {
-  SILGenFunction &SGF;
-  SILLocation Loc;
-
+class ResultPlanner : public TranslatorBase<ResultPlanner> {
   /// A single result-translation operation.
   struct Operation {
     enum Kind {
@@ -2574,25 +2586,25 @@ class ResultPlanner {
   SmallVector<Operation, 8> Operations;
   ArrayRef<SILResultInfo> AllOuterResults;
   ArrayRef<SILResultInfo> AllInnerResults;
-  SmallVectorImpl<SILValue> &InnerIndirectResultAddrs;
-  size_t NextOuterIndirectResultIndex = 0;
+  SmallVectorImpl<SILValue> &InnerArgs;
 
 public:
   ResultPlanner(SILGenFunction &SGF, SILLocation loc,
-                SmallVectorImpl<SILValue> &innerIndirectResultAddrs)
-    : SGF(SGF), Loc(loc),
-      InnerIndirectResultAddrs(innerIndirectResultAddrs) {}
+                ArrayRef<ManagedValue> outerArgs,
+                SmallVectorImpl<SILValue> &innerArgs)
+    : TranslatorBase(SGF, loc, outerArgs),
+      InnerArgs(innerArgs) {}
 
   void plan(AbstractionPattern innerOrigType, CanType innerSubstType,
             AbstractionPattern outerOrigType, CanType outerSubstType,
             CanSILFunctionType innerFnType, CanSILFunctionType outerFnType) {
     // Assert that the indirect results are set up like we expect.
-    assert(InnerIndirectResultAddrs.empty());
+    assert(InnerArgs.empty());
     assert(SGF.F.begin()->args_size()
            >= SILFunctionConventions(outerFnType, SGF.SGM.M)
                   .getNumIndirectSILResults());
 
-    InnerIndirectResultAddrs.reserve(
+    InnerArgs.reserve(
         SILFunctionConventions(innerFnType, SGF.SGM.M)
             .getNumIndirectSILResults());
 
@@ -2606,12 +2618,10 @@ public:
     // information we needed.
     assert(AllOuterResults.empty());
     assert(AllInnerResults.empty());
-    assert(InnerIndirectResultAddrs.size() ==
+    assert(InnerArgs.size() ==
            SILFunctionConventions(innerFnType, SGF.SGM.M)
                .getNumIndirectSILResults());
-    assert(NextOuterIndirectResultIndex
-           == SILFunctionConventions(outerFnType, SGF.SGM.M)
-                  .getNumIndirectSILResults());
+    OuterArgs.finish();
   }
 
   SILValue execute(SILValue innerResult, CanSILFunctionType innerFuncTy);
@@ -2754,7 +2764,7 @@ private:
 
     SILValue resultAddr;
     if (SGF.silConv.isSILIndirect(result)) {
-      resultAddr = SGF.F.begin()->getArgument(NextOuterIndirectResultIndex++);
+      resultAddr = OuterArgs.claimNext().getLValueAddress();
     }
 
     return { result, resultAddr };
@@ -2768,7 +2778,7 @@ private:
     auto temporary =
         SGF.emitTemporaryAllocation(Loc,
                             SGF.getSILType(innerResult, CanSILFunctionType()));
-    InnerIndirectResultAddrs.push_back(temporary);
+    InnerArgs.push_back(temporary);
     return temporary;
   }
 
@@ -2778,7 +2788,7 @@ private:
     auto temporary =
         SGF.emitTemporaryPackAllocation(Loc,
                             SGF.getSILType(innerResult, CanSILFunctionType()));
-    InnerIndirectResultAddrs.push_back(temporary);
+    InnerArgs.push_back(temporary);
     return temporary;
   }
 
@@ -2844,7 +2854,7 @@ private:
   /// Cause the next inner indirect result to be emitted directly into
   /// the given outer result address.
   void addInPlace(SILValue outerResultAddr) {
-    InnerIndirectResultAddrs.push_back(outerResultAddr);
+    InnerArgs.push_back(outerResultAddr);
     // Does not require an Operation.
   }
 
@@ -4368,7 +4378,8 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
   SmallVector<ManagedValue, 8> params;
-  SGF.collectThunkParams(loc, params);
+  SmallVector<ManagedValue, 4> indirectResultParams;
+  SGF.collectThunkParams(loc, params, &indirectResultParams);
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -4412,7 +4423,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // Plan the results.  This builds argument values for all the
   // inner indirect results.
-  ResultPlanner resultPlanner(SGF, loc, argValues);
+  ResultPlanner resultPlanner(SGF, loc, indirectResultParams, argValues);
   resultPlanner.plan(inputOrigType.getFunctionResultType(),
                      inputSubstType.getResult(),
                      outputOrigType.getFunctionResultType(),
@@ -4723,7 +4734,7 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
   SmallVector<ManagedValue, 8> params;
-  SmallVector<SILArgument*, 8> indirectResults;
+  SmallVector<ManagedValue, 8> indirectResults;
   SGF.collectThunkParams(loc, params, &indirectResults);
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
@@ -4736,8 +4747,8 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
 
   SmallVector<SILValue, 8> argValues;
   if (!indirectResults.empty()) {
-    for (auto *result : indirectResults)
-      argValues.push_back(SILValue(result));
+    for (auto result : indirectResults)
+      argValues.push_back(result.getLValueAddress());
   }
 
   // Forward indirect result arguments.
@@ -4924,15 +4935,15 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
   SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
   SmallVector<ManagedValue, 4> params;
-  SmallVector<SILArgument *, 4> thunkIndirectResults;
+  SmallVector<ManagedValue, 4> thunkIndirectResults;
   thunkSGF.collectThunkParams(loc, params, &thunkIndirectResults);
 
   SILFunctionConventions fromConv(fromType, getModule());
   SILFunctionConventions toConv(toType, getModule());
   if (!toConv.useLoweredAddresses()) {
     SmallVector<ManagedValue, 4> thunkArguments;
-    for (auto *indRes : thunkIndirectResults)
-      thunkArguments.push_back(ManagedValue::forLValue(indRes));
+    for (auto indRes : thunkIndirectResults)
+      thunkArguments.push_back(indRes);
     thunkArguments.append(params.begin(), params.end());
     SmallVector<SILParameterInfo, 4> toParameters(
         toConv.getParameters().begin(), toConv.getParameters().end());
@@ -5011,8 +5022,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   }
 
   SmallVector<ManagedValue, 4> thunkArguments;
-  for (auto *indRes : thunkIndirectResults)
-    thunkArguments.push_back(ManagedValue::forLValue(indRes));
+  thunkArguments.append(thunkIndirectResults.begin(),
+                        thunkIndirectResults.end());
   thunkArguments.append(params.begin(), params.end());
   SmallVector<SILParameterInfo, 4> toParameters(toConv.getParameters().begin(),
                                                 toConv.getParameters().end());
@@ -5196,7 +5207,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
         toConv.getSILType(toRes, thunkSGF.getTypeExpansionContext());
     assert(resultTy.isAddress());
     auto indRes = *toIndResultsIter++;
-    thunkSGF.emitSemanticStore(loc, *fromDirResultsIter++, indRes,
+    thunkSGF.emitSemanticStore(loc, *fromDirResultsIter++,
+                               indRes.getLValueAddress(),
                                thunkSGF.getTypeLowering(resultTy),
                                IsInitialization);
   }
@@ -5257,7 +5269,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
 
   SILGenFunction thunkSGF(*this, *thunk, customDerivativeFn->getDeclContext());
   SmallVector<ManagedValue, 4> params;
-  SmallVector<SILArgument *, 4> indirectResults;
+  SmallVector<ManagedValue, 4> indirectResults;
   thunkSGF.collectThunkParams(loc, params, &indirectResults);
 
   auto *fnRef = thunkSGF.B.createFunctionRef(loc, customDerivativeFn);
@@ -5300,8 +5312,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
 
   // Collect thunk arguments, converting ownership.
   SmallVector<SILValue, 8> arguments;
-  for (auto *indRes : indirectResults)
-    arguments.push_back(indRes);
+  for (auto indRes : indirectResults)
+    arguments.push_back(indRes.getLValueAddress());
   forwardFunctionArguments(thunkSGF, loc, fnRefType, params, arguments);
 
   // Apply function argument.
@@ -5678,7 +5690,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   Scope scope(Cleanups, cleanupLoc);
 
   SmallVector<ManagedValue, 8> thunkArgs;
-  collectThunkParams(loc, thunkArgs);
+  SmallVector<ManagedValue, 8> thunkIndirectResults;
+  collectThunkParams(loc, thunkArgs, &thunkIndirectResults);
 
   CanSILFunctionType derivedFTy;
   if (baseLessVisibleThanDerived) {
@@ -5728,7 +5741,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 
   if (coroutineKind == SILCoroutineKind::None) {
     // First, indirect results.
-    resultPlanner.emplace(*this, loc, args);
+    resultPlanner.emplace(*this, loc, thunkIndirectResults, args);
     resultPlanner->plan(outputOrigType.getFunctionResultType(),
                         outputSubstType.getResult(),
                         inputOrigType.getFunctionResultType(),
@@ -5982,7 +5995,8 @@ void SILGenFunction::emitProtocolWitness(
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> origParams;
-  collectThunkParams(loc, origParams);
+  SmallVector<ManagedValue, 8> thunkIndirectResults;
+  collectThunkParams(loc, origParams, &thunkIndirectResults);
 
   if (witness.getDecl()->requiresUnavailableDeclABICompatibilityStubs())
     emitApplyOfUnavailableCodeReached();
@@ -6111,7 +6125,7 @@ void SILGenFunction::emitProtocolWitness(
   llvm::Optional<ResultPlanner> resultPlanner;
   if (coroutineKind == SILCoroutineKind::None) {
     //   - indirect results
-    resultPlanner.emplace(*this, loc, args);
+    resultPlanner.emplace(*this, loc, thunkIndirectResults, args);
     resultPlanner->plan(witnessOrigTy.getFunctionResultType(),
                         witnessSubstTy.getResult(),
                         reqtOrigTy.getFunctionResultType(),
