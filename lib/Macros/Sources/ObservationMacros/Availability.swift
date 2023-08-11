@@ -108,13 +108,3 @@ extension AttributeListSyntax {
     return AttributeListSyntax(elements)
   }
 }
-
-extension DeclGroupSyntax {
-  var availability: AttributeListSyntax? {
-    if let attributes {
-      return attributes.availability
-    } else {
-      return nil
-    }
-  }
-}
