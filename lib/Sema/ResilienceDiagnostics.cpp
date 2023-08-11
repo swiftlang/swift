@@ -280,6 +280,11 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
+  // Skip the special Sendable and Copyable conformances we synthesized in
+  // ASTContext::getBuiltinTupleDecl().
+  if (ext->getParentModule()->isBuiltinModule())
+    return false;
+
   auto originKind = getDisallowedOriginKind(ext, where);
   if (originKind == DisallowedOriginKind::None)
     return false;
