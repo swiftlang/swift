@@ -5968,25 +5968,29 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
     case AssociatedValueCheck::HasAssociatedValues:
       return false;
   }
+
+  bool hasAnyUnavailableValues = false;
+  bool hasAssociatedValues = false;
+
   for (auto elt : getAllElements()) {
     for (auto Attr : elt->getAttrs()) {
       if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-        if (!AvAttr->isInvalid()) {
-          const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAnyUnavailableValues
-            = true;
-        }
+        if (!AvAttr->isInvalid())
+          hasAnyUnavailableValues = true;
       }
     }
 
-    if (elt->hasAssociatedValues()) {
-      const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
-        = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
-      return false;
-    }
+    if (elt->hasAssociatedValues())
+      hasAssociatedValues = true;
   }
-  const_cast<EnumDecl*>(this)->Bits.EnumDecl.HasAssociatedValues
-    = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
-  return true;
+
+  EnumDecl *enumDecl = const_cast<EnumDecl *>(this);
+
+  enumDecl->Bits.EnumDecl.HasAnyUnavailableValues = hasAnyUnavailableValues;
+  enumDecl->Bits.EnumDecl.HasAssociatedValues = static_cast<unsigned>(
+      hasAssociatedValues ? AssociatedValueCheck::HasAssociatedValues
+                          : AssociatedValueCheck::NoAssociatedValues);
+  return !hasAssociatedValues;
 }
 
 bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
