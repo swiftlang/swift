@@ -84,10 +84,6 @@ public:
   llvm::Expected<int> runMain(llvm::ArrayRef<std::string> Args);
 
 private:
-  static llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>>
-  CreateObjLinkingLayer(llvm::orc::ExecutionSession &ES,
-                        const llvm::Triple &TT);
-
   static llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
   CreateLLJIT(CompilerInstance &CI);
 

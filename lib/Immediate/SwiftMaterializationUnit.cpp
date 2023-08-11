@@ -141,16 +141,6 @@ llvm::orc::ObjectTransformLayer &SwiftJIT::getObjTransformLayer() {
   return J->getObjTransformLayer();
 }
 
-llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>>
-SwiftJIT::CreateObjLinkingLayer(llvm::orc::ExecutionSession &ES,
-                                const llvm::Triple &TT) {
-  auto MemMgr = llvm::jitlink::InProcessMemoryManager::Create();
-  if (!MemMgr)
-    return MemMgr.takeError();
-  return std::make_unique<llvm::orc::ObjectLinkingLayer>(ES,
-                                                         std::move(*MemMgr));
-}
-
 llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
 SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
   llvm::TargetOptions TargetOpt;
@@ -170,7 +160,6 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
                   .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
   auto J = llvm::orc::LLJITBuilder()
                .setJITTargetMachineBuilder(std::move(JTMB))
-               .setObjectLinkingLayerCreator(CreateObjLinkingLayer)
                .create();
   if (!J)
     return J.takeError();
