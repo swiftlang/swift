@@ -650,13 +650,16 @@ protected:
                         /// address diversified ptrauth qualified field.
                         IsNonTrivialPtrAuth : 1);
 
-  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1+1,
     /// True if the enum has cases and at least one case has associated values.
     HasAssociatedValues : 2,
     /// True if the enum has at least one case that has some availability
     /// attribute.  A single bit because it's lazily computed along with the
     /// HasAssociatedValues bit.
-    HasAnyUnavailableValues : 1
+    HasAnyUnavailableValues : 1,
+    /// True if \c isAvailableDuringLowering() is false for any cases. Lazily
+    /// computed along with HasAssociatedValues.
+    HasAnyUnavailableDuringLoweringValues : 1
   );
 
   SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
@@ -4293,6 +4296,11 @@ public:
   ///
   /// Note that this is false for enums with absolutely no cases.
   bool hasPotentiallyUnavailableCaseValue() const;
+
+  /// True if \c isAvailableDuringLowering() is false for any cases.
+  ///
+  /// Note that this is false for enums with absolutely no cases.
+  bool hasCasesUnavailableDuringLowering() const;
 
   /// True if the enum has cases.
   bool hasCases() const {

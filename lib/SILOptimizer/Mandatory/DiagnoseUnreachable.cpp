@@ -890,8 +890,12 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   if (!SWI)
     return false;
 
-  // FIXME: Return early if EnumDecl doesn't have any elements that are
-  // unavailable.
+  EnumDecl *ED = SWI->getOperand(0)->getType().getEnumOrBoundGenericEnum();
+  assert(ED && "operand is not an enum");
+
+  // No need to check the instruction if all elements are available.
+  if (!ED->hasCasesUnavailableDuringLowering())
+    return false;
 
   ASTContext &ctx = BB.getModule().getASTContext();
   SILLocation Loc = SWI->getLoc();
