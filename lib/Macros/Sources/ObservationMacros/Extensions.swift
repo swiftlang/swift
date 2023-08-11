@@ -21,12 +21,10 @@ extension VariableDeclSyntax {
   }
   
   var isInstance: Bool {
-    if let modifiers {
-      for modifier in modifiers {
-        for token in modifier.tokens(viewMode: .all) {
-          if token.tokenKind == .keyword(.static) || token.tokenKind == .keyword(.class) {
-            return false
-          }
+    for modifier in modifiers {
+      for token in modifier.tokens(viewMode: .all) {
+        if token.tokenKind == .keyword(.static) || token.tokenKind == .keyword(.class) {
+          return false
         }
       }
     }
@@ -103,7 +101,6 @@ extension VariableDeclSyntax {
   }
   
   func hasMacroApplication(_ name: String) -> Bool {
-    guard let attributes else { return false }
     for attribute in attributes {
       switch attribute {
       case .attribute(let attr):
@@ -179,12 +176,10 @@ extension TypeSyntax {
 
 extension FunctionDeclSyntax {
   var isInstance: Bool {
-    if let modifiers {
-      for modifier in modifiers {
-        for token in modifier.tokens(viewMode: .all) {
-          if token.tokenKind == .keyword(.static) || token.tokenKind == .keyword(.class) {
-            return false
-          }
+    for modifier in modifiers {
+      for token in modifier.tokens(viewMode: .all) {
+        if token.tokenKind == .keyword(.static) || token.tokenKind == .keyword(.class) {
+          return false
         }
       }
     }

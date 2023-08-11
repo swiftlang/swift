@@ -168,7 +168,7 @@ extension OptionSetMacro: MemberMacro {
     }
 
     // Dig out the access control keyword we need.
-    let access = decl.modifiers?.first(where: \.isNeededAccessLevelModifier)
+    let access = decl.modifiers.first(where: \.isNeededAccessLevelModifier)
 
     let staticVars = caseElements.map { (element) -> DeclSyntax in
       """
