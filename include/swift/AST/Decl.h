@@ -1237,7 +1237,10 @@ public:
   /// Returns true if this declaration should be considered available during
   /// SIL/IR lowering. A declaration would not be available during lowering if,
   /// for example, it is annotated as unavailable with `@available` and
-  /// optimization settings require that it be omitted.
+  /// optimization settings require that it be omitted. Canonical SIL must not
+  /// contain any references to declarations that are unavailable during
+  /// lowering because the resulting IR could reference non-existent symbols
+  /// and fail to link.
   bool isAvailableDuringLowering() const;
 
   /// Returns true if ABI compatibility stubs must be emitted for the given
@@ -4204,6 +4207,11 @@ public:
   /// A range for iterating the elements of an enum.
   using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
 
+  /// A range for iterating the elements of an enum that are available during
+  /// lowering.
+  using ElementRangeForLowering = OptionalTransformRange<
+      ElementRange, AvailableDuringLoweringDeclFilter<EnumElementDecl>>;
+
   /// A range for iterating the cases of an enum.
   using CaseRange = DowncastFilterRange<EnumCaseDecl, DeclRange>;
 
@@ -4215,6 +4223,13 @@ public:
   unsigned getNumElements() const {
     auto eltRange = getAllElements();
     return std::distance(eltRange.begin(), eltRange.end());
+  }
+
+  /// Returns a range that iterates over all the elements of an enum for which
+  /// \c isAvailableDuringLowering() is true.
+  ElementRangeForLowering getAllElementsForLowering() const {
+    return ElementRangeForLowering(
+        getAllElements(), AvailableDuringLoweringDeclFilter<EnumElementDecl>());
   }
 
   /// If this enum has a unique element, return it. A unique element can
