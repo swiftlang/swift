@@ -93,6 +93,9 @@ public protocol Comparable {
 
 sil [ossa] @unknown : $@convention(thin) () -> ()
 sil [ossa] @getT : $@convention(thin) <T> () -> @out T
+sil [ossa] @getKlass : $@convention(thin) () -> (@owned Klass)
+sil [ossa] @borrowKlass : $(@in_guaranteed Klass) -> ()
+sil [ossa] @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil [ossa] @getPair : $@convention(thin) <T> () -> @out Pair<T>
 sil [ossa] @getOwned : $@convention(thin) <T : AnyObject> () -> (@owned T)
 sil [ossa] @takeGuaranteedObject : $@convention(thin) (@guaranteed AnyObject) -> ()
@@ -2517,6 +2520,101 @@ bb0:
   %out = enum $PairEnum<T>, #PairEnum.it!enumelt, %pair_out : $(T, T)
   destroy_value %out : $PairEnum<T>
   destroy_value %second_in : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_1_addronly_heap : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[GET:%[^,]+]] = function_ref @getT
+// CHECK:         apply [[GET]]<T>([[STACK]])
+// CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowT
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [[BORROW]]<T>([[STACK]])
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_1_addronly_heap'
+sil [ossa] @test_partial_apply_1_addronly_heap : $<T> () -> () {
+  %get = function_ref @getT : $@convention(thin) <T> () -> (@out T)
+  %instance = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
+  %callee = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %closure = partial_apply [callee_guaranteed] %callee<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %closure() : $@callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_2_addronly_stack : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[GET:%[^,]+]] = function_ref @getT
+// CHECK:         apply [[GET]]<T>([[STACK]])
+// CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowT
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW]]<T>([[STACK]])
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_2_addronly_stack'
+sil [ossa] @test_partial_apply_2_addronly_stack : $<T> () -> () {
+  %get = function_ref @getT : $@convention(thin) <T> () -> (@out T)
+  %instance = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
+  %callee = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %callee<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %closure() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_3_loadable_heap : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getKlass
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowKlass
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Klass
+// CHECK:         store [[INSTANCE]] to [init] [[ADDR]]
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [[BORROW]]([[ADDR]])
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_3_loadable_heap'
+sil [ossa] @test_partial_apply_3_loadable_heap : $() -> () {
+  %get = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %instance = apply %get() : $@convention(thin) () -> (@owned Klass)
+  %callee = function_ref @borrowKlass : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %closure = partial_apply [callee_guaranteed] %callee(%instance) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  apply %closure() : $@callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  // destroy_value %instance : $Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_4_loadable_stack : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getKlass
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowKlass
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $Klass
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[STORAGE_LIFETIME:%[^,]+]] = store_borrow [[LIFETIME]] to [[STACK]]
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW]]([[STORAGE_LIFETIME]])
+// FIXME: These end_borrows must be _after_ the apply of the closure!
+// CHECK:         end_borrow [[STORAGE_LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK:         apply [[CLOSURE]]() : $@noescape @callee_guaranteed () -> ()
+// CHECK:         destroy_value [[CLOSURE]] : $@noescape @callee_guaranteed () -> ()
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_4_loadable_stack'
+sil [ossa] @test_partial_apply_4_loadable_stack : $() -> () {
+  %get = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %instance = apply %get() : $@convention(thin) () -> (@owned Klass)
+  %callee = function_ref @borrowKlass : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %callee(%instance) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  apply %closure() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  destroy_value %instance : $Klass
   %retval = tuple ()
   return %retval : $()
 }
