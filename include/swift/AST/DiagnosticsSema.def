@@ -1800,6 +1800,11 @@ NOTE(objc_implementation_one_matched_requirement,none,
      "'@objc(%3)' to use it}2",
      (ValueDecl *, ObjCSelector, bool, StringRef))
 
+WARNING(wrap_objc_implementation_will_become_error,none,
+        "%0; this will become an error before '@_objcImplementation' is "
+        "stabilized",
+        (DiagnosticInfo *))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,
