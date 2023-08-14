@@ -312,6 +312,9 @@ bool Decl::isAvailableDuringLowering() const {
       UnavailableDeclOptimization::Complete)
     return true;
 
+  if (hasClangNode())
+    return true;
+
   return !isUnconditionallyUnavailable(this);
 }
 
