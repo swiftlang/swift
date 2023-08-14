@@ -509,7 +509,7 @@ struct AddressLoweringState {
   // Applies with indirect results are removed as they are rewritten. Applies
   // with only indirect arguments are rewritten in a post-pass, only after all
   // parameters are rewritten.
-  SmallBlotSetVector<FullApplySite, 16> indirectApplies;
+  SmallBlotSetVector<ApplySite, 16> indirectApplies;
 
   // unconditional_checked_cast instructions of loadable type which need to be
   // rewritten.
@@ -732,7 +732,7 @@ public:
   void mapValueStorage();
 
 protected:
-  void checkForIndirectApply(FullApplySite applySite);
+  void checkForIndirectApply(ApplySite applySite);
   void visitValue(SILValue value);
   void canonicalizeReturnValues();
 };
@@ -755,7 +755,7 @@ void OpaqueValueVisitor::mapValueStorage() {
       }
     }
     for (auto &inst : *block) {
-      if (auto apply = FullApplySite::isa(&inst))
+      if (auto apply = ApplySite::isa(&inst))
         checkForIndirectApply(apply);
 
       if (auto *yieldInst = dyn_cast<YieldInst>(&inst)) {
@@ -774,7 +774,7 @@ void OpaqueValueVisitor::mapValueStorage() {
 }
 
 /// Populate `indirectApplies`.
-void OpaqueValueVisitor::checkForIndirectApply(FullApplySite applySite) {
+void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
   auto calleeConv = applySite.getSubstCalleeConv();
   unsigned calleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
   for (Operand &operand : applySite.getArgumentOperands()) {
@@ -2228,7 +2228,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // Allocate temporary storage for a loadable operand.
   AllocStackInst *allocInst =
       argBuilder.createAllocStack(callLoc, argValue->getType());
-  if (apply.getArgumentConvention(*operand).isOwnedConvention()) {
+  if (apply.getCaptureConvention(*operand).isOwnedConvention()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
     apply.insertAfterApplication([&](SILBuilder &callBuilder) {
@@ -4139,10 +4139,17 @@ protected:
 
 // Rewrite applies with indirect parameters or results of loadable types which
 // were not visited during opaque value rewriting.
-static void rewriteIndirectApply(FullApplySite apply,
+static void rewriteIndirectApply(ApplySite anyApply,
                                  AddressLoweringState &pass) {
   // If all indirect args were loadable, then they still need to be rewritten.
-  CallArgRewriter(apply, pass).rewriteArguments();
+  CallArgRewriter(anyApply, pass).rewriteArguments();
+
+  auto apply = anyApply.asFullApplySite();
+  if (!apply) {
+    // The "result" of the partial_apply isn't rewritten.
+    assert(anyApply.getKind() == ApplySiteKind::PartialApplyInst);
+    return;
+  }
 
   switch (apply.getKind()) {
   case FullApplySiteKind::ApplyInst:
