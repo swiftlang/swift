@@ -127,7 +127,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
-  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
+  //expected-error@-1 {{key path value type 'WritableKeyPath<A, Prop>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, Prop>'}}
 
   let _: (A) -> A = \.[sub]
   let _: PartialKeyPath<A> = \.[sub]
@@ -168,7 +168,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: PartialKeyPath<C<A>> = \C.value
   let _: KeyPath<C<A>, A> = \C.value
   let _: WritableKeyPath<C<A>, A> = \C.value
-  // expected-error@+1{{cannot convert}}
+  // expected-error@+1{{key path value type 'WritableKeyPath<C<A>, A>' cannot be converted to contextual type 'ReferenceWritableKeyPath<C<A>, A>'}}
   let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
   let _: (Prop) -> B = \.nonMutatingProperty
