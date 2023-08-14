@@ -104,7 +104,7 @@ bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
 }
 
 void ModuleDependencyInfo::addModuleDependency(ModuleDependencyID dependencyID) {
-  storage->resolvedModuleDependencies.push_back(dependencyID);
+  storage->resolvedDirectModuleDependencies.push_back(dependencyID);
 }
 
 void ModuleDependencyInfo::addOptionalModuleImport(
@@ -622,8 +622,8 @@ ModuleDependenciesCache::ModuleDependenciesCache(
     std::string scannerContextHash)
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
-      moduleOutputPath(moduleOutputPath),
       scannerContextHash(scannerContextHash),
+      moduleOutputPath(moduleOutputPath),
       clangScanningTool(*globalScanningService.ClangScanningService,
                         globalScanningService.getClangScanningFS()) {
   globalScanningService.configureForContextHash(scannerContextHash);
@@ -687,7 +687,7 @@ void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID module
   assert(optionalDependencyInfo.has_value() && "Resolving unknown dependency");
   // Copy the existing info to a mutable one we can then replace it with, after resolving its dependencies.
   auto dependencyInfo = *(optionalDependencyInfo.value());
-  dependencyInfo.resolveDependencies(dependencyIDs);
+  dependencyInfo.resolveDirectDependencies(dependencyIDs);
   updateDependency(moduleID, dependencyInfo);
 }
 

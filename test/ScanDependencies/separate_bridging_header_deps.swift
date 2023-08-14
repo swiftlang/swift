@@ -17,7 +17,7 @@ import E
 // CHECK-DAG:          "swift": "_StringProcessing"
 // The source of dependency on clang:F is the bridging header, ensure it is captured here
 // CHECK-DAG:          "clang": "F"
-// CHECK-DAG:          "swift": "F"
+
 
 // CHECK: "bridgingHeader": {
 // CHECK-NEXT:             "path": "{{.*}}Bridging.h",
@@ -27,3 +27,9 @@ import E
 // CHECK-NEXT:            ],
 // CHECK-NEXT:            "moduleDependencies": [
 // CHECK-NEXT:              "F"
+
+// CHECK:      "swiftOverlayDependencies": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:      "swift": "F"
+// CHECK-NEXT:   }
+// CHECK-NEXT: ]
