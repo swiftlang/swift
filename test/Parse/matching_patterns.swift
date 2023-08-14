@@ -56,7 +56,7 @@ case _: // expected-warning {{case is already handled by previous patterns; cons
 
 var e : Any = 0
 
-switch e { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch e { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 // 'is' pattern.
 case is Int,
      is A<Int>,

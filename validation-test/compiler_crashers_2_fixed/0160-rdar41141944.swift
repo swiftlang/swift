@@ -4,7 +4,7 @@
 import Foundation
 
 @objc protocol P {
-  func foo(a arg: Int) // expected-note {{protocol requires function 'foo(a:)' with type '(Int) -> ()'; do you want to add a stub?}}
+  func foo(a arg: Int) // expected-note {{protocol requires function 'foo(a:)' with type '(Int) -> ()'; add a stub for conformance}}
 }
 
 class C : P {

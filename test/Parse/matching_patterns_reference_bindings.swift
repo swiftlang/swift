@@ -68,7 +68,7 @@ case (inout a, inout a): // expected-error {{invalid redeclaration of 'a'}}
 
 var e : Any = 0
 
-switch e { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch e { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 // 'is' pattern.
 case is Int,
      is A<Int>,

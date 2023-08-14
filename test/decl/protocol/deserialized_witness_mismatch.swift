@@ -9,7 +9,7 @@ import deserialized_witness_mismatch_other
 
 protocol HasCurrent {
   var current: Self { get }
-  // expected-note@-1 {{protocol requires property 'current' with type 'TimeZone'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires property 'current' with type 'TimeZone'; add a stub for conformance}}
 }
 
 extension TimeZone : HasCurrent {}

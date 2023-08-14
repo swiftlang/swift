@@ -9,7 +9,7 @@ public enum NonExhaustive {
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive) {
   switch value { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 {{do you want to add missing cases?}}
+  // expected-note@-1 {{add missing cases}}
   case .a: break
   }
 
@@ -21,7 +21,7 @@ public func testNonExhaustive(_ value: NonExhaustive) {
   }
 
   // expected-error@+2 {{switch must be exhaustive}}
-  // expected-note@+1 {{do you want to add missing cases?}} {{+1:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n@unknown default:\n<#code#>\n}}
+  // expected-note@+1 {{add missing cases}} {{+1:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n@unknown default:\n<#code#>\n}}
   switch value {
   }
 

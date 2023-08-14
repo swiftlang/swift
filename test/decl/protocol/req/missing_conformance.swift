@@ -4,8 +4,8 @@
 // in various ways.
 
 protocol LikeSetAlgebra {
-    func onion(_ other: Self) -> Self // expected-note {{protocol requires function 'onion' with type '(X) -> X'; do you want to add a stub?}}
-    func indifference(_ other: Self) -> Self // expected-note {{protocol requires function 'indifference' with type '(X) -> X'; do you want to add a stub?}}
+    func onion(_ other: Self) -> Self // expected-note {{protocol requires function 'onion' with type '(X) -> X'; add a stub for conformance}}
+    func indifference(_ other: Self) -> Self // expected-note {{protocol requires function 'indifference' with type '(X) -> X'; add a stub for conformance}}
 
 }
 protocol LikeOptionSet : LikeSetAlgebra, RawRepresentable {}
@@ -31,8 +31,8 @@ struct Y : LikeSequence {} // expected-error {{type 'Y' does not conform to prot
 
 protocol P1 {
     associatedtype Result
-    func get() -> Result // expected-note {{protocol requires function 'get()' with type '() -> Result'; do you want to add a stub?}}
-    func got() // expected-note {{protocol requires function 'got()' with type '() -> ()'; do you want to add a stub?}}
+    func get() -> Result // expected-note {{protocol requires function 'get()' with type '() -> Result'; add a stub for conformance}}
+    func got() // expected-note {{protocol requires function 'got()' with type '() -> ()'; add a stub for conformance}}
 }
 protocol P2 {
     static var singularThing: Self { get }
@@ -48,7 +48,7 @@ extension P1 where Self : P3 {
 struct Z<T1, T2, T3, Result, T4> : P1 {} // expected-error {{type 'Z<T1, T2, T3, Result, T4>' does not conform to protocol 'P1'}}
 
 protocol P4 {
-    func this() // expected-note 2 {{protocol requires function 'this()' with type '() -> ()'; do you want to add a stub?}}
+    func this() // expected-note 2 {{protocol requires function 'this()' with type '() -> ()'; add a stub for conformance}}
 }
 protocol P5 {}
 extension P4 where Self : P5 {
@@ -82,7 +82,7 @@ struct B : P8 { // expected-error {{type 'B' does not conform to protocol 'P8'}}
 }
 
 protocol P9 {
-    func foo() // expected-note {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+    func foo() // expected-note {{protocol requires function 'foo()' with type '() -> ()'; add a stub for conformance}}
 }
 class C2 {}
 extension P9 where Self : C2 {
@@ -92,7 +92,7 @@ class C3 : P9 {} // expected-error {{type 'C3' does not conform to protocol 'P9'
 
 protocol P10 {
     associatedtype A
-    func bar() // expected-note {{protocol requires function 'bar()' with type '() -> ()'; do you want to add a stub?}}
+    func bar() // expected-note {{protocol requires function 'bar()' with type '() -> ()'; add a stub for conformance}}
 }
 extension P10 where A == Int {
     func bar() {} // expected-note {{candidate would match if 'A' was the same type as 'Int'}}

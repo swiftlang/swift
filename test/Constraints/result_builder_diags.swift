@@ -641,7 +641,7 @@ struct MyView {
   }
 
   @TupleBuilder var emptySwitch: some P {
-    switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
+    switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}}
     }
   }
 

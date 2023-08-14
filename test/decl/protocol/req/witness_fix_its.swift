@@ -8,14 +8,14 @@ postfix operator ^^^^
 import OtherOS
 
 protocol Foo {
-  var bar1: Int { get set } // expected-note {{protocol requires property 'bar1' with type 'Int'; do you want to add a stub?}}
-  static var bar2: Int { get set } // expected-note {{protocol requires property 'bar2' with type 'Int'; do you want to add a stub?}}
-  var bar3: Int { get set } // expected-note {{protocol requires property 'bar3' with type 'Int'; do you want to add a stub?}}
-  static prefix func ^^^(value: Self) -> Int // expected-note {{protocol requires function '^^^' with type '(ConformsToFoo) -> Int'; do you want to add a stub?}}
-  static postfix func ^^^^(value: Self) -> Int // expected-note {{protocol requires function '^^^^' with type '(ConformsToFoo) -> Int'; do you want to add a stub?}}
-  func bar4(closure: () throws -> Int) rethrows // expected-note {{protocol requires function 'bar4(closure:)' with type '(() throws -> Int) throws -> ()'; do you want to add a stub?}}
-  var bar5: Int { get set } // expected-note {{protocol requires property 'bar5' with type 'Int'; do you want to add a stub?}}
-  static subscript(_ pos: Int) -> Int { get } // expected-note {{protocol requires subscript with type '(Int) -> Int'; do you want to add a stub?}}
+  var bar1: Int { get set } // expected-note {{protocol requires property 'bar1' with type 'Int'; add a stub for conformance}}
+  static var bar2: Int { get set } // expected-note {{protocol requires property 'bar2' with type 'Int'; add a stub for conformance}}
+  var bar3: Int { get set } // expected-note {{protocol requires property 'bar3' with type 'Int'; add a stub for conformance}}
+  static prefix func ^^^(value: Self) -> Int // expected-note {{protocol requires function '^^^' with type '(ConformsToFoo) -> Int'; add a stub for conformance}}
+  static postfix func ^^^^(value: Self) -> Int // expected-note {{protocol requires function '^^^^' with type '(ConformsToFoo) -> Int'; add a stub for conformance}}
+  func bar4(closure: () throws -> Int) rethrows // expected-note {{protocol requires function 'bar4(closure:)' with type '(() throws -> Int) throws -> ()'; add a stub for conformance}}
+  var bar5: Int { get set } // expected-note {{protocol requires property 'bar5' with type 'Int'; add a stub for conformance}}
+  static subscript(_ pos: Int) -> Int { get } // expected-note {{protocol requires subscript with type '(Int) -> Int'; add a stub for conformance}}
 }
 
 struct ConformsToFoo: Foo { // expected-error {{type 'ConformsToFoo' does not conform to protocol 'Foo'}}
@@ -32,7 +32,7 @@ struct ConformsToFoo: Foo { // expected-error {{type 'ConformsToFoo' does not co
 }
 
 protocol Foo1 {
-  subscript(value: Bool) -> Bool { get set } // expected-note {{protocol requires subscript with type '(Bool) -> Bool'; do you want to add a stub?}}
+  subscript(value: Bool) -> Bool { get set } // expected-note {{protocol requires subscript with type '(Bool) -> Bool'; add a stub for conformance}}
 }
 
 struct ConformsToFoo1: Foo1 { // expected-error {{type 'ConformsToFoo1' does not conform to protocol 'Foo1'}}
@@ -43,7 +43,7 @@ struct ConformsToFoo1: Foo1 { // expected-error {{type 'ConformsToFoo1' does not
 // This protocol requirement must conflict with the one in
 // witness_fix_its_other_module.swift.
 protocol RenameableProtocol {
-  var name: String { get set } // expected-note {{protocol requires property 'name' with type 'String'; do you want to add a stub?}}
+  var name: String { get set } // expected-note {{protocol requires property 'name' with type 'String'; add a stub for conformance}}
 }
 
 extension Linux: RenameableProtocol {} // expected-error {{type 'Linux' does not conform to protocol 'RenameableProtocol'}}

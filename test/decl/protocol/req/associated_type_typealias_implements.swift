@@ -4,7 +4,7 @@ protocol P { }
 
 protocol Q {
   associatedtype T
-  associatedtype U // expected-note 2{{protocol requires nested type 'U'; do you want to add it?}}
+  associatedtype U // expected-note 2{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
 }
 
 protocol R: Q {

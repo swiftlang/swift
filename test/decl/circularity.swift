@@ -60,7 +60,7 @@ extension SIMD3 where SIMD3.Scalar == Float {
 // Test case with circular overrides
 protocol P {
     associatedtype A
-    // expected-note@-1 {{protocol requires nested type 'A'; do you want to add it?}}
+    // expected-note@-1 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
     func run(a: A)
 }
 

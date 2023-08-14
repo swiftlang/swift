@@ -2689,9 +2689,9 @@ NOTE(inherited_protocol_does_not_conform,none,
 NOTE(no_witnesses,none,
      "protocol requires "
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
-     "%select{|; do you want to add a stub?}3",
+     "%select{|; add a stub for conformance}3",
      (RequirementKind, const ValueDecl *, Type, bool))
-NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
+NOTE(missing_witnesses_general,none, "add stubs for conformance",
      ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
@@ -2704,7 +2704,7 @@ NOTE(ambiguous_witnesses_wrong_name,none,
      "subscript operators}0 with type %2",
      (RequirementKind, const ValueDecl *, Type))
 NOTE(no_witnesses_type,none,
-     "protocol requires nested type %0; do you want to add it?",
+     "protocol requires nested type %0; add nested type %0 for conformance",
      (const AssociatedTypeDecl *))
 NOTE(default_associated_type_req_fail,none,
      "default type %0 for associated type %1 (from protocol %2) "
@@ -6643,16 +6643,15 @@ WARNING(debug_long_expression, none,
 
 ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' "
-      "block; do you want to add a default case?",())
+      "block; add a default case",())
 ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
 ERROR(possibly_non_exhaustive_switch,none,
       "the compiler is unable to check that this switch is exhaustive in reasonable time",
       ())
 
 NOTE(missing_several_cases,none,
-     "do you want to add "
-     "%select{missing cases|a default clause}0"
-     "?", (bool))
+     "add "
+     "%select{missing cases|a default clause}0", (bool))
 NOTE(missing_unknown_case,none,
      "handle unknown values using \"@unknown default\"", ())
 

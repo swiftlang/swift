@@ -3,7 +3,7 @@
 import _Differentiation
 
 protocol TangentVectorP: Differentiable {
-  // expected-note @+1 {{protocol requires property 'requirement' with type 'Int'; do you want to add a stub?}}
+  // expected-note @+1 {{protocol requires property 'requirement' with type 'Int'; add a stub for conformance}}
   var requirement: Int { get }
 }
 
