@@ -7450,11 +7450,6 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
   return false;
 }
 
-/// Whether this property has any attached runtime metadata attributes.
-bool VarDecl::hasRuntimeMetadataAttributes() const {
-  return !getRuntimeDiscoverableAttrs().empty();
-}
-
 bool VarDecl::hasImplicitPropertyWrapper() const {
   if (getAttrs().hasAttribute<CustomAttr>()) {
     if (!getAttachedPropertyWrappers().empty())
@@ -10960,22 +10955,6 @@ void MacroExpansionDecl::forEachExpandedNode(
   auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
   for (auto node : sourceFile->getTopLevelItems())
     callback(node);
-}
-
-NominalTypeDecl *
-ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
-  auto &ctx = getASTContext();
-  auto *nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{attr, getDeclContext()}, nullptr);
-  assert(nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>());
-  return nominal;
-}
-
-ArrayRef<CustomAttr *> Decl::getRuntimeDiscoverableAttrs() const {
-  auto *mutableSelf = const_cast<Decl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           GetRuntimeDiscoverableAttributes{mutableSelf},
-                           nullptr);
 }
 
 /// Adjust the declaration context to find a point in the context hierarchy
