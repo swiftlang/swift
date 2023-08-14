@@ -127,7 +127,7 @@ public:
 
 private:
   LazySwiftMaterializationUnit(SwiftJIT &JIT, CompilerInstance &CI,
-                               SymbolSourceMap Sources,
+                               const SymbolSourceMap *Sources,
                                llvm::orc::SymbolFlagsMap Symbols);
   void materialize(
       std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) override;
@@ -135,7 +135,7 @@ private:
   void discard(const llvm::orc::JITDylib &JD,
                const llvm::orc::SymbolStringPtr &Sym) override;
 
-  SymbolSourceMap Sources;
+  const SymbolSourceMap *Sources;
   SwiftJIT &JIT;
   CompilerInstance &CI;
 };

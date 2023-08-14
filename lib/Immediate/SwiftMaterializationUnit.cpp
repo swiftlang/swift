@@ -293,10 +293,10 @@ LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
   Opts.PublicSymbolsOnly = false;
   auto TBDDesc = TBDGenDescriptor::forModule(M, std::move(Opts));
   SymbolSourceMapRequest SourceReq{TBDDesc};
-  auto Sources =
+  const auto *Sources =
       llvm::cantFail(M->getASTContext().evaluator(std::move(SourceReq)));
   llvm::orc::SymbolFlagsMap PublicInterface;
-  for (const auto &Entry : Sources) {
+  for (const auto &Entry : *Sources) {
     const auto &Source = Entry.getValue();
     if (Source.kind != SymbolSource::Kind::SIL) {
       continue;
@@ -320,10 +320,10 @@ StringRef LazySwiftMaterializationUnit::getName() const {
 }
 
 LazySwiftMaterializationUnit::LazySwiftMaterializationUnit(
-    SwiftJIT &JIT, CompilerInstance &CI, SymbolSourceMap Sources,
+    SwiftJIT &JIT, CompilerInstance &CI, const SymbolSourceMap *Sources,
     llvm::orc::SymbolFlagsMap Symbols)
-    : MaterializationUnit({std::move(Symbols), nullptr}),
-      Sources(std::move(Sources)), JIT(JIT), CI(CI) {}
+    : MaterializationUnit({std::move(Symbols), nullptr}), Sources(Sources),
+      JIT(JIT), CI(CI) {}
 
 void LazySwiftMaterializationUnit::materialize(
     std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) {
@@ -331,9 +331,10 @@ void LazySwiftMaterializationUnit::materialize(
   const auto &RS = MR->getRequestedSymbols();
   for (auto &Sym : RS) {
     auto Name = demangle(*Sym);
-    auto Source = Sources.find(Name);
-    assert(Source && "Requested symbol doesn't have source?");
-    auto Ref = Source->getSILDeclRef();
+    auto itr = Sources->find(Name);
+    assert(itr != Sources->end() && "Requested symbol doesn't have source?");
+    const auto &Source = itr->getValue();
+    auto Ref = Source.getSILDeclRef();
     if (auto *AFD = Ref.getAbstractFunctionDecl()) {
       AFD->getTypecheckedBody();
       if (CI.getASTContext().hadError()) {
@@ -390,7 +391,7 @@ void LazySwiftMaterializationUnit::materialize(
     }
   }
   std::unique_ptr<MaterializationUnit> UnrequestedMU(
-      new LazySwiftMaterializationUnit(JIT, CI, std::move(Sources),
+      new LazySwiftMaterializationUnit(JIT, CI, Sources,
                                        std::move(UnrequestedSymbols)));
   if (auto Err = MR->replace(std::move(UnrequestedMU))) {
     logError(std::move(Err));

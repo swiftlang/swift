@@ -205,50 +205,12 @@ public:
 };
 
 /// Maps a symbol back to its source for lazy compilation.
-class SymbolSourceMap {
-  friend class SymbolSourceMapRequest;
-
-  using Storage = llvm::StringMap<SymbolSource>;
-  const Storage *storage;
-
-  explicit SymbolSourceMap(const Storage *storage) : storage(storage) {
-    assert(storage);
-  }
-
-public:
-  llvm::Optional<SymbolSource> find(StringRef symbol) const {
-    auto result = storage->find(symbol);
-    if (result == storage->end())
-      return llvm::None;
-    return result->second;
-  }
-  
-  Storage::const_iterator begin() const {
-    return storage->begin();
-  }
-  
-  Storage::const_iterator end() const {
-    return storage->end();
-  }
-
-  friend bool operator==(const SymbolSourceMap &lhs,
-                         const SymbolSourceMap &rhs) {
-    return lhs.storage == rhs.storage;
-  }
-  friend bool operator!=(const SymbolSourceMap &lhs,
-                         const SymbolSourceMap &rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend void simple_display(llvm::raw_ostream &out, const SymbolSourceMap &) {
-    out << "(symbol storage map)";
-  }
-};
+using SymbolSourceMap = llvm::StringMap<SymbolSource>;
 
 /// Computes a map of symbols to their SymbolSource for a file or module.
 class SymbolSourceMapRequest
     : public SimpleRequest<SymbolSourceMapRequest,
-                           SymbolSourceMap(TBDGenDescriptor),
+                           const SymbolSourceMap *(TBDGenDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -257,7 +219,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SymbolSourceMap evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+  const SymbolSourceMap *evaluate(Evaluator &evaluator,
+                                  TBDGenDescriptor desc) const;
 
 public:
   // Cached.
