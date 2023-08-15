@@ -887,6 +887,22 @@ public:
   }
 };
 
+template <class Expander>
+class OuterPackArgGenerator {
+  Expander &TheExpander;
+public:
+  using reference = ManagedValue;
+
+  OuterPackArgGenerator(Expander &expander) : TheExpander(expander) {}
+
+  bool isFinished() const { llvm_unreachable("don't call this"); }
+  void finish() { llvm_unreachable("don't call this"); }
+  void advance() { llvm_unreachable("don't call this"); }
+  reference claimNext() const {
+    return TheExpander.claimNextOuterPackArg();
+  }
+};
+
 /// A CRTP helper class for classes that supervise a translation between
 /// inner and outer signatures.
 template <class Impl>
@@ -897,11 +913,12 @@ protected:
   SILGenFunction &SGF;
   SILLocation Loc;
   ArrayRefGenerator<ArrayRef<ManagedValue>> OuterArgs;
+  OuterPackArgGenerator<Impl> OuterPackArgs;
 
 public:
   ExpanderBase(SILGenFunction &SGF, SILLocation loc,
                ArrayRef<ManagedValue> outerArgs)
-    : SGF(SGF), Loc(loc), OuterArgs(outerArgs) {}
+    : SGF(SGF), Loc(loc), OuterArgs(outerArgs), OuterPackArgs(asImpl()) {}
 
   void expand(AbstractionPattern innerOrigType,
               CanType innerSubstType,
@@ -1913,6 +1930,10 @@ private:
     return OuterArgs.claimNext();
   }
 
+  ManagedValue claimNextOuterPackArg() {
+    return claimNextOuterArg();
+  }
+
   /// Claim the next lowered parameter in the inner.  The conventions in
   /// this class are set up such that the place that claims an inner type
   /// is also responsible for adding the inner to inners.  This allows
@@ -2660,9 +2681,9 @@ class ResultPlanner : public ExpanderBase<ResultPlanner> {
 
 public:
   ResultPlanner(SILGenFunction &SGF, SILLocation loc,
-                ArrayRef<ManagedValue> outerArgs,
+                ArrayRef<ManagedValue> outerIndirectArgs,
                 SmallVectorImpl<SILValue> &innerArgs)
-    : ExpanderBase(SGF, loc, outerArgs),
+    : ExpanderBase(SGF, loc, outerIndirectArgs),
       InnerArgs(innerArgs), InnerPacks(*this) {}
 
   void plan(AbstractionPattern innerOrigType, CanType innerSubstType,
@@ -2840,6 +2861,14 @@ private:
     }
 
     return { result, resultAddr };
+  }
+
+  friend OuterPackArgGenerator<ResultPlanner>;
+  ManagedValue claimNextOuterPackArg() {
+    SILResultInfo result = claimNext(AllOuterResults);
+    assert(result.isPack()); (void) result;
+
+    return OuterArgs.claimNext();
   }
 
   /// Create a temporary address suitable for passing to the given inner
@@ -3125,7 +3154,7 @@ void ExpanderBase<Impl>::expandVanishingTuple(AbstractionPattern origType,
     if (forInner) {
       return asImpl().getInnerPackGenerator();
     } else {
-      return OuterArgs;
+      return OuterPackArgs;
     }
   }();
 
@@ -3169,7 +3198,7 @@ void ExpanderBase<Impl>::expandParallelTuples(
   auto innerPacks = asImpl().getInnerPackGenerator();
   ExpandedTupleInputGenerator innerElt(ctx, innerPacks,
                                        innerOrigType, innerSubstType);
-  ExpandedTupleInputGenerator outerElt(ctx, OuterArgs,
+  ExpandedTupleInputGenerator outerElt(ctx, OuterPackArgs,
                                        outerOrigType, outerSubstType);
 
   for (; !innerElt.isFinished(); innerElt.advance(), outerElt.advance()) {
@@ -4036,7 +4065,7 @@ void ExpanderBase<Impl>::expandParallelTuplesInnerIndirect(
 
   auto &ctx = SGF.getASTContext();
   ExpandedTupleInputGenerator
-    outerElt(ctx, OuterArgs, outerOrigType, outerSubstType);
+    outerElt(ctx, OuterPackArgs, outerOrigType, outerSubstType);
   TupleElementAddressGenerator
     innerElt(ctx, innerAddr, innerOrigType, innerSubstType);
   for (; !innerElt.isFinished(); innerElt.advance(), outerElt.advance()) {
@@ -4118,7 +4147,7 @@ void ResultPlanner::planExpandedFromDirect(AbstractionPattern innerOrigType,
 
   // Expand the outer tuple and recurse.
   ExpandedTupleInputGenerator
-    outerElt(SGF.getASTContext(), OuterArgs, outerOrigType, outerSubstType);
+    outerElt(SGF.getASTContext(), OuterPackArgs, outerOrigType, outerSubstType);
   innerOrigType.forEachExpandedTupleElement(innerSubstType,
       [&](AbstractionPattern innerOrigEltType,
           CanType innerSubstEltType,
