@@ -742,3 +742,22 @@ sil [ossa] @dont_canonicalize_undef : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_canonicalize_erased_copy : {{.*}} {
+// CHECK:       bb0(%0 :
+// CHECK:         destroy_value %0
+// CHECK-LABEL: } // end sil function 'dont_canonicalize_erased_copy'
+sil [ossa] @dont_canonicalize_erased_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %stack = alloc_stack $C
+  %copy = copy_value %instance : $C
+  store %copy to [init] %stack : $*C
+  %loaded_copy = load [take] %stack : $*C
+  destroy_value %loaded_copy : $C
+  store %instance to [init] %stack : $*C
+  %loaded_instance = load [take] %stack : $*C
+  destroy_value %loaded_instance : $C
+  dealloc_stack %stack : $*C
+  %retval = tuple ()
+  return %retval : $()
+}
