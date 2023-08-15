@@ -261,12 +261,13 @@ namespace irgen {
                        CanSILFunctionType fnType, Explosion &result,
                        Explosion &error);
 
-  Address emitAutoDiffCreateLinearMapContext(
-      IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);
+  Address
+  emitAutoDiffCreateLinearMapContext(IRGenFunction &IGF,
+                                     llvm::Value *topLevelSubcontextMetatype);
   Address emitAutoDiffProjectTopLevelSubcontext(
       IRGenFunction &IGF, Address context);
-  Address emitAutoDiffAllocateSubcontext(
-      IRGenFunction &IGF, Address context, llvm::Value *size);
+  Address emitAutoDiffAllocateSubcontext(IRGenFunction &IGF, Address context,
+                                         llvm::Value *subcontextMetatype);
 
   FunctionPointer getFunctionPointerForDispatchCall(IRGenModule &IGM,
                                                     const FunctionPointer &fn);

@@ -13,7 +13,7 @@
 #include "AutoDiffSupport.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
-
+#include "llvm/ADT/SmallVector.h"
 #include <new>
 
 using namespace swift;
@@ -21,7 +21,13 @@ using namespace llvm;
 
 SWIFT_CC(swift)
 static void destroyLinearMapContext(SWIFT_CONTEXT HeapObject *obj) {
-  static_cast<AutoDiffLinearMapContext *>(obj)->~AutoDiffLinearMapContext();
+  auto *linearMapContext = static_cast<AutoDiffLinearMapContext *>(obj);
+
+  for (auto *heapObjectPtr : linearMapContext->getAllocatedHeapObjects()) {
+    swift_release(heapObjectPtr);
+  }
+
+  linearMapContext->~AutoDiffLinearMapContext();
   free(obj);
 }
 
@@ -43,36 +49,54 @@ static FullMetadata<HeapMetadata> linearMapContextHeapMetadata = {
   }
 };
 
-AutoDiffLinearMapContext::AutoDiffLinearMapContext()
+AutoDiffLinearMapContext::AutoDiffLinearMapContext(
+    OpaqueValue *const topLevelLinearMapContextProjection)
     : HeapObject(&linearMapContextHeapMetadata) {
-}
-
-void *AutoDiffLinearMapContext::projectTopLevelSubcontext() const {
-  auto offset = alignTo(
-      sizeof(AutoDiffLinearMapContext), alignof(AutoDiffLinearMapContext));
-  return const_cast<uint8_t *>(
-      reinterpret_cast<const uint8_t *>(this) + offset);
-}
-
-void *AutoDiffLinearMapContext::allocate(size_t size) {
-  return allocator.Allocate(size, alignof(AutoDiffLinearMapContext));
+  this->topLevelLinearMapContextProjection = topLevelLinearMapContextProjection;
 }
 
 AutoDiffLinearMapContext *swift::swift_autoDiffCreateLinearMapContext(
-    size_t topLevelLinearMapStructSize) {
-  auto allocationSize = alignTo(
-      sizeof(AutoDiffLinearMapContext), alignof(AutoDiffLinearMapContext))
-      + topLevelLinearMapStructSize;
-  auto *buffer = (AutoDiffLinearMapContext *)malloc(allocationSize);
-  return ::new (buffer) AutoDiffLinearMapContext;
+    const Metadata *topLevelLinearMapContextMetadata) {
+  // Linear map context metadata must have non-null value witnesses
+  assert(topLevelLinearMapContextMetadata->getValueWitnesses());
+
+  // Allocate a box for the top-level linear map context
+  auto [topLevelContextHeapObjectPtr, toplevelContextProjection] =
+      swift_allocBox(topLevelLinearMapContextMetadata);
+
+  // Create a linear map context object that stores the projection
+  // for the top level context
+  auto linearMapContext =
+      new AutoDiffLinearMapContext(toplevelContextProjection);
+
+  // Stash away the `HeapObject` pointer for the allocated context
+  // for proper "release" during clean up.
+  linearMapContext->storeAllocatedHeapObjectPtr(topLevelContextHeapObjectPtr);
+
+  // Return the newly created linear map context object
+  return linearMapContext;
 }
 
 void *swift::swift_autoDiffProjectTopLevelSubcontext(
-    AutoDiffLinearMapContext *allocator) {
-  return allocator->projectTopLevelSubcontext();
+    AutoDiffLinearMapContext *linearMapContext) {
+  return static_cast<void *>(
+      linearMapContext->getTopLevelLinearMapContextProjection());
 }
 
 void *swift::swift_autoDiffAllocateSubcontext(
-    AutoDiffLinearMapContext *allocator, size_t size) {
-  return allocator->allocate(size);
+    AutoDiffLinearMapContext *linearMapContext,
+    const Metadata *linearMapSubcontextMetadata) {
+  // Linear map context metadata must have non-null value witnesses
+  assert(linearMapSubcontextMetadata->getValueWitnesses());
+
+  // Allocate a box for the linear map subcontext
+  auto [subcontextHeapObjectPtr, subcontextProjection] =
+      swift_allocBox(linearMapSubcontextMetadata);
+
+  // Stash away the `HeapObject` pointer for the allocated context
+  // for proper "release" during clean up.
+  linearMapContext->storeAllocatedHeapObjectPtr(subcontextHeapObjectPtr);
+
+  // Return the subcontext projection
+  return static_cast<void *>(subcontextProjection);
 }
