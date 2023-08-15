@@ -244,7 +244,7 @@ extension _SmallString {
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
     let len = try withUnsafeMutableBytes(of: &_storage) {
-      try f(.init(rebasing: $0.prefix(_SmallString.capacity)))
+      try f(.init(start: $0.baseAddress, count: _SmallString.capacity))
     }
 
     if len <= 0 {
