@@ -1866,7 +1866,7 @@ bool PullbackCloner::Implementation::run() {
 
       // Check that active values are differentiable. Otherwise we may crash
       // later when tangent space is required, but not available.
-      if (!getTangentSpace(remapType(type).getASTType()).has_value()) {
+      if (!getTangentSpace(remapType(type).getASTType())) {
         getContext().emitNondifferentiabilityError(
             v, getInvoker(), diag::autodiff_expression_not_differentiable_note);
         errorOccurred = true;
