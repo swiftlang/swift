@@ -6827,8 +6827,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           // unexpected state for key path diagnostics should we fail.
           if (locator->isLastElement<LocatorPathElt::KeyPathType>() &&
               type2->is<AnyFunctionType>())
-            return matchTypesBindTypeVar(typeVar1, type2, kind, flags, locator,
-                                         formUnsolvedResult);
+            return matchTypesBindTypeVar(typeVar1, type2, kind,
+                                         flags | TMF_BindingTypeVariable,
+                                         locator, formUnsolvedResult);
         }
 
         // Performance optimization: Propagate fully or partially resolved
