@@ -2200,7 +2200,7 @@ bool CallArgRewriter::rewriteArguments() {
                 endArgIdx = argIdx + apply.getNumArguments();
        argIdx < endArgIdx; ++argIdx) {
 
-    Operand &operand = apply.getArgumentRef(argIdx);
+    Operand &operand = apply.getArgumentRefAtCalleeArgIndex(argIdx);
     // Ignore arguments that have already been rewritten with an address.
     if (operand.get()->getType().isAddress())
       continue;
