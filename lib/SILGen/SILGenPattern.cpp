@@ -2918,7 +2918,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
     if (auto *singleEnumDecl = canSubjectTy->getEnumOrBoundGenericEnum()) {
       if (singleEnumDecl->isObjC()) {
-        auto metatype = ManagedValue::forUnmanaged(
+        auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
             B.createMetatype(loc, loweredMetatypeType));
 
         // Bitcast the enum value to its raw type. (This is only safe for @objc
