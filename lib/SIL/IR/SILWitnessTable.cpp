@@ -43,8 +43,8 @@ ProtocolDecl *SILWitnessTable::getProtocol() const {
   return getConformance()->getProtocol();
 }
 
-CanType SILWitnessTable::getConformingType() const {
-  return getConformance()->getType()->getCanonicalType();
+NominalTypeDecl *SILWitnessTable::getConformingNominal() const {
+  return getConformance()->getDeclContext()->getSelfNominalTypeDecl();
 }
 
 void SILWitnessTable::addWitnessTable() {

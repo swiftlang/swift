@@ -803,15 +803,15 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
-    auto ty = getType();
-    ValueDecl *nominal = nullptr;
-    if (auto *otat = ty->getAs<OpaqueTypeArchetypeType>()) {
-      nominal = otat->getDecl();
+    TypeDecl *typeDecl = nullptr;
+    if (auto *otat = getType()->getAs<OpaqueTypeArchetypeType>()) {
+      typeDecl = otat->getDecl();
     } else {
-      nominal = ty->getAnyNominal();
+      typeDecl = getProtocolConformance()->getDeclContext()
+          ->getSelfNominalTypeDecl();
     }
-    assert(nominal);
-    if (getDeclLinkage(nominal) == FormalLinkage::Private ||
+    assert(typeDecl);
+    if (getDeclLinkage(typeDecl) == FormalLinkage::Private ||
         getLinkageAsConformance() == SILLinkage::Private) {
       return SILLinkage::Private;
     } else {

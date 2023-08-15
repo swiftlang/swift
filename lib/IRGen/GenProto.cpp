@@ -1984,7 +1984,7 @@ namespace {
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = IGM.getTypeEntityReference(
-                   Conformance->getType()->getAnyNominal());
+                   Conformance->getDeclContext()->getSelfNominalTypeDecl());
       B.addRelativeAddress(ref.getValue());
       Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
@@ -2474,8 +2474,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Record this conformance descriptor.
   addProtocolConformance(std::move(description));
 
-  IRGen.noteUseOfTypeContextDescriptor(conf->getType()->getAnyNominal(),
-                                       RequireMetadata);
+  IRGen.noteUseOfTypeContextDescriptor(
+      conf->getDeclContext()->getSelfNominalTypeDecl(),
+      RequireMetadata);
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
