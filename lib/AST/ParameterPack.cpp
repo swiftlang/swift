@@ -432,8 +432,17 @@ PackType::getExpandedGenericArgs(ArrayRef<GenericTypeParamType *> params,
     auto arg = args[i];
 
     if (params[i]->isParameterPack()) {
-      auto argPackElements = arg->castTo<PackType>()->getElementTypes();
-      wrappedArgs.append(argPackElements.begin(), argPackElements.end());
+      // FIXME: A temporary fix to make it possible to debug expressions
+      // with partially resolved variadic generic types. The issue stems
+      // from the fact that `BoundGenericType` is allowed to have pack
+      // parameters directly represented by type variables, as soon as
+      // that is no longer the case this check should be removed.
+      if (arg->is<TypeVariableType>()) {
+        wrappedArgs.push_back(arg);
+      } else {
+        auto argPackElements = arg->castTo<PackType>()->getElementTypes();
+        wrappedArgs.append(argPackElements.begin(), argPackElements.end());
+      }
       continue;
     }
 

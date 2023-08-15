@@ -4210,7 +4210,16 @@ static void enumerateOptionalConversionRestrictions(
 /// Determine whether we can bind the given type variable to the given
 /// fixed type.
 static bool isBindable(TypeVariableType *typeVar, Type type) {
-  return !ConstraintSystem::typeVarOccursInType(typeVar, type) &&
+  // Disallow recursive bindings.
+  if (ConstraintSystem::typeVarOccursInType(typeVar, type))
+    return false;
+
+  // If type variable we are about to bind represents a pack
+  // expansion type, allow the binding to happen regardless of
+  // what the \c type is, because contextual type is just a hint
+  // in this situation and type variable would be bound to its
+  // opened type instead.
+  return typeVar->getImpl().isPackExpansion() ||
          !type->is<DependentMemberType>();
 }
 
@@ -11621,29 +11630,15 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
                                             Type contextualType) {
+  assert(typeVar->getImpl().isPackExpansion());
+
   auto *locator = typeVar->getImpl().getLocator();
 
-  Type openedExpansionType;
-  if (auto expansionElt =
-          locator->getLastElementAs<LocatorPathElt::PackExpansionType>()) {
-    openedExpansionType = expansionElt->getOpenedType();
-  }
-
-  if (!openedExpansionType)
-    return false;
+  Type openedExpansionType =
+      locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
+          .getOpenedType();
 
   assignFixedType(typeVar, openedExpansionType, locator);
-
-  // We have a fully resolved contextual pack expansion type, let's
-  // apply it right away.
-  if (!contextualType->isEqual(openedExpansionType)) {
-    assert(contextualType->is<PackExpansionType>() &&
-           !contextualType->hasTypeVariable());
-    auto result = matchTypes(openedExpansionType, contextualType,
-                             ConstraintKind::Equal, {}, locator);
-    return !result.isFailure();
-  }
-
   return true;
 }
 
