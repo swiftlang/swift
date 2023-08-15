@@ -311,8 +311,6 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   }
 
   IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
-  if (constant.isRuntimeAccessibleFunction())
-    isRuntimeAccessible = IsRuntimeAccessible;
 
   auto *F = SILFunction::create(
       mod, linkage, name, constantType, nullptr, llvm::None, IsNotBare, IsTrans,
