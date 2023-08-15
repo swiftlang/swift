@@ -756,6 +756,21 @@ void swift::rewriting::realizeInheritedRequirements(
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }
+
+  auto &ctx = dc->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // All associated types or generic type params are Copyable by default.
+    // TODO: if we saw ~Copyable in the inherited types list earlier, skip this!
+
+    if (auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable)) {
+      SourceLoc loc = decl->getLoc();
+      Type copyableType = copyable->getDeclaredInterfaceType();
+
+      // Add Copyable as an "inferred" requirement.
+      Requirement req(RequirementKind::Conformance, type, copyableType);
+      result.push_back({req, loc, /*wasInferred=*/true});
+    }
+  }
 }
 
 /// StructuralRequirementsRequest realizes all the user-written requirements

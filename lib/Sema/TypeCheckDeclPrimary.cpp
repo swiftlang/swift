@@ -1811,11 +1811,22 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
 static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
       proto->getSelfInterfaceType());
+  const bool enabledNoncopyableGenerics =
+      proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   for (auto *otherProto : requiredProtos) {
     // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
     if (otherProto == proto)
       continue;
+
+    if (enabledNoncopyableGenerics) {
+      // For any protocol 'P', there is an implied requirement 'Self: Copyable',
+      // unless it was suppressed via `Self: ~Copyable`; so skip if present.
+      if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
+        continue;
+
+      // TODO: report that something implied Copyable despite writing ~Copyable
+    }
 
     // GenericSignature::getRequiredProtocols() canonicalizes the protocol
     // list by dropping protocols that are inherited by other protocols in

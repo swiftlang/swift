@@ -1015,6 +1015,10 @@ static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
                                          SourceLoc loc,
                                          Type unboundTy,
                                          ArrayRef<Type> genericArgs) {
+
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return false;
+
   bool didEmitDiag = false;
   for (auto t: genericArgs) {
     if (!t->isPureMoveOnly())
@@ -2294,6 +2298,9 @@ bool TypeResolver::diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr) {
 bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                            Type unboundTy,
                                            Type genericArgTy) {
+  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return false;
+
   if (genericArgTy->isPureMoveOnly()) {
     if (unboundTy) {
       diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_specific,
