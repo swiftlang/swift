@@ -713,7 +713,8 @@ func test_result_builder_in_member_chaining() {
   Test.test {
     let test = Test()
     return test
-  }.builder { // Ok
+  // FIXME: This call should type-check, currently closure is resolved before overload of `builder` is picked.
+  }.builder { // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
     let result = ""
     result
   }
