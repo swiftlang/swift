@@ -5,6 +5,10 @@
 // RUN: %swift -target arm64-apple-macos13.0 -target-variant arm64-apple-ios16.0-macabi -typecheck -parse-as-library %t/test.swift -emit-tbd -emit-tbd-path %t/zippered.tbd
 // RUN: %llvm-readtapi %t/zippered.tbd %t/expected.tbd
 
+// llvm-readtapi: command not found
+// rdar://113880049
+// XFAIL: *
+
 //--- test.swift
 public func foo() -> Bool {
     return true
