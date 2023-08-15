@@ -634,13 +634,7 @@ private:
       return Range;
     }
 
-    // For pattern binding declarations, include the attributes in the source
-    // range so that we're sure to cover any property wrappers.
-    if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
-      return D->getSourceRangeIncludingAttrs();
-    }
-
-    return D->getSourceRange();
+    return D->getSourceRangeIncludingAttrs();
   }
 
   // Creates an implicit decl TRC specifying the deployment
@@ -3250,6 +3244,11 @@ public:
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
                                         /*useConformanceAvailabilityErrorsOpt=*/true);
       }
+    }
+
+    if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
+      diagnoseDeclRefAvailability(
+          ME->getMacroRef(), ME->getMacroNameLoc().getSourceRange());
     }
 
     return Action::Continue(E);

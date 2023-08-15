@@ -528,6 +528,7 @@ public:
 
     DeclVisitor<AccessControlChecker>::visit(D);
     checkGlobalActorAccess(D);
+    checkAttachedMacrosAccess(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1258,6 +1259,18 @@ public:
                                minDiagAccessLevel, problemIsResult);
       highlightOffendingType(diag, complainRepr);
       noteLimitingImport(MD->getASTContext(), minImportLimit, complainRepr);
+    }
+  }
+
+  void checkAttachedMacrosAccess(const Decl *D) {
+    for (auto customAttrC : D->getSemanticAttrs().getAttributes<CustomAttr>()) {
+      auto customAttr = const_cast<CustomAttr *>(customAttrC);
+      auto *macroDecl = D->getResolvedMacro(customAttr);
+      if (macroDecl) {
+        diagnoseDeclAvailability(
+          macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
+          ExportContext::forDeclSignature(const_cast<Decl *>(D)), llvm::None);
+      }
     }
   }
 };
