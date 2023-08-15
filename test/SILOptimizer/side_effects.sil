@@ -827,8 +827,8 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: sil @not_called_partial_apply
-// CHECK-NEXT:  [global: ]
-// CHECK-NEXT:  {{^[^[]}}
+// CHECK-NEXT: [%0: read v**]
+// CHECK-NEXT: [global: read,write,copy,destroy,allocate,deinit_barrier]
 sil @not_called_partial_apply : $@convention(thin) (@in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
 bb0(%0 : $*Int32):
   %2 = function_ref @closure : $@convention(thin) (Bool, @in Int32) -> Int32
@@ -837,8 +837,9 @@ bb0(%0 : $*Int32):
 }
 
 // CHECK-LABEL: sil @partial_apply_chain
-// CHECK-NEXT: [global: ]
-// CHECK-NEXT: {{^[^[]}}
+// CHECK-NEXT: [%0: read v**]
+// CHECK-NEXT: [%1: read v**]
+// CHECK-NEXT: [global: read,write,copy,destroy,allocate,deinit_barrier]
 sil @partial_apply_chain : $@convention(thin) (@in Int32, @in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
 bb0(%0 : $*Int32, %1 : $*Int32):
   %3 = function_ref @closure2 : $@convention(thin) (Bool, @in Int32, @in Int32) -> Int32
@@ -1178,4 +1179,3 @@ bb0(%0 : $*T, %1 : $*T):
   %4 = tuple ()
   return %4 : $()
 }
-

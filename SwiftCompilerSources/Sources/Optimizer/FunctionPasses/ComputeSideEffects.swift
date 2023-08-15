@@ -137,8 +137,7 @@ private struct CollectedEffects {
 
     case let pa as PartialApplyInst:
       if pa.canBeAppliedInFunction(context) {
-        // Only if the created closure can actually be called in the function
-        // we have to consider side-effects within the closure.
+        // Only if the closure is applied or returned, consider its side-effects.
         handleApply(pa)
         checkedIfDeinitBarrier = true
       }
@@ -497,12 +496,10 @@ private extension PartialApplyInst {
     struct EscapesToApply : EscapeVisitor {
       func visitUse(operand: Operand, path: EscapePath) -> UseResult {
         switch operand.instruction {
-        case is FullApplySite:
-          // Any escape to apply - regardless if it's an argument or the callee operand - might cause
+        case is ReturnInst, is FullApplySite:
+          // Any escape to apply or return - regardless if it's an argument or the callee operand - might cause
           // the closure to be called.
           return .abort
-        case is ReturnInst:
-          return .ignore
         default:
           return .continueWalk
         }
