@@ -1804,11 +1804,6 @@ bool PullbackCloner::Implementation::run() {
   DominanceOrder domOrder(original.getEntryBlock(), domInfo);
   // Keep track of visited values.
   SmallPtrSet<SILValue, 8> visited;
-
-  auto *diffProto =
-      builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-  auto *swiftModule = getModule().getSwiftModule();
-
   while (auto *bb = domOrder.getNext()) {
     auto &bbActiveValues = activeValues[bb];
     // If the current block has an immediate dominator, append the immediate
@@ -1869,10 +1864,9 @@ bool PullbackCloner::Implementation::run() {
       if (Projection::isAddressProjection(v))
         return false;
 
-      // Make sure that all active values are differentiable.
-      auto diffConf =
-          swiftModule->lookupConformance(type.getASTType(), diffProto);
-      if (diffConf.isInvalid()) {
+      // Check that active values are differentiable. Otherwise we may crash
+      // later when tangent space is required, but not available.
+      if (!getTangentSpace(remapType(type).getASTType()).has_value()) {
         getContext().emitNondifferentiabilityError(
             v, getInvoker(), diag::autodiff_expression_not_differentiable_note);
         errorOccurred = true;
