@@ -2984,7 +2984,7 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 }
 
 static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
-                                       Size count, SILType T,
+                                       int32_t count, SILType T,
                                        llvm::Value *metadata,
                                        MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
@@ -3040,8 +3040,8 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
                                        "vwtFlags");
 
   // Count is only ever -1 if we're not an array like layout.
-  if (count != Size(-1)) {
-    stride = IGF.Builder.CreateMul(stride, IGM.getSize(count));
+  if (count != -1) {
+    stride = IGF.Builder.CreateMul(stride, IGM.getSize(Size(count)));
     size = stride;
   }
 
@@ -3067,7 +3067,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
 }
 
 static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
-                                    Size count, SILType T,
+                                    int32_t count, SILType T,
                                     llvm::Value *metadata,
                                     MetadataDependencyCollector *collector) {
   // If our deployment target doesn't contain the new swift_initRawStructMetadata,
@@ -3090,7 +3090,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   // Call swift_initRawStructMetadata().
   IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
                          {metadata, IGM.getSize(Size(uintptr_t(flags))),
-                          likeTypeLayout, IGM.getSize(count)});
+                          likeTypeLayout, IGM.getInt32(count)});
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -3115,18 +3115,17 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
     // is the wrong thing for these types.
     if (auto rawLayout = nominalDecl->getAttrs().getAttribute<RawLayoutAttr>()) {
       SILType loweredLikeType;
-      Size count;
+      int32_t count = -1;
 
       if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
         loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                              *likeType);
-        count = Size(-1);
       } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
         auto likeType = likeArray->first;
         loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                              likeType);
 
-        count = Size(likeArray->second);
+        count = likeArray->second;
       }
 
       emitInitializeRawLayout(IGF, loweredLikeType, count, loweredTy, metadata,

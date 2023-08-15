@@ -1044,7 +1044,7 @@ SWIFT_RUNTIME_EXPORT
 void swift_initRawStructMetadata(StructMetadata *self,
                                  StructLayoutFlags flags,
                                  const TypeLayout *likeType,
-                                 size_t count);
+                                 int32_t count);
 
 #pragma clang diagnostic pop
 

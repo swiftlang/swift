@@ -2910,7 +2910,7 @@ SWIFT_RUNTIME_EXPORT
 void swift::swift_initRawStructMetadata(StructMetadata *structType,
                                         StructLayoutFlags layoutFlags,
                                         const TypeLayout *likeTypeLayout,
-                                        size_t count) {
+                                        int32_t count) {
   auto vwtable = getMutableVWTableForInit(structType, layoutFlags);
 
   // The existing vwt function entries are all fine to preserve, the only thing
