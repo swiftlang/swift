@@ -1251,7 +1251,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
   if (TypeVar->getImpl().isKeyPathType()) {
     auto objectTy = type->lookThroughAllOptionalTypes();
-    if (!isKnownKeyPathType(objectTy))
+    if (!(isKnownKeyPathType(objectTy) || objectTy->is<AnyFunctionType>()))
       return llvm::None;
     
     auto &ctx = CS.getASTContext();
