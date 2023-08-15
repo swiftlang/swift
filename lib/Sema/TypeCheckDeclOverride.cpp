@@ -1625,8 +1625,6 @@ namespace  {
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
 
-    UNINTERESTING_ATTR(RuntimeMetadata)
-
     UNINTERESTING_ATTR(MacroRole)
     UNINTERESTING_ATTR(LexicalLifetimes)
 #undef UNINTERESTING_ATTR
