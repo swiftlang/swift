@@ -441,9 +441,8 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
-  // FIXME: We ought to have a symbol source for this.
   Mangle::ASTMangler mangler;
-  addSymbol(mangler.mangleEntity(VD), SymbolSource::forUnknown());
+  addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD));
 }
 
 void TBDGenVisitor::addLinkEntity(LinkEntity entity) {

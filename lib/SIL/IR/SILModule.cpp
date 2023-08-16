@@ -865,9 +865,27 @@ void SILModule::installSILRemarkStreamer() {
 }
 
 void SILModule::promoteLinkages() {
-  for (auto &Fn : functions)
+  for (auto &Fn : functions) {
+    // Ignore functions with shared linkage
+    if (Fn.getLinkage() == SILLinkage::Shared)
+      continue;
+
     if (Fn.isDefinition())
       Fn.setLinkage(SILLinkage::Public);
+    else
+      Fn.setLinkage(SILLinkage::PublicExternal);
+  }
+
+  for (auto &Global : silGlobals) {
+    // Ignore globals with shared linkage
+    if (Global.getLinkage() == SILLinkage::Shared)
+      continue;
+
+    if (Global.isDefinition())
+      Global.setLinkage(SILLinkage::Public);
+    else
+      Global.setLinkage(SILLinkage::PublicExternal);
+  }
 
   // TODO: Promote linkage of other SIL entities
 }

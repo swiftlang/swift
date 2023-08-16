@@ -298,14 +298,15 @@ LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
   llvm::orc::SymbolFlagsMap PublicInterface;
   for (const auto &Entry : *Sources) {
     const auto &Source = Entry.getValue();
-    if (Source.kind != SymbolSource::Kind::SIL) {
-      continue;
-    }
     const auto &SymbolName = Entry.getKey();
-    auto Flags =
-        llvm::JITSymbolFlags::Callable | llvm::JITSymbolFlags::Exported;
-    auto MangledName = mangle(SymbolName);
-    PublicInterface[JIT.intern(MangledName)] = Flags;
+    auto Flags = Source.getJITSymbolFlags();
+    if (Flags.isCallable()) {
+      // Only create lazy reexports for callable symbols
+      auto MangledName = mangle(SymbolName);
+      PublicInterface[JIT.intern(MangledName)] = Flags;
+    } else {
+      PublicInterface[JIT.intern(SymbolName)] = Flags;
+    }
   }
   return std::unique_ptr<LazySwiftMaterializationUnit>(
       new LazySwiftMaterializationUnit(JIT, CI, std::move(Sources),
@@ -324,24 +325,22 @@ LazySwiftMaterializationUnit::LazySwiftMaterializationUnit(
 
 void LazySwiftMaterializationUnit::materialize(
     std::unique_ptr<llvm::orc::MaterializationResponsibility> MR) {
-  SILRefsToEmit Refs;
+  SymbolSources Entities;
   const auto &RS = MR->getRequestedSymbols();
   for (auto &Sym : RS) {
     auto Name = demangle(*Sym);
     auto itr = Sources->find(Name);
     assert(itr != Sources->end() && "Requested symbol doesn't have source?");
     const auto &Source = itr->getValue();
-    auto Ref = Source.getSILDeclRef();
-    if (auto *AFD = Ref.getAbstractFunctionDecl()) {
-      AFD->getTypecheckedBody();
-      if (CI.getASTContext().hadError()) {
-        MR->failMaterialization();
-        return;
-      }
+    Source.typecheck();
+    if (CI.getASTContext().hadError()) {
+      // If encounter type error, bail out
+      MR->failMaterialization();
+      return;
     }
-    Refs.push_back(std::move(Ref));
+    Entities.push_back(Source);
   }
-  auto SM = performASTLowering(CI, std::move(Refs));
+  auto SM = performASTLowering(CI, std::move(Entities));
 
   // Promote linkages of SIL entities
   // defining requested symbols so they are

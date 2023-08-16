@@ -1097,6 +1097,7 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       break;
     case SymbolSource::Kind::LinkerDirective:
     case SymbolSource::Kind::Unknown:
+    case SymbolSource::Kind::Global:
       llvm_unreachable("Not supported");
     }
   }
@@ -1122,9 +1123,8 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // SIL for the file or module.
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   if (!SILMod) {
-    auto loweringDesc = ASTLoweringDescriptor{
-        desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
-        symsToEmit.transform([](const auto &x) { return x.silRefsToEmit; })};
+    auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts,
+                                              nullptr, llvm::None};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
     // If there was an error, bail.

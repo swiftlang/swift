@@ -515,6 +515,20 @@ class LinkEntity {
     return Kind(LINKENTITY_GET_FIELD(Data, Kind));
   }
 
+  friend llvm::hash_code hash_value(const LinkEntity &Entity) {
+    return llvm::hash_combine(Entity.Pointer, Entity.SecondaryPointer,
+                              Entity.Data);
+  }
+
+  friend bool operator==(const LinkEntity &LHS, const LinkEntity &RHS) {
+    return LHS.Pointer == RHS.Pointer &&
+           LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
+  }
+
+  friend bool operator!=(const LinkEntity &LHS, const LinkEntity &RHS) {
+    return !(LHS == RHS);
+  }
+
   static bool isDeclKind(Kind k) {
     return k <= Kind::AsyncFunctionPointerAST;
   }

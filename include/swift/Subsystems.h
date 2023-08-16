@@ -17,6 +17,7 @@
 #ifndef SWIFT_SUBSYSTEMS_H
 #define SWIFT_SUBSYSTEMS_H
 
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
@@ -193,7 +194,7 @@ namespace swift {
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performASTLowering(CompilerInstance &CI,
-                     llvm::SmallVector<SILDeclRef, 1> Refs);
+                     llvm::SmallVector<SymbolSource, 1> Sources);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
