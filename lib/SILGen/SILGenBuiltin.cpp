@@ -1475,7 +1475,8 @@ static ManagedValue emitBuiltinEndAsyncLet(
 static ManagedValue emitBuiltinGetCurrentExecutor(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&preparedArgs, SGFContext C) {
-  return ManagedValue::forUnmanaged(SGF.emitGetCurrentExecutor(loc));
+  return ManagedValue::forObjectRValueWithoutOwnership(
+      SGF.emitGetCurrentExecutor(loc));
 }
 
 // Emit SIL for sizeof/strideof/alignof.
@@ -1766,7 +1767,7 @@ static ManagedValue emitBuildExecutorRef(SILGenFunction &SGF, SILLocation loc,
   auto builtinApply = SGF.B.createBuiltin(loc, builtinID,
       SILType::getPrimitiveObjectType(ctx.TheExecutorType),
       subs, argValues);
-  return ManagedValue::forUnmanaged(builtinApply);
+  return ManagedValue::forObjectRValueWithoutOwnership(builtinApply);
 }
 static ManagedValue emitBuiltinBuildOrdinarySerialExecutorRef(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,

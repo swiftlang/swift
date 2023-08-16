@@ -2087,7 +2087,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(value->getType());
   if (lowering.isTrivial())
-    return ManagedValue::forUnmanaged(value);
+    return ManagedValue::forObjectRValueWithoutOwnership(value);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
   CleanupHandle handle = Cleanups.getTopCleanup();

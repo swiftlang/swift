@@ -1184,7 +1184,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
     }
 
-    auto managedArgv = ManagedValue::forUnmanaged(argv);
+    auto managedArgv = ManagedValue::forObjectRValueWithoutOwnership(argv);
 
     if (unwrappedTy != argv->getType()) {
       auto converted =
