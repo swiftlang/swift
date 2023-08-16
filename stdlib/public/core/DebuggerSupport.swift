@@ -280,19 +280,19 @@ internal func _withHeapObject<R>(
 }
 
 // Utilities to get refcount(s) of class objects.
-@_alwaysEmitIntoClient
+@backDeployed(before: SwiftStdlib 5.10)
 public func _getRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@_alwaysEmitIntoClient
+@backDeployed(before: SwiftStdlib 5.10)
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@_alwaysEmitIntoClient
+@backDeployed(before: SwiftStdlib 5.10)
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { swift_weakRetainCount($0) }
   return UInt(bitPattern: count)
