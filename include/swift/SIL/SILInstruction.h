@@ -6583,7 +6583,7 @@ public:
     }
 
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
-    for (auto elt : decl->getAllElements())
+    for (auto elt : decl->getAllElementsForLowering())
       unswitchedElts.insert(elt);
 
     for (unsigned i = 0, e = this->getNumCases(); i != e; ++i) {
@@ -9812,7 +9812,7 @@ public:
     assert(decl && "switch_enum operand is not an enum");
 
     SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
-    for (auto elt : decl->getAllElements())
+    for (auto elt : decl->getAllElementsForLowering())
       unswitchedElts.insert(elt);
 
     for (unsigned i = 0, e = getNumCases(); i != e; ++i) {

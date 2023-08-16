@@ -531,9 +531,8 @@ std::string serialization::StatusToString(Status S) {
   case Status::TargetIncompatible: return "TargetIncompatible";
   case Status::TargetTooNew: return "TargetTooNew";
   case Status::SDKMismatch: return "SDKMismatch";
-  default:
-    llvm_unreachable("The switch should cover all cases");
   }
+  llvm_unreachable("The switch should cover all cases");
 }
 
 bool serialization::isSerializedAST(StringRef data) {
