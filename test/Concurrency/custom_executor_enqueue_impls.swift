@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown
 // REQUIRES: concurrency
 
 // rdar://106849189 move-only types should be supported in freestanding mode
