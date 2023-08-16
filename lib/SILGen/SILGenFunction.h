@@ -1697,9 +1697,9 @@ public:
                                      Type resultType,
                                      RValue &&operand);
 
-  ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
-  ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
-                                 const TypeLowering &lowering);
+  ManagedValue emitManagedCopy(SILLocation loc, SILValue v);
+  ManagedValue emitManagedCopy(SILLocation loc, SILValue v,
+                               const TypeLowering &lowering);
 
   ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v);
   ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v,

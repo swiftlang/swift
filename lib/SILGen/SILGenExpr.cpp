@@ -60,15 +60,13 @@
 using namespace swift;
 using namespace Lowering;
 
-ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
-                                               SILValue v) {
+ManagedValue SILGenFunction::emitManagedCopy(SILLocation loc, SILValue v) {
   auto &lowering = getTypeLowering(v->getType());
-  return emitManagedRetain(loc, v, lowering);
+  return emitManagedCopy(loc, v, lowering);
 }
 
-ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
-                                               SILValue v,
-                                               const TypeLowering &lowering) {
+ManagedValue SILGenFunction::emitManagedCopy(SILLocation loc, SILValue v,
+                                             const TypeLowering &lowering) {
   assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forRValueWithoutOwnership(v);
@@ -5710,7 +5708,7 @@ public:
     auto strongType = SILType::getPrimitiveObjectType(
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = SGF.B.createUnmanagedToRef(loc, unowned, strongType);
-    auto ownedMV = SGF.emitManagedRetain(loc, owned);
+    auto ownedMV = SGF.emitManagedCopy(loc, owned);
 
     // Then create a mark dependence in between the base and the ownedMV. This
     // is important to ensure that the destroy of the assign is not hoisted

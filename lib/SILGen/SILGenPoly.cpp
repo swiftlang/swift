@@ -1756,7 +1756,7 @@ private:
     // initially owned.
     if (inner.getOwnershipKind() == OwnershipKind::Unowned) {
       assert(!inner.hasCleanup());
-      inner = SGF.emitManagedRetain(Loc, inner.getValue());
+      inner = SGF.emitManagedCopy(Loc, inner.getValue());
     }
 
     // If the inner is unowned or owned, create a borrow.
@@ -4366,7 +4366,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
                        "reabstraction of returns_inner_pointer function");
       LLVM_FALLTHROUGH;
     case ResultConvention::Unowned:
-      return SGF.emitManagedRetain(Loc, resultValue, resultTL);
+      return SGF.emitManagedCopy(Loc, resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
   };

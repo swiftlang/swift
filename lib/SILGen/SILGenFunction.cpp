@@ -864,7 +864,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           capturedArgs.push_back(
               ManagedValue::forUnmanaged(Entry.box).borrow(*this, loc));
         } else {
-          capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
+          capturedArgs.push_back(emitManagedCopy(loc, Entry.box));
         }
         if (captureCanEscape)
           escapesToMark.push_back(val);

@@ -312,7 +312,7 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
 
   case ParameterConvention::Direct_Unowned:
     // We need to independently retain the value.
-    return SGF.emitManagedRetain(loc, value, valueTL);
+    return SGF.emitManagedCopy(loc, value, valueTL);
 
   case ParameterConvention::Indirect_Inout:
     return ManagedValue::forLValue(value);
@@ -2180,7 +2180,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           break;
         case ParameterConvention::Direct_Guaranteed:
         case ParameterConvention::Direct_Unowned:
-          param = emitManagedRetain(fd, paramValue);
+          param = emitManagedCopy(fd, paramValue);
           break;
         case ParameterConvention::Indirect_Inout:
         case ParameterConvention::Indirect_InoutAliasable:
