@@ -12191,6 +12191,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
           return locator->isInKeyPathComponent() &&
                  tv->getImpl().canBindToHole();
         })) {
+      (void)tryMatchRootAndValueFromType(keyPathTy);
       return SolutionKind::Solved;
     }
   }
