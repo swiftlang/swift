@@ -371,7 +371,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   SILArgument *actorSystemArg = F.getArgument(1);
 
   SILValue selfArgValue = F.getSelfArgument();
-  ManagedValue selfArg = ManagedValue::forUnmanaged(selfArgValue);
+  ManagedValue selfArg = ManagedValue::forBorrowedObjectRValue(selfArgValue);
 
   // type: SpecificDistributedActor.Type
   auto selfArgType = selfArg.getType().getASTType();

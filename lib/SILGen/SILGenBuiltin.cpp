@@ -486,7 +486,7 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
             : context.getIdentifier("unprotectedAddressOfBorrowOpaque");
     auto builtin = SGF.B.createBuiltin(loc, identifier, rawPointerType,
                                        substitutions, {borrow.getValue()});
-    return ManagedValue::forUnmanaged(builtin);
+    return ManagedValue::forObjectRValueWithoutOwnership(builtin);
   }
 
   if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
@@ -799,7 +799,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
     }
     // Leave the cleanup on the original value.
     if (toTL.isTrivial())
-      return ManagedValue::forUnmanaged(toAddr);
+      return ManagedValue::forTrivialAddressRValue(toAddr);
 
     // Initialize the +1 result buffer without taking the incoming value. The
     // source and destination cleanups will be independent.

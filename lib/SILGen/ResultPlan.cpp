@@ -810,11 +810,13 @@ public:
     if (handlerIsOptional) {
       block = SGF.B.createOptionalSome(loc, block, impTy);
     }
-    
+
     // We don't need to manage the block because it's still on the stack. We
     // know we won't escape it locally so the callee can be responsible for
     // _Block_copy-ing it.
-    return ManagedValue::forUnmanaged(block);
+    //
+    // InitBlockStorageHeader always has Unowned ownership.
+    return ManagedValue::forUnownedObjectValue(block);
   }
 
   void deferExecutorBreadcrumb(ExecutorBreadcrumb &&crumb) override {
@@ -899,9 +901,9 @@ public:
             SILValue(wrappedContinuation));
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,
-            {continuationMV, ManagedValue::forCopyOwnedObjectRValue(
-                                 SGF, loc, bridgedForeignError,
-                                 ManagedValue::ScopeKind::Lexical)},
+            {continuationMV,
+             SGF.B.copyOwnedObjectRValue(loc, bridgedForeignError,
+                                         ManagedValue::ScopeKind::Lexical)},
             SGFContext());
 
         // Second, emit a branch from the end of the foreign error block to the

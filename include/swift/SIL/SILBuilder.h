@@ -551,6 +551,13 @@ public:
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+    assert(OnStack == PartialApplyInst::OnStackKind::OnStack ||
+           llvm::all_of(Args,
+                        [](SILValue value) {
+                          return value->getOwnershipKind().isCompatibleWith(
+                              OwnershipKind::Owned);
+                        }) &&
+               "Must have an owned compatible object");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention, *F,
         SpecializationInfo, OnStack));
@@ -900,6 +907,8 @@ public:
   EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
     assert(!SILArgument::isTerminatorResult(borrowedValue) &&
                "terminator results do not have end_borrow");
+    assert(!isa<SILFunctionArgument>(borrowedValue) &&
+           "Function arguments should never have an end_borrow");
     return insert(new (getModule())
                       EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }

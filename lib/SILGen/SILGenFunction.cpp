@@ -715,7 +715,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
-          auto guaranteed = ManagedValue::forUnmanaged(val).borrow(*this, loc);
+          auto guaranteed = B.borrowObjectRValue(
+              *this, loc, val, ManagedValue::ScopeKind::Lexical);
           if (eliminateMoveOnlyWrapper)
             guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
                 loc, guaranteed);
@@ -758,8 +759,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(ManagedValue::forBorrowedRValue(addr));
       }
       else if (!silConv.useLoweredAddresses()) {
-        capturedArgs.push_back(
-          B.createCopyValue(loc, ManagedValue::forUnmanaged(val)));
+        capturedArgs.push_back(B.copyOwnedObjectRValue(
+            loc, val, ManagedValue::ScopeKind::Lexical));
       } else {
         auto addr = getAddressValue(val, /*forceCopy=*/true);
         // If our address is move only wrapped, unwrap it.
@@ -798,13 +799,16 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // If this is a boxed variable, we can use it directly.
       if (Entry.box &&
           val->getType().getASTType() == minimalLoweredType) {
-        auto box = ManagedValue::forBorrowedObjectRValue(Entry.box);
+        ManagedValue box;
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
-          box = box.borrow(*this, loc);
+          box = B.borrowObjectRValue(*this, loc, Entry.box,
+                                     ManagedValue::ScopeKind::Lexical);
         } else {
-          box = box.copy(*this, loc);
+          box = B.copyOwnedObjectRValue(loc, Entry.box,
+                                        ManagedValue::ScopeKind::Lexical);
         }
+        assert(box);
 
         // If our captured value is a box with a moveonlywrapped type inside,
         // unwrap it.
@@ -861,8 +865,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           val->getType().getASTType() == minimalLoweredType) {
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
-          capturedArgs.push_back(
-              ManagedValue::forUnmanaged(Entry.box).borrow(*this, loc));
+          capturedArgs.push_back(B.borrowObjectRValue(
+              *this, loc, Entry.box, ManagedValue::ScopeKind::Lexical));
         } else {
           capturedArgs.push_back(emitManagedCopy(loc, Entry.box));
         }
