@@ -905,11 +905,11 @@ public:
 
   OuterPackArgGenerator(Expander &expander) : TheExpander(expander) {}
 
-  bool isFinished() const { llvm_unreachable("don't call this"); }
-  void finish() { llvm_unreachable("don't call this"); }
-  void advance() { llvm_unreachable("don't call this"); }
-  reference claimNext() const {
+  reference claimNext() {
     return TheExpander.claimNextOuterPackArg();
+  }
+  void finishCurrent(ManagedValue packAddr) {
+    TheExpander.finishCurrentOuterPackArg(packAddr);
   }
 };
 
@@ -2669,19 +2669,13 @@ class ResultPlanner : public ExpanderBase<ResultPlanner> {
   public:
     InnerPackResultGenerator(ResultPlanner &planner) : planner(planner) {}
 
-    bool isFinished() const {
-      return planner.AllInnerResults.empty();
-    }
     ManagedValue claimNext() {
       SILResultInfo resultInfo = planner.claimNextInnerResult();
       return ManagedValue::forLValue(
         planner.addInnerIndirectPackResultTemporary(resultInfo));
     }
-    void advance() {
-      llvm_unreachable("should always be claimed from");
-    }
-    void finish() {
-      llvm_unreachable("should not be finished directly");
+    void finishCurrent(ManagedValue packAddr) {
+      // ignore this
     }
   };
 
@@ -2883,6 +2877,9 @@ private:
 
     return OuterArgs.claimNext();
   }
+  void finishCurrentOuterPackArg(ManagedValue packAddr) {
+    // ignore; all of the cleanup changes should be irrelevant
+  }
 
   /// Create a temporary address suitable for passing to the given inner
   /// indirect result and add it as an inner indirect result.
@@ -2906,7 +2903,7 @@ private:
     return temporary;
   }
 
-  SimpleGeneratorRef<ManagedValue> getInnerPackGenerator() {
+  PackGeneratorRef getInnerPackGenerator() {
     return InnerPacks;
   }
 
@@ -3163,7 +3160,7 @@ void ExpanderBase<Impl>::expandVanishingTuple(AbstractionPattern origType,
 
   bool foundSurvivor = false;
 
-  auto packInputs = [&]() -> SimpleGeneratorRef<ManagedValue> {
+  auto packInputs = [&]() -> PackGeneratorRef {
     if (forInner) {
       return asImpl().getInnerPackGenerator();
     } else {

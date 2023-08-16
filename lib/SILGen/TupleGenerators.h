@@ -27,6 +27,43 @@
 namespace swift {
 namespace Lowering {
 
+/// A reference to a generator suitable for handling pack inputs.
+/// Has the same basic liveness characteristics as SimpleGeneratorRef.
+class PackGeneratorRef {
+  struct VTable {
+    ManagedValue (*claimNext)(void *impl);
+    void (*finishCurrent)(void *impl, ManagedValue packAddr);
+  };
+
+  template <class Impl>
+  struct VTableImpl {
+    static constexpr VTable vtable = {
+      [](void *impl) {
+        return static_cast<Impl*>(impl)->claimNext();
+      },
+      [](void *impl, ManagedValue packAddr) {
+        static_cast<Impl*>(impl)->finishCurrent(packAddr);
+      }
+    };
+  };
+
+  void *pointer;
+  const VTable *vtable;
+public:
+  template <class G>
+  PackGeneratorRef(G &generator,
+    std::enable_if_t<!std::is_same_v<std::remove_const_t<G>, PackGeneratorRef>,
+                     bool> = false)
+    : pointer(&generator), vtable(&VTableImpl<G>::vtable) {}
+
+  ManagedValue claimNext() {
+    return vtable->claimNext(pointer);
+  }
+  void finishCurrent(ManagedValue packAddr) {
+    vtable->finishCurrent(pointer, packAddr);
+  }
+};
+
 /// A generator for destructuring a tuple type that is recursively
 /// expanded in some sequence.  In SIL, this sort of expansion
 /// happens in both function parameters and function results.
@@ -48,7 +85,7 @@ namespace Lowering {
 /// reaches them.
 class ExpandedTupleInputGenerator {
   const ASTContext &ctx;
-  SimpleGeneratorRef<ManagedValue> packInputs;
+  PackGeneratorRef packInputs;
   TupleElementGenerator origElt;
 
   /// If origElt.isPackExpansion(), this is the pack currently
@@ -82,10 +119,22 @@ class ExpandedTupleInputGenerator {
       if (substEltIndex != origElt.getSubstTypes().size())
         return;
 
-      // Otherwise, advance, and ready the next orig element if we
-      // didn't finish.
+      // Otherwise, we need to advance and ready the next orig element.
+
+      // If the current orig element is a pack expansion, tell the
+      // pack generator about the completed pack value.
+      if (origElt.isOrigPackExpansion()) {
+        assert(packValue.isValid());
+        packInputs.finishCurrent(packValue);
+      }
+
+      // Advance to the next orig element.  If we're out of elements,
+      // we're done.
       origElt.advance();
       if (origElt.isFinished()) return;
+
+      // Ready the next orig element, which may include generating a pack
+      // value.
       readyOrigElement();
     }
   }
@@ -110,12 +159,14 @@ class ExpandedTupleInputGenerator {
 
   void updatePackValue(ManagedValue newPackValue) {
     assert(isOrigPackExpansion());
+    assert(packValue.isValid());
+    assert(newPackValue.isValid());
     packValue = newPackValue;
   }
 
 public:
   ExpandedTupleInputGenerator(const ASTContext &ctx,
-                              SimpleGeneratorRef<ManagedValue> inputs,
+                              PackGeneratorRef inputs,
                               AbstractionPattern origTupleType,
                               CanType substType)
     : ctx(ctx), packInputs(inputs), origElt(origTupleType, substType) {
