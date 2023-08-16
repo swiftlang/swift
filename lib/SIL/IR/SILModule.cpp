@@ -864,6 +864,14 @@ void SILModule::installSILRemarkStreamer() {
   silRemarkStreamer = SILRemarkStreamer::create(*this);
 }
 
+void SILModule::promoteLinkages() {
+  for (auto &Fn : functions)
+    if (Fn.isDefinition())
+      Fn.setLinkage(SILLinkage::Public);
+
+  // TODO: Promote linkage of other SIL entities
+}
+
 bool SILModule::isStdlibModule() const {
   return TheSwiftModule->isStdlibModule();
 }

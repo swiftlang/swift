@@ -301,12 +301,9 @@ LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
     if (Source.kind != SymbolSource::Kind::SIL) {
       continue;
     }
-    auto Ref = Source.getSILDeclRef();
     const auto &SymbolName = Entry.getKey();
-    auto Flags = llvm::JITSymbolFlags::Callable;
-    if (Ref.getDefinitionLinkage() == SILLinkage::Public) {
-      Flags |= llvm::JITSymbolFlags::Exported;
-    }
+    auto Flags =
+        llvm::JITSymbolFlags::Callable | llvm::JITSymbolFlags::Exported;
     auto MangledName = mangle(SymbolName);
     PublicInterface[JIT.intern(MangledName)] = Flags;
   }
@@ -345,6 +342,12 @@ void LazySwiftMaterializationUnit::materialize(
     Refs.push_back(std::move(Ref));
   }
   auto SM = performASTLowering(CI, std::move(Refs));
+
+  // Promote linkages of SIL entities
+  // defining requested symbols so they are
+  // emitted during IRGen.
+  SM->promoteLinkages();
+
   runSILDiagnosticPasses(*SM);
   runSILLoweringPasses(*SM);
   auto GM = generateModule(CI, std::move(SM));
