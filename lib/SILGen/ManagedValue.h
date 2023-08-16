@@ -90,6 +90,7 @@ class ManagedValue {
   }
 
 public:
+  /// Constructs an invalid ManagedValue.
   ManagedValue() = default;
 
   /// Sometimes SILGen wants to represent an owned value or owned address
@@ -249,6 +250,10 @@ public:
   /// being represented by this ManagedValue.
   static ManagedValue forInContext() {
     return ManagedValue(SILValue(), true, CleanupHandle::invalid());
+  }
+
+  bool isValid() const {
+    return valueAndFlag.getInt() || valueAndFlag.getPointer();
   }
 
   bool isLValue() const {
