@@ -5944,25 +5944,13 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
 }
 
 bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
-  switch (static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
-  case AssociatedValueCheck::Unchecked:
-    this->hasOnlyCasesWithoutAssociatedValues();
-    LLVM_FALLTHROUGH;
-  default:
-    return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableValues);
-  }
+  (void)this->hasOnlyCasesWithoutAssociatedValues(); // Prime the cache
+  return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableValues);
 }
 
 bool EnumDecl::hasCasesUnavailableDuringLowering() const {
-  switch (
-      static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
-  case AssociatedValueCheck::Unchecked:
-    this->hasOnlyCasesWithoutAssociatedValues();
-    LLVM_FALLTHROUGH;
-  default:
-    return static_cast<bool>(
-        Bits.EnumDecl.HasAnyUnavailableDuringLoweringValues);
-  }
+  (void)this->hasOnlyCasesWithoutAssociatedValues(); // Prime the cache
+  return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableDuringLoweringValues);
 }
 
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
