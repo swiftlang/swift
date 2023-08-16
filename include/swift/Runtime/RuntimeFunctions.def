@@ -2776,7 +2776,8 @@ FUNCTION(InitRawStructMetadata,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy->getPointerTo(0), Int32Ty),
          ATTRS(NoUnwind),
-         EFFECT(MetaData))
+         EFFECT(MetaData),
+         UNKNOWN_MEMEFFECTS)
 
 #undef RETURNS
 #undef ARGS
