@@ -21,9 +21,10 @@ toolchain have been cloned.
 .PARAMETER BinaryCache
 The path to a directory where to write build system files and outputs.
 
-.PARAMETER LibraryRoot
-The path to a directory where built libraries should be placed,
-similar to the /Library or ~/Library directories on macOS.
+.PARAMETER ImageRoot
+The path to a directory that mimics a file system image root,
+under which "Library" and "Program Files" subdirectories will be created
+with the files installed by CMake.
 
 .PARAMETER BuildType
 The CMake build type to use, one of: Release, RelWithDebInfo, Debug.
@@ -43,9 +44,6 @@ Supports semantic version strings.
 
 .PARAMETER SkipBuild
 If set, does not run the build phase.
-
-.PARAMETER SkipRedistInstall
-If set, does not create S:\Program Files to mimic an installed redistributable.
 
 .PARAMETER SkipPackaging
 If set, skips building the msi's and installer
@@ -74,7 +72,7 @@ PS> .\Build.ps1 -SDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
 param(
   [string] $SourceCache = "S:\SourceCache",
   [string] $BinaryCache = "S:\b",
-  [string] $LibraryRoot = "S:\Library",
+  [string] $ImageRoot = "S:",
   [string] $BuildType = "Release",
   [string] $CDebugFormat = "dwarf",
   [string] $SwiftDebugFormat = "dwarf",
@@ -136,11 +134,11 @@ $ArchX64 = @{
   CMakeName = "AMD64";
   BinaryDir = "bin64";
   BuildID = 100;
-  BinaryRoot = "$BinaryCache\x64";
+  BinaryCache = "$BinaryCache\x64";
   PlatformInstallRoot = "$BinaryCache\x64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\SDKs\Windows.sdk";
-  XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
-  ToolchainInstallRoot = "$BinaryCache\x64\unknown-Asserts-development.xctoolchain";
+  XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-$ProductVersion";
+  ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
 }
 
 $ArchX86 = @{
@@ -151,10 +149,10 @@ $ArchX86 = @{
   CMakeName = "i686";
   BinaryDir = "bin32";
   BuildID = 200;
-  BinaryRoot = "$BinaryCache\x86";
+  BinaryCache = "$BinaryCache\x86";
   PlatformInstallRoot = "$BinaryCache\x86\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\Windows.sdk";
-  XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
+  XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-$ProductVersion";
 }
 
 $ArchARM64 = @{
@@ -165,11 +163,11 @@ $ArchARM64 = @{
   CMakeName = "aarch64";
   BinaryDir = "bin64a";
   BuildID = 300;
-  BinaryRoot = "$BinaryCache\arm64";
+  BinaryCache = "$BinaryCache\arm64";
   PlatformInstallRoot = "$BinaryCache\arm64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\Windows.sdk";
-  XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
-  ToolchainInstallRoot = "$BinaryCache\arm64\unknown-Asserts-development.xctoolchain";
+  XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-$ProductVersion";
+  ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
 }
 
 $HostArch = switch ($NativeProcessorArchName) {
@@ -178,7 +176,7 @@ $HostArch = switch ($NativeProcessorArchName) {
   default { throw "Unsupported processor architecture" }
 }
 
-function Get-RuntimeInstallRoot($Arch) {
+function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
     $ProgramFilesName = "Program Files"
   } elseif ($Arch -eq $ArchX86) {
@@ -191,13 +189,13 @@ function Get-RuntimeInstallRoot($Arch) {
     # arm64 cannot be installed on x64
     return $null
   }
-
-  return "S:\$ProgramFilesName\swift\runtime-development"
+  return "$ImageRoot\$ProgramFilesName\Swift"
 }
 
-$ToolchainInstallRoot = "$LibraryRoot\Developer\Toolchains\unknown-Asserts-development.xctoolchain"
-$PlatformInstallRoot = "$LibraryRoot\Developer\Platforms\Windows.platform"
-$RuntimeInstallRoot = "$(Get-RuntimeInstallRoot $HostArch)"
+$LibraryRoot = "$ImageRoot\Library"
+$ToolchainInstallRoot = "$(Get-InstallDir $HostArch)\Toolchains\$ProductVersion+Asserts"
+$PlatformInstallRoot = "$(Get-InstallDir $HostArch)\Platforms\Windows.platform"
+$RuntimeInstallRoot = "$(Get-InstallDir $HostArch)\Runtimes\$ProductVersion"
 $SDKInstallRoot = "$PlatformInstallRoot\Developer\SDKs\Windows.sdk"
 
 # For dev productivity, install the host toolchain directly using CMake.
@@ -215,7 +213,7 @@ $SDKArchs = $SDKs | ForEach-Object {
 }
 
 # Build functions
-function Get-ProjectBuildDir($Arch, $ID) {
+function Get-ProjectBinaryCache($Arch, $ID) {
   return "$BinaryCache\" + ($Arch.BuildID + $ID)
 }
 
@@ -331,6 +329,8 @@ function Append-FlagsDefine([hashtable]$Defines, [string]$Name, [string]$Value) 
 }
 
 function Test-CMakeAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
+  if ($ToBatch) { return $false }
+
   $CMakeVersionString = @(& cmake.exe --version)[0]
   if (-not ($CMakeVersionString -match "^cmake version (\d+)\.(\d+)(?:\.(\d+))?")) {
     throw "Unexpected CMake version string format"
@@ -427,8 +427,8 @@ function Build-CMakeProject {
       TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\1\bin\swiftc.exe"
       TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget
 
-      $RuntimeBuildDir = Get-ProjectBuildDir $Arch 1
-      $SwiftResourceDir = "${RuntimeBuildDir}\lib\swift"
+      $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
+      $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
       $SwiftArgs = [System.Collections.ArrayList]@()
 
@@ -437,7 +437,7 @@ function Build-CMakeProject {
       } else {
         $SwiftArgs.Add("-resource-dir $SwiftResourceDir") | Out-Null
         $SwiftArgs.Add("-L $SwiftResourceDir\windows") | Out-Null
-        $SwiftArgs.Add("-vfsoverlay $RuntimeBuildDir\stdlib\windows-vfs-overlay.yaml") | Out-Null
+        $SwiftArgs.Add("-vfsoverlay $RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml") | Out-Null
       }
 
       # Debug Information
@@ -476,7 +476,11 @@ function Build-CMakeProject {
       # Avoid backslashes in defines since they are going into CMakeCache.txt,
       # where they are interpreted as escapes. Assume all backslashes
       # are path separators and can be turned into forward slashes.
-      $ValueWithForwardSlashes = $Define.Value.Replace("\", "/")
+      $ValueWithPlaceholder = if ($SwiftSDK -ne "") { $Define.Value.Replace("$SwiftSDK", "<SDK>") } else { $Define.Value }
+      $ValueWithForwardSlashes = $ValueWithPlaceholder.Replace("\", "/")
+      if ($SwiftSDK -ne "") {
+        $ValueWithForwardSlashes = $ValueWithForwardSlashes.Replace("<SDK>", "\`"$SwiftSDK\`"")
+      }
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$ValueWithForwardSlashes")
     }
 
@@ -535,13 +539,12 @@ function Build-SPMProject {
         "-Xlinker", "-L$($HostArch.SDKInstallRoot)\usr\lib\swift\windows"
     )
     if ($BuildType -eq "Release") {
-      $Arguments += @("-Xswiftc", "-gnone")
+      $Arguments += @("-debug-info-format", "none")
     } else {
       if ($SwiftDebugFormat -eq "dwarf") {
-        $Arguments += @("-Xlinker", "-debug:dwarf")
+        $Arguments += @("-debug-info-format", "dwarf")
       } else {
-        $Arguments += @("-g", "-debug-info-format=codeview")
-        $Arguments += @("-Xlinker", "-debug")
+        $Arguments += @("-debug-info-format", "codeview")
       }
     }
 
@@ -565,7 +568,6 @@ function Build-WiXProject() {
     [hashtable]$Properties = @{}
   )
 
-  $Name = $FileName.Split('.')[0]
   $ArchName = $Arch.VSName
 
   $ProductVersionArg = $ProductVersion
@@ -578,18 +580,22 @@ function Build-WiXProject() {
 
   $Properties = $Properties.Clone()
   TryAdd-KeyValue $Properties Configuration Release
-  TryAdd-KeyValue $Properties IntermediateOutputPath "$($Arch.BinaryRoot)\$Name\"
-  TryAdd-KeyValue $Properties OutputPath "$($Arch.BinaryRoot)\msi\"
+  TryAdd-KeyValue $Properties BaseOutputPath "$($Arch.BinaryCache)\msi\"
   TryAdd-KeyValue $Properties ProductArchitecture $ArchName
   TryAdd-KeyValue $Properties ProductVersion $ProductVersionArg
-  TryAdd-KeyValue $Properties RunWixToolsOutOfProc true
 
   $MSBuildArgs = @("$SourceCache\swift-installer-scripts\platforms\Windows\$FileName")
   $MSBuildArgs += "-noLogo"
   $MSBuildArgs += "-restore"
   foreach ($Property in $Properties.GetEnumerator()) {
-    $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
+    if ($Property.Value.Contains(" ")) {
+      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
+    } else {
+      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
+    }
   }
+  $MSBuildArgs += "-bl:$($Arch.BinaryCache)\msi\$ArchName-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
+  $MSBuildArgs += "-ds:False"
 
   Invoke-Program $msbuild @MSBuildArgs
 }
@@ -691,7 +697,7 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
 function Build-LLVM($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
-    -Bin (Get-ProjectBuildDir $Arch 0) `
+    -Bin (Get-ProjectBinaryCache $Arch 0) `
     -Arch $Arch `
     -Defines @{
       LLVM_HOST_TRIPLE = $Arch.LLVMTarget;
@@ -703,7 +709,7 @@ function Build-ZLib($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin "$($Arch.BinaryRoot)\zlib-1.2.11" `
+    -Bin "$($Arch.BinaryCache)\zlib-1.2.11" `
     -InstallTo $LibraryRoot\zlib-1.2.11\usr `
     -Arch $Arch `
     -BuildTargets default `
@@ -719,7 +725,7 @@ function Build-XML2($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
-    -Bin "$($Arch.BinaryRoot)\libxml2-2.9.12" `
+    -Bin "$($Arch.BinaryCache)\libxml2-2.9.12" `
     -InstallTo "$LibraryRoot\libxml2-2.9.12\usr" `
     -Arch $Arch `
     -BuildTargets default `
@@ -742,7 +748,7 @@ function Build-CURL($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin "$($Arch.BinaryRoot)\curl-7.77.0" `
+    -Bin "$($Arch.BinaryCache)\curl-7.77.0" `
     -InstallTo "$LibraryRoot\curl-7.77.0\usr" `
     -Arch $Arch `
     -BuildTargets default `
@@ -790,7 +796,7 @@ function Build-ICU($Arch) {
     # Use previously built x64 tools
     $BuildToolsDefines = @{
       BUILD_TOOLS = "NO";
-      ICU_TOOLS_DIR = "$($ArchX64.BinaryRoot)\icu-69.1"
+      ICU_TOOLS_DIR = "$($ArchX64.BinaryCache)\icu-69.1"
     }
   } else {
     $BuildToolsDefines = @{BUILD_TOOLS = "YES"}
@@ -798,7 +804,7 @@ function Build-ICU($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\icu\icu4c `
-    -Bin "$($Arch.BinaryRoot)\icu-69.1" `
+    -Bin "$($Arch.BinaryCache)\icu-69.1" `
     -InstallTo "$LibraryRoot\icu-69.1\usr" `
     -Arch $Arch `
     -BuildTargets default `
@@ -810,11 +816,11 @@ function Build-ICU($Arch) {
 }
 
 function Build-Runtime($Arch) {
-  $LLVMBuildDir = Get-ProjectBuildDir $Arch 0
+  $LLVMBinaryCache = Get-ProjectBinaryCache $Arch 0
 
   Build-CMakeProject `
     -Src $SourceCache\swift `
-    -Bin (Get-ProjectBuildDir $Arch 1) `
+    -Bin (Get-ProjectBinaryCache $Arch 1) `
     -InstallTo "$($Arch.SDKInstallRoot)\usr" `
     -Arch $Arch `
     -CacheScript $SourceCache\swift\cmake\caches\Runtime-Windows-$($Arch.LLVMName).cmake `
@@ -822,7 +828,7 @@ function Build-Runtime($Arch) {
     -BuildTargets default `
     -Defines @{
       CMAKE_Swift_COMPILER_TARGET = $Arch.LLVMTarget;
-      LLVM_DIR = "$LLVMBuildDir\lib\cmake\llvm";
+      LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -845,7 +851,7 @@ function Build-Dispatch($Arch, [switch]$Test = $false) {
 
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
-    -Bin (Get-ProjectBuildDir $Arch 2) `
+    -Bin (Get-ProjectBinaryCache $Arch 2) `
     -Arch $Arch `
     -UseBuiltCompilers C,CXX,Swift `
     -BuildTargets $Targets `
@@ -858,20 +864,20 @@ function Build-Dispatch($Arch, [switch]$Test = $false) {
 }
 
 function Build-Foundation($Arch, [switch]$Test = $false) {
-  $DispatchBinDir = Get-ProjectBuildDir $Arch 2
-  $FoundationBinDir = Get-ProjectBuildDir $Arch 3
+  $DispatchBinaryCache = Get-ProjectBinaryCache $Arch 2
+  $FoundationBinaryCache = Get-ProjectBinaryCache $Arch 3
   $ShortArch = $Arch.ShortName
 
   Isolate-EnvVars {
     if ($Test) {
-      $RuntimeBinDir = Get-ProjectBuildDir $Arch 1
-      $XCTestBinDir = Get-ProjectBuildDir $Arch 4
+      $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
+      $XCTestBinaryCache = Get-ProjectBinaryCache $Arch 4
       $TestingDefines = @{
         ENABLE_TESTING = "YES";
-        XCTest_DIR = "$XCTestBinDir\cmake\modules";
+        XCTest_DIR = "$XCTestBinaryCache\cmake\modules";
       }
       $Targets = @("default", "test")
-      $env:Path = "$XCTestBinDir;$FoundationBinDir\bin;$DispatchBinDir;$RuntimeBinDir\bin;$env:Path"
+      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$RuntimeBinaryCache\bin;$env:Path"
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
@@ -880,7 +886,7 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
     $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-foundation `
-      -Bin $FoundationBinDir `
+      -Bin $FoundationBinaryCache `
       -Arch $Arch `
       -UseBuiltCompilers ASM,C,Swift `
       -BuildTargets $Targets `
@@ -902,29 +908,29 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
         LIBXML2_DEFINITIONS = "/DLIBXML_STATIC";
         ZLIB_LIBRARY = "$LibraryRoot\zlib-1.2.11\usr\lib\$ShortArch\zlibstatic.lib";
         ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.2.11\usr\include";
-        dispatch_DIR = "$DispatchBinDir\cmake\modules";
+        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
       } + $TestingDefines)
   }
 }
 
 function Build-XCTest($Arch, [switch]$Test = $false) {
-  $LLVMBinDir = Get-ProjectBuildDir $Arch 0
-  $DispatchBinDir = Get-ProjectBuildDir $Arch 2
-  $FoundationBinDir = Get-ProjectBuildDir $Arch 3
-  $XCTestBinDir = Get-ProjectBuildDir $Arch 4
+  $LLVMBinaryCache = Get-ProjectBinaryCache $Arch 0
+  $DispatchBinaryCache = Get-ProjectBinaryCache $Arch 2
+  $FoundationBinaryCache = Get-ProjectBinaryCache $Arch 3
+  $XCTestBinaryCache = Get-ProjectBinaryCache $Arch 4
 
   Isolate-EnvVars {
     if ($Test) {
-      $RuntimeBinDir = Get-ProjectBuildDir $Arch 1
+      $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
       $TestingDefines = @{
         ENABLE_TESTING = "YES";
-        LLVM_DIR = "$LLVMBinDir/lib/cmake/llvm";
-        XCTEST_PATH_TO_LIBDISPATCH_BUILD = $DispatchBinDir;
+        LLVM_DIR = "$LLVMBinaryCache/lib/cmake/llvm";
+        XCTEST_PATH_TO_LIBDISPATCH_BUILD = $DispatchBinaryCache;
         XCTEST_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
-        XCTEST_PATH_TO_FOUNDATION_BUILD = $FoundationBinDir;
+        XCTEST_PATH_TO_FOUNDATION_BUILD = $FoundationBinaryCache;
       }
       $Targets = @("default", "check-xctest")
-      $env:Path = "$XCTestBinDir;$FoundationBinDir\bin;$DispatchBinDir;$RuntimeBinDir\bin;$env:Path;$UnixToolsBinDir"
+      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$RuntimeBinaryCache\bin;$env:Path;$UnixToolsBinDir"
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
@@ -932,7 +938,7 @@ function Build-XCTest($Arch, [switch]$Test = $false) {
 
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
-      -Bin $XCTestBinDir `
+      -Bin $XCTestBinaryCache `
       -Arch $Arch `
       -UseBuiltCompilers Swift `
       -BuildTargets $Targets `
@@ -940,15 +946,15 @@ function Build-XCTest($Arch, [switch]$Test = $false) {
         CMAKE_INSTALL_PREFIX = "$($Arch.XCTestInstallRoot)\usr";
         CMAKE_SYSTEM_NAME = "Windows";
         CMAKE_SYSTEM_PROCESSOR = $Arch.CMakeName;
-        dispatch_DIR = "$DispatchBinDir\cmake\modules";
-        Foundation_DIR = "$FoundationBinDir\cmake\modules";
+        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
+        Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
       } + $TestingDefines)
 
     if ($DefaultsLLD) {
-      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': '$ProductVersion', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
         -OutFile "$($Arch.PlatformInstallRoot)\Info.plist"
     } else {
-      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" `
+      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': '$ProductVersion' } }), encoding='utf-8'))" `
         -OutFile "$($Arch.PlatformInstallRoot)\Info.plist"
     }
   }
@@ -970,9 +976,7 @@ function Copy-Directory($Src, $Dst) {
 function Install-Redist($Arch) {
   if ($ToBatch) { return }
 
-  $RedistInstallRoot = Get-RuntimeInstallRoot $Arch
-  if ($null -eq $RedistInstallRoot) { return }
-
+  $RedistInstallRoot = "$(Get-InstallDir $Arch)\Runtimes\$ProductVersion"
   Remove-Item -Force -Recurse $RedistInstallRoot -ErrorAction Ignore
   Copy-Directory "$($Arch.SDKInstallRoot)\usr\bin" "$RedistInstallRoot\usr"
 }
@@ -1025,7 +1029,7 @@ function Install-Platform($Arch) {
   Copy-File "$($Arch.SDKInstallRoot)\SDKSettings.plist" $SDKInstallRoot\
 
   # Copy XCTest
-  $XCTestInstallRoot = "$PlatformInstallRoot\Developer\Library\XCTest-development"
+  $XCTestInstallRoot = "$PlatformInstallRoot\Developer\Library\XCTest-$ProductVersion"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\bin\XCTest.dll" "$XCTestInstallRoot\usr\$($Arch.BinaryDir)\"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\windows\XCTest.lib" "$XCTestInstallRoot\usr\lib\swift\windows\$($Arch.LLVMName)\"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\windows\$($Arch.LLVMName)\XCTest.swiftmodule" "$XCTestInstallRoot\usr\lib\swift\windows\XCTest.swiftmodule\$($Arch.LLVMTarget).swiftmodule"
@@ -1069,7 +1073,7 @@ install(FILES sqlite3.h sqlite3ext.h DESTINATION include)
 
   Build-CMakeProject `
     -Src $SrcPath `
-    -Bin "$($Arch.BinaryRoot)\sqlite-3.36.0" `
+    -Bin "$($Arch.BinaryCache)\sqlite-3.36.0" `
     -InstallTo $LibraryRoot\sqlite-3.36.0\usr `
     -Arch $Arch `
     -BuildTargets default `
@@ -1356,7 +1360,7 @@ function Install-HostToolchain() {
 }
 
 function Build-Inspect() {
-  $OutDir = Join-Path -Path $HostArch.BinaryRoot -ChildPath swift-inspect
+  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-inspect
 
   Build-SPMProject `
     -Src $SourceCache\swift\tools\swift-inspect `
@@ -1367,22 +1371,28 @@ function Build-Inspect() {
 }
 
 function Build-Format() {
-  $OutDir = Join-Path -Path $HostArch.BinaryRoot -ChildPath swift-format
+  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-format
 
-  Build-SPMProject `
-    -Src $SourceCache\swift-format `
-    -Bin $OutDir `
-    -Arch $HostArch
+  Isolate-EnvVars {
+    $env:SWIFTCI_USE_LOCAL_DEPS=1
+    Build-SPMProject `
+      -Src $SourceCache\swift-format `
+      -Bin $OutDir `
+      -Arch $HostArch
+  }
 }
 
 function Build-DocC() {
-  $OutDir = Join-Path -Path $HostArch.BinaryRoot -ChildPath swift-docc
+  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-docc
 
-  Build-SPMProject `
-    -Src $SourceCache\swift-docc `
-    -Bin $OutDir `
-    -Arch $HostArch `
-    --product docc
+  Isolate-EnvVars {
+    $env:SWIFTCI_USE_LOCAL_DEPS=1
+    Build-SPMProject `
+      -Src $SourceCache\swift-docc `
+      -Bin $OutDir `
+      -Arch $HostArch `
+      --product docc
+  }
 }
 
 function Build-Installer() {
@@ -1395,14 +1405,14 @@ function Build-Installer() {
     DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     INCLUDE_SWIFT_FORMAT = "true";
-    SWIFT_FORMAT_BUILD = "$($HostArch.BinaryRoot)\swift-format\release";
+    SWIFT_FORMAT_BUILD = "$($HostArch.BinaryCache)\swift-format\release";
   }
 
   Build-WiXProject dbg\dbg.wixproj -Arch $HostArch -Properties @{
     DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     INCLUDE_SWIFT_INSPECT = "true";
-    SWIFT_INSPECT_BUILD = "$($HostArch.BinaryRoot)\swift-inspect\release";
+    SWIFT_INSPECT_BUILD = "$($HostArch.BinaryCache)\swift-inspect\release";
   }
 
   Build-WiXProject ide\ide.wixproj -Arch $HostArch -Properties @{
@@ -1411,7 +1421,7 @@ function Build-Installer() {
   }
 
   foreach ($Arch in $SDKArchs) {
-    Build-WiXProject runtime\runtime.wixproj -Arch $Arch -Properties @{
+    Build-WiXProject runtimemsi\runtimemsi.wixproj -Arch $Arch -Properties @{
       SDK_ROOT = "$($Arch.SDKInstallRoot)\";
     }
 
@@ -1423,9 +1433,16 @@ function Build-Installer() {
     }
   }
 
+  foreach ($MSI in ("bld", "cli", "dbg", "ide", "sdk", "runtime")) {
+    if ($ToBatch) {
+      Write-Output "Move-Item $($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\$MSI.msi $($HostArch.BinaryCache)\msi\";
+    } else {
+      Move-Item "$($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\$MSI.msi" "$($HostArch.BinaryCache)\msi\";
+    }
+  }
+
   Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Bundle -Properties @{
-    OutputPath = "$($HostArch.BinaryRoot)\";
-    MSI_LOCATION = "$($HostArch.BinaryRoot)\msi\";
+    MSI_LOCATION = "$($HostArch.BinaryCache)\msi\";
   }
 }
 
@@ -1450,10 +1467,6 @@ foreach ($Arch in $SDKArchs) {
     Build-Dispatch $Arch
     Build-Foundation $Arch
     Build-XCTest $Arch
-  }
-
-  if (-not $SkipRedistInstall) {
-    Install-Redist $Arch
   }
 }
 
@@ -1503,6 +1516,6 @@ if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
 if (-not $SkipPackaging -and $Stage -ne "") {
   $Stage += "\" # Interpret as target directory
 
-  Copy-File "$($HostArch.BinaryRoot)\msi\*.msi" $Stage
-  Copy-File "$($HostArch.BinaryRoot)\installer.exe" $Stage
+  Copy-File "$($HostArch.BinaryCache)\msi\*.msi" $Stage
+  Copy-File "$($HostArch.BinaryCache)\installer.exe" $Stage
 }

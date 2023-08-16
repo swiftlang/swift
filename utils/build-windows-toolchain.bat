@@ -73,15 +73,15 @@ if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
+:: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
-  -LibraryRoot %BuildRoot%\Library ^
+  -ImageRoot %BuildRoot% ^
   -BuildType %CMAKE_BUILD_TYPE% ^
-  -SkipRedistInstall ^
   %SkipPackagingArg% ^
   %TestArg% ^
-  -Stage "%BuildRoot%\package"
+  -Stage %PackageRoot%
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
