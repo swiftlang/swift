@@ -2897,6 +2897,34 @@ AllMembersRequest::evaluate(
   return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
+ArrayRef<EnumElementDecl *>
+EnumElementsRequest::evaluate(Evaluator &evaluator,
+                              const EnumDecl *enumDecl) const {
+  auto &ctx = enumDecl->getASTContext();
+  SmallVector<EnumElementDecl *, 8> result;
+
+  for (auto member : enumDecl->getMembers()) {
+    if (auto caseDecl = dyn_cast<EnumElementDecl>(member))
+      result.push_back(caseDecl);
+  }
+
+  return ctx.AllocateCopy(result);
+}
+
+ArrayRef<EnumCaseDecl *>
+EnumCasesRequest::evaluate(Evaluator &evaluator,
+                           const EnumDecl *enumDecl) const {
+  auto &ctx = enumDecl->getASTContext();
+  SmallVector<EnumCaseDecl *, 8> result;
+
+  for (auto member : enumDecl->getMembers()) {
+    if (auto caseDecl = dyn_cast<EnumCaseDecl>(member))
+      result.push_back(caseDecl);
+  }
+
+  return ctx.AllocateCopy(result);
+}
+
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                                          NominalTypeDecl *nominal) {
   // Pass-through only makes sense when the typealias refers to a nominal

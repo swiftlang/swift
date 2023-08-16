@@ -1875,6 +1875,42 @@ public:
   bool isCached() const { return true; }
 };
 
+class EnumElementsRequest
+    : public SimpleRequest<EnumElementsRequest,
+                           ArrayRef<EnumElementDecl *>(const EnumDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<EnumElementDecl *> evaluate(Evaluator &evaluator,
+                                       const EnumDecl *enumDecl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class EnumCasesRequest
+    : public SimpleRequest<EnumCasesRequest,
+                           ArrayRef<EnumCaseDecl *>(const EnumDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<EnumCaseDecl *> evaluate(Evaluator &evaluator,
+                                    const EnumDecl *enumDecl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class IsImplicitlyUnwrappedOptionalRequest :
     public SimpleRequest<IsImplicitlyUnwrappedOptionalRequest,
                          bool(ValueDecl *),

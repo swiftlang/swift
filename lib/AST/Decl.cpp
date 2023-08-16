@@ -5288,6 +5288,20 @@ void EnumDecl::setRawType(Type rawType) {
                                         std::move(rawType));
 }
 
+ArrayRef<EnumElementDecl *> EnumDecl::getAllElements() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator, EnumElementsRequest{this},
+                           ArrayRef<EnumElementDecl *>());
+}
+
+ArrayRef<EnumCaseDecl *> EnumDecl::getAllCases() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator, EnumCasesRequest{this},
+                           ArrayRef<EnumCaseDecl *>());
+}
+
+bool EnumDecl::hasCases() const { return !getAllCases().empty(); }
+
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        ArrayRef<InheritedEntry> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)

@@ -4201,16 +4201,8 @@ public:
   }
 
 public:
-  /// A range for iterating the elements of an enum.
-  using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
-
-  /// A range for iterating the cases of an enum.
-  using CaseRange = DowncastFilterRange<EnumCaseDecl, DeclRange>;
-
   /// Return a range that iterates over all the elements of an enum.
-  ElementRange getAllElements() const {
-    return ElementRange(getMembers());
-  }
+  ArrayRef<EnumElementDecl *> getAllElements() const;
 
   unsigned getNumElements() const {
     auto eltRange = getAllElements();
@@ -4222,10 +4214,10 @@ public:
   /// not imply the existence or non-existence of the opposite unique element.
   EnumElementDecl *getUniqueElement(bool hasValue) const;
 
-  /// Return a range that iterates over all the cases of an enum.
-  CaseRange getAllCases() const {
-    return CaseRange(getMembers());
-  }
+  /// Get all enum cases.
+  ///
+  /// The resulting list of cases will be stable across translation units.
+  ArrayRef<EnumCaseDecl *> getAllCases() const;
 
   /// Insert all of the 'case' element declarations into a DenseSet.
   void getAllElements(llvm::DenseSet<EnumElementDecl*> &elements) const {
@@ -4280,9 +4272,7 @@ public:
   bool hasPotentiallyUnavailableCaseValue() const;
 
   /// True if the enum has cases.
-  bool hasCases() const {
-    return !getAllElements().empty();
-  }
+  bool hasCases() const;
 
   /// True if the enum is marked 'indirect'.
   bool isIndirect() const {
