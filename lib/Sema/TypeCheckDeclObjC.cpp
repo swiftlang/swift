@@ -2866,9 +2866,16 @@ namespace {
 class ObjCImplementationChecker {
   DiagnosticEngine &diags;
 
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    auto diag = diags.diagnose(std::forward<ArgTypes>(Args)...);
+  template<typename Loc, typename ...ArgTypes>
+  InFlightDiagnostic diagnose(Loc loc, Diag<ArgTypes...> diagID,
+                        typename detail::PassArgument<ArgTypes>::type... Args) {
+    auto diag = diags.diagnose(loc, diagID, std::forward<ArgTypes>(Args)...);
+
+    // WORKAROUND (5.9): Soften newly-introduced errors to make things easier
+    // for early adopters.
+    if (diags.declaredDiagnosticKindFor(diagID.ID) == DiagnosticKind::Error)
+      diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
+
     return diag;
   }
 
