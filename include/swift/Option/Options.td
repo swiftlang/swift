@@ -893,7 +893,7 @@ def use_ld : Joined<["-"], "use-ld=">,
   HelpText<"Specifies the flavor of the linker to be used">;
 
 def ld_path : Joined<["--"], "ld-path=">,
-  Flags<[DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the path to the linker to be used">;
 
 def Xlinker : Separate<["-"], "Xlinker">,
