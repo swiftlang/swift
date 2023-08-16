@@ -890,7 +890,11 @@ def no_static_executable : Flag<["-"], "no-static-executable">,
 
 def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
-  HelpText<"Specifies the linker to be used">;
+  HelpText<"Specifies the flavor of the linker to be used">;
+
+def ld_path : Joined<["--"], "ld-path=">,
+  Flags<[DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Specifies the path to the linker to be used">;
 
 def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
