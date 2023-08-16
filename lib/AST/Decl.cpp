@@ -5944,14 +5944,13 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
 }
 
 bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
-  switch (static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
-    case AssociatedValueCheck::Unchecked:
-      // Compute below
-      this->hasOnlyCasesWithoutAssociatedValues();
-      LLVM_FALLTHROUGH;
-    default:
-      return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableValues);
-  }
+  (void)this->hasOnlyCasesWithoutAssociatedValues(); // Prime the cache
+  return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableValues);
+}
+
+bool EnumDecl::hasCasesUnavailableDuringLowering() const {
+  (void)this->hasOnlyCasesWithoutAssociatedValues(); // Prime the cache
+  return static_cast<bool>(Bits.EnumDecl.HasAnyUnavailableDuringLoweringValues);
 }
 
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
@@ -5970,6 +5969,7 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   }
 
   bool hasAnyUnavailableValues = false;
+  bool hasAnyUnavailableDuringLoweringValues = false;
   bool hasAssociatedValues = false;
 
   for (auto elt : getAllElements()) {
@@ -5980,6 +5980,9 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
       }
     }
 
+    if (!elt->isAvailableDuringLowering())
+      hasAnyUnavailableDuringLoweringValues = true;
+
     if (elt->hasAssociatedValues())
       hasAssociatedValues = true;
   }
@@ -5987,6 +5990,8 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   EnumDecl *enumDecl = const_cast<EnumDecl *>(this);
 
   enumDecl->Bits.EnumDecl.HasAnyUnavailableValues = hasAnyUnavailableValues;
+  enumDecl->Bits.EnumDecl.HasAnyUnavailableDuringLoweringValues =
+      hasAnyUnavailableDuringLoweringValues;
   enumDecl->Bits.EnumDecl.HasAssociatedValues = static_cast<unsigned>(
       hasAssociatedValues ? AssociatedValueCheck::HasAssociatedValues
                           : AssociatedValueCheck::NoAssociatedValues);

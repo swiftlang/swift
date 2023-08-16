@@ -650,13 +650,16 @@ protected:
                         /// address diversified ptrauth qualified field.
                         IsNonTrivialPtrAuth : 1);
 
-  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1+1,
     /// True if the enum has cases and at least one case has associated values.
     HasAssociatedValues : 2,
     /// True if the enum has at least one case that has some availability
     /// attribute.  A single bit because it's lazily computed along with the
     /// HasAssociatedValues bit.
-    HasAnyUnavailableValues : 1
+    HasAnyUnavailableValues : 1,
+    /// True if \c isAvailableDuringLowering() is false for any cases. Lazily
+    /// computed along with HasAssociatedValues.
+    HasAnyUnavailableDuringLoweringValues : 1
   );
 
   SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
@@ -1237,7 +1240,10 @@ public:
   /// Returns true if this declaration should be considered available during
   /// SIL/IR lowering. A declaration would not be available during lowering if,
   /// for example, it is annotated as unavailable with `@available` and
-  /// optimization settings require that it be omitted.
+  /// optimization settings require that it be omitted. Canonical SIL must not
+  /// contain any references to declarations that are unavailable during
+  /// lowering because the resulting IR could reference non-existent symbols
+  /// and fail to link.
   bool isAvailableDuringLowering() const;
 
   /// Returns true if ABI compatibility stubs must be emitted for the given
@@ -4204,6 +4210,11 @@ public:
   /// A range for iterating the elements of an enum.
   using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
 
+  /// A range for iterating the elements of an enum that are available during
+  /// lowering.
+  using ElementRangeForLowering = OptionalTransformRange<
+      ElementRange, AvailableDuringLoweringDeclFilter<EnumElementDecl>>;
+
   /// A range for iterating the cases of an enum.
   using CaseRange = DowncastFilterRange<EnumCaseDecl, DeclRange>;
 
@@ -4215,6 +4226,13 @@ public:
   unsigned getNumElements() const {
     auto eltRange = getAllElements();
     return std::distance(eltRange.begin(), eltRange.end());
+  }
+
+  /// Returns a range that iterates over all the elements of an enum for which
+  /// \c isAvailableDuringLowering() is true.
+  ElementRangeForLowering getAllElementsForLowering() const {
+    return ElementRangeForLowering(
+        getAllElements(), AvailableDuringLoweringDeclFilter<EnumElementDecl>());
   }
 
   /// If this enum has a unique element, return it. A unique element can
@@ -4278,6 +4296,11 @@ public:
   ///
   /// Note that this is false for enums with absolutely no cases.
   bool hasPotentiallyUnavailableCaseValue() const;
+
+  /// True if \c isAvailableDuringLowering() is false for any cases.
+  ///
+  /// Note that this is false for enums with absolutely no cases.
+  bool hasCasesUnavailableDuringLowering() const;
 
   /// True if the enum has cases.
   bool hasCases() const {
