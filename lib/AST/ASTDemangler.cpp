@@ -328,6 +328,17 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 }
 
 Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> labels) {
+  // Unwrap unlabeled one-element tuples.
+  //
+  // FIXME: The behavior of one-element labeled tuples is inconsistent
+  // throughout the different re-implementations of type substitution
+  // and pack expansion.
+  if (eltTypes.size() == 1 &&
+      !eltTypes[0]->is<PackExpansionType>() &&
+      labels[0].empty()) {
+    return eltTypes[0];
+  }
+
   SmallVector<TupleTypeElt, 4> elements;
   elements.reserve(eltTypes.size());
   for (unsigned i : indices(eltTypes)) {
