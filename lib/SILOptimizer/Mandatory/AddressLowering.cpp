@@ -2190,14 +2190,17 @@ bool CallArgRewriter::rewriteArguments() {
   bool changed = false;
 
   auto origConv = apply.getSubstCalleeConv();
-  assert(apply.getNumArguments() == origConv.getNumParameters() &&
-         "results should not yet be rewritten");
+  assert((apply.getNumArguments() == origConv.getNumParameters() &&
+          apply.asFullApplySite()) ||
+         (apply.getNumArguments() <= origConv.getNumParameters() &&
+          !apply.asFullApplySite()) &&
+             "results should not yet be rewritten");
 
   for (unsigned argIdx = apply.getCalleeArgIndexOfFirstAppliedArg(),
                 endArgIdx = argIdx + apply.getNumArguments();
        argIdx < endArgIdx; ++argIdx) {
 
-    Operand &operand = apply.getArgumentRef(argIdx);
+    Operand &operand = apply.getArgumentRefAtCalleeArgIndex(argIdx);
     // Ignore arguments that have already been rewritten with an address.
     if (operand.get()->getType().isAddress())
       continue;
