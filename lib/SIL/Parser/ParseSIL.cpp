@@ -3594,6 +3594,17 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createTuplePackElementAddr(InstLoc, index, tuple, elementType);
     break;
   }
+  case SILInstructionKind::TuplePackExtractInst: {
+    SILValue index, tuple;
+    SILType elementType;
+    if (parseValueRef(index, SILType::getPackIndexType(P.Context), InstLoc,
+                      B) ||
+        parseVerbatim("of") || parseTypedValueRef(tuple, B) ||
+        parseVerbatim("as") || parseSILType(elementType))
+      return true;
+    ResultVal = B.createTuplePackExtract(InstLoc, index, tuple, elementType);
+    break;
+  }
 
 #define UNARY_INSTRUCTION(ID)                                                  \
   case SILInstructionKind::ID##Inst:                                           \

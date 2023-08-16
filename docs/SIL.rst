@@ -6403,6 +6403,23 @@ tuple_extract
 
 Extracts an element from a loadable tuple value.
 
+
+tuple_pack_extract
+``````````````````
+::
+
+  sil-instruction ::= 'tuple_pack_extract' sil-value 'of' sil-operand 'as' sil-type
+
+  %value = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("01234567-89AB-CDEF-0123-000000000000") U
+  // %index must be of $Builtin.PackIndex type
+  // %tuple must be of tuple type
+  // %addr will be the result type specified by the 'as' clause
+
+Extracts a value at a dynamic index from a tuple value.
+
+Only valid in opaque values mode.  Lowered by AddressLowering to
+tuple_pack_element_addr.  For more details, see that instruction.
+
 tuple_element_addr
 ``````````````````
 ::

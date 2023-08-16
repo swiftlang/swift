@@ -2780,6 +2780,27 @@ void SILCloner<ImplClass>::visitTuplePackElementAddrInst(
                                                     newElementType));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTuplePackExtractInst(
+    TuplePackExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newIndex = getOpValue(Inst->getIndex());
+  auto newTuple = getOpValue(Inst->getTuple());
+  auto newElementType = getOpType(Inst->getElementType());
+
+  // If the tuple-ness of the operand disappears due to substitution,
+  // replace this instruction with an unchecked_value_cast.
+  if (doesOpTupleDisappear(Inst->getTupleType())) {
+    recordClonedInstruction(Inst, getBuilder().createUncheckedValueCast(
+                                      loc, newTuple, newElementType));
+    return;
+  }
+
+  recordClonedInstruction(Inst, getBuilder().createTuplePackExtract(
+                                    loc, newIndex, newTuple, newElementType));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {

@@ -7805,6 +7805,45 @@ public:
   }
 };
 
+/// Extracts a tuple element as appropriate for the given
+/// pack element index.  The pack index must index into a pack with
+/// the same shape as the tuple element type list.
+///
+/// Legal only in opaque values mode.  Transformed by AddressLowering to
+/// TuplePackElementAddrInst.
+class TuplePackExtractInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::TuplePackExtractInst, TuplePackExtractInst,
+          OwnershipForwardingSingleValueInstruction> {
+public:
+  enum { IndexOperand = 0, TupleOperand = 1 };
+
+private:
+  friend SILBuilder;
+
+  TuplePackExtractInst(SILDebugLocation debugLoc,
+                       ArrayRef<SILValue> allOperands, SILType elementType,
+                       ValueOwnershipKind forwardingOwnershipKind)
+      : InstructionBaseWithTrailingOperands(allOperands, debugLoc, elementType,
+                                            forwardingOwnershipKind) {}
+
+  static TuplePackExtractInst *
+  create(SILFunction &F, SILDebugLocation debugLoc, SILValue indexOperand,
+         SILValue tupleOperand, SILType elementType,
+         ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  SILValue getIndex() const { return getAllOperands()[IndexOperand].get(); }
+
+  SILValue getTuple() const { return getAllOperands()[TupleOperand].get(); }
+
+  CanTupleType getTupleType() const {
+    return getTuple()->getType().castTo<TupleType>();
+  }
+
+  SILType getElementType() const { return getType(); }
+};
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<SILInstructionKind::ProjectBlockStorageInst,
@@ -10543,6 +10582,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::LinearFunctionExtractInst:

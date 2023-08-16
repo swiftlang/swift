@@ -304,6 +304,7 @@ public:
   bool canForwardGuaranteedCompatibleValuesOnly() {
     switch (forwardingInst->getKind()) {
     case SILInstructionKind::TupleExtractInst:
+    case SILInstructionKind::TuplePackExtractInst:
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::DifferentiableFunctionExtractInst:
     case SILInstructionKind::LinearFunctionExtractInst:

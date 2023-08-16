@@ -115,6 +115,24 @@ bb0(%instance : @guaranteed $WeakBox<T>):
   return %strong_optional : $Optional<T>
 }
 
+// Test tuple_pack_extract parsing.
+
+// CHECK-LABEL: sil [ossa] @test_tuple_pack_extract : {{.*}} {
+// CHECK:       bb0([[TUPLE:%[^,]+]] :
+// CHECK:         [[ZERO:%[^,]+]] = integer_literal
+// CHECK:         [[INDEX:%[^,]+]] = dynamic_pack_index [[ZERO]]
+// CHECK:         [[ELT:%[^,]+]] = tuple_pack_extract [[INDEX]] of [[TUPLE]]
+// CHECK-LABEL: } // end sil function 'test_tuple_pack_extract'
+sil [ossa] @test_tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+entry(%tuple : @guaranteed $(repeat each T)):
+  %zero = integer_literal $Builtin.Word, 0
+  %index = dynamic_pack_index %zero of $Pack{repeat each T}
+  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
+  %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // Test weak_copy_value parsing.
 
 // CHECK-LABEL: sil [ossa] @test_weak_copy_value_1 : {{.*}} {
