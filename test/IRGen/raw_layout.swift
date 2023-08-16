@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Swift
 
@@ -64,18 +64,75 @@ struct Keymaster: ~Copyable {
     let lock3: Lock
 }
 
-/*
-TODO: Dependent layout not yet implemented
+// Dependent Layouts:
+// These types have their layouts all zeroed out and will be fixed up at
+// runtime.
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}4CellVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
 @_rawLayout(like: T)
 struct Cell<T>: ~Copyable {}
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}10PaddedCellVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
 @_rawLayout(likeArrayOf: T, count: 1)
 struct PaddedCell<T>: ~Copyable {}
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}14SmallVectorBufVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
 @_rawLayout(likeArrayOf: T, count: 8)
 struct SmallVectorBuf<T>: ~Copyable {}
-*/
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}8UsesCellVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 8
+// stride
+// CHECK-SAME:  , {{i64|i32}} 8
+// flags: alignment 3, noncopyable
+// CHECK-SAME:  , <i32 0x800003>
+struct UsesCell: ~Copyable {
+    let someCondition: Bool
+    let specialInt: Cell<Int32>
+}
+
+// Dependent layout metadata initialization:
+
+// Cell<T>
+
+// CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}4CellVMr"(ptr %"Cell<T>", ptr {{.*}}, ptr {{.*}})
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"Cell<T>", {{i64|i32}} 2
+// CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState({{i64|i32}} 319, ptr [[T]])
+// CHECK-NEXT: [[T:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK: [[T_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[T]], {{i64|i32}} -1
+// CHECK-NEXT: [[T_VWT:%.*]] = load ptr, ptr [[T_VWT_ADDR]]
+// CHECK-NEXT: [[T_LAYOUT:%.*]] = getelementptr inbounds ptr, ptr [[T_VWT]], i32 8
+// CHECK-NEXT: call void @swift_initRawStructMetadata(ptr %"Cell<T>", {{i64|i32}} 0, ptr [[T_LAYOUT]], {{i64|i32}} -1)
+
+// PaddedCell<T>
+
+// CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}10PaddedCellVMr"(ptr %"PaddedCell<T>", ptr {{.*}}, ptr {{.*}})
+// CHECK: call void @swift_initRawStructMetadata(ptr %"PaddedCell<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 1)
+
+// SmallVectorBuf<T>
+
+// CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}14SmallVectorBufVMr"(ptr %"SmallVectorBuf<T>", ptr {{.*}}, ptr {{.*}})
+// CHECK: call void @swift_initRawStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8)
 
 sil @use_lock : $@convention(thin) (@in_guaranteed Lock) -> () {
 entry(%L: $*Lock):
