@@ -681,7 +681,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       // when they are converted to an object via objc_metatype_to_object.
       assert(!v.hasCleanup() &&
              "Metatypes are trivial and thus should not have cleanups");
-      return ManagedValue::forUnmanaged(native);
+      return ManagedValue::forObjectRValueWithoutOwnership(native);
     }
   }
 

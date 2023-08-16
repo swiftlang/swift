@@ -330,7 +330,7 @@ ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
                                                        ManagedValue base) {
   if (SGF.getTypeLowering(base.getType()).isTrivial()) {
     auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
-    return ManagedValue::forUnmanaged(i);
+    return ManagedValue::forObjectRValueWithoutOwnership(i);
   }
 
   SILValue baseValue = base.getValue();
@@ -342,7 +342,7 @@ ManagedValue SILGenBuilder::createFormalAccessLoadCopy(SILLocation loc,
                                                        ManagedValue base) {
   if (SGF.getTypeLowering(base.getType()).isTrivial()) {
     auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
-    return ManagedValue::forUnmanaged(i);
+    return ManagedValue::forObjectRValueWithoutOwnership(i);
   }
 
   SILValue baseValue = base.getValue();
@@ -590,7 +590,7 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
 
   // If we have a trivial value, just return without a cleanup.
   if (operand.getOwnershipKind() != OwnershipKind::Owned) {
-    return ManagedValue::forUnmanaged(value);
+    return ManagedValue::forObjectRValueWithoutOwnership(value);
   }
 
   // Otherwise, recreate the cleanup.
@@ -600,8 +600,10 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
 ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
                                        EnumElementDecl *decl, SILType type) {
   SILValue result = createEnum(loc, payload.forward(SGF), decl, type);
-  if (result->getOwnershipKind() != OwnershipKind::Owned)
-    return ManagedValue::forUnmanaged(result);
+  if (result->getOwnershipKind() == OwnershipKind::None)
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
+  if (result->getOwnershipKind() == OwnershipKind::Guaranteed)
+    return ManagedValue::forBorrowedObjectRValue(result);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -671,12 +673,13 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);
   SGF.emitInjectOptionalNothingInto(loc, tempResult,
                                     SGF.getTypeLowering(type));
-  return ManagedValue::forUnmanaged(tempResult);
+  return ManagedValue::forBorrowedAddressRValue(tempResult);
 }
 
 ManagedValue SILGenBuilder::createManagedFunctionRef(SILLocation loc,
                                                      SILFunction *f) {
-  return ManagedValue::forUnmanaged(createFunctionRefFor(loc, f));
+  return ManagedValue::forObjectRValueWithoutOwnership(
+      createFunctionRefFor(loc, f));
 }
 
 ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
@@ -795,7 +798,7 @@ ManagedValue SILGenBuilder::createSuperMethod(SILLocation loc,
                                               SILDeclRef member,
                                               SILType methodTy) {
   SILValue v = createSuperMethod(loc, operand.getValue(), member, methodTy);
-  return ManagedValue::forUnmanaged(v);
+  return ManagedValue::forObjectRValueWithoutOwnership(v);
 }
 
 ManagedValue SILGenBuilder::createObjCSuperMethod(SILLocation loc,
@@ -803,14 +806,14 @@ ManagedValue SILGenBuilder::createObjCSuperMethod(SILLocation loc,
                                                   SILDeclRef member,
                                                   SILType methodTy) {
   SILValue v = createObjCSuperMethod(loc, operand.getValue(), member, methodTy);
-  return ManagedValue::forUnmanaged(v);
+  return ManagedValue::forObjectRValueWithoutOwnership(v);
 }
 
 ManagedValue SILGenBuilder::
 createValueMetatype(SILLocation loc, SILType metatype,
                     ManagedValue base) {
   SILValue v = createValueMetatype(loc, metatype, base.getValue());
-  return ManagedValue::forUnmanaged(v);
+  return ManagedValue::forObjectRValueWithoutOwnership(v);
 }
 
 ManagedValue SILGenBuilder::createStoreBorrow(SILLocation loc,
@@ -897,7 +900,7 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // Handle the empty tuple case.
   if (elements.empty()) {
     SILValue result = createTuple(loc, type, ArrayRef<SILValue>());
-    return ManagedValue::forUnmanaged(result);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
   }
 
   // We need to look for the first value without .none ownership and use that as
@@ -916,7 +919,7 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
                       return mv.forward(getSILGenFunction());
                     });
     SILValue result = createTuple(loc, type, forwardedValues);
-    return ManagedValue::forUnmanaged(result);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
   }
 
   // Otherwise, we use that values cloner. This is taking advantage of
@@ -942,7 +945,7 @@ ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
                                                           SILType type) {
   SILValue result =
       SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
-  return ManagedValue::forUnmanaged(result);
+  return ManagedValue::forObjectRValueWithoutOwnership(result);
 }
 
 void SILGenBuilder::emitDestructureValueOperation(
