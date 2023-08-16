@@ -2619,6 +2619,22 @@ sil [ossa] @test_partial_apply_4_loadable_stack : $() -> () {
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_partial_apply_5_indexing : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @test_partial_apply_5_indexing_callee
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [[CALLEE]]([[C]])
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_5_indexing'
+sil @test_partial_apply_5_indexing_callee : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
+sil [ossa] @test_partial_apply_5_indexing : $@convention(thin) (@owned Klass) -> () {
+bb0(%c : @owned $Klass):
+  %callee = function_ref @test_partial_apply_5_indexing_callee : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
+  %closure = partial_apply [callee_guaranteed] %callee(%c) : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
+  destroy_value %closure : $@callee_guaranteed (@inout Int) -> (@out Int)
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
 // CHECK:         [[LOAD_ADDR:%[^,]+]] = alloc_stack $Self
