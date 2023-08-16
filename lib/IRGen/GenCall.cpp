@@ -134,8 +134,8 @@ AsyncContextLayout::AsyncContextLayout(
     IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
     ArrayRef<const TypeInfo *> fieldTypeInfos, CanSILFunctionType originalType,
     CanSILFunctionType substitutedType, SubstitutionMap substitutionMap)
-    : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject, strategy,
-                   fieldTypeInfos, /*typeToFill*/ nullptr),
+    : StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
+                   strategy, fieldTypeInfos, /*typeToFill*/ nullptr),
       originalType(originalType), substitutedType(substitutedType),
       substitutionMap(substitutionMap)  {
   assert(fieldTypeInfos.size() == fieldTypes.size() &&

@@ -45,4 +45,3 @@ struct Butt {
 
 @_rawLayout(size: 4, alignment: 4) @_alignment(16) // expected-error{{type with @_rawLayout cannot also have an @_alignment attribute}}
 struct RawLayoutAndAlignment: ~Copyable {}
-

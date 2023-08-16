@@ -2437,6 +2437,17 @@ namespace {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
         return true;
 
+      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+
+      // If our struct has a raw layout, it may be dependent on the like type.
+      if (rawLayout) {
+        if (auto likeType = rawLayout->getResolvedScalarLikeType(decl)) {
+          return visit((*likeType)->getCanonicalType());
+        } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
+          return visit(likeArray->first->getCanonicalType());
+        }
+      }
+
       for (auto field : decl->getStoredProperties()) {
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
