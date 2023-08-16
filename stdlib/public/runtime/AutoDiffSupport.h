@@ -13,58 +13,68 @@
 #ifndef SWIFT_RUNTIME_AUTODIFF_SUPPORT_H
 #define SWIFT_RUNTIME_AUTODIFF_SUPPORT_H
 
+#include "swift/ABI/Metadata.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
 /// A data structure responsible for efficiently allocating closure contexts for
 /// linear maps such as pullbacks, including recursive branching trace enum
 /// case payloads.
 class AutoDiffLinearMapContext : public HeapObject {
+  /// A simple wrapper around a context object allocated by the
+  /// `AutoDiffLinearMapContext` type. This type knows all the "physical"
+  /// properties and behavior of the allocated context object by way of
+  /// storing the allocated type's `TypeMetadata`. It uses this information
+  /// to ensure that the allocated context object is destroyed/deinitialized
+  /// properly, upon its own destruction.
+  class [[nodiscard]] AllocatedContextObjectRecord final {
+    const Metadata *contextObjectMetadata;
+    OpaqueValue *contextObjectPtr;
+
+  public:
+    AllocatedContextObjectRecord(const Metadata *contextObjectMetadata,
+                                 OpaqueValue *contextObjectPtr)
+        : contextObjectMetadata(contextObjectMetadata),
+          contextObjectPtr(contextObjectPtr) {}
+
+    AllocatedContextObjectRecord(const Metadata *contextObjectMetadata,
+                                 void *contextObjectPtr)
+        : AllocatedContextObjectRecord(
+              contextObjectMetadata,
+              static_cast<OpaqueValue *>(contextObjectPtr)) {}
+
+    ~AllocatedContextObjectRecord() {
+      contextObjectMetadata->vw_destroy(contextObjectPtr);
+    }
+
+    size_t size() const { return contextObjectMetadata->vw_size(); }
+
+    size_t align() const { return contextObjectMetadata->vw_alignment(); }
+  };
+
 private:
-  // TODO: Commenting out BumpPtrAllocator temporarily
-  // until we move away from the interim solution of allocating
-  // boxes for linear map contexts/subcontexts.
-  //
-  // /// The underlying allocator.
-  // // TODO: Use a custom allocator so that the initial slab can be
-  // // tail-allocated.
-  // llvm::BumpPtrAllocator allocator;
+  /// The underlying allocator.
+  // TODO: Use a custom allocator so that the initial slab can be
+  // tail-allocated.
+  llvm::BumpPtrAllocator allocator;
 
-  /// A projection/pointer to the memory storing the
-  /// top-level linear map context object.
-  OpaqueValue *topLevelLinearMapContextProjection;
-
-  /// Storage for `HeapObject` pointers to the linear map
-  /// context and subcontexts allocated for derivatives with
-  /// loops.
-  llvm::SmallVector<HeapObject *, 4> allocatedHeapObjects;
+  /// Storage for `AllocatedContextObjectRecord`s, corresponding to the
+  /// subcontext allocations performed by the type.
+  llvm::SmallVector<AllocatedContextObjectRecord, 4> allocatedContextObjects;
 
 public:
   /// Creates a linear map context.
-  AutoDiffLinearMapContext(OpaqueValue *const);
+  AutoDiffLinearMapContext(const Metadata *topLevelLinearMapContextMetadata);
 
-  // TODO: Commenting out BumpPtrAllocator temporarily
-  // until we move away from the interim solution of allocating
-  // boxes for linear map contexts/subcontexts.
-  //
-  // llvm::BumpPtrAllocator& getAllocator() const {
-  //   return const_cast<llvm::BumpPtrAllocator&>(this->allocator);
-  // }
+  /// Returns the address of the tail-allocated top-level subcontext.
+  void *projectTopLevelSubcontext() const;
 
-  OpaqueValue *getTopLevelLinearMapContextProjection() const {
-    return this->topLevelLinearMapContextProjection;
-  }
-
-  llvm::ArrayRef<HeapObject *> getAllocatedHeapObjects() const {
-    return this->allocatedHeapObjects;
-  }
-
-  void storeAllocatedHeapObjectPtr(HeapObject *allocatedHeapObjectPtr) {
-    this->allocatedHeapObjects.push_back(allocatedHeapObjectPtr);
-  }
+  /// Allocates memory for a new subcontext.
+  void *allocateSubcontext(const Metadata *contextObjectMetadata);
 };
 
 /// Creates a linear map context with a tail-allocated top-level subcontext.

@@ -21,13 +21,7 @@ using namespace llvm;
 
 SWIFT_CC(swift)
 static void destroyLinearMapContext(SWIFT_CONTEXT HeapObject *obj) {
-  auto *linearMapContext = static_cast<AutoDiffLinearMapContext *>(obj);
-
-  for (auto *heapObjectPtr : linearMapContext->getAllocatedHeapObjects()) {
-    swift_release(heapObjectPtr);
-  }
-
-  linearMapContext->~AutoDiffLinearMapContext();
+  static_cast<AutoDiffLinearMapContext *>(obj)->~AutoDiffLinearMapContext();
   free(obj);
 }
 
@@ -50,53 +44,48 @@ static FullMetadata<HeapMetadata> linearMapContextHeapMetadata = {
 };
 
 AutoDiffLinearMapContext::AutoDiffLinearMapContext(
-    OpaqueValue *const topLevelLinearMapContextProjection)
+    const Metadata *topLevelLinearMapContextMetadata)
     : HeapObject(&linearMapContextHeapMetadata) {
-  this->topLevelLinearMapContextProjection = topLevelLinearMapContextProjection;
+  allocatedContextObjects.push_back(AllocatedContextObjectRecord{
+      topLevelLinearMapContextMetadata, projectTopLevelSubcontext()});
+}
+
+void *AutoDiffLinearMapContext::projectTopLevelSubcontext() const {
+  auto offset = alignTo(sizeof(AutoDiffLinearMapContext),
+                        alignof(AutoDiffLinearMapContext));
+  return const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(this) +
+                               offset);
+}
+
+void *AutoDiffLinearMapContext::allocateSubcontext(
+    const Metadata *contextObjectMetadata) {
+  auto size = contextObjectMetadata->vw_size();
+  auto align = contextObjectMetadata->vw_alignment();
+  auto *contextObjectPtr = allocator.Allocate(size, align);
+  allocatedContextObjects.push_back(
+      AllocatedContextObjectRecord{contextObjectMetadata, contextObjectPtr});
+  return contextObjectPtr;
 }
 
 AutoDiffLinearMapContext *swift::swift_autoDiffCreateLinearMapContext(
     const Metadata *topLevelLinearMapContextMetadata) {
-  // Linear map context metadata must have non-null value witnesses
-  assert(topLevelLinearMapContextMetadata->getValueWitnesses());
-
-  // Allocate a box for the top-level linear map context
-  auto [topLevelContextHeapObjectPtr, toplevelContextProjection] =
-      swift_allocBox(topLevelLinearMapContextMetadata);
-
-  // Create a linear map context object that stores the projection
-  // for the top level context
-  auto linearMapContext =
-      new AutoDiffLinearMapContext(toplevelContextProjection);
-
-  // Stash away the `HeapObject` pointer for the allocated context
-  // for proper "release" during clean up.
-  linearMapContext->storeAllocatedHeapObjectPtr(topLevelContextHeapObjectPtr);
-
-  // Return the newly created linear map context object
-  return linearMapContext;
+  auto topLevelLinearMapContextSize =
+      topLevelLinearMapContextMetadata->vw_size();
+  auto allocationSize = alignTo(sizeof(AutoDiffLinearMapContext),
+                                alignof(AutoDiffLinearMapContext)) +
+                        topLevelLinearMapContextSize;
+  auto *buffer = (AutoDiffLinearMapContext *)malloc(allocationSize);
+  return ::new (buffer)
+      AutoDiffLinearMapContext(topLevelLinearMapContextMetadata);
 }
 
 void *swift::swift_autoDiffProjectTopLevelSubcontext(
     AutoDiffLinearMapContext *linearMapContext) {
-  return static_cast<void *>(
-      linearMapContext->getTopLevelLinearMapContextProjection());
+  return static_cast<void *>(linearMapContext->projectTopLevelSubcontext());
 }
 
 void *swift::swift_autoDiffAllocateSubcontext(
     AutoDiffLinearMapContext *linearMapContext,
     const Metadata *linearMapSubcontextMetadata) {
-  // Linear map context metadata must have non-null value witnesses
-  assert(linearMapSubcontextMetadata->getValueWitnesses());
-
-  // Allocate a box for the linear map subcontext
-  auto [subcontextHeapObjectPtr, subcontextProjection] =
-      swift_allocBox(linearMapSubcontextMetadata);
-
-  // Stash away the `HeapObject` pointer for the allocated context
-  // for proper "release" during clean up.
-  linearMapContext->storeAllocatedHeapObjectPtr(subcontextHeapObjectPtr);
-
-  // Return the subcontext projection
-  return static_cast<void *>(subcontextProjection);
+  return linearMapContext->allocateSubcontext(linearMapSubcontextMetadata);
 }
