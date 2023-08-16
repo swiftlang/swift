@@ -1038,10 +1038,9 @@ namespace {
       if (refType.is<ExistentialMetatypeType>()) {
         assert(refType.getPreferredExistentialRepresentation()
                  == ExistentialRepresentation::Metatype);
-        ref = ManagedValue::forUnmanaged(
-                SGF.B.createOpenExistentialMetatype(loc,
-                                                    result.getUnmanagedValue(),
-                                                    getTypeOfRValue()));
+        ref = ManagedValue::forObjectRValueWithoutOwnership(
+            SGF.B.createOpenExistentialMetatype(loc, result.getUnmanagedValue(),
+                                                getTypeOfRValue()));
       } else {
         assert(refType.getPreferredExistentialRepresentation()
                  == ExistentialRepresentation::Class);
