@@ -168,6 +168,36 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
 }
 
+bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
+                                               ResilienceExpansion expansion) {
+  auto &ctx = getASTContext();
+  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
+  if (!backDeployBeforeVersion)
+    return false;
+
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    // In a minimal resilience expansion we must always call the back deployment
+    // thunk since we can't predict the deployment targets of the modules that
+    // might inline the call.
+    return true;
+  case ResilienceExpansion::Maximal:
+    // FIXME: We can skip thunking if we're in the same module.
+    break;
+  }
+
+  // Use of a back deployment thunk is unnecessary if the deployment target is
+  // high enough that the ABI implementation of the back deployed declaration is
+  // guaranteed to be available.
+  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+  auto declAvailability =
+      AvailabilityContext(VersionRange::allGTE(*backDeployBeforeVersion));
+  if (deploymentAvailability.isContainedIn(declAvailability))
+    return false;
+
+  return true;
+}
+
 void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   // Generate code equivalent to:
   //
