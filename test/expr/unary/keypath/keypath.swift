@@ -918,13 +918,12 @@ func testKeyPathHole() {
   provideValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   provideValueButNotRoot(\String.foo) // expected-error {{value of type 'String' has no member 'foo'}}
 
-  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} // expected-note {{in call to function 'provideKPValueButNotRoot'}}
+  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} 
   provideKPValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   provideKPValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
 
   provideKPValueButNotRoot(\String.foo)
   // expected-error@-1 {{value of type 'String' has no member 'foo'}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 }
 
 func testMissingMember() {
