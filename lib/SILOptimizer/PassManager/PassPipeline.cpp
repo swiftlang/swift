@@ -423,6 +423,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
 
+  addSimplifyCFGSILCombinePasses(P);
+
   if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
@@ -432,8 +434,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     }
     P.addNonTransparentFunctionOwnershipModelEliminator();
   }
-
-  addSimplifyCFGSILCombinePasses(P);
 
   P.addArrayElementPropagation();
 
