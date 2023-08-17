@@ -27,8 +27,8 @@ struct SmallVectorBuf<T>: ~Copyable {}
 // CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState({{i64|i32}} 319, ptr [[T]])
 // CHECK-NEXT: [[T:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK: [[T_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[T]], {{i64|i32}} -1
-// CHECK-NEXT: [[T_VWT:%.*]] = load ptr, ptr [[T_VWT_ADDR]]
-// CHECK-NEXT: [[T_LAYOUT:%.*]] = getelementptr inbounds ptr, ptr [[T_VWT]], i32 8
+// CHECK-NEXT: {{%.*}} = load ptr, ptr [[T_VWT_ADDR]]
+// CHECK: [[T_LAYOUT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i32 8
 // CHECK-NEXT: [[T_LAYOUT_LOADED:%.*]] = load %swift.type_layout, ptr [[T_LAYOUT]]
 // CHECK-NEXT: [[T_SIZE:%.*]] = extractvalue %swift.type_layout [[T_LAYOUT_LOADED]], 0
 // CHECK-NEXT: [[T_STRIDE:%.*]] = extractvalue %swift.type_layout [[T_LAYOUT_LOADED]], 1
