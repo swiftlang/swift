@@ -7,7 +7,7 @@
 
 // RUN: %FileCheck %s --check-prefix=INTERFACE-FLAG < %t/textual/Foo.swiftinterface
 
-// INTERFACE-FLAG: swift-module-flags-ignorable:
+// INTERFACE-FLAG: swift-module-flags:
 // INTERFACE-FLAG: -allowable-client FooFriend1 -allowable-client FooFriend2 -allowable-client FooFriend3
 
 
