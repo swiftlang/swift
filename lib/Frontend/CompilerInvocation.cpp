@@ -953,14 +953,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.isSwiftVersionAtLeast(6)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
-    auto value =
-        llvm::StringSwitch<llvm::Optional<StrictConcurrency>>(A->getValue())
-            .Case("minimal", StrictConcurrency::Minimal)
-            .Case("targeted", StrictConcurrency::Targeted)
-            .Case("complete", StrictConcurrency::Complete)
-            .Default(llvm::None);
-
-    if (value)
+    if (auto value = parseStrictConcurrency(A->getValue()))
       Opts.StrictConcurrencyLevel = *value;
     else
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,

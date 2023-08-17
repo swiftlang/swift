@@ -3145,10 +3145,7 @@ namespace {
           isolatedActor, llvm::None, llvm::None, getClosureActorIsolation);
       switch (result) {
       case ActorReferenceResult::SameConcurrencyDomain:
-        if (diagnoseReferenceToUnsafeGlobal(decl, loc))
-          return true;
-
-        return false;
+        return diagnoseReferenceToUnsafeGlobal(decl, loc);
 
       case ActorReferenceResult::ExitsActorToNonisolated:
         if (diagnoseReferenceToUnsafeGlobal(decl, loc))
@@ -4073,6 +4070,33 @@ ActorIsolation ActorIsolationRequest::evaluate(
       return ActorIsolation::forActorInstanceParameter(actor, *paramIdx);
   }
 
+  // Diagnose global state that is not either immutable plus Sendable or
+  // isolated to a global actor.
+  auto checkGlobalIsolation = [var = dyn_cast<VarDecl>(value)](
+                                  ActorIsolation isolation) {
+    if (var && var->getLoc() &&
+        var->getASTContext().LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+        !isolation.isGlobalActor()) {
+      const bool isGlobalState =
+          var->isStatic() || var->getDeclContext()->isModuleScopeContext() ||
+          (var->getDeclContext()->isTypeContext() && !var->isInstanceMember());
+      auto *classDecl = var->getDeclContext()->getSelfClassDecl();
+      const bool isActorType = classDecl && classDecl->isAnyActor();
+      if (isGlobalState && !isActorType) {
+        if (var->isLet()) {
+          if (!isSendableType(var->getModuleContext(),
+                              var->getInterfaceType())) {
+            var->diagnose(diag::shared_immutable_state_decl, var);
+          }
+        } else {
+          var->diagnose(diag::shared_mutable_state_decl, var);
+          var->diagnose(diag::shared_mutable_state_decl_note, var);
+        }
+      }
+    }
+    return isolation;
+  };
+
   auto isolationFromAttr = getIsolationFromAttributes(value);
   if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
     // Main.main() and Main.$main are implicitly MainActor-protected.
@@ -4099,7 +4123,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
         checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
     }
 
-    return *isolationFromAttr;
+    return checkGlobalIsolation(*isolationFromAttr);
   }
 
   // Determine the default isolation for this declaration, which may still be
@@ -4130,78 +4154,82 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Function used when returning an inferred isolation.
-  auto inferredIsolation = [&](
-      ActorIsolation inferred, bool onlyGlobal = false) {
-    // check if the inferred isolation is valid in the context of
-    // its overridden isolation.
-    if (overriddenValue) {
-      // if the inferred isolation is not valid, then carry-over the overridden
-      // declaration's isolation as this decl's inferred isolation.
-      switch (validOverrideIsolation(
-                  value, inferred, overriddenValue, *overriddenIso)) {
-      case OverrideIsolationResult::Allowed:
-      case OverrideIsolationResult::Sendable:
-        break;
+  auto inferredIsolation = [&](ActorIsolation inferred,
+                               bool onlyGlobal = false) {
+    // Invoke the body within checkGlobalIsolation to check the result.
+    return checkGlobalIsolation([&] {
+      // check if the inferred isolation is valid in the context of
+      // its overridden isolation.
+      if (overriddenValue) {
+        // if the inferred isolation is not valid, then carry-over the
+        // overridden declaration's isolation as this decl's inferred isolation.
+        switch (validOverrideIsolation(value, inferred, overriddenValue,
+                                       *overriddenIso)) {
+        case OverrideIsolationResult::Allowed:
+        case OverrideIsolationResult::Sendable:
+          break;
 
-      case OverrideIsolationResult::Disallowed:
-        inferred = *overriddenIso;
-        break;
-      }
-    }
-
-    // Add an implicit attribute to capture the actor isolation that was
-    // inferred, so that (e.g.) it will be printed and serialized.
-    ASTContext &ctx = value->getASTContext();
-    switch (inferred) {
-    case ActorIsolation::Independent:
-      // Stored properties cannot be non-isolated, so don't infer it.
-      if (auto var = dyn_cast<VarDecl>(value)) {
-        if (!var->isStatic() && var->hasStorage())
-          return ActorIsolation::forUnspecified()
-                    .withPreconcurrency(inferred.preconcurrency());
+        case OverrideIsolationResult::Disallowed:
+          inferred = *overriddenIso;
+          break;
+        }
       }
 
+      // Add an implicit attribute to capture the actor isolation that was
+      // inferred, so that (e.g.) it will be printed and serialized.
+      ASTContext &ctx = value->getASTContext();
+      switch (inferred) {
+      case ActorIsolation::Independent:
+        // Stored properties cannot be non-isolated, so don't infer it.
+        if (auto var = dyn_cast<VarDecl>(value)) {
+          if (!var->isStatic() && var->hasStorage())
+            return ActorIsolation::forUnspecified().withPreconcurrency(
+                inferred.preconcurrency());
+        }
 
-      if (onlyGlobal)
-        return ActorIsolation::forUnspecified()
-                  .withPreconcurrency(inferred.preconcurrency());
+        if (onlyGlobal) {
+          return ActorIsolation::forUnspecified().withPreconcurrency(
+              inferred.preconcurrency());
+        }
 
-      value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
-      break;
+        value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+        break;
 
-    case ActorIsolation::GlobalActorUnsafe:
-    case ActorIsolation::GlobalActor: {
-      // Stored properties of a struct don't need global-actor isolation.
-      if (ctx.isSwiftVersionAtLeast(6))
-        if (auto *var = dyn_cast<VarDecl>(value))
-          if (!var->isStatic() && var->isOrdinaryStoredProperty())
-            if (auto *varDC = var->getDeclContext())
-              if (auto *nominal = varDC->getSelfNominalTypeDecl())
-                if (isa<StructDecl>(nominal) &&
-                    !isWrappedValueOfPropWrapper(var))
-                  return ActorIsolation::forUnspecified()
-                              .withPreconcurrency(inferred.preconcurrency());
+      case ActorIsolation::GlobalActorUnsafe:
+      case ActorIsolation::GlobalActor: {
+        // Stored properties of a struct don't need global-actor isolation.
+        if (ctx.isSwiftVersionAtLeast(6))
+          if (auto *var = dyn_cast<VarDecl>(value))
+            if (!var->isStatic() && var->isOrdinaryStoredProperty())
+              if (auto *varDC = var->getDeclContext())
+                if (auto *nominal = varDC->getSelfNominalTypeDecl())
+                  if (isa<StructDecl>(nominal) &&
+                      !isWrappedValueOfPropWrapper(var))
+                    return ActorIsolation::forUnspecified().withPreconcurrency(
+                        inferred.preconcurrency());
 
-      auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
-      auto attr = CustomAttr::create(
-          ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-      if (inferred == ActorIsolation::GlobalActorUnsafe)
-        attr->setArgIsUnsafe(true);
-      value->getAttrs().add(attr);
-      break;
-    }
+        auto typeExpr =
+            TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
+        auto attr =
+            CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+        if (inferred == ActorIsolation::GlobalActorUnsafe)
+          attr->setArgIsUnsafe(true);
+        value->getAttrs().add(attr);
+        break;
+      }
 
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::Unspecified:
-      if (onlyGlobal)
-        return ActorIsolation::forUnspecified()
-                    .withPreconcurrency(inferred.preconcurrency());
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Unspecified:
+        if (onlyGlobal)
+          return ActorIsolation::forUnspecified().withPreconcurrency(
+              inferred.preconcurrency());
 
-      // Nothing to do.
-      break;
-    }
+        // Nothing to do.
+        break;
+      }
 
-    return inferred;
+      return inferred;
+    }());
   };
 
   // If this is a local function, inherit the actor isolation from its
@@ -4332,7 +4360,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Default isolation for this member.
-  return defaultIsolation;
+  return checkGlobalIsolation(defaultIsolation);
 }
 
 bool HasIsolatedSelfRequest::evaluate(
