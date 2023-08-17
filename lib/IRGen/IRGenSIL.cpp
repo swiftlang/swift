@@ -1159,11 +1159,6 @@ public:
       const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
       IndirectionKind Indirection,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
-    if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
-      if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
-        ty = metaTy->getRootClass().getPointer();
-    }
-
     assert(IGM.DebugInfo && "debug info not enabled");
 
     if (VarInfo.ArgNo) {
