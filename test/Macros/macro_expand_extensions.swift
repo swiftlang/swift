@@ -179,3 +179,22 @@ struct MultipleConformances {}
 // CHECK-DUMP: }
 // CHECK-DUMP: extension MultipleConformances: P2 {
 // CHECK-DUMP: }
+
+@attached(extension, conformances: Equatable, names: named(==))
+macro Equatable() = #externalMacro(module: "MacroDefinition", type: "EquatableViaMembersMacro")
+
+@propertyWrapper
+struct NotEquatable<T> {
+  var wrappedValue: T
+}
+
+@Equatable
+struct HasPropertyWrappers {
+  @NotEquatable
+  var value: Int = 0
+}
+
+func requiresEquatable<T: Equatable>(_: T) { }
+func testHasPropertyWrappers(hpw: HasPropertyWrappers) {
+  requiresEquatable(hpw)
+}

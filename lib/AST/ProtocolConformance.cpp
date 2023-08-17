@@ -1302,8 +1302,8 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
            switch (conformance->getSourceKind()) {
            case ConformanceEntryKind::Explicit:
            case ConformanceEntryKind::Synthesized:
+               return true;
            case ConformanceEntryKind::PreMacroExpansion:
-             return true;
            case ConformanceEntryKind::Implied:
            case ConformanceEntryKind::Inherited:
              return false;
@@ -1314,34 +1314,22 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
            case ConformanceEntryKind::Explicit:
            case ConformanceEntryKind::Synthesized:
            case ConformanceEntryKind::Implied:
-           case ConformanceEntryKind::PreMacroExpansion:
              return true;
            case ConformanceEntryKind::Inherited:
+           case ConformanceEntryKind::PreMacroExpansion:
              return false;
            }
 
          case ConformanceLookupKind::All:
          case ConformanceLookupKind::NonStructural:
            return true;
-
-          case ConformanceLookupKind::ExcludeUnexpandedMacros:
-           switch (conformance->getSourceKind()) {
-           case ConformanceEntryKind::PreMacroExpansion:
-             return false;
-           case ConformanceEntryKind::Explicit:
-           case ConformanceEntryKind::Synthesized:
-           case ConformanceEntryKind::Implied:
-           case ConformanceEntryKind::Inherited:
-             return true;
-           }
          }
       });
 
   // If we want to add structural conformances, do so now.
   switch (lookupKind) {
     case ConformanceLookupKind::All:
-    case ConformanceLookupKind::NonInherited:
-    case ConformanceLookupKind::ExcludeUnexpandedMacros: {
+    case ConformanceLookupKind::NonInherited: {
       // Look for a Sendable conformance globally. If it is synthesized
       // and matches this declaration context, use it.
       auto dc = getAsGenericContext();

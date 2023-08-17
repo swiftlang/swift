@@ -1757,6 +1757,17 @@ namespace {
   };
 }
 
+/// Given an extension declaration, return the extended nominal type if the
+/// extension was produced by expanding an extension or conformance macro from
+/// the nominal declaration itself.
+static NominalTypeDecl *nominalForExpandedExtensionDecl(ExtensionDecl *ext) {
+  if (!ext->isInMacroExpansionInContext())
+    return nullptr;
+
+
+  return ext->getSelfNominalTypeDecl();
+}
+
 PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
     Evaluator &evaluator, TypeOrExtensionDecl container) const {
   /// The implementation here needs to be kept in sync with
@@ -1766,6 +1777,15 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
   // Member macros on the type or extension.
   auto containerDecl = container.getAsDecl();
   forEachPotentialAttachedMacro(containerDecl, MacroRole::Member, nameTracker);
+
+  // If the container is an extension that was created from an extension macro,
+  // look at the nominal declaration to find any extension macros.
+  if (auto ext = dyn_cast<ExtensionDecl>(containerDecl)) {
+    if (auto nominal = nominalForExpandedExtensionDecl(ext)) {
+      forEachPotentialAttachedMacro(
+          nominal, MacroRole::Extension, nameTracker);
+    }
+  }
 
   // Peer and freestanding declaration macros.
   auto dc = container.getAsDeclContext();
@@ -1825,13 +1845,15 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
   // names match.
   {
     MacroIntroducedNameTracker nameTracker;
-    if (auto nominal = dyn_cast<NominalTypeDecl>(container.getAsDecl())) {
-      forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
-      if (nameTracker.shouldExpandForName(name)) {
-        (void)evaluateOrDefault(
-            ctx.evaluator,
-            ExpandExtensionMacros{nominal},
-            false);
+    if (auto ext = dyn_cast<ExtensionDecl>(container.getAsDecl())) {
+      if (auto nominal = nominalForExpandedExtensionDecl(ext)) {
+        forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
+        if (nameTracker.shouldExpandForName(name)) {
+          (void)evaluateOrDefault(
+              ctx.evaluator,
+              ExpandExtensionMacros{nominal},
+              false);
+        }
       }
     }
   }

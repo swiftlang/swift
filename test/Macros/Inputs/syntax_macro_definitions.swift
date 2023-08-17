@@ -1335,6 +1335,39 @@ public struct EquatableMacro: ConformanceMacro {
   }
 }
 
+public struct EquatableViaMembersMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let comparisons: [String] = decl.storedProperties().map { property in
+      guard let binding = property.bindings.first,
+            let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier else {
+        return "true"
+      }
+
+      return "lhs.\(identifier) == rhs.\(identifier)"
+    }
+
+    let condition = comparisons.joined(separator: " && ")
+    let equalOperator: DeclSyntax = """
+      static func ==(lhs: \(type.trimmed), rhs: \(type.trimmed)) -> Bool {
+        return \(raw: condition)
+      }
+      """
+
+    let ext: DeclSyntax = """
+      extension \(type.trimmed): Equatable {
+        \(equalOperator)
+      }
+      """
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
 public struct ConformanceViaExtensionMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
