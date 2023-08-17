@@ -238,9 +238,6 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
   void addConformances(const IterableDeclContext *IDC) {
     for (auto conformance :
          IDC->getLocalConformances(ConformanceLookupKind::NonInherited)) {
-      if (conformance->getSourceKind() == ConformanceEntryKind::PreMacroExpansion)
-        continue;
-
       auto protocol = conformance->getProtocol();
       if (Ctx.getOpts().PublicSymbolsOnly &&
           getDeclLinkage(protocol) != FormalLinkage::PublicUnique)

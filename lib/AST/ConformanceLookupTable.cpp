@@ -892,6 +892,16 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   if (!conformingDC)
     return nullptr;
 
+  // Never produce a conformance for a pre-macro-expansion conformance. They
+  // are placeholders that will be superseded.
+  if (entry->getKind() == ConformanceEntryKind::PreMacroExpansion) {
+    if (auto supersedingEntry = entry->SupersededBy) {
+      return getConformance(nominal, supersedingEntry);
+    }
+
+    return nullptr;
+  }
+
   auto *conformingNominal = conformingDC->getSelfNominalTypeDecl();
 
   // Form the conformance.
@@ -929,6 +939,16 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
           ? conformingNominal->getLoc()
           : cast<ExtensionDecl>(conformingDC)->getLoc();
 
+    NormalProtocolConformance *implyingConf = nullptr;
+    if (entry->Source.getKind() == ConformanceEntryKind::Implied) {
+      auto implyingEntry = entry->Source.getImpliedSource();
+      auto origImplyingConf = getConformance(conformingNominal, implyingEntry);
+      if (!origImplyingConf)
+        return nullptr;
+
+      implyingConf = origImplyingConf->getRootNormalConformance();
+    }
+
     // Create or find the normal conformance.
     auto normalConf =
         ctx.getNormalConformance(conformingType, protocol, conformanceLoc,
@@ -939,12 +959,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     // early return at the start of this function.
     entry->Conformance = normalConf;
 
-    NormalProtocolConformance *implyingConf = nullptr;
-    if (entry->Source.getKind() == ConformanceEntryKind::Implied) {
-      auto implyingEntry = entry->Source.getImpliedSource();
-      implyingConf = getConformance(conformingNominal, implyingEntry)
-                         ->getRootNormalConformance();
-    }
     normalConf->setSourceKindAndImplyingConformance(entry->Source.getKind(),
                                                     implyingConf);
 
