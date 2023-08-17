@@ -1710,15 +1710,27 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto tupleTypeRef = S.addTypeRef(tupleType.getRawASTType());
     auto tupleRef = addValueRef(tuple);
     auto indexRef = addValueRef(TPEAI->getIndex());
-    SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILPackElementGetLayout::Code],
-        (unsigned)SI.getKind(),
-        elementTypeRef,
-        (unsigned) elementType.getCategory(),
-        tupleTypeRef,
-        (unsigned) tupleType.getCategory(),
-        tupleRef,
-        indexRef);
+    SILPackElementGetLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(), elementTypeRef,
+        (unsigned)elementType.getCategory(), tupleTypeRef,
+        (unsigned)tupleType.getCategory(), tupleRef, indexRef);
+    break;
+  }
+  case SILInstructionKind::TuplePackExtractInst: {
+    auto TPEI = cast<TuplePackExtractInst>(&SI);
+    auto elementType = TPEI->getElementType();
+    auto elementTypeRef = S.addTypeRef(elementType.getRawASTType());
+    auto tuple = TPEI->getTuple();
+    auto tupleType = tuple->getType();
+    auto tupleTypeRef = S.addTypeRef(tupleType.getRawASTType());
+    auto tupleRef = addValueRef(tuple);
+    auto indexRef = addValueRef(TPEI->getIndex());
+    SILPackElementGetLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(), elementTypeRef,
+        (unsigned)elementType.getCategory(), tupleTypeRef,
+        (unsigned)tupleType.getCategory(), tupleRef, indexRef);
     break;
   }
   case SILInstructionKind::TailAddrInst: {

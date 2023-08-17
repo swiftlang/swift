@@ -974,6 +974,9 @@ static Operand *getProjectedDefOperand(SILValue value) {
   case ValueKind::OpenExistentialBoxValueInst:
     assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
     return &cast<SingleValueInstruction>(value)->getAllOperands()[0];
+  case ValueKind::TuplePackExtractInst:
+    assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+    return &cast<SingleValueInstruction>(value)->getAllOperands()[1];
   }
 }
 
@@ -1703,6 +1706,8 @@ protected:
 
   SILValue materializeTupleExtract(SILInstruction *extractInst,
                                    SILValue elementValue, unsigned fieldIdx);
+  SILValue materializeTuplePackExtract(SILInstruction *extractInst,
+                                       SILValue elementValue, SILValue index);
 
   SILValue materializeProjectionIntoUse(Operand *operand, bool intoPhiOperand);
   SILValue materializeProjectionIntoUseImpl(Operand *operand,
@@ -1859,6 +1864,11 @@ SILValue AddressMaterialization::materializeDefProjection(SILValue origValue) {
     return materializeTupleExtract(extractInst, origValue,
                                    extractInst->getFieldIndex());
   }
+  case ValueKind::TuplePackExtractInst: {
+    auto *extractInst = cast<TuplePackExtractInst>(origValue);
+    return materializeTuplePackExtract(extractInst, origValue,
+                                       extractInst->getIndex());
+  }
   case ValueKind::SILPhiArgument: {
     // Handle this in the caller. unchecked_take_enum_data_addr is
     // destructive. It cannot be materialized on demand.
@@ -1885,6 +1895,14 @@ SILValue AddressMaterialization::materializeTupleExtract(
   SILValue srcAddr = pass.getMaterializedAddress(extractInst->getOperand(0));
   return projectionBuilder.createTupleElementAddr(
       pass.genLoc(), srcAddr, fieldIdx,
+      elementValue->getType().getAddressType());
+}
+
+SILValue AddressMaterialization::materializeTuplePackExtract(
+    SILInstruction *extractInst, SILValue elementValue, SILValue fieldIdx) {
+  SILValue srcAddr = pass.getMaterializedAddress(extractInst->getOperand(1));
+  return projectionBuilder.createTuplePackElementAddr(
+      pass.genLoc(), fieldIdx, srcAddr,
       elementValue->getType().getAddressType());
 }
 
@@ -3528,6 +3546,9 @@ protected:
   // Extract from an opaque tuple.
   void visitTupleExtractInst(TupleExtractInst *extractInst);
 
+  // Extract from an opaque pack tuple.
+  void visitTuplePackExtractInst(TuplePackExtractInst *extractInst);
+
   void
   visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
     SILValue srcVal = uncheckedCastInst->getOperand();
@@ -3816,6 +3837,10 @@ void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
 
 // Extract from an opaque tuple.
 void UseRewriter::visitTupleExtractInst(TupleExtractInst *extractInst) {
+  emitExtract(extractInst);
+}
+
+void UseRewriter::visitTuplePackExtractInst(TuplePackExtractInst *extractInst) {
   emitExtract(extractInst);
 }
 

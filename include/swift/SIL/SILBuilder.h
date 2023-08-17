@@ -2150,6 +2150,16 @@ public:
                               packIndex, tupleAddr, elementType));
   }
 
+  TuplePackExtractInst *createTuplePackExtract(SILLocation loc,
+                                               SILValue packIndex,
+                                               SILValue tuple,
+                                               SILType elementType) {
+    assert(!getFunction().getModule().useLoweredAddresses());
+    return insert(TuplePackExtractInst::create(
+        getFunction(), getSILDebugLocation(loc), packIndex, tuple, elementType,
+        tuple->getOwnershipKind()));
+  }
+
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
                                                      SILValue Storage) {
     auto CaptureTy = Storage->getType()

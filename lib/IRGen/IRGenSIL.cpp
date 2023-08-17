@@ -1354,6 +1354,7 @@ public:
   void visitPackElementGetInst(PackElementGetInst *i);
   void visitPackElementSetInst(PackElementSetInst *i);
   void visitTuplePackElementAddrInst(TuplePackElementAddrInst *i);
+  void visitTuplePackExtractInst(TuplePackExtractInst *i);
 
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -7189,6 +7190,11 @@ void IRGenSILFunction::visitTuplePackElementAddrInst(
                                              i->getTuple()->getType(),
                                              index, elementType);
   setLoweredAddress(i, elementAddr);
+}
+
+void IRGenSILFunction::visitTuplePackExtractInst(TuplePackExtractInst *i) {
+  llvm::report_fatal_error(
+      "tuple_pack_extract not lowered by AddressLowering!?");
 }
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){

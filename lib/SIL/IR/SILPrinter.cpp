@@ -2431,6 +2431,10 @@ public:
           << getIDAndType(I->getTuple()) << " as "
           << I->getElementType();
   }
+  void visitTuplePackExtractInst(TuplePackExtractInst *I) {
+    *this << Ctx.getID(I->getIndex()) << " of " << getIDAndType(I->getTuple())
+          << " as " << I->getElementType();
+  }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     *this << getIDAndType(PBSI->getOperand());
   }
