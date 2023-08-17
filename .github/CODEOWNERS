@@ -68,6 +68,7 @@
 /include/swift/IDE/                                @ahoppen @bnbarham @rintaro @hamishknight
 /include/swift/Index/                              @bnbarham
 /include/swift/Refactoring                         @ahoppen @bnbarham
+/include/swift/Option/*Options*                    @tshortli
 /include/swift/Parse/                              @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 /include/swift/PrintAsClang                        @zoecarver @hyp @egorzhdan
 # TODO: /include/swift/SIL/
