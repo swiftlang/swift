@@ -172,9 +172,6 @@ enum class ConformanceLookupKind : unsigned {
   /// All conformances except structurally-derived conformances, of which
   /// Sendable is the only one.
   NonStructural,
-  /// Exclude conformances added by a macro that has not been expanded
-  /// yet.
-  ExcludeUnexpandedMacros,
 };
 
 /// Describes a diagnostic for a conflict between two protocol
