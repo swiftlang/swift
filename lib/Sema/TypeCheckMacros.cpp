@@ -1238,9 +1238,13 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   {
     llvm::raw_string_ostream OS(conformanceList);
     if (role == MacroRole::Extension) {
-      for (auto *protocol : conformances) {
-        protocol->getDeclaredType()->print(OS);
-      }
+      llvm::interleave(
+          conformances,
+          [&](const ProtocolDecl *protocol) {
+            protocol->getDeclaredType()->print(OS);
+          },
+          [&] { OS << ", "; }
+      );
     } else {
       OS << "";
     }
@@ -1593,15 +1597,7 @@ llvm::Optional<unsigned> swift::expandExtensions(CustomAttr *attr,
   for (auto protocol : potentialConformances) {
     SmallVector<ProtocolConformance *, 2> existingConformances;
     nominal->lookupConformance(protocol, existingConformances);
-
-    bool hasExistingConformance = llvm::any_of(
-        existingConformances,
-        [&](ProtocolConformance *conformance) {
-          return conformance->getSourceKind() !=
-              ConformanceEntryKind::PreMacroExpansion;
-        });
-
-    if (!hasExistingConformance) {
+    if (existingConformances.empty()) {
       introducedConformances.push_back(protocol);
     }
   }

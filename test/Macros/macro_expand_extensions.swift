@@ -165,3 +165,36 @@ macro AvailableEquatable() = #externalMacro(module: "MacroDefinition", type: "Co
 struct TestAvailability {
   static let x : any Equatable.Type = TestAvailability.self
 }
+
+protocol P1 {}
+protocol P2 {}
+
+@attached(extension, conformances: P1, P2)
+macro AddAllConformances() = #externalMacro(module: "MacroDefinition", type: "AddAllConformancesMacro")
+
+@AddAllConformances
+struct MultipleConformances {}
+
+// CHECK-DUMP: extension MultipleConformances: P1 {
+// CHECK-DUMP: }
+// CHECK-DUMP: extension MultipleConformances: P2 {
+// CHECK-DUMP: }
+
+@attached(extension, conformances: Equatable, names: named(==))
+macro Equatable() = #externalMacro(module: "MacroDefinition", type: "EquatableViaMembersMacro")
+
+@propertyWrapper
+struct NotEquatable<T> {
+  var wrappedValue: T
+}
+
+@Equatable
+struct HasPropertyWrappers {
+  @NotEquatable
+  var value: Int = 0
+}
+
+func requiresEquatable<T: Equatable>(_: T) { }
+func testHasPropertyWrappers(hpw: HasPropertyWrappers) {
+  requiresEquatable(hpw)
+}
