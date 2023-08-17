@@ -233,12 +233,13 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
-        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
-                             SEI->getOperand());
+        auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);
+        OldBlockArg->replaceAllUsesWith(SEI->getOperand());
+        ThreadedSuccessorBlock->eraseArgument(0);
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock);
       }
     } else {
-      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
-                           ArrayRef<SILValue>());
+      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock);
     }
     SEI->eraseFromParent();
   }
@@ -502,11 +503,12 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
       if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
         LLVM_DEBUG(llvm::dbgs() << "simplify threaded " << *SEI);
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
-        if (EI->hasOperand() && !LiveBlock->args_empty()) {
-          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock,
-                                                EI->getOperand());
-        } else if (!LiveBlock->args_empty()) {
-          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock, {EI});
+        if (!LiveBlock->args_empty()) {
+          auto *LiveBlockArg = LiveBlock->getArgument(0);
+          auto NewValue = EI->hasOperand() ? EI->getOperand() : EI;
+          LiveBlockArg->replaceAllUsesWith(NewValue);
+          LiveBlock->eraseArgument(0);
+          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
         } else {
           SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
         }
