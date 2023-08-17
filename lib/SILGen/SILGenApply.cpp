@@ -280,31 +280,6 @@ static void convertOwnershipConventionsGivenParamInfos(
                   });
 }
 
-static bool shouldApplyBackDeploymentThunk(ValueDecl *decl, ASTContext &ctx,
-                                           ResilienceExpansion expansion) {
-  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
-  if (!backDeployBeforeVersion)
-    return false;
-
-  // If the context of the application is inlinable then we must always call the
-  // back deployment thunk since we can't predict the deployment targets of
-  // other modules.
-  if (expansion != ResilienceExpansion::Maximal)
-    return true;
-
-  // In resilient function bodies skip calling the back deployment thunk when
-  // the deployment target is high enough that the ABI implementation of the
-  // back deployed function is guaranteed to be available.
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
-  auto declAvailability =
-      AvailabilityContext(VersionRange::allGTE(*backDeployBeforeVersion));
-
-  if (deploymentAvailability.isContainedIn(declAvailability))
-    return false;
-
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 //                                   Callee
 //===----------------------------------------------------------------------===//
@@ -1155,7 +1130,6 @@ public:
 
   SILDeclRef getDeclRefForStaticDispatchApply(DeclRefExpr *e) {
     auto *afd = cast<AbstractFunctionDecl>(e->getDecl());
-    auto &ctx = SGF.getASTContext();
 
     // A call to a `distributed` function may need to go through a thunk.
     if (callSite && callSite->shouldApplyDistributedThunk()) {
@@ -1164,8 +1138,9 @@ public:
     }
 
     // A call to `@backDeployed` function may need to go through a thunk.
-    if (shouldApplyBackDeploymentThunk(afd, ctx,
-                                       SGF.F.getResilienceExpansion())) {
+
+    if (SGF.SGM.requiresBackDeploymentThunk(afd,
+                                            SGF.F.getResilienceExpansion())) {
       return SILDeclRef(afd).asBackDeploymentKind(
           SILDeclRef::BackDeploymentKind::Thunk);
     }
@@ -6717,7 +6692,7 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor,
                                             ResilienceExpansion expansion) {
   auto declRef = SILDeclRef(accessor, SILDeclRef::Kind::Func);
 
-  if (shouldApplyBackDeploymentThunk(accessor, getASTContext(), expansion))
+  if (requiresBackDeploymentThunk(accessor, expansion))
     return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
 
   return declRef.asForeign(requiresForeignEntryPoint(accessor));

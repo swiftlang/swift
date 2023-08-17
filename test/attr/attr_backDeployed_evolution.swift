@@ -149,6 +149,7 @@ do {
 
   let empty = IntArray.empty
   precondition(empty.values == [])
+  precondition(empty[keyPath: \.values] == [])
 
   var array = IntArray([5])
 
@@ -177,6 +178,7 @@ do {
 do {
   let defaulted = ReferenceIntArray()
   precondition(defaulted.values == [])
+  precondition(defaulted[keyPath: \.values] == [])
 
   let empty = ReferenceIntArray.empty
   precondition(empty.values == [])
