@@ -2983,9 +2983,22 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
 
+  // Get the address of the type in context.
+  auto getAddressInContext = [this, &var](auto addr) -> Address {
+    SILType loweredTyInContext =
+        var->getLoweredTypeInContext(getExpansionContext());
+    auto &tiInContext = getTypeInfo(loweredTyInContext);
+    auto ptr = Builder.CreateBitOrPointerCast(
+        addr.getAddress(), tiInContext.getStorageType()->getPointerTo());
+    addr = Address(ptr, tiInContext.getStorageType(),
+                   tiInContext.getBestKnownAlignment());
+    return addr;
+  };
+
   // If the global is fixed-size in all resilience domains that can see it,
   // we allocated storage for it statically, and there's nothing to do.
   if (ti.isFixedSize(expansion)) {
+    addr = getAddressInContext(addr);
     setLoweredAddress(i, addr);
     return;
   }
@@ -2993,15 +3006,7 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   // Otherwise, the static storage for the global consists of a fixed-size
   // buffer; project it.
   addr = emitProjectValueInBuffer(*this, loweredTy, addr);
-
-
-  // Get the address of the type in context.
-  SILType loweredTyInContext = var->getLoweredTypeInContext(getExpansionContext());
-  auto &tiInContext = getTypeInfo(loweredTyInContext);
-  auto ptr = Builder.CreateBitOrPointerCast(addr.getAddress(),
-                                            tiInContext.getStorageType()->getPointerTo());
-  addr = Address(ptr, tiInContext.getStorageType(),
-                 tiInContext.getBestKnownAlignment());
+  addr = getAddressInContext(addr);
   setLoweredAddress(i, addr);
 }
 
