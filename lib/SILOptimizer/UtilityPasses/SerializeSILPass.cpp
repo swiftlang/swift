@@ -241,6 +241,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::StructInst:
   case SILInstructionKind::StructExtractInst:

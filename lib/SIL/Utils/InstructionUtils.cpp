@@ -588,6 +588,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
            RuntimeEffect::MetaData;
 
+  case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::TuplePackElementAddrInst:
     return RuntimeEffect::MetaData;
 

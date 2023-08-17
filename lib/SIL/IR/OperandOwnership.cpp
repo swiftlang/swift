@@ -312,6 +312,7 @@ OPERAND_OWNERSHIP(PointerEscape, ExtractExecutor)
 
 // Instructions that propagate a value within a borrow scope.
 OPERAND_OWNERSHIP(GuaranteedForwarding, TupleExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, TuplePackExtract)
 OPERAND_OWNERSHIP(GuaranteedForwarding, StructExtract)
 OPERAND_OWNERSHIP(GuaranteedForwarding, DifferentiableFunctionExtract)
 OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
