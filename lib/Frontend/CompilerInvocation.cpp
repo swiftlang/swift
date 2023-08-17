@@ -1941,7 +1941,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // If we're only emitting a module, stop optimizations once we've serialized
   // the SIL for the module.
-  if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
+  if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
+      FEOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface)
     Opts.StopOptimizationAfterSerialization = true;
 
   // Propagate the typechecker's understanding of
