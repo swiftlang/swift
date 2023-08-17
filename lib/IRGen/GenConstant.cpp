@@ -340,7 +340,7 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     return llvm::ConstantExpr::getIntToPtr(val, sTy);
 
   } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand)) {
-    return emitConstantValue(IGM, CFI->getOperand());
+    return emitConstantValue(IGM, CFI->getOperand(), flatten);
 
   } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
     SILType type = operand->getType();
