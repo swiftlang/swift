@@ -181,10 +181,41 @@ var optBlack: Color? = Color.black
 // CHECK-LABEL: sil_global hidden @$s4test9optSalmonAA5ColorOSgvp : $Optional<Color> = {
 var optSalmon: Color? = Color.rgb(r: 0xfa, g: 0x80, b: 0x72)
 
+public final class C {
+  var x = 27
+}
+
+func printClass(_ c: C?) {
+  if let c = c {
+    print("\(c): \(c.x)")
+  } else {
+    print("none")
+  }
+}
+
+
+public enum FunctionEnum {
+  case f((C) -> ())
+  case i(Int)
+}
+
+// CHECK-LABEL: sil_global hidden @$s4test2feAA12FunctionEnumOvp : $FunctionEnum = {
+var fe = FunctionEnum.f(printClass)
+
 // CHECK-LABEL: sil_global private @$s4test9createArrSaySiSgGyFTv_ : $_ContiguousArrayStorage<Optional<Int>> = {
 @inline(never)
 func createArr() -> [Int?] {
   return [ 27, 42, nil, 103 ]
+}
+
+@inline(never)
+func printFunctionEnum() {
+  switch fe {
+  case .f(let f):
+    f(C())
+  case .i:
+    break
+  }
 }
 
 @main
@@ -260,6 +291,8 @@ struct Main {
     print("optBlack:", optBlack as Any)
     // CHECK-OUTPUT: optSalmon: Optional(test.Color.rgb(r: 250, g: 128, b: 114))
     print("optSalmon:", optSalmon as Any)
+    // CHECK-OUTPUT: test.C: 27
+    printFunctionEnum()
   }
 }
 
