@@ -255,7 +255,7 @@ class ARCSequenceOpts : public SILFunctionTransform {
     if (!getOptions().EnableARCOptimizations)
       return;
 
-    // FIXME: We should support ownership.
+    // ARCSequenceOpts is for non-ossa only.
     if (F->hasOwnership())
       return;
 
