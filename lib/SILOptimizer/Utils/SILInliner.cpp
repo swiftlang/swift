@@ -896,6 +896,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   // tuple_pack_element_addr is just a GEP, but getting the offset
   // can require accessing metadata, so conservatively treat it as
   // expensive.
+  case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::TuplePackElementAddrInst:
     return InlineCost::Expensive;
 
