@@ -3733,12 +3733,14 @@ namespace {
                                                             TVO_CanBindToHole);
       CS.recordKeyPath(E, root, value, CurDC);
 
+      auto typeLoc =
+          CS.getConstraintLocator(locator, LocatorPathElt::KeyPathType(value));
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape |
                                                      TVO_CanBindToHole);
       auto *fallbackTy =
           BoundGenericType::get(kpDecl, /*parent*/ Type(), {root, value});
-      CS.addConstraint(ConstraintKind::FallbackType, kpTy, fallbackTy,
-                       CS.getConstraintLocator(E));
+      CS.addUnsolvedConstraint(Constraint::create(
+          CS, ConstraintKind::FallbackType, kpTy, fallbackTy, locator));
 
       return kpTy;
     }
@@ -4077,6 +4079,14 @@ namespace {
           auto &cs = CG.getConstraintSystem();
           (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
         }
+
+        auto &CS = CG.getConstraintSystem();
+        auto kpType = CG.visitKeyPathExpr(keyPath);
+        if (!kpType)
+          return Action::Stop();
+
+        CS.setType(expr, kpType);
+        return Action::SkipChildren(expr);
       }
 
       // Generate constraints for each of the entries in the capture list.
@@ -4185,6 +4195,71 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+  auto *keyPathLocator = typeVar->getImpl().getLocator();
+  auto *keyPath = castToExpr<KeyPathExpr>(keyPathLocator->getAnchor());
+
+  if (keyPath->hasSingleInvalidComponent()) {
+    assignFixedType(typeVar, contextualType);
+    return true;
+  }
+
+  auto objectTy = contextualType->lookThroughAllOptionalTypes();
+  {
+    auto &ctx = getASTContext();
+    // `AnyKeyPath` and `PartialKeyPath` represent type-erased versions of
+    // `KeyPath<T, V>`.
+    //
+    // In situations where `AnyKeyPath` or `PartialKeyPath` cannot be used
+    // directly i.e. passing an argument to a parameter represented by a
+    // `AnyKeyPath` or `PartialKeyPath`, let's attempt a `KeyPath` binding which
+    // would then be converted to a `AnyKeyPath` or `PartialKeyPath` since there
+    // is a subtype relationship between them.
+    if (objectTy->isAnyKeyPath()) {
+      auto root = getKeyPathRootType(keyPath);
+      auto value = getKeyPathValueType(keyPath);
+
+      contextualType =
+          BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
+    } else if (objectTy->isPartialKeyPath()) {
+      auto rootTy = objectTy->castTo<BoundGenericType>()->getGenericArgs()[0];
+      // Since partial key path is an erased version of `KeyPath`, the value
+      // type would never be used, which means that binding can use
+      // type variable generated for a result of key path expression.
+      auto valueTy = getKeyPathValueType(keyPath);
+
+      contextualType = BoundGenericType::get(ctx.getKeyPathDecl(), Type(),
+                                             {rootTy, valueTy});
+    } else if (isKnownKeyPathType(objectTy)) {
+      auto *keyPathTy = objectTy->castTo<BoundGenericType>();
+      auto args = keyPathTy->getGenericArgs();
+      assert(args.size() == 2);
+
+      auto root = args.front();
+      auto value = getKeyPathValueType(keyPath);
+
+      // Make sure that key path always gets a chance to infer its
+      // value type from the member chain.
+      if (!value->isEqual(args.back())) {
+        contextualType = BoundGenericType::get(
+            keyPathTy->getDecl(), keyPathTy->getParent(), {root, value});
+      }
+    } else if (contextualType->isPlaceholder()) {
+      auto root = simplifyType(getKeyPathRootType(keyPath));
+      if (!(root->isTypeVariableOrMember() || root->isPlaceholder())) {
+        auto value = getKeyPathValueType(keyPath);
+        contextualType =
+            BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
+      }
+    }
+  }
+
+  assignFixedType(typeVar, contextualType);
+  return true;
+}
 
 static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
                                     DeclContext *DC) {
