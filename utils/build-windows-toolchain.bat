@@ -61,7 +61,7 @@ set NINJA_STATUS=[%%f/%%t][%%p][%%es]
 
 if "%CMAKE_BUILD_TYPE%"=="" (set CMAKE_BUILD_TYPE=Release)
 
-:: Build the -Test argument, if any
+:: Build the -Test argument, if any, by subtracting skipped tests
 set TestArg=-Test swift,dispatch,foundation,xctest,
 for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
 if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )

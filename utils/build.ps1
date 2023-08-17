@@ -137,7 +137,7 @@ $ArchX64 = @{
   BinaryCache = "$BinaryCache\x64";
   PlatformInstallRoot = "$BinaryCache\x64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\SDKs\Windows.sdk";
-  XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-$ProductVersion";
+  XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
 }
 
@@ -152,7 +152,7 @@ $ArchX86 = @{
   BinaryCache = "$BinaryCache\x86";
   PlatformInstallRoot = "$BinaryCache\x86\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\Windows.sdk";
-  XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-$ProductVersion";
+  XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
 }
 
 $ArchARM64 = @{
@@ -166,7 +166,7 @@ $ArchARM64 = @{
   BinaryCache = "$BinaryCache\arm64";
   PlatformInstallRoot = "$BinaryCache\arm64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\Windows.sdk";
-  XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-$ProductVersion";
+  XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
 }
 
@@ -526,17 +526,17 @@ function Build-SPMProject {
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   Isolate-EnvVars {
-    $env:Path = "${RuntimeInstallRoot}\usr\bin;${ToolchainInstallRoot}\usr\bin;${env:Path}"
-    $env:SDKROOT = $Arch.SDKInstallRoot
+    $env:Path = "$RuntimeInstallRoot\usr\bin;$ToolchainInstallRoot\usr\bin;${env:Path}"
+    $env:SDKROOT = $SDKInstallRoot
 
     $Arguments = @(
         "--scratch-path", $Bin,
         "--package-path", $Src,
         "-c", "release",
-        "-Xbuild-tools-swiftc", "-I$($HostArch.SDKInstallRoot)\usr\lib\swift",
-        "-Xbuild-tools-swiftc", "-L$($HostArch.SDKInstallRoot)\usr\lib\swift\windows",
-        "-Xcc", "-I$($HostArch.SDKInstallRoot)\usr\lib\swift",
-        "-Xlinker", "-L$($HostArch.SDKInstallRoot)\usr\lib\swift\windows"
+        "-Xbuild-tools-swiftc", "-I$SDKInstallRoot\usr\lib\swift",
+        "-Xbuild-tools-swiftc", "-L$SDKInstallRoot\usr\lib\swift\windows",
+        "-Xcc", "-I$SDKInstallRoot\usr\lib\swift",
+        "-Xlinker", "-L$SDKInstallRoot\usr\lib\swift\windows"
     )
     if ($BuildType -eq "Release") {
       $Arguments += @("-debug-info-format", "none")
@@ -548,7 +548,7 @@ function Build-SPMProject {
       }
     }
 
-    Invoke-Program "$($Arch.ToolchainInstallRoot)\usr\bin\swift.exe" "build" @Arguments @AdditionalArguments
+    Invoke-Program "$ToolchainInstallRoot\usr\bin\swift.exe" "build" @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
@@ -951,10 +951,10 @@ function Build-XCTest($Arch, [switch]$Test = $false) {
       } + $TestingDefines)
 
     if ($DefaultsLLD) {
-      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': '$ProductVersion', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
         -OutFile "$($Arch.PlatformInstallRoot)\Info.plist"
     } else {
-      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': '$ProductVersion' } }), encoding='utf-8'))" `
+      Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" `
         -OutFile "$($Arch.PlatformInstallRoot)\Info.plist"
     }
   }
@@ -1029,7 +1029,7 @@ function Install-Platform($Arch) {
   Copy-File "$($Arch.SDKInstallRoot)\SDKSettings.plist" $SDKInstallRoot\
 
   # Copy XCTest
-  $XCTestInstallRoot = "$PlatformInstallRoot\Developer\Library\XCTest-$ProductVersion"
+  $XCTestInstallRoot = "$PlatformInstallRoot\Developer\Library\XCTest-development"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\bin\XCTest.dll" "$XCTestInstallRoot\usr\$($Arch.BinaryDir)\"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\windows\XCTest.lib" "$XCTestInstallRoot\usr\lib\swift\windows\$($Arch.LLVMName)\"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\windows\$($Arch.LLVMName)\XCTest.swiftmodule" "$XCTestInstallRoot\usr\lib\swift\windows\XCTest.swiftmodule\$($Arch.LLVMTarget).swiftmodule"
@@ -1366,7 +1366,7 @@ function Build-Inspect() {
     -Src $SourceCache\swift\tools\swift-inspect `
     -Bin $OutDir `
     -Arch $HostArch `
-    -Xcc "-I$($HostArch.SDKInstallRoot)\usr\include\swift\SwiftRemoteMirror" -Xlinker "$($HostArch.SDKInstallRoot)\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib" `
+    -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib" `
     -Xcc -Xclang -Xcc -fno-split-cold-code # Workaround https://github.com/llvm/llvm-project/issues/40056
 }
 
