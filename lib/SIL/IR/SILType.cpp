@@ -940,6 +940,12 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
 bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
   EnumDecl *decl = getEnumOrBoundGenericEnum();
   assert(decl && "Called for a non enum type");
+
+  // Since unavailable enum elements cannot be referenced in canonical SIL,
+  // enums with these elements cannot be treated as exhaustive types.
+  if (decl->hasCasesUnavailableDuringLowering())
+    return false;
+
   return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
                                        f->getResilienceExpansion());
 }

@@ -173,12 +173,11 @@ extension PatternBindingListSyntax {
 
 extension VariableDeclSyntax {
   func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
-    let newAttributes = AttributeListSyntax(
-      (attributes.map(Array.init) ?? []) + [.attribute(attribute)])
+    let newAttributes = attributes + [.attribute(attribute)]
     return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
-      modifiers: modifiers?.privatePrefixed(prefix) ?? DeclModifierListSyntax(keyword: .private),
+      modifiers: modifiers.privatePrefixed(prefix),
       bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
       bindings: bindings.privatePrefixed(prefix),
       trailingTrivia: trailingTrivia
@@ -276,7 +275,7 @@ extension ObservableMacro: ExtensionMacro {
         """
     let ext = decl.cast(ExtensionDeclSyntax.self)
 
-    if let availability = declaration.availability {
+    if let availability = declaration.attributes.availability {
       return [ext.with(\.attributes, availability)]
     } else {
       return [ext]

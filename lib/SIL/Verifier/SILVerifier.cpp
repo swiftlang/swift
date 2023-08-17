@@ -1956,12 +1956,16 @@ public:
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
     for (auto p : llvm::enumerate(PAI->getArguments())) {
+      unsigned argIdx = appliedArgStartIdx + p.index();
       requireSameType(
           p.value()->getType(),
-          substConv.getSILArgumentType(appliedArgStartIdx + p.index(),
-                                       F.getTypeExpansionContext()),
+          substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+      if (PAI->isOnStack()) {
+        require(!substConv.getSILArgumentConvention(argIdx).isOwnedConvention(),
+          "on-stack closures do not support owned arguments");
+      }
     }
 
     // The arguments to the result function type must match the prefix of the
@@ -2343,7 +2347,13 @@ public:
       else
         break;
     }
-    require(isa<AllocBoxInst>(value) || isa<SILFunctionArgument>(value),
+
+    auto isLegal = [](SILValue value) {
+      if (auto *a = dyn_cast<MarkUnresolvedReferenceBindingInst>(value))
+        value = a->getOperand();
+      return isa<AllocBoxInst>(value) || isa<SILFunctionArgument>(value);
+    };
+    require(isLegal(value),
             "Lexical borrows of SILBoxTypes must be of vars or captures.");
   }
 
@@ -4896,6 +4906,14 @@ public:
       requireSameType(
           result->getType(), SEO->getType(),
           "select_enum case operand must match type of instruction");
+
+      // In canonical SIL, select instructions must not cover any enum elements
+      // that are unavailable.
+      if (F.getModule().getStage() >= SILStage::Canonical) {
+        require(elt->isAvailableDuringLowering(),
+                "select_enum dispatches on enum element that is unavailable "
+                "during lowering.");
+      }
     }
 
     // If the select is non-exhaustive, we require a default.
@@ -4984,6 +5002,15 @@ public:
                 "arguments");
         return;
       }
+
+      // In canonical SIL, switch instructions must not cover any enum elements
+      // that are unavailable.
+      if (F.getModule().getStage() >= SILStage::Canonical) {
+        require(elt->isAvailableDuringLowering(),
+                "switch_enum dispatches on enum element that is unavailable "
+                "during lowering.");
+      }
+
       // Check for a valid switch result type.
       if (dest->getArguments().size() == 1) {
         SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule(),
@@ -5087,6 +5114,14 @@ public:
               "switch_enum_addr dispatches on same enum element "
               "more than once");
       unswitchedElts.erase(elt);
+
+      // In canonical SIL, switch instructions must not cover any enum elements
+      // that are unavailable.
+      if (F.getModule().getStage() >= SILStage::Canonical) {
+        require(elt->isAvailableDuringLowering(),
+                "switch_enum_addr dispatches on enum element that is "
+                "unavailable during lowering.");
+      }
 
       // The destination BB must not have BB arguments.
       require(dest->getArguments().empty(),

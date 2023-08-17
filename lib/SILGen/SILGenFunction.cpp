@@ -201,13 +201,6 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     auto *file = ref.getDecl()->getDeclContext()->getParentSourceFile();
     return getMagicFunctionName(file);
   }
-  case SILDeclRef::Kind::RuntimeAttributeGenerator: {
-    if (auto *var = dyn_cast<VarDecl>(ref.getDecl()))
-      return var->getName();
-
-    auto *DC = dyn_cast<DeclContext>(ref.getDecl());
-    return getMagicFunctionName(DC ? DC : ref.getDecl()->getDeclContext());
-  }
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -1184,7 +1177,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
     }
 
-    auto managedArgv = ManagedValue::forUnmanaged(argv);
+    auto managedArgv = ManagedValue::forObjectRValueWithoutOwnership(argv);
 
     if (unwrappedTy != argv->getType()) {
       auto converted =
@@ -1507,8 +1500,6 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     }
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
-  } else if (function.kind == SILDeclRef::Kind::RuntimeAttributeGenerator) {
-    params = ParameterList::createEmpty(getASTContext());
   }
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);

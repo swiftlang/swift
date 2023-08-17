@@ -1276,12 +1276,13 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   auto &diags = C.Diags;
   auto module = nominal->getParentModule();
   Type nominalTy = nominal->getDeclaredInterfaceType();
+  NominalTypeDecl *executorDecl = C.getExecutorDecl();
 
   // enqueue(_:)
   auto enqueueDeclName = DeclName(C, DeclBaseName(C.Id_enqueue), { Identifier() });
 
   FuncDecl *moveOnlyEnqueueRequirement = nullptr;
-  FuncDecl *legacyMoveOnlyEnqueueRequirement = nullptr; // TODO: preferably we'd want to remove handling of `enqueue(Job)` when able to
+  FuncDecl *legacyMoveOnlyEnqueueRequirement = nullptr;
   FuncDecl *unownedEnqueueRequirement = nullptr;
   for (auto req: proto->getProtocolRequirements()) {
     auto *funcDecl = dyn_cast<FuncDecl>(req);
@@ -1324,18 +1325,17 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   assert(unownedEnqueueRequirement && "could not find the enqueue(UnownedJob) requirement, which should be always there");
 
   // try to find at least a single implementations of enqueue(_:)
-  ConcreteDeclRef unownedEnqueueWitness = concreteConformance->getWitnessDeclRef(unownedEnqueueRequirement);
-  ValueDecl *unownedEnqueueWitnessDecl = unownedEnqueueWitness.getDecl();
+  ValueDecl *unownedEnqueueWitnessDecl = concreteConformance->getWitnessDecl(unownedEnqueueRequirement);
   ValueDecl *moveOnlyEnqueueWitnessDecl = nullptr;
   ValueDecl *legacyMoveOnlyEnqueueWitnessDecl = nullptr;
 
   if (moveOnlyEnqueueRequirement) {
-    moveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDeclRef(
-        moveOnlyEnqueueRequirement).getDecl();
+    moveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDecl(
+        moveOnlyEnqueueRequirement);
   }
   if (legacyMoveOnlyEnqueueRequirement) {
-    legacyMoveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDeclRef(
-        legacyMoveOnlyEnqueueRequirement).getDecl();
+    legacyMoveOnlyEnqueueWitnessDecl = concreteConformance->getWitnessDecl(
+        legacyMoveOnlyEnqueueRequirement);
   }
 
   // --- Diagnose warnings and errors
@@ -1358,26 +1358,62 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
   }
 
+  auto concurrencyModule = C.getLoadedModule(C.Id_Concurrency);
+  auto isStdlibDefaultImplDecl = [executorDecl, concurrencyModule](ValueDecl *witness) -> bool {
+    if (auto declContext = witness->getDeclContext()) {
+      if (auto *extension = dyn_cast<ExtensionDecl>(declContext)) {
+        auto extensionModule = extension->getParentModule();
+        if (extensionModule != concurrencyModule) {
+          return false;
+        }
+
+        if (auto extendedNominal = extension->getExtendedNominal()) {
+          return extendedNominal->getDeclaredInterfaceType()->isEqual(
+              executorDecl->getDeclaredInterfaceType());
+        }
+      }
+    }
+    return false;
+  };
+
   // If both old and new enqueue are implemented, but the old one cannot be removed,
   // emit a warning that the new enqueue is unused.
-  if (!canRemoveOldDecls &&
-      unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid() &&
-      moveOnlyEnqueueWitnessDecl && moveOnlyEnqueueWitnessDecl->getLoc().isValid()) {
-    diags.diagnose(moveOnlyEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_unused_implementation);
+  if (!canRemoveOldDecls && unownedEnqueueWitnessDecl && moveOnlyEnqueueWitnessDecl) {
+    if (!isStdlibDefaultImplDecl(moveOnlyEnqueueWitnessDecl)) {
+      diags.diagnose(moveOnlyEnqueueWitnessDecl->getLoc(),
+                     diag::executor_enqueue_unused_implementation);
+    }
   }
 
   // Old UnownedJob based impl is present, warn about it suggesting the new protocol requirement.
-  if (canRemoveOldDecls && unownedEnqueueWitnessDecl && unownedEnqueueWitnessDecl->getLoc().isValid()) {
-    diags.diagnose(unownedEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_unowned_implementation, nominalTy);
+  if (canRemoveOldDecls && unownedEnqueueWitnessDecl) {
+    if (!isStdlibDefaultImplDecl(unownedEnqueueWitnessDecl)) {
+      diags.diagnose(unownedEnqueueWitnessDecl->getLoc(),
+                     diag::executor_enqueue_deprecated_unowned_implementation,
+                     nominalTy);
+    }
   }
   // Old Job based impl is present, warn about it suggesting the new protocol requirement.
-  if (legacyMoveOnlyEnqueueWitnessDecl && legacyMoveOnlyEnqueueWitnessDecl->getLoc().isValid()) {
-    diags.diagnose(legacyMoveOnlyEnqueueWitnessDecl->getLoc(), diag::executor_enqueue_deprecated_owned_job_implementation, nominalTy);
+  if (legacyMoveOnlyEnqueueWitnessDecl) {
+    if (!isStdlibDefaultImplDecl(legacyMoveOnlyEnqueueWitnessDecl)) {
+      diags.diagnose(legacyMoveOnlyEnqueueWitnessDecl->getLoc(),
+                     diag::executor_enqueue_deprecated_owned_job_implementation,
+                     nominalTy);
+    }
   }
 
-  if ((!unownedEnqueueWitnessDecl || unownedEnqueueWitnessDecl->getLoc().isInvalid()) &&
-      (!moveOnlyEnqueueWitnessDecl || moveOnlyEnqueueWitnessDecl->getLoc().isInvalid()) &&
-      (!legacyMoveOnlyEnqueueWitnessDecl || legacyMoveOnlyEnqueueWitnessDecl->getLoc().isInvalid())) {
+  bool unownedEnqueueWitnessIsDefaultImpl = isStdlibDefaultImplDecl(unownedEnqueueWitnessDecl);
+  bool moveOnlyEnqueueWitnessIsDefaultImpl = isStdlibDefaultImplDecl(moveOnlyEnqueueWitnessDecl);
+  bool legacyMoveOnlyEnqueueWitnessDeclIsDefaultImpl = isStdlibDefaultImplDecl(legacyMoveOnlyEnqueueWitnessDecl);
+
+  auto missingWitness = !unownedEnqueueWitnessDecl &&
+                        !moveOnlyEnqueueWitnessDecl &&
+                        !legacyMoveOnlyEnqueueWitnessDecl;
+  auto allWitnessesAreDefaultImpls = unownedEnqueueWitnessIsDefaultImpl &&
+                                     moveOnlyEnqueueWitnessIsDefaultImpl &&
+                                     legacyMoveOnlyEnqueueWitnessDeclIsDefaultImpl;
+  if ((missingWitness) ||
+      (!missingWitness && allWitnessesAreDefaultImpls)) {
     // Neither old nor new implementation have been found, but we provide default impls for them
     // that are mutually recursive, so we must error and suggest implementing the right requirement.
     //

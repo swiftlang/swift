@@ -2866,9 +2866,16 @@ namespace {
 class ObjCImplementationChecker {
   DiagnosticEngine &diags;
 
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    auto diag = diags.diagnose(std::forward<ArgTypes>(Args)...);
+  template<typename Loc, typename ...ArgTypes>
+  InFlightDiagnostic diagnose(Loc loc, Diag<ArgTypes...> diagID,
+                        typename detail::PassArgument<ArgTypes>::type... Args) {
+    auto diag = diags.diagnose(loc, diagID, std::forward<ArgTypes>(Args)...);
+
+    // WORKAROUND (5.9): Soften newly-introduced errors to make things easier
+    // for early adopters.
+    if (diags.declaredDiagnosticKindFor(diagID.ID) == DiagnosticKind::Error)
+      diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
+
     return diag;
   }
 
@@ -3506,6 +3513,15 @@ public:
   void diagnoseUnmatchedCandidates() {
     for (auto &pair : unmatchedCandidates) {
       auto cand = pair.first;
+
+      // `isObjCMemberImplementation()` incorrectly returns true for required
+      // inits that are overrides because checking in that accessor would create
+      // a cycle between override computations and access control. Don't
+      // diagnose such candidates.
+      // FIXME: Refactor around this so these methods are never made candidates.
+      if (auto ctor = dyn_cast<ConstructorDecl>(cand))
+        if (ctor->isRequired() && !ctor->getOverriddenDecls().empty())
+          continue;
 
       diagnose(cand, diag::member_of_objc_implementation_not_objc_or_final,
                cand, cand->getDeclContext()->getSelfClassDecl());

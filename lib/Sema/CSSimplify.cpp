@@ -4210,7 +4210,16 @@ static void enumerateOptionalConversionRestrictions(
 /// Determine whether we can bind the given type variable to the given
 /// fixed type.
 static bool isBindable(TypeVariableType *typeVar, Type type) {
-  return !ConstraintSystem::typeVarOccursInType(typeVar, type) &&
+  // Disallow recursive bindings.
+  if (ConstraintSystem::typeVarOccursInType(typeVar, type))
+    return false;
+
+  // If type variable we are about to bind represents a pack
+  // expansion type, allow the binding to happen regardless of
+  // what the \c type is, because contextual type is just a hint
+  // in this situation and type variable would be bound to its
+  // opened type instead.
+  return typeVar->getImpl().isPackExpansion() ||
          !type->is<DependentMemberType>();
 }
 
@@ -11599,19 +11608,52 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
                                       ConstraintLocatorBuilder locator) {
   auto *keyPathLocator = typeVar->getImpl().getLocator();
   auto *keyPath = castToExpr<KeyPathExpr>(keyPathLocator->getAnchor());
+
   if (keyPath->hasSingleInvalidComponent()) {
     assignFixedType(typeVar, contextualType);
     return true;
   }
-  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
-    auto args = BGT->getGenericArgs();
-    if (isKnownKeyPathType(contextualType) && args.size() >= 1) {
-      auto root = BGT->getGenericArgs()[0];
 
-      auto *keyPathValueTV = getKeyPathValueType(keyPath);
-      contextualType = BoundGenericType::get(
-          args.size() == 1 ? getASTContext().getKeyPathDecl() : BGT->getDecl(),
-          /*parent=*/Type(), {root, keyPathValueTV});
+  auto objectTy = contextualType->lookThroughAllOptionalTypes();
+  {
+    auto &ctx = getASTContext();
+    // `AnyKeyPath` and `PartialKeyPath` represent type-erased versions of
+    // `KeyPath<T, V>`.
+    //
+    // In situations where `AnyKeyPath` or `PartialKeyPath` cannot be used
+    // directly i.e. passing an argument to a parameter represented by a
+    // `AnyKeyPath` or `PartialKeyPath`, let's attempt a `KeyPath` binding which
+    // would then be converted to a `AnyKeyPath` or `PartialKeyPath` since there
+    // is a subtype relationship between them.
+    if (objectTy->isAnyKeyPath()) {
+      auto root = getKeyPathRootType(keyPath);
+      auto value = getKeyPathValueType(keyPath);
+
+      contextualType =
+          BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
+    } else if (objectTy->isPartialKeyPath()) {
+      auto rootTy = objectTy->castTo<BoundGenericType>()->getGenericArgs()[0];
+      // Since partial key path is an erased version of `KeyPath`, the value
+      // type would never be used, which means that binding can use
+      // type variable generated for a result of key path expression.
+      auto valueTy = getKeyPathValueType(keyPath);
+
+      contextualType = BoundGenericType::get(ctx.getKeyPathDecl(), Type(),
+                                             {rootTy, valueTy});
+    } else if (isKnownKeyPathType(objectTy)) {
+      auto *keyPathTy = objectTy->castTo<BoundGenericType>();
+      auto args = keyPathTy->getGenericArgs();
+      assert(args.size() == 2);
+
+      auto root = args.front();
+      auto value = getKeyPathValueType(keyPath);
+
+      // Make sure that key path always gets a chance to infer its
+      // value type from the member chain.
+      if (!value->isEqual(args.back())) {
+        contextualType = BoundGenericType::get(
+            keyPathTy->getDecl(), keyPathTy->getParent(), {root, value});
+      }
     }
   }
 
@@ -11621,29 +11663,15 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
                                             Type contextualType) {
+  assert(typeVar->getImpl().isPackExpansion());
+
   auto *locator = typeVar->getImpl().getLocator();
 
-  Type openedExpansionType;
-  if (auto expansionElt =
-          locator->getLastElementAs<LocatorPathElt::PackExpansionType>()) {
-    openedExpansionType = expansionElt->getOpenedType();
-  }
-
-  if (!openedExpansionType)
-    return false;
+  Type openedExpansionType =
+      locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
+          .getOpenedType();
 
   assignFixedType(typeVar, openedExpansionType, locator);
-
-  // We have a fully resolved contextual pack expansion type, let's
-  // apply it right away.
-  if (!contextualType->isEqual(openedExpansionType)) {
-    assert(contextualType->is<PackExpansionType>() &&
-           !contextualType->hasTypeVariable());
-    auto result = matchTypes(openedExpansionType, contextualType,
-                             ConstraintKind::Equal, {}, locator);
-    return !result.isFailure();
-  }
-
   return true;
 }
 

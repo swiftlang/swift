@@ -295,8 +295,19 @@ public:
   /// Return the apply operand for the given applied argument index.
   Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
 
+  // The apply operand at the given index into the callee's function's
+  // arguments.
+  Operand &getArgumentRefAtCalleeArgIndex(unsigned i) const {
+    return getArgumentRef(i - getCalleeArgIndexOfFirstAppliedArg());
+  }
+
   /// Return the ith applied argument.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
+
+  // The argument at the given index into the callee's function's arguments.
+  SILValue getArgumentAtCalleeArgIndex(unsigned i) const {
+    return getArgument(i - getCalleeArgIndexOfFirstAppliedArg());
+  }
 
   /// Set the ith applied argument.
   void setArgument(unsigned i, SILValue V) const {
@@ -541,9 +552,9 @@ public:
 
   void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
 
-  /// Attempt to cast this apply site to a full apply site, returning None on
-  /// failure.
-  llvm::Optional<FullApplySite> asFullApplySite() const;
+  /// Form a FullApplySite.  Note that it will be null if this apply site is not
+  /// in fact a FullApplySite.
+  FullApplySite asFullApplySite() const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -818,7 +829,7 @@ template <> struct DenseMapInfo<::swift::FullApplySite> {
 
 namespace swift {
 
-inline llvm::Optional<FullApplySite> ApplySite::asFullApplySite() const {
+inline FullApplySite ApplySite::asFullApplySite() const {
   return FullApplySite::isa(getInstruction());
 }
 
@@ -826,7 +837,7 @@ inline bool ApplySite::isIndirectResultOperand(const Operand &op) const {
   auto fas = asFullApplySite();
   if (!fas)
     return false;
-  return fas->isIndirectResultOperand(op);
+  return fas.isIndirectResultOperand(op);
 }
 
 } // namespace swift

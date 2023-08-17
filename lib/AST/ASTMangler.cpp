@@ -925,8 +925,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
-    case SymbolKind::RuntimeDiscoverableAttributeRecord:
-      return appendOperator("Ha");
   }
 }
 
@@ -2441,14 +2439,6 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       }
       return;
     }
-
-    case InitializerKind::RuntimeAttribute: {
-      auto attrInit = cast<RuntimeAttributeInitializer>(ctx);
-
-      auto *decl = attrInit->getAttachedToDecl();
-      appendRuntimeAttributeGeneratorEntity(decl, attrInit->getAttr());
-      return;
-    }
     }
     llvm_unreachable("bad initializer kind");
 
@@ -3847,14 +3837,6 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }
 
-std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
-    const ValueDecl *decl, CustomAttr *attr, SymbolKind SKind) {
-  beginMangling();
-  appendRuntimeAttributeGeneratorEntity(decl, attr);
-  appendSymbolKind(SKind);
-  return finalize();
-}
-
 void ASTMangler::appendMacroExpansionContext(
     SourceLoc loc, DeclContext *origDC
 ) {
@@ -4209,19 +4191,4 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
     }
   }
   return appendOperator("XP");
-}
-
-void ASTMangler::appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
-                                                       CustomAttr *attr) {
-  auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
-
-  appendContext(attrType, attrType->getAlternateModuleName());
-
-  if (auto dc = dyn_cast<DeclContext>(decl)) {
-    appendContext(dc, decl->getAlternateModuleName());
-  } else {
-    appendEntity(decl);
-  }
-
-  appendOperator("fa");
 }

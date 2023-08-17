@@ -66,11 +66,17 @@ public:
 // CHECK-NEXT:    var y: Int32
 // CHECK-NEXT:  }
 // CHECK-NEXT:  struct TemplateRecord {
+// CHECK-NEXT:    @available(*, deprecated, message:
+// CHECK-NEXT:    init()
 // CHECK-NEXT:    mutating func methodFunc(_ x: Any)
 // CHECK-NEXT:    struct InnerRecord {
+// CHECK-NEXT:      @available(*, deprecated, message:
+// CHECK-NEXT:      init()
 // CHECK-NEXT:      mutating func innerMethod(_ y: Any)
 // CHECK-NEXT:    }
 // CHECK-NEXT:    struct InnerTemplate {
+// CHECK-NEXT:      @available(*, deprecated, message:
+// CHECK-NEXT:      init()
 // CHECK-NEXT:      mutating func innerTemplateMethod()
 // CHECK-NEXT:    }
 // CHECK-NEXT:    mutating func returnsTemplateMethod()
@@ -79,7 +85,11 @@ public:
 // CHECK-NEXT: }
 // CHECK-NEXT: typealias MyType = ns.TemplateRecord
 // CHECK-NEXT: struct OuterTemp2 {
+// CHECK-NEXT:   @available(*, deprecated, message:
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   struct InnerTemp2 {
+// CHECK-NEXT:     @available(*, deprecated, message:
+// CHECK-NEXT:     init()
 // CHECK-NEXT:     init(x2: Any)
 // CHECK-NEXT:     mutating func testMe(_ p: Any, _ x: Any)
 // CHECK-NEXT:     var x2: Any

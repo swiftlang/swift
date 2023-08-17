@@ -312,6 +312,9 @@ bool Decl::isAvailableDuringLowering() const {
       UnavailableDeclOptimization::Complete)
     return true;
 
+  if (hasClangNode())
+    return true;
+
   return !isUnconditionallyUnavailable(this);
 }
 
@@ -571,6 +574,11 @@ ASTContext::getSignedConformsToProtocolAvailability() {
 AvailabilityContext
 ASTContext::getSignedDescriptorAvailability() {
   return getSwift59Availability();
+}
+
+AvailabilityContext
+ASTContext::getInitRawStructMetadataAvailability() {
+  return getSwiftFutureAvailability();
 }
 
 AvailabilityContext ASTContext::getSwift52Availability() {

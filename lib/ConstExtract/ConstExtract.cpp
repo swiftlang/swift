@@ -397,23 +397,13 @@ extractPropertyWrapperAttrValues(VarDecl *propertyDecl) {
   return customAttrValues;
 }
 
-static AttrValueVector
-extractRuntimeMetadataAttrValues(VarDecl *propertyDecl) {
-  AttrValueVector customAttrValues;
-  for (auto *runtimeMetadataAttribute : propertyDecl->getRuntimeDiscoverableAttrs())
-    customAttrValues.push_back(extractAttributeValue(runtimeMetadataAttribute));
-  return customAttrValues;
-}
-
 static ConstValueTypePropertyInfo
 extractTypePropertyInfo(VarDecl *propertyDecl) {
   if (const auto binding = propertyDecl->getParentPatternBinding()) {
     if (const auto originalInit = binding->getInit(0)) {
-      if (propertyDecl->hasAttachedPropertyWrapper() ||
-          propertyDecl->hasRuntimeMetadataAttributes()) {
+      if (propertyDecl->hasAttachedPropertyWrapper()) {
         return {propertyDecl, extractCompileTimeValue(originalInit),
-                extractPropertyWrapperAttrValues(propertyDecl),
-                extractRuntimeMetadataAttrValues(propertyDecl)};
+                extractPropertyWrapperAttrValues(propertyDecl)};
       }
 
       return {propertyDecl, extractCompileTimeValue(originalInit)};
@@ -699,21 +689,6 @@ void writePropertyWrapperAttributes(
   });
 }
 
-void writeRuntimeMetadataAttributes(
-    llvm::json::OStream &JSON,
-    llvm::Optional<AttrValueVector> RuntimeMetadataAttributes,
-    const ASTContext &ctx) {
-  if (!RuntimeMetadataAttributes.has_value() ||
-      RuntimeMetadataAttributes.value().empty()) {
-    return;
-  }
-
-  JSON.attributeArray("runtimeMetadataAttributes", [&] {
-    for (auto RMA : RuntimeMetadataAttributes.value())
-      writeAttributeInfo(JSON, RMA, ctx);;
-  });
-}
-
 void writeEnumCases(
     llvm::json::OStream &JSON,
     llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements) {
@@ -892,9 +867,6 @@ void writeProperties(llvm::json::OStream &JSON,
                                  decl->getDeclContext()->getASTContext());
         writeValue(JSON, PropertyInfo.Value);
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
-                                       decl->getASTContext());
-        writeRuntimeMetadataAttributes(JSON,
-                                       PropertyInfo.RuntimeMetadataAttributes,
                                        decl->getASTContext());
         writeResultBuilderInformation(JSON, &NomTypeDecl, decl);
         writeAttrInformation(JSON, decl->getAttrs());

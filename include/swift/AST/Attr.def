@@ -416,9 +416,6 @@ DECL_ATTR(_documentation, Documentation,
 SIMPLE_DECL_ATTR(_noMetadata, NoMetadata,
   OnGenericTypeParam | UserInaccessible | NotSerialized | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   138)
-SIMPLE_DECL_ATTR(runtimeMetadata, RuntimeMetadata,
-  OnStruct | OnClass | OnEnum | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  139)
 SIMPLE_DECL_ATTR(_used, Used,
   OnAbstractFunction | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   143)

@@ -1094,13 +1094,6 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
 
-    // If there are no bindings for the closure yet we cannot prioritize
-    // it because that runs into risk of missing a result builder transform.
-    if (TypeVar->getImpl().isClosureType()) {
-      if (Bindings.empty())
-        return false;
-    }
-
     if (auto transform = CS.getAppliedResultBuilderTransform(closure)) {
       // Conjunctions that represent closures with result builder transformed
       // bodies could be attempted right after their resolution if they meet
@@ -1260,35 +1253,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     auto objectTy = type->lookThroughAllOptionalTypes();
     if (!isKnownKeyPathType(objectTy))
       return llvm::None;
-    
-    auto &ctx = CS.getASTContext();
-    auto *keyPathTypeLoc = TypeVar->getImpl().getLocator();
-    auto *keyPath = castToExpr<KeyPathExpr>(keyPathTypeLoc->getAnchor());
-    // `AnyKeyPath` and `PartialKeyPath` represent type-erased versions of
-    // `KeyPath<T, V>`.
-    //
-    // In situations where `AnyKeyPath` or `PartialKeyPath` cannot be used
-    // directly i.e. passing an argument to a parameter represented by a
-    // `AnyKeyPath` or `PartialKeyPath`, let's attempt a `KeyPath` binding which
-    // would then be converted to a `AnyKeyPath` or `PartialKeyPath` since there
-    // is a subtype relationship between them.
-    if (objectTy->isAnyKeyPath()) {
-      auto root = CS.getKeyPathRootType(keyPath);
-      auto value = CS.getKeyPathValueType(keyPath);
-      
-      type = BoundGenericType::get(ctx.getKeyPathDecl(), Type(),
-                                   {root, value});
-    } else if (objectTy->isPartialKeyPath() &&
-               kind == AllowedBindingKind::Subtypes) {
-      auto rootTy = objectTy->castTo<BoundGenericType>()->getGenericArgs()[0];
-      // Since partial key path is an erased version of `KeyPath`, the value
-      // type would never be used, which means that binding can use
-      // type variable generated for a result of key path expression.
-      auto valueTy = CS.getKeyPathValueType(keyPath);
-
-      type = BoundGenericType::get(ctx.getKeyPathDecl(), Type(),
-                                   {rootTy, valueTy});
-    }
   }
 
   if (auto *locator = TypeVar->getImpl().getLocator()) {

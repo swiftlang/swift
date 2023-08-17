@@ -1800,6 +1800,11 @@ NOTE(objc_implementation_one_matched_requirement,none,
      "'@objc(%3)' to use it}2",
      (ValueDecl *, ObjCSelector, bool, StringRef))
 
+WARNING(wrap_objc_implementation_will_become_error,none,
+        "%0; this will become an error before '@_objcImplementation' is "
+        "stabilized",
+        (DiagnosticInfo *))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,
@@ -6687,7 +6692,7 @@ WARNING(hashvalue_implementation,Deprecation,
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
 
-WARNING(executor_enqueue_unowned_implementation,Deprecation,
+WARNING(executor_enqueue_deprecated_unowned_implementation,Deprecation,
         "'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; "
         "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead",
         (Type))
@@ -7082,7 +7087,7 @@ ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
       (DeclAttribute, DescriptiveDeclKind))
 
-ERROR(backdeployed_opaque_result_not_supported,none,
+WARNING(backdeployed_opaque_result_not_supported,none,
       "'%0' is unsupported on a %1 with a 'some' return type",
       (DeclAttribute, DescriptiveDeclKind))
 
@@ -7154,9 +7159,7 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
-      "macro %2; the type must be public and provided by a macro target in a "
-      "Swift package, or via '-plugin-path' or '-load-plugin-library'",
-      (StringRef, StringRef, DeclName))
+      "macro %2", (StringRef, StringRef, DeclName))
 ERROR(macro_must_be_defined,none,
       "macro %0 requires a definition", (DeclName))
 ERROR(external_macro_outside_macro_definition,none,
@@ -7373,62 +7376,6 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
-
-//------------------------------------------------------------------------------
-// MARK: Runtime discoverable attributes (@runtimeMetadata)
-//------------------------------------------------------------------------------
-
-ERROR(runtime_discoverable_attrs_are_experimental,none,
-      "runtime discoverable attributes are an experimental feature", ())
-
-ERROR(invalid_decl_for_runtime_discoverable_attr,none,
-      "@%0 can only be applied to non-generic types, methods, "
-      "instance properties, and global functions", (StringRef))
-
-ERROR(invalid_decl_for_runtime_discoverable_attr_in_extension,none,
-      "@%0 can only be applied to unavailable extensions in the same module"
-      " as %1", (StringRef, DeclName))
-
-ERROR(invalid_attr_redeclaration_in_extension,none,
-      "@%0 is already applied to type %1; did you want to remove it?",
-      (StringRef, DeclName))
-
-ERROR(duplicate_runtime_discoverable_attr,none,
-      "duplicate runtime discoverable attribute", ())
-
-ERROR(runtime_attribute_requires_init,none,
-      "runtime attribute type %0 does not contain a required initializer"
-      " - init(attachedTo:)",
-      (DeclName))
-
-ERROR(runtime_attribute_type_failable_init,none,
-      "runtime attribute type initializer %0 cannot be failable", (DeclName))
-
-ERROR(runtime_attribute_type_requirement_not_accessible,none,
-      "%select{private|fileprivate|internal|package|public|open}0 %kind1 cannot have "
-      "more restrictive access than its enclosing runtime attribute type %2 "
-      "(which is %select{private|fileprivate|internal|package|public|open}3)",
-      (AccessLevel, const ValueDecl *, Type, AccessLevel))
-
-ERROR(cannot_use_attr_with_custom_arguments_on_protocol,none,
-      "reflection metadata attributes applied to protocols cannot have"
-      " additional attribute arguments; attribute arguments must be"
-      " explicitly written on the conforming type",
-      ())
-
-NOTE(missing_reflection_metadata_attribute_on_type,none,
-     "protocol %0 requires reflection metadata attribute @%1",
-     (DeclName, StringRef))
-
-ERROR(missing_reflection_metadata_attribute_on_subclass,none,
-      "superclass %0 requires reflection metadata attribute @%1",
-      (DeclName, StringRef))
-NOTE(add_missing_reflection_metadata_attr,none,
-     "add missing reflection metadata attribute @%0", (StringRef))
-NOTE(opt_out_from_missing_reflection_metadata_attr,none,
-     "opt-out of reflection metadata attribute @%0 using"
-     " unavailable extension",
-     (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors

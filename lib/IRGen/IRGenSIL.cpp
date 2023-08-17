@@ -1902,6 +1902,21 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   if (f->getLoweredFunctionType()->isCoroutine()) {
     CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
+
+  auto optMode = f->getOptimizationMode();
+  if (optMode != OptimizationMode::NotSet &&
+      optMode != f->getModule().getOptions().OptMode) {
+    if (optMode == OptimizationMode::NoOptimization) {
+      CurFn->addFnAttr(llvm::Attribute::OptimizeNone);
+      // LLVM requires noinline attribute along with optnone
+      CurFn->addFnAttr(llvm::Attribute::NoInline);
+    }
+    if (optMode == OptimizationMode::ForSize) {
+      CurFn->addFnAttr(llvm::Attribute::OptimizeForSize);
+    }
+    // LLVM doesn't have an attribute for -O
+  }
+
   // Emit the thunk that calls the previous implementation if this is a dynamic
   // replacement.
   if (f->getDynamicallyReplacedFunction()) {

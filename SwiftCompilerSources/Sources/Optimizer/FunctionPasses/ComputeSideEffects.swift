@@ -142,6 +142,24 @@ private struct CollectedEffects {
         handleApply(pa)
         checkedIfDeinitBarrier = true
       }
+      // In addition to the effects of the apply, also consider the
+      // effects of the capture, which reads the captured value in
+      // order to move it into the context. This only applies to
+      // addressible values, because capturing does not dereference
+      // any class objects.
+      //
+      // Ignore captures for on-stack partial applies. They only
+      // bitwise-move or capture by address, so the call to
+      // handleApply above is sufficient. And, if they are not applied
+      // in this function, then they are never applied.
+      if !pa.isOnStack {
+        // the callee and its arguments are all captured...
+        for operand in pa.operands {
+          if operand.value.type.isAddress {
+            addEffects(.read, to: operand.value)
+          }
+        }
+      }
 
     case let fl as FixLifetimeInst:
       // A fix_lifetime instruction acts like a read on the operand to prevent
