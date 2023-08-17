@@ -351,6 +351,11 @@ public:
   /// Emits a thunk from an actor function to a potentially distributed call.
   void emitDistributedThunk(SILDeclRef thunk);
 
+  /// Returns true if the given declaration must be referenced through a
+  /// back deployment thunk in a context with the given resilience expansion.
+  bool requiresBackDeploymentThunk(ValueDecl *decl,
+                                   ResilienceExpansion expansion);
+
   /// Emits a thunk that calls either the original function if it is available
   /// or otherwise calls a fallback variant of the function that was emitted
   /// into the client module.
