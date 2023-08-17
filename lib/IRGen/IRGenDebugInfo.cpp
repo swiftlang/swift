@@ -2989,11 +2989,6 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  if (swift::TypeBase *ty = DbgTy.getType()) {
-    if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
-      ty = metaTy->getInstanceType().getPointer();
-  }
-
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   VarDecl *VD = nullptr;
   if (Loc)
