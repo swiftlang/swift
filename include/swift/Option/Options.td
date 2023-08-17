@@ -532,7 +532,7 @@ def package_name : Separate<["-"], "package-name">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorablePrivate]>,
   HelpText<"Name of the package the module belongs to">;
 def export_as : Separate<["-"], "export-as">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Module name to use when referenced in clients module interfaces">;
 
 def emit_module : Flag<["-"], "emit-module">,
@@ -762,7 +762,7 @@ def disable_actor_data_race_checks :
   HelpText<"Disable runtime checks for actor data races">;
 
 def enable_bare_slash_regex : Flag<["-"], "enable-bare-slash-regex">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable the use of forward slash regular-expression literal syntax">;
 
 def warn_implicit_overrides :
@@ -794,11 +794,11 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable an experimental feature">;
 
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
 
@@ -1286,7 +1286,7 @@ def explain_module_dependency : Separate<["-"], "explain-module-dependency">,
   HelpText<"Emit remark/notes describing why compilaiton may depend on a module with a given name.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Require inlinable code with no '@available' attribute to back-deploy "
            "to this version of the '-target' OS">;
 
@@ -1405,12 +1405,12 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
 def user_module_version : Separate<["-"], "user-module-version">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, NewDriverOnlyOption]>,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 
 def allowable_client : Separate<["-"], "allowable-client">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, NewDriverOnlyOption]>,
   HelpText<"Module names that are allowed to import this module">,
   MetaVarName<"<vers>">;
 // VFS

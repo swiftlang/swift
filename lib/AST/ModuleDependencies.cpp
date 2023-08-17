@@ -622,8 +622,8 @@ ModuleDependenciesCache::ModuleDependenciesCache(
     std::string scannerContextHash)
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
-      moduleOutputPath(moduleOutputPath),
       scannerContextHash(scannerContextHash),
+      moduleOutputPath(moduleOutputPath),
       clangScanningTool(*globalScanningService.ClangScanningService,
                         globalScanningService.getClangScanningFS()) {
   globalScanningService.configureForContextHash(scannerContextHash);

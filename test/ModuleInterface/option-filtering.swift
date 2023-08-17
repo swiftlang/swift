@@ -5,7 +5,7 @@
 //
 // CHECK-SWIFTINTERFACE-NOT: -enable-experimental-feature LayoutStringValueWitnesses
 // CHECK-SWIFTINTERFACE-NOT: -enable-experimental-feature LayoutStringValueWitnessesInstantiation
-// CHECK-SWIFTINTERFACE: swift-module-flags-ignorable:
+// CHECK-SWIFTINTERFACE: swift-module-flags:
 // CHECK-SWIFTINTERFACE-SAME: -enable-experimental-feature MoveOnlyClasses
 // CHECK-SWIFTINTERFACE-SAME: -enable-experimental-feature NoImplicitCopy
 
