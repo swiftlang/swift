@@ -3,10 +3,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// First check for no errors.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition)
-
 // Check for expected errors.
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS -verify-ignore-unknown
 // RUN: not %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS %s > %t/diags.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DIAGS %s < %t/diags.txt
 
@@ -98,21 +96,62 @@ ms.favoriteColor = "Yellow"
 struct MyBrokenStruct {
   var _birthDate: MyWrapperThingy<Date?> = .init(storage: nil)
 
+  // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper' on property 'birthDate' here}}
   @myPropertyWrapper
   var birthDate: Date? {
     // CHECK-DIAGS: variable already has a getter
     // CHECK-DIAGS: in expansion of macro
     // CHECK-DIAGS: previous definition of getter here
     get { fatalError("Boom") }
+    // expected-note @-1{{previous definition of getter here}}
 
     // CHECK-DIAGS: variable already has a setter
     // CHECK-DIAGS: in expansion of macro
     // CHECK-DIAGS: previous definition of setter here
     set { fatalError("Boom") }
+    // expected-note @-1{{previous definition of setter here}}
   }
 }
 
+// expected-error@+1{{'accessor' macro cannot be attached to struct ('CannotHaveAccessors')}}
 @myPropertyWrapper
 struct CannotHaveAccessors {}
 // CHECK-DIAGS: 'accessor' macro cannot be attached to struct
 #endif
+
+
+
+@attached(accessor, names: named(willSet))
+macro SkipsComputed() =
+    #externalMacro(module: "MacroDefinition", type: "PropertyWrapperSkipsComputedMacro")
+
+struct HasComputed {
+  @SkipsComputed
+  var value: Int { 17 }
+}
+
+@attached(accessor, names: named(willSet))
+macro AddWillSet() =
+    #externalMacro(module: "MacroDefinition", type: "WillSetMacro")
+
+@attached(accessor)
+macro AddWillSetSneakily() =
+    #externalMacro(module: "MacroDefinition", type: "WillSetMacro")
+
+@attached(accessor, names: named(willSet))
+macro MakeComputedSneakily() =
+    #externalMacro(module: "MacroDefinition", type: "PropertyWrapperMacro")
+
+struct HasStoredTests {
+  @AddWillSet var x: Int = 0
+
+#if TEST_DIAGNOSTICS
+  @AddWillSetSneakily var y: Int = 0
+  // expected-error@-1{{expansion of macro 'AddWillSetSneakily()' did not produce a non-observing accessor (such as 'get') as expected}}
+
+  @MakeComputedSneakily var z: Int = 0
+  // expected-error@-1{{expansion of macro 'MakeComputedSneakily()' produced an unexpected getter}}
+  // expected-note@-2 2{{in expansion of macro}}
+  // expected-note@-3 2{{'z' declared here}}
+#endif
+}
