@@ -452,13 +452,6 @@ unsigned LocalDiscriminatorsRequest::evaluate(
       node = initInfo.getInitFromProjectedValue();
       break;
     }
-  } else if (auto *runtimeAttrInit =
-                 dyn_cast<RuntimeAttributeInitializer>(dc)) {
-    auto *attachedTo = runtimeAttrInit->getAttachedToDecl();
-    auto generator = attachedTo->getRuntimeDiscoverableAttributeGenerator(
-        runtimeAttrInit->getAttr());
-    if (generator.second)
-      node = generator.first;
   } else {
     params = getParameterList(dc);
   }

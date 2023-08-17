@@ -1403,9 +1403,6 @@ public:
 
     /// A defer body
     DeferBody,
-
-    // A runtime discoverable attribute initialization expression.
-    RuntimeAttribute,
   };
 
 private:
@@ -1547,10 +1544,6 @@ public:
 
     if (isa<PropertyWrapperInitializer>(init)) {
       return Context(Kind::PropertyWrapper);
-    }
-
-    if (isa<RuntimeAttributeInitializer>(init)) {
-      return Context(Kind::RuntimeAttribute);
     }
 
     auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
@@ -1829,7 +1822,6 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
-    case Kind::RuntimeAttribute:
       Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_illegal_context,
                  static_cast<unsigned>(getKind()), getEffectSourceName(reason));
       return;
@@ -1866,7 +1858,6 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
-    case Kind::RuntimeAttribute:
       Diags.diagnose(S->getStartLoc(), diag::throw_in_illegal_context,
                      static_cast<unsigned>(getKind()));
       return;
@@ -1893,7 +1884,6 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
-    case Kind::RuntimeAttribute:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -1996,7 +1986,6 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
-    case Kind::RuntimeAttribute:
       diagnoseAsyncInIllegalContext(Diags, node);
       return;
     }

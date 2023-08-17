@@ -1707,9 +1707,6 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "defaultarg") {
         Kind = SILDeclRef::Kind::IVarInitializer;
         ParseState = 1;
-      } else if (!ParseState && Id.str() == "attrgenerator") {
-        Kind = SILDeclRef::Kind::RuntimeAttributeGenerator;
-        ParseState = 1;
       } else if (!ParseState && Id.str() == "propertyinit") {
         Kind = SILDeclRef::Kind::StoredPropertyInitializer;
         ParseState = 1;
