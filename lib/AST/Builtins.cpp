@@ -1608,9 +1608,9 @@ static ValueDecl *getBuildComplexEqualitySerialExecutorRef(ASTContext &ctx,
 
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
-                            _parameters(_metatype(_typeparam(0))),
-                            _nativeObject);
+  return getBuiltinFunction(
+    ctx, id, _thin, _generics(_unrestricted), 
+    _parameters(_metatype(_typeparam(0))), _nativeObject);
 }
 
 static ValueDecl *getAutoDiffProjectTopLevelSubcontext(ASTContext &ctx,
@@ -2967,13 +2967,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
 
-  case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+  case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     return getAutoDiffCreateLinearMapContext(Context, Id);
 
   case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     return getAutoDiffProjectTopLevelSubcontext(Context, Id);
 
-  case BuiltinValueKind::AutoDiffAllocateSubcontext:
+  case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     return getAutoDiffAllocateSubcontext(Context, Id);
   }
 

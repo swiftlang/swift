@@ -13,9 +13,9 @@
 #ifndef SWIFT_RUNTIME_AUTODIFF_SUPPORT_H
 #define SWIFT_RUNTIME_AUTODIFF_SUPPORT_H
 
+#include "swift/Runtime/HeapObject.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/HeapObject.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
@@ -48,7 +48,19 @@ class AutoDiffLinearMapContext : public HeapObject {
               static_cast<OpaqueValue *>(contextObjectPtr)) {}
 
     ~AllocatedContextObjectRecord() {
-      contextObjectMetadata->vw_destroy(contextObjectPtr);
+      if (contextObjectMetadata != nullptr && contextObjectPtr != nullptr) {
+        contextObjectMetadata->vw_destroy(contextObjectPtr);
+      }
+    }
+
+    AllocatedContextObjectRecord(const AllocatedContextObjectRecord &) = delete;
+
+    AllocatedContextObjectRecord(
+        AllocatedContextObjectRecord &&other) noexcept {
+      this->contextObjectMetadata = other.contextObjectMetadata;
+      this->contextObjectPtr = other.contextObjectPtr;
+      other.contextObjectMetadata = nullptr;
+      other.contextObjectPtr = nullptr;
     }
 
     size_t size() const { return contextObjectMetadata->vw_size(); }
@@ -67,27 +79,54 @@ private:
   llvm::SmallVector<AllocatedContextObjectRecord, 4> allocatedContextObjects;
 
 public:
-  /// Creates a linear map context.
+  /// DEPRECATED - Use overloaded constructor taking a `const Metadata *`
+  /// parameter instead. This constructor might be removed as it leads to memory
+  /// leaks.
+  AutoDiffLinearMapContext();
+
   AutoDiffLinearMapContext(const Metadata *topLevelLinearMapContextMetadata);
 
   /// Returns the address of the tail-allocated top-level subcontext.
   void *projectTopLevelSubcontext() const;
 
   /// Allocates memory for a new subcontext.
+  ///
+  /// DEPRECATED - Use `allocateSubcontext` instead. This
+  /// method might be removed as it leads to memory leaks.
+  void *allocate(size_t size);
+
+  /// Allocates memory for a new subcontext.
   void *allocateSubcontext(const Metadata *contextObjectMetadata);
 };
 
 /// Creates a linear map context with a tail-allocated top-level subcontext.
+///
+/// DEPRECATED - Use `swift_autoDiffCreateLinearMapContextWithType` instead.
+/// This builtin might be removed as it leads to memory leaks.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
-    AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(
-        const Metadata *topLevelLinearMapContextMetadata);
+AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(
+    size_t topLevelSubcontextSize);
 
 /// Returns the address of the tail-allocated top-level subcontext.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 void *swift_autoDiffProjectTopLevelSubcontext(AutoDiffLinearMapContext *);
 
 /// Allocates memory for a new subcontext.
-SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) void *swift_autoDiffAllocateSubcontext(
-    AutoDiffLinearMapContext *, const Metadata *linearMapSubcontextMetadata);
+///
+/// DEPRECATED - Use `swift_autoDiffAllocateSubcontextWithType` instead. This
+/// builtin might be removed as it leads to memory leaks.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void *swift_autoDiffAllocateSubcontext(AutoDiffLinearMapContext *, size_t size);
+
+/// Creates a linear map context with a tail-allocated top-level subcontext.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+    AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContextWithType(
+        const Metadata *topLevelLinearMapContextMetadata);
+
+/// Allocates memory for a new subcontext.
+SWIFT_RUNTIME_EXPORT
+    SWIFT_CC(swift) void *swift_autoDiffAllocateSubcontextWithType(
+        AutoDiffLinearMapContext *,
+        const Metadata *linearMapSubcontextMetadata);
 } // namespace swift
 #endif /* SWIFT_RUNTIME_AUTODIFF_SUPPORT_H */

@@ -2273,9 +2273,9 @@ FUNCTION(TaskGroupDestroy,
          ATTRS(NoUnwind),
          EFFECT(Concurrency))
 
-// AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(const Metadata *);
-FUNCTION(AutoDiffCreateLinearMapContext,
-         swift_autoDiffCreateLinearMapContext, SwiftCC,
+// AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContextWithType(const Metadata *);
+FUNCTION(AutoDiffCreateLinearMapContextWithType,
+         swift_autoDiffCreateLinearMapContextWithType, SwiftCC,
          DifferentiationAvailability,
          RETURNS(RefCountedPtrTy),
          ARGS(TypeMetadataPtrTy),
@@ -2291,9 +2291,9 @@ FUNCTION(AutoDiffProjectTopLevelSubcontext,
          ATTRS(NoUnwind, ArgMemOnly),
          EFFECT(AutoDiff))
 
-// void *swift_autoDiffAllocateSubcontext(AutoDiffLinearMapContext *, const Metadata *);
-FUNCTION(AutoDiffAllocateSubcontext,
-         swift_autoDiffAllocateSubcontext, SwiftCC,
+// void *swift_autoDiffAllocateSubcontextWithType(AutoDiffLinearMapContext *, const Metadata *);
+FUNCTION(AutoDiffAllocateSubcontextWithType,
+         swift_autoDiffAllocateSubcontextWithType, SwiftCC,
          DifferentiationAvailability,
          RETURNS(Int8PtrTy),
          ARGS(RefCountedPtrTy, TypeMetadataPtrTy),

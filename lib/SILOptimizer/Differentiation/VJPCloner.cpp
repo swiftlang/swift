@@ -131,8 +131,8 @@ class VJPCloner::Implementation final
     // Create an context.
     pullbackContextValue = Builder.createBuiltin(
         original->getLocation(),
-        getASTContext().getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
+        getASTContext().getIdentifier(getBuiltinName(
+            BuiltinValueKind::AutoDiffCreateLinearMapContextWithType)),
         SILType::getNativeObjectType(getASTContext()), SubstitutionMap(),
         {pbTupleMetatype});
     borrowedPullbackContextValue = Builder.createBeginBorrow(
@@ -156,8 +156,8 @@ class VJPCloner::Implementation final
       return builtinAutoDiffAllocateSubcontextGenericSignature;
     auto &ctx = getASTContext();
     auto *decl = cast<FuncDecl>(getBuiltinValueDecl(
-        ctx, ctx.getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext))));
+        ctx, ctx.getIdentifier(getBuiltinName(
+                 BuiltinValueKind::AutoDiffAllocateSubcontextWithType))));
     builtinAutoDiffAllocateSubcontextGenericSignature =
         decl->getGenericSignature();
     assert(builtinAutoDiffAllocateSubcontextGenericSignature);
@@ -1085,8 +1085,8 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
 
     auto rawBufferValue = builder.createBuiltin(
         loc,
-        getASTContext().getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+        getASTContext().getIdentifier(getBuiltinName(
+            BuiltinValueKind::AutoDiffAllocateSubcontextWithType)),
         rawPtrType, SubstitutionMap(),
         {borrowedPullbackContextValue, pbTupleMetatype});
 

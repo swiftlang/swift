@@ -1307,9 +1307,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::AutoDiffCreateLinearMapContext) {
+  if (Builtin.ID == BuiltinValueKind::AutoDiffCreateLinearMapContextWithType) {
     auto topLevelSubcontextMetaType = args.claimNext();
-    out.add(emitAutoDiffCreateLinearMapContext(IGF, topLevelSubcontextMetaType)
+    out.add(emitAutoDiffCreateLinearMapContextWithType(
+                IGF, topLevelSubcontextMetaType)
                 .getAddress());
     return;
   }
@@ -1322,13 +1323,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::AutoDiffAllocateSubcontext) {
+  if (Builtin.ID == BuiltinValueKind::AutoDiffAllocateSubcontextWithType) {
     Address allocatorAddr(args.claimNext(), IGF.IGM.RefCountedStructTy,
                           IGF.IGM.getPointerAlignment());
     auto subcontextMetatype = args.claimNext();
-    out.add(
-        emitAutoDiffAllocateSubcontext(IGF, allocatorAddr, subcontextMetatype)
-            .getAddress());
+    out.add(emitAutoDiffAllocateSubcontextWithType(IGF, allocatorAddr,
+                                                   subcontextMetatype)
+                .getAddress());
     return;
   }
 

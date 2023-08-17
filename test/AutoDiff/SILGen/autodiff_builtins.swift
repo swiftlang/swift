@@ -84,19 +84,20 @@ func applyDerivative_f1_vjp<T: AdditiveArithmetic & Differentiable>(t0: T) -> (T
 // CHECK: copy_addr [take] [[D_RESULT_BUFFER_0_FOR_LOAD]] to [init] [[ORIG_RESULT_OUT_PARAM]]
 // CHECK: return [[PULLBACK]]
 
-@_silgen_name("test_context_builtins")
-func test_context_builtins<T>(t: T) {
-  let context = Builtin.autoDiffCreateLinearMapContext(T.self)
+
+@_silgen_name("test_context_builtins_with_type")
+func test_context_builtins_with_type<T>(t: T) {
+  let context = Builtin.autoDiffCreateLinearMapContextWithType(T.self)
   let topLevelSubctxAddr = Builtin.autoDiffProjectTopLevelSubcontext(context)
   UnsafeMutableRawPointer(topLevelSubctxAddr).storeBytes(of: t, as: T.self)
-  let newBuffer = Builtin.autoDiffAllocateSubcontext(context, T.self)
+  let newBuffer = Builtin.autoDiffAllocateSubcontextWithType(context, T.self)
   UnsafeMutableRawPointer(newBuffer).storeBytes(of: t, as: T.self)
 }
 
-// CHECK-LABEL: sil{{.*}}@test_context_builtins : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil{{.*}}@test_context_builtins_with_type : $@convention(thin) <T> (@in_guaranteed T) -> () {
 // CHECK: bb0({{%.*}} : $*T):
-// CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContext"<T>({{%.*}} : $@thick T.Type) : $Builtin.NativeObject // users: {{.*}}
+// CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContextWithType"<T>({{%.*}} : $@thick T.Type) : $Builtin.NativeObject // users: {{.*}}
 // CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [lexical] [[CTX]] : $Builtin.NativeObject // users: {{.*}}
 // CHECK:   [[BUF:%.*]] = builtin "autoDiffProjectTopLevelSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject) : $Builtin.RawPointer // users: {{.*}}
-// CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontext"<T>([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $@thick T.Type) : $Builtin.RawPointer // users: {{.*}}
+// CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontextWithType"<T>([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $@thick T.Type) : $Builtin.RawPointer // users: {{.*}}
 // CHECK:   destroy_value [[CTX]]
