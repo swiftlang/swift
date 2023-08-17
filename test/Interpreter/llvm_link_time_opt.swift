@@ -1,7 +1,7 @@
 // UNSUPPORTED: OS=windows-msvc
 // static library is not well supported yet on Windows
 
-// REQUIRES: lld_lto
+// XFAIL: OS=linux-android, OS=linux-androideabi
 
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is

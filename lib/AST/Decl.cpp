@@ -4783,11 +4783,31 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    // We consider this decl belongs to the module either it's currently
-    // defined in this module or it's originally defined in this module, which
-    // is specified by @_originallyDefinedIn
-    return M != getModuleContext() && !isOriginallyDefinedIn(this, M) &&
-      isResilient();
+    // We can access declarations from the same module
+    // non-resiliently in a maximal context.
+    if (M == getModuleContext()) {
+      return false;
+    }
+    // If a protocol is originally declared in the current module, then we
+    // directly expose protocol witness tables and their contents for any
+    // conformances in the same module as symbols. If the protocol later
+    // moves, then we need to preserve those extra symbols from the home
+    // module by treating the protocol as if it was still defined in the same
+    // module.
+    //
+    // This logic does not and should not generally extend to other kinds of
+    // declaration. If a declaration moves to a new module with library
+    // evolution enabled, then even the original module has to access it
+    // according to the library evolution ABI. This is an ABI compatibility
+    // hack only for protocols. If you see other variations of `isResilient`
+    // that don't check `isOriginallyDefinedIn`, they are probably correct.
+    if (isa<ProtocolDecl>(this)
+        && isOriginallyDefinedIn(this, M)) {
+      return false;
+    }
+    // Otherwise, we have to access the declaration resiliently if it's
+    // resilient anywhere.
+    return isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }

@@ -51,6 +51,8 @@
 // ASM-NOT: .section
 // ASM: $s7section3fooyyF:
 // ASM-linux-gnu: .section{{.*}}__TEXT,__mysection
+// ASM-linux-android: .section{{.*}}__TEXT,__mysection
+// ASM-linux-androideabi: .section{{.*}}__TEXT,__mysection
 // ASM-NOT: .section
 // ASM: $s7section2g0Sivp:
 // ASM-NOT: .section
