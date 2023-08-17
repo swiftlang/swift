@@ -381,19 +381,6 @@ class CMakeProduct(product.Product):
             # in the compiler checks CMake performs
             swift_cmake_options.define('CMAKE_OSX_ARCHITECTURES', arch)
 
-        # We don't currently support building compiler-rt for cross-compile targets.
-        # It's not clear that's useful anyway.
-        if self.is_cross_compile_target(host_target):
-            llvm_cmake_options.define('LLVM_TOOL_COMPILER_RT_BUILD:BOOL', 'FALSE')
-            llvm_cmake_options.define('LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL', 'FALSE')
-        else:
-            llvm_cmake_options.define('LLVM_TOOL_COMPILER_RT_BUILD:BOOL',
-                                      cmake.CMakeOptions.true_false(
-                                          self.args.build_compiler_rt))
-            llvm_cmake_options.define('LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL',
-                                      cmake.CMakeOptions.true_false(
-                                          self.args.build_compiler_rt))
-
         # If we are asked to not generate test targets for LLVM and or Swift,
         # disable as many LLVM tools as we can. This improves compile time when
         # compiling with LTO.
