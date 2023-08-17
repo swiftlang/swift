@@ -1459,9 +1459,10 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
   getResourceDirPath(LibPath, Args, /*Shared=*/true);
   // Remove platform name.
   llvm::sys::path::remove_filename(LibPath);
-  llvm::sys::path::append(LibPath, "clang", "lib",
-                          T.isOSDarwin() ? "darwin"
-                                         : getPlatformNameForTriple(T));
+  StringRef platformName = "darwin";
+  if (!T.isOSDarwin())
+    platformName = T.isAndroid() ? "linux" : getPlatformNameForTriple(T);
+  llvm::sys::path::append(LibPath, "clang", "lib", platformName);
 }
 
 /// Get the runtime library link path, which is platform-specific and found
