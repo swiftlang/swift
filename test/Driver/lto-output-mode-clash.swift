@@ -1,5 +1,3 @@
-// REQUIRES: lld_lto
-
 // RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -static -emit-library -target x86_64-apple-macosx10.9 | %FileCheck %s
 // RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -emit-library -target x86_64-apple-macosx10.9 | %FileCheck %s
 // RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -c -target x86_64-apple-macosx10.9 | %FileCheck %s

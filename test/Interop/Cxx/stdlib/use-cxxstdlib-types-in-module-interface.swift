@@ -40,7 +40,7 @@ public:
     std::vector<SimplePOD * _Nullable> getMutPODPtrItems() const;
 };
 
-// CHECK: func getPODItems() -> std{{\.__1\.|\.}}vector<SimplePOD, allocator<SimplePOD>>
-// CHECK: func getFRTItems() -> std{{\.__1\.|\.}}vector<FRTType, allocator<FRTType>>
-// CHECK: func getPODPtrItems() -> std{{\.__1\.|\.}}vector<UnsafePointer<SimplePOD>, allocator<UnsafePointer<SimplePOD>>>
-// CHECK: func getMutPODPtrItems() -> std{{\.__1\.|\.}}vector<UnsafeMutablePointer<SimplePOD>, allocator<UnsafeMutablePointer<SimplePOD>>>
+// CHECK: func getPODItems() -> std{{\.__(ndk)?1\.|\.}}vector<SimplePOD, allocator<SimplePOD>>
+// CHECK: func getFRTItems() -> std{{\.__(ndk)?1\.|\.}}vector<FRTType, allocator<FRTType>>
+// CHECK: func getPODPtrItems() -> std{{\.__(ndk)?1\.|\.}}vector<UnsafePointer<SimplePOD>, allocator<UnsafePointer<SimplePOD>>>
+// CHECK: func getMutPODPtrItems() -> std{{\.__(ndk)?1\.|\.}}vector<UnsafeMutablePointer<SimplePOD>, allocator<UnsafeMutablePointer<SimplePOD>>>

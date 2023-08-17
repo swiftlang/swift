@@ -20,6 +20,8 @@
 
 // RUN: %target-interop-build-clangxx -fsyntax-only -x c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++20 -c -fmodules -fcxx-modules -I %t
 
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 //--- header.h
 
 struct Trivial {
