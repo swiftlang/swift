@@ -3646,10 +3646,6 @@ enum class CustomAttrTypeKind {
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
-
-  /// Attributes that are discoverable/constructable at runtime given a name.
-  /// They allow unbound generic types.
-  RuntimeMetadata,
 };
 
 void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
@@ -4239,57 +4235,6 @@ public:
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); }
 
-  bool isCached() const { return true; }
-};
-
-class GetRuntimeDiscoverableAttributes
-    : public SimpleRequest<GetRuntimeDiscoverableAttributes,
-                           ArrayRef<CustomAttr *>(Decl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, Decl *decl) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeRuntimeMetadataAttrGenerator
-    : public SimpleRequest<SynthesizeRuntimeMetadataAttrGenerator,
-                           Expr *(CustomAttr *, ValueDecl *),
-                           RequestFlags::Cached> {
-
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  Expr *evaluate(Evaluator &evaluator, CustomAttr *attr,
-                 ValueDecl *attachedTo) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeRuntimeMetadataAttrGeneratorBody
-    : public SimpleRequest<SynthesizeRuntimeMetadataAttrGeneratorBody,
-                           BraceStmt *(CustomAttr *, ValueDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  BraceStmt *evaluate(Evaluator &evaluator, CustomAttr *attr,
-                      ValueDecl *attachedTo) const;
-
-public:
   bool isCached() const { return true; }
 };
 

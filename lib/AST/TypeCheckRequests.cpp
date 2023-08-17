@@ -1581,10 +1581,6 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
   case CustomAttrTypeKind::GlobalActor:
     out << "global-actor";
     return;
-
-  case CustomAttrTypeKind::RuntimeMetadata:
-    out << "runtime-metadata";
-    return;
   }
 
   llvm_unreachable("bad kind");

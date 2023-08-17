@@ -3818,15 +3818,6 @@ void *SourceFile::getExportedSourceFile() const {
   return evaluateOrDefault(eval, ExportedSourceFileRequest{this}, nullptr);
 }
 
-void SourceFile::addDeclWithRuntimeDiscoverableAttrs(ValueDecl *decl) {
-  assert(!decl->getRuntimeDiscoverableAttrs().empty());
-  DeclsWithRuntimeDiscoverableAttrs.insert(decl);
-}
-
-ArrayRef<ValueDecl *> SourceFile::getDeclsWithRuntimeDiscoverableAttrs() const {
-  return DeclsWithRuntimeDiscoverableAttrs.getArrayRef();
-}
-
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
   getTopLevelDecls(Decls);

@@ -475,15 +475,6 @@ SWIFT_REQUEST(TypeChecker, ExpandSynthesizedMemberMacroRequest,
 SWIFT_REQUEST(TypeChecker, ExpandPeerMacroRequest,
               ArrayRef<unsigned>(Decl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGenerator,
-              Expr *(CustomAttr *, ValueDecl *),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGeneratorBody,
-              BraceStmt *(CustomAttr *, ValueDecl *),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetRuntimeDiscoverableAttributes,
-              ArrayRef<CustomAttr *>(Decl *),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),
               Cached, NoLocationInfo)
