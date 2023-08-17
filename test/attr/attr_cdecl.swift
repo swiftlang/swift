@@ -18,7 +18,7 @@ var computed: Int {
 
 struct SwiftStruct { var x, y: Int }
 enum SwiftEnum { case A, B }
-#if os(Windows) && arch(x86_64)
+#if os(Windows) && (arch(x86_64) || arch(arm64))
 @objc enum CEnum: Int32 { case A, B }
 #else
 @objc enum CEnum: Int { case A, B }
