@@ -3375,30 +3375,6 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                  info);
 }
 
-/// Type of runtime discoverable attribute generator is () -> <#AttrType#>
-static CanAnyFunctionType
-getRuntimeAttributeGeneratorInterfaceType(TypeConverter &TC, SILDeclRef c) {
-  auto *attachedToDecl = c.getDecl();
-  auto *attr = c.pointer.get<CustomAttr *>();
-  auto *attrType = attachedToDecl->getRuntimeDiscoverableAttrTypeDecl(attr);
-  auto generator =
-      attachedToDecl->getRuntimeDiscoverableAttributeGenerator(attr);
-
-  auto resultTy = generator.second->getCanonicalType();
-
-  CanType canResultTy = resultTy->getReducedType(
-      attrType->getInnermostDeclContext()->getGenericSignatureOfContext());
-
-  // Remove @noescape from function return types. A @noescape
-  // function return type is a contradiction.
-  canResultTy = removeNoEscape(canResultTy);
-
-  // FIXME: Verify ExtInfo state is correct, not working by accident.
-  CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(/*genericSignature=*/nullptr,
-                                 /*params=*/{}, canResultTy, info);
-}
-
 /// Get the type of a property wrapper backing initializer,
 /// (property-type) -> backing-type.
 static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
@@ -3659,8 +3635,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getAsyncEntryPoint(Context);
   case SILDeclRef::Kind::EntryPoint:
     return getEntryPointInterfaceType(Context);
-  case SILDeclRef::Kind::RuntimeAttributeGenerator:
-    return getRuntimeAttributeGeneratorInterfaceType(*this, c);
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -3714,7 +3688,6 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
     return vd->getDeclContext()->getGenericSignatureOfContext();
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-  case SILDeclRef::Kind::RuntimeAttributeGenerator:
     llvm_unreachable("Doesn't have generic signature");
   }
 

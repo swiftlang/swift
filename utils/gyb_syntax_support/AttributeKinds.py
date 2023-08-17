@@ -722,11 +722,6 @@ DECL_ATTR_KINDS = [
                         ABIStableToAdd, ABIBreakingToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
                         code=138),
 
-    SimpleDeclAttribute('runtimeMetadata', 'RuntimeMetadata',
-                        OnStruct, OnClass, OnEnum,
-                        ABIBreakingToAdd, ABIBreakingToRemove, APIBreakingToAdd, APIBreakingToRemove,  # noqa: E501
-                        code=139),
-
     SimpleDeclAttribute('_used', 'Used',
                         OnAbstractFunction, OnVar,
                         UserInaccessible,

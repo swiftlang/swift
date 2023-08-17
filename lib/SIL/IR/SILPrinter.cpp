@@ -391,9 +391,6 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
     break;
-  case SILDeclRef::Kind::RuntimeAttributeGenerator:
-    OS << "!attrgenerator";
-    break;
   }
 
   if (isForeign)
