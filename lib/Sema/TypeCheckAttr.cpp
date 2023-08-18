@@ -4468,11 +4468,9 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // An enum element with an associated value cannot be potentially
     // unavailable.
     if (EED->hasAssociatedValues()) {
-      auto &ctx = DC->getASTContext();
       auto *SF = DC->getParentSourceFile();
 
-      if (SF->Kind == SourceFileKind::Interface ||
-          ctx.LangOpts.WarnOnPotentiallyUnavailableEnumCase) {
+      if (SF->Kind == SourceFileKind::Interface) {
         return diag::availability_enum_element_no_potential_warn;
       } else {
         return diag::availability_enum_element_no_potential;
