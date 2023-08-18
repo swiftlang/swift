@@ -96,7 +96,7 @@ ms.favoriteColor = "Yellow"
 struct MyBrokenStruct {
   var _birthDate: MyWrapperThingy<Date?> = .init(storage: nil)
 
-  // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper'}}
+  // expected-note@+2 2{{in expansion of macro 'myPropertyWrapper'}}
   @myPropertyWrapper
   var birthDate: Date? {
     // CHECK-DIAGS: variable already has a getter
