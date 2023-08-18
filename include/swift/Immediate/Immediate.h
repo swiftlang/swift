@@ -41,6 +41,9 @@ namespace swift {
   int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                      const IRGenOptions &IRGenOpts, const SILOptions &SILOpts,
                      std::unique_ptr<SILModule> &&SM);
+
+  int RunImmediatelyFromAST(CompilerInstance &CI);
+
 } // end namespace swift
 
 #endif // SWIFT_IMMEDIATE_IMMEDIATE_H

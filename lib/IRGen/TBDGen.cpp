@@ -441,9 +441,8 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
-  // FIXME: We ought to have a symbol source for this.
   Mangle::ASTMangler mangler;
-  addSymbol(mangler.mangleEntity(VD), SymbolSource::forUnknown());
+  addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD));
 }
 
 void TBDGenVisitor::addLinkEntity(LinkEntity entity) {
@@ -855,24 +854,24 @@ void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
 
 /// NOTE: This is part of an incomplete experimental feature. There are
 /// currently no clients that depend on its output.
-SymbolSourceMap SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
-                                                 TBDGenDescriptor desc) const {
-  using Map = SymbolSourceMap::Storage;
-  Map symbolSources;
+const SymbolSourceMap *
+SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
+                                 TBDGenDescriptor desc) const {
 
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
-    symbolSources.insert({symbol, source});
+  // FIXME: Once the evaluator supports returning a reference to a cached value
+  // in storage, this won't be necessary.
+  auto &Ctx = desc.getParentModule()->getASTContext();
+  auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
+
+  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source) {
+    SymbolSources->insert({symbol, source});
   };
 
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
 
-  // FIXME: Once the evaluator supports returning a reference to a cached value
-  // in storage, this won't be necessary.
-  auto &ctx = desc.getParentModule()->getASTContext();
-  auto *memory = ctx.Allocate<Map>();
-  *memory = std::move(symbolSources);
-  ctx.addCleanup([memory](){ memory->~Map(); });
-  return SymbolSourceMap(memory);
+  Ctx.addCleanup([SymbolSources]() { SymbolSources->~SymbolSourceMap(); });
+
+  return SymbolSources;
 }

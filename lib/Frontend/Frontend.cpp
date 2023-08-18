@@ -1576,6 +1576,12 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
       frontendOpts.ReuseFrontendForMultipleCompilations) {
     opts |= ParsingFlags::EnableInterfaceHash;
   }
+  const auto &LangOpts = Invocation.getLangOptions();
+  if (action == ActionType::Immediate &&
+      LangOpts.hasFeature(Feature::LazyImmediate)) {
+    opts -= ParsingFlags::DisableDelayedBodies;
+    opts -= ParsingFlags::ValidateNewParserDiagnostics;
+  }
   return opts;
 }
 
