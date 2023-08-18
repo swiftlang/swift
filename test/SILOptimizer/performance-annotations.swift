@@ -385,3 +385,23 @@ func testPointerToX() -> UnsafePointer<Int> {
   return pointerToX
 }
 
+func foo<T>(_ body: () -> (T)) -> T {
+    return body()
+}
+
+func bar<T>(_ body: () -> (T)) -> T {
+    return body()
+}
+
+func baz<T>(t: T) -> T {
+    foo {
+        bar {
+            return t
+        }
+    }
+}
+
+@_noLocks
+func nestedClosures() -> Int {
+    return baz(t: 42)
+}
