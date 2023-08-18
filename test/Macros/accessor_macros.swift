@@ -96,7 +96,7 @@ ms.favoriteColor = "Yellow"
 struct MyBrokenStruct {
   var _birthDate: MyWrapperThingy<Date?> = .init(storage: nil)
 
-  // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper' on property 'birthDate' here}}
+  // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper'}}
   @myPropertyWrapper
   var birthDate: Date? {
     // CHECK-DIAGS: variable already has a getter
@@ -113,7 +113,7 @@ struct MyBrokenStruct {
   }
 }
 
-// expected-error@+1{{'accessor' macro cannot be attached to struct ('CannotHaveAccessors')}}
+// expected-error@+1{{'accessor' macro cannot be attached to struct}}
 @myPropertyWrapper
 struct CannotHaveAccessors {}
 // CHECK-DIAGS: 'accessor' macro cannot be attached to struct
