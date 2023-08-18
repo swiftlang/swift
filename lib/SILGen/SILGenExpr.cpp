@@ -3803,6 +3803,12 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       return false;
     }
 
+    // Back deployed properties have the same restrictions as
+    // always-emit-into-client properties.
+    if (requiresBackDeploymentThunk(baseDecl, expansion)) {
+      return false;
+    }
+
     // Properties that only dispatch via ObjC lookup do not have nor
     // need property descriptors, since the selector identifies the
     // storage.
