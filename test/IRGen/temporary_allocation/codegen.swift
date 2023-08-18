@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 @_silgen_name("blackHole")
 func blackHole(_ value: UnsafeMutableRawPointer?) -> Void
