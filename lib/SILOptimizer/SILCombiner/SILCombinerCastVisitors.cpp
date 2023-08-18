@@ -1110,6 +1110,10 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   // %vjp' = convert_escape_to_noescape %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
   if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(Cvt->getOperand())) {
+    // This SILCombine is disabled in ossa, see #67992 on github for details.
+    if (DFI->getFunction()->hasOwnership()) {
+      return nullptr;
+    }
     auto createConvertEscapeToNoEscape = [&](NormalDifferentiableFunctionTypeComponent extractee) {
       if (!DFI->hasExtractee(extractee))
         return SILValue();
