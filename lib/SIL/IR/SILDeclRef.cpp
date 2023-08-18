@@ -720,7 +720,7 @@ bool SILDeclRef::isSetter() const {
 }
 
 AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
-  return dyn_cast<AbstractFunctionDecl>(getDecl());
+  return dyn_cast_or_null<AbstractFunctionDecl>(getDecl());
 }
 
 bool SILDeclRef::isInitAccessor() const {

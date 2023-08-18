@@ -1077,7 +1077,7 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
   auto &ctx = desc.getParentModule()->getASTContext();
   auto tbdDesc = desc.getTBDGenDescriptor();
   tbdDesc.getOptions().PublicSymbolsOnly = false;
-  auto symbolMap =
+  const auto *symbolMap =
       llvm::cantFail(ctx.evaluator(SymbolSourceMapRequest{std::move(tbdDesc)}));
 
   // Then split up the symbols so they can be emitted by the appropriate part
@@ -1085,14 +1085,15 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
   SILRefsToEmit silRefsToEmit;
   IREntitiesToEmit irEntitiesToEmit;
   for (const auto &symbol : *desc.SymbolsToEmit) {
-    auto source = symbolMap.find(symbol);
-    assert(source && "Couldn't find symbol");
-    switch (source->kind) {
+    auto itr = symbolMap->find(symbol);
+    assert(itr != symbolMap->end() && "Couldn't find symbol");
+    const auto &source = itr->getValue();
+    switch (source.kind) {
     case SymbolSource::Kind::SIL:
-      silRefsToEmit.push_back(source->getSILDeclRef());
+      silRefsToEmit.push_back(source.getSILDeclRef());
       break;
     case SymbolSource::Kind::IR:
-      irEntitiesToEmit.push_back(source->getIRLinkEntity());
+      irEntitiesToEmit.push_back(source.getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
     case SymbolSource::Kind::Unknown:

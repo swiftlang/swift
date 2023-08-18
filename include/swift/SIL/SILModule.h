@@ -737,6 +737,10 @@ public:
     return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
   }
 
+  /// Promote the linkage of every entity in this SIL module so that they are
+  /// externally visible.
+  void promoteLinkages();
+
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
 

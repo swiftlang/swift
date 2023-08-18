@@ -1364,13 +1364,25 @@ static bool performAction(CompilerInstance &Instance,
                                 [](CompilerInstance &Instance) {
                                   return Instance.getASTContext().hadError();
                                 });
+  case FrontendOptions::ActionType::Immediate: {
+    const auto &Ctx = Instance.getASTContext();
+    if (Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
+      ReturnValue = RunImmediatelyFromAST(Instance);
+      return Ctx.hadError();
+    }
+    return withSemanticAnalysis(
+        Instance, observer, [&](CompilerInstance &Instance) {
+          assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
+                 "All actions not requiring SILGen must have been handled!");
+          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+        });
+  }
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
-  case FrontendOptions::ActionType::Immediate:
   case FrontendOptions::ActionType::EmitAssembly:
   case FrontendOptions::ActionType::EmitIRGen:
   case FrontendOptions::ActionType::EmitIR:
