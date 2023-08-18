@@ -156,6 +156,12 @@ class IsolatedInstance {
 }
 
 @Observable
+class IgnoredComputed {
+  @ObservationIgnored
+  var message: String { "hello" }
+}
+
+@Observable
 class ClassHasExistingConformance: Observable { }
 
 protocol Intermediary: Observable { }

@@ -543,8 +543,8 @@ static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
   return Identifier();
 }
 
-bool swift::diagnoseInvalidAttachedMacro(MacroRole role,
-                                         Decl *attachedTo) {
+bool swift::isInvalidAttachedMacro(MacroRole role,
+                                   Decl *attachedTo) {
   switch (role) {
   case MacroRole::Expression:
   case MacroRole::Declaration:
@@ -582,9 +582,6 @@ bool swift::diagnoseInvalidAttachedMacro(MacroRole role,
     break;
   }
 
-  attachedTo->diagnose(diag::macro_attached_to_invalid_decl,
-                       getMacroRoleString(role),
-                       attachedTo->getDescriptiveKind());
   return true;
 }
 
@@ -1362,7 +1359,9 @@ bool swift::accessorMacroOnlyIntroducesObservers(
   for (auto name : attr->getNames()) {
     if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
         (name.getName().getBaseName().userFacingName() == "willSet" ||
-         name.getName().getBaseName().userFacingName() == "didSet")) {
+         name.getName().getBaseName().userFacingName() == "didSet" ||
+         name.getName().getBaseName().getKind() ==
+             DeclBaseName::Kind::Constructor)) {
       foundObserver = true;
     } else {
       // Introduces something other than an observer.
@@ -1413,24 +1412,28 @@ llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
   // Trigger parsing of the sequence of accessor declarations. This has the
   // side effect of registering those accessor declarations with the storage
   // declaration, so there is nothing further to do.
-  bool foundNonObservingAccessor = false;
-  bool foundNonObservingAccessorInMacro = false;
-  bool foundInitAccessor = false;
+  AccessorDecl *foundNonObservingAccessor = nullptr;
+  AccessorDecl *foundNonObservingAccessorInMacro = nullptr;
+  AccessorDecl *foundInitAccessor = nullptr;
   for (auto accessor : storage->getAllAccessors()) {
-    if (accessor->isInitAccessor())
-      foundInitAccessor = true;
+    if (accessor->isInitAccessor()) {
+      if (!foundInitAccessor)
+        foundInitAccessor = accessor;
+      continue;
+    }
 
     if (!accessor->isObservingAccessor()) {
-      foundNonObservingAccessor = true;
+      if (!foundNonObservingAccessor)
+        foundNonObservingAccessor = accessor;
 
-      if (accessor->isInMacroExpansionInContext())
-        foundNonObservingAccessorInMacro = true;
+      if (!foundNonObservingAccessorInMacro &&
+          accessor->isInMacroExpansionInContext())
+        foundNonObservingAccessorInMacro = accessor;
     }
   }
 
   auto roleAttr = macro->getMacroRoleAttr(MacroRole::Accessor);
-  bool expectedNonObservingAccessor =
-    !accessorMacroOnlyIntroducesObservers(macro, roleAttr);
+  bool expectObservers = accessorMacroOnlyIntroducesObservers(macro, roleAttr);
   if (foundNonObservingAccessorInMacro) {
     // If any non-observing accessor was added, mark the initializer as
     // subsumed unless it has init accessor, because the initializer in
@@ -1451,11 +1454,24 @@ llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
       storage->removeAccessor(accessor);
   }
 
-  // Make sure we got non-observing accessors exactly where we expected to.
-  if (foundNonObservingAccessor != expectedNonObservingAccessor) {
+  // If the macro told us to expect only observing accessors, but the macro
+  // produced a non-observing accessor, it could have converted a stored
+  // property into a computed one without telling us pre-expansion. Produce
+  // an error to prevent this.
+  if (expectObservers && foundNonObservingAccessorInMacro) {
     storage->diagnose(
-        diag::macro_accessor_missing_from_expansion, macro->getName(),
-        !expectedNonObservingAccessor);
+        diag::macro_nonobserver_unexpected_in_expansion, macro->getName(),
+        foundNonObservingAccessorInMacro->getDescriptiveKind());
+  }
+
+  // We expected to get a non-observing accessor, but there isn't one (from
+  // the macro or elsewhere), meaning that we counted on this macro to make
+  // this stored property into a a computed property... but it didn't.
+  // Produce an error.
+  if (!expectObservers && !foundNonObservingAccessor) {
+    storage->diagnose(
+        diag::macro_nonobserving_accessor_missing_from_expansion,
+        macro->getName());
   }
 
   // 'init' accessors must be documented in the macro role attribute.
