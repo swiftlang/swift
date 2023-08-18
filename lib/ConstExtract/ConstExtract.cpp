@@ -71,6 +71,7 @@ std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
   Options.AlwaysDesugarArraySliceTypes = true;
   Options.AlwaysDesugarDictionaryTypes = true;
   Options.AlwaysDesugarOptionalTypes = true;
+  Options.PrintTypeAliasUnderlyingType = true;
   Options.OpaqueReturnTypePrinting =
     PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
   Type.print(OutputStream, Options);
