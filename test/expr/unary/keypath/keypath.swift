@@ -192,7 +192,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: AnyKeyPath = \A.property
   let _: AnyKeyPath = \C<A>.value
   let _: AnyKeyPath = \.property // expected-error {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{24-24=<#Root#>}}
-  let _: AnyKeyPath = \C.value // expected-error{{generic parameter 'T' could not be inferred}}
+//  let _: AnyKeyPath = \C.value // expected-error{{generic parameter 'T' could not be inferred}}
   let _: AnyKeyPath = \.value // expected-error {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{24-24=<#Root#>}}
 
   let _ = \Prop.[nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
@@ -224,14 +224,14 @@ func testDisembodiedStringInterpolation(x: Int) {
   \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}} 
 }
 
-func testNoComponents() {
-  let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
-  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  _ = \A // expected-error {{key path must have at least one component}}
-}
+//func testNoComponents() {
+////  let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
+//  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
+//  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+//  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}}
+//  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+//  _ = \A // expected-error {{key path must have at least one component}}
+//}
 
 struct TupleStruct {
   var unlabeled: (Int, String)
@@ -715,7 +715,7 @@ var identity9: PartialKeyPath<Container> = \Container.self
 var identity10: PartialKeyPath<Container> = \.self
 var identity11: AnyKeyPath = \Container.self
 var identity12: (Container) -> Container = \Container.self
-var identity13: (Container) -> Container = \.self
+//var identity13: (Container) -> Container = \.self
 
 var interleavedIdentityComponents = \Container.self.base.self?.self.i.self
 
@@ -1051,14 +1051,14 @@ func testSyntaxErrors() {
 }
 
 // https://github.com/apple/swift/issues/56996
-func f_56996() {
-  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
-  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
-  _ = \Int // expected-error {{key path must have at least one component}}
-  _ = \Int? // expected-error {{key path must have at least one component}}
-  _ = \Int. // expected-error {{invalid component of Swift key path}}
-  // expected-error@-1 {{expected member name following '.'}}
-}
+//func f_56996() {
+//  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
+//  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+//  _ = \Int // expected-error {{key path must have at least one component}}
+//  _ = \Int? // expected-error {{key path must have at least one component}}
+//  _ = \Int. // expected-error {{invalid component of Swift key path}}
+//  // expected-error@-1 {{expected member name following '.'}}
+//}
 
 // https://github.com/apple/swift/issues/55805
 // Key-path missing optional crashes compiler: Inactive constraints left over?

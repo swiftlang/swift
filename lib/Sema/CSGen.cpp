@@ -4215,6 +4215,7 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
   auto objectTy = contextualType->lookThroughAllOptionalTypes();
   {
     auto &ctx = getASTContext();
+
     // `AnyKeyPath` and `PartialKeyPath` represent type-erased versions of
     // `KeyPath<T, V>`.
     //
@@ -4228,9 +4229,8 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
       contextualType =
           BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
     } else if (objectTy->isPartialKeyPath()) {
-      root = objectTy->castTo<BoundGenericType>()
-                 ->getGenericArgs()[0]
-                 ->castTo<TypeVariableType>();
+      auto root = objectTy->castTo<BoundGenericType>()->getGenericArgs()[0];
+
       // Since partial key path is an erased version of `KeyPath`, the value
       // type would never be used, which means that binding can use
       // type variable generated for a result of key path expression.
@@ -4242,7 +4242,7 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
       auto args = keyPathTy->getGenericArgs();
       assert(args.size() == 2);
 
-      root = args.front()->castTo<TypeVariableType>();
+      auto root = args.front();
 
       // Make sure that key path always gets a chance to infer its
       // value type from the member chain.
@@ -4258,10 +4258,9 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
             BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
       }
     }
+    if (!locator.directlyAt<KeyPathExpr>())
+      assignFixedType(typeVar, contextualType);
   }
-
-  if (root && !root->isTypeVariableOrMember())
-    assignFixedType(typeVar, contextualType);
 
   // If a root type was explicitly given, then resolve it now.
   ConstraintGenerator CG(*this, dc);
