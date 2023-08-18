@@ -10332,7 +10332,9 @@ static ConstraintFix *fixMemberRef(
         return fix;
     }
 
-    if (locator->isForKeyPathDynamicMemberLookup()) {
+    if (locator->isForKeyPathDynamicMemberLookup() ||
+        locator->isForKeyPathComponent() ||
+        locator->isKeyPathSubscriptComponent()) {
       if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, decl, locator))
         return fix;
     }
@@ -12303,11 +12305,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
       auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
-      if (auto *fix = AllowInvalidRefInKeyPath::forRef(
-              *this, choice.getDecl(), calleeLoc)) {
-        if (!hasFixFor(calleeLoc, FixKind::AllowTypeOrInstanceMember))
-          if (!shouldAttemptFixes() || recordFix(fix))
-            return SolutionKind::Error;
+      if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath)) {
+        if (!shouldAttemptFixes())
+          return SolutionKind::Error;
 
         // If this was a method reference let's mark it as read-only.
         if (!storage) {
