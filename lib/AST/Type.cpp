@@ -31,6 +31,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1747,6 +1748,9 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::Function:
   case TypeKind::GenericFunction: {
     AnyFunctionType *funcTy = cast<AnyFunctionType>(this);
+
+    PrettyStackTraceType trace(funcTy->getResult()->getASTContext(),
+                               "computing canonical type for ", this);
 
     CanGenericSignature genericSig;
     if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
