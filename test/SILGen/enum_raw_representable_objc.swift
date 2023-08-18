@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen -emit-sorted-sil %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-library-evolution %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 
-#if os(Windows) && arch(x86_64)
+#if os(Windows) && (arch(x86_64) || arch(arm64))
 @objc public enum CLike: Int32 {
   case a, b, c
 }
