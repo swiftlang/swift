@@ -303,7 +303,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
             addSymbolIfNecessary(getter, witnessDecl);
           }
         }
-      });
+      }, /*useResolver=*/true);
     }
   }
 
@@ -580,13 +580,8 @@ public:
     if (!Ctx.getOpts().VisitMembers)
       return;
 
-    for (auto member : D->getMembers()) {
-      member->visitAuxiliaryDecls([&](Decl *decl) {
-        visit(decl);
-      });
-
+    for (auto member : D->getABIMembers())
       visit(member);
-    }
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
