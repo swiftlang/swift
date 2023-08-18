@@ -34,6 +34,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1995,6 +1996,23 @@ public:
     }
   }
 
+  void emitSymbolSource(SymbolSource Source) {
+    switch (Source.kind) {
+    case SymbolSource::Kind::SIL:
+      emitSILFunctionDefinition(Source.getSILDeclRef());
+      break;
+    case SymbolSource::Kind::Global:
+      SGM.addGlobalVariable(Source.getGlobal());
+      break;
+    case SymbolSource::Kind::IR:
+      llvm_unreachable("Unimplemented: Emission of LinkEntities");
+    case SymbolSource::Kind::Unknown:
+    case SymbolSource::Kind::LinkerDirective:
+      // Nothing to do
+      break;
+    }
+  }
+
   void emitSILFunctionDefinition(SILDeclRef ref) {
     SGM.emitFunctionDefinition(ref, SGM.getFunction(ref, ForDefinition));
   }
@@ -2049,9 +2067,9 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   SILGenModuleRAII scope(*silMod);
 
   // Emit a specific set of SILDeclRefs if needed.
-  if (auto refs = desc.refsToEmit) {
-    for (auto ref : *refs)
-      scope.emitSILFunctionDefinition(ref);
+  if (auto Sources = desc.SourcesToEmit) {
+    for (auto Source : *Sources)
+      scope.emitSymbolSource(std::move(Source));
   }
 
   // Emit any whole-files needed.
@@ -2082,6 +2100,18 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                                                     llvm::None, irgenOptions);
   return llvm::cantFail(
       mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
+}
+
+std::unique_ptr<SILModule> swift::performASTLowering(CompilerInstance &CI,
+                                                     SymbolSources Sources) {
+  auto *M = CI.getMainModule();
+  const auto &Invocation = CI.getInvocation();
+  const auto &SILOpts = Invocation.getSILOptions();
+  const auto &IRGenOpts = Invocation.getIRGenOptions();
+  auto &TC = CI.getSILTypes();
+  auto Desc = ASTLoweringDescriptor::forWholeModule(
+      M, TC, SILOpts, std::move(Sources), &IRGenOpts);
+  return llvm::cantFail(M->getASTContext().evaluator(ASTLoweringRequest{Desc}));
 }
 
 std::unique_ptr<SILModule>

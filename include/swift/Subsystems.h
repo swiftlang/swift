@@ -17,10 +17,13 @@
 #ifndef SWIFT_SUBSYSTEMS_H
 #define SWIFT_SUBSYSTEMS_H
 
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Version.h"
+#include "swift/Frontend/Frontend.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -184,6 +187,14 @@ namespace swift {
   performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
                      const SILOptions &options,
                      const IRGenOptions *irgenOptions = nullptr);
+
+  /// Turn the given module into SIL IR.
+  ///
+  /// The module must contain source files. The optimizer will assume that the
+  /// SIL of all files in the module is present in the SILModule.
+  std::unique_ptr<SILModule>
+  performASTLowering(CompilerInstance &CI,
+                     llvm::SmallVector<SymbolSource, 1> Sources);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>

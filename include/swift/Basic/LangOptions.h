@@ -799,6 +799,9 @@ namespace swift {
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
+
+    /// Defer typechecking of declarations to their use at runtime
+    bool DeferToRuntime = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
