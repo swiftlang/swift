@@ -580,6 +580,7 @@ function Build-WiXProject() {
 
   $Properties = $Properties.Clone()
   TryAdd-KeyValue $Properties Configuration Release
+  TryAdd-KeyValue $Properties BaseIntermediateOutputPath "$($Arch.BinaryCache)\installer-scripts\"
   TryAdd-KeyValue $Properties BaseOutputPath "$($Arch.BinaryCache)\msi\"
   TryAdd-KeyValue $Properties ProductArchitecture $ArchName
   TryAdd-KeyValue $Properties ProductVersion $ProductVersionArg
@@ -971,14 +972,6 @@ function Copy-File($Src, $Dst) {
 function Copy-Directory($Src, $Dst) {
   New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
   Copy-Item -Force -Recurse $Src $Dst
-}
-
-function Install-Redist($Arch) {
-  if ($ToBatch) { return }
-
-  $RedistInstallRoot = "$(Get-InstallDir $Arch)\Runtimes\$ProductVersion"
-  Remove-Item -Force -Recurse $RedistInstallRoot -ErrorAction Ignore
-  Copy-Directory "$($Arch.SDKInstallRoot)\usr\bin" "$RedistInstallRoot\usr"
 }
 
 # Copies files installed by CMake from the arch-specific platform root,
@@ -1471,6 +1464,11 @@ foreach ($Arch in $SDKArchs) {
 }
 
 if (-not $ToBatch) {
+  if ($HostArch -in $SDKArchs) {
+    Remove-Item -Force -Recurse $RuntimeInstallRoot -ErrorAction Ignore
+    Copy-Directory "$($HostArch.SDKInstallRoot)\usr\bin" "$RuntimeInstallRoot\usr"
+  }
+
   Remove-Item -Force -Recurse $PlatformInstallRoot -ErrorAction Ignore
   foreach ($Arch in $SDKArchs) {
     Install-Platform $Arch
