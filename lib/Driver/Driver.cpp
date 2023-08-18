@@ -1607,6 +1607,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
     case options::OPT_parse:
     case options::OPT_resolve_imports:
+    case options::OPT_experimental_lazy_typecheck:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_print_ast:

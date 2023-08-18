@@ -33,6 +33,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpAST:
@@ -104,6 +105,7 @@ bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
   case ActionType::PrintFeature:
     return false;
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpAST:
   case ActionType::PrintAST:
@@ -149,6 +151,7 @@ bool FrontendOptions::doesActionRequireInputs(ActionType action) {
   case ActionType::CompileModuleFromInterface:
   case ActionType::TypecheckModuleFromInterface:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpAST:
   case ActionType::PrintAST:
@@ -191,6 +194,7 @@ bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
   case ActionType::CompileModuleFromInterface:
   case ActionType::TypecheckModuleFromInterface:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpAST:
   case ActionType::PrintAST:
@@ -230,6 +234,7 @@ bool FrontendOptions::supportCompilationCaching(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpAST:
   case ActionType::PrintAST:
@@ -290,6 +295,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
 
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpParse:
@@ -377,6 +383,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::PrintFeature:
     return false;
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -403,6 +410,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -445,6 +453,7 @@ bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -506,6 +515,7 @@ bool FrontendOptions::canActionEmitClangHeader(ActionType action) {
   case ActionType::PrintVersion:
   case ActionType::PrintFeature:
     return false;
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -547,6 +557,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::PrintFeature:
     return false;
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -576,6 +587,7 @@ bool FrontendOptions::canActionEmitModuleSemanticInfo(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -619,6 +631,7 @@ bool FrontendOptions::canActionEmitConstValues(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -660,6 +673,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
@@ -727,6 +741,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::PrintFeature:
     return false;
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -747,6 +762,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpAST:
@@ -805,6 +821,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
 
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
@@ -834,6 +851,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
@@ -885,6 +903,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
   case ActionType::TypecheckModuleFromInterface:
+  case ActionType::LazyTypecheck:
   case ActionType::Typecheck:
   case ActionType::ResolveImports:
   case ActionType::MergeModules:
