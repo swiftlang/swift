@@ -1360,6 +1360,9 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
 
   auto concurrencyModule = C.getLoadedModule(C.Id_Concurrency);
   auto isStdlibDefaultImplDecl = [executorDecl, concurrencyModule](ValueDecl *witness) -> bool {
+    if (!witness)
+      return false;
+
     if (auto declContext = witness->getDeclContext()) {
       if (auto *extension = dyn_cast<ExtensionDecl>(declContext)) {
         auto extensionModule = extension->getParentModule();
