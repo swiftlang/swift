@@ -321,7 +321,7 @@ extension String: Foo {}
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple3",
-// CHECK-NEXT:        "type": "Swift.Void",
+// CHECK-NEXT:        "type": "()",
 // CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
