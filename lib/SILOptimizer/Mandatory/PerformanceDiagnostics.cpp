@@ -259,6 +259,8 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = bb->getOperand();
     } else if (auto *cv = dyn_cast<ConvertFunctionInst>(closure)) {
       closure = cv->getOperand();
+    } else if (auto *md = dyn_cast<MarkDependenceInst>(closure)) {
+      closure = md->getValue();
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
       // We can assume that a function closure argument is already checked at
       // the call site.
