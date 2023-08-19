@@ -31,13 +31,22 @@ set_target_properties(libSwiftScan
     OUTPUT_NAME ${SWIFT_SCAN_LIB_NAME})
 
 if(SWIFT_SWIFT_PARSER)
-  # Ensure that we can find the host shared libraries.
-  set_property(
-    TARGET libSwiftScan
-    APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host")
-  set_property(
-    TARGET libSwiftScan
-    APPEND PROPERTY INSTALL_RPATH "@loader_path/../host")
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    # Ensure that we can find the host shared libraries.
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host")
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "@loader_path/../host")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/swift/host")
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../host")
+  endif()
 endif()
 
 add_llvm_symbol_exports(libSwiftScan ${LLVM_EXPORTED_SYMBOL_FILE})
@@ -59,6 +68,12 @@ else()
     ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
     LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
     RUNTIME DESTINATION "bin" COMPONENT compiler)
+
+  swift_install_strip_builder_rpath(
+    TARGETS libSwiftScan
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
+    COMPONENT compiler
+  )
 
   # Create a symlink to previously-used path of 'lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}'
   # to the new location under 'lib/swift/host' for clients of the legacy path.

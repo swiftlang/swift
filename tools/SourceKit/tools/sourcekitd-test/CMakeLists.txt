@@ -39,3 +39,9 @@ endif()
 add_dependencies(tools sourcekitd-test)
 swift_install_in_component(TARGETS sourcekitd-test
   RUNTIME DESTINATION bin COMPONENT tools)
+
+swift_install_strip_builder_rpath(
+  TARGETS sourcekitd-test
+  DESTINATION bin
+  COMPONENT tools
+)
