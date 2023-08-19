@@ -72,16 +72,17 @@ public:
 class PartialDestroyPackCleanup : public Cleanup {
   SILValue Addr;
   unsigned PackComponentIndex;
+
+  /// NOTE: It is expected that LimitWithinComponent maybe an empty SILValue.
   SILValue LimitWithinComponent;
   CanPackType FormalPackType;
 public:
-  PartialDestroyPackCleanup(SILValue addr,
-                            CanPackType formalPackType,
+  PartialDestroyPackCleanup(SILValue addr, CanPackType formalPackType,
                             unsigned packComponentIndex,
                             SILValue limitWithinComponent)
-    : Addr(addr), PackComponentIndex(packComponentIndex),
-      LimitWithinComponent(limitWithinComponent),
-      FormalPackType(formalPackType) {}
+      : Addr(addr), PackComponentIndex(packComponentIndex),
+        LimitWithinComponent(limitWithinComponent),
+        FormalPackType(formalPackType) {}
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
@@ -93,10 +94,14 @@ public:
 #ifndef NDEBUG
     llvm::errs() << "PartialDestroyPackCleanup\n"
                  << "State:" << getState() << "\n"
-                 << "Addr:" << Addr << "\n"
-                 << "FormalPackType:" << FormalPackType << "\n"
+                 << "Addr:" << Addr << "FormalPackType:" << FormalPackType
+                 << "\n"
                  << "ComponentIndex:" << PackComponentIndex << "\n"
-                 << "LimitWithinComponent:" << LimitWithinComponent << "\n";
+                 << "LimitWithinComponent: ";
+    if (LimitWithinComponent)
+      llvm::errs() << LimitWithinComponent;
+    else
+      llvm::errs() << "None\n";
 #endif
   }
 };
