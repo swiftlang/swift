@@ -5248,6 +5248,15 @@ NOTE(actor_mutable_state,none,
 WARNING(shared_mutable_state_access,none,
         "reference to %kind0 is not concurrency-safe because it involves "
         "shared mutable state", (const ValueDecl *))
+WARNING(shared_mutable_state_decl,none,
+        "%kind0 is not concurrency-safe because it is non-isolated global "
+        "shared mutable state", (const ValueDecl *))
+NOTE(shared_mutable_state_decl_note,none,
+     "isolate %0 to a global actor, or convert it to a 'let' constant and "
+     "conform it to 'Sendable'", (const ValueDecl *))
+WARNING(shared_immutable_state_decl,none,
+        "%kind0 is not concurrency-safe because it is not either conforming to "
+        "'Sendable' or isolated to a global actor", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
      "requirement",
