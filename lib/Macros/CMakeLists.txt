@@ -31,6 +31,19 @@ function(add_swift_macro_library name)
   # Add the library.
   add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
 
+  # Add rpath to 'lib/{platform}'
+  file(RELATIVE_PATH relpath_to_lib
+    "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+  )
+  _set_pure_swift_link_flags(${name} "${relpath_to_lib}")
+
+  # Add rpath to 'lib/host'
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+    set_property(TARGET ${name}
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/..")
+  endif()
+
   # If we don't have the Swift swift parser, bail out, because the above
   # add_pure_swift_host_library did nothing.
   if (NOT SWIFT_SWIFT_PARSER)
@@ -44,13 +57,21 @@ function(add_swift_macro_library name)
       LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_PLUGINS_DEST_DIR}"
   )
 
+  set(destination_dir "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins")
+
   swift_install_in_component(TARGETS ${name}
     LIBRARY
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
+      DESTINATION "${destination_dir}"
       COMPONENT compiler
     ARCHIVE
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
+      DESTINATION "${destination_dir}"
       COMPONENT compiler)
+
+  swift_install_strip_builder_rpath(
+    TARGETS ${name}
+    DESTINATION "${destination_dir}"
+    COMPONENT compiler
+  )
 
   # Export this macro plugin target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_MACRO_PLUGINS ${name})

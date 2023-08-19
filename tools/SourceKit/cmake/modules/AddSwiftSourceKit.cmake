@@ -129,11 +129,12 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
+
+      file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
+
       if(ASKD_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         list(APPEND RPATH_LIST "${host_lib_dir}")
-      else()
-        file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-        list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
       endif()
 
     elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
@@ -301,6 +302,15 @@ macro(add_sourcekit_library name)
     RUNTIME
       DESTINATION "bin"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
+
+  if(SOURCEKITLIB_SHARED)
+    swift_install_strip_builder_rpath(
+      TARGETS ${name}
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+    )
+  endif()
+
   swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
                              DESTINATION "include/SourceKit"
                              COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
@@ -351,16 +361,6 @@ macro(add_sourcekit_executable name)
   add_sourcekit_default_compiler_flags("${name}")
 
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
-
-  if(SWIFT_SWIFT_PARSER)
-    set(SKEXEC_HAS_SWIFT_MODULES TRUE)
-  else()
-    set(SKEXEC_HAS_SWIFT_MODULES FALSE)
-  endif()
-
-  set(RPATH_LIST)
-  add_sourcekit_swift_runtime_link_flags(${name} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR} ${SKEXEC_HAS_SWIFT_MODULES})
-
 endmacro()
 
 # Add a new SourceKit framework.
