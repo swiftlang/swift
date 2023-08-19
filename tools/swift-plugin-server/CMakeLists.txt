@@ -30,4 +30,9 @@ if (SWIFT_SWIFT_PARSER)
       DESTINATION bin
       COMPONENT compiler
   )
+  swift_install_strip_builder_rpath(
+    TARGETS swift-plugin-server
+    DESTINATION bin
+    COMPONENT compiler
+  )
 endif()

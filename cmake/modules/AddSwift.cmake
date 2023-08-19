@@ -548,10 +548,14 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
+
+      # At runtime, use swiftCore in the current toolchain.
+      # FIXME: This assumes the ABI hasn't changed since the builder.
+      set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+
       if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-        set(swift_runtime_rpath "${host_lib_dir}")
-      else()
-        set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+        # But before building the stdlib with the tool, use the builder libs. This should be removed in install time.
+        list(APPEND swift_runtime_rpath "${host_lib_dir}")
       endif()
 
     elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
@@ -576,9 +580,6 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   endif()
 
   if(SWIFT_SWIFT_PARSER)
-    # Make sure we can find the early SwiftSyntax libraries.
-    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
-
     # For the "end step" of bootstrapping configurations, we need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -967,7 +968,14 @@ function(add_swift_host_tool executable)
     swift_install_in_component(TARGETS ${executable}
                                RUNTIME
                                  DESTINATION bin
-                                 COMPONENT ${ASHT_SWIFT_COMPONENT})
+                                 COMPONENT ${ASHT_SWIFT_COMPONENT}
+    )
+
+    swift_install_strip_builder_rpath(
+      TARGETS ${executable}
+      DESTINATION bin
+      COMPONENT ${ASHT_SWIFT_COMPONENT}
+    )
 
     swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
   endif()

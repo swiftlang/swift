@@ -33,7 +33,7 @@ if (SWIFT_SWIFT_PARSER)
   list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND "SwiftSyntax::"
        OUTPUT_VARIABLE SWIFT_SYNTAX_TARGETS)
 
-  set(SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR
+  set(SWIFT_SYNTAX_LIBRARIES_BUILD_DIR
       "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
   set(SWIFT_HOST_LIBRARIES_DEST_DIR
       "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
@@ -53,15 +53,44 @@ if (SWIFT_SWIFT_PARSER)
   # Copy over all of the shared libraries from earlyswiftsyntax so they can
   # be found via RPATH.
   foreach (sharedlib ${SWIFT_SYNTAX_SHARED_LIBRARIES})
+    set(add_origin_rpath)
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+      get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+
+      # At runtime, use swiftCore in the current toolchain.
+      
+      swift_get_set_rpath_script_file(setrpath_command)
+      set(add_origin_rpath COMMAND ${CMAKE_COMMAND}
+        "-DSWIFT_SET_RPATH_FILE=${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+        "-DSWIFT_SET_RPATH_NEW_RPATH='$$ORIGIN:$$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}:${host_lib_dir}'"
+        -P "${setrpath_command}"
+      )
+    endif()
+
     add_custom_command(
       OUTPUT "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
-      DEPENDS "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${sharedlib}"
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${sharedlib} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}
+      DEPENDS "${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${sharedlib}"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${sharedlib} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}
+      ${add_origin_rpath}
     )
 
     add_custom_target(copy_swiftSyntaxLibrary_${sharedlib}
       DEPENDS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
       COMMENT "Copying ${sharedlib}"
+    )
+
+    swift_install_in_component(
+      FILES "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
+      COMPONENT compiler
+    )
+
+    swift_install_file_set_rpath(
+      "lib${LLVM_LIBDIR_SUFFIX}/swift/host/${sharedlib}"
+      "$ORIGIN:$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
+      compiler
     )
 
     add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxLibrary_${sharedlib})
@@ -76,7 +105,7 @@ if (SWIFT_SWIFT_PARSER)
   foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
     # Find all of the source module files.
     file(GLOB module_files
-         "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swiftinterface")
+      "${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${module_dir}/*.swiftinterface")
 
     # Determine the destination module files.
     set(dest_module_files)
@@ -96,6 +125,12 @@ if (SWIFT_SWIFT_PARSER)
     add_custom_target(copy_swiftSyntaxModule_${module_dir}
       DEPENDS ${dest_module_files}
       COMMENT "Copying ${module_dir}"
+    )
+
+    swift_install_in_component(
+      FILES ${dest_module_files}
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/${module_dir}"
+      COMPONENT compiler
     )
 
     add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxModule_${module_dir})

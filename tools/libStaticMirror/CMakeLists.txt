@@ -37,3 +37,9 @@ swift_install_in_component(TARGETS libStaticMirror
 swift_install_in_component(DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/StaticMirror/"
                            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SCAN_LIB_NAME}"
                            COMPONENT static-mirror-lib)
+
+swift_install_strip_builder_rpath(
+  TARGETS libStaticMirror
+  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
+  COMPONENT static-mirror-lib
+)
