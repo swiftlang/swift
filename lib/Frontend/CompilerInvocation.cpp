@@ -642,6 +642,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_check_api_availability_only))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-check-api-availability-only");
+  if (Args.hasArg(OPT_warn_on_potentially_unavailable_enum_case))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-warn-on-potentially-unavailable-enum-case");
 
   if (const Arg *A = Args.getLastArg(OPT_unavailable_decl_optimization_EQ)) {
     auto value =
@@ -667,8 +670,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_conformance_availability_errors);
   }
 
-  Opts.WarnOnPotentiallyUnavailableEnumCase |=
-      Args.hasArg(OPT_warn_on_potentially_unavailable_enum_case);
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
 
   if (auto A = Args.getLastArg(OPT_disable_typo_correction,
@@ -1944,7 +1945,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // If we're only emitting a module, stop optimizations once we've serialized
   // the SIL for the module.
-  if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
+  if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
+      FEOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface)
     Opts.StopOptimizationAfterSerialization = true;
 
   // Propagate the typechecker's understanding of

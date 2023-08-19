@@ -1304,10 +1304,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (wt->getLinkage() == SILLinkage::Shared)
     return true;
 
-  NominalTypeDecl *ConformingTy =
-    wt->getConformingType()->getNominalOrBoundGenericNominal();
-
-  switch (ConformingTy->getEffectiveAccess()) {
+  switch (wt->getConformingNominal()->getEffectiveAccess()) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       return true;

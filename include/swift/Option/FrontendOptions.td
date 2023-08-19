@@ -617,7 +617,7 @@ def disable_conformance_availability_errors : Flag<["-"],
 
 def warn_on_potentially_unavailable_enum_case : Flag<["-"],
   "warn-on-potentially-unavailable-enum-case">,
-  HelpText<"Downgrade potential unavailability of enum case to a warning">;
+  HelpText<"Deprecated, will be removed in future versions">;
 
 def warn_on_editor_placeholder : Flag<["-"],
   "warn-on-editor-placeholder">,

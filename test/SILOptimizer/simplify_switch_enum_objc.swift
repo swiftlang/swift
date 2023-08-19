@@ -48,12 +48,12 @@ public class InClass {
 // CHECK:  switch_enum
 // CHECK: bb1
 // CHECK:  br bb5
-// CHECK: bb2:
+// CHECK: bb2({{.*}}):
 // CHECK:  apply
 // CHECK:  switch_enum
 // CHECK: bb3:
 // CHECK:  br bb5
-// CHECK: bb4:
+// CHECK: bb4({{.*}}):
 // CHECK:  objc_method
 // CHECK:  apply
 // CHECK:  objc_method

@@ -2671,6 +2671,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
           }
         }
         assert(foundVarDecl && "VarDecl not declared in its parent?");
+        (void) foundVarDecl;
       } else {
         // We have some other parent stmt. Type check it completely.
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
@@ -2780,6 +2781,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     // We need to add implicit initializers because they
     // affect vtable layout.
     TypeChecker::addImplicitConstructors(nominal);
+
+    // Destructors don't affect vtable layout, but TBDGen needs to
+    // see them, so we also force the destructor here.
+    if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+      (void) classDecl->getDestructor();
   }
 
   // Force any conformances that may introduce more members.

@@ -705,7 +705,6 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
-  case ActionType::ResolveImports:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -727,6 +726,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::ScanDependencies:
   case ActionType::PrintFeature:
     return false;
+  case ActionType::ResolveImports:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:

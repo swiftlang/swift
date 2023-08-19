@@ -7390,7 +7390,7 @@ ERROR(init_accessor_can_refer_only_to_properties,none,
       (DescriptiveDeclKind, DeclNameRef))
 
 ERROR(init_accessor_initializes_attribute_on_other_declaration,none,
-      "initalizes(...) attribute could only be used with init accessors",
+      "initializes(...) attribute could only be used with init accessors",
       ())
 ERROR(init_accessor_accesses_attribute_on_other_declaration,none,
       "accesses(...) attribute could only be used with init accessors",

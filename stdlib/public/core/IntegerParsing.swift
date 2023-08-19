@@ -57,6 +57,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _parseInteger<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
