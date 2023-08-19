@@ -2573,6 +2573,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
+
+  case TypeReprKind::Self:
+    return cast<SelfTypeRepr>(repr)->getType();
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -5221,6 +5224,7 @@ public:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Tuple:
     case TypeReprKind::Fixed:
+    case TypeReprKind::Self:
     case TypeReprKind::Array:
     case TypeReprKind::SILBox:
     case TypeReprKind::Isolated:

@@ -3000,6 +3000,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
   case TypeReprKind::Fixed:
     llvm_unreachable("Cannot get fixed TypeReprs in name lookup");
+  case TypeReprKind::Self:
+    llvm_unreachable("Cannot get fixed SelfTypeRepr in name lookup");
 
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
