@@ -58,19 +58,21 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-// This is temporarily used for testing until Swift 5.5 branches to reduce risk.
-llvm::cl::opt<bool> EnableOSSASimplifyCFG(
-    "enable-ossa-simplify-cfg",
-    llvm::cl::desc(
-        "Enable non-trivial OSSA simplify-cfg and simple jump threading "
-        "(staging)."));
+llvm::cl::opt<bool> EnableOSSACheckedCastBrJumpThreading(
+    "enable-ossa-checked-cast-br-jump-threading",
+    llvm::cl::desc("Enable OSSA checked cast branch jump threading "
+                   "(staging)."),
+    llvm::cl::init(true));
 
-// This requires new OwnershipOptUtilities which aren't well tested yet.
-llvm::cl::opt<bool> EnableOSSARewriteTerminator(
-    "enable-ossa-rewriteterminator",
-    llvm::cl::desc(
-        "Enable OSSA simplify-cfg with non-trivial terminator rewriting "
-        "(staging)."));
+llvm::cl::opt<bool> EnableOSSASimpleJumpThreading(
+    "enable-ossa-simple-jump-threading",
+    llvm::cl::desc("Enable OSSA simple jump threading (staging)."),
+    llvm::cl::init(true));
+
+llvm::cl::opt<bool> EnableOSSADominatorBasedSimplify(
+    "enable-ossa-dominator-based-simplify",
+    llvm::cl::desc("Enable OSSA dominator based simplifications (staging)."),
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> IsInfiniteJumpThreadingBudget(
     "sil-infinite-jump-threading-budget",
@@ -183,7 +185,6 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
     return false;
 
   Cloner.cloneBranchTarget(SrcTerm);
-
   // We have copied the threaded block into the edge.
   auto *clonedSrc = Cloner.getNewBB();
   SmallVector<SILBasicBlock *, 4> clonedSuccessors(
@@ -207,7 +208,6 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                                                ThreadedSuccessorBlock, Args);
 
     CondTerm->eraseFromParent();
-
   } else {
     // Get the enum element and the destination block of the block we jump
     // thread.
@@ -217,21 +217,29 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
     // Instantiate the payload if necessary.
     SILBuilderWithScope Builder(SEI);
     if (!ThreadedSuccessorBlock->args_empty()) {
-      auto EnumVal = SEI->getOperand();
-      auto EnumTy = EnumVal->getType();
-      auto Loc = SEI->getLoc();
-      auto Ty = EnumTy.getEnumElementType(ti.EnumCase, SEI->getModule(),
-                                          Builder.getTypeExpansionContext());
-      SILValue UED(
-          Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
-      assert(UED->getType()
-                 == (*ThreadedSuccessorBlock->args_begin())->getType()
-             && "Argument types must match");
-      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
-
+      if (ti.EnumCase->hasAssociatedValues() &&
+          (!SEI->hasDefault() ||
+           ThreadedSuccessorBlock != SEI->getDefaultBB())) {
+        auto EnumVal = SEI->getOperand();
+        auto EnumTy = EnumVal->getType();
+        auto Loc = SEI->getLoc();
+        auto Ty = EnumTy.getEnumElementType(ti.EnumCase, SEI->getModule(),
+                                            Builder.getTypeExpansionContext());
+        SILValue UED(
+            Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
+        assert(UED->getType() ==
+                   (*ThreadedSuccessorBlock->args_begin())->getType() &&
+               "Argument types must match");
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+      } else {
+        assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
+        auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);
+        OldBlockArg->replaceAllUsesWith(SEI->getOperand());
+        ThreadedSuccessorBlock->eraseArgument(0);
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock);
+      }
     } else {
-      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
-                           ArrayRef<SILValue>());
+      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock);
     }
     SEI->eraseFromParent();
   }
@@ -495,11 +503,15 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
       if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
         LLVM_DEBUG(llvm::dbgs() << "simplify threaded " << *SEI);
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
-        if (EI->hasOperand() && !LiveBlock->args_empty())
-          SILBuilderWithScope(SEI)
-              .createBranch(SEI->getLoc(), LiveBlock, EI->getOperand());
-        else
+        if (!LiveBlock->args_empty()) {
+          auto *LiveBlockArg = LiveBlock->getArgument(0);
+          auto NewValue = EI->hasOperand() ? EI->getOperand() : EI;
+          LiveBlockArg->replaceAllUsesWith(NewValue);
+          LiveBlock->eraseArgument(0);
           SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+        } else {
+          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+        }
         SEI->eraseFromParent();
         if (EI->use_empty())
           EI->eraseFromParent();
@@ -536,7 +548,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   // Get the dominator tree.
   DT = DA->get(&Fn);
 
-  if (!EnableOSSASimplifyCFG && Fn.hasOwnership())
+  if (!EnableOSSADominatorBasedSimplify && Fn.hasOwnership())
     return false;
 
   // Split all critical edges such that we can move code onto edges. This is
@@ -560,7 +572,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
     if (tryCheckedCastBrJumpThreading(&Fn, DT, deBlocks, BlocksForWorklist,
-                                      EnableOSSARewriteTerminator)) {
+                                      EnableOSSACheckedCastBrJumpThreading)) {
       for (auto BB: BlocksForWorklist)
         addToWorklist(BB);
 
@@ -907,19 +919,13 @@ static bool hasInjectedEnumAtEndOfBlock(SILBasicBlock *block, SILValue enumAddr)
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
-  if (!EnableOSSASimplifyCFG && Fn.hasOwnership())
+  if (!EnableOSSASimpleJumpThreading && Fn.hasOwnership())
     return false;
 
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
   TermInst *destTerminator = DestBB->getTerminator();
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    if (llvm::any_of(DestBB->getArguments(), [this](SILValue op) {
-          return !op->getType().isTrivial(Fn);
-        })) {
-      return false;
-   }
-  }
+
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
   if (destTerminator->isFunctionExiting())
@@ -948,14 +954,13 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   for (unsigned i : indices(BI->getArgs())) {
     SILValue Arg = BI->getArg(i);
 
-    // TODO: Verify if we need to jump thread to remove releases in OSSA.
     // If the value being substituted on is release there is a chance we could
     // remove the release after jump threading.
-    if (!Arg->getType().isTrivial(*SrcBB->getParent()) &&
-        couldRemoveRelease(SrcBB, Arg, DestBB,
-                           DestBB->getArgument(i))) {
-        ThreadingBudget = 8;
-        break;
+    // In ossa, copy propagation can do this, avoid jump threading.
+    if (!Fn.hasOwnership() && !Arg->getType().isTrivial(*SrcBB->getParent()) &&
+        couldRemoveRelease(SrcBB, Arg, DestBB, DestBB->getArgument(i))) {
+      ThreadingBudget = 8;
+      break;
     }
 
     // If the value being substituted is an enum, check to see if there are any
@@ -2954,10 +2959,8 @@ static bool shouldTailDuplicate(SILBasicBlock &Block) {
 bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
   SmallVector<SILBasicBlock *, 16> ObjCBlocks;
 
-  // TODO: OSSA phi support. Even if all block arguments are trivial,
-  // jump-threading may require creation of guaranteed phis, which may require
-  // creation of nested borrow scopes.
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
+  if (Fn.hasOwnership()) {
+    // TODO: This needs additional support in ossa.
     return false;
   }
   // Collect blocks to tail duplicate.
@@ -3166,8 +3169,8 @@ RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
                             llvm::cl::init(true));
 
 bool ArgumentSplitter::split() {
-  if (!EnableOSSARewriteTerminator && Arg->getFunction()->hasOwnership()) {
-    // TODO: OSSA phi support
+  if (Arg->getFunction()->hasOwnership()) {
+    // TODO: Additional work is needed to create non-trivial projections in ossa
     if (!Arg->getType().isTrivial(*Arg->getFunction()))
       return false;
   }
@@ -3688,6 +3691,19 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *Use = *A->use_begin();
   auto *User = Use->getUser();
 
+  auto disableInOSSA = [](SingleValueInstruction *inst) {
+    assert(isa<StructInst>(inst) || isa<TupleInst>(inst) ||
+           isa<EnumInst>(inst));
+    if (!inst->getFunction()->hasOwnership()) {
+      return false;
+    }
+    if (inst->getOwnershipKind() == OwnershipKind::Owned)
+      return !inst->getSingleUse();
+    if (BorrowedValue borrow = BorrowedValue(inst->getOperand(0)))
+      return borrow.isLocalScope();
+    return false;
+  };
+
   // Handle projections.
   if (!isa<StructExtractInst>(User) &&
       !isa<TupleExtractInst>(User) &&
@@ -3702,15 +3718,17 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
       return false;
     auto *Branch = cast<BranchInst>(Pred->getTerminator());
     SILValue BranchArg = Branch->getArg(i);
-    if (isa<StructInst>(BranchArg))
-      continue;
-    if (isa<TupleInst>(BranchArg))
-      continue;
-    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
-      if (EI->getElement() == cast<UncheckedEnumDataInst>(proj)->getElement())
-        continue;
+    if (!isa<StructInst>(BranchArg) && !isa<TupleInst>(BranchArg) &&
+        !isa<EnumInst>(BranchArg)) {
+      return false;
     }
-    return false;
+    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
+      if (EI->getElement() != cast<UncheckedEnumDataInst>(proj)->getElement())
+        return false;
+    }
+    if (disableInOSSA(cast<SingleValueInstruction>(BranchArg))) {
+      return false;
+    }
   }
 
   // Okay, we'll replace the BB arg with one with the right type, replace
