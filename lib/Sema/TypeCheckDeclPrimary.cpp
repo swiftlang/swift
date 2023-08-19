@@ -1844,12 +1844,13 @@ public:
 
   ASTContext &getASTContext() const { return Ctx; }
   void addDelayedFunction(AbstractFunctionDecl *AFD) {
-    if (!SF) return;
+    if (!SF)
+      return;
 
-    while (auto enclosingSF = SF->getEnclosingSourceFile())
-      SF = enclosingSF;
+    while (auto *ESF = SF->getEnclosingSourceFile())
+      SF = ESF;
 
-    SF->DelayedFunctions.push_back(AFD);
+    SF->addDelayedFunction(AFD);
   }
 
   void visit(Decl *decl) {

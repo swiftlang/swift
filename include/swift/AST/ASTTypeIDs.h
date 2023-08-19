@@ -70,7 +70,6 @@ struct FragileFunctionKind;
 enum class PolymorphicEffectKind : uint8_t;
 class PolymorphicEffectRequirementList;
 class SourceFile;
-class SymbolSourceMap;
 struct TangentPropertyInfo;
 class Type;
 class TypeAliasDecl;

@@ -287,7 +287,7 @@ struct SILDeclRef {
   bool hasAutoClosureExpr() const;
   bool hasFuncDecl() const;
 
-  ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
+  ValueDecl *getDecl() const { return loc.dyn_cast<ValueDecl *>(); }
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return loc.dyn_cast<AbstractClosureExpr *>();
   }

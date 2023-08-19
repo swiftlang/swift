@@ -737,6 +737,12 @@ public:
     return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
   }
 
+  /// Promote the linkage of every entity in this SIL module so that they are
+  /// externally visible. This is used to promote the linkage of private
+  /// entities that are compiled on-demand for lazy immediate mode, as each is
+  /// emitted into its own `SILModule`.
+  void promoteLinkages();
+
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
 
