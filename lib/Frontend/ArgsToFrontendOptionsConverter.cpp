@@ -552,6 +552,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))
     return FrontendOptions::ActionType::ResolveImports;
+  if (Opt.matches(OPT_experimental_lazy_typecheck))
+    return FrontendOptions::ActionType::LazyTypecheck;
   if (Opt.matches(OPT_typecheck))
     return FrontendOptions::ActionType::Typecheck;
   if (Opt.matches(OPT_dump_parse))
