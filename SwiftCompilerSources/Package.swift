@@ -26,14 +26,14 @@ private extension Target {
         path: path ?? "Sources/\(name)",
         exclude: ["CMakeLists.txt"],
         sources: sources,
-        cxxSettings: [
-          .headerSearchPath("../include"),
-          .headerSearchPath("../../llvm-project/llvm/include"),
-          .headerSearchPath("../../llvm-project/clang/include"),
-        ],
         swiftSettings: [
           .interoperabilityMode(.Cxx),
-          .unsafeFlags(["-cross-module-optimization"]),
+          .unsafeFlags([
+            "-Xcc", "-I../include",
+            "-Xcc", "-I../../llvm-project/llvm/include",
+            "-Xcc", "-I../../llvm-project/clang/include",
+            "-cross-module-optimization",
+          ]),
         ] + swiftSettings)
     }
 }
