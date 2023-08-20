@@ -588,7 +588,7 @@ public func nonEscapingpartialApplyTest<T : P>(_ x: __owned T) {
 public func partialApplyTest<T : P>(_ x: __owned T) -> () -> () {
     var x2 = x
     x2 = x
-    let _ = consume x2 // expected-error {{'consume' applied to value that the compiler does not support}}
+    let _ = consume x2 // expected-error {{'consume' cannot be applied to escaping captures}}
     let f = {
         print(x2)
     }

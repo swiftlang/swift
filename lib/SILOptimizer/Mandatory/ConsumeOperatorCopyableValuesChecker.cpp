@@ -507,7 +507,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
 }
 
 //===----------------------------------------------------------------------===//
-//                        Unsupported Use Case Errors
+//                     MARK: Unsupported Use Case Errors
 //===----------------------------------------------------------------------===//
 
 static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
@@ -515,6 +515,25 @@ static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
   auto diag = diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
   diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
   mvi->setAllowsDiagnostics(false);
+}
+
+/// Try to pattern match if we were trying to move a global. In such a case,
+/// emit a better error.
+static bool tryEmitCannotConsumeNonLocalMemoryError(MoveValueInst *mvi) {
+  auto *li = dyn_cast<LoadInst>(mvi->getOperand());
+  if (!li)
+    return false;
+
+  auto &astContext = mvi->getModule().getASTContext();
+  if (auto *gai =
+          dyn_cast<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
+    auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+    diagnose(astContext, mvi->getLoc().getSourceLoc(), diag, 0);
+    mvi->setAllowsDiagnostics(false);
+    return true;
+  }
+
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -578,6 +597,10 @@ class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
               mvi->setAllowsDiagnostics(false);
               continue;
             }
+
+            // Try to emit a better error if we try to consume a global.
+            if (tryEmitCannotConsumeNonLocalMemoryError(mvi))
+              continue;
 
             if (!DisableUnhandledMoveDiagnostic)
               emitUnsupportedUseCaseError(mvi);
