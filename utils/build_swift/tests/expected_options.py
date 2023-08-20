@@ -48,7 +48,6 @@ EXPECTED_DEFAULTS = {
     'benchmark_num_onone_iterations': 3,
     'build_android': False,
     'build_args': [],
-    'build_backdeployconcurrency': False,
     'build_benchmarks': True,
     'build_clang_tools_extra': True,
     'build_compiler_rt': True,
@@ -517,7 +516,6 @@ EXPECTED_OPTIONS = [
 
     SetFalseOption('--no-llvm-include-tests', dest='llvm_include_tests'),
 
-    SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
     SetTrueOption('--install-back-deploy-concurrency',
                   dest='install_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
