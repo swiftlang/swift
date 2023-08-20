@@ -1427,6 +1427,19 @@ public struct HashableMacro: ExtensionMacro {
   }
 }
 
+public struct ImpliesHashableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type.trimmed): ImpliesHashable {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
 public struct DelegatedConformanceMacro: ExtensionMacro, MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
