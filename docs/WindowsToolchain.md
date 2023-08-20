@@ -6,15 +6,15 @@ Different terms are used to reference the different portions of the tree.  These
 
 * **Runtime** (`%ProgramFiles%\Swift\Runtimes\0.0.0\...`)
 
-This is the *runtime* component. It contains the libraries which are needed by the user to execute code writtenin Swift. These set of libraries are required to be redistributed with any Swift application or must be provided by the Operating System (e.g. as with macOS). This usually contains the Swift runtime, standard library. It may optionally require Foundation if it is used by the application. Only one copy of the runtime component is required, though each application may bundle its own requisite subset.
+This is the *runtime* component. It contains the libraries which are needed by the user to execute code written in Swift. These set of libraries must be redistributed with any Swift application or must be provided by the Operating System (e.g. as with macOS). This usually contains the Swift runtime and standard libraries. It may optionally require Foundation if it is used by the application. Only one copy of the runtime component is required, though each application may bundle its own requisite subset.
 
 * **SDK** (`%ProgramFiles%\Platforms\Windows.platform\Developer\SDKs\Windows.sdk\...`)
 
-More than one SDK may be installed at a time. There is no requirement that the platform SDK match the host. However, the host SDK is likely required as dependency on Swift within the Swift toolchain grows. The platform SDK may support multiple architectures. This content is used by the developer to build products for the specific platform for any set of architecture(s) it supports.
+More than one SDK may be installed at a time. There is no requirement that the platform SDK match the host. However, the host SDK is likely required as dependency on Swift within the Swift compiler grows. The platform SDK may support multiple architectures. This content is used by the developer to build products for the specific platform for any set of architectures it supports.
 
 * **Toolchain** (`%ProgramFiles%\Toolchains\0.0.0+Asserts\...`)
 
-More than one SDK may be installed at a time. The toolchains are labelled by a SemVer number and a variant (e.g. `+Asserts`, `+NoAsserts`). This allows for installing multiple versions of the toolchain in parallel including variations on a single version. The toolchain contians all the tools required to build C, C++, and Swift code (compiler, assembler, linker) as well as to debug the products (debugger). It also contains binary inspection tools (e.g. `objdump`). This enables a single installation of the toolchain to be sufficient to build most applications and their dependencies.
+More than one toolchain may be installed at a time. The toolchains are labelled by a SemVer number and a variant (e.g. `+Asserts`, `+NoAsserts`). This allows for installing multiple versions of the toolchain in parallel including variations on a single version. The toolchain contains all the tools required to build C, C++, and Swift code (compiler, assembler, linker) as well as to debug the products (debugger). It also contains binary inspection tools (e.g. `objdump`). This enables a single installation of the toolchain to be sufficient to build most applications and their dependencies.
 
 * **Redistributables** (`%ProgramFiles%\Redistributables\0.0.0\...`)
 
@@ -38,7 +38,7 @@ This is the root of the SDK. If available, the value of this environment variabl
 
 ## Packaging
 
-The Swift Tool Kit is distributed as a standalone installer.  The installer comprises of multiple MSIs (Microsoft Installer) packages. This allows for a selective installation of components.
+The Swift Tool Kit is distributed as a standalone installer.  The installer comprises of multiple MSI (Microsoft Installer) packages. This allows for a selective installation of components.
 
 - `bld` (Build Tools)
 
