@@ -143,9 +143,9 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit error block.
     SGF.B.emitBlock(errorBB);
-    SILValue error = errorBB->createPhiArgument(
-        SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
-        OwnershipKind::Owned);
+    ManagedValue error =
+        SGF.B.createPhi(SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
+                        OwnershipKind::Owned);
     SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
 
     // Emit normal block.

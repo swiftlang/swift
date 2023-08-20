@@ -22,6 +22,7 @@
 #include "SILGen.h"
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/Basic/NoDiscard.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1697,9 +1698,13 @@ public:
                                      Type resultType,
                                      RValue &&operand);
 
-  ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
-  ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
-                                 const TypeLowering &lowering);
+  ManagedValue emitManagedCopy(SILLocation loc, SILValue v);
+  ManagedValue emitManagedCopy(SILLocation loc, SILValue v,
+                               const TypeLowering &lowering);
+
+  ManagedValue emitManagedFormalEvaluationCopy(SILLocation loc, SILValue v);
+  ManagedValue emitManagedFormalEvaluationCopy(SILLocation loc, SILValue v,
+                                               const TypeLowering &lowering);
 
   ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v);
   ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v,

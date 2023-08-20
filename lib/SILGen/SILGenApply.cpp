@@ -1360,12 +1360,13 @@ public:
       // we installed.  Install a new special cleanup.
       if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
         SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
-        SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
+        SGF.InitDelegationSelf =
+            ManagedValue::forUnmanagedOwnedValue(underlyingSelf);
         CleanupHandle newWriteback = SGF.enterOwnedValueWritebackCleanup(
             SGF.InitDelegationLoc.value(), SGF.InitDelegationSelfBox,
             superMV.forward(SGF));
-        SGF.SuperInitDelegationSelf =
-            ManagedValue(superMV.getValue(), newWriteback);
+        SGF.SuperInitDelegationSelf = ManagedValue::forOwnedObjectRValue(
+            superMV.getValue(), newWriteback);
         super = RValue(SGF, SGF.InitDelegationLoc.value(), superFormalType,
                        SGF.SuperInitDelegationSelf);
       }
@@ -4328,7 +4329,7 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
         value = SGF.B.createFormalAccessLoadCopy(loc, value);
         // Strip off the cleanup from the load [copy] since we do not want the
         // cleanup to be forwarded.
-        value = ManagedValue::forUnmanaged(value.getValue());
+        value = ManagedValue::forUnmanagedOwnedValue(value.getValue());
       } else {
         value = SGF.B.createFormalAccessLoadBorrow(loc, value);
       }
@@ -4507,7 +4508,7 @@ public:
   }
 
   ManagedValue getManagedBox() const {
-    return ManagedValue(box, initCleanup);
+    return ManagedValue::forOwnedObjectRValue(box, initCleanup);
   }
 };
 
@@ -6224,7 +6225,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                                    Ctx.getArrayDecl());
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
-                              ManagedValue::forUnmanaged(array),
+                              ManagedValue::forUnmanagedOwnedValue(array),
                               SGFContext());
 }
 
@@ -6247,9 +6248,9 @@ ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
   // Invoke the intrinsic.
   auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                                    Ctx.getArrayDecl());
-  RValue result = emitApplyOfLibraryIntrinsic(loc, finalize, subMap,
-                              ManagedValue::forUnmanaged(arrayVal),
-                              SGFContext());
+  RValue result = emitApplyOfLibraryIntrinsic(
+      loc, finalize, subMap, ManagedValue::forUnmanagedOwnedValue(arrayVal),
+      SGFContext());
   return std::move(result).getScalarValue();
 }
 

@@ -308,20 +308,21 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
   case ParameterConvention::Direct_Guaranteed:
     // If we have a guaranteed parameter, the object should not need to be
     // retained or have a cleanup.
-    return ManagedValue::forUnmanaged(value);
+    return ManagedValue::forBorrowedObjectRValue(value);
 
   case ParameterConvention::Direct_Unowned:
     // We need to independently retain the value.
-    return SGF.emitManagedRetain(loc, value, valueTL);
+    return SGF.emitManagedCopy(loc, value, valueTL);
 
   case ParameterConvention::Indirect_Inout:
     return ManagedValue::forLValue(value);
 
   case ParameterConvention::Indirect_In_Guaranteed:
     if (valueTL.isLoadable()) {
-      return SGF.B.createLoadBorrow(loc, ManagedValue::forUnmanaged(value));
+      return SGF.B.createLoadBorrow(
+          loc, ManagedValue::forBorrowedAddressRValue(value));
     } else {
-      return ManagedValue::forUnmanaged(value);
+      return ManagedValue::forBorrowedAddressRValue(value);
     }
 
   case ParameterConvention::Indirect_In:
@@ -904,7 +905,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   // Add the block argument.
   SILValue blockV =
       entry->createFunctionArgument(SILType::getPrimitiveObjectType(blockTy));
-  ManagedValue block = ManagedValue::forUnmanaged(blockV);
+  ManagedValue block = ManagedValue::forBorrowedObjectRValue(blockV);
 
   CanType formalResultType = formalFuncTy.getResult();
 
@@ -1098,7 +1099,7 @@ static ManagedValue emitCBridgedToNativeValue(
       // when they are converted to an object via objc_metatype_to_object.
       assert(!v.hasCleanup() && "Metatypes are trivial and should not have "
                                 "cleanups");
-      return ManagedValue::forUnmanaged(native);
+      return ManagedValue::forUnmanagedOwnedValue(native);
     }
   }
 
@@ -2180,7 +2181,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           break;
         case ParameterConvention::Direct_Guaranteed:
         case ParameterConvention::Direct_Unowned:
-          param = emitManagedRetain(fd, paramValue);
+          param = emitManagedCopy(fd, paramValue);
           break;
         case ParameterConvention::Indirect_Inout:
         case ParameterConvention::Indirect_InoutAliasable:

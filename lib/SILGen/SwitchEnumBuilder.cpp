@@ -91,7 +91,7 @@ void SwitchEnumBuilder::emit() && {
     ArrayRef<ProfileCounter> caseBlockCountsRef = caseBlockCounts;
     if (isAddressOnly) {
       if (subjectExprOperand.getType().isMoveOnlyWrapped()) {
-        subjectExprOperand = ManagedValue::forUnmanaged(
+        subjectExprOperand = ManagedValue::forBorrowedAddressRValue(
             builder.createMoveOnlyWrapperToCopyableAddr(
                 loc, subjectExprOperand.getValue()));
       }
