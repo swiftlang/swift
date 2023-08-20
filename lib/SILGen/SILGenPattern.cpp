@@ -1392,7 +1392,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
-    return {ManagedValue::forUnmanaged(value), consumption};
+    return {ManagedValue::forBorrowedRValue(value), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess:
     return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
@@ -1553,7 +1553,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
       // If we have a loadable type, then we have a loadable sub-type of the
       // underlying address only tuple.
-      auto memberMV = ManagedValue::forUnmanaged(member);
+      auto memberMV = ManagedValue::forBorrowedAddressRValue(member);
       switch (src.getFinalConsumption()) {
       case CastConsumptionKind::TakeAlways: {
         // If our original source value is take always, perform a load [take].
@@ -1577,7 +1577,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
       }
       case CastConsumptionKind::CopyOnSuccess: {
         // We translate copy_on_success => borrow_always.
-        auto memberMV = ManagedValue::forUnmanaged(member);
+        auto memberMV = ManagedValue::forBorrowedAddressRValue(member);
         return {SGF.B.createLoadBorrow(loc, memberMV),
                 CastConsumptionKind::BorrowAlways};
       }
@@ -2079,8 +2079,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
     if (!blocks.hasAnyRefutableCase())
       break;
 
-    src = ConsumableManagedValue(ManagedValue::forUnmanaged(src.getValue()),
-                                 CastConsumptionKind::CopyOnSuccess);
+    src = ConsumableManagedValue(
+        ManagedValue::forUnmanagedOwnedValue(src.getValue()),
+        CastConsumptionKind::CopyOnSuccess);
     break;
   }
 

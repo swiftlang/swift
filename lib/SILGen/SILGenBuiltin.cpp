@@ -406,7 +406,7 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   SILValue result = SGF.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
                                                 destType);
   // The result has ownership semantics, so retain it with a cleanup.
-  return SGF.emitManagedRetain(loc, result, destLowering);
+  return SGF.emitManagedCopy(loc, result, destLowering);
 }
 
 static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,
@@ -486,7 +486,7 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
             : context.getIdentifier("unprotectedAddressOfBorrowOpaque");
     auto builtin = SGF.B.createBuiltin(loc, identifier, rawPointerType,
                                        substitutions, {borrow.getValue()});
-    return ManagedValue::forUnmanaged(builtin);
+    return ManagedValue::forObjectRValueWithoutOwnership(builtin);
   }
 
   if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
@@ -799,7 +799,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
     }
     // Leave the cleanup on the original value.
     if (toTL.isTrivial())
-      return ManagedValue::forUnmanaged(toAddr);
+      return ManagedValue::forTrivialAddressRValue(toAddr);
 
     // Initialize the +1 result buffer without taking the incoming value. The
     // source and destination cleanups will be independent.
@@ -924,7 +924,7 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
   }
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
-  return SGF.emitManagedRetain(loc, result);
+  return SGF.emitManagedCopy(loc, result);
 }
 
 // This should only accept as an operand type single-refcounted-pointer types,

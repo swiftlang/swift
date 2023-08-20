@@ -452,7 +452,13 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
   RValue rvalue(SGF, loc, getSubstFormalType(), temporary);
 
   // Don't consume cleanups on the base if this isn't final.
-  if (base && !isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
+  if (base && !isFinal) {
+    if (base.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      base = ManagedValue::forBorrowedRValue(base.getValue());
+    } else {
+      base = ManagedValue::forUnmanagedOwnedValue(base.getValue());
+    }
+  }
 
   // Clone the component if this isn't final.
   std::unique_ptr<LogicalPathComponent> clonedComponent =
@@ -3340,11 +3346,16 @@ SILGenFunction::maybeEmitValueOfLocalVarDecl(
     if (ptr->getType().isAddress())
       return ManagedValue::forLValue(ptr);
 
-    // Otherwise, it is an RValue let.  Uses of it are borrows, but we don't
-    // want to proactively emit a borrow here.
+    // Otherwise, it is an RValue let. SILGen is inconsistent here and may store
+    // either an "unmanaged borrowed" owned value that must be borrowed before
+    // use /or/ it may store an already borrowed value. In the case of the
+    // former, we don't want to proactively emit a borrow here.
+    //
     // TODO: integrate this with how callers want these values so we can do
-    // something more semantic than just forUnmanaged.
-    return ManagedValue::forUnmanaged(ptr);
+    // something more semantic than just forUnmanagedOwnedValue.
+    if (ptr->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
+      return ManagedValue::forBorrowedRValue(ptr);
+    return ManagedValue::forUnmanagedOwnedValue(ptr);
   }
 
   // Otherwise, it's non-local or not stored.
@@ -4398,10 +4409,10 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
       SILType addrType = addrTL.getLoweredType();
       if (!rvalueType.isMoveOnlyWrapped() && addrType.isMoveOnlyWrapped()) {
         SILValue value = B.createMoveOnlyWrapperToCopyableAddr(loc, addr);
-        return ManagedValue::forUnmanaged(value);
+        return ManagedValue::forBorrowedAddressRValue(value);
       }
       if (rvalueTL.getLoweredType() == addrTL.getLoweredType()) {
-        return ManagedValue::forUnmanaged(addr);
+        return ManagedValue::forBorrowedAddressRValue(addr);
       }
     }
 
@@ -4423,7 +4434,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   // we can perform a +0 load of the address instead of materializing a +1
   // value.
   if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
-    return B.createLoadBorrow(loc, ManagedValue::forUnmanaged(addr));
+    return B.createLoadBorrow(loc,
+                              ManagedValue::forBorrowedAddressRValue(addr));
   }
 
   // Load the loadable value, and retain it if we aren't taking it.
@@ -4460,7 +4472,7 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
     if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
-      return ManagedValue::forUnmanaged(addr);
+      return ManagedValue::forBorrowedAddressRValue(addr);
 
     // Copy the address-only value.
     return B.formalAccessBufferForExpr(
@@ -4482,8 +4494,8 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
   // we can perform a +0 load of the address instead of materializing a +1
   // value.
   if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
-    return B.createFormalAccessLoadBorrow(loc,
-                                          ManagedValue::forUnmanaged(addr));
+    return B.createFormalAccessLoadBorrow(
+        loc, ManagedValue::forBorrowedAddressRValue(addr));
   }
 
   // Load the loadable value, and retain it if we aren't taking it.

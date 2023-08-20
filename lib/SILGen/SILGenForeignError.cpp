@@ -97,12 +97,10 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
   }
 
   // Otherwise, do a normal assignment.
-  LValue lvalue =
-    SGF.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
-                           bridgedErrorPtrType, pointeeProperty,
-                           LValueOptions(),
-                           SGFAccessKind::Write,
-                           AccessSemantics::Ordinary);
+  LValue lvalue = SGF.emitPropertyLValue(
+      loc, ManagedValue::forRValueWithoutOwnership(foreignErrorSlot),
+      bridgedErrorPtrType, pointeeProperty, LValueOptions(),
+      SGFAccessKind::Write, AccessSemantics::Ordinary);
   RValue rvalue(SGF, loc, bridgedErrorProto,
                 SGF.emitManagedRValueWithCleanup(bridgedError));
   SGF.emitAssignToLValue(loc, std::move(rvalue), std::move(lvalue));
