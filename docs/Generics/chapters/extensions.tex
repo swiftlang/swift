@@ -186,7 +186,7 @@ Ordinary type resolution depends on generic signature construction and protocol 
 
 This is the situation alluded to previously, where extension binding fails but the \textbf{type-check source file request} successfully resolves the extended type later. In this case, a couple of additional checks help tailor the diagnostic. If ordinary type resolution returned a type alias type \texttt{Foo} desugaring to a nominal type \texttt{Bar}, the type checker emits the ``extension of type \texttt{Foo} must be declared as an extension of \texttt{Bar}'' diagnostic. Even though we know what the extended type should be at this point, we must still diagnose an error; it is too late to bind the extension, because other name lookups may have already been performed, potentially missing out on finding members of this extension.
 
-\begin{example}\label{bad extension 1} An invalid extension of an inferred type alias:
+\begin{example}\label{bad extension 1} An invalid extension of an inferred type alias:\index{horse}
 \begin{Verbatim}
 protocol Animal {
   associatedtype FeedType

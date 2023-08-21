@@ -8,7 +8,7 @@
 \index{abstract conformance}
 \IndexDefinition{concrete conformance}
 \IndexDefinition{normal conformance}
-\IndexDefinition{specialized conformance}
+\index{specialized conformance}
 \index{inherited conformance}
 \IndexDefinition{self conformance}
 \index{specialized type}
@@ -34,7 +34,7 @@ Concrete conformances break down further into four sub-kinds, the first two bein
 \index{inheritance clause}%
 \IndexDefinition{conformance}%
 \index{protocol conformance|see{conformance}}%
-\paragraph{Normal conformances} Structs, enums and classes can conform to protocols. A normal conformance represents the \emph{declaration} of a conformance. Normal conformances are declared in the inheritance clause of a nominal type or extension:
+\paragraph{Normal conformances} Structs, enums and classes can conform to protocols. A normal conformance represents the \emph{declaration} of a conformance. Normal conformances are declared in the inheritance clause of a nominal type or extension:\index{horse}
 \begin{Verbatim}
 struct Horse: Animal {...}
 
@@ -207,7 +207,7 @@ Thus, we can apply substitution maps to conformances, just like we can apply the
 
 \section{Type Witnesses}\label{type witnesses}
 
-\index{type witness}
+\IndexDefinition{type witness}
 \index{type alias declaration}
 \index{generic parameter declaration}
 \IndexDefinition{associated type inference}
@@ -353,7 +353,7 @@ The derived conformance requirement $\ConfReq{T}{P}$ gives us the abstract confo
 As every valid dependent member type is the type witness of an abstract conformance, we can define the application of a substitution map to a dependent member type by factoring the dependent member type in this manner:
 \[\texttt{T.[P]A}\otimes\Sigma=\bigl(\AssocType{[P]A} \otimes \ConfReq{T}{P}\bigr)\otimes\Sigma=\AssocType{[P]A}\otimes\bigl(\ConfReq{T}{P}\otimes\Sigma\bigr)\]
 
-We saw how normal and specialized conformances are substituted in Section~\ref{conformance subst}. Now, it appears we need the ability to apply a substitution map to an abstract conformance. This operation is named \index{local conformance lookup}\emph{local conformance lookup} by analogy with \index{global conformance lookup}global conformance lookup. Local conformance lookup is \emph{compatible} with global conformance lookup, in this sense: a local conformance lookup with some \index{substitution map}substitution map $\Sigma$, type parameter \texttt{T} and protocol \texttt{P} must return the same conformance as performing a global conformance lookup of $\texttt{T}\otimes\Sigma$ to $\texttt{P}$. This can be expressed as an equation:
+We saw how normal and specialized conformances are substituted in Section~\ref{conformance subst}. Now, it appears we need the ability to apply a substitution map to an abstract conformance. This operation is named \IndexDefinition{local conformance lookup}\emph{local conformance lookup} by analogy with \index{global conformance lookup}global conformance lookup. Local conformance lookup is \emph{compatible} with global conformance lookup, in this sense: a local conformance lookup with some \index{substitution map}substitution map $\Sigma$, type parameter \texttt{T} and protocol \texttt{P} must return the same conformance as performing a global conformance lookup of $\texttt{T}\otimes\Sigma$ to $\texttt{P}$. This can be expressed as an equation:
 \[(\protosym{P}\otimes\texttt{T})\otimes\Sigma=\protosym{P}\otimes(\texttt{T}\otimes\Sigma)\]
 
 Local conformance lookup is not actually implemented in terms of global conformance lookup, though. In the simple case, when the abstract conformance corresponds to an explicit conformance requirement in the substitution map's input generic signature,  local conformance lookup returns one of the conformances stored by the substitution map. In the general case, local conformance lookup derives the conformance via a \index{conformance path}\emph{conformance path}. This will be revealed in Chapter~\ref{conformance paths}.

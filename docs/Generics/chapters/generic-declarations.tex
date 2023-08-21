@@ -247,7 +247,7 @@ Opaque parameter declarations were introduced in Swift 5.7 \cite{se0341}. Note t
 \index{protocol declaration}
 \index{conforming type}
 \IndexDefinition{protocol Self type@protocol \texttt{Self} type}
-Protocols have an implicit generic parameter list with a single generic parameter named \texttt{Self}, which conceptually stands in for the concrete conforming type. Protocols can specify generic requirements on the \texttt{Self} type and its associated types, using similar syntax as other generic declarations; conforming concrete types are checked to satisfy these requirements (Section~\ref{requirement sig}). Protocols can only appear at the top level of a source file, and structs, classes and enums cannot be nested inside protocols (Section~\ref{nested nominal types}).
+Protocols have an implicit generic parameter list with a single generic parameter named \texttt{Self}, which represents the conforming type of a concrete conformance. Protocols can impose \IndexDefinition{associated requirement}\emph{associated requirements} on the \texttt{Self} type and its member types, and any concrete conformance to this protocol must satisfy those requirements. The associated requirements are collected in the protocol's requirement signature (Section~\ref{requirement sig}). Protocols can only appear at the top level of a source file, and structs, classes and enums cannot be nested inside protocols (Section~\ref{nested nominal types}).
 
 \IndexDefinition{primary associated type}%
 \index{parameterized protocol type}%
@@ -343,8 +343,8 @@ We'll say more about the semantics of protocol inheritance clauses and name look
 \paragraph{History}
 In older releases of Swift, protocols could only constrain associated types by writing a constraint type in the associated type's inheritance clause, which limited the kinds of requirements that could be imposed on the associated type. The trailing \texttt{where} clause syntax was extended to cover associated types and protocols in Swift~4~\cite{se0142}.
 
-\index{recursive conformance}%
-Another important generalization allowed an associated type to conform to the same protocol that it appears in, either directly or indirectly. The ability to declare a so-called \emph{recursive conformance} was introduced in Swift 4.1 \cite{se0157}. This feature has some profound implications, which are further explored in Section~\ref{type parameter graph}, \ref{recursive conformances}, and \ref{monoidsasprotocols}.
+\index{recursive conformance requirement}%
+Another important generalization allowed an associated type to conform to the same protocol that it appears in, either directly or indirectly. The ability to declare a so-called \emph{recursive conformance} was introduced in Swift 4.1 \cite{se0157}. This feature has some profound implications, which are further explored in Section~\ref{type parameter graph}, \ref{recursive conformances}, \ref{monoidsasprotocols}, and \ref{recursive conformances redux}.
 
 \section{Source Code Reference}\label{genericdeclsourceref}
 

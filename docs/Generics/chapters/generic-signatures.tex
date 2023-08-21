@@ -135,7 +135,7 @@ Requirement signatures also store a compact description of all protocol type ali
 
 \cite{combinatory}
 
-What \emph{exactly} are these mysterious \index{dependent member type}dependent member types, the \index{type parameter}type parameters that are not top-level generic parameters? The definition offered so far---a dependent member type stores a base type parameter together with a reference to an identifier or associated type declaration---is unsatisfying, for several reasons. Primarily, it does not address the question of which \IndexDefinition{valid type parameter}dependent member types are valid, or where they come from. It turns out the answer to this question is intertwined with the notion of a \IndexDefinition{derived requirement}\emph{derived requirement}.
+What \emph{exactly} are these mysterious \index{dependent member type}dependent member types, the \IndexDefinition{type parameter}type parameters that are not top-level generic parameters? The definition offered so far---a dependent member type stores a base type parameter together with a reference to an identifier or associated type declaration---is unsatisfying, for several reasons. Primarily, it does not address the question of which \IndexDefinition{valid type parameter}dependent member types are valid, or where they come from. It turns out the answer to this question is intertwined with the notion of a \IndexDefinition{derived requirement}\emph{derived requirement}.
 
 Just like type parameters are more general than generic parameters, we can talk about requirements that are ``known to be true'' as a more general concept than the minimal requirements directly stated in the generic signature. This section will define a set of \emph{derivation rules} which start with a base set of assumptions---the generic parameters and minimal requirements of a generic signature---and prove new type parameters and derived requirements. Understanding this formalism will motivate much of the rest of the book.
 
@@ -164,7 +164,7 @@ So far this is just abstract nonsense, but here's the trick. The \texttt{Sequenc
 \end{gather*}
 This time, our derivations actually made use of a previously-proven fact, albeit still in a rather trivial way. For the next step, we recall that the requirement signature of \texttt{Sequence} conforms \texttt{Self.[Sequence]Iterator} to \texttt{IteratorProtocol}. Just like the minimal requirements of a generic signature, the minimal requirements of a requirement signature can be immediately stated:
 \begin{gather}
-\vdash\ConfReq{Self.[Sequence]Iterator}{IteratorProtocol}\qquad\mbox{(in \texttt{Sequence})}\tag{2}
+\vdash\ConfReq{Self.[Sequence]Iterator}{IteratorProtocol}_\texttt{Sequence}\tag{2}
 \end{gather}
 The above requirement applies to the requirement signature of \texttt{Sequence}. If we replace \texttt{Self} with \ttgp{0}{1} in (2), we get a derived requirement for our generic signature. This derivation is valid, because we established that \ttgp{0}{1} conforms to \texttt{Sequence} in (1). Thus,
 \begin{gather}
@@ -178,7 +178,7 @@ This last derivation is now non-trivial---it is a consequence of two requirement
 \end{gather}
 We also make use of that same-type requirement in the \texttt{Sequence} protocol; to avoid overfull hboxes, let's abbreviate the protocol qualification in those dependent member types:
 \begin{gather}
-\vdash\FormalReq{Self.[S]Element == Self.[S]Iterator.[I]Element}\tag{5}\qquad\mbox{(in \texttt{Sequence})}
+\vdash\FormalReq{Self.[S]Element == Self.[S]Iterator.[I]Element}_\texttt{Sequence}\tag{5}
 \end{gather}
 Let's use this requirement signature requirement to derive a same-type requirement in our generic signature:
 \begin{gather}
@@ -203,7 +203,7 @@ Every \index{generic parameter type}generic parameter in a generic signature is 
 \vdash\FormalReq{T == U}
 \end{gather*}
 
-\paragraph{Dependent member types} \IndexStepDefinition{AssocType}All other type parameters are dependent member types, and they owe their existence to conformance requirements. If we have a \index{conformance requirement}conformance requirement \texttt{T:~P}, and the protocol \texttt{P} declares an \index{associated type declaration}associated type named \texttt{A}, we get a pair of valid type parameters from this conformance requirement. These are the \index{unbound dependent member type}unbound and \index{bound dependent member type}bound \index{dependent member type}dependent member type for \texttt{A} with base type \texttt{T}. We also want them to be equivalent, so we derive a same-type requirement to that effect:
+\paragraph{Dependent member types} \IndexStepDefinition{AssocType}All other type parameters are dependent member types, and they owe their existence to conformance requirements. If we have a \index{conformance requirement}conformance requirement $\ConfReq{T}{P}$, and the protocol \texttt{P} declares an \index{associated type declaration}associated type named \texttt{A}, we get a pair of valid type parameters from this conformance requirement. These are the \index{unbound dependent member type}unbound and \index{bound dependent member type}bound \index{dependent member type}dependent member type for \texttt{A} with base type \texttt{T}. We also want them to be equivalent, so we derive a same-type requirement to that effect:
 \begin{gather*}
 \ConfReq{T}{P}\vdash\texttt{T.A}\tag{\textsc{AssocType}}\\
 \ConfReq{T}{P}\vdash\texttt{T.[P]A}\\
@@ -213,10 +213,10 @@ Every \index{generic parameter type}generic parameter in a generic signature is 
 \paragraph{Requirement signatures}
 \IndexStepDefinition{ReqSig} For every protocol \texttt{P}, every minimal requirement of the requirement signature of \texttt{P} can be immediately derived; they are annotated with their protocol, making them distinct from other requirements of other protocols:
 \begin{gather*}
-\vdash\ConfReq{Self.U}{P}\qquad\mbox{(in \texttt{P})}\tag{\textsc{ReqSig}}\\
-\vdash\ConfReq{Self.U}{C}\qquad\mbox{(in \texttt{P})}\\
-\vdash\ConfReq{Self.U}{AnyObject}\qquad\mbox{(in \texttt{P})}\\
-\vdash\FormalReq{Self.U == Self.V}\qquad\mbox{(in \texttt{P})}
+\vdash\ConfReq{Self.U}{P}_\texttt{P}\tag{\textsc{ReqSig}}\\
+\vdash\ConfReq{Self.U}{C}_\texttt{P}\\
+\vdash\ConfReq{Self.U}{AnyObject}_\texttt{P}\\
+\vdash\FormalReq{Self.U == Self.V}_\texttt{P}
 \end{gather*}
 These requirements, all rooted in the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type, come into play if we are also able to derive a conformance requirement $\ConfReq{T}{P}$. In fact, while any requirement signature requirement can be immediately derived as above, there is no way to make use of one unless one can prove a conformance requirement first. The idea of which protocols we can ``reach'' comes up again in Section~\ref{recursive conformances} and \ref{protocol component}.
 
@@ -304,13 +304,13 @@ A \IndexDefinition{relation}\emph{relation} on a \index{set}set $S$ is a \index{
 If the partial order relation $R$ is understood from context, we can write $x<y$ instead of $(x,y)\in R$, and $x\not< y$ if $(x,y)\not\in R$. Sometimes in the literature, partial orders use the symbol $\le$ and require that $a\le a$ for all $a\in S$ (that is, the relation is reflexive, not anti-reflexive). This is equivalent to our definition, because we can define $a<b$ to mean $a\leq b$ and $a\neq b$.
 \end{definition}
 
-\begin{definition} A \emph{linear order} over some set $S$ is a partial order $<$ with the additional property that for each pair $a$, $b\in S$, exactly one of $a<b$, $b<a$ or $a=b$ is true. Sometimes, a linear order is called a ``total order.''
+\begin{definition} A \IndexDefinition{linear order}\emph{linear order} over some set $S$ is a partial order $<$ with the additional property that for each pair $a$, $b\in S$, exactly one of $a<b$, $b<a$ or $a=b$ is true. Sometimes, a linear order is called a ``total order.''
 \end{definition}
 
 With both partial and linear orders, if $a<b$, then $b\not< a$. To see why, note that if $a<b$ and $b<a$ were both simultaneously true, the transitivity of $<$ would imply that $a<a$, contradicting the assumption that $<$ is anti-reflexive. A partial order also allows for \emph{incomparable} elements, where both $a\not< b$ and $b\not< a$. This cannot occur in a linear order.
 
 The linear order on type parameters is built up from three simpler linear orders: on generic parameters, protocol declarations, and associated type declarations. Note that the below algorithms all compute whether $x<y$, $y>x$ or $x=y$ simultaneously.
-\begin{algorithm}[Generic parameter order]\label{generic parameter order} \index{generic parameter order}Takes \index{generic parameter type}generic parameter types \ttgp{d}{i} and \ttgp{D}{I} as input, where that all four of \texttt{d}, \texttt{i}, \texttt{D} and \texttt{I} are non-negative intgers. Returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
+\begin{algorithm}[Generic parameter order]\label{generic parameter order} \IndexDefinition{generic parameter order}Takes \index{generic parameter type}generic parameter types \ttgp{d}{i} and \ttgp{D}{I} as input, where that all four of \texttt{d}, \texttt{i}, \texttt{D} and \texttt{I} are non-negative intgers. Returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
 \item If $\texttt{d}<\texttt{D}$, return ``$<$''.
 \item If $\texttt{d}>\texttt{D}$, return ``$>$''.
@@ -327,7 +327,7 @@ The linear order on type parameters is built up from three simpler linear orders
 \end{enumerate}
 \end{algorithm}
 \begin{example}
-Say the \texttt{Barn} module defines a \texttt{Horse} protocol, and the \texttt{Swift} module defines \texttt{Collection}. We have $\mathtt{Barn.Horse}<\mathtt{Swift.Collection}$, since $\mathtt{Barn}<\mathtt{Swift}$.
+Say the \texttt{Barn} module defines a \index{horse}\texttt{Horse} protocol, and the \texttt{Swift} module defines \texttt{Collection}. We have $\mathtt{Barn.Horse}<\mathtt{Swift.Collection}$, since $\mathtt{Barn}<\mathtt{Swift}$.
 
 If the \texttt{Barn} module also defines a \texttt{Saddle} protocol, then $\mathtt{Barn.Horse}<\mathtt{Barn.Saddle}$; both are from the same module, so we compare protocol names, $\mathtt{Horse}<\mathtt{Saddle}$.
 \end{example}
@@ -464,7 +464,7 @@ These definitions characterize reduced types but don't give an algorithm for com
 \[\cdots < -3 < -2 < -1\]
 On the other hand, in the set of \index{natural numbers}natural numbers (non-negative integers) $\mathbb{N}$, every non-empty subset $S\subseteq\mathbb{N}$ has a minimum element. We first check if $0\in S$; if so, we're done. Otherwise, we check if $1\in S$, $2\in S$, and so on. Since $S$ was non-empty this must terminate after a finite number of steps and produce a minimum element. The difference between the ``less-than'' order on $\mathbb{N}$ and $\mathbb{Z}$ is given by the following definition.
 \begin{definition}
-A \index{partial order}partial order over a set $S$ is \index{well-founded order}\emph{well-founded} if $S$ does not have an infinite descending chain; that is, there does not exist an infinite sequence of elements $x_i\in S$ such that:
+A \index{partial order}partial order over a set $S$ is \IndexDefinition{well-founded order}\emph{well-founded} if $S$ does not have an infinite descending chain; that is, there does not exist an infinite sequence of elements $x_i\in S$ such that:
 \[\ldots <x_n<\ldots <x_3<x_2<x_1\]
 \end{definition}
 \begin{proposition}\label{well founded type order} The type parameter order defined by Algorithm~\ref{type parameter order} is well-founded.
@@ -521,7 +521,7 @@ protocol N {
 \end{Verbatim}
 Now consider \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:~N>}. In this generic signature, we can derive an infinite sequence of type parameters. We start with some initial derivations:
 \begin{gather}
-\vdash\ConfReq{Self}{A}\qquad\mbox{(in \texttt{N})}\tag{1}\\
+\vdash\ConfReq{Self}{A}_\texttt{N}\tag{1}\\
 \vdash\ttgp{0}{0}\tag{2}
 \end{gather}
 Now, we can derive a dependent member type:
@@ -626,13 +626,13 @@ Consider this generic signature:
 \end{gather*}
 \texttt{requiresProtocol(T.Iterator, IteratorProtocol)} is true because \texttt{Sequence} makes \texttt{Iterator} conform to \texttt{IteratorProtocol}:
 \begin{gather}
-\vdash \ConfReq{Self.Iterator}{IteratorProtocol} \qquad \mbox{(in \texttt{Sequence})}\tag{4}\\
+\vdash \ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}\tag{4}\\
 (3),\,(4)\vdash \FormalReq{T.Iterator:~IteratorProtocol}\tag{5}
 \end{gather}
 \texttt{requiresClass(U)} is true because \texttt{Executor} is defined as a \index{class-constrained protocol}class-constrained protocol in the standard library:
 \begin{gather}
 \vdash \ConfReq{U}{Executor}\tag{6}\\
-\vdash \ConfReq{Self}{AnyObject}\qquad\mbox{(in \texttt{Executor})}\tag{7}\\
+\vdash \ConfReq{Self}{AnyObject}_\texttt{Executor}\tag{7}\\
 (6),\,(7)\vdash \ConfReq{U}{AnyObject}\tag{8}
 \end{gather}
 \texttt{requiresClass(V)} is true because \texttt{NSObject} is a class. This proof requires derivation kinds we haven't introduced, because we must say things about concrete types. So keep in mind the below is hand-waving, for now:
@@ -647,7 +647,7 @@ Consider this generic signature:
 \end{gather}
 \texttt{isConcreteType(T.Iterator.Element)} is also true because it is implied by the same-type requirement in \texttt{Sequence}:
 \begin{gather}
-\vdash\FormalReq{Self.Element == Self.Iterator.Element}\qquad\mbox{(in \texttt{Sequence})}\tag{13}\\
+\vdash\FormalReq{Self.Element == Self.Iterator.Element}_\texttt{Sequence}\tag{13}\\
 (3),(13)\vdash\FormalReq{T.Element == T.Iterator.Element}\tag{14}\\
 (14)\vdash\FormalReq{T.Iterator.Element == T.Element}\tag{15}\\
 (15),(12)\vdash\FormalReq{T.Iterator.Element == Array<U>}\tag{16}
@@ -693,12 +693,12 @@ In the following generic signature, \texttt{getConcreteType(T.Index)} is \texttt
 Proving this by hand is tricky, and demonstrates the expressivity of generic signature queries. First, we derive $\FormalReq{T.Indices:~Collection}$:
 \begin{gather}
 \vdash \ConfReq{T}{Collection}\tag{1}\\
-\vdash \FormalReq{Self.Indices:~Collection}\qquad\mbox{(in \texttt{Collection})}\tag{2}\\
+\vdash \FormalReq{Self.Indices:~Collection}_\texttt{Collection}\tag{2}\\
 (1),\,(2)\vdash\FormalReq{T.Indices:~Collection}\tag{3}
 \end{gather}
 Next, we need a same-type requirement between \texttt{T.Index} and \texttt{T.Indices.Element}:
 \begin{gather}
-\vdash \FormalReq{Self.Index == Self.Indices.Element}\qquad\mbox{(in \texttt{Collection})}\tag{4}\\
+\vdash \FormalReq{Self.Index == Self.Indices.Element}_\texttt{Collection}\tag{4}\\
 (1),\,(4)\vdash \FormalReq{T.Index == T.Indices.Element}\tag{5}
 \end{gather}
 Now, we're going to use the \textsc{Member} derivation step, by which same-type requirements recursively apply to dependent member types:
@@ -750,7 +750,7 @@ protocol P {
 The reduced type of \texttt{T.[P]A} is \texttt{Array<Int>}:
 \begin{gather}
 \vdash \ConfReq{T}{P}\tag{1}\\
-\vdash \FormalReq{Self.[P]A == Array<Self.[P]B>}\qquad\mbox{(in \texttt{P})}\tag{2}\\
+\vdash \FormalReq{Self.[P]A == Array<Self.[P]B>}_\texttt{P}\tag{2}\\
 (1),\,(2)\vdash \FormalReq{T.[P]A == Array<T.[P]B>}\tag{3}\\
 \vdash \FormalReq{T.[P]B == Int}\tag{4}\\
 (4)\vdash \FormalReq{Array<T.[P]B> == Array<Int>}\tag{5}\\

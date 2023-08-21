@@ -18,7 +18,7 @@ The entities being operated upon:
 \end{itemize}
 A composition operation is defined on various kinds of entities, written as \index{$\otimes$}$A \otimes B$. If a juxtaposition of three entities can be evaluated in two different ways, the result is always the same, so the composition operator is \emph{associative}: $A\otimes (B\otimes C) = (A\otimes B) \otimes C$.
 
-Substitution maps act on the right of types, conformances, and other substitution maps. This gives us \index{type substitution}type substitution (Section~\ref{substmaps}), \index{conformance substitution}conformance substitution (Chapter~\ref{conformances}) and \index{substitution map composition}substitution map composition (Section~\ref{submapcomposition}). This action produces a new entity of the same kind as the original:
+Substitution maps act on the right of types, conformances, and other substitution maps. This gives us \index{type substitution}type substitution (Section~\ref{substmaps}), \index{conformance substitution map}conformance substitution (Chapter~\ref{conformances}) and \index{substitution map composition}substitution map composition (Section~\ref{submapcomposition}). This action produces a new entity of the same kind as the original:
 \begin{gather*}
 \TypeObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}\\
 \ConfObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\ConfObj{H}\\
@@ -26,7 +26,7 @@ Substitution maps act on the right of types, conformances, and other substitutio
 \end{gather*}
 Protocols act on the left of types (\index{global conformance lookup}global conformance lookup, Section~\ref{conformance lookup}):
 \[\ProtoObj\otimes\TypeObj{G}\longrightarrow\ConfObj{G}\]
-Associated type declarations act on the left of conformances (\index{type witness projection}type witness projection, Section~\ref{type witnesses}):
+Associated type declarations act on the left of conformances (\index{type witness}type witness projection, Section~\ref{type witnesses}):
 \[\AssocTypeObj{P}\otimes\ConfPObj{P}{G}\longrightarrow\TypeObj{G}\]
 Associated conformance requirements act on the left of conformances (\index{associated conformance projection}associated conformance projection, Section~\ref{associated conformances}):
 \[\AssocConfObj{P}\otimes\ConfPObj{P}{G}\longrightarrow\ConfPObj{P}{G}\]
