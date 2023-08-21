@@ -2743,7 +2743,7 @@ void swift::swift_initStructMetadataWithLayoutString(
       }
 
       fullOffset += fieldType->size;
-      previousFieldOffset = fieldType->size;
+      previousFieldOffset = fieldType->size - sizeof(uintptr_t);
 
       continue;
     }

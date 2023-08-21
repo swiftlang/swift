@@ -223,6 +223,47 @@ public struct Recursive<T> {
     }
 }
 
+public protocol Foo: AnyObject {}
+
+public enum Repro {
+    public struct R1 {
+        let x: R2?
+        let y: Int
+        weak var z: Foo?
+        let w: [NSNotification.Name]
+
+        public init(x: R2?,
+                    y: Int,
+                    z: Foo?,
+                    w: [NSNotification.Name]) {
+            self.x = x
+            self.y = y
+            self.z = z
+            self.w = w
+        }
+    }
+
+    public struct R2 {
+        let x: NSNotification.Name?
+        let y: Bool
+        let z: E1
+
+        public init(x: NSNotification.Name?,
+                    y: Bool,
+                    z: E1) {
+            self.x = x
+            self.y = y
+            self.z = z
+        }
+    }
+
+    public enum E1: Int {
+        case x
+        case y
+        case z
+    }
+}
+
 #if os(macOS)
 import Foundation
 

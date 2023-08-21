@@ -360,11 +360,19 @@ public:
         break;
       }
 
-      default: {
+      case RefCountingKind::Existential: {
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
         refCountBytes += sizeof(uint64_t);
         skip = 0;
+        break;
+      }
+
+      default: {
+        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+        B.addInt64(op);
+        refCountBytes += sizeof(uint64_t);
+        skip = refCounting.size - IGM.getPointerSize().getValue();
         break;
       }
       }

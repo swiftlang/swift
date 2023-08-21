@@ -24,6 +24,40 @@ class TestClass {
     }
 }
 
+class XX: Foo {
+    deinit {
+        print("XX deinitialized!")
+    }
+}
+
+func testRepro() {
+    let ptr = allocateInternalGenericPtr(of: Repro.R1.self)
+
+    do {
+        let x = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: XX(), w: [])
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: XX(), w: [])
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: XX deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: XX deinitialized!
+    testGenericDestroy(ptr, of: Repro.R1.self)
+
+    ptr.deallocate()
+}
+
+testRepro()
+
 func testGeneric() {
     let ptr = allocateInternalGenericPtr(of: TestClass.self)
     
