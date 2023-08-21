@@ -44,7 +44,7 @@ Requirement machines come in four varieties:
 \end{enumerate}
 Note that we have all four combinations of domain and ``purpose.'' In case (1) and (2) above, the domain is a list of generic parameters. In case (3)~and~(4), the domain is a list of protocols in a protocol component (which will be introduced shortly). In case (1)~and~(3), our goal is to build a requirement machine and use its rewrite system and property map, so we don't record rewrite loops. In case (2)~and~(4), we're also computing a list of minimal requirements, so we \emph{do} record rewrite loops. Let's now take a closer look at each of these four possibilities.
 
-\paragraph{Generic signature}
+\paragraph{Generic signature.}
 \index{generic signature query}%
 \IndexDefinition{rewrite context}%
 \index{rewrite rule}%
@@ -132,7 +132,7 @@ The lazy construction of a requirement machine for a generic signature is simila
 \end{center}
 \end{figure}
 
-\paragraph{Generic signature minimization}
+\paragraph{Generic signature minimization.}
 \index{inferred generic signature request}%
 \index{abstract generic signature request}%
 \index{minimal requirement}%
@@ -159,7 +159,7 @@ Of course it is worth asking if a requirement machine built from desugared user-
 \end{itemize}
  The \texttt{-disable-requirement-machine-reuse} frontend flag forces the rewrite context to always just discard the requirement machine after minimization. If you're lucky enough to discover a new scenario not covered by one of the above cases, then this flag might address the problem; it would certainly make for an interesting bug report!
 
-\paragraph{Protocol component}
+\paragraph{Protocol component.}
 \index{protocol component}%
 A requirement machine for a protocol component is built in a similar way to Figure~\ref{rqm flowchart generic signature}. We take with the requirement signature of each protocol in the component, build rewrite rules, run completion, and construct the property map. Protocol component machines are never directly used for queries; we only issue queries against generic signature machines. Instead, protocol component machines only have one purpose in life: to have their rewrite rules imported into other requirement machines.
 \eject
@@ -170,7 +170,7 @@ The rule builder here converts the requirements of the requirement signature int
 \index{main module}%
 Typically, protocol component requirement machines are created for protocols that were deserialized from another module, where the requirement signatures were previously computed and serialized as well. For protocols in the main module (that is, written in source) we use the fourth and final kind of requirement machine to compute their requirement signatures first; this requirement machine is then installed in the rewrite context so that those rules can be imported later. However, just as the generic signature minimization requirement machine cannot be installed under some circumstances, the same edge cases can force us to discard the protocol component minimization requirement machine instead of installing it, in which case we will build a new protocol component requirement machine from the requirement signatures we just built.
 
-\paragraph{Protocol component minimization}
+\paragraph{Protocol component minimization.}
 \index{structural requirements request}%
 \index{type alias requirements request}%
 \index{requirement signature request}%
@@ -186,7 +186,7 @@ A requirement machine is constructed from an initial list of requirements. To un
 
 TODO: mention domain
 
-\paragraph{Derived requirements}
+\paragraph{Derived requirements.}
 There is a link between the protocol dependency graph and the \index{derived requirement}derived requirements formalism. Define a relation \index{$\prec$}\index{$\prec$!z@\igobble|seealso{reachability relation}}$\prec$ between protocols, where $\texttt{P}\prec\texttt{Q}$ if $G_\texttt{P}\vDash\ConfReq{T}{Q}$ for some type parameter \texttt{T}; that is, $\texttt{P}\prec\texttt{Q}$ means that we can derive a conformance requirement mentioning \texttt{Q} starting from the requirements of \texttt{P}. Now, this conformance requirement has a conformance path, to which we can apply our graph homomorphism and get a path from \texttt{P} to \texttt{Q}. Thus, $\texttt{P}\prec\texttt{Q}$ can also be understood as the reachability relation in the protocol dependency graph. In Chapter~\ref{rqm basic operation}, we make use of this fact when building the rewrite system for a generic signature, by pulling in the requirements of protocols reachable via the protocol dependency graph.
 
 \index{protocol dependency graph}%

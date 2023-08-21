@@ -35,7 +35,7 @@
 
 Suppose the text ``\texttt{Array<Int>}'' appears in a valid position of the language grammar. First, the \index{lexer}lexer splits the input text into a tokens: ``\texttt{Array}'', ``\texttt{<}'', ``\texttt{Int}'', and ``\texttt{>}''. The \index{parser}parser inspects each token and builds a type representation.
 
-The parsed type representation \texttt{Array<Int>} has a \index{tree}tree structure, combining the identifier ``\texttt{Array}'' with the type representation \texttt{Int}. The latter is a leaf node just storing an identifier. As syntactic objects, type representations only store identifiers, which bear no relation to actual type declarations. The ``shape'' of a tree node is determined by the type representation's \emph{kind}, corresponding to syntactic productions.
+The parsed type representation \texttt{Array<Int>} has a \index{tree}tree structure, combining the identifier ``\texttt{Array}'' with the type representation \texttt{Int}. The latter is a leaf node just storing an identifier. As syntactic objects, type representations only store identifiers, which bear no relation to actual type declarations. The ``shape'' of a tree node is determined by the type representation's \IndexDefinition{type representation kind}\emph{kind}, corresponding to syntactic productions.
 
 \medskip
 
@@ -68,7 +68,7 @@ Type resolution calls upon name lookup to find type declarations for \texttt{Arr
 
 The generic nominal type \texttt{Array<Int>} points at the \texttt{Array} type declaration, and contains a child node for its generic argument, which is the type \texttt{Int}. The latter type also points at the declaration of \texttt{Int}, and not just an identifier.
 
-Types are categorized by \emph{kind}, just like type representations. Each kind has a constructor operation to form a new type from \emph{structural components}, and corresponding operations to take an existing type apart.
+Types are categorized by \IndexDefinition{type kind}\emph{kind}, just like type representations. Each kind has a constructor operation to form a new type from \IndexDefinition{structural components}\emph{structural components}, and corresponding operations to take an existing type apart.
 
 \paragraph{Categorization by kind}
 Type representation kinds are given by various productions in the grammar, such as identifiers, function type representations ``\texttt{(Int) -> ()}'', tuple type representations ``\texttt{(Bool, String)}'', and so on. The latter two correspond directly to function types and tuple types, but type kinds are more fine-grained in general, as we can see if we consider identifier type representations. An identifier type representation ``\texttt{Element}'' can resolve to one of several kinds of types; we consider a few now.
@@ -369,7 +369,7 @@ Note that a dependent member type is ``dependent'' in the C++ sense, \emph{not} 
 \paragraph{Archetype types}
 Type parameters derive their meaning from the requirements of a generic signature; they are only ``names'' of external entities, in a sense. \IndexDefinition{archetype type}Archetypes are an alternate ``self-describing'' representation. Archetypes are instantiated from a \emph{generic environment}, which stores a generic signature together with other information (Chapter~\ref{genericenv}).
 
-Archetypes appear in place of type parameters inside the types of \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (Section~\ref{opaquearchetype}) and the type of the payload inside of an existential (Section~\ref{open existential archetypes}). In diagnostics, an archetype is printed as the type parameter it represents. To distinguish an archetype from its type parameter \texttt{T}, we use the notation $\archetype{T}$ for the archetype. A type that might contain archetypes but is not necessarily an archetype itself is called a \IndexDefinition{contextual type}\emph{contextual type}.
+Archetypes appear in place of type parameters inside the types of \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (Section~\ref{opaquearchetype}) and the type of the payload inside of an existential (Section~\ref{open existential archetypes}). In diagnostics, an archetype is printed as the type parameter it represents. To distinguish an archetype from its type parameter \texttt{T}, we use the notation $\archetype{T}$ for the archetype. A type that might contain archetypes but is not necessarily an archetype itself is called a \index{contextual type}\emph{contextual type}.
 
 \medskip
 
@@ -603,7 +603,7 @@ A \IndexDefinition{generic function type}generic function type has the same stru
 \end{verbatim}
 \end{quote}
 
-Generic function types are the \index{interface type}interface types of generic \index{function declaration}function and \index{subscript declaration}subscript declarations. A reference to a generic function declaration from an expression always applies substitutions first, so generic function types do not appear as the types of expressions. In particular, an unsubstituted generic function value cannot be a parameter to another function, thus the Swift type system does not support \index{higher-rank polymorphism}higher-rank polymorphism. Type inference with higher-rank types is known to be \index{halting problem}\index{undecidable problem}undecidable \cite{wells}.
+Generic function types are the \index{interface type}interface types of generic \index{function declaration}function and \index{subscript declaration}subscript declarations. A reference to a generic function declaration from an expression always applies substitutions first, so generic function types do not appear as the types of expressions. In particular, an unsubstituted generic function value cannot be a parameter to another function, thus the Swift type system does not support \index{higher-rank polymorphism}higher-rank polymorphism. Type inference with higher-rank types is known to be \index{halting problem}\index{undecidable problem}undecidable; see \cite{wells} and \cite{practicalhigherrank}.
 
 Generic function types have a special behavior when their canonical type is computed. Since generic function types carry a generic signature, the parameter types and return type of a \emph{canonical} generic function type are actually \emph{reduced} types with respect to this generic signature (Section~\ref{reducedtypes}).
 
@@ -725,7 +725,7 @@ The \texttt{getPointer()} method is only used occasionally, because types are us
 \item \textbf{Substitution:} \texttt{subst()} implements type substitution, which is a particularly common kind of transform which replaces generic parameters or archetypes with concrete types (Section~\ref{substmapsourcecoderef}).
 \item \textbf{Printing:} \texttt{print()} outputs the string form of a type, with many customization options; \texttt{dump()} prints the \index{tree}tree structure of a type in an \index{s-expression}s-expression form. The latter is extremely useful for invoking from inside a debugger, or ad-hoc print debug statements.
 \end{itemize}
-\IndexSource{pointer type equality}
+\IndexSource{type pointer equality}
 The \texttt{Type} class explicitly deletes the overloads of \texttt{operator==} and \texttt{operator!=} to make the choice between pointer and canonical equality explicit. To check type pointer equality of possibly-sugared types, first unwrap both sides with a \texttt{getPointer()} call:
 \begin{Verbatim}
 if (lhsType.getPointer() == rhsType.getPointer())

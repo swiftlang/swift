@@ -164,9 +164,9 @@ Substitution of an interface type containing dependent member types can \emph{fa
 
 \paragraph{Output generic signature}
 \IndexDefinition{output generic signature}%
-If the replacement types in the substitution map are \index{fully concrete type}fully concrete---that is, they do not contain any type parameters---then all possible substituted types produced by this substitution map will also be fully concrete. If the replacement types are interface types for some \emph{output} generic signature, the substitution map will produce interface types for this generic signature. The output generic signature might be a different from the \emph{input} generic signature of the substitution map. 
+If the replacement types in the substitution map are \index{fully-concrete type}fully concrete---that is, they do not contain any type parameters---then all possible substituted types produced by this substitution map will also be fully concrete. If the replacement types are interface types for some \emph{output} generic signature, the substitution map will produce interface types for this generic signature. The output generic signature might be a different from the \emph{input} generic signature of the substitution map. 
 
-The output generic signature is not stored in the substitution map; it is implicit from context. Also, fully concrete types can be seen as valid interface types for \emph{any} generic signature, because they do not contain type parameters at all. Keeping these caveats in mind, we have this essential principle:
+The output generic signature is not stored in the substitution map; it is implicit from context. Also, fully-concrete types can be seen as valid interface types for \emph{any} generic signature, because they do not contain type parameters at all. Keeping these caveats in mind, we have this essential principle:
 \begin{quote}
 \textbf{A substitution map defines a transformation from the interface types of its input generic signature to the interface types of its output generic signature.}
 \end{quote}
@@ -239,7 +239,7 @@ Applying the identity substitution map to any interface type leaves it unchanged
 \end{enumerate}
 
 \paragraph{The empty substitution map}
-The \index{empty generic signature}empty generic signature only has a single unique substitution map, the \IndexDefinition{empty substitution map}\emph{empty substitution map}, so the context substitution map of a non-specialized nominal type is the empty substitution map. In our notation, the empty substitution map is denoted $\SubstMap{}$. The only valid interface types of the empty generic signature are the \index{fully concrete type}fully concrete types. The action of the empty substitution map leaves fully concrete types unchanged, so for example, $\texttt{Int}\otimes\SubstMap{} = \texttt{Int}$.
+The \index{empty generic signature}empty generic signature only has a single unique substitution map, the \IndexDefinition{empty substitution map}\emph{empty substitution map}, so the context substitution map of a non-specialized nominal type is the empty substitution map. In our notation, the empty substitution map is denoted $\SubstMap{}$. The only valid interface types of the empty generic signature are the \index{fully-concrete type}fully-concrete types. The action of the empty substitution map leaves fully-concrete types unchanged, so for example, $\texttt{Int}\otimes\SubstMap{} = \texttt{Int}$.
 
 The empty substitution map $\SubstMap{}$ is almost never the same as the identity substitution map $1_G$. In fact, they only coincide if $G$ is the empty generic signature. Applying the empty substitution map to an interface type containing type parameters is a substitution failure and returns an error type.
 \[\texttt{\ttgp{0}{0}.[Sequence]Element} \otimes \SubstMap{} = \texttt{<<error type>>}\]
@@ -330,7 +330,7 @@ The context substitution map of a type with respect to a protocol declaration co
 }
 \]
 
-\begin{listing}\captionabove{The context substitution map with respect to a protocol context}\label{protocolsubstitutionmaplisting}
+\begin{listing}\captionabove{The context substitution map with respect to a protocol context}\label{protocolsubstitutionmaplisting}\index{horse}
 \begin{Verbatim}
 struct Horse: Animal {
   typealias Food = Hay

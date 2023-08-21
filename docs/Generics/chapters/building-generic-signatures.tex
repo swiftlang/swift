@@ -119,7 +119,7 @@ The first step is to construct a list of user-written requirements, resolving co
 The inferred generic signature request emits diagnostics at the source location of the generic context in the following circumstances:
 \begin{enumerate}
 \item If the compiler is able to prove that no substitution map can ever simultaneously satisfy all of the requirements in the generic signature, the signature is said to contain \emph{conflicting requirements}. These will diagnose an error.
-\item If some requirement can be shown to be a consequence of other requirements, the requirement is called a \emph{redundant requirement}. By default, redundant requirements are silently dropped, but if the \texttt{-Xfrontend -warn-redundant-requirements} flag is passed they are diagnosed as warnings.
+\item If some requirement can be shown to be a consequence of other requirements, the requirement is called a \emph{redundant requirement}. By default, redundant requirements are silently dropped, but if the \texttt{-Xfrontend -warn-redundant-requirements} flag is passed they are diagnosed as \index{warning}warnings.
 \end{enumerate}
 
 \begin{figure}\captionabove{Overview of the abstract generic signature request}\label{abstract generic signature request figure}
@@ -169,7 +169,7 @@ This request builds a requirement signature from the protocol's requirements and
 \index{inheritance clause}
 Recall from Section~\ref{protocols} that a constraint type written in a protocol's inheritance clause declares a conformance requirement with a subject type of \texttt{Self}. Qualified name lookup must be aware of protocol inheritance relationships, since a lookup into a protocol can also find members of inherited protocols. However, qualified lookup sits ``below'' generics. Building a protocol's requirement signature performs type resolution, which queries name lookup; those name lookups cannot in turn depend on the requirement signature having already been constructed. Thus, qualified name lookup can only look at syntactic constructs and cannot query the requirement signature.
 
-The practical consequence of this design is that protocol inheritance must be explicitly stated, and cannot be implied as a non-trivial consequence of same-type requirements. After building a protocol's requirement signature, we ensure that any conformance requirements known to be satisfied by \texttt{Self} are actually explicit requirements written in the protocol's inheritance clause, or \texttt{where} clause entires with a subject type of \texttt{Self}. Anything else is diagnosed with a warning.
+The practical consequence of this design is that protocol inheritance must be explicitly stated, and cannot be implied as a non-trivial consequence of same-type requirements. After building a protocol's requirement signature, we ensure that any conformance requirements known to be satisfied by \texttt{Self} are actually explicit requirements written in the protocol's inheritance clause, or \texttt{where} clause entires with a subject type of \texttt{Self}. Anything else is diagnosed with a \index{warning}warning.
 
 \begin{listing}\captionabove{Example showing non-obvious protocol inheritance relationship}\label{badinheritance}
 \begin{Verbatim}
@@ -196,7 +196,7 @@ protocol Bad {
 \begin{example}
 In Listing~\ref{badinheritance}, the \texttt{Self} type of the \texttt{Bad} protocol is equivalent to the type parameter \texttt{Self.Tricky.Other} via a same-type requirement. The \texttt{Tricky} associated type conforms to \texttt{Base}, and the \texttt{Other} associated type of \texttt{Base} also conforms to \texttt{Base}. For this reason, the \texttt{Self} type of \texttt{Bad} actually conforms to \texttt{Base}.
 
-However, this inheritance relationship is invisible to name lookup, so resolution of the underlying type of \texttt{Income} fails to find the declaration of \texttt{Salary}. After building the protocol's requirement signature, the type checker discovers the unexpected conformance requirement on \texttt{Self}, but at this stage, it is too late to attempt the failed name lookup again! The compiler instead emits a warning suggesting the user explicitly states the inheritance relationship in the declaration of \texttt{Bad}.
+However, this inheritance relationship is invisible to name lookup, so resolution of the underlying type of \texttt{Income} fails to find the declaration of \texttt{Salary}. After building the protocol's requirement signature, the type checker discovers the unexpected conformance requirement on \texttt{Self}, but at this stage, it is too late to attempt the failed name lookup again! The compiler instead emits a \index{warning}warning suggesting the user explicitly states the inheritance relationship in the declaration of \texttt{Bad}.
 \end{example}
 
 \section{Requirement Inference}\label{requirementinference}
@@ -217,7 +217,7 @@ func uniqueElements<S: Sequence>(_ seq: S) -> Set<S.Element> {...}
 \end{Verbatim}
 The type \verb|Set<S.Element>| only makes sense if \texttt{S.Element} conforms to \texttt{Hashable}. This is checked by type resolution in the interface resolution stage, after the generic signature has been built. However this requirement is not explicitly stated here. Instead, requirement inference \emph{adds} this requirement during the structural resolution stage when the generic signature is being built, ensuring that the type representation \verb|Set<S.Element>| can successfully resolve later.
 
-You can always state an inferred requirement explicitly instead. Since this is useful for documentation purposes, the \verb|-warn-redundant-requirements| flag will not emit a warning if an explicit requirement is made redundant by an inferred requirement.
+You can always state an inferred requirement explicitly instead. Since this is useful for documentation purposes, the \verb|-warn-redundant-requirements| flag will not emit a \index{warning}warning if an explicit requirement is made redundant by an inferred requirement.
 \begin{Verbatim}
 func uniqueElements<S: Sequence>(_ seq: S) -> Set<S.Element>
     where S.Element: Hashable {...}
@@ -678,8 +678,8 @@ Here we make use of the assumption that we have derivations for both \texttt{T} 
 Having done that, we argue that for all other derivation steps in our given derivation, the formal substitution alone is sufficient and preserves validity. For example, suppose we have the following derivation in a protocol generic signature \verb|<Self where Self: P>|:
 \begin{gather}
 \vdash\ConfReq{Self}{P}\tag{1}\\
-\vdash\FormalReq{Self.A == Self.B}\qquad\mbox{(in \texttt{P})}\tag{2}\\
-\vdash\FormalReq{Self.B == Self.C}\qquad\mbox{(in \texttt{P})}\tag{3}\\
+\vdash\FormalReq{Self.A == Self.B}_\texttt{P}\tag{2}\\
+\vdash\FormalReq{Self.B == Self.C}_\texttt{P}\tag{3}\\
 (1),\,(2)\vdash\FormalReq{Self.A == Self.B}\tag{4}\\
 (1),\,(3)\vdash\FormalReq{Self.B == Self.C}\tag{5}\\
 (1),\,(5)\vdash\FormalReq{Self.A == Self.C}\tag{6}
@@ -687,8 +687,8 @@ Having done that, we argue that for all other derivation steps in our given deri
 After replacing the initial derivation step with a derivation of \texttt{T} and substituting \texttt{T} for \texttt{Self} in all other derivation steps, we get a derivation in $G$:
 \begin{gather}
 \ldots \vdash\ConfReq{T}{P}\tag{1}\\
-\vdash\FormalReq{Self.A == Self.B}\qquad\mbox{(in \texttt{P})}\tag{2}\\
-\vdash\FormalReq{Self.B == Self.C}\qquad\mbox{(in \texttt{P})}\tag{3}\\
+\vdash\FormalReq{Self.A == Self.B}_\texttt{P}\tag{2}\\
+\vdash\FormalReq{Self.B == Self.C}_\texttt{P}\tag{3}\\
 (1),\,(2)\vdash\FormalReq{T.A == T.B}\tag{4}\\
 (1),\,(3)\vdash\FormalReq{T.B == T.C}\tag{5}\\
 (1),\,(5)\vdash\FormalReq{T.A == T.C}\tag{6}
