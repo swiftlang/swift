@@ -935,13 +935,21 @@ public:
               AbstractionPattern outerOrigType,
               CanType outerSubstType);
 
-  void expandVanishingTuple(AbstractionPattern origType, CanType substType,
-                            bool forInner,
-            llvm::function_ref<void(AbstractionPattern origType,
-                                    CanType substType)> handleSingle,
-            llvm::function_ref<void(AbstractionPattern origType,
-                                    CanType substType,
-                                    ManagedValue eltResult)> handlePackElement);
+  void expandInnerVanishingTuple(AbstractionPattern innerOrigType,
+                                 CanType innerSubstType,
+    llvm::function_ref<void(AbstractionPattern innerOrigEltType,
+                            CanType innerSubstEltType)> handleSingle,
+    llvm::function_ref<void(AbstractionPattern innerOrigEltType,
+                            CanType innerSubstEltType,
+                            ManagedValue innerEltAddr)> handlePackElement);
+
+  void expandOuterVanishingTuple(AbstractionPattern outerOrigType,
+                                 CanType outerSubstType,
+    llvm::function_ref<void(AbstractionPattern outerOrigEltType,
+                            CanType outerSubstEltType)> handleSingle,
+    llvm::function_ref<void(AbstractionPattern outerOrigEltType,
+                            CanType outerSubstEltType,
+                            ManagedValue outerEltAddr)> handlePackElement);
 
   void expandParallelTuples(AbstractionPattern innerOrigType,
                             CanType innerSubstType,
@@ -3102,8 +3110,7 @@ void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
   // through that and recurse.
   bool outerIsExpanded = outerOrigType.isTuple();
   if (outerIsExpanded && outerOrigType.doesTupleVanish()) {
-    asImpl().expandVanishingTuple(outerOrigType, outerSubstType,
-                                  /*inner*/ false,
+    asImpl().expandOuterVanishingTuple(outerOrigType, outerSubstType,
        [&](AbstractionPattern outerOrigEltType, CanType outerSubstEltType) {
       asImpl().expand(innerOrigType, innerSubstType,
                       outerOrigEltType, outerSubstEltType);
@@ -3120,7 +3127,7 @@ void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
   // through that and recurse.
   bool innerIsExpanded = innerOrigType.isTuple();
   if (innerIsExpanded && innerOrigType.doesTupleVanish()) {
-    expandVanishingTuple(innerOrigType, innerSubstType, /*inner*/ true,
+    expandInnerVanishingTuple(innerOrigType, innerSubstType,
        [&](AbstractionPattern innerOrigEltType, CanType innerSubstEltType) {
       asImpl().expand(innerOrigEltType, innerSubstEltType,
                          outerOrigType, outerSubstType);
@@ -3149,43 +3156,69 @@ void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
 }
 
 template <class Impl>
-void ExpanderBase<Impl>::expandVanishingTuple(AbstractionPattern origType,
-                                              CanType substType,
-                                              bool forInner,
-          llvm::function_ref<void(AbstractionPattern origType,
-                                  CanType substType)> handleSingle,
-          llvm::function_ref<void(AbstractionPattern origType,
-                                  CanType substType,
-                                  ManagedValue eltValue)> handlePackElement) {
+void ExpanderBase<Impl>::expandOuterVanishingTuple(
+                          AbstractionPattern outerOrigType,
+                          CanType outerSubstType,
+    llvm::function_ref<void(AbstractionPattern outerOrigEltType,
+                            CanType outerSubstEltType)> handleSingle,
+    llvm::function_ref<void(AbstractionPattern outerOrigEltType,
+                            CanType outerOrigSubstType,
+                            ManagedValue outerEltAddr)> handlePackElement) {
+  assert(outerOrigType.isTuple());
+  assert(outerOrigType.doesTupleVanish());
 
   bool foundSurvivor = false;
 
-  auto packInputs = [&]() -> PackGeneratorRef {
-    if (forInner) {
-      return asImpl().getInnerPackGenerator();
-    } else {
-      return OuterPackArgs;
-    }
-  }();
-
-  ExpandedTupleInputGenerator elt(SGF.getASTContext(), packInputs,
-                                  origType, substType);
+  ExpandedTupleInputGenerator elt(SGF.getASTContext(), OuterPackArgs,
+                                  outerOrigType, outerSubstType);
   for (; !elt.isFinished(); elt.advance()) {
     assert(!foundSurvivor);
     foundSurvivor = true;
 
     if (!elt.isOrigPackExpansion()) {
-      handleSingle(elt.getOrigType(), elt.getSubstType());
+      handleSingle(elt.getOrigType(), outerSubstType);
     } else {
       assert(elt.getPackComponentIndex() == 0);
       assert(!isa<PackExpansionType>(elt.getSubstType()));
-      ManagedValue eltAddr = [&] {
-        if (forInner)
-          return elt.createPackComponentTemporary(SGF, Loc);
-        return elt.projectPackComponent(SGF, Loc);
-      }();
+      ManagedValue eltAddr = elt.projectPackComponent(SGF, Loc);
       handlePackElement(elt.getOrigType().getPackExpansionPatternType(),
-                        substType, eltAddr);
+                        outerSubstType, eltAddr);
+    }
+  }
+  elt.finish();
+
+  assert(foundSurvivor && "vanishing tuple had no surviving element?");
+}
+
+template <class Impl>
+void ExpanderBase<Impl>::expandInnerVanishingTuple(
+                          AbstractionPattern innerOrigType,
+                          CanType innerSubstType,
+    llvm::function_ref<void(AbstractionPattern innerOrigEltType,
+                            CanType innerSubstEltType)> handleSingle,
+    llvm::function_ref<void(AbstractionPattern innerOrigEltType,
+                            CanType innerOrigSubstType,
+                            ManagedValue innerEltAddr)> handlePackElement) {
+  assert(innerOrigType.isTuple());
+  assert(innerOrigType.doesTupleVanish());
+
+  bool foundSurvivor = false;
+
+  ExpandedTupleInputGenerator elt(SGF.getASTContext(),
+                                  asImpl().getInnerPackGenerator(),
+                                  innerOrigType, innerSubstType);
+  for (; !elt.isFinished(); elt.advance()) {
+    assert(!foundSurvivor);
+    foundSurvivor = true;
+
+    if (!elt.isOrigPackExpansion()) {
+      handleSingle(elt.getOrigType(), innerSubstType);
+    } else {
+      assert(elt.getPackComponentIndex() == 0);
+      assert(!isa<PackExpansionType>(elt.getSubstType()));
+      ManagedValue eltAddr = elt.createPackComponentTemporary(SGF, Loc);
+      handlePackElement(elt.getOrigType().getPackExpansionPatternType(),
+                        innerSubstType, eltAddr);
     }
   }
   elt.finish();
@@ -3604,7 +3637,7 @@ void ExpanderBase<Impl>::expandOuterIndirect(
 
   // Otherwise, we have a vanishing tuple.  Expand it, find the surviving
   // element, and recurse.
-  asImpl().expandVanishingTuple(innerOrigType, innerSubstType, /*inner*/ true,
+  asImpl().expandInnerVanishingTuple(innerOrigType, innerSubstType,
      [&](AbstractionPattern innerOrigEltType, CanType innerSubstEltType) {
     asImpl().expandOuterIndirect(innerOrigEltType, innerSubstEltType,
                                  outerOrigType, outerSubstType,
@@ -3783,7 +3816,7 @@ void ResultPlanner::planIntoDirect(AbstractionPattern innerOrigType,
 
   // Otherwise, the inner tuple vanishes.  Expand it, find the surviving
   // element, and recurse.
-  expandVanishingTuple(innerOrigType, innerSubstType, /*inner*/ true,
+  expandInnerVanishingTuple(innerOrigType, innerSubstType,
      [&](AbstractionPattern innerOrigEltType, CanType innerSubstEltType) {
     planIntoDirect(innerOrigEltType, innerSubstEltType,
                    outerOrigType, outerSubstType,
@@ -4025,7 +4058,7 @@ void ExpanderBase<Impl>::expandInnerIndirect(AbstractionPattern innerOrigType,
 
   // Otherwise, the outer pattern is a vanishing tuple.  Expand it,
   // find the surviving element, and recurse.
-  asImpl().expandVanishingTuple(outerOrigType, outerSubstType, /*inner*/ false,
+  asImpl().expandOuterVanishingTuple(outerOrigType, outerSubstType,
      [&](AbstractionPattern outerOrigEltType, CanType outerSubstEltType) {
     asImpl().expandInnerIndirect(innerOrigType, innerSubstType,
                                  outerOrigEltType, outerSubstEltType,
@@ -4208,7 +4241,7 @@ void ResultPlanner::planFromDirect(AbstractionPattern innerOrigType,
 
   // Otherwise, expand the outer tuple and recurse for the surviving
   // element.
-  expandVanishingTuple(outerOrigType, outerSubstType, /*inner*/ false,
+  expandOuterVanishingTuple(outerOrigType, outerSubstType,
      [&](AbstractionPattern outerOrigEltType, CanType outerSubstEltType) {
     planFromDirect(innerOrigType, innerSubstType,
                    outerOrigEltType, outerSubstEltType,
