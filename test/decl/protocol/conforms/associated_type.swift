@@ -3,13 +3,18 @@
 class C { }
 
 protocol P {
-  associatedtype AssocP : C // expected-note{{protocol requires nested type 'AssocP'; do you want to add it?}}
+  associatedtype AssocC : C // expected-note{{protocol requires nested type 'AssocC'; do you want to add it?}}
   associatedtype AssocA : AnyObject // expected-note{{protocol requires nested type 'AssocA'; do you want to add it?}}
+  associatedtype AssocP : P // expected-note{{protocol requires nested type 'AssocP'; do you want to add it?}}
+  associatedtype AssocQ : P // expected-note{{protocol requires nested type 'AssocQ'; do you want to add it?}}
 }
+protocol Q: P {}
 
 struct X : P { // expected-error{{type 'X' does not conform to protocol 'P'}}
-  typealias AssocP = Int // expected-note{{possibly intended match 'X.AssocP' (aka 'Int') does not inherit from 'C'}}
+  typealias AssocC = Int // expected-note{{possibly intended match 'X.AssocC' (aka 'Int') does not inherit from 'C'}}
   typealias AssocA = Int // expected-note{{possibly intended match 'X.AssocA' (aka 'Int') does not conform to 'AnyObject'}}
+  typealias AssocP = P // expected-note{{possibly intended match 'X.AssocP' (aka 'P') cannot conform to 'P': a protocol used as a type does not conform to itself}}
+  typealias AssocQ = Q // expected-note{{possibly intended match 'X.AssocQ' (aka 'Q') cannot conform to 'P': a protocol used as a type does not conform to itself or the protocols it requires concrete types to conform to}}
 }
 
 // https://github.com/apple/swift/issues/47742

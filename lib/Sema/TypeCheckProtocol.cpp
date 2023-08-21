@@ -4712,6 +4712,20 @@ ConformanceChecker::resolveWitnessTryingAllStrategies(ValueDecl *requirement) {
   return ResolveWitnessResult::Missing;
 }
 
+static bool containsEveryProtocol(Type attempted, Type required,
+                                  ModuleDecl *visibleFrom) {
+  if (auto protoRequired = required->getAs<ProtocolType>())
+    return !TypeChecker::containsProtocol(attempted, protoRequired->getDecl(),
+                                          visibleFrom).isInvalid();
+
+  if(auto compRequired = required->getAs<ProtocolCompositionType>())
+    for (auto memberRequired : compRequired->getMembers())
+      if (!containsEveryProtocol(attempted, memberRequired, visibleFrom))
+        return false;
+
+  return true;
+}
+
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
@@ -4877,12 +4891,26 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
             candidate.second.isError())
           continue;
 
-        diags.diagnose(
-           candidate.first,
-           diag::protocol_witness_nonconform_type,
-           candidate.first->getDeclaredInterfaceType(),
-           candidate.second.getRequirement(),
-           candidate.second.isConformanceRequirement());
+        auto attempted = candidate.first->getDeclaredInterfaceType();
+        auto required = candidate.second.getRequirement();
+        auto isConformanceReq = candidate.second.isConformanceRequirement();
+
+        // Would this type have satisfied the requirement if existentials
+        // conformed to the protocols they require?
+        if (attempted->isExistentialType() &&
+            containsEveryProtocol(attempted, required,
+                                  candidate.first->getModuleContext())) {
+          assert(isConformanceReq && "existential subclass???");
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_witness_nonconform_type_existential, attempted,
+             required, attempted->isEqual(required));
+        }
+        else {
+          diags.diagnose(
+             candidate.first, diag::protocol_witness_nonconform_type,
+             attempted, required, isConformanceReq);
+        }
       }
     });
 

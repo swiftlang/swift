@@ -2838,7 +2838,13 @@ NOTE(protocol_witness_type,none,
      "possibly intended match", ())
 NOTE(protocol_witness_nonconform_type,none,
      "possibly intended match %0 does not "
-     "%select{inherit from|conform to}2 %1", (Type, Type, bool))
+     "%select{inherit from|conform to}2 %1",
+     (Type, Type, /*isConformanceReq=*/bool))
+NOTE(protocol_witness_nonconform_type_existential,none,
+     "possibly intended match %0 cannot conform to %1: a protocol used as a "
+     "type does not conform to itself%select{ or the protocols it requires "
+     "concrete types to conform to|}2",
+     (Type, Type, /*needsSelfConformancePrecisely=*/bool))
 
 NOTE(protocol_witness_circularity,none,
      "candidate references itself", ())
