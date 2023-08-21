@@ -1414,12 +1414,14 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
     if (srcTagBytes >= xiTagValues && destTagBytes >= xiTagValues) {
       return;
     } else if (destTagBytes >= xiTagValues) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountInitWithCopy(metadata, reader, addrOffset, dest, src);
       }
       return;
     } else if (srcTagBytes >= xiTagValues) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
       }
     } else {
@@ -1448,12 +1450,14 @@ static void singlePayloadEnumFNAssignWithCopy(const Metadata *metadata,
     if (SWIFT_UNLIKELY(srcTag == 0 && destTag == 0)) {
       return;
     } else if (srcTag == 0) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountInitWithCopy(metadata, reader, addrOffset, dest, src);
       }
       return;
     } else if (destTag == 0) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
       }
     } else {
@@ -1482,12 +1486,14 @@ static void singlePayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
     if (SWIFT_UNLIKELY(srcTag == 0 && destTag == 0)) {
       return;
     } else if (srcTag == 0) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountInitWithCopy(metadata, reader, addrOffset, dest, src);
       }
       return;
     } else if (destTag == 0) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
       }
     } else {
@@ -1541,12 +1547,14 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     if (SWIFT_UNLIKELY(srcTag == 0 && destTag == 0)) {
       return;
     } else if (srcTag == 0) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountInitWithCopy(metadata, reader, addrOffset, dest, src);
       }
       return;
     } else if (destTag == 0) {
-      while (reader.layoutStr < (reader.layoutStr + refCountBytes)) {
+      const uint8_t *end = (reader.layoutStr + refCountBytes);
+      while (reader.layoutStr < end) {
         handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
       }
     } else {
