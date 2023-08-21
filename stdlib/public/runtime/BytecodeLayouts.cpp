@@ -1404,13 +1404,13 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
 
     if (srcTagBytes >= xiTagValues && destTagBytes >= xiTagValues) {
       return;
-    } else if (destTagBytes >= xiTagValues) {
+    } else if (srcTagBytes >= xiTagValues) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
       while (reader.layoutStr < end) {
         handleSingleRefCountInitWithCopy(metadata, reader, addrOffset, dest, src);
       }
       return;
-    } else if (srcTagBytes >= xiTagValues) {
+    } else if (destTagBytes >= xiTagValues) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
       while (reader.layoutStr < end) {
         handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
