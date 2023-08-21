@@ -119,12 +119,12 @@ public class Other {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
+// CHECK: integer_literal
 // CHECK: [[R1:%.*]] = ref_element_addr %0 : $Other, #Other.z
 // CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*any DerivedProtocol to $*@opened("{{.*}}", any DerivedProtocol) Self
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}", any DerivedProtocol) Self, #DerivedProtocol.foo : <Self where Self : DerivedProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}", any DerivedProtocol) Self : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}", any DerivedProtocol) Self>([[O1]]) : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
-// CHECK: integer_literal
 // CHECK: builtin
 // CHECK: tuple_extract 
 // CHECK: tuple_extract 
