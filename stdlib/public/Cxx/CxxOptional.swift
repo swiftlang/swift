@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol CxxOptional<Wrapped> {
+public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral {
   associatedtype Wrapped
+
+  init()
 
   func __convertToBool() -> Bool
 
@@ -19,6 +21,10 @@ public protocol CxxOptional<Wrapped> {
 }
 
 extension CxxOptional {
+  public init(nilLiteral: ()) {
+    self.init()
+  }
+
   @inlinable
   public var hasValue: Bool {
     get {
