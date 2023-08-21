@@ -877,12 +877,19 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
               if (llvm::any_of(initAccessorProperties, [&](const auto &entry) {
                     auto *property =
                         entry.second->getParentPatternBinding();
-                    return property->isInitialized(0);
+                    return property->isInitialized(0) ||
+                           property->isDefaultInitializable();
                   }))
                 return;
 
               if (VD->hasStorageOrWrapsStorage())
                 HasStorage = true;
+
+              // Treat an init accessor property that doesn't initialize other
+              // properties  as stored for initialization purposes.
+              if (auto *initAccessor = VD->getAccessor(AccessorKind::Init)) {
+                HasStorage |= initAccessor->getInitializedProperties().empty();
+              }
             });
 
         if (!HasStorage) continue;
