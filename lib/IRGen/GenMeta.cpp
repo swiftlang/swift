@@ -2581,17 +2581,17 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
     hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
-  }
 
-  if (auto sd = dyn_cast<StructDecl>(type)) {
     if (!hasLayoutString &&
         IGM.Context.LangOpts.hasFeature(
             Feature::LayoutStringValueWitnessesInstantiation) &&
         IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
-      hasLayoutString |= requiresForeignTypeMetadata(type) ||
-                         needsSingletonMetadataInitialization(IGM, type) ||
+      hasLayoutString |= needsSingletonMetadataInitialization(IGM, type) ||
                          (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
     }
+  }
+
+  if (auto sd = dyn_cast<StructDecl>(type)) {
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
                                    hasLayoutString).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
@@ -4646,8 +4646,6 @@ namespace {
         return false;
       }
 
-      auto &ti = IGM.getTypeInfo(getLoweredType());
-
       return !!getLayoutString();
     }
 
@@ -6247,10 +6245,6 @@ namespace {
     CanType getTargetType() const {
       return Target->getDeclaredType()->getCanonicalType();
     }
-
-    // bool hasLayoutString() {
-    //   return false;
-    // }
 
     void createMetadataCompletionFunction() {
       llvm_unreachable("foreign structs never require completion");

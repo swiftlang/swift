@@ -44,13 +44,13 @@ static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
 
-template <typename FnTy>
-static const FnTy readRelativeFunctionPointer(LayoutStringReader &reader) {
+template <typename FnTy, typename Reader>
+static const FnTy readRelativeFunctionPointer(Reader &reader) {
   static_assert(std::is_pointer<FnTy>::value);
 
-  auto absolute = reader.layoutStr + reader.offset;
+  auto absolute = reader.getAbsolute();
   auto relativeOffset =
-      (uintptr_t)(intptr_t)(int32_t)reader.readBytes<intptr_t>();
+      (uintptr_t)(intptr_t)(int32_t)reader.template readBytes<intptr_t>();
   FnTy fn;
 
 #if SWIFT_PTRAUTH
@@ -66,8 +66,9 @@ static const FnTy readRelativeFunctionPointer(LayoutStringReader &reader) {
 
 typedef Metadata *(*MetadataAccessor)(const Metadata *const *);
 
+template <typename Reader>
 static const Metadata *getResilientTypeMetadata(const Metadata *metadata,
-                                                LayoutStringReader &reader) {
+                                                Reader &reader) {
   auto fn = readRelativeFunctionPointer<MetadataAccessor>(reader);
   return fn(metadata->getGenericArgs());
 }
@@ -97,13 +98,13 @@ static uint64_t readTagBytes(const uint8_t *addr, uint8_t byteCount) {
 }
 
 static void handleRefCountsDestroy(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *addr);
 
 template <typename ...Params>
 static void handleEnd(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *addr,
                           Params ...params) {
@@ -111,7 +112,7 @@ static void handleEnd(const Metadata *metadata,
 }
 
 static void errorDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   SwiftError *error = *(SwiftError**)(addr + addrOffset);
@@ -119,7 +120,7 @@ static void errorDestroyBranchless(const Metadata *metadata,
 }
 
 static void nativeStrongDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   HeapObject *object = (HeapObject*)((*(uintptr_t *)(addr + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
@@ -127,7 +128,7 @@ static void nativeStrongDestroyBranchless(const Metadata *metadata,
 }
 
 static void unownedDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   HeapObject *object = (HeapObject*)((*(uintptr_t *)(addr + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
@@ -135,14 +136,14 @@ static void unownedDestroyBranchless(const Metadata *metadata,
 }
 
 static void weakDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   swift_weakDestroy((WeakReference *)(addr + addrOffset));
 }
 
 static void unknownDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   void *object = *(void**)(addr + addrOffset);
@@ -150,7 +151,7 @@ static void unknownDestroyBranchless(const Metadata *metadata,
 }
 
 static void unknownUnownedDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   UnownedReference *object = (UnownedReference*)(addr + addrOffset);
@@ -158,14 +159,14 @@ static void unknownUnownedDestroyBranchless(const Metadata *metadata,
 }
 
 static void unknownWeakDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   swift_unknownObjectWeakDestroy((WeakReference *)(addr + addrOffset));
 }
 
 static void bridgeDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   swift_bridgeObjectRelease(*(void **)(addr + addrOffset));
@@ -173,11 +174,11 @@ static void bridgeDestroyBranchless(const Metadata *metadata,
 
 template<typename ...Params>
 static void singlePayloadEnumSimpleBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params... params) {
-  reader.modify([&](LayoutStringReader &reader) {
+  reader.modify([&](LayoutStringReader1 &reader) {
     uint64_t byteCountsAndOffset;
     size_t payloadSize;
     uint64_t zeroTagValue;
@@ -220,16 +221,16 @@ typedef unsigned (*GetEnumTagFn)(const uint8_t *);
 
 template<typename ...Params>
 static void singlePayloadEnumFNBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
-  reader.modify([&](LayoutStringReader &reader) {
+  reader.modify([&](LayoutStringReader1 &reader) {
     GetEnumTagFn getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
 
     unsigned enumTag = getEnumTag(addr + addrOffset);
 
-    if (enumTag == 0) {
+    if (SWIFT_LIKELY(enumTag == 0)) {
       reader.skip(sizeof(size_t) * 2);
     } else {
       size_t refCountBytes;
@@ -243,11 +244,11 @@ static void singlePayloadEnumFNBranchless(const Metadata *metadata,
 
 template<typename ...Params>
 static void singlePayloadEnumFNResolvedBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
-  reader.modify([&](LayoutStringReader &reader) {
+  reader.modify([&](LayoutStringReader1 &reader) {
     GetEnumTagFn getEnumTag;
     size_t refCountBytes;
     size_t skip;
@@ -255,7 +256,7 @@ static void singlePayloadEnumFNResolvedBranchless(const Metadata *metadata,
 
     unsigned enumTag = getEnumTag(addr + addrOffset);
 
-    if (enumTag != 0) {
+    if (SWIFT_UNLIKELY(enumTag != 0)) {
       reader.skip(refCountBytes);
       addrOffset += skip;
     }
@@ -264,11 +265,11 @@ static void singlePayloadEnumFNResolvedBranchless(const Metadata *metadata,
 
 template<typename ...Params>
 static void singlePayloadEnumGenericBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
-  reader.modify([&](LayoutStringReader &reader) {
+  reader.modify([&](LayoutStringReader1 &reader) {
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
@@ -280,7 +281,7 @@ static void singlePayloadEnumGenericBranchless(const Metadata *metadata,
     auto xiTagBytesOffset =
         tagBytesAndOffset & std::numeric_limits<uint32_t>::max();
 
-    if (extraTagBytesPattern) {
+    if (SWIFT_UNLIKELY(extraTagBytesPattern)) {
       auto extraTagBytes = 1 << (extraTagBytesPattern - 1);
       auto tagBytes = readTagBytes(addr + addrOffset + payloadSize, extraTagBytes);
 
@@ -289,11 +290,11 @@ static void singlePayloadEnumGenericBranchless(const Metadata *metadata,
       }
     }
 
-    if (xiType) {
+    if (SWIFT_LIKELY(xiType)) {
       auto tag = xiType->vw_getEnumTagSinglePayload(
           (const OpaqueValue *)(addr + addrOffset + xiTagBytesOffset),
           numEmptyCases);
-      if (tag == 0) {
+      if (SWIFT_LIKELY(tag == 0)) {
         return;
       }
     }
@@ -305,67 +306,69 @@ static void singlePayloadEnumGenericBranchless(const Metadata *metadata,
 
 template<auto HandlerFn, typename ...Params>
 static void multiPayloadEnumFNBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
-  reader.modify([&](LayoutStringReader &reader) {
+  size_t numPayloads;
+  size_t refCountBytes;
+  size_t enumSize;
+  LayoutStringReader1 nestedReader;
+  uintptr_t nestedAddrOffset;
+  unsigned enumTag;
+
+  reader.modify([&](LayoutStringReader1 &reader) {
     GetEnumTagFn getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
-
-    size_t numPayloads;
-    size_t refCountBytes;
-    size_t enumSize;
     reader.readBytes(numPayloads, refCountBytes, enumSize);
+    nestedReader = reader;
+    nestedAddrOffset = addrOffset;
 
-    unsigned enumTag = getEnumTag(addr + addrOffset);
-
-    if (enumTag < numPayloads) {
-      size_t refCountOffset = reader.peekBytes<size_t>(enumTag * sizeof(size_t));
-
-      LayoutStringReader nestedReader = reader;
-      nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-      uintptr_t nestedAddrOffset = addrOffset;
-      HandlerFn(metadata, nestedReader, nestedAddrOffset, addr, std::forward<Params>(params)...);
-    }
-
+    enumTag = getEnumTag(addr + addrOffset);
     reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
     addrOffset += enumSize;
   });
+
+  if (SWIFT_LIKELY(enumTag < numPayloads)) {
+    size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+    HandlerFn(metadata, nestedReader, nestedAddrOffset, addr, std::forward<Params>(params)...);
+  }
 }
 
 template<auto HandlerFn, typename ...Params>
 static void multiPayloadEnumFNResolvedBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
-  reader.modify([&](LayoutStringReader &reader) {
+  size_t numPayloads;
+  size_t refCountBytes;
+  size_t enumSize;
+  LayoutStringReader1 nestedReader;
+  uintptr_t nestedAddrOffset;
+  unsigned enumTag;
+
+  reader.modify([&](LayoutStringReader1 &reader) {
     GetEnumTagFn getEnumTag = reader.readBytes<GetEnumTagFn>();
-
-    size_t numPayloads;
-    size_t refCountBytes;
-    size_t enumSize;
     reader.readBytes(numPayloads, refCountBytes, enumSize);
+    nestedReader = reader;
+    nestedAddrOffset = addrOffset;
 
-    unsigned enumTag = getEnumTag(addr + addrOffset);
-
-    if (enumTag < numPayloads) {
-      size_t refCountOffset = reader.peekBytes<size_t>(enumTag * sizeof(size_t));
-
-      LayoutStringReader nestedReader = reader;
-      nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-      uintptr_t nestedAddrOffset = addrOffset;
-      HandlerFn(metadata, nestedReader, nestedAddrOffset, addr, std::forward<Params>(params)...);
-    }
-
+    enumTag = getEnumTag(addr + addrOffset);
     reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
     addrOffset += enumSize;
   });
+
+  if (SWIFT_LIKELY(enumTag < numPayloads)) {
+    size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+    HandlerFn(metadata, nestedReader, nestedAddrOffset, addr, std::forward<Params>(params)...);
+  }
 }
 
 template<auto HandlerFn, typename ...Params>
 static void multiPayloadEnumGenericBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
@@ -375,17 +378,17 @@ static void multiPayloadEnumGenericBranchless(const Metadata *metadata,
   size_t enumSize;
   uint64_t enumTag;
   uintptr_t nestedAddrOffset;
-  LayoutStringReader nestedReader;
-  reader.modify([&](LayoutStringReader &reader) {
+  LayoutStringReader1 nestedReader;
+  reader.modify([&](LayoutStringReader1 &reader) {
     reader.readBytes(tagBytes, numPayloads, refCountBytes, enumSize);
 
     nestedReader = reader;
     nestedAddrOffset = addrOffset;
     auto tagBytesOffset = enumSize - tagBytes;
 
-    reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
     enumTag = readTagBytes(addr + addrOffset + tagBytesOffset, tagBytes);
 
+    reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
     addrOffset += enumSize;
   });
 
@@ -400,14 +403,14 @@ static void multiPayloadEnumGenericBranchless(const Metadata *metadata,
 
 #if SWIFT_OBJC_INTEROP
 static void blockDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   _Block_release((void *)(addr + addrOffset));
 }
 
 static void objcStrongDestroyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
   objc_object *object = (objc_object*)(*(uintptr_t *)(addr + addrOffset));
@@ -416,7 +419,7 @@ static void objcStrongDestroyBranchless(const Metadata *metadata,
 #endif
 
 static void metatypeDestroyBranchless(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *addr) {
   auto *type = reader.readBytes<const Metadata *>();
@@ -424,7 +427,7 @@ static void metatypeDestroyBranchless(const Metadata *metadata,
 }
 
 static void existentialDestroyBranchless(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *addr) {
   OpaqueValue *object = (OpaqueValue *)(addr + addrOffset);
@@ -437,7 +440,7 @@ static void existentialDestroyBranchless(const Metadata *metadata,
 }
 
 static void resilientDestroyBranchless(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *addr) {
   auto *type = getResilientTypeMetadata(metadata, reader);
@@ -445,7 +448,7 @@ static void resilientDestroyBranchless(const Metadata *metadata,
 }
 
 typedef void (*DestrFnBranchless)(const Metadata *metadata,
-                                  LayoutStringReader &reader,
+                                  LayoutStringReader1 &reader,
                                   uintptr_t &addrOffset,
                                   uint8_t *addr);
 
@@ -481,35 +484,46 @@ const DestrFnBranchless destroyTableBranchless[] = {
 };
 
 static void handleRefCountsDestroy(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *addr) {
-  uint64_t tag = 0;
-  do {
-    tag = reader.readBytes<uint64_t>();
+  while (true) {
+    auto tag = reader.readBytes<uint64_t>();
     addrOffset += (tag & ~(0xFFULL << 56));
     tag >>= 56;
+    if (SWIFT_UNLIKELY(tag == 0)) {
+      return;
+    }
 
     destroyTableBranchless[tag](metadata, reader, addrOffset, addr);
-  } while (tag != 0);
+  }
 }
 
 extern "C" void
 swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
-  LayoutStringReader reader{layoutStr, layoutStringHeaderSize};
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
   handleRefCountsDestroy(metadata, reader, addrOffset, (uint8_t *)address);
 }
 
+void swift::swift_generic_arrayDestroy(swift::OpaqueValue *address, size_t count, size_t stride, const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  for (size_t i = 0; i < count; i++) {
+    LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+    uintptr_t addrOffset = i * stride;
+    handleRefCountsDestroy(metadata, reader, addrOffset, (uint8_t *)address);
+  }
+}
+
 static void handleRefCountsInitWithCopy(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
                           uint8_t *src);
 
 static void errorRetainBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -517,7 +531,7 @@ static void errorRetainBranchless(const Metadata *metadata,
 }
 
 static void nativeStrongRetainBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -526,7 +540,7 @@ static void nativeStrongRetainBranchless(const Metadata *metadata,
 }
 
 static void unownedRetainBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -535,7 +549,7 @@ static void unownedRetainBranchless(const Metadata *metadata,
 }
 
 static void weakCopyInitBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -543,7 +557,7 @@ static void weakCopyInitBranchless(const Metadata *metadata,
 }
 
 static void unknownRetainBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -552,7 +566,7 @@ static void unknownRetainBranchless(const Metadata *metadata,
 }
 
 static void unknownUnownedCopyInitBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -562,7 +576,7 @@ static void unknownUnownedCopyInitBranchless(const Metadata *metadata,
 }
 
 static void unknownWeakCopyInitBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -571,7 +585,7 @@ static void unknownWeakCopyInitBranchless(const Metadata *metadata,
 }
 
 static void bridgeRetainBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -580,7 +594,7 @@ static void bridgeRetainBranchless(const Metadata *metadata,
 
 #if SWIFT_OBJC_INTEROP
 static void blockCopyBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -588,7 +602,7 @@ static void blockCopyBranchless(const Metadata *metadata,
 }
 
 static void objcStrongRetainBranchless(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -598,7 +612,7 @@ static void objcStrongRetainBranchless(const Metadata *metadata,
 #endif
 
 static void metatypeInitWithCopyBranchless(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *dest,
                                uint8_t *src) {
@@ -608,7 +622,7 @@ static void metatypeInitWithCopyBranchless(const Metadata *metadata,
 }
 
 static void existentialInitWithCopyBranchless(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *dest,
                                uint8_t *src) {
@@ -618,7 +632,7 @@ static void existentialInitWithCopyBranchless(const Metadata *metadata,
 }
 
 static void resilientInitWithCopyBranchless(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *dest,
                                uint8_t *src) {
@@ -628,7 +642,7 @@ static void resilientInitWithCopyBranchless(const Metadata *metadata,
 }
 
 typedef void (*InitFn)(const Metadata *metadata,
-                                 LayoutStringReader &reader,
+                                 LayoutStringReader1 &reader,
                                  uintptr_t &addrOffset,
                                  uint8_t *dest,
                                  uint8_t *src);
@@ -665,18 +679,20 @@ static const InitFn initWithCopyTable[] = {
 };
 
 static void handleRefCountsInitWithCopy(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
                           uint8_t *src) {
-  uint64_t tag = 0;
-  do {
-    tag = reader.readBytes<uint64_t>();
+  while (true) {
+    auto tag = reader.readBytes<uint64_t>();
     addrOffset += (tag & ~(0xFFULL << 56));
     tag >>= 56;
+    if (SWIFT_UNLIKELY(tag == 0)) {
+      return;
+    }
 
     initWithCopyTable[tag](metadata, reader, addrOffset, dest, src);
-  } while (tag != 0);
+  }
 }
 
 extern "C" swift::OpaqueValue *
@@ -686,21 +702,37 @@ swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   memcpy(dest, src, size);
 
   const uint8_t *layoutStr = metadata->getLayoutString();
-  LayoutStringReader reader{layoutStr, layoutStringHeaderSize};
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
   handleRefCountsInitWithCopy(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
 
   return dest;
 }
 
+void swift::swift_generic_arrayInitWithCopy(swift::OpaqueValue *dest,
+                                     swift::OpaqueValue *src,
+                                     size_t count,
+                                     size_t stride,
+                                     const Metadata *metadata) {
+  size_t size = stride * count;
+  memcpy(dest, src, size);
+
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  for (size_t i = 0; i < count; i++) {
+    LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+    uintptr_t addrOffset = i * stride;
+    handleRefCountsInitWithCopy(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
+  }
+}
+
 static void handleRefCountsInitWithTake(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
                           uint8_t *src);
 
 static void unknownWeakInitWithTake(const Metadata *metadata,
-                             LayoutStringReader &reader,
+                             LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
@@ -709,7 +741,7 @@ static void unknownWeakInitWithTake(const Metadata *metadata,
 }
 
 static void metatypeInitWithTake(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
                           uint8_t *src) {
@@ -722,7 +754,7 @@ static void metatypeInitWithTake(const Metadata *metadata,
 }
 
 static void existentialInitWithTake(const Metadata *metadata,
-                               LayoutStringReader &reader,
+                               LayoutStringReader1 &reader,
                                uintptr_t &addrOffset,
                                uint8_t *dest,
                                uint8_t *src) {
@@ -734,7 +766,7 @@ static void existentialInitWithTake(const Metadata *metadata,
 }
 
 static void resilientInitWithTake(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
                           uint8_t *src) {
@@ -773,19 +805,21 @@ static const InitFn initWithTakeTable[] = {
 };
 
 static void handleRefCountsInitWithTake(const Metadata *metadata,
-                          LayoutStringReader &reader,
+                          LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
                           uint8_t *src) {
-  uint64_t tag = 0;
-  do {
-    tag = reader.readBytes<uint64_t>();
+  while (true) {
+    auto tag = reader.readBytes<uint64_t>();
     addrOffset += (tag & ~(0xFFULL << 56));
     tag >>= 56;
+    if (SWIFT_UNLIKELY(tag == 0)) {
+      return;
+    }
 
     if (auto handler = initWithTakeTable[tag])
       handler(metadata, reader, addrOffset, dest, src);
-  } while (tag != 0);
+  }
 }
 
 extern "C" swift::OpaqueValue *
@@ -800,7 +834,7 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   }
 
   const uint8_t *layoutStr = metadata->getLayoutString();
-  LayoutStringReader reader{layoutStr, layoutStringHeaderSize};
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
 
   handleRefCountsInitWithTake(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
@@ -973,7 +1007,7 @@ extern "C" unsigned
 swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
                                          const Metadata *metadata) {
   auto addr = reinterpret_cast<const uint8_t *>(address);
-  LayoutStringReader reader{metadata->getLayoutString(),
+  LayoutStringReader1 reader{metadata->getLayoutString() +
                             layoutStringHeaderSize + sizeof(uint64_t)};
 
   auto tagBytes = reader.readBytes<size_t>();
