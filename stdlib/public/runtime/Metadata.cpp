@@ -2783,10 +2783,6 @@ void swift::swift_initStructMetadataWithLayoutString(
 size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
   if (type->vw_size() == 0 || type->getValueWitnesses()->isPOD()) {
     return 0;
-  } else if (type->hasLayoutString()) {
-    size_t offset = sizeof(uint64_t);
-    return LayoutStringReader{type->getLayoutString(), offset}
-        .readBytes<size_t>();
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(type)) {
     size_t res = 0;
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
@@ -2803,6 +2799,10 @@ size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
       }
     }
     return sizeof(uint64_t);
+  } else if (type->hasLayoutString()) {
+    size_t offset = sizeof(uint64_t);
+    return LayoutStringReader{type->getLayoutString(), offset}
+        .readBytes<size_t>();
   } else if (type->isAnyExistentialType()) {
     return sizeof(uint64_t);
   } else {
@@ -2824,37 +2824,6 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
   } else if (fieldType->getValueWitnesses()->isPOD()) {
     // No need to handle PODs
     previousFieldOffset = offset + fieldType->vw_size();
-    fullOffset += fieldType->vw_size();
-  } else if (fieldType->hasLayoutString()) {
-    LayoutStringReader reader{fieldType->getLayoutString(), 0};
-    const auto fieldFlags = reader.readBytes<LayoutStringFlags>();
-    const auto fieldRefCountBytes = reader.readBytes<size_t>();
-    if (fieldRefCountBytes > 0) {
-      flags |= fieldFlags;
-      memcpy(writer.layoutStr + writer.offset,
-             reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
-
-      if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(
-            writer.layoutStr, writer.offset,
-            reader.layoutStr + layoutStringHeaderSize, fieldType);
-      }
-
-      if (offset) {
-        LayoutStringReader tagReader {writer.layoutStr, writer.offset};
-        auto writerOffsetCopy = writer.offset;
-        auto firstTagAndOffset = tagReader.readBytes<uint64_t>();
-        firstTagAndOffset += offset;
-        writer.writeBytes(firstTagAndOffset);
-        writer.offset = writerOffsetCopy;
-      }
-
-      reader.offset = layoutStringHeaderSize + fieldRefCountBytes;
-      previousFieldOffset = reader.readBytes<uint64_t>();
-      writer.skip(fieldRefCountBytes);
-    } else {
-      previousFieldOffset += fieldType->vw_size();
-    }
     fullOffset += fieldType->vw_size();
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(fieldType)) {
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
@@ -2890,6 +2859,36 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
     writer.writeBytes(((uint64_t)tag << 56) | offset);
     previousFieldOffset = fieldType->vw_size();
     fullOffset += previousFieldOffset;
+  } else if (fieldType->hasLayoutString()) {
+    LayoutStringReader reader{fieldType->getLayoutString(), 0};
+    const auto fieldFlags = reader.readBytes<LayoutStringFlags>();
+    const auto fieldRefCountBytes = reader.readBytes<size_t>();
+    if (fieldRefCountBytes > 0) {
+      flags |= fieldFlags;
+      memcpy(writer.layoutStr + writer.offset,
+             reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
+
+      if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
+        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
+                                         reader.layoutStr + layoutStringHeaderSize, fieldType);
+      }
+
+      if (offset) {
+        LayoutStringReader tagReader {writer.layoutStr, writer.offset};
+        auto writerOffsetCopy = writer.offset;
+        auto firstTagAndOffset = tagReader.readBytes<uint64_t>();
+        firstTagAndOffset += offset;
+        writer.writeBytes(firstTagAndOffset);
+        writer.offset = writerOffsetCopy;
+      }
+
+      reader.offset = layoutStringHeaderSize + fieldRefCountBytes;
+      previousFieldOffset = reader.readBytes<uint64_t>();
+      writer.skip(fieldRefCountBytes);
+    } else {
+      previousFieldOffset += fieldType->vw_size();
+    }
+    fullOffset += fieldType->vw_size();
   } else if (fieldType->isAnyExistentialType()) {
     auto *existential = dyn_cast<ExistentialTypeMetadata>(fieldType);
     assert(existential);

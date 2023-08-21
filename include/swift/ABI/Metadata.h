@@ -323,13 +323,13 @@ public:
   }
 
   const uint8_t *getLayoutString() const {
-    //assert(hasLayoutString());
-    // if (isAnyClass()) {
-    //   return asFullMetadata(
-    //              reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
-    //                  this))
-    //       ->layoutString;
-    // }
+    assert(hasLayoutString());
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
+                     this))
+          ->layoutString;
+    }
     return asFullMetadata(this)->layoutString;
   }
 
@@ -3778,7 +3778,7 @@ public:
   }
 
   bool hasLayoutString() const {
-    return getTypeContextDescriptorFlags().hasLayoutString();
+    return !hasForeignMetadataInitialization() && getTypeContextDescriptorFlags().hasLayoutString();
   }
 
   /// Given that this type has foreign metadata initialization, return the

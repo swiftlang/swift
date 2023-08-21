@@ -2580,7 +2580,8 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
 
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
-    hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
+    hasLayoutString = !ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal) &&
+                      !!typeLayoutEntry->layoutString(IGM, genericSig);
 
     if (!hasLayoutString &&
         IGM.Context.LangOpts.hasFeature(
@@ -4647,7 +4648,9 @@ namespace {
         return false;
       }
 
-      return !!getLayoutString();
+      auto &ti = IGM.getTypeInfo(getLoweredType());
+
+      return !ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal) && !!getLayoutString();
     }
 
     ConstantReference emitValueWitnessTable(bool relativeReference) {
@@ -5163,10 +5166,10 @@ namespace {
 
       if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
           IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
-        return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
+        return (!!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target)) && !needsForeignMetadataCompletionFunction(IGM, Target);
       }
 
-      return !!getLayoutString();
+      return !!getLayoutString() && !needsForeignMetadataCompletionFunction(IGM, Target);
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -6245,6 +6248,10 @@ namespace {
     
     CanType getTargetType() const {
       return Target->getDeclaredType()->getCanonicalType();
+    }
+
+    bool hasLayoutString() {
+      return false;
     }
 
     void createMetadataCompletionFunction() {

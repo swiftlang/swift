@@ -380,7 +380,7 @@ static void multiPayloadEnumGenericBranchless(const Metadata *metadata,
 
     auto enumTag = readTagBytes(addr + addrOffset + tagBytesOffset, tagBytes);
 
-    if (enumTag < numPayloads) {
+    if (SWIFT_LIKELY(enumTag < numPayloads)) {
       size_t refCountOffset = reader.peekBytes<size_t>(enumTag * sizeof(size_t));
 
       LayoutStringReader nestedReader = reader;
@@ -517,7 +517,8 @@ static void nativeStrongRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  swift_retain(*(HeapObject **)(dest + addrOffset));
+  HeapObject *object = (HeapObject*)((*(uintptr_t *)(dest + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
+  swift_retain(object);
 }
 
 static void unownedRetainBranchless(const Metadata *metadata,
@@ -525,7 +526,7 @@ static void unownedRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  HeapObject *object = (HeapObject*)((*(uintptr_t *)(dest + addrOffset)));
+  HeapObject *object = (HeapObject*)((*(uintptr_t *)(dest + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
   swift_unownedRetain(object);
 }
 
@@ -1244,13 +1245,12 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
       reader.skip(sizeof(size_t));
 
       size_t casesBeginOffset = layoutStrOffset + reader.offset +
-                                layoutStringHeaderSize +
                                 (numCases * sizeof(size_t));
 
+      auto fieldCasesBeginOffset = fieldLayoutStr + (numCases * sizeof(size_t)) + reader.offset;
       for (size_t j = 0; j < numCases; j++) {
         size_t caseOffset = reader.readBytes<size_t>();
-        const uint8_t *caseLayoutString = fieldLayoutStr + reader.offset +
-                                          (numCases * sizeof(size_t)) +
+        const uint8_t *caseLayoutString = fieldCasesBeginOffset +
                                           caseOffset;
         swift_resolve_resilientAccessors(layoutStr,
                                          casesBeginOffset + caseOffset,
