@@ -95,6 +95,11 @@ static unsigned getElementCountRec(TypeExpansionContext context,
       for (auto *VD : NTD->getStoredProperties())
         NumElements += getElementCountRec(
             context, Module, T.getFieldType(VD, Module, context), false);
+      for (auto *P : NTD->getInitAccessorProperties()) {
+        auto *init = P->getAccessor(AccessorKind::Init);
+        if (init->getInitializedProperties().empty())
+          ++NumElements;
+      }
       return NumElements;
     }
   }
@@ -451,6 +456,15 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
         Element -= NumFieldElements;
       }
 
+      for (auto *property : NTD->getInitAccessorProperties()) {
+        auto *init = property->getAccessor(AccessorKind::Init);
+        if (init->getInitializedProperties().empty()) {
+          if (Element == 0)
+            return property;
+          --Element;
+        }
+      }
+
       // If we do not have any stored properties, we have nothing of interest.
       if (!HasStoredProperty)
         return nullptr;
@@ -495,6 +509,15 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
     if (Element < NumFieldElements)
       return VD->isLet();
     Element -= NumFieldElements;
+  }
+
+  for (auto *property : NTD->getInitAccessorProperties()) {
+    auto *init = property->getAccessor(AccessorKind::Init);
+    if (init->getInitializedProperties().empty()) {
+      if (Element == 0)
+        return !property->getAccessor(AccessorKind::Set);
+      --Element;
+    }
   }
 
   // Otherwise, we miscounted elements?
@@ -1221,10 +1244,22 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
 
   auto initializedElts = Inst->getInitializedProperties();
   if (initializedElts.empty()) {
-    // Add a placeholder use that doesn't touch elements to make sure that
-    // the `assign_or_init` instruction gets the kind set when `initializes`
-    // list is empty.
-    trackUse(DIMemoryUse(Inst, DIUseKind::InitOrAssign, BaseEltNo, 0));
+    auto initAccessorProperties = typeDC->getInitAccessorProperties();
+    auto initFieldAt = typeDC->getStoredProperties().size();
+
+    for (auto *property : initAccessorProperties) {
+      auto initAccessor = property->getAccessor(AccessorKind::Init);
+      if (!initAccessor->getInitializedProperties().empty())
+        continue;
+
+      if (property == Inst->getProperty()) {
+        trackUse(DIMemoryUse(Inst, DIUseKind::InitOrAssign, initFieldAt,
+                             /*NumElements=*/1));
+        break;
+      }
+
+      ++initFieldAt;
+    }
   } else {
     for (auto *property : initializedElts)
       addUse(property, DIUseKind::InitOrAssign);
