@@ -33,18 +33,23 @@ class XX: Foo {
 func testRepro() {
     let ptr = allocateInternalGenericPtr(of: Repro.R1.self)
 
+    var xx: XX? = XX()
+
     do {
-        let x = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: XX(), w: [])
+        let x = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: xx!, w: [])
         testGenericInit(ptr, to: x)
     }
 
+    var yy: XX? = XX()
+
     do {
-        let y = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: XX(), w: [])
+        let y = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: yy!, w: [])
         // CHECK: Before deinit
         print("Before deinit")
 
         // CHECK-NEXT: XX deinitialized!
         testGenericAssign(ptr, from: y)
+        xx = nil
     }
 
     // CHECK-NEXT: Before deinit
@@ -52,6 +57,7 @@ func testRepro() {
 
     // CHECK-NEXT: XX deinitialized!
     testGenericDestroy(ptr, of: Repro.R1.self)
+    yy = nil
 
     ptr.deallocate()
 }
