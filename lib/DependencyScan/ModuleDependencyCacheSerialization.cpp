@@ -298,7 +298,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
         moduleDep.addModuleImport(moduleName);
 
       // Add qualified dependencies of this module
-      moduleDep.resolveDependencies(*currentModuleDependencyIDs);
+      moduleDep.resolveDirectDependencies(*currentModuleDependencyIDs);
 
       // Add bridging header file path
       if (bridgingHeaderFileID != 0) {
@@ -1114,7 +1114,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                      dependencyInfo->getModuleImports());
       addDependencyIDArray(
           moduleID, ModuleIdentifierArrayKind::QualifiedModuleDependencyIDs,
-          dependencyInfo->getModuleDependencies());
+          dependencyInfo->getDirectModuleDependencies());
 
       // Add the dependency-kind-specific data
       switch (dependencyInfo->getKind()) {
