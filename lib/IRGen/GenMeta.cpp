@@ -5675,7 +5675,7 @@ namespace {
 
     llvm::Constant *emitNominalTypeDescriptor() {
       auto descriptor = EnumContextDescriptorBuilder(
-                            IGM, Target, RequireMetadata, !!getLayoutString())
+                            IGM, Target, RequireMetadata, hasLayoutString())
                             .emit();
       return descriptor;
     }
@@ -5724,7 +5724,7 @@ namespace {
     }
 
     bool canBeConstant() {
-      return !HasUnfilledPayloadSize;// && !hasInstantiatedLayoutString();
+      return !HasUnfilledPayloadSize && !hasInstantiatedLayoutString();
     }
   };
 
