@@ -5,7 +5,7 @@ protocol Foo { }
 var x: any Foo
 
 protocol SelfAsType {
-  var x: Self { get } // expected-note{{protocol requires property 'x' with type 'U'; do you want to add a stub?}}
+  var x: Self { get } // expected-note{{protocol requires property 'x' with type 'U'; add a stub for conformance}}
 }
 
 struct U : SelfAsType { // expected-error{{type 'U' does not conform to protocol 'SelfAsType'}}

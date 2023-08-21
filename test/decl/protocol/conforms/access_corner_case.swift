@@ -22,7 +22,7 @@ fileprivate protocol R : Q {
 private protocol S : R {
   func privateRequirement()
   func privateRequirementCannotWork()
-  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'; add a stub for conformance}}
 }
 
 extension S {
@@ -48,7 +48,7 @@ fileprivate protocol Rpkg : Qpkg {
 private protocol Spkg : Rpkg {
   func privateRequirement()
   func privateRequirementCannotWork()
-  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'; add a stub for conformance}}
 }
 
 extension Spkg {

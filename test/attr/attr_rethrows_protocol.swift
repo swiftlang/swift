@@ -157,10 +157,10 @@ takesEmpty(EmptyWitness())
 // Note: the SimpleThrowsClosure protocol is not @rethrows
 protocol SimpleThrowsClosure {
   func doIt(_: () throws -> ()) rethrows
-  // expected-note@-1 {{protocol requires function 'doIt' with type '(() throws -> ()) throws -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'doIt' with type '(() throws -> ()) throws -> ()'; add a stub for conformance}}
 
   func doIt2<T : Empty>(_: T) rethrows
-  // expected-note@-1 {{protocol requires function 'doIt2' with type '<T> (T) throws -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'doIt2' with type '<T> (T) throws -> ()'; add a stub for conformance}}
 }
 
 struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosure {

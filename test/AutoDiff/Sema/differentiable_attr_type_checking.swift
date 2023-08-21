@@ -557,7 +557,7 @@ public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
 
 public protocol HasRequirement {
   @differentiable(reverse)
-  // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'; do you want to add a stub?}}
+  // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'; add a stub for conformance}}
   func requirement<T: Differentiable>(_ x: T, _ y: T) -> T
 }
 

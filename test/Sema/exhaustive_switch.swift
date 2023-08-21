@@ -778,7 +778,7 @@ do {
 
   func foo(_ str: String) -> Int {
     switch str { // expected-error {{switch must be exhaustive}}
-    // expected-note@-1 {{do you want to add a default clause?}}
+    // expected-note@-1 {{add a default clause}}
     case let (x as Int) as Any:
       return x
     }

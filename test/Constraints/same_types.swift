@@ -2,7 +2,7 @@
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol Fooable {
-  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; do you want to add it?}}
+  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; add nested type 'Foo' for conformance}}
 
   var foo: Foo { get }
 }

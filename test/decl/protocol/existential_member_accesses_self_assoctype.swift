@@ -855,7 +855,7 @@ do {
 class BadConformanceClass: CompositionBrokenClassConformance_a {}
 // expected-error@-1 {{type 'BadConformanceClass' does not conform to protocol 'CompositionBrokenClassConformance_a'}}
 protocol CompositionBrokenClassConformance_a {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 protocol CompositionBrokenClassConformance_b: CompositionBrokenClassConformance_a {
   func method(_: A)

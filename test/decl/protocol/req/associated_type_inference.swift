@@ -129,11 +129,11 @@ struct XProp0b : PropertyP0 { // expected-error{{type 'XProp0b' does not conform
 // Inference from subscripts
 protocol SubscriptP0 {
   associatedtype Index
-  // expected-note@-1 2 {{protocol requires nested type 'Index'; do you want to add it?}}
+  // expected-note@-1 2 {{protocol requires nested type 'Index'; add nested type 'Index' for conformance}}
 
   associatedtype Element : PSimple
   // expected-note@-1 {{unable to infer associated type 'Element' for protocol 'SubscriptP0'}}
-  // expected-note@-2 2 {{protocol requires nested type 'Element'; do you want to add it?}}
+  // expected-note@-2 2 {{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
 
   subscript (i: Index) -> Element { get }
 }
@@ -160,9 +160,9 @@ struct XSubP0d : SubscriptP0 {
 // Inference from properties and subscripts
 protocol CollectionLikeP0 {
   associatedtype Index
-  // expected-note@-1 {{protocol requires nested type 'Index'; do you want to add it?}}
+  // expected-note@-1 {{protocol requires nested type 'Index'; add nested type 'Index' for conformance}}
   associatedtype Element
-  // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
+  // expected-note@-1 {{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
 
   var startIndex: Index { get }
   var endIndex: Index { get }
@@ -358,7 +358,7 @@ struct X12 : P12 {
 // the associated type
 protocol Cookie {
   associatedtype Dough
-  // expected-note@-1 {{protocol requires nested type 'Dough'; do you want to add it?}}
+  // expected-note@-1 {{protocol requires nested type 'Dough'; add nested type 'Dough' for conformance}}
 
   init(t: Dough)
 }
@@ -385,7 +385,7 @@ struct Int8Vector : Vector {
 // https://github.com/apple/swift/issues/47063
 
 protocol P13 {
-  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; do you want to add it?}}
+  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; add nested type 'Arg' for conformance}}
   func foo(arg: Arg)
 }
 
@@ -432,7 +432,7 @@ protocol P15f {
 }
 
 protocol P15g: P15c, P15f {
-  associatedtype A // expected-note{{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note{{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 
 
@@ -503,7 +503,7 @@ struct Foo: RefinesAssocWithDefault {
 }
 
 protocol P20 {
-  associatedtype T // expected-note{{protocol requires nested type 'T'; do you want to add it?}}
+  associatedtype T // expected-note{{protocol requires nested type 'T'; add nested type 'T' for conformance}}
   typealias TT = T?
 }
 struct S19 : P20 {  // expected-error{{type 'S19' does not conform to protocol 'P20'}}
@@ -538,12 +538,12 @@ protocol P32 {
   var bar: B { get }
 }
 protocol P33 {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 
   var baz: A { get }
 }
 protocol P34 {
-  associatedtype A  // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A  // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 
   func boo() -> A
 }
@@ -627,9 +627,9 @@ protocol P40a {
   func foo(arg: A)
 }
 protocol P40b: P40a {
-  associatedtype C = (A, B.A, D.D, E) -> Self // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
-  associatedtype D: P40b // expected-note {{protocol requires nested type 'D'; do you want to add it?}}
-  associatedtype E: Equatable // expected-note {{protocol requires nested type 'E'; do you want to add it?}}
+  associatedtype C = (A, B.A, D.D, E) -> Self // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
+  associatedtype D: P40b // expected-note {{protocol requires nested type 'D'; add nested type 'D' for conformance}}
+  associatedtype E: Equatable // expected-note {{protocol requires nested type 'E'; add nested type 'E' for conformance}}
 }
 protocol P40c: P40b where D == S40<Never> {}
 struct S40<E: Equatable>: P40c {

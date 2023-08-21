@@ -3,7 +3,7 @@
 // https://github.com/apple/swift/issues/52995
 
 protocol Nested {
-    associatedtype U // expected-note {{protocol requires nested type 'U'; do you want to add it?}}
+    associatedtype U // expected-note {{protocol requires nested type 'U'; add nested type 'U' for conformance}}
 }
 
 class A<M> {
