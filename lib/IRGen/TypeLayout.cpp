@@ -364,8 +364,7 @@ public:
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
         refCountBytes += sizeof(uint64_t);
-
-        skip = refCounting.size;
+        skip = 0;
         break;
       }
       }

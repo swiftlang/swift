@@ -2857,8 +2857,8 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
     }
 
     writer.writeBytes(((uint64_t)tag << 56) | offset);
-    previousFieldOffset = fieldType->vw_size();
-    fullOffset += previousFieldOffset;
+    previousFieldOffset = 0;
+    fullOffset += fieldType->vw_size();
   } else if (fieldType->hasLayoutString()) {
     LayoutStringReader reader{fieldType->getLayoutString(), 0};
     const auto fieldFlags = reader.readBytes<LayoutStringFlags>();
@@ -2895,14 +2895,14 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
     auto tag = existential->isClassBounded() ? RefCountingKind::Unknown
                                              : RefCountingKind::Existential;
     writer.writeBytes(((uint64_t)tag << 56) | offset);
-    previousFieldOffset = fieldType->vw_size();
-    fullOffset += previousFieldOffset;
+    previousFieldOffset = existential->isClassBounded() ? fieldType->vw_size() - sizeof(uintptr_t) : 0;
+    fullOffset += fieldType->vw_size();
   } else {
 metadata:
   writer.writeBytes(((uint64_t)RefCountingKind::Metatype << 56) | offset);
   writer.writeBytes(fieldType);
-  previousFieldOffset = fieldType->vw_size();
-  fullOffset += previousFieldOffset;
+  previousFieldOffset = 0;
+  fullOffset += fieldType->vw_size();
   }
 }
 
