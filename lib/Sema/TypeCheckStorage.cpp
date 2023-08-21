@@ -491,11 +491,16 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     }
   }
 
+  auto isInitAccessorProperty = [](Pattern *pattern) {
+    auto *var = pattern->getSingleVar();
+    return var && var->getAccessor(AccessorKind::Init);
+  };
+
   // If we have a type but no initializer, check whether the type is
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      pattern->hasStorage()) {
+      (pattern->hasStorage() || isInitAccessorProperty(pattern))) {
     if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.

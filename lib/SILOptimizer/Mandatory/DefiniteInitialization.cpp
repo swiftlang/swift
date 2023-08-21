@@ -1182,6 +1182,12 @@ void LifetimeChecker::doIt() {
     while (returnBB != F.end()) {
       auto *terminator = returnBB->getTerminator();
 
+      // If this is an unreachable block, let's ignore it.
+      if (isa<UnreachableInst>(terminator)) {
+        ++returnBB;
+        continue;
+      }
+
       if (!isInitializedAtUse(DIMemoryUse(terminator, DIUseKind::Load, 0, 1)))
         diagnoseMissingInit();
 
