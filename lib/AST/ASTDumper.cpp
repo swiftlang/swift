@@ -4476,6 +4476,37 @@ void Requirement::dump(raw_ostream &out) const {
     out << getLayoutConstraint();
 }
 
+void RequirementSignature::dump(llvm::raw_ostream &os) const {
+  os << "(signature";
+
+  if (getErrors().contains(GenericSignatureErrorFlags::CompletionFailed))
+    os << " completion_failed";
+  if (getErrors().contains(GenericSignatureErrorFlags::HasConcreteConformances))
+    os << " has_concrete_conformances";
+  if (getErrors().contains(GenericSignatureErrorFlags::HasInvalidRequirements))
+    os << " has_invalid_requirements";
+
+  for (auto &req : getRequirements()) {
+    os << "\n  (requirement ";
+    req.dump(os);
+    os << ")";
+  }
+
+  for (auto &alias : getTypeAliases()) {
+    os << "\n  (type_alias ";
+    os << alias.getName() << " ";
+    alias.getUnderlyingType().dump(os);
+    os << ")";
+  }
+
+  os << ")";
+}
+
+void RequirementSignature::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
+
 void SILParameterInfo::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';

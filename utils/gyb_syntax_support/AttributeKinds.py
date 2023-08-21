@@ -330,7 +330,7 @@ DECL_ATTR_KINDS = [
                         ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
                         code=53),
     DeclAttribute('__synthesized_protocol', 'SynthesizedProtocol',
-                  OnConcreteNominalType,
+                  OnNominalType,
                   UserInaccessible,
                   RejectByParser,
                   NotSerialized,

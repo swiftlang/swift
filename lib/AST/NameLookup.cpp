@@ -3170,6 +3170,14 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
+  // these to add `Sendable` conformances to protocols without modifying the
+  // inherited type list.
+  for (auto attr : PD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (known.insert(attr->getProtocol()).second)
+      result.push_back(attr->getProtocol());
+  }
+
   return PD->getASTContext().AllocateCopy(result);
 }
 
