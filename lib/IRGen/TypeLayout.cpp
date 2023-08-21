@@ -1741,7 +1741,7 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM,
 
 bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                                        GenericSignature genericSig) const {
-  if (!isFixedSize(IGM)) {
+  if (!isFixedSize(IGM) || ty.isMoveOnly()) {
     return false;
   }
 
