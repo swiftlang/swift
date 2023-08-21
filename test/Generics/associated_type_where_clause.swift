@@ -22,7 +22,7 @@ struct ConcreteConforms2: Conforms { typealias T = Int }
 struct ConcreteConformsNonFoo2: Conforms { typealias T = Float }
 
 protocol NestedConforms {
-    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'; do you want to add it?}}
+    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
 
     func foo(_: U)
 }
@@ -62,7 +62,7 @@ func needsNestedConformsDefault<X: NestedConformsDefault>(_: X.Type) {
 }
 
 protocol NestedSameType {
-    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'; do you want to add it?}}
+    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
 
     func foo(_: U)
 }

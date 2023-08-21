@@ -8,7 +8,7 @@ case message
 struct NewItemResponse {}
 
 protocol Publisher {
-  associatedtype Output // expected-note {{protocol requires nested type 'Output'; do you want to add it?}}
+  associatedtype Output // expected-note {{protocol requires nested type 'Output'; add nested type 'Output' for conformance}}
 }
 
 extension Publisher {

@@ -75,7 +75,7 @@ struct P5Conformer : P5 { // expected-error {{does not conform}}
 
 
 protocol P6Base {
-  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; do you want to add it?}}
+  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; add nested type 'Foo' for conformance}}
   func foo()
   func bar() -> Foo
 }
@@ -103,7 +103,7 @@ struct A: OptionSet {
 // Type witness cannot have its own generic parameters
 // FIXME: Crappy diagnostic
 protocol PA {
-  associatedtype A // expected-note 3 {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note 3 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 
 struct BadCase1 : PA { // expected-error {{type 'BadCase1' does not conform to protocol 'PA'}}
@@ -135,17 +135,17 @@ let diagnose: UInt32 = "reta"
 // Test that we attempt to resolve a value witness unless mapping its interface
 // type into the conformance context produces an invalid type.
 protocol P7 {
-  associatedtype A: Sequence // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A: Sequence // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 
   subscript(subscript1 _: A) -> Never { get }
   subscript<T>(subscript2 _: T) -> Never where T: Sequence, T.Element == A { get }
-  // expected-note@-1 {{protocol requires subscript with type '<T> (subscript2: T) -> Never'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires subscript with type '<T> (subscript2: T) -> Never'; add a stub for conformance}}
 
   func method1(_: A)
   func method2() -> A.Element
   func method3<T>(_: T) where T: Sequence, T.Element == A
-  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; do you want to add a stub?}}
-  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; add a stub for conformance}}
+  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; add a stub for conformance}}
 }
 do {
   struct Conformer: P7 {} // expected-error {{type 'Conformer' does not conform to protocol 'P7'}}
@@ -154,11 +154,11 @@ do {
 protocol P8 {
   associatedtype A: Sequence where A.Element == Never
 
-  func method1(_: A) // expected-note {{protocol requires function 'method1' with type '(Conformer.A) -> ()' (aka '(Array<Bool>) -> ()'); do you want to add a stub?}}
-  func method2() -> A.Element // expected-note {{protocol requires function 'method2()' with type '() -> Bool'; do you want to add a stub?}}
+  func method1(_: A) // expected-note {{protocol requires function 'method1' with type '(Conformer.A) -> ()' (aka '(Array<Bool>) -> ()'); add a stub for conformance}}
+  func method2() -> A.Element // expected-note {{protocol requires function 'method2()' with type '() -> Bool'; add a stub for conformance}}
   func method3<T>(_: T) where T: Sequence, T.Element == A
-  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; do you want to add a stub?}}
-  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; add a stub for conformance}}
+  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; add a stub for conformance}}
 }
 do {
   struct Conformer: P8 {
@@ -175,13 +175,13 @@ protocol P9a {
 protocol P9b: P9a where A: Sequence {
   subscript(subscript1 _: A.Element) -> Never { get }
   subscript<T>(subscript2 _: T) -> Never where T: Sequence, T.Element == A.Element { get }
-  // expected-note@-1 {{protocol requires subscript with type '<T> (subscript2: T) -> Never'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires subscript with type '<T> (subscript2: T) -> Never'; add a stub for conformance}}
 
-  func method1(_: A) // expected-note {{protocol requires function 'method1' with type '(Conformer.A) -> ()' (aka '(Bool) -> ()'); do you want to add a stub?}}
+  func method1(_: A) // expected-note {{protocol requires function 'method1' with type '(Conformer.A) -> ()' (aka '(Bool) -> ()'); add a stub for conformance}}
   func method2() -> A.Element
   func method3<T>(_: T) where T: Sequence, T.Element == A
-  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; do you want to add a stub?}}
-  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; add a stub for conformance}}
+  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; add a stub for conformance}}
 }
 do {
   struct Conformer: P9b {
@@ -195,11 +195,11 @@ protocol P10a {
   associatedtype A
 }
 protocol P10b: P10a where A: Sequence, A.Element == Never {
-  func method1(_: A) // expected-note {{protocol requires function 'method1' with type '(Conformer.A) -> ()' (aka '(Array<Bool>) -> ()'); do you want to add a stub?}}
-  func method2() -> A.Element // expected-note {{protocol requires function 'method2()' with type '() -> Bool'; do you want to add a stub?}}
+  func method1(_: A) // expected-note {{protocol requires function 'method1' with type '(Conformer.A) -> ()' (aka '(Array<Bool>) -> ()'); add a stub for conformance}}
+  func method2() -> A.Element // expected-note {{protocol requires function 'method2()' with type '() -> Bool'; add a stub for conformance}}
   func method3<T>(_: T) where T: Sequence, T.Element == A
-  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; do you want to add a stub?}}
-  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'method3' with type '<T> (T) -> ()'; add a stub for conformance}}
+  func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'; add a stub for conformance}}
 }
 do {
   struct Conformer: P10b {
@@ -214,7 +214,7 @@ protocol P11 {
   associatedtype A: Equatable
   // FIXME: Should not resolve witness for 'method', but Type::subst doesn't care
   // about conditional requirements when querying type witnesses.
-  // expected-note@+1 {{protocol requires function 'method()' with type '() -> Conformer.A' (aka '() -> Array<any P11>'); do you want to add a stub?}}
+  // expected-note@+1 {{protocol requires function 'method()' with type '() -> Conformer.A' (aka '() -> Array<any P11>'); add a stub for conformance}}
   func method() -> A
 }
 do {
@@ -229,7 +229,7 @@ do {
 }
 
 protocol P12 {
-  associatedtype A: Sequence where A.Element == Never // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A: Sequence where A.Element == Never // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
   // FIXME: Should not resolve witness for 'prop', but getInterfaceType() returns
   // '(Self) -> Never' instead of '(Self) -> Self.A.Element', and the invalid
   // type parameter is never found (see 'hasInvalidTypeInConformanceContext').
@@ -239,7 +239,7 @@ protocol P12 {
   // Instead, patterns should be refactored to use interface types, at least if
   // they appear in type contexts.
   //
-  // expected-note@+1 {{protocol requires property 'prop' with type '(Conformer) -> Never'; do you want to add a stub?}}
+  // expected-note@+1 {{protocol requires property 'prop' with type '(Conformer) -> Never'; add a stub for conformance}}
   var prop: (Self) -> A.Element { get }
 }
 do {

@@ -7,7 +7,7 @@
 
 protocol P1 {
     associatedtype X
-    // expected-note@-1 {{protocol requires nested type 'X'; do you want to add it?}}
+    // expected-note@-1 {{protocol requires nested type 'X'; add nested type 'X' for conformance}}
     associatedtype A: P2 where A.X == X
 }
 

@@ -333,7 +333,7 @@ protocol ErrorQ {
   associatedtype Y
 }
 protocol ErrorP {
-  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
+  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'; add nested type 'X' for conformance}}
 }
 
 typealias ErrorA<T: ErrorP> = T.X.Y

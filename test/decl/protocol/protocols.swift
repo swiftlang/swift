@@ -82,10 +82,10 @@ struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'Not
 
 // Protocol compositions in inheritance clauses
 protocol Left {
-  func l() // expected-note {{protocol requires function 'l()' with type '() -> ()'; do you want to add a stub?}}
+  func l() // expected-note {{protocol requires function 'l()' with type '() -> ()'; add a stub for conformance}}
 }
 protocol Right {
-  func r() // expected-note {{protocol requires function 'r()' with type '() -> ()'; do you want to add a stub?}}
+  func r() // expected-note {{protocol requires function 'r()' with type '() -> ()'; add a stub for conformance}}
 }
 typealias Both = Left & Right
 

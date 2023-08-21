@@ -3,8 +3,8 @@
 class C { }
 
 protocol P {
-  associatedtype AssocP : C // expected-note{{protocol requires nested type 'AssocP'; do you want to add it?}}
-  associatedtype AssocA : AnyObject // expected-note{{protocol requires nested type 'AssocA'; do you want to add it?}}
+  associatedtype AssocP : C // expected-note{{protocol requires nested type 'AssocP'; add nested type 'AssocP' for conformance}}
+  associatedtype AssocA : AnyObject // expected-note{{protocol requires nested type 'AssocA'; add nested type 'AssocA' for conformance}}
 }
 
 struct X : P { // expected-error{{type 'X' does not conform to protocol 'P'}}
@@ -78,9 +78,9 @@ struct X1d : P1 {
 }
 
 protocol P2 {
-  func f(_: (Int) -> Int) // expected-note{{expected sendability to match requirement here}} expected-note 2{{protocol requires function 'f' with type '((Int) -> Int) -> ()'; do you want to add a stub?}}
+  func f(_: (Int) -> Int) // expected-note{{expected sendability to match requirement here}} expected-note 2{{protocol requires function 'f' with type '((Int) -> Int) -> ()'; add a stub for conformance}}
   func g(_: @escaping (Int) -> Int) // expected-note 2 {{expected sendability to match requirement here}}
-  func h(_: @Sendable (Int) -> Int) // expected-note 2 {{protocol requires function 'h' with type '(@Sendable (Int) -> Int) -> ()'; do you want to add a stub?}}
+  func h(_: @Sendable (Int) -> Int) // expected-note 2 {{protocol requires function 'h' with type '(@Sendable (Int) -> Int) -> ()'; add a stub for conformance}}
   func i(_: @escaping @Sendable (Int) -> Int)
 }
 
@@ -139,7 +139,7 @@ struct S3b: P3b {
 // FIXME: resolveTypeWitnessViaLookup must not happen independently in the
 // general case.
 protocol P4 {
-  associatedtype A: GenClass<B> // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A: GenClass<B> // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
   associatedtype B
 }
 struct S4: P4 { // expected-error {{type 'S4' does not conform to protocol 'P4'}}
