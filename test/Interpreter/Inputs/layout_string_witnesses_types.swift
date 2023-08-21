@@ -536,6 +536,11 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 }
 
 @inline(never)
+public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
+    ptr.assign(from: x, count: 1)
+}
+
+@inline(never)
 public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
     ptr.initialize(to: x)
 }

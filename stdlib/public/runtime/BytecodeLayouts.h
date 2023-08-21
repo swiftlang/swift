@@ -70,6 +70,31 @@ struct LayoutStringReader {
     return returnVal;
   }
 
+  template <typename... T>
+  inline void readBytes(T&... result) {
+    uintptr_t additionalOffset = 0;
+    ([&] {
+        memcpy(&result, layoutStr + offset + additionalOffset, sizeof(T));
+        additionalOffset += sizeof(T);
+    }(), ...);
+    offset += additionalOffset;
+  }
+
+  template<typename T, typename F>
+  inline T modify(F &&f) {
+    LayoutStringReader readerCopy = *this;
+    T res = f(readerCopy);
+    offset = readerCopy.offset;
+    return res;
+  }
+
+  template<typename F>
+  inline void modify(F &&f) {
+    LayoutStringReader readerCopy = *this;
+    f(readerCopy);
+    offset = readerCopy.offset;
+  }
+
   template <typename T>
   inline T peekBytes(size_t peekOffset = 0) const {
     T returnVal;
