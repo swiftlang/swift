@@ -1,0 +1,3 @@
+struct ExplicitClangModuleType {
+  int value;
+};
