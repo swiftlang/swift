@@ -293,6 +293,43 @@ func testExistentialStructBox() {
 
 testExistentialStructBox()
 
+class ClassWithABC: A, B, C {
+    deinit {
+        print("ClassWithABC deinitialized!")
+    }
+}
+
+func testMultiProtocolExistential() {
+    let ptr = UnsafeMutablePointer<MultiProtocolExistentialWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = ClassWithABC()
+        testInit(ptr, to: MultiProtocolExistentialWrapper(y: x, z: SimpleClass(x: 23)))
+    }
+
+    do {
+        let y = ClassWithABC()
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ClassWithABC deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: MultiProtocolExistentialWrapper(y: y, z: SimpleClass(x: 32)))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: ClassWithABC deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiProtocolExistential()
+
 class ClassWithSomeClassProtocol: SomeClassProtocol {
     deinit {
         print("ClassWithSomeClassProtocol deinitialized!")

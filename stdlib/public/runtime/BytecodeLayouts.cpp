@@ -684,7 +684,7 @@ static void existentialDestroyBranchless(const Metadata *metadata,
                                uint8_t *addr) {
   OpaqueValue *object = (OpaqueValue *)(addr + addrOffset);
   auto* type = getExistentialTypeMetadata(object);
-  addrOffset += sizeof(uintptr_t) * (NumWords_ValueBuffer + 2);
+  addrOffset += sizeof(uintptr_t) * NumWords_ValueBuffer;
   if (type->getValueWitnesses()->isValueInline()) {
     type->vw_destroy(object);
   } else {
@@ -918,12 +918,9 @@ static void existentialInitWithCopyBranchless(const Metadata *metadata,
                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
   auto *type = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
-  auto *witness = *(void**)(src + _addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)));
-  memcpy(dest + _addrOffset + (NumWords_ValueBuffer * sizeof(uintptr_t)), &type, sizeof(uintptr_t));
-  memcpy(dest + _addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)), &witness, sizeof(uintptr_t));
   auto *destObject = (ValueBuffer *)(dest + _addrOffset);
   auto *srcObject = (ValueBuffer *)(src + _addrOffset);
-  addrOffset = _addrOffset + (sizeof(uintptr_t) * (2 + NumWords_ValueBuffer));
+  addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
   type->vw_initializeBufferWithCopyOfBuffer(destObject, srcObject);
 }
 
@@ -1062,12 +1059,9 @@ static void existentialInitWithTake(const Metadata *metadata,
                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
   auto* type = getExistentialTypeMetadata((OpaqueValue*)(src + addrOffset));
-  auto *witness = *(void**)(src + _addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)));
   auto *destObject = (OpaqueValue *)(dest + _addrOffset);
   auto *srcObject = (OpaqueValue *)(src + _addrOffset);
-  memcpy(dest + _addrOffset + (NumWords_ValueBuffer * sizeof(uintptr_t)), &type, sizeof(uintptr_t));
-  memcpy(dest + _addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)), &witness, sizeof(uintptr_t));
-  addrOffset = _addrOffset + (sizeof(uintptr_t) * (2 + NumWords_ValueBuffer));
+  addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
   if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
     type->vw_initializeWithTake(destObject, srcObject);
   }
@@ -1317,12 +1311,9 @@ static void existentialAssignWithCopy(const Metadata *metadata,
                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
   auto *type = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
-  auto *witness = *(void**)(src + _addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)));
-  memcpy(dest + _addrOffset + (NumWords_ValueBuffer * sizeof(uintptr_t)), &type, sizeof(uintptr_t));
-  memcpy(dest + _addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)), &witness, sizeof(uintptr_t));
   auto *destObject = (OpaqueValue *)(dest + _addrOffset);
   auto *srcObject = (OpaqueValue *)(src + _addrOffset);
-  addrOffset = _addrOffset + (sizeof(uintptr_t) * (2 + NumWords_ValueBuffer));
+  addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
   if (type->getValueWitnesses()->isValueInline()) {
     type->vw_assignWithCopy(destObject, srcObject);
   } else {

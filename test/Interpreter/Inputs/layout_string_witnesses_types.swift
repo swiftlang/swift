@@ -264,6 +264,21 @@ public enum Repro {
     }
 }
 
+public protocol A {}
+public protocol B {}
+public protocol C {}
+
+public struct MultiProtocolExistentialWrapper {
+    let x: Int = 0
+    let y: any (A&B&C)
+    let z: AnyObject
+
+    public init(y: any (A&B&C), z: AnyObject) {
+        self.y = y
+        self.z = z
+    }
+}
+
 #if os(macOS)
 import Foundation
 
