@@ -2733,13 +2733,13 @@ private:
                          SmallVector<SILValue, 4> &innerDirectResults);
 
   void expandInnerTuple(AbstractionPattern innerOrigType,
-                        CanType innerSubstType,
+                        CanTupleType innerSubstType,
                         AbstractionPattern outerOrigType,
                         CanType outerSubstType);
   void expandOuterTuple(AbstractionPattern innerOrigType,
                         CanType innerSubstType,
                         AbstractionPattern outerOrigType,
-                        CanType outerSubstType);
+                        CanTupleType outerSubstType);
 
   void expandSingle(AbstractionPattern innerOrigType,
                     CanType innerSubstType,
@@ -3138,9 +3138,9 @@ void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
                                   outerOrigType, outerSubstType);
   } else if (outerIsExpanded) {
     asImpl().expandOuterTuple(innerOrigType, innerSubstType,
-                              outerOrigType, outerSubstType);
+                              outerOrigType, cast<TupleType>(outerSubstType));
   } else if (innerIsExpanded) {
-    asImpl().expandInnerTuple(innerOrigType, innerSubstType,
+    asImpl().expandInnerTuple(innerOrigType, cast<TupleType>(innerSubstType),
                               outerOrigType, outerSubstType);
   } else {
     asImpl().expandSingle(innerOrigType, innerSubstType,
@@ -3480,7 +3480,7 @@ void ResultPlanner::Operation::emitReabstractTupleIntoPackExpansion(
 void ResultPlanner::expandOuterTuple(AbstractionPattern innerOrigType,
                                      CanType innerSubstType,
                                      AbstractionPattern outerOrigType,
-                                     CanType outerSubstType) {
+                                     CanTupleType outerSubstType) {
   assert(outerOrigType.isTuple());
   assert(!outerOrigType.doesTupleVanish());
   assert(!innerOrigType.isTuple());
@@ -3489,7 +3489,6 @@ void ResultPlanner::expandOuterTuple(AbstractionPattern innerOrigType,
   // plan function filters that out), so the outer subst type must be a
   // tuple.  The inner subst type must also be a tuple because only tuples
   // convert to tuples.
-  auto outerSubstTupleType = cast<TupleType>(outerSubstType);
   auto innerSubstTupleType = cast<TupleType>(innerSubstType);
 
   // The next inner result is not expanded, so there's a single result.
@@ -3498,30 +3497,27 @@ void ResultPlanner::expandOuterTuple(AbstractionPattern innerOrigType,
   if (SGF.silConv.isSILIndirect(innerResult)) {
     SILValue innerResultAddr = addInnerIndirectResultTemporary(innerResult);
     expandParallelTuplesInnerIndirect(innerOrigType, innerSubstTupleType,
-                                      outerOrigType, outerSubstTupleType,
+                                      outerOrigType, outerSubstType,
                                       ManagedValue::forLValue(innerResultAddr));
   } else {
     assert(!SGF.silConv.useLoweredAddresses() &&
            "Formal Indirect Results that are not SIL Indirect are only "
            "allowed in opaque values mode");
     planExpandedFromDirect(innerOrigType, innerSubstTupleType,
-                           outerOrigType, outerSubstTupleType,
+                           outerOrigType, outerSubstType,
                            innerResult);
   }
 }
 
 void ResultPlanner::expandInnerTuple(AbstractionPattern innerOrigType,
-                                     CanType innerSubstType,
+                                     CanTupleType innerSubstType,
                                      AbstractionPattern outerOrigType,
                                      CanType outerSubstType) {
   assert(innerOrigType.isTuple());
   assert(!innerOrigType.doesTupleVanish());
   assert(!outerOrigType.isTuple());
 
-  // We know that the inner tuple is not vanishing (because the top-level
-  // plan function filters that out), so the inner subst type must be a
-  // tuple.  The outer subst type might not be a tuple if it's e.g. Any.
-  auto innerSubstTupleType = cast<TupleType>(innerSubstType);
+  // The outer subst type might not be a tuple if it's e.g. Any.
 
   // The next outer result is not expanded, so there's a single result.
   auto outerResultPair = claimNextOuterResult();
@@ -3531,12 +3527,12 @@ void ResultPlanner::expandInnerTuple(AbstractionPattern innerOrigType,
   // Base the plan on whether the single result is direct or indirect.
   if (SGF.silConv.isSILIndirect(outerResult)) {
     assert(outerResultAddr);
-    expandInnerTupleOuterIndirect(innerOrigType, innerSubstTupleType,
+    expandInnerTupleOuterIndirect(innerOrigType, innerSubstType,
                                   outerOrigType, outerSubstType,
                                   ManagedValue::forLValue(outerResultAddr));
   } else {
     assert(!outerResultAddr);
-    planExpandedIntoDirect(innerOrigType, innerSubstTupleType,
+    planExpandedIntoDirect(innerOrigType, innerSubstType,
                            outerOrigType, outerSubstType,
                            outerResult);
   }
