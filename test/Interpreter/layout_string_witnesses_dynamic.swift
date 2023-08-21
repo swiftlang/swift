@@ -24,46 +24,6 @@ class TestClass {
     }
 }
 
-class XX: Foo {
-    deinit {
-        print("XX deinitialized!")
-    }
-}
-
-func testRepro() {
-    let ptr = allocateInternalGenericPtr(of: Repro.R1.self)
-
-    var xx: XX? = XX()
-
-    do {
-        let x = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: xx!, w: [])
-        testGenericInit(ptr, to: x)
-    }
-
-    var yy: XX? = XX()
-
-    do {
-        let y = Repro.R1(x: Repro.R2(x: .NSThreadWillExit, y: true, z: .x), y: 43, z: yy!, w: [])
-        // CHECK: Before deinit
-        print("Before deinit")
-
-        // CHECK-NEXT: XX deinitialized!
-        testGenericAssign(ptr, from: y)
-        xx = nil
-    }
-
-    // CHECK-NEXT: Before deinit
-    print("Before deinit")
-
-    // CHECK-NEXT: XX deinitialized!
-    testGenericDestroy(ptr, of: Repro.R1.self)
-    yy = nil
-
-    ptr.deallocate()
-}
-
-testRepro()
-
 func testGeneric() {
     let ptr = allocateInternalGenericPtr(of: TestClass.self)
     
@@ -894,7 +854,7 @@ func testResilientSinglePayloadEnumComplexTag() {
 testResilientSinglePayloadEnumComplexTag()
 
 func testResilientMultiPayloadEnumTag() {
-    let x = switch getResilientMultiPayloadEnumEmpty0(AnyObject.self) {
+    let x = switch getResilientMultiPayloadEnumEmpty0() {
     case .nonEmpty0: 0
     case .nonEmpty1: 1
     case .empty0: 2
