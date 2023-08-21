@@ -101,7 +101,6 @@ TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 
 // Declaration Attributes and Modifers
-// To add a new entry here, update `utils/gyb_syntax_support/AttributeKinds.py`
 DECL_ATTR(_silgen_name, SILGenName,
   OnAbstractFunction | OnVar | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   0)
