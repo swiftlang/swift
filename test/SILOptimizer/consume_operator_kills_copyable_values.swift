@@ -260,11 +260,11 @@ let myLetGlobal = Klass()
 var myVarGlobal = Klass()
 
 public func performMoveOnVarGlobalError() {
-    let _ = consume myVarGlobal // expected-error {{'consume' applied to value that the compiler does not support}}
+    let _ = consume myVarGlobal // expected-error {{'consume' cannot be applied to globals}}
 }
 
 public func performMoveOnLetGlobalError() {
-    let _ = consume myVarGlobal // expected-error {{'consume' applied to value that the compiler does not support}}
+    let _ = consume myVarGlobal // expected-error {{'consume' cannot be applied to globals}}
 }
 
 public func multipleVarsWithSubsequentBorrows() -> Bool {

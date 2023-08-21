@@ -2388,6 +2388,70 @@ bool ConsumeOperatorCopyableAddressesChecker::check(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
+//                     MARK: Unsupported Use Case Errors
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct UnsupportedUseCaseDiagnosticEmitter {
+  MarkUnresolvedMoveAddrInst *mai;
+
+  ~UnsupportedUseCaseDiagnosticEmitter() {
+    assert(!mai && "Didn't call cleanup!\n");
+  }
+
+  bool cleanup() && {
+    // Now that we have emitted the error, replace the move_addr with a
+    // copy_addr so that future passes never see it. We mark it as a
+    // copy_addr [init].
+    SILBuilderWithScope builder(mai);
+    builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
+                           IsNotTake, IsInitialization);
+    mai->eraseFromParent();
+    mai = nullptr;
+    return true;
+  }
+
+  ASTContext &getASTContext() const { return mai->getModule().getASTContext(); }
+
+  void emitUnsupportedUseCaseError() const {
+    auto diag =
+        diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+    diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag);
+  }
+
+  /// Try to pattern match if we were trying to move a global. In such a case,
+  /// emit a better error.
+  bool tryEmitCannotConsumeNonLocalMemoryError() const {
+    auto src = stripAccessMarkers(mai->getSrc());
+
+    if (auto *gai = dyn_cast<GlobalAddrInst>(src)) {
+      auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+      diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 0);
+      return true;
+    }
+
+    // If we have a project_box, then we must have an escaping capture. It is
+    // the only case that allocbox to stack doesn't handle today.
+    if (isa<ProjectBoxInst>(src)) {
+      auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+      diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 1);
+      return true;
+    }
+
+    return false;
+  }
+
+  void emit() const {
+    if (tryEmitCannotConsumeNonLocalMemoryError())
+      return;
+    emitUnsupportedUseCaseError();
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -2490,17 +2554,9 @@ class ConsumeOperatorCopyableAddressesCheckerPass
         ++ii;
 
         if (auto *mai = dyn_cast<MarkUnresolvedMoveAddrInst>(inst)) {
-          auto diag =
-              diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
-          diagnose(astContext, mai->getLoc().getSourceLoc(), diag);
-
-          // Now that we have emitted the error, replace the move_addr with a
-          // copy_addr so that future passes never see it. We mark it as a
-          // copy_addr [init].
-          SILBuilderWithScope builder(mai);
-          builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
-                                 IsNotTake, IsInitialization);
-          mai->eraseFromParent();
+          UnsupportedUseCaseDiagnosticEmitter emitter{mai};
+          emitter.emit();
+          std::move(emitter).cleanup();
           lateMadeChange = true;
         }
       }
