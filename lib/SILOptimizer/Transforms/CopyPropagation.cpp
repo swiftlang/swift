@@ -492,9 +492,14 @@ void CopyPropagation::run() {
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
-  CanonicalizeOSSALifetime canonicalizer(
-      pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
-      getFunction(), accessBlockAnalysis, domTree, calleeAnalysis, deleter);
+  CanonicalizeOSSALifetime::Options options;
+  if (pruneDebug)
+    options |= CanonicalizeOSSALifetime::Flags::PruneDebugMode;
+  if (!getFunction()->shouldOptimize())
+    options |= CanonicalizeOSSALifetime::Flags::MaximizeLifetime;
+  CanonicalizeOSSALifetime canonicalizer(options, getFunction(),
+                                         accessBlockAnalysis, domTree,
+                                         calleeAnalysis, deleter);
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.

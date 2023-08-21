@@ -2191,9 +2191,12 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
       break;
     }
   }
-  CanonicalizeOSSALifetime canonicalizer(
-      /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
-      accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
+  CanonicalizeOSSALifetime::Options options = {
+      CanonicalizeOSSALifetime::Flags::PruneDebugMode};
+  if (!f.shouldOptimize())
+    options |= CanonicalizeOSSALifetime::Flags::MaximizeLifetime;
+  CanonicalizeOSSALifetime canonicalizer(options, &f, accessBlockAnalysis,
+                                         domInfo, calleeAnalysis, deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
