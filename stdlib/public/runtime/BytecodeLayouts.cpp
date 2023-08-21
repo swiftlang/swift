@@ -780,9 +780,9 @@ static void errorRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  memcpy(dest + addrOffset, src + addrOffset, sizeof(SwiftError*));
-  auto *object = *(SwiftError**)(dest + addrOffset);
-  addrOffset += sizeof(object);
+  SwiftError *object = *(SwiftError **)(src + addrOffset);
+  memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
+  addrOffset += sizeof(SwiftError *);
   swift_errorRetain(object);
 }
 
@@ -791,10 +791,11 @@ static void nativeStrongRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  memcpy(dest + addrOffset, src + addrOffset, sizeof(HeapObject*));
-  HeapObject *object = (HeapObject*)((*(uintptr_t *)(dest + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
-  addrOffset += sizeof(object);
-  swift_retain(object);
+  uintptr_t object = *(uintptr_t *)(src + addrOffset);
+  memcpy(dest + addrOffset, &object, sizeof(HeapObject*));
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  addrOffset += sizeof(HeapObject *);
+  swift_retain((HeapObject *)object);
 }
 
 static void unownedRetainBranchless(const Metadata *metadata,
@@ -802,10 +803,11 @@ static void unownedRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  memcpy(dest + addrOffset, src + addrOffset, sizeof(HeapObject*));
-  HeapObject *object = (HeapObject*)((*(uintptr_t *)(dest + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
-  addrOffset += sizeof(object);
-  swift_unownedRetain(object);
+  uintptr_t object = *(uintptr_t *)(src + addrOffset);
+  memcpy(dest + addrOffset, &object, sizeof(HeapObject*));
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  addrOffset += sizeof(HeapObject *);
+  swift_unownedRetain((HeapObject *)object);
 }
 
 static void weakCopyInitBranchless(const Metadata *metadata,
@@ -824,9 +826,9 @@ static void unknownRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  memcpy(dest + addrOffset, src + addrOffset, sizeof(void*));
-  void *object = *(void**)(dest + addrOffset);
-  addrOffset += sizeof(void*);
+  void *object = *(void **)(src + addrOffset);
+  memcpy(dest + addrOffset, &object, sizeof(void*));
+  addrOffset += sizeof(void *);
   swift_unknownObjectRetain(object);
 }
 
@@ -857,8 +859,8 @@ static void bridgeRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  memcpy(dest + addrOffset, src + addrOffset, sizeof(void*));
-  auto *object = *(void **)(dest + addrOffset);
+  void *object = *(void **)(src + addrOffset);
+  memcpy(dest + addrOffset, &object, sizeof(void*));
   addrOffset += sizeof(void*);
   swift_bridgeObjectRetain(object);
 }
@@ -879,8 +881,8 @@ static void objcStrongRetainBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
-  memcpy(dest + addrOffset, src + addrOffset, sizeof(objc_object*));
   objc_object *object = (objc_object*)(*(uintptr_t *)(src + addrOffset));
+  memcpy(dest + addrOffset, &object, sizeof(objc_object*));
   addrOffset += sizeof(objc_object*);
   objc_retain(object);
 }
@@ -904,11 +906,11 @@ static void existentialInitWithCopyBranchless(const Metadata *metadata,
                                uint8_t *dest,
                                uint8_t *src) {
   auto *type = getExistentialTypeMetadata((OpaqueValue*)(src + addrOffset));
+  auto *witness = *(void**)(src + addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)));
+  memcpy(dest + addrOffset + (NumWords_ValueBuffer * sizeof(uintptr_t)), &type, sizeof(uintptr_t));
+  memcpy(dest + addrOffset + ((NumWords_ValueBuffer + 1) * sizeof(uintptr_t)), &witness, sizeof(uintptr_t));
   auto *destObject = (ValueBuffer *)(dest + addrOffset);
   auto *srcObject = (ValueBuffer *)(src + addrOffset);
-  memcpy(dest + addrOffset + (NumWords_ValueBuffer * sizeof(uintptr_t)),
-         src + addrOffset + (NumWords_ValueBuffer * sizeof(uintptr_t)),
-         sizeof(uintptr_t) * 2);
   addrOffset += type->vw_size();
   type->vw_initializeBufferWithCopyOfBuffer(destObject, srcObject);
 }
