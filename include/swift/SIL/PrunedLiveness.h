@@ -760,55 +760,6 @@ public:
   LiveRangeSummary computeSimple();
 };
 
-//===----------------------------------------------------------------------===//
-//                          DiagnosticPrunedLiveness
-//===----------------------------------------------------------------------===//
-
-// FIXME: it isn't clear what this is for or what nonLifetimeEndingUseInLiveOut
-// means precisely.
-class DiagnosticPrunedLiveness : public SSAPrunedLiveness {
-  /// A side array that stores any non lifetime ending uses we find in live out
-  /// blocks. This is used to enable our callers to emit errors on non-lifetime
-  /// ending uses that extend liveness into a loop body.
-  SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
-
-public:
-  DiagnosticPrunedLiveness(
-      SILFunction *function,
-      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
-      SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut =
-          nullptr)
-      : SSAPrunedLiveness(function, discoveredBlocks),
-        nonLifetimeEndingUsesInLiveOut(nonLifetimeEndingUsesInLiveOut) {}
-
-  void updateForUse(SILInstruction *user, bool lifetimeEnding);
-
-  using NonLifetimeEndingUsesInLiveOutRange =
-      iterator_range<SILInstruction *const *>;
-
-  NonLifetimeEndingUsesInLiveOutRange
-  getNonLifetimeEndingUsesInLiveOut() const {
-    assert(nonLifetimeEndingUsesInLiveOut &&
-           "Called without passing in nonLifetimeEndingUsesInLiveOut to "
-           "constructor?!");
-    return llvm::make_range(nonLifetimeEndingUsesInLiveOut->begin(),
-                            nonLifetimeEndingUsesInLiveOut->end());
-  }
-
-  using NonLifetimeEndingUsesInLiveOutBlocksRange =
-      TransformRange<NonLifetimeEndingUsesInLiveOutRange,
-                     function_ref<SILBasicBlock *(const SILInstruction *&)>>;
-  NonLifetimeEndingUsesInLiveOutBlocksRange
-  getNonLifetimeEndingUsesInLiveOutBlocks() const {
-    function_ref<SILBasicBlock *(const SILInstruction *&)> op;
-    op = [](const SILInstruction *&ptr) -> SILBasicBlock * {
-      return ptr->getParent();
-    };
-    return NonLifetimeEndingUsesInLiveOutBlocksRange(
-        getNonLifetimeEndingUsesInLiveOut(), op);
-  }
-};
-
 } // namespace swift
 
 #endif

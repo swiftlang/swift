@@ -772,25 +772,3 @@ static FunctionTest MultiDefLivenessTest(
       boundary.print(llvm::outs());
     });
 } // end namespace swift::test
-
-//===----------------------------------------------------------------------===//
-//                       DiagnosticPrunedLiveness
-//===----------------------------------------------------------------------===//
-
-// FIXME: This is wrong. Why is nonLifetimeEndingUsesInLiveOut inside
-// PrunedLiveness, and what does it mean? Blocks may transition to LiveOut
-// later. Or they may already be LiveOut from a previous use. After computing
-// liveness, clients should check uses that are in PrunedLivenessBoundary.
-void DiagnosticPrunedLiveness::
-updateForUse(SILInstruction *user, bool lifetimeEnding) {
-  SSAPrunedLiveness::updateForUse(user, 0);
-
-  auto useBlockLive = getBlockLiveness(user->getParent());
-  // Record all uses of blocks on the liveness boundary. For blocks marked
-  // LiveWithin, the boundary is considered to be the last use in the block.
-  if (!lifetimeEnding && useBlockLive == PrunedLiveBlocks::LiveOut) {
-    if (nonLifetimeEndingUsesInLiveOut)
-      nonLifetimeEndingUsesInLiveOut->insert(user);
-    return;
-  }
-}

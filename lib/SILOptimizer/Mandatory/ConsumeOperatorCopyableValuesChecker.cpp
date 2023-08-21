@@ -58,7 +58,7 @@ struct CheckerLivenessInfo {
   SmallSetVector<Operand *, 8> consumingUse;
   SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
-  BitfieldRef<DiagnosticPrunedLiveness> liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   CheckerLivenessInfo() : nonLifetimeEndingUsesInLiveOut() {}
 
@@ -438,10 +438,11 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   //
   // TODO: We should add llvm.dbg.addr support for fastisel and also teach
   // CodeGen how to handle llvm.dbg.addr better.
+  SmallVector<SILBasicBlock *, 32> discoveredBlocks;
   while (!valuesToProcess.empty()) {
-    BitfieldRef<DiagnosticPrunedLiveness>::StackState livenessBitfieldContainer(
-        livenessInfo.liveness, fn, nullptr,
-        &livenessInfo.nonLifetimeEndingUsesInLiveOut);
+    discoveredBlocks.clear();
+    BitfieldRef<SSAPrunedLiveness>::StackState livenessBitfieldContainer(
+        livenessInfo.liveness, fn, &discoveredBlocks);
 
     auto lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
@@ -456,6 +457,32 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
     bool canOptimize = livenessInfo.compute();
     if (!canOptimize)
       continue;
+
+    // Then go through all of our nonconsuming uses. If any of these uses are in
+    // LiveOut blocks, then we store them in a special array. The reason for
+    // this is that if they are in a block that is not control equivalent to our
+    // move, they will not actually be on the boundary, but they are the case
+    // that we need to search for and error upon.
+    for (auto *user : livenessInfo.liveness->getNonLifetimeEndingUsers()) {
+      switch (livenessInfo.liveness->getBlockLiveness(user->getParent())) {
+      case PrunedLiveBlocks::IsLive::Dead:
+      case PrunedLiveBlocks::IsLive::LiveWithin:
+        continue;
+      case PrunedLiveBlocks::IsLive::LiveOut:
+        // If we have an end_borrow, use the begin_borrow instead.
+        if (auto *ebi = dyn_cast<EndBorrowInst>(user)) {
+          // We shouldn't ever allow for reborrows to occur, so we should be
+          // able to just cast to begin_borrow here.
+          livenessInfo.nonLifetimeEndingUsesInLiveOut.insert(
+              cast<BeginBorrowInst>(ebi->getOperand()));
+          continue;
+        }
+
+        // Otherwise, just use the regular instruction.
+        livenessInfo.nonLifetimeEndingUsesInLiveOut.insert(user);
+        continue;
+      }
+    }
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
@@ -474,25 +501,26 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         mvi->setAllowsDiagnostics(false);
 
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
+        foundMove = true;
         if (livenessInfo.liveness->isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
-          if (auto varInfo = dbgVarInst.getVarInfo()) {
-            auto *next = mvi->getNextInstruction();
-            SILBuilderWithScope builder(next);
-            // We need to make sure any undefs we put in are the same loc/debug
-            // scope as our original so that the backend treats them as
-            // referring to the same "debug entity".
-            builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
-            builder.createDebugValue(
-                dbgVarInst->getLoc(),
-                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
-                false /*poison*/, true /*moved*/);
-          }
+          continue;
         }
-        foundMove = true;
+
+        LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
+        if (auto varInfo = dbgVarInst.getVarInfo()) {
+          auto *next = mvi->getNextInstruction();
+          SILBuilderWithScope builder(next);
+          // We need to make sure any undefs we put in are the same loc/debug
+          // scope as our original so that the backend treats them as
+          // referring to the same "debug entity".
+          builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
+          builder.createDebugValue(
+              dbgVarInst->getLoc(),
+              SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
+              false /*poison*/, true /*moved*/);
+        }
       }
     }
 
