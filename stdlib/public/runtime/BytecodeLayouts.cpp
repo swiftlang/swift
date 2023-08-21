@@ -369,29 +369,33 @@ static void multiPayloadEnumGenericBranchless(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *addr,
                              Params ...params) {
+  size_t tagBytes;
+  size_t numPayloads;
+  size_t refCountBytes;
+  size_t enumSize;
+  uint64_t enumTag;
+  uintptr_t nestedAddrOffset;
+  LayoutStringReader nestedReader;
   reader.modify([&](LayoutStringReader &reader) {
-    size_t tagBytes;
-    size_t numPayloads;
-    size_t refCountBytes;
-    size_t enumSize;
     reader.readBytes(tagBytes, numPayloads, refCountBytes, enumSize);
 
+    nestedReader = reader;
+    nestedAddrOffset = addrOffset;
     auto tagBytesOffset = enumSize - tagBytes;
 
-    auto enumTag = readTagBytes(addr + addrOffset + tagBytesOffset, tagBytes);
-
-    if (SWIFT_LIKELY(enumTag < numPayloads)) {
-      size_t refCountOffset = reader.peekBytes<size_t>(enumTag * sizeof(size_t));
-
-      LayoutStringReader nestedReader = reader;
-      nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-      uintptr_t nestedAddrOffset = addrOffset;
-      HandlerFn(metadata, nestedReader, nestedAddrOffset, addr, std::forward<Params>(params)...);
-    }
-
     reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
+    enumTag = readTagBytes(addr + addrOffset + tagBytesOffset, tagBytes);
+
     addrOffset += enumSize;
   });
+
+  if (SWIFT_LIKELY(enumTag < numPayloads)) {
+    size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
+
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+
+    HandlerFn(metadata, nestedReader, nestedAddrOffset, addr, std::forward<Params>(params)...);
+  }
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -704,7 +708,7 @@ static void unknownWeakInitWithTake(const Metadata *metadata,
                                   (WeakReference *)(src + addrOffset));
 }
 
-static inline void metatypeInitWithTake(const Metadata *metadata,
+static void metatypeInitWithTake(const Metadata *metadata,
                           LayoutStringReader &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,
@@ -729,7 +733,7 @@ static void existentialInitWithTake(const Metadata *metadata,
   }
 }
 
-static inline void resilientInitWithTake(const Metadata *metadata,
+static void resilientInitWithTake(const Metadata *metadata,
                           LayoutStringReader &reader,
                           uintptr_t &addrOffset,
                           uint8_t *dest,

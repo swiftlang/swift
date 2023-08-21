@@ -2580,9 +2580,10 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
 
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
-    hasLayoutString = !ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal) &&
-                      !!typeLayoutEntry->layoutString(IGM, genericSig);
+    hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
+  }
 
+  if (auto sd = dyn_cast<StructDecl>(type)) {
     if (!hasLayoutString &&
         IGM.Context.LangOpts.hasFeature(
             Feature::LayoutStringValueWitnessesInstantiation) &&
@@ -2591,9 +2592,6 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
                          needsSingletonMetadataInitialization(IGM, type) ||
                          (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
     }
-  }
-
-  if (auto sd = dyn_cast<StructDecl>(type)) {
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
                                    hasLayoutString).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
@@ -4650,7 +4648,7 @@ namespace {
 
       auto &ti = IGM.getTypeInfo(getLoweredType());
 
-      return !ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal) && !!getLayoutString();
+      return !!getLayoutString();
     }
 
     ConstantReference emitValueWitnessTable(bool relativeReference) {
@@ -5166,10 +5164,10 @@ namespace {
 
       if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
           IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
-        return (!!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target)) && !needsForeignMetadataCompletionFunction(IGM, Target);
+        return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
       }
 
-      return !!getLayoutString() && !needsForeignMetadataCompletionFunction(IGM, Target);
+      return !!getLayoutString();
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -5679,7 +5677,7 @@ namespace {
 
     llvm::Constant *emitNominalTypeDescriptor() {
       auto descriptor = EnumContextDescriptorBuilder(
-                            IGM, Target, RequireMetadata, hasLayoutString())
+                            IGM, Target, RequireMetadata, !!getLayoutString())
                             .emit();
       return descriptor;
     }
@@ -5728,7 +5726,7 @@ namespace {
     }
 
     bool canBeConstant() {
-      return !HasUnfilledPayloadSize && !hasInstantiatedLayoutString();
+      return !HasUnfilledPayloadSize;// && !hasInstantiatedLayoutString();
     }
   };
 
@@ -6250,9 +6248,9 @@ namespace {
       return Target->getDeclaredType()->getCanonicalType();
     }
 
-    bool hasLayoutString() {
-      return false;
-    }
+    // bool hasLayoutString() {
+    //   return false;
+    // }
 
     void createMetadataCompletionFunction() {
       llvm_unreachable("foreign structs never require completion");
