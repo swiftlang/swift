@@ -116,7 +116,7 @@ The calling conventions of these functions differ significantly:
 
 The standard ownership semantics for a Swift function call are defined such that the caller retains ownership over the parameter values passed into the callee, while the callee transfers ownership of the return value to the caller. This means that the \verb|identity(_:)| function cannot just return the value \texttt{x}; instead, it must first create a logical copy of \texttt{x} that it owns, and then return this owned copy. This is achieved by incrementing the string value's buffer reference count via a call to a runtime function.
 \end{enumerate}
-More generally, every Swift type has a size and alignment, and defines three fundamental operations that can be performed on all values of that type: moving the value, copying the value, and destroying the value. A move is semantically equivalent to, but more efficient than, copying a value followed by destroying the old copy.\footnote{Of course if move-only types are ever introduced into the language, this will no longer be so; a new kind of value will exist which cannot be copied.}
+More generally, every Swift type has a size and alignment, and defines three fundamental operations that can be performed on all values of that type: moving the value, copying the value, and destroying the value. A move is semantically equivalent to, but more efficient than, copying a value followed by destroying the old copy. (Non-copyable types were recently introduced in \cite{se0390}; the runtime metadata of a non-copyable type does not define a copy function. We won't talk about non-copyable types in this book; it suffices to say that the compiler statically checks that copy operations on them are not performed, and at least at the time of writing, the generics implementation does not yet allow abstracting over non-copyable types.)
 
 With a trivial type, moving or copying a value simply copies the value's bytes from one memory location to another, and destroying a value does nothing. With a reference type, these operations update the reference count. Copying a reference increments the reference count on its heap-allocated backing storage, and destroying a reference decrements the reference count, deallocating the backing storage when the reference count reaches zero. Even more complex behaviors are also possible; a struct might contain a mix of trivial types and references, for example. Weak references and existential types also have non-trivial value operations.
 
@@ -520,6 +520,7 @@ More generally, the replacement types and conformances are defined in terms of t
 \cite{Milewski_2015}
 \cite{peytonjones1997type}
 \cite{concepts}
+\cite{essential}
 
 \index{C++}
 \index{Java}

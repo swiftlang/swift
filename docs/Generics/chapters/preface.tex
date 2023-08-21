@@ -85,9 +85,9 @@ A set $X$ is a \emph{subset} of another set $Y$, written as \index{$\subseteq$}\
 The \emph{Cartesian product} of two sets $X$ and $Y$, denoted \index{$\times$}\index{$\times$!z@\igobble|seealso{Cartesian product}}$X\times Y$, is the set of all \emph{ordered pairs} $(x,y)$ where $x\in X$, $y\in Y$. Note that the ordered pair $(x,y)$ is not the same as the set $\{x,y\}$. The Cartesian product construction generalizes to any finite number of sets, to give \emph{ordered tuples} or \emph{sequences}.
 
 \IndexDefinition{binary operation}
-\IndexDefinition{mapping}
 \IndexDefinition{homomorphism}
 \index{mapping|see{function}}
+\IndexDefinition{function}
 A \emph{function} (or \emph{mapping}) $f\colon X\rightarrow Y$ assigns to each $x\in X$ a unique element $f(x)\in Y$. If the sets $X$ and $Y$ are equipped with some kind of additional structure (which will be explicitly defined), then $f$ is a \emph{homomorphism} if it preserves this structure.
 
 A function $f\colon X\times Y\rightarrow Z$ defined on the Cartesian product can be thought of as taking a pair of values $x\in X$, $y\in Y$ to an element $f(x,y)\in Z$. A \emph{binary operation} is a function named by a symbol like $\otimes$, $\star$ or $\cdot$ defined on the Cartesian product of two sets. The application of a binary operation is denoted by writing the symbol in between the two elements, like $x\otimes y$.
@@ -131,7 +131,7 @@ I don't even attempt to formally prove the correctness of most things, but somet
 
 I'd like to thank everyone who read earlier versions of the text, pointed out typos, and asked clarifying questions. Also, the Swift generics system itself is the result of over a decade of collaborative effort by countless people. This includes compiler developers, Swift evolution proposal authors, members of the evolution community, and of course, all the users who repeatedly punched holes in our conceptual model by patiently reducing test cases and reporting mind-bending correctness bugs. This book attempts to give an overview of the sum total of all these contributions; I'm not claiming any of the design ideas or implementation techniques described here as my own.
 
-It's also worth mentioning what was left out. Most of the book is current as of Swift~5.8, but I don't talk about variadic generics, which are still under development. Also the low-level code generation and runtime support for generics only get a cursory mention in Chapter~\ref{roadmap} and Appendix~\ref{runtime representation}, but it really deserves a complete treatment in a future Part~IV.
+It's also worth mentioning what was left out. Most of the book is current as of Swift~5.9, but I don't talk about \index{variadic generics}\index{parameter packs}variadic generics (\cite{se0393}, \cite{se0398}, \cite{se0399}). Also the low-level code generation and runtime support for generics only get a cursory mention in Chapter~\ref{roadmap} and Appendix~\ref{runtime representation}, but it really deserves a complete treatment in a future Part~IV.
 
 The \TeX{} source for this book is our git repository, under the same license as the rest of the codebase:
 \begin{quote}

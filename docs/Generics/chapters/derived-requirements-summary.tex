@@ -22,10 +22,10 @@
 \ConfReq{T}{P}\vdash\texttt{T.A}\tag{\textsc{AssocType}}\\
 \ConfReq{T}{P}\vdash\texttt{T.[P]A}\\
 \ConfReq{T}{P}\vdash\FormalReq{T.[P]A == T.A}\\[\medskipamount]
-\vdash\ConfReq{Self.U}{P}\qquad\mbox{(in \texttt{P})}\tag{\textsc{ReqSig}}\\
-\vdash\ConfReq{Self.U}{C}\qquad\mbox{(in \texttt{P})}\\
-\vdash\ConfReq{Self.U}{AnyObject}\qquad\mbox{(in \texttt{P})}\\
-\vdash\FormalReq{Self.U == Self.V}\qquad\mbox{(in \texttt{P})}\\[\medskipamount]
+\vdash\ConfReq{Self.U}{Q}_\texttt{P}\tag{\textsc{ReqSig}}\\
+\vdash\ConfReq{Self.U}{C}_\texttt{P}\\
+\vdash\ConfReq{Self.U}{AnyObject}_\texttt{P}\\
+\vdash\FormalReq{Self.U == Self.V}_\texttt{P}\\[\medskipamount]
 \ConfReq{T}{P},\,\ConfReq{Self.U}{Q}\vdash\ConfReq{T.U}{Q}\tag{\textsc{Conf}}\\
 \ConfReq{T}{P},\,\ConfReq{Self.U}{C}\vdash\ConfReq{T.U}{C}\\
 \ConfReq{T}{P},\,\ConfReq{Self.U}{AnyObject}\vdash\ConfReq{T.U}{AnyObject}\\
