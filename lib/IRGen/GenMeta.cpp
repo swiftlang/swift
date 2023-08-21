@@ -2586,8 +2586,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
         IGM.Context.LangOpts.hasFeature(
             Feature::LayoutStringValueWitnessesInstantiation) &&
         IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
-      hasLayoutString |= requiresForeignTypeMetadata(type) ||
-                         needsSingletonMetadataInitialization(IGM, type) ||
+      hasLayoutString |= needsSingletonMetadataInitialization(IGM, type) ||
                          (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
     }
   }

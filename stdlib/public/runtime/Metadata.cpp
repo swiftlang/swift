@@ -2743,7 +2743,7 @@ void swift::swift_initStructMetadataWithLayoutString(
       }
 
       fullOffset += fieldType->size;
-      previousFieldOffset = fieldType->size;
+      previousFieldOffset = fieldType->size - sizeof(uintptr_t);
 
       continue;
     }
@@ -2781,28 +2781,28 @@ void swift::swift_initStructMetadataWithLayoutString(
 }
 
 size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
-  if (type->vw_size() == 0 || type->getValueWitnesses()->isPOD()) {
+  auto *vwt = type->getValueWitnesses();
+  if (type->vw_size() == 0 || vwt->isPOD()) {
     return 0;
-  } else if (type->hasLayoutString()) {
-    size_t offset = sizeof(uint64_t);
-    return LayoutStringReader{type->getLayoutString(), offset}
-        .readBytes<size_t>();
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(type)) {
     size_t res = 0;
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
       res += _swift_refCountBytesForMetatype(tuple->getElement(i).Type);
     }
     return res;
+  } else if (vwt == &VALUE_WITNESS_SYM(Bo) ||
+             vwt == &VALUE_WITNESS_SYM(BO) ||
+             vwt == &VALUE_WITNESS_SYM(Bb)) {
+    return sizeof(uint64_t);
   } else if (auto *cls = type->getClassObject()) {
     if (cls->isTypeMetadata()) {
-      auto *vwt = cls->getValueWitnesses();
-      if (vwt != &VALUE_WITNESS_SYM(Bo) &&
-          vwt != &VALUE_WITNESS_SYM(BO) &&
-          vwt != &VALUE_WITNESS_SYM(Bb)) {
-        goto metadata;
-      }
+      goto metadata;
     }
     return sizeof(uint64_t);
+  } else if (type->hasLayoutString()) {
+    size_t offset = sizeof(uint64_t);
+    return LayoutStringReader{type->getLayoutString(), offset}
+        .readBytes<size_t>();
   } else if (type->isAnyExistentialType()) {
     return sizeof(uint64_t);
   } else {
@@ -2819,11 +2819,52 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
   size_t unalignedOffset = fullOffset;
   fullOffset = roundUpToAlignMask(fullOffset, fieldType->vw_alignment() - 1);
   size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
+  auto *vwt = fieldType->getValueWitnesses();
   if (fieldType->vw_size() == 0) {
     return;
-  } else if (fieldType->getValueWitnesses()->isPOD()) {
+  } else if (vwt->isPOD()) {
     // No need to handle PODs
     previousFieldOffset = offset + fieldType->vw_size();
+    fullOffset += fieldType->vw_size();
+  } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(fieldType)) {
+    for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
+      _swift_addRefCountStringForMetatype(writer, flags,
+                                          tuple->getElement(i).Type, fullOffset,
+                                          previousFieldOffset);
+    }
+  } else if (vwt == &VALUE_WITNESS_SYM(Bo)) {
+    auto tag = RefCountingKind::NativeStrong;
+    writer.writeBytes(((uint64_t)tag << 56) | offset);
+    previousFieldOffset = 0;
+    fullOffset += fieldType->vw_size();
+  } else if (vwt == &VALUE_WITNESS_SYM(BO)) {
+  #if SWIFT_OBJC_INTEROP
+    auto tag = RefCountingKind::ObjC;
+  #else
+    auto tag = RefCountingKind::Unknown;
+  #endif
+    writer.writeBytes(((uint64_t)tag << 56) | offset);
+    previousFieldOffset = 0;
+    fullOffset += fieldType->vw_size();
+  } else if (vwt == &VALUE_WITNESS_SYM(Bb)) {
+    auto tag = RefCountingKind::Bridge;
+    writer.writeBytes(((uint64_t)tag << 56) | offset);
+    previousFieldOffset = 0;
+    fullOffset += fieldType->vw_size();
+  } else if (auto *cls = fieldType->getClassObject()) {
+    RefCountingKind tag;
+    if (!cls->isTypeMetadata()) {
+    #if SWIFT_OBJC_INTEROP
+      tag = RefCountingKind::ObjC;
+    #else
+      tag = RefCountingKind::Unknown;
+    #endif
+    } else {
+      goto metadata;
+    }
+
+    writer.writeBytes(((uint64_t)tag << 56) | offset);
+    previousFieldOffset = 0;
     fullOffset += fieldType->vw_size();
   } else if (fieldType->hasLayoutString()) {
     LayoutStringReader reader{fieldType->getLayoutString(), 0};
@@ -2835,9 +2876,8 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
              reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
 
       if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(
-            writer.layoutStr, writer.offset,
-            reader.layoutStr + layoutStringHeaderSize, fieldType);
+        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
+                                         reader.layoutStr + layoutStringHeaderSize, fieldType);
       }
 
       if (offset) {
@@ -2856,54 +2896,20 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
       previousFieldOffset += fieldType->vw_size();
     }
     fullOffset += fieldType->vw_size();
-  } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(fieldType)) {
-    for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
-      _swift_addRefCountStringForMetatype(writer, flags,
-                                          tuple->getElement(i).Type, fullOffset,
-                                          previousFieldOffset);
-    }
-  } else if (auto *cls = fieldType->getClassObject()) {
-    RefCountingKind tag;
-    if (!cls->isTypeMetadata()) {
-    #if SWIFT_OBJC_INTEROP
-      tag = RefCountingKind::ObjC;
-    #else
-      tag = RefCountingKind::Unknown;
-    #endif
-    } else {
-      auto *vwt = cls->getValueWitnesses();
-      if (vwt == &VALUE_WITNESS_SYM(Bo)) {
-        tag = RefCountingKind::NativeStrong;
-      } else if (vwt == &VALUE_WITNESS_SYM(BO)) {
-      #if SWIFT_OBJC_INTEROP
-        tag = RefCountingKind::ObjC;
-      #else
-        tag = RefCountingKind::Unknown;
-      #endif
-      } else if (vwt == &VALUE_WITNESS_SYM(Bb)) {
-        tag = RefCountingKind::Bridge;
-      } else {
-        goto metadata;
-      };
-    }
-
-    writer.writeBytes(((uint64_t)tag << 56) | offset);
-    previousFieldOffset = fieldType->vw_size();
-    fullOffset += previousFieldOffset;
   } else if (fieldType->isAnyExistentialType()) {
     auto *existential = dyn_cast<ExistentialTypeMetadata>(fieldType);
     assert(existential);
     auto tag = existential->isClassBounded() ? RefCountingKind::Unknown
                                              : RefCountingKind::Existential;
     writer.writeBytes(((uint64_t)tag << 56) | offset);
-    previousFieldOffset = fieldType->vw_size();
-    fullOffset += previousFieldOffset;
+    previousFieldOffset = fieldType->vw_size() - (existential->isClassBounded() ? sizeof(uintptr_t) : (NumWords_ValueBuffer * sizeof(uintptr_t)));
+    fullOffset += fieldType->vw_size();
   } else {
 metadata:
   writer.writeBytes(((uint64_t)RefCountingKind::Metatype << 56) | offset);
   writer.writeBytes(fieldType);
-  previousFieldOffset = fieldType->vw_size();
-  fullOffset += previousFieldOffset;
+  previousFieldOffset = 0;
+  fullOffset += fieldType->vw_size();
   }
 }
 
