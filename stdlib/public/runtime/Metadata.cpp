@@ -2895,7 +2895,7 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
     auto tag = existential->isClassBounded() ? RefCountingKind::Unknown
                                              : RefCountingKind::Existential;
     writer.writeBytes(((uint64_t)tag << 56) | offset);
-    previousFieldOffset = existential->isClassBounded() ? fieldType->vw_size() - sizeof(uintptr_t) : 0;
+    previousFieldOffset = fieldType->vw_size() - (existential->isClassBounded() ? sizeof(uintptr_t) : (NumWords_ValueBuffer * sizeof(uintptr_t)));
     fullOffset += fieldType->vw_size();
   } else {
 metadata:

@@ -293,6 +293,37 @@ func testExistentialStructBox() {
 
 testExistentialStructBox()
 
+func testAnyWrapper() {
+    let ptr = UnsafeMutablePointer<AnyWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = TestClass()
+        testInit(ptr, to: AnyWrapper(y: x, z: SimpleClass(x: 23)))
+    }
+
+    do {
+        let y = TestClass()
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: AnyWrapper(y: y, z: SimpleClass(x: 32)))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testAnyWrapper()
+
 class ClassWithABC: A, B, C {
     deinit {
         print("ClassWithABC deinitialized!")

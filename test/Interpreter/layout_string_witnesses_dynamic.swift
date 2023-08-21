@@ -4,7 +4,7 @@
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
+// RUN: %target-build-swift -g -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
@@ -92,7 +92,35 @@ func testGeneric() {
 
 testGeneric()
 
-func testPrespecializedStructAnyObject() {
+func testGenericAny() {
+    let ptr = allocateInternalGenericPtr(of: Any.self)
+
+    do {
+        let x: Any = TestClass()
+        testGenericInit(ptr, to: x as Any)
+    }
+
+    do {
+        let y: Any = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y as Any)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: Any.self)
+
+    ptr.deallocate()
+}
+
+testGenericAny()
+
+func testPrespecializedAnyObject() {
     let ptr = UnsafeMutablePointer<PrespecializedStruct<AnyObject>>.allocate(capacity: 1)
 
     do {
@@ -120,7 +148,7 @@ func testPrespecializedStructAnyObject() {
     ptr.deallocate()
 }
 
-testPrespecializedStructAnyObject()
+testPrespecializedAnyObject()
 
 func testPrespecializedStructSimpleClass() {
     let ptr = UnsafeMutablePointer<PrespecializedStruct<SimpleClass>>.allocate(capacity: 1)
@@ -866,7 +894,7 @@ func testResilientSinglePayloadEnumComplexTag() {
 testResilientSinglePayloadEnumComplexTag()
 
 func testResilientMultiPayloadEnumTag() {
-    let x = switch getResilientMultiPayloadEnumEmpty0() {
+    let x = switch getResilientMultiPayloadEnumEmpty0(AnyObject.self) {
     case .nonEmpty0: 0
     case .nonEmpty1: 1
     case .empty0: 2
