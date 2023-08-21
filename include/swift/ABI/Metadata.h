@@ -323,13 +323,9 @@ public:
   }
 
   const uint8_t *getLayoutString() const {
-    // assert(hasLayoutString());
-    // if (isAnyClass()) {
-    //   return asFullMetadata(
-    //              reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
-    //                  this))
-    //       ->layoutString;
-    // }
+    assert(hasLayoutString());
+    // Classes should not have layout strings
+    assert(!isAnyClass());
     return asFullMetadata(this)->layoutString;
   }
 
