@@ -932,7 +932,7 @@ setlocal enableextensions enabledelayedexpansion
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bundle\installer.wixproj ^
   -m ^
   -restore ^
-  -p:BundleFlavor=web ^
+  -p:BundleFlavor=online ^
   -p:BaseReleaseDownloadUrl=https://download.swift.org/development/windows ^
   -p:Configuration=Release ^
   -p:BaseOutputPath=%PackageRoot%\online\ ^
