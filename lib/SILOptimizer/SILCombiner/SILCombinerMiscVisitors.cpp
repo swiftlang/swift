@@ -1320,6 +1320,15 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   if (tedai->use_empty())
     return nullptr;
 
+  // TODO : Enable this in ossa. It is disabled due to an unrelated issue in
+  // MemoryVerifier where it incorrectly raises an error about a trivial enum
+  // not destroyed. There is pattern matching in MemoryVerifier to check if a
+  // memory location has a trivial value, this is missing an edge case exposed
+  // by this optimization. Details in : rdar://114274714.
+  if (tedai->getFunction()->hasOwnership()) {
+    return nullptr;
+  }
+
   bool onlyLoads = true;
   bool onlyDestroys = true;
   for (auto U : getNonDebugUses(tedai)) {
