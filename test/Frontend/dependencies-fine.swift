@@ -82,7 +82,7 @@
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}Foundation.h
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}NSObject.h
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}ObjectiveC.apinotes
-// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}module.map
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}module.modulemap
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}objc.h
 // CHECK-IMPORT-TRACK-SYSTEM-NOT: {{[^\\]}}:
 
