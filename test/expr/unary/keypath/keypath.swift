@@ -134,22 +134,22 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
-  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>'}}
+  //expected-error@-1 {{key path value type 'WritableKeyPath<A, A>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, A>'}}
 
   let _: (A) -> Prop? = \.optProperty?
   let _: PartialKeyPath<A> = \.optProperty?
   let _: KeyPath<A, Prop?> = \.optProperty?
-  // expected-error@+1{{cannot convert}}
+  // expected-error@+1{{key path value type 'KeyPath<A, Prop?>' cannot be converted to contextual type 'WritableKeyPath<A, Prop?>'}}
   let _: WritableKeyPath<A, Prop?> = \.optProperty?
-  // expected-error@+1{{cannot convert}}
+  // expected-error@+1{{key path value type 'KeyPath<A, Prop?>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, Prop?>'}}
   let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
   let _: (A) -> A? = \.optProperty?[sub]
   let _: PartialKeyPath<A> = \.optProperty?[sub]
   let _: KeyPath<A, A?> = \.optProperty?[sub]
-  // expected-error@+1{{cannot convert}}
+  // expected-error@+1{{key path value type 'KeyPath<A, A?>' cannot be converted to contextual type 'WritableKeyPath<A, A?>'}}
   let _: WritableKeyPath<A, A?> = \.optProperty?[sub]
-  // expected-error@+1{{cannot convert}}
+  // expected-error@+1{{key path value type 'KeyPath<A, A?>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, A?>'}}
   let _: ReferenceWritableKeyPath<A, A?> = \.optProperty?[sub]
 
   let _: KeyPath<A, Prop> = \.optProperty!
@@ -162,7 +162,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<C<A>, A> = \.value
   let _: WritableKeyPath<C<A>, A> = \.value
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
-  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<C<A>, A>' to specified type 'ReferenceWritableKeyPath<C<A>, A>'}}
+  // expected-error@-1 {{key path value type 'WritableKeyPath<C<A>, A>' cannot be converted to contextual type 'ReferenceWritableKeyPath<C<A>, A>'}}
 
   let _: (C<A>) -> A = \C.value
   let _: PartialKeyPath<C<A>> = \C.value
@@ -224,14 +224,14 @@ func testDisembodiedStringInterpolation(x: Int) {
   \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}} 
 }
 
-//func testNoComponents() {
-////  let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
-//  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
-//  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-//  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}}
-//  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-//  _ = \A // expected-error {{key path must have at least one component}}
-//}
+func testNoComponents() {
+  let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
+  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  _ = \A // expected-error {{key path must have at least one component}}
+}
 
 struct TupleStruct {
   var unlabeled: (Int, String)
@@ -913,8 +913,10 @@ func testKeyPathHole() {
   // expected-error@-1 {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{25-25=<#Root#>}}
 
   func f(_ i: Int) {}
-  f(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
-  f(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
+  f(\.x) // expected-error {{cannot convert value of type 'KeyPath<_, _>' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  f(\.x.y) // expected-error {{cannot convert value of type 'KeyPath<_, _>' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
 
   func provideValueButNotRoot<T>(_ fn: (T) -> String) {} 
   provideValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
@@ -1051,14 +1053,14 @@ func testSyntaxErrors() {
 }
 
 // https://github.com/apple/swift/issues/56996
-//func f_56996() {
-//  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
-//  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
-//  _ = \Int // expected-error {{key path must have at least one component}}
-//  _ = \Int? // expected-error {{key path must have at least one component}}
-//  _ = \Int. // expected-error {{invalid component of Swift key path}}
-//  // expected-error@-1 {{expected member name following '.'}}
-//}
+func f_56996() {
+  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
+  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+  _ = \Int // expected-error {{key path must have at least one component}}
+  _ = \Int? // expected-error {{key path must have at least one component}}
+  _ = \Int. // expected-error {{invalid component of Swift key path}}
+  // expected-error@-1 {{expected member name following '.'}}
+}
 
 // https://github.com/apple/swift/issues/55805
 // Key-path missing optional crashes compiler: Inactive constraints left over?
