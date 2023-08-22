@@ -14,6 +14,11 @@ func genericInout<T>(_: inout T) {}
 
 func hasVarArg(_ args: Any...) {}
 
+@_silgen_name("sink")
+func sink<T>(_ t: consuming T) {}
+@_silgen_name("source")
+func source<T>(_ t: T.Type) -> T
+
 // Test array initialization - we are still (somewhat) using addresses
 // ---
 // CHECK-LABEL: sil [ossa] @$s20opaque_values_silgen10callVarArgyyF : $@convention(thin) () -> () {
@@ -797,5 +802,24 @@ func intIntoAnyHashableLet() {
 func consumeExprOfOwnedAddrOnlyValue<T>(_ t: __owned T) {
   sink(consume t)
 }
-@_silgen_name("sink")
-func sink<T>(_ t: consuming T) {}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfLoadExprOfOwnedAddrOnlyLValue : {{.*}} {
+// CHECK:         [[VAR:%[^,]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VAR]]
+// CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
+// CHECK:         store {{%[^,]+}} to [init] [[VAR_ADDR]]
+// CHECK:         [[VAR_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[VAR_ADDR]]
+// CHECK:         [[TEMPORARY_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         mark_unresolved_move_addr [[VAR_ACCESS]] to [[TEMPORARY_ADDR]]
+// CHECK:         [[TEMPORARY:%[^,]+]] = load [take] [[TEMPORARY_ADDR]]
+// CHECK:         end_access [[VAR_ACCESS]]
+// CHECK:         [[SINK:%[^,]+]] = function_ref @sink
+// CHECK:         apply [[SINK]]<T>([[TEMPORARY]])
+// CHECK:         dealloc_stack [[TEMPORARY_ADDR]]
+// CHECK:         destroy_value [[VAR]]
+// CHECK-LABEL: } // end sil function 'consumeExprOfLoadExprOfOwnedAddrOnlyLValue'
+@_silgen_name("consumeExprOfLoadExprOfOwnedAddrOnlyLValue")
+func consumeExprOfLoadExprOfOwnedAddrOnlyLValue<T>(_ ty: T.Type) {
+  var t = source(ty)
+  sink(consume t)
+}
