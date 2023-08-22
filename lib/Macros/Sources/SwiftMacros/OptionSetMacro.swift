@@ -123,27 +123,25 @@ public struct OptionSetMacro {
   }
 }
 
-extension OptionSetMacro: ConformanceMacro {
-  public static func expansion<
-    Decl: DeclGroupSyntax,
-    Context: MacroExpansionContext
-  >(
+extension OptionSetMacro: ExtensionMacro {
+  public static func expansion(
     of attribute: AttributeSyntax,
-    providingConformancesOf decl: Decl,
-    in context: Context
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    // Decode the expansion arguments.
-    guard let (structDecl, _, _) = decodeExpansion(of: attribute, attachedTo: decl, in: context) else {
-      return []
-    }
-
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
     // If there is an explicit conformance to OptionSet already, don't add one.
-    if let inheritedTypes = structDecl.inheritanceClause?.inheritedTypeCollection,
-       inheritedTypes.contains(where: { inherited in inherited.typeName.trimmedDescription == "OptionSet" }) {
+    if protocols.isEmpty {
       return []
     }
 
-    return [("OptionSet", nil)]
+    let ext: DeclSyntax =
+      """
+      extension \(type.trimmed): OptionSet {}
+      """
+
+    return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }
 

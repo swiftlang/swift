@@ -1344,14 +1344,16 @@ public struct EmptyPeerMacro: PeerMacro {
   }
 }
 
-public struct EquatableMacro: ConformanceMacro {
+public struct EquatableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    providingConformancesOf decl: some DeclGroupSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    let protocolName: TypeSyntax = "Equatable"
-    return [(protocolName, nil)]
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type.trimmed): Equatable {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }
 
@@ -1412,34 +1414,50 @@ public struct ConformanceViaExtensionMacro: ExtensionMacro {
   }
 }
 
-public struct HashableMacro: ConformanceMacro {
+public struct HashableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    providingConformancesOf decl: some DeclGroupSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    let protocolName: TypeSyntax = "Hashable"
-    return [(protocolName, nil)]
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type.trimmed): Hashable {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }
 
-public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
+public struct ImpliesHashableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    providingConformancesOf decl: some DeclGroupSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    let protocolName: TypeSyntax = "P"
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type.trimmed): ImpliesHashable {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
+public struct DelegatedConformanceMacro: ExtensionMacro, MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
     let conformance: DeclSyntax =
       """
-      extension Placeholder where Element: P {}
+      extension \(type.trimmed): P where Element: P {}
       """
 
     guard let extensionDecl = conformance.as(ExtensionDeclSyntax.self) else {
       return []
     }
 
-    return [(protocolName, extensionDecl.genericWhereClause)]
+    return [extensionDecl]
   }
 
   public static func expansion(
@@ -1894,26 +1912,21 @@ public struct AddPeerStoredPropertyMacro: PeerMacro, Sendable {
   }
 }
 
-public struct InitializableMacro: ConformanceMacro, MemberMacro {
+public struct InitializableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    providingConformancesOf decl: some DeclGroupSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    return [("Initializable", nil)]
-  }
-
-  public static func expansion(
-    of node: AttributeSyntax,
-    providingMembersOf decl: some DeclGroupSyntax,
-    in context: some MacroExpansionContext
-  ) throws -> [DeclSyntax] {
-    let requirement: DeclSyntax =
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = 
       """
-      init(value: Int) {}
+      extension \(type.trimmed): Initializable {
+        init(value: Int) {}
+      }
       """
-
-    return [requirement]
+    return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }
 
