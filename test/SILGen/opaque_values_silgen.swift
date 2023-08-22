@@ -672,7 +672,7 @@ func set<Container, Field>(into container: inout Container, at keyPath: Writable
 // CHECK-SAME:      [[CONTAINER:%[^,]+]] :
 // CHECK:         [[CONTAINER_COPY:%[^,]+]] = copy_value [[CONTAINER]]
 // CHECK:         [[SETTER:%[^,]+]] = class_method [[CONTAINER_COPY]]
-// CHECK:         [[REGISTER_4:%[^,]+]] = apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
+// CHECK:         apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
 // CHECK:         destroy_value [[CONTAINER_COPY]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk'
 @_silgen_name("FormClassKeyPath")
