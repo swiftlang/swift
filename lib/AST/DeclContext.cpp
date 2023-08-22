@@ -407,7 +407,7 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 void DeclContext::getSeparatelyImportedOverlays(
     ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const {
-  if (auto SF = getParentSourceFile())
+  if (auto SF = getOutermostParentSourceFile())
     SF->getSeparatelyImportedOverlays(declaring, overlays);
 }
 
@@ -1234,13 +1234,13 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
 
   // use the type declaration as the private scope if it is in the same
   // file as useSF. This occurs for both extensions and declarations.
-  if (NTD->getParentSourceFile() == useSF)
+  if (NTD->getOutermostParentSourceFile() == useSF)
     return NTD;
 
   // Otherwise use the last extension declaration in the same file.
   const DeclContext *lastExtension = nullptr;
   for (ExtensionDecl *ED : NTD->getExtensions())
-    if (ED->getParentSourceFile() == useSF)
+    if (ED->getOutermostParentSourceFile() == useSF)
       lastExtension = ED;
 
   // If there's no last extension, return the supplied context.
@@ -1250,7 +1250,7 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
 AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
     : Value(DC, isPrivate) {
   if (isPrivate) {
-    DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
+    DC = getPrivateDeclContext(DC, DC->getOutermostParentSourceFile());
     Value.setPointer(DC);
   }
   if (!DC || isa<ModuleDecl>(DC) || isa<PackageUnit>(DC))
@@ -1300,8 +1300,8 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     }
   }
   // Do not allow access if the sourceDC is in a different file
-  auto useSF = useDC->getParentSourceFile();
-  if (useSF != sourceDC->getParentSourceFile())
+  auto useSF = useDC->getOutermostParentSourceFile();
+  if (useSF != sourceDC->getOutermostParentSourceFile())
     return false;
 
   // Do not allow access if the sourceDC does not represent a type.
