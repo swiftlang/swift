@@ -69,6 +69,13 @@ static bool performTransform(SILFunction &fn) {
 
       if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
         auto destroyType = dvi->getOperand()->getType();
+        auto structDecl = destroyType.getStructOrBoundGenericStruct();
+
+        // Experimentally only turn this on for raw layout types.
+        if (structDecl && structDecl->getAttrs().hasAttribute<RawLayoutAttr>()) {
+          continue;
+        }
+
         if (destroyType.isPureMoveOnly() &&
             !isa<DropDeinitInst>(lookThroughOwnershipInsts(dvi->getOperand()))) {
           LLVM_DEBUG(llvm::dbgs() << "Handling: " << *dvi);
@@ -112,7 +119,14 @@ static bool performTransform(SILFunction &fn) {
 
       if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
         auto destroyType = dai->getOperand()->getType();
-        if (destroyType.isLoadable(fn) && destroyType.isPureMoveOnly() &&
+        auto structDecl = destroyType.getStructOrBoundGenericStruct();
+
+        // Experimentally only turn this on for raw layout types.
+        if (structDecl && !structDecl->getAttrs().hasAttribute<RawLayoutAttr>()) {
+          continue;
+        }
+
+        if (/* destroyType.isLoadable(fn) && */ destroyType.isPureMoveOnly() &&
             !isa<DropDeinitInst>(dai->getOperand())) {
           LLVM_DEBUG(llvm::dbgs() << "Handling: " << *dai);
           auto *nom = destroyType.getNominalOrBoundGenericNominal();
