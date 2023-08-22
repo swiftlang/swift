@@ -216,3 +216,22 @@ func testMakeMeHashable(mmh: MakeMeHashable, dict: [MakeMeHashable: Int]) {
 
 @ImpliesHashable
 public struct MakeMeHashable { }
+
+
+// https://github.com/apple/swift/issues/67989 - member added via extension
+// to a protocol is not visible
+
+@attached(extension, names: named(foo), named(printFoo))
+public macro FooExtension() = #externalMacro(module: "MacroDefinition", type: "FooExtensionMacro")
+
+@FooExtension
+protocol Foo {
+  var foo: String { get }
+}
+
+extension String: Foo { }
+
+func testStringFoo(s: String) {
+  "Test".printFoo()
+  s.printFoo()
+}
