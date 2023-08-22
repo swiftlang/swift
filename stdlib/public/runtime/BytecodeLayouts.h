@@ -58,6 +58,56 @@ enum class RefCountingKind : uint8_t {
   // Reserved: 0x81 - 0xFF
 };
 
+struct LayoutStringReader1 {
+  const uint8_t *layoutStr;
+
+  template <typename T>
+  inline T readBytes() {
+    T returnVal;
+    memcpy(&returnVal, layoutStr, sizeof(T));
+    layoutStr += sizeof(T);
+    return returnVal;
+  }
+
+  template <typename... T>
+  inline void readBytes(T&... result) {
+    uintptr_t additionalOffset = 0;
+    ([&] {
+        memcpy(&result, layoutStr + additionalOffset, sizeof(T));
+        additionalOffset += sizeof(T);
+    }(), ...);
+    layoutStr += additionalOffset;
+  }
+
+  template<typename T, typename F>
+  inline T modify(F &&f) {
+    LayoutStringReader1 readerCopy = *this;
+    T res = f(readerCopy);
+    layoutStr = readerCopy.layoutStr;
+    return res;
+  }
+
+  template<typename F>
+  inline void modify(F &&f) {
+    LayoutStringReader1 readerCopy = *this;
+    f(readerCopy);
+    layoutStr = readerCopy.layoutStr;
+  }
+
+  template <typename T>
+  inline T peekBytes(size_t peekOffset = 0) const {
+    T returnVal;
+    memcpy(&returnVal, layoutStr + peekOffset, sizeof(T));
+    return returnVal;
+  }
+
+  inline void skip(size_t n) { layoutStr += n; }
+
+  inline uintptr_t getAbsolute() {
+    return (uintptr_t) layoutStr;
+  }
+};
+
 struct LayoutStringReader {
   const uint8_t *layoutStr;
   size_t offset;
@@ -70,6 +120,31 @@ struct LayoutStringReader {
     return returnVal;
   }
 
+  template <typename... T>
+  inline void readBytes(T&... result) {
+    uintptr_t additionalOffset = 0;
+    ([&] {
+        memcpy(&result, layoutStr + offset + additionalOffset, sizeof(T));
+        additionalOffset += sizeof(T);
+    }(), ...);
+    offset += additionalOffset;
+  }
+
+  template<typename T, typename F>
+  inline T modify(F &&f) {
+    LayoutStringReader readerCopy = *this;
+    T res = f(readerCopy);
+    offset = readerCopy.offset;
+    return res;
+  }
+
+  template<typename F>
+  inline void modify(F &&f) {
+    LayoutStringReader readerCopy = *this;
+    f(readerCopy);
+    offset = readerCopy.offset;
+  }
+
   template <typename T>
   inline T peekBytes(size_t peekOffset = 0) const {
     T returnVal;
@@ -78,6 +153,10 @@ struct LayoutStringReader {
   }
 
   inline void skip(size_t n) { offset += n; }
+
+  inline uintptr_t getAbsolute() {
+    return (uintptr_t) layoutStr + offset;
+  }
 };
 
 struct LayoutStringWriter {
@@ -154,6 +233,17 @@ void swift_resolve_resilientAccessors(uint8_t *layoutStr,
                                       size_t layoutStrOffset,
                                       const uint8_t *fieldLayoutStr,
                                       const Metadata *fieldType);
+
+void swift_generic_arrayDestroy(swift::OpaqueValue *addr,
+                                size_t count,
+                                size_t stride,
+                                const Metadata *metadata);
+
+void swift_generic_arrayInitWithCopy(swift::OpaqueValue *dest,
+                                     swift::OpaqueValue *src,
+                                     size_t count,
+                                     size_t stride,
+                                     const Metadata *metadata);
 
 constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 
