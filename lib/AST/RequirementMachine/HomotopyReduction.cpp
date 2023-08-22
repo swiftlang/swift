@@ -646,7 +646,10 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
 }
 
 /// Returns flags indicating if the rewrite system has unresolved or
-/// conflicting rules in our minimization domain.
+/// conflicting rules in our minimization domain. If these flags are
+/// set, we do not install this rewrite system in the rewrite context
+/// after minimization. Instead, we will rebuild a new rewrite system
+/// from the minimized requirements.
 GenericSignatureErrors RewriteSystem::getErrors() const {
   assert(Complete);
   assert(Minimized);
@@ -668,10 +671,19 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
     if (rule.isConflicting() || rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
-    if (!rule.isRedundant())
-      if (auto property = rule.isPropertyRule())
+    if (!rule.isRedundant()) {
+      if (auto property = rule.isPropertyRule()) {
         if (property->getKind() == Symbol::Kind::ConcreteConformance)
           result |= GenericSignatureErrorFlags::HasConcreteConformances;
+
+        if (property->hasSubstitutions()) {
+          for (auto t : property->getSubstitutions()) {
+            if (t.containsUnresolvedSymbols())
+              result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+          }
+        }
+      }
+    }
   }
 
   return result;
