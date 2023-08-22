@@ -41,4 +41,12 @@ StdOptionalTestSuite.test("std::optional hasValue/value") {
   expectNil(nilOpt.value)
 }
 
+StdOptionalTestSuite.test("std::optional as ExpressibleByNilLiteral") {
+  let res1 = takesOptionalInt(nil)
+  expectFalse(res1)
+
+  let res2 = takesOptionalString(nil)
+  expectFalse(res2)
+}
+
 runAllTests()
