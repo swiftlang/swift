@@ -79,6 +79,8 @@ namespace {
       SelfBounds findSelfBounds(const DeclContext *dc);
       ValueDecl *lookupBaseDecl(const DeclContext *baseDC) const;
       ValueDecl *getBaseDeclForResult(const DeclContext *baseDC) const;
+      void addResult(ValueDecl *Result,
+                     SmallVectorImpl<LookupResultEntry> &results) const;
 
       // Classify this declaration.
       // Types are formally members of the metatype.
@@ -329,6 +331,16 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 
 #pragma mark context-based lookup definitions
 
+void UnqualifiedLookupFactory::ResultFinderForTypeContext::addResult(
+    ValueDecl *Result, SmallVectorImpl<LookupResultEntry> &results) const {
+  auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
+  auto baseDecl = getBaseDeclForResult(baseDC);
+  results.emplace_back(baseDC, baseDecl, Result);
+#ifndef NDEBUG
+  factory->addedResult(results.back());
+#endif
+}
+
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
     const DeclNameRef &Name, NLOptions baseNLOptions,
     const DeclContext *contextForLookup,
@@ -340,13 +352,31 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   SmallVector<ValueDecl *, 4> Lookup;
   contextForLookup->lookupQualified(selfBounds, Name, factory->Loc,
                                     baseNLOptions, Lookup);
+
   for (auto Result : Lookup) {
-    auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
-    auto baseDecl = getBaseDeclForResult(baseDC);
-    results.emplace_back(baseDC, baseDecl, Result);
-#ifndef NDEBUG
-    factory->addedResult(results.back());
-#endif
+    addResult(Result, results);
+  }
+
+  // All types include a `with` member, which is actually implemented
+  // as a global `_with` func in the standard library so not retreived
+  // by `lookupQualified`. Instead, we manually add it as a result
+  // making sure that its baseDecl refers to this type's baseDC.
+  auto &ctx = contextForLookup->getASTContext();
+  if (Name.isSimpleName(ctx.Id_with)) {
+    // Look up the global _with decls defined in the standard library
+    SmallVector<ValueDecl *, 1> withDecls;
+    ctx.lookupInSwiftModule("_with", withDecls);
+    ctx.lookupInSwiftModule("_with_throws", withDecls);
+
+    // Async variants are defined in the concurrency module
+    if (auto concurrency = ctx.getLoadedModule(ctx.Id_Concurrency)) {
+      ctx.lookupInModule(concurrency, "_with", withDecls);
+      ctx.lookupInModule(concurrency, "_with_throws", withDecls);
+    }
+
+    for (auto withDecl : withDecls) {
+      addResult(withDecl, results);
+    }
   }
 }
 

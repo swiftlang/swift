@@ -10105,8 +10105,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // To maximize source compatibility this is a disfavored overload,
   // and doesn't suppress `@dynamicMemberLookup`.
   if (constraintKind == ConstraintKind::ValueMember &&
-      memberName.isSimpleName() && !memberName.isSpecial() &&
-      memberName.getBaseIdentifier() == ctx.getIdentifier("with")) {
+      memberName.isSimpleName(ctx.Id_with)) {
 
     // Look up the global _with decls defined in the standard library
     SmallVector<ValueDecl *, 1> withDecls;

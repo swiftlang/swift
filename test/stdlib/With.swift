@@ -35,6 +35,12 @@ _ = tuple.a?.with { $0 = "withA?" }
 _ = tuple.b.with { $0 = "withB" }
 _ = tuple.b?.with { $0 = "withB?" }
 
+extension Int {
+  func addingTwo() -> Int {
+    with { $0 += 2 }
+  }
+}
+
 struct Test {
   var foo: String?
   var bar: String?
@@ -61,10 +67,19 @@ struct Test {
 }
 
 let explicitWithFunc = Test().with
+let explicitWithFuncExplicitType: (String) -> Test = Test().with
+let explicitWithFuncExplicitType2: (String) -> Test = explicitWithFunc
 let with: ((inout Test) -> Void) -> Test = Test().with
-let with_throws: ((inout Test) throws -> Void) throws -> Test  = Test().with
-let with_async: ((inout Test) async -> Void) async -> Test  = Test().with
+let with_throws: ((inout Test) throws -> Void) throws -> Test = Test().with
+let with_async: ((inout Test) async -> Void) async -> Test = Test().with
 let with_async_throws: ((inout Test) async throws -> Void) async throws -> Test = Test().with
+
+let explicitWithFunc_as = Test().with
+let explicitWithFuncExplicitType_as = Test().with as (String) -> Test
+let with_as = Test().with as ((inout Test) -> Void) -> Test
+let with_throws_as = Test().with as ((inout Test) throws -> Void) throws -> Test
+let with_async_as = Test().with as ((inout Test) async -> Void) async -> Test 
+let with_async_throws_as = Test().with as ((inout Test) async throws -> Void) async throws -> Test
 
 _ = try Test()
   .with { $0.foo = "foo" }
@@ -96,6 +111,44 @@ struct TestAlreadyHasWithFuncDefined {
 
 _ = TestAlreadyHasWithFuncDefined.with
 _ = TestAlreadyHasWithFuncDefined().with { $0.foo = "foo" }
+
+// This type intentionally doesn't have a member named "with",
+// because this exercises a different code path in name lookup.
+struct TestWithImplicitSelf {
+  var foo: String?
+
+  func withFoo(_ foo: String) -> TestWithImplicitSelf {
+    with { $0.modifyFoo(foo) }
+  }
+
+  func withFooThrowing(_ foo: String) throws -> TestWithImplicitSelf {
+    try with { try $0.modifyFooThrowing(foo) }
+  }
+
+  func withFooAsync(_ foo: String) async -> TestWithImplicitSelf {
+    await with { await $0.modifyFooAsync(foo) }
+  }
+
+  func withFooAsyncThrowing(_ foo: String) async throws -> TestWithImplicitSelf {
+    try await with { try await $0.modifyFooAsyncThrowing(foo) }
+  }
+
+  mutating func modifyFoo(_ foo: String) {
+    self.foo = foo
+  }
+
+  mutating func modifyFooThrowing(_ foo: String) throws {
+    self.foo = foo
+  }
+
+  mutating func modifyFooAsync(_ foo: String) async {
+    self.foo = foo
+  }
+
+  mutating func modifyFooAsyncThrowing(_ foo: String) async throws {
+    self.foo = foo
+  }
+}
 
 @dynamicMemberLookup
 struct DynamicMemberLookupTest {
