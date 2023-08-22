@@ -672,7 +672,7 @@ func set<Container, Field>(into container: inout Container, at keyPath: Writable
 // CHECK-SAME:      [[CONTAINER:%[^,]+]] :
 // CHECK:         [[CONTAINER_COPY:%[^,]+]] = copy_value [[CONTAINER]]
 // CHECK:         [[SETTER:%[^,]+]] = class_method [[CONTAINER_COPY]]
-// CHECK:         [[REGISTER_4:%[^,]+]] = apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
+// CHECK:         apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
 // CHECK:         destroy_value [[CONTAINER_COPY]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk'
 @_silgen_name("FormClassKeyPath")
@@ -782,3 +782,20 @@ func intIntoAnyHashableVar() {
 func intIntoAnyHashableLet() {
   let anyHashable: AnyHashable = 0
 }
+
+// CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfOwnedAddrOnlyValue : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[T_LIFETIME:%[^,]+]] = begin_borrow [[T]]
+// CHECK:         [[T_COPY:%[^,]+]] = copy_value [[T_LIFETIME]]
+// CHECK:         [[T_MOVE:%[^,]+]] = move_value [allows_diagnostics] [[T_COPY]]
+// CHECK:         [[SINK:%[^,]+]] = function_ref @sink
+// CHECK:         apply [[SINK]]<T>([[T_MOVE]])
+// CHECK:         end_borrow [[T_LIFETIME]]
+// CHECK:         destroy_value [[T]]
+// CHECK-LABEL: } // end sil function 'consumeExprOfOwnedAddrOnlyValue'
+@_silgen_name("consumeExprOfOwnedAddrOnlyValue")
+func consumeExprOfOwnedAddrOnlyValue<T>(_ t: __owned T) {
+  sink(consume t)
+}
+@_silgen_name("sink")
+func sink<T>(_ t: consuming T) {}
