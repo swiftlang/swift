@@ -1020,8 +1020,17 @@ public:
         Options.TransformContext->isPrintingSynthesizedExtension() &&
         isa<ExtensionDecl>(D);
 
+    SWIFT_DEFER {
+      D->visitAuxiliaryDecls([&](Decl *auxDecl) {
+        visit(auxDecl);
+      });
+    };
+
     if (!shouldPrint(D, true) && !Synthesize)
       return false;
+
+    if (isa<MacroExpansionDecl>(D))
+      return true;
 
     Decl *Old = Current;
     Current = D;
