@@ -1160,7 +1160,7 @@ FunctionType *ConstraintSystem::openFunctionType(
        DeclContext *outerDC) {
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
     auto signature = genericFn->getGenericSignature();
-
+    //TO-DO Maybe update here
     openGenericParameters(outerDC, signature, replacements, locator);
 
     openGenericRequirements(outerDC, signature,
@@ -1672,6 +1672,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     OpenedTypeMap replacements;
 
+    // TO-DO check for sendable here and update type
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
     auto openedType = openFunctionType(
@@ -1711,6 +1712,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
+
+    //check the base ... let's check
+    //funcType = funcType->withExtInfo(functy->getExtInfo().withConcurrent())->castTo<AnyFunctionType>();
+    
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
@@ -2624,6 +2629,14 @@ ConstraintSystem::getTypeOfMemberReference(
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
     functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                        functionType, locator);
+    auto sendableProtocol = useDC->getParentModule()->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+    // FIXME: Handle conditional conformances
+    auto baseSendable = TypeChecker::conformsToProtocol( baseOpenedTy, sendableProtocol, useDC->getParentModule());
+    
+    if (!baseSendable.isInvalid()) {
+          functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+    }
+    
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     openedType =

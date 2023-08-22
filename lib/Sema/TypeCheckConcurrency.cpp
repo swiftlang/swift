@@ -2469,6 +2469,11 @@ namespace {
         auto value = valueRef.getDecl();
         auto loc = declRef->getLoc();
 
+//        for (auto arg : *declRef->getArgs()) {
+////          if (swift::isSendableType(getDeclContext()->getParentModule(), arg))
+//          value->getAttrs().add(new (ctx) SendableAttr(true));
+//        }
+        
         //FIXME: Should this be subsumed in reference checking?
         if (value->isLocalCapture())
           checkLocalCapture(valueRef, loc, declRef);
@@ -2489,6 +2494,12 @@ namespace {
                 partialApply->base, memberRef->first, memberRef->second,
                 partialApply);
 
+            if (diagnosePartialApplySendability(partialApply->fn, partialApply->base, getDeclContext())){
+              if(auto funcdecl = dyn_cast<FuncDecl>(memberRef->first.getDecl())){
+                // Mark with @Sendable attribute implicitly if type is Sendable
+                    funcdecl->getAttrs().add(new (ctx) SendableAttr(true));
+              }
+            }
             partialApply->base->walk(*this);
 
             return Action::SkipChildren(expr);
@@ -3104,6 +3115,11 @@ namespace {
       if (mayExitToNonisolated && fnType->isAsync() &&
           getContextIsolation().isActorIsolated())
         unsatisfiedIsolation = ActorIsolation::forNonisolated();
+
+      // move check for sendability of arguments earlier
+      if (!ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking)) {
+        diagnoseApplyArgSendability(apply, getDeclContext());
+      }
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
