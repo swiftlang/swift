@@ -4032,7 +4032,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      auto srcFile = resultDC->getParentSourceFile();
+      auto srcFile = resultDC->getOutermostParentSourceFile();
       // Check if the file containing package decls is an interface file; if an
       // interface file contains package decls, they must be usableFromInline or
       // inlinable and are accessed within the defining module, so package-name
