@@ -93,9 +93,8 @@ public:
   /// function signature instead of suggesting individual labels. Used when
   /// completing after the opening '(' of a function call \param Loc The
   /// location of the code completion token
-  void deliverResults(bool IncludeSignature, SourceLoc Loc, DeclContext *DC,
-                      CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(bool IncludeSignature, SourceLoc Loc, DeclContext *DC,
+                      CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

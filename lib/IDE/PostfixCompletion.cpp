@@ -396,10 +396,9 @@ static void addOperatorResults(Type LHSType, ArrayRef<OperatorDecl *> Operators,
   }
 }
 
-void PostfixCompletionCallback::deliverResults(
+void PostfixCompletionCallback::collectResults(
     SourceLoc DotLoc, bool IsInSelector, bool IncludeOperators,
-    bool HasLeadingSpace, CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    bool HasLeadingSpace, CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -429,6 +428,11 @@ void PostfixCompletionCallback::deliverResults(
     Lookup.collectOperators(Operators);
   }
 
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+  bool UnifiedCanHandleAsync = false;
+
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
   for (auto &Result : Results) {
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
@@ -446,7 +450,11 @@ void PostfixCompletionCallback::deliverResults(
     if (IncludeOperators && !Result.BaseIsStaticMetaType) {
       addOperatorResults(Result.BaseTy, Operators, DC, Lookup);
     }
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
+    UnifiedCanHandleAsync |= Result.IsInAsyncContext;
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           UnifiedCanHandleAsync);
 }

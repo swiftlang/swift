@@ -295,10 +295,9 @@ void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
   }
 }
 
-void ArgumentTypeCheckCompletionCallback::deliverResults(
+void ArgumentTypeCheckCompletionCallback::collectResults(
     bool IncludeSignature, SourceLoc Loc, DeclContext *DC,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -402,5 +401,7 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
     addExprKeywords(CompletionCtx.getResultSink(), DC);
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC,
+                           *Lookup.getExpectedTypeContext(),
+                           Lookup.canCurrDeclContextHandleAsync());
 }

@@ -1298,9 +1298,10 @@ void swift::ide::postProcessCompletionResults(
   }
 }
 
-void swift::ide::deliverCompletionResults(
+void swift::ide::collectCompletionResults(
     CodeCompletionContext &CompletionContext, CompletionLookup &Lookup,
-    DeclContext *DC, CodeCompletionConsumer &Consumer) {
+    DeclContext *DC, const ExpectedTypeContext &TypeContext,
+    bool CanCurrDeclContextHandleAsync) {
   auto &SF = *DC->getParentSourceFile();
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
@@ -1420,9 +1421,8 @@ void swift::ide::deliverCompletionResults(
                                CompletionContext.CodeCompletionKind, DC,
                                /*Sink=*/nullptr);
 
-  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   Lookup.getExpectedTypeContext(), DC,
-                                   Lookup.canCurrDeclContextHandleAsync());
+  CompletionContext.addResultsFromModules(RequestedModules, TypeContext, DC,
+                                          CanCurrDeclContextHandleAsync);
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
@@ -1489,8 +1489,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     bool IncludeOperators = (Kind == CompletionKind::PostfixExpr);
 
-    Lookup.deliverResults(DotLoc, isInsideObjCSelector(), IncludeOperators,
-                          HasSpace, CompletionContext, Consumer);
+    Lookup.collectResults(DotLoc, isInsideObjCSelector(), IncludeOperators,
+                          HasSpace, CompletionContext);
+    Consumer.handleResults(CompletionContext);
     return true;
   }
   case CompletionKind::UnresolvedMember: {
@@ -1502,7 +1503,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
+    Lookup.collectResults(CurDeclContext, DotLoc, CompletionContext);
+    Consumer.handleResults(CompletionContext);
     return true;
   }
   case CompletionKind::KeyPathExprSwift: {
@@ -1514,7 +1516,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
     typeCheckWithLookup(Lookup);
 
-    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
+    Lookup.collectResults(CurDeclContext, DotLoc, CompletionContext);
+    Consumer.handleResults(CompletionContext);
     return true;
   }
   case CompletionKind::PostfixExprParen:
@@ -1525,8 +1528,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
                                                CurDeclContext);
     typeCheckWithLookup(Lookup);
 
-    Lookup.deliverResults(ShouldCompleteCallPatternAfterParen, CompletionLoc,
-                          CurDeclContext, CompletionContext, Consumer);
+    Lookup.collectResults(ShouldCompleteCallPatternAfterParen, CompletionLoc,
+                          CurDeclContext, CompletionContext);
+    Consumer.handleResults(CompletionContext);
     return true;
   }
   case CompletionKind::AccessorBeginning:
@@ -1556,7 +1560,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
     SourceLoc CCLoc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    Lookup.deliverResults(CCLoc, CompletionContext, Consumer);
+    Lookup.collectResults(CCLoc, CompletionContext);
+    Consumer.handleResults(CompletionContext);
     return true;
   }
   case CompletionKind::AfterPoundExpr: {
@@ -1569,7 +1574,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-    Lookup.deliverResults(CompletionContext, Consumer);
+    Lookup.collectResults(CompletionContext);
+    Consumer.handleResults(CompletionContext);
     return true;
   }
   default:
@@ -2041,7 +2047,10 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
-  deliverCompletionResults(CompletionContext, Lookup, CurDeclContext, Consumer);
+  collectCompletionResults(CompletionContext, Lookup, CurDeclContext,
+                           *Lookup.getExpectedTypeContext(),
+                           Lookup.canCurrDeclContextHandleAsync());
+  Consumer.handleResults(CompletionContext);
 }
 
 namespace {
