@@ -734,9 +734,6 @@ importer::getNormalInvocationArguments(
       }
     }
   }
-
-  invocationArgStrs.push_back("-Xclang");
-  invocationArgStrs.push_back("-fincremental-extensions");
 }
 
 static void
@@ -1355,6 +1352,7 @@ ClangImporter::create(ASTContext &ctx,
     return nullptr; // there was an error related to the compiler arguments.
 
   clang::Preprocessor &clangPP = instance.getPreprocessor();
+  clangPP.enableIncrementalProcessing();
 
   // Setup Preprocessor callbacks before initialing the parser to make sure
   // we catch implicit includes.
