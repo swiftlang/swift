@@ -11,7 +11,7 @@
 
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=scudo,address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=SCUDO_ASAN %s
 // RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=scudo,thread -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=SCUDO_TSAN %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=scudo,undefined -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=SCUDO_UBSAN_LINUX %s
+// RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=scudo,undefined -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=SCUDO_UBSAN %s
 
 
 /*
@@ -34,7 +34,6 @@
 
 // SCUDO_ASAN: argument '-sanitize=scudo' is not allowed with '-sanitize=address'
 // SCUDO_TSAN: argument '-sanitize=scudo' is not allowed with '-sanitize=thread'
-// SCUDO_UBSAN_LINUX: -fsanitize=undefined,scudo
+// SCUDO_UBSAN: argument '-sanitize=scudo' is not allowed with '-sanitize=undefined'
 // SCUDO_LIBRARY_LINUX: bin{{/|\\\\}}clang
 // SCUDO_LIBRARY_LINUX-NOT: -fsanitize=scudo
-
