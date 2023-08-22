@@ -2662,19 +2662,26 @@ TypeResolver::resolveOpenedExistentialArchetype(
                     interfaceType);
 
     archetypeType = ErrorType::get(interfaceType->getASTContext());
-  } {
+  } else {
     // The constraint type is written with respect to the surrounding
     // generic environment.
     constraintType = GenericEnvironment::mapTypeIntoContext(
                resolution.getGenericSignature().getGenericEnvironment(),
                constraintType);
 
-    // The opened existential type is formed by mapping the interface type
-    // into a new opened generic environment.
-    archetypeType = OpenedArchetypeType::get(constraintType->getCanonicalType(),
-                                             interfaceType,
-                                             GenericSignature(),
-                                             attrs.getOpenedID());
+    if (auto *dmt = interfaceType->getAs<DependentMemberType>()) {
+      auto base = dmt->getBase();
+      auto baseArchetype =
+          OpenedArchetypeType::get(constraintType->getCanonicalType(), base,
+                                   GenericSignature(), attrs.getOpenedID());
+      archetypeType = DependentMemberType::get(baseArchetype, dmt->getName());
+    } else {
+      // The opened existential type is formed by mapping the interface type
+      // into a new opened generic environment.
+      archetypeType = OpenedArchetypeType::get(
+          constraintType->getCanonicalType(), interfaceType, GenericSignature(),
+          attrs.getOpenedID());
+    }
   }
 
   attrs.clearAttribute(TAK_opened);
