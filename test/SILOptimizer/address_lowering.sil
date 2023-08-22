@@ -2524,6 +2524,28 @@ bb0:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
+// CHECK:       bb0([[PACK:%[^,]+]] : 
+// CHECK-SAME:      [[RAW_INDEX:%[^,]+]] :
+// CHECK:         [[INDEX:%[^,]+]] = dynamic_pack_index [[RAW_INDEX]]
+// CHECK:         open_pack_element [[INDEX]] {{.*}}, uuid "00000000-0000-0000-0000-000000000003" 
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $@pack_element("00000000-0000-0000-0000-000000000003")
+// CHECK:         [[ELEMENT_ADDR:%[^,]+]] = pack_element_get [[INDEX]] of [[PACK]]
+// CHECK:         copy_addr [[ELEMENT_ADDR]] to [init] [[STACK]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'test_open_pack_element_dominance'
+sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
+bb0(%pack : $*Pack{repeat each T}, %raw_index : $Builtin.Word):
+  %index = dynamic_pack_index %raw_index of $Pack{repeat each T}
+  open_pack_element %index of <each T> at <Pack{repeat each T}>, shape $each T, uuid "00000000-0000-0000-0000-000000000003"
+  %element_addr = pack_element_get %index of %pack : $*Pack{repeat each T} as $*@pack_element("00000000-0000-0000-0000-000000000003") each T
+  %element = load [copy] %element_addr : $*@pack_element("00000000-0000-0000-0000-000000000003") each T
+  destroy_value %element : $@pack_element("00000000-0000-0000-0000-000000000003") each T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_partial_apply_1_addronly_heap : {{.*}} {
 // CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
 // CHECK:         [[GET:%[^,]+]] = function_ref @getT
