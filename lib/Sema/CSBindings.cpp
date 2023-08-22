@@ -2044,10 +2044,14 @@ bool TypeVarBindingProducer::computeNext() {
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }
 
-      for (auto supertype : enumerateDirectSupertypes(type)) {
-        // If we're not allowed to try this binding, skip it.
-        if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype))
-          addNewBinding(binding.withType(*simplifiedSuper));
+      // Prevent supertype binding generation for type variables that represent
+      // key path expressions which may not be fully resolved yet.
+      if (!TypeVar->getImpl().isKeyPathType()) {
+        for (auto supertype : enumerateDirectSupertypes(type)) {
+          // If we're not allowed to try this binding, skip it.
+          if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype))
+            addNewBinding(binding.withType(*simplifiedSuper));
+        }
       }
     }
   }
