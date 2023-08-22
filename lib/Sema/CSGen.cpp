@@ -4395,7 +4395,14 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
     componentTy = optTy;
   }
 
-  addConstraint(ConstraintKind::Equal, componentTy, value, keyPathLoc);
+  // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
+  // let's record a AllowKeyPathMissingComponent fix.
+  if (keyPath->hasSingleInvalidComponent()) {
+    auto *fix = AllowKeyPathWithoutComponents::create(*this, keyPathLoc);
+    (void)recordFix(fix);
+  } else {
+    addConstraint(ConstraintKind::Equal, componentTy, value, keyPathLoc);
+  }
 
   addKeyPathConstraint(typeVar, root, value, componentTypeVars, keyPathLoc);
   return true;
