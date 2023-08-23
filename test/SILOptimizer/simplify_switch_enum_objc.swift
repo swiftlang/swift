@@ -3,6 +3,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: rdar114110966
 
 import Foundation
 
