@@ -1148,6 +1148,12 @@ extension ThrowingTaskGroup: AsyncSequence {
   }
 }
 
+@available(*, unavailable)
+extension TaskGroup.Iterator: Sendable { }
+
+@available(*, unavailable)
+extension ThrowingTaskGroup.Iterator: Sendable { }
+
 // ==== -----------------------------------------------------------------------
 // MARK: Runtime functions
 
