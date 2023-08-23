@@ -63,6 +63,31 @@ foreach(input ${sources})
     list(APPEND outputs "${output_dir_static}/${input}")
   endif()
 endforeach()
+if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
+  # Copy the module map into the parent directory. Using "parent.modulemap"
+  # instead of putting "module.modulemap" into the parent module to avoid
+  # module redefinition conflicts with the toolchain.
+  add_custom_command(
+      OUTPUT "${output_dir}/../module.modulemap"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+        "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
+        "${output_dir}/../module.modulemap"
+      COMMENT "Copying parent.modulemap to ${output_dir}")
+  list(APPEND outputs "${output_dir}/../module.modulemap")
+  if(SWIFT_BUILD_STATIC_STDLIB)
+    add_custom_command(
+        OUTPUT "${output_dir_static}/../module.modulemap"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
+          "${output_dir_static}/../module.modulemap"
+        COMMENT "Copying parent.modulemap to ${output_dir_static}")
+    list(APPEND outputs "${output_dir_static}/../module.modulemap")
+  endif()
+endif()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
@@ -179,17 +204,43 @@ if(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
         COMMENT "Symlinking headers for bootstrapping0")
 
     add_dependencies(${target_name} copy_shim_headers)
+
+    if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
+      set(modulemap_target_name "symlink-modulemap-bootstrapping${bootstrapping}")
+      add_custom_command_target(unused_var
+          COMMAND
+            "${CMAKE_COMMAND}" "-E" "make_directory" "${outdir}"
+          COMMAND
+            "${CMAKE_COMMAND}" "-E" ${cmake_symlink_option}
+            "${output_dir}/../module.modulemap" "${outdir}/module.modulemap"
+
+          CUSTOM_TARGET_NAME ${modulemap_target_name}
+          OUTPUT "${outdir}/module.modulemap"
+          COMMENT "Symlinking shims modulemap for bootstrapping0")
+      add_dependencies(${modulemap_target_name} copy_shim_headers)
+      add_dependencies(${target_name} ${modulemap_target_name})
+    endif()
   endforeach()
 endif()
 
 swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"
                            COMPONENT stdlib)
+if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
+  swift_install_in_component(FILES "${output_dir}/../module.modulemap"
+                             DESTINATION "lib/swift"
+                             COMPONENT stdlib)
+endif()
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_in_component(FILES ${sources}
                              DESTINATION "lib/swift_static/shims"
                              COMPONENT stdlib)
+  if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
+    swift_install_in_component(FILES "${output_dir_static}/../module.modulemap"
+                               DESTINATION "lib/swift_static"
+                               COMPONENT stdlib)
+  endif()
 endif()
 
 # Install Clang headers under the Swift library so that an installed Swift's
