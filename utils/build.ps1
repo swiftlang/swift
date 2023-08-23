@@ -1513,6 +1513,6 @@ if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
 if (-not $SkipPackaging -and $Stage -ne "") {
   $Stage += "\" # Interpret as target directory
 
-  Copy-File "$($HostArch.BinaryCache)\msi\*.msi" $Stage
-  Copy-File "$($HostArch.BinaryCache)\installer.exe" $Stage
+  Copy-File "$($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\*.msi" $Stage
+  Copy-File "$($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\installer.exe" $Stage
 }
