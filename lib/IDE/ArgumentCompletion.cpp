@@ -50,6 +50,24 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     const AnyFunctionType::Param *TypeParam = &ParamsToPass[Idx];
     bool Required = !Res.DeclParamIsOptional[Idx];
 
+    if (Res.FirstTrailingClosureIndex && Idx > *Res.FirstTrailingClosureIndex &&
+        !TypeParam->getPlainType()
+             ->lookThroughAllOptionalTypes()
+             ->is<AnyFunctionType>()) {
+      // We are completing an argument after the first trailing closure, i.e.
+      // a multitple trailing closure label but the parameter is not a function
+      // type. Since we only allow labeled trailing closures after the first
+      // trailing closure, we cannot pass an argument for this parameter.
+      // If the parameter is required, stop here since we cannot pass an argument
+      // for the parameter. If it's optional, keep looking for more trailing
+      // closures that can be passed.
+      if (Required) {
+        break;
+      } else {
+        continue;
+      }
+    }
+
     if (TypeParam->hasLabel() && !(IsCompletion && Res.IsNoninitialVariadic)) {
       // Suggest parameter label if parameter has label, we are completing in it
       // and it is not a variadic parameter that already has arguments
@@ -198,9 +216,11 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   bool HasLabel = false;
+  llvm::Optional<unsigned> FirstTrailingClosureIndex = llvm::None;
   if (auto PE = CS.getParentExpr(CompletionExpr)) {
     if (auto Args = PE->getArgs()) {
       HasLabel = !Args->getLabel(ArgIdx).empty();
+      FirstTrailingClosureIndex = Args->getFirstTrailingClosureIndex();
     }
   }
 
@@ -258,11 +278,11 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     }
   }
 
-  Results.push_back({ExpectedTy, ExpectedCallType,
-                     isa<SubscriptExpr>(ParentCall), Info.getValue(), FuncTy,
-                     ArgIdx, ParamIdx, std::move(ClaimedParams),
-                     IsNoninitialVariadic, Info.BaseTy, HasLabel, IsAsync,
-                     DeclParamIsOptional, SolutionSpecificVarTypes});
+  Results.push_back(
+      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
+       Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
+       IsNoninitialVariadic, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
+       IsAsync, DeclParamIsOptional, SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
@@ -296,8 +316,8 @@ void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
 }
 
 void ArgumentTypeCheckCompletionCallback::collectResults(
-    bool IncludeSignature, SourceLoc Loc, DeclContext *DC,
-    ide::CodeCompletionContext &CompletionCtx) {
+    bool IncludeSignature, bool IsLabeledTrailingClosure, SourceLoc Loc,
+    DeclContext *DC, ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -374,7 +394,7 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
       shouldPerformGlobalCompletion |=
           addPossibleParams(Ret, Params, ExpectedTypes);
     }
-    Lookup.addCallArgumentCompletionResults(Params);
+    Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
   }
 
   if (shouldPerformGlobalCompletion) {

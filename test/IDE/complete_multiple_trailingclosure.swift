@@ -1,31 +1,13 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBALFUNC_SAMELINE | %FileCheck %s -check-prefix=GLOBALFUNC_SAMELINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBALFUNC_NEWLINE | %FileCheck %s -check-prefix=GLOBALFUNC_NEWLINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBALFUNC_AFTERLABEL | %FileCheck %s -check-prefix=GLOBALFUNC_AFTERLABEL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_SAMELINE | %FileCheck %s -check-prefix=METHOD_SAMELINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_NEWLINE | %FileCheck %s -check-prefix=METHOD_NEWLINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OVERLOADED_SAMELINE | %FileCheck %s -check-prefix=INIT_OVERLOADED_SAMELINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OVERLOADED_NEWLINE | %FileCheck %s -check-prefix=INIT_OVERLOADED_NEWLINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OPTIONAL_SAMELINE | %FileCheck %s -check-prefix=INIT_OPTIONAL_SAMELINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OPTIONAL_NEWLINE | %FileCheck %s -check-prefix=INIT_OPTIONAL_NEWLINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_1 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_1 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_1 | %FileCheck %s -check-prefix=INIT_FALLBACK_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_2 | %FileCheck %s -check-prefix=INIT_FALLBACK_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBERDECL_SAMELINE | %FileCheck %s -check-prefix=MEMBERDECL_SAMELINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBERDECL_NEWLINE | %FileCheck %s -check-prefix=MEMBERDECL_NEWLINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INITIALIZED_VARDECL_SAMELINE | %FileCheck %s -check-prefix=INITIALIZED_VARDECL_SAMELINE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INITIALIZED_VARDECL_NEWLINE | %FileCheck %s -check-prefix=INITIALIZED_VARDECL_NEWLINE
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 func globalFunc1(fn1: () -> Int, fn2: () -> String) {}
 func testGlobalFunc() {
   globalFunc1()
     { 1 } #^GLOBALFUNC_SAMELINE^#
     #^GLOBALFUNC_NEWLINE^#
-// GLOBALFUNC_SAMELINE: Begin completions, 1 items
+// GLOBALFUNC_SAMELINE: Begin completions, 2 items
+// GLOBALFUNC_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#Void#]; name=self
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
 
 // GLOBALFUNC_NEWLINE: Begin completions
@@ -129,8 +111,11 @@ func testOptionalInit() {
   } #^INIT_REQUIRED_SAMELINE_1^#
   #^INIT_REQUIRED_NEWLINE_1^#
 
-// INIT_REQUIRED_SAMELINE_1: Begin completions, 1 items
-// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn2: () -> String {|}#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_1: Begin completions, 3 items
+// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: () -> String {|}#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_1-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct3#]; name=self
+// INIT_REQUIRED_SAMELINE_1-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#]; name=testStructMethod()
+
 
 // INIT_REQUIRED_NEWLINE_1: Begin completions
 // FIXME-INIT_REQUIRED_NEWLINE_1-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn2: () -> String {|}#}[#() -> String#];
@@ -144,8 +129,10 @@ func testOptionalInit() {
   } #^INIT_REQUIRED_SAMELINE_2^#
   #^INIT_REQUIRED_NEWLINE_2^#
 
-// INIT_REQUIRED_SAMELINE_2: Begin completions, 1 items
-// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn3: () -> String {|}#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_2: Begin completions, 3 items
+// INIT_REQUIRED_SAMELINE_2-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct3#]; name=self
+// INIT_REQUIRED_SAMELINE_2-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#]; name=testStructMethod()
+// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn3: () -> String {|}#}[#() -> String#];
 
 // INIT_REQUIRED_NEWLINE_2: Begin completions
 // FIXME-INIT_REQUIRED_NEWLINE_2-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn3: () -> String {|}#}[#() -> String#];
@@ -161,7 +148,7 @@ func testOptionalInit() {
   } #^INIT_REQUIRED_SAMELINE_3^#
   #^INIT_REQUIRED_NEWLINE_3^#
 
-// INIT_REQUIRED_SAMELINE_3: Begin completions, 2 items
+// INIT_REQUIRED_SAMELINE_3: Begin completions
 // INIT_REQUIRED_SAMELINE_3-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_REQUIRED_SAMELINE_3-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct3#];
 
@@ -185,22 +172,17 @@ func testFallbackPostfix() {
   let _ = MyStruct4 {
     1
   } #^INIT_FALLBACK_1^#
-// FIXME: We shouldn't be suggesting arg3 here because the second initializer
-// doesn't match the already-provided parameters (missing `name` label argument
-// and closure does not return `String`). However, we are not type-checking at
-// the stage at which we complete argument labels, so we can't rule it out for
-// now. (https://github.com/apple/swift/issues/56806)
 // INIT_FALLBACK_1: Begin completions, 3 items
-// INIT_FALLBACK_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg3: () -> _ {|}#}[#() -> _#]
-// INIT_FALLBACK_1-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
-// INIT_FALLBACK_1-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
+// INIT_FALLBACK_1-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#]; name=self
+// INIT_FALLBACK_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: .testStructMethod()[#Void#]; name=testStructMethod()
+// INIT_FALLBACK_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg1: Int#}[#Int#]; name=arg1:
   let _ = MyStruct4(name: "test") {
     ""
   } arg3: {
     1
   } #^INIT_FALLBACK_2^#
-// INIT_FALLBACK_2: Begin completions, 2 items
-// INIT_FALLBACK_2-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_FALLBACK_2: Begin completions
+// INIT_FALLBACK_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:   .testStructMethod()[#Void#];
 // INIT_FALLBACK_2-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
 }
 
@@ -213,7 +195,7 @@ struct TestNominalMember: P {
 
 // MEMBERDECL_SAMELINE: Begin completions, 4 items
 // MEMBERDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2:
-// MEMBERDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#]; name=enumFunc()
+// MEMBERDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:   .enumFunc()[#Void#]; name=enumFunc()
 // MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+ 
 // MEMBERDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#]; name=self
 
@@ -235,7 +217,7 @@ func testInitializedVarDecl() {
 // INITIALIZED_VARDECL_SAMELINE-NOT: localVal
 // INITIALIZED_VARDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: () -> String {|}#}[#() -> String#];
 // INITIALIZED_VARDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn3: () -> String {|}#}[#() -> String#];
-// INITIALIZED_VARDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INITIALIZED_VARDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:   .testStructMethod()[#Void#];
 // INITIALIZED_VARDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct#];
 // INITIALIZED_VARDECL_SAMELINE-NOT: localVal
 

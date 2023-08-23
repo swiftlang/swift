@@ -133,7 +133,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
-  bool IsAtStartOfLine = false;
   llvm::Optional<DeclKind> AttTargetDK;
   llvm::Optional<StmtKind> ParentStmtKind;
 
@@ -583,6 +582,7 @@ void CodeCompletionCallbacksImpl::completeLabeledTrailingClosure(
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::LabeledTrailingClosure;
   IsAtStartOfLine = isAtStartOfLine;
+  ShouldCompleteCallPatternAfterParen = false;
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -1491,6 +1491,43 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     Lookup.collectResults(DotLoc, isInsideObjCSelector(), IncludeOperators,
                           HasSpace, CompletionContext);
+
+    // Check if we are completing after a call that already has a trailing
+    // closure. In that case, also suggest labels for additional trailing
+    // closures.
+    if (auto AE = dyn_cast<ApplyExpr>(ParsedExpr)) {
+      if (AE->getArgs()->hasAnyTrailingClosures()) {
+        ASTContext &Ctx = CurDeclContext->getASTContext();
+
+        // Modify the call that has the code completion expression as an
+        // additional argument, restore the original arguments afterwards.
+        auto OriginalArgs = AE->getArgs();
+        llvm::SmallVector<Argument> ArgsWithCC(OriginalArgs->begin(),
+                                               OriginalArgs->end());
+        auto CC = new (Ctx) CodeCompletionExpr(CodeCompleteTokenExpr->getLoc());
+        ArgsWithCC.emplace_back(SourceLoc(), Identifier(), CC);
+        auto ArgList =
+            ArgumentList::create(Ctx, OriginalArgs->getLParenLoc(), ArgsWithCC,
+                                 OriginalArgs->getRParenLoc(),
+                                 OriginalArgs->getFirstTrailingClosureIndex(),
+                                 OriginalArgs->isImplicit());
+        AE->setArgs(ArgList);
+        SWIFT_DEFER { AE->setArgs(OriginalArgs); };
+
+        // Perform argument label completions on the newly created call.
+        ArgumentTypeCheckCompletionCallback Lookup(CC, CurDeclContext);
+
+        llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+            Context.CompletionCallback, &Lookup);
+        typeCheckContextAt(
+            TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
+            CompletionLoc);
+        Lookup.collectResults(/*IncludeSignature=*/false,
+                              /*IsLabeledTrailingClosure=*/true, CompletionLoc,
+                              CurDeclContext, CompletionContext);
+      }
+    }
+
     Consumer.handleResults(CompletionContext);
     return true;
   }
@@ -1521,14 +1558,19 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     return true;
   }
   case CompletionKind::PostfixExprParen:
-  case CompletionKind::CallArg: {
+  case CompletionKind::CallArg:
+  case CompletionKind::LabeledTrailingClosure: {
+    // FIXME: Delete LabeledTrailingClosure
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
     ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
                                                CurDeclContext);
     typeCheckWithLookup(Lookup);
 
-    Lookup.collectResults(ShouldCompleteCallPatternAfterParen, CompletionLoc,
+    bool IsLabeledTrailingClosure =
+        (Kind == CompletionKind::LabeledTrailingClosure);
+    Lookup.collectResults(ShouldCompleteCallPatternAfterParen,
+                          IsLabeledTrailingClosure, CompletionLoc,
                           CurDeclContext, CompletionContext);
     Consumer.handleResults(CompletionContext);
     return true;
@@ -1690,12 +1732,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     Lookup.includeInstanceMembers();
   if (PreferFunctionReferencesToCalls)
     Lookup.setPreferFunctionReferencesToCalls();
-
-  auto DoPostfixExprBeginning = [&] (){
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    Lookup.getValueCompletionsInDeclContext(Loc);
-    Lookup.getSelfTypeCompletionInDeclContext(Loc, /*isForDeclResult=*/false);
-  };
 
   switch (Kind) {
   case CompletionKind::None:
