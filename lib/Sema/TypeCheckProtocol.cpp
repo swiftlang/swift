@@ -1331,6 +1331,13 @@ static bool contextMayExpandOperator(
   else
     return false;
 
+  // If the context declaration itself is within a macro expansion, it may
+  // have an operator.
+  if (auto sourceFile = dc->getParentSourceFile()) {
+    if (sourceFile->getFulfilledMacroRole())
+      return true;
+  }
+
   ASTContext &ctx = dc->getASTContext();
   auto potentialExpansions = evaluateOrDefault(
       ctx.evaluator, PotentialMacroExpansionsInContextRequest{decl},
