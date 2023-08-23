@@ -111,6 +111,37 @@
 using namespace swift;
 using namespace Lowering;
 
+namespace {
+
+class IndirectSlot {
+  llvm::PointerUnion<SILValue, SILType> value;
+public:
+  explicit IndirectSlot(SILType type) : value(type) {}
+  IndirectSlot(SILValue address) : value(address) {
+    assert(address->getType().isAddress());
+  }
+
+  SILType getType() const {
+    if (value.is<SILValue>()) {
+      return value.get<SILValue>()->getType();
+    } else {
+      return value.get<SILType>();
+    }
+  }
+
+  bool hasAddress() const { return value.is<SILValue>(); }
+
+  SILValue getAddress() const {
+    return value.get<SILValue>();
+  }
+
+  SILValue allocate(SILGenFunction &SGF, SILLocation loc) const {
+    if (hasAddress()) return getAddress();
+    return SGF.emitTemporaryAllocation(loc, getType());
+  }
+};
+
+} // end anonymous namespace
 
 /// A helper function that pulls an element off the front of an array.
 template <class T>
@@ -939,9 +970,9 @@ public:
                                  CanType innerSubstType,
     llvm::function_ref<void(AbstractionPattern innerOrigEltType,
                             CanType innerSubstEltType)> handleSingle,
-    llvm::function_ref<void(AbstractionPattern innerOrigEltType,
-                            CanType innerSubstEltType,
-                            ManagedValue innerEltAddr)> handlePackElement);
+    llvm::function_ref<ManagedValue(AbstractionPattern innerOrigEltType,
+                                    CanType innerSubstEltType,
+                                    SILType innerEltTy)> handlePackElement);
 
   void expandOuterVanishingTuple(AbstractionPattern outerOrigType,
                                  CanType outerSubstType,
@@ -956,22 +987,23 @@ public:
                             AbstractionPattern outerOrigType,
                             CanType outerSubstType);
 
-  void expandParallelTuplesInnerIndirect(AbstractionPattern innerOrigType,
-                                         CanTupleType innerSubstType,
-                                         AbstractionPattern outerOrigType,
-                                         CanTupleType outerSubstType,
-                                         ManagedValue innerAddr);
+  ManagedValue
+  expandParallelTuplesInnerIndirect(AbstractionPattern innerOrigType,
+                                    CanTupleType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanTupleType outerSubstType,
+                                    IndirectSlot innerAddr);
   void expandParallelTuplesOuterIndirect(AbstractionPattern innerOrigType,
                                          CanTupleType innerSubstType,
                                          AbstractionPattern outerOrigType,
                                          CanTupleType outerSubstType,
                                          ManagedValue outerAddr);
 
-  void expandInnerIndirect(AbstractionPattern innerOrigType,
-                           CanType innerSubstType,
-                           AbstractionPattern outerOrigType,
-                           CanType outerSubstType,
-                           ManagedValue innerAddr);
+  ManagedValue expandInnerIndirect(AbstractionPattern innerOrigType,
+                                   CanType innerSubstType,
+                                   AbstractionPattern outerOrigType,
+                                   CanType outerSubstType,
+                                   IndirectSlot innerSlot);
 
   void expandOuterIndirect(AbstractionPattern innerOrigType,
                            CanType innerSubstType,
@@ -2087,6 +2119,44 @@ ExpandedTupleInputGenerator::createPackComponentTemporary(SILGenFunction &SGF,
   return ManagedValue::forLValue(temporary);
 }
 
+void ExpandedTupleInputGenerator::setPackComponent(SILGenFunction &SGF,
+                                                   SILLocation loc,
+                                                   ManagedValue eltValue) {
+  assert(isOrigPackExpansion());
+  assert(!isSubstPackExpansion());
+
+  auto formalPackType = getFormalPackType();
+  auto componentIndex = getPackComponentIndex();
+
+  auto packValue = getPackValue();
+  assert(packValue.getType().getPackElementType(componentIndex)
+           == eltValue.getType());
+
+  // Write the address into the pack.
+  auto packIndex =
+    SGF.B.createScalarPackIndex(loc, componentIndex, formalPackType);
+  SGF.B.createPackElementSet(loc, eltValue.getValue(), packIndex,
+                             packValue.getValue());
+
+  // Update the cleanup on the pack value if we're building a managed
+  // pack value and the element has a cleanup.
+  assert(packValue.isLValue() == eltValue.isLValue());
+  if (!eltValue.hasCleanup())
+    return;
+
+  // Forward the old cleanup on the pack and value and enter a new cleanup
+  // to cover both.
+  // The assumption here is that we're building a +1 pack overall.
+  // FIXME: know that somehow and assert that we get elements with
+  // appropriate ownership
+  eltValue.forward(SGF);
+  auto packAddr = packValue.forward(SGF);
+  auto packCleanup =
+    SGF.enterDestroyPrecedingPackComponentsCleanup(packAddr, formalPackType,
+                                                   componentIndex + 1);
+  updatePackValue(ManagedValue::forOwnedAddressRValue(packAddr, packCleanup));
+}
+
 ManagedValue
 FunctionInputGenerator::projectPackComponent(SILGenFunction &SGF,
                                              SILLocation loc) {
@@ -2802,41 +2872,43 @@ private:
                       CanType outerSubstType,
                       SILResultInfo innerResult);
 
-  void expandOuterTupleInnerIndirect(AbstractionPattern innerOrigType,
-                                     CanType innerSubstType,
-                                     AbstractionPattern outerOrigType,
-                                     CanTupleType outerSubstType,
-                                     ManagedValue innerResultAddr);
+  ManagedValue
+  expandOuterTupleInnerIndirect(AbstractionPattern innerOrigType,
+                                CanType innerSubstType,
+                                AbstractionPattern outerOrigType,
+                                CanTupleType outerSubstType,
+                                IndirectSlot innerResultAddr);
   void planExpandedFromDirect(AbstractionPattern innerOrigType,
                               CanTupleType innerSubstType,
                               AbstractionPattern outerOrigType,
                               CanTupleType outerSubstType,
                               SILResultInfo innerResult);
-  void expandSingleInnerIndirect(AbstractionPattern innerOrigType,
-                                 CanType innerSubstType,
-                                 AbstractionPattern outerOrigType,
-                                 CanType outerSubstType,
-                                 ManagedValue innerResultAddr);
-  void planSingleFromIndirect(AbstractionPattern innerOrigType,
-                              CanType innerSubstType,
-                              AbstractionPattern outerOrigType,
-                              CanType outerSubstType,
-                              SILValue innerResultAddr,
-                              SILResultInfo outerResult,
-                              SILValue optOuterResultAddr);
-
-  void expandSingleIndirect(AbstractionPattern innerOrigType,
+  ManagedValue
+  expandSingleInnerIndirect(AbstractionPattern innerOrigType,
                             CanType innerSubstType,
                             AbstractionPattern outerOrigType,
                             CanType outerSubstType,
-                            ManagedValue innerResultAddr,
-                            ManagedValue outerResultAddr);
-  void planIndirectIntoIndirect(AbstractionPattern innerOrigType,
-                                CanType innerSubstType,
-                                AbstractionPattern outerOrigType,
-                                CanType outerSubstType,
-                                SILValue innerResultAddr,
-                                SILValue outerResultAddr);
+                            IndirectSlot innerResultAddr);
+  SILValue planSingleFromIndirect(AbstractionPattern innerOrigType,
+                                  CanType innerSubstType,
+                                  AbstractionPattern outerOrigType,
+                                  CanType outerSubstType,
+                                  IndirectSlot innerResultSlot,
+                                  SILResultInfo outerResult,
+                                  SILValue optOuterResultAddr);
+
+  ManagedValue expandSingleIndirect(AbstractionPattern innerOrigType,
+                                    CanType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanType outerSubstType,
+                                    IndirectSlot innerResultTy,
+                                    ManagedValue outerResultAddr);
+  SILValue planIndirectIntoIndirect(AbstractionPattern innerOrigType,
+                                    CanType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanType outerSubstType,
+                                    IndirectSlot innerResultAddr,
+                                    SILValue outerResultAddr);
 
   void expandPackExpansionFromPack(AbstractionPattern innerOrigType,
                                    CanType innerSubstType,
@@ -2853,7 +2925,7 @@ private:
                                     AbstractionPattern outerOrigType,
                                     CanType outerSubstType,
                                     CanPackType innerFormalPackType,
-                                    ManagedValue innerTupleAddr,
+                                    SILValue innerTupleAddr,
                                     unsigned innerComponentIndex,
                                     CanPackType outerFormalPackType,
                                     ManagedValue outerTupleOrPackAddr,
@@ -2915,10 +2987,10 @@ private:
     return InnerPacks;
   }
 
-  bool hasAbstractionDifference(SILValue resultAddr1,
-                                SILValue resultAddr2) {
-    return hasAbstractionDifference(resultAddr1->getType(),
-                                    resultAddr2->getType());
+  bool hasAbstractionDifference(IndirectSlot resultSlot,
+                                SILValue resultAddr) {
+    return hasAbstractionDifference(resultSlot.getType(),
+                                    resultAddr->getType());
   }
 
   bool hasAbstractionDifference(SILType resultType1,
@@ -2926,9 +2998,9 @@ private:
     return resultType1.getASTType() != resultType2.getASTType();
   }
 
-  bool hasAbstractionDifference(SILValue resultAddr,
+  bool hasAbstractionDifference(IndirectSlot resultSlot,
                                 SILResultInfo resultInfo) {
-    return resultAddr->getType().getASTType()
+    return resultSlot.getType().getASTType()
         != resultInfo.getInterfaceType();
   }
 
@@ -3130,12 +3202,14 @@ void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
     expandInnerVanishingTuple(innerOrigType, innerSubstType,
        [&](AbstractionPattern innerOrigEltType, CanType innerSubstEltType) {
       asImpl().expand(innerOrigEltType, innerSubstEltType,
-                         outerOrigType, outerSubstType);
+                      outerOrigType, outerSubstType);
     }, [&](AbstractionPattern innerOrigEltType, CanType innerSubstEltType,
-           ManagedValue innerResultAddr) {
-      asImpl().expandInnerIndirect(innerOrigEltType, innerSubstEltType,
-                                   outerOrigType, outerSubstType,
-                                   innerResultAddr);
+           SILType innerResultTy) {
+      return asImpl().expandInnerIndirect(innerOrigEltType,
+                                          innerSubstEltType,
+                                          outerOrigType,
+                                          outerSubstType,
+                                          IndirectSlot(innerResultTy));
     });
     return;
   }
@@ -3196,9 +3270,9 @@ void ExpanderBase<Impl>::expandInnerVanishingTuple(
                           CanType innerSubstType,
     llvm::function_ref<void(AbstractionPattern innerOrigEltType,
                             CanType innerSubstEltType)> handleSingle,
-    llvm::function_ref<void(AbstractionPattern innerOrigEltType,
-                            CanType innerOrigSubstType,
-                            ManagedValue innerEltAddr)> handlePackElement) {
+    llvm::function_ref<ManagedValue(AbstractionPattern innerOrigEltType,
+                                    CanType innerOrigSubstType,
+                                    SILType innerEltTy)> handlePackElement) {
   assert(innerOrigType.isTuple());
   assert(innerOrigType.doesTupleVanish());
 
@@ -3216,9 +3290,10 @@ void ExpanderBase<Impl>::expandInnerVanishingTuple(
     } else {
       assert(elt.getPackComponentIndex() == 0);
       assert(!isa<PackExpansionType>(elt.getSubstType()));
-      ManagedValue eltAddr = elt.createPackComponentTemporary(SGF, Loc);
-      handlePackElement(elt.getOrigType().getPackExpansionPatternType(),
-                        innerSubstType, eltAddr);
+      ManagedValue eltAddr =
+        handlePackElement(elt.getOrigType().getPackExpansionPatternType(),
+                          innerSubstType, elt.getPackComponentType());
+      elt.setPackComponent(SGF, Loc, eltAddr);
     }
   }
   elt.finish();
@@ -3275,10 +3350,11 @@ void ExpanderBase<Impl>::expandParallelTuples(
       auto outerEltAddr = outerElt.projectPackComponent(SGF, Loc);
       if (innerElt.isOrigPackExpansion()) {
         auto innerEltAddr =
-          innerElt.createPackComponentTemporary(SGF, Loc);
-        asImpl().expandSingleIndirect(innerOrigEltType, innerSubstEltType,
-                                      outerOrigEltType, outerSubstEltType,
-                                      innerEltAddr, outerEltAddr);
+          asImpl().expandSingleIndirect(innerOrigEltType, innerSubstEltType,
+                                        outerOrigEltType, outerSubstEltType,
+                           IndirectSlot(innerElt.getPackComponentType()),
+                                        outerEltAddr);
+        innerElt.setPackComponent(SGF, Loc, innerEltAddr);
       } else {
         asImpl().expandOuterIndirect(innerOrigEltType, innerSubstEltType,
                                      outerOrigEltType, outerSubstEltType,
@@ -3286,10 +3362,12 @@ void ExpanderBase<Impl>::expandParallelTuples(
       }
     } else {
       if (innerElt.isOrigPackExpansion()) {
-        auto innerEltAddr = innerElt.createPackComponentTemporary(SGF, Loc);
-        asImpl().expandInnerIndirect(innerOrigEltType, innerSubstEltType,
-                                     outerOrigEltType, outerSubstEltType,
-                                     innerEltAddr);
+        auto innerEltAddr =
+          asImpl().expandInnerIndirect(innerOrigEltType, innerSubstEltType,
+                                       outerOrigEltType, outerSubstEltType,
+                                       IndirectSlot(
+                                         innerElt.getPackComponentType()));
+        innerElt.setPackComponent(SGF, Loc, innerEltAddr);
       } else {
         asImpl().expand(innerOrigEltType, innerSubstEltType,
                         outerOrigEltType, outerSubstEltType);
@@ -3420,7 +3498,7 @@ void ResultPlanner::expandPackExpansionFromTuple(
                       AbstractionPattern outerOrigType,
                       CanType outerSubstType,
                       CanPackType innerInducedPackType,
-                      ManagedValue innerTupleAddr,
+                      SILValue innerTupleAddr,
                       unsigned innerComponentIndex,
                       CanPackType outerFormalPackType,
                       ManagedValue outerPackOrTupleAddr,
@@ -3429,7 +3507,7 @@ void ResultPlanner::expandPackExpansionFromTuple(
   addReabstractTupleIntoPackExpansion(innerOrigType, innerSubstType,
                                       outerOrigType, outerSubstType,
                                       innerInducedPackType,
-                                      innerTupleAddr.getLValueAddress(),
+                                      innerTupleAddr,
                                       innerComponentIndex,
                                       outerFormalPackType,
                                       outerPackOrTupleAddr.getLValueAddress(),
@@ -3529,9 +3607,12 @@ void ResultPlanner::expandOuterTuple(AbstractionPattern innerOrigType,
 
   if (SGF.silConv.isSILIndirect(innerResult)) {
     SILValue innerResultAddr = addInnerIndirectResultTemporary(innerResult);
-    expandParallelTuplesInnerIndirect(innerOrigType, innerSubstTupleType,
-                                      outerOrigType, outerSubstType,
-                                      ManagedValue::forLValue(innerResultAddr));
+    auto innerResultMV =
+      expandParallelTuplesInnerIndirect(innerOrigType, innerSubstTupleType,
+                                        outerOrigType, outerSubstType,
+                                        innerResultAddr);
+    assert(innerResultMV.getValue() == innerResultAddr);
+    (void) innerResultMV;
   } else {
     assert(!SGF.silConv.useLoweredAddresses() &&
            "Formal Indirect Results that are not SIL Indirect are only "
@@ -3643,10 +3724,13 @@ void ExpanderBase<Impl>::expandOuterIndirect(
                                  outerOrigType, outerSubstType,
                                  outerAddr);
   }, [&](AbstractionPattern innerOrigEltType,
-         CanType innerSubstEltType, ManagedValue innerAddr) {
-    asImpl().expandSingleIndirect(innerOrigEltType, innerSubstEltType,
-                                  outerOrigType, outerSubstType,
-                                  innerAddr, outerAddr);
+         CanType innerSubstEltType, SILType innerEltTy) {
+    return asImpl().expandSingleIndirect(innerOrigEltType,
+                                         innerSubstEltType,
+                                         outerOrigType,
+                                         outerSubstType,
+                                         IndirectSlot(innerEltTy),
+                                         outerAddr);
   });
 }
 
@@ -3764,12 +3848,13 @@ void ExpanderBase<Impl>::expandParallelTuplesOuterIndirect(
 
     if (!innerElt.isSubstPackExpansion()) {
       ManagedValue innerEltAddr =
-        innerElt.createPackComponentTemporary(SGF, Loc);
-      asImpl().expandSingleIndirect(innerElt.getOrigType(),
-                                    innerElt.getSubstType(),
-                                    outerElt.getOrigType(),
-                                    outerElt.getSubstType(),
-                                    innerEltAddr, outerEltAddr);
+        asImpl().expandSingleIndirect(innerElt.getOrigType(),
+                                      innerElt.getSubstType(),
+                                      outerElt.getOrigType(),
+                                      outerElt.getSubstType(),
+                         IndirectSlot(innerElt.getPackComponentType()),
+                                      outerEltAddr);
+      innerElt.setPackComponent(SGF, Loc, innerEltAddr);
       continue;
     }
 
@@ -3822,11 +3907,13 @@ void ResultPlanner::planIntoDirect(AbstractionPattern innerOrigType,
                    outerOrigType, outerSubstType,
                    outerResult);
   }, [&](AbstractionPattern innerOrigEltType,
-         CanType innerSubstEltType, ManagedValue innerResultAddr) {
-    planSingleFromIndirect(innerOrigEltType, innerSubstEltType,
-                           outerOrigType, outerSubstType,
-                           innerResultAddr.getLValueAddress(),
-                           outerResult, SILValue());
+         CanType innerSubstEltType, SILType innerEltTy) {
+    auto innerTemp =
+      planSingleFromIndirect(innerOrigEltType, innerSubstEltType,
+                             outerOrigType, outerSubstType,
+                             IndirectSlot(innerEltTy),
+                             outerResult, SILValue());
+    return ManagedValue::forLValue(innerTemp);
   });
 }
 
@@ -3928,11 +4015,13 @@ void ResultPlanner::planExpandedIntoDirect(AbstractionPattern innerOrigType,
     // indirect; create a temporary for it and reabstract that back to
     // a direct result.
     if (innerElt.isOrigPackExpansion()) {
-      auto innerEltAddr = innerElt.createPackComponentTemporary(SGF, Loc);
-      planSingleFromIndirect(innerElt.getOrigType(), innerElt.getSubstType(),
-                             outerOrigEltType, outerSubstEltType,
-                             innerEltAddr.getLValueAddress(),
-                             outerEltResult, SILValue());
+      auto innerEltAddr =
+        planSingleFromIndirect(innerElt.getOrigType(), innerElt.getSubstType(),
+                               outerOrigEltType, outerSubstEltType,
+                               IndirectSlot(innerElt.getPackComponentType()),
+                               outerEltResult, SILValue());
+      innerElt.setPackComponent(SGF, Loc,
+                                ManagedValue::forLValue(innerEltAddr));
 
     // Otherwise, recurse normally.
     } else {
@@ -3963,9 +4052,11 @@ void ResultPlanner::planSingleIntoDirect(AbstractionPattern innerOrigType,
   if (SGF.silConv.isSILIndirect(innerResult)) {
     SILValue innerResultAddr =
       addInnerIndirectResultTemporary(innerResult);
-    planSingleFromIndirect(innerOrigType, innerSubstType,
-                           outerOrigType, outerSubstType,
-                           innerResultAddr, outerResult, SILValue());
+    auto innerResultValue =
+      planSingleFromIndirect(innerOrigType, innerSubstType,
+                             outerOrigType, outerSubstType,
+                             innerResultAddr, outerResult, SILValue());
+    assert(innerResultValue == innerResultAddr); (void) innerResultValue;
     return;
   }
 
@@ -4030,96 +4121,111 @@ ResultPlanner::planSingleIntoIndirect(AbstractionPattern innerOrigType,
 
 /// Plan the emission of a call result from an inner result address.
 template <class Impl>
-void ExpanderBase<Impl>::expandInnerIndirect(AbstractionPattern innerOrigType,
-                                             CanType innerSubstType,
-                                             AbstractionPattern outerOrigType,
-                                             CanType outerSubstType,
-                                             ManagedValue innerAddr) {
+ManagedValue
+ExpanderBase<Impl>::expandInnerIndirect(AbstractionPattern innerOrigType,
+                                        CanType innerSubstType,
+                                        AbstractionPattern outerOrigType,
+                                        CanType outerSubstType,
+                                        IndirectSlot innerSlot) {
   assert(!innerOrigType.isTuple());
 
   // If the outer pattern is scalar, stop expansion and delegate to the
   // impl class.
   if (!outerOrigType.isTuple()) {
-    asImpl().expandSingleInnerIndirect(innerOrigType, innerSubstType,
-                                       outerOrigType, outerSubstType,
-                                       innerAddr);
-    return;
+    return asImpl().expandSingleInnerIndirect(innerOrigType, innerSubstType,
+                                              outerOrigType, outerSubstType,
+                                              innerSlot);
   }
 
   // If the outer pattern is a non-vanishing tuple, we have to expand it.
   if (!outerOrigType.doesTupleVanish()) {
-    asImpl().expandOuterTupleInnerIndirect(innerOrigType,
-                                           innerSubstType,
-                                           outerOrigType,
-                                           cast<TupleType>(outerSubstType),
-                                           innerAddr);
-    return;
+    return asImpl().expandOuterTupleInnerIndirect(innerOrigType,
+                                                  innerSubstType,
+                                                  outerOrigType,
+                                  cast<TupleType>(outerSubstType),
+                                                  innerSlot);
   }
 
   // Otherwise, the outer pattern is a vanishing tuple.  Expand it,
   // find the surviving element, and recurse.
+  ManagedValue innerAddr;
   asImpl().expandOuterVanishingTuple(outerOrigType, outerSubstType,
      [&](AbstractionPattern outerOrigEltType, CanType outerSubstEltType) {
-    asImpl().expandInnerIndirect(innerOrigType, innerSubstType,
-                                 outerOrigEltType, outerSubstEltType,
-                                 innerAddr);
+    innerAddr =
+      asImpl().expandInnerIndirect(innerOrigType, innerSubstType,
+                                   outerOrigEltType, outerSubstEltType,
+                                   innerSlot);
   }, [&](AbstractionPattern outerOrigEltType, CanType outerSubstEltType,
          ManagedValue outerAddr) {
-    asImpl().expandSingleIndirect(innerOrigType, innerSubstType,
-                                  outerOrigEltType, outerSubstEltType,
-                                  innerAddr, outerAddr);
+    innerAddr =
+      asImpl().expandSingleIndirect(innerOrigType, innerSubstType,
+                                    outerOrigEltType, outerSubstEltType,
+                                    innerSlot, outerAddr);
   });
+  return innerAddr;
 }
 
-void ResultPlanner::expandOuterTupleInnerIndirect(
+ManagedValue ResultPlanner::expandOuterTupleInnerIndirect(
                                             AbstractionPattern innerOrigType,
                                             CanType innerSubstType,
                                             AbstractionPattern outerOrigType,
                                             CanTupleType outerSubstType,
-                                            ManagedValue innerResultAddr) {
+                                            IndirectSlot innerResultSlot) {
   assert(outerOrigType.isTuple());
   assert(!outerOrigType.doesTupleVanish());
 
   // In results, if the outer substituted type is a tuple, the inner
   // type must be a tuple, so we must have parallel tuple structure.
-  expandParallelTuplesInnerIndirect(innerOrigType,
-                                    cast<TupleType>(innerSubstType),
-                                    outerOrigType,
-                                    outerSubstType,
-                                    innerResultAddr);
+  return expandParallelTuplesInnerIndirect(innerOrigType,
+                                           cast<TupleType>(innerSubstType),
+                                           outerOrigType,
+                                           outerSubstType,
+                                           innerResultSlot);
 }
 
 /// Expand outer tuple structure, given that the inner substituted type
 /// is a tuple with parallel structured that's passed indirectly.
 template <class Impl>
-void ExpanderBase<Impl>::expandParallelTuplesInnerIndirect(
+ManagedValue
+ExpanderBase<Impl>::expandParallelTuplesInnerIndirect(
                                              AbstractionPattern innerOrigType,
                                              CanTupleType innerSubstType,
                                              AbstractionPattern outerOrigType,
                                              CanTupleType outerSubstType,
-                                             ManagedValue innerAddr) {
+                                             IndirectSlot innerTupleSlot) {
   assert(innerSubstType->getNumElements() == outerSubstType->getNumElements());
   assert(outerOrigType.isTuple());
   assert(!outerOrigType.doesTupleVanish());
+
+  SILValue innerTupleAddr = innerTupleSlot.allocate(SGF, Loc);
 
   auto &ctx = SGF.getASTContext();
   ExpandedTupleInputGenerator
     outerElt(ctx, OuterPackArgs, outerOrigType, outerSubstType);
   TupleElementAddressGenerator
-    innerElt(ctx, innerAddr, innerOrigType, innerSubstType);
+    innerElt(ctx, ManagedValue::forLValue(innerTupleAddr),
+             innerOrigType, innerSubstType);
+  SmallVector<CleanupHandle, 4> eltCleanups;
   for (; !innerElt.isFinished(); innerElt.advance(), outerElt.advance()) {
     assert(!outerElt.isFinished());
 
     // Project the address of the element.
-    ManagedValue innerEltAddr = innerElt.projectElementAddress(SGF, Loc);
+    SILValue innerEltAddr =
+      innerElt.projectElementAddress(SGF, Loc).getLValueAddress();
 
     // If the outer element does not come from a pack, we just recurse.
     if (!outerElt.isOrigPackExpansion()) {
-      asImpl().expandInnerIndirect(innerElt.getOrigType(),
-                                   innerElt.getSubstType(),
-                                   outerElt.getOrigType(),
-                                   outerElt.getSubstType(),
-                                   innerEltAddr);
+      auto innerEltMV =
+        asImpl().expandInnerIndirect(innerElt.getOrigType(),
+                                     innerElt.getSubstType(),
+                                     outerElt.getOrigType(),
+                                     outerElt.getSubstType(),
+                                     innerEltAddr);
+
+      assert(innerEltMV.getValue() == innerEltAddr);
+      if (innerEltMV.hasCleanup())
+        eltCleanups.push_back(innerEltMV.getCleanup());
+
       continue;
     }
 
@@ -4142,15 +4248,33 @@ void ExpanderBase<Impl>::expandParallelTuplesInnerIndirect(
       continue;
     }
 
-    asImpl().expandSingleIndirect(innerElt.getOrigType(),
-                                  innerElt.getSubstType(),
-                                  outerElt.getOrigType(),
-                                  outerElt.getSubstType(),
-                                  innerEltAddr,
-                                  outerEltAddr);
+    auto innerEltMV =
+      asImpl().expandSingleIndirect(innerElt.getOrigType(),
+                                    innerElt.getSubstType(),
+                                    outerElt.getOrigType(),
+                                    outerElt.getSubstType(),
+                                    innerEltAddr,
+                                    outerEltAddr);
+
+    assert(innerEltMV.getValue() == innerEltAddr);
+    if (innerEltMV.hasCleanup())
+      eltCleanups.push_back(innerEltMV.getCleanup());
   }
   innerElt.finish();
   outerElt.finish();
+
+  // Construct a managed value for the whole tuple.
+
+  // FIXME: we really should know here whether we're building an owned
+  // (but trivial) value or an indirect result slot
+  if (eltCleanups.empty()) {
+    return ManagedValue::forLValue(innerTupleAddr);
+  }
+
+  for (auto cleanup : eltCleanups) {
+    SGF.Cleanups.forwardCleanup(cleanup);
+  }
+  return SGF.emitManagedBufferWithCleanup(innerTupleAddr);
 }
 
 void ResultPlanner::planExpandedFromDirect(AbstractionPattern innerOrigType,
@@ -4173,11 +4297,11 @@ void ResultPlanner::planExpandedFromDirect(AbstractionPattern innerOrigType,
   assert(innerSubstType->containsPackExpansionType() ==
            outerSubstType->containsPackExpansionType());
   if (innerSubstType->containsPackExpansionType()) {
-    auto temporary = SGF.emitTemporaryAllocation(Loc, innerResultTy);
-    addDirectToIndirect(innerResult, temporary);
-    expandParallelTuplesInnerIndirect(innerOrigType, innerSubstType,
-                                      outerOrigType, outerSubstType,
-                                      ManagedValue::forLValue(temporary));
+    auto innerResultAddr =
+      expandParallelTuplesInnerIndirect(innerOrigType, innerSubstType,
+                                        outerOrigType, outerSubstType,
+                                        IndirectSlot(innerResultTy));
+    addDirectToIndirect(innerResult, innerResultAddr.getLValueAddress());
     return;
   }
 
@@ -4254,27 +4378,31 @@ void ResultPlanner::planFromDirect(AbstractionPattern innerOrigType,
   });
 }
 
-void ResultPlanner::expandSingleInnerIndirect(AbstractionPattern innerOrigType,
-                                              CanType innerSubstType,
-                                              AbstractionPattern outerOrigType,
-                                              CanType outerSubstType,
-                                              ManagedValue innerResultAddr) {
+ManagedValue
+ResultPlanner::expandSingleInnerIndirect(AbstractionPattern innerOrigType,
+                                         CanType innerSubstType,
+                                         AbstractionPattern outerOrigType,
+                                         CanType outerSubstType,
+                                         IndirectSlot innerResultSlot) {
   auto outerResult = claimNextOuterResult();
-  planSingleFromIndirect(innerOrigType, innerSubstType,
-                         outerOrigType, outerSubstType,
-                         innerResultAddr.getLValueAddress(),
-                         outerResult.first, outerResult.second);
+  auto innerResultAddr =
+    planSingleFromIndirect(innerOrigType, innerSubstType,
+                           outerOrigType, outerSubstType,
+                           innerResultSlot,
+                           outerResult.first, outerResult.second);
+  return ManagedValue::forLValue(innerResultAddr);
 }
 
 /// Plan the emission of a call result from an inner result address,
 /// given that the outer abstraction pattern is not a tuple.
-void ResultPlanner::planSingleFromIndirect(AbstractionPattern innerOrigType,
-                                           CanType innerSubstType,
-                                           AbstractionPattern outerOrigType,
-                                           CanType outerSubstType,
-                                           SILValue innerResultAddr,
-                                           SILResultInfo outerResult,
-                                           SILValue optOuterResultAddr) {
+SILValue
+ResultPlanner::planSingleFromIndirect(AbstractionPattern innerOrigType,
+                                      CanType innerSubstType,
+                                      AbstractionPattern outerOrigType,
+                                      CanType outerSubstType,
+                                      IndirectSlot innerResultSlot,
+                                      SILResultInfo outerResult,
+                                      SILValue optOuterResultAddr) {
   assert(!innerOrigType.isTuple());
   assert(!outerOrigType.isTuple());
   assert(SGF.silConv.isSILIndirect(outerResult) == bool(optOuterResultAddr));
@@ -4285,44 +4413,60 @@ void ResultPlanner::planSingleFromIndirect(AbstractionPattern innerOrigType,
 
   if (SGF.silConv.isSILIndirect(outerResult)) {
     assert(optOuterResultAddr);
-    planIndirectIntoIndirect(innerOrigType, innerSubstType,
-                             outerOrigType, outerSubstType,
-                             innerResultAddr, optOuterResultAddr);
+    return planIndirectIntoIndirect(innerOrigType, innerSubstType,
+                                    outerOrigType, outerSubstType,
+                                    innerResultSlot, optOuterResultAddr);
   } else {
-    if (!hasAbstractionDifference(innerResultAddr, outerResult)) {
+    auto innerResultAddr = innerResultSlot.allocate(SGF, Loc);
+    if (!hasAbstractionDifference(innerResultSlot, outerResult)) {
       addIndirectToDirect(innerResultAddr, outerResult);
     } else {
       addReabstractIndirectToDirect(innerOrigType, innerSubstType,
                                     outerOrigType, outerSubstType,
                                     innerResultAddr, outerResult);
     }
+    return innerResultAddr;
   }
 }
 
-void ResultPlanner::expandSingleIndirect(AbstractionPattern innerOrigType,
-                                         CanType innerSubstType,
-                                         AbstractionPattern outerOrigType,
-                                         CanType outerSubstType,
-                                         ManagedValue innerResultAddr,
-                                         ManagedValue outerResultAddr) {
-  planIndirectIntoIndirect(innerOrigType, innerSubstType,
-                           outerOrigType, outerSubstType,
-                           innerResultAddr.getLValueAddress(),
-                           outerResultAddr.getLValueAddress());
+ManagedValue
+ResultPlanner::expandSingleIndirect(AbstractionPattern innerOrigType,
+                                    CanType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanType outerSubstType,
+                                    IndirectSlot innerResultSlot,
+                                    ManagedValue outerResultAddr) {
+  auto innerResultAddr =
+    planIndirectIntoIndirect(innerOrigType, innerSubstType,
+                             outerOrigType, outerSubstType,
+                             innerResultSlot,
+                             outerResultAddr.getLValueAddress());
+  return ManagedValue::forLValue(innerResultAddr);
 }
 
-void ResultPlanner::planIndirectIntoIndirect(AbstractionPattern innerOrigType,
-                                             CanType innerSubstType,
-                                             AbstractionPattern outerOrigType,
-                                             CanType outerSubstType,
-                                             SILValue innerResultAddr,
-                                             SILValue outerResultAddr) {
-  if (!hasAbstractionDifference(innerResultAddr, outerResultAddr)) {
+SILValue
+ResultPlanner::planIndirectIntoIndirect(AbstractionPattern innerOrigType,
+                                        CanType innerSubstType,
+                                        AbstractionPattern outerOrigType,
+                                        CanType outerSubstType,
+                                        IndirectSlot innerResultSlot,
+                                        SILValue outerResultAddr) {
+  if (!hasAbstractionDifference(innerResultSlot, outerResultAddr)) {
+    // If there's no abstraction difference and no fixed address for
+    // the inner result, just forward the outer address.
+    if (!innerResultSlot.hasAddress())
+      return outerResultAddr;
+
+    // Otherwise, emit into the fixed inner address.
+    auto innerResultAddr = innerResultSlot.getAddress();
     addIndirectToIndirect(innerResultAddr, outerResultAddr);
+    return innerResultAddr;
   } else {
+    auto innerResultAddr = innerResultSlot.allocate(SGF, Loc);
     addReabstractIndirectToIndirect(innerOrigType, innerSubstType,
                                     outerOrigType, outerSubstType,
                                     innerResultAddr, outerResultAddr);
+    return innerResultAddr;
   }
 }
 

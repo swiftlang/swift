@@ -225,6 +225,11 @@ public:
     return formalPackType;
   }
 
+  SILType getPackComponentType() const {
+    assert(isOrigPackExpansion());
+    return packValue.getType().getPackElementType(getPackComponentIndex());
+  }
+
   /// Given that we just processed an input, advance to the next,
   /// if there is on.
   ///
@@ -261,6 +266,17 @@ public:
   /// be used for *inner* types.  If the pack is an input you've
   /// received, you should call projectPackComponent.
   ManagedValue createPackComponentTemporary(SILGenFunction &SGF, SILLocation loc);
+
+  /// Set the current pack component.  Do not call this multiple times
+  /// for the same component.
+  ///
+  /// You should only call this when the pack not yet initialized,
+  /// which generally means when it corresponds to an output you're
+  /// generating.  In the reabstraction code, this means it should only
+  /// be used for *inner* types.  If the pack is an input you've
+  /// received, you should call projectPackComponent.
+  void setPackComponent(SILGenFunction &SGF, SILLocation loc,
+                        ManagedValue elt);
 };
 
 /// A generator for visiting the addresses of the elements of

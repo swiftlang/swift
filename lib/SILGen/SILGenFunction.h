@@ -2515,6 +2515,13 @@ public:
                                              CanPackType formalPackType,
                                              unsigned componentIndex);
 
+  /// Enter a cleanup to destroy the preceding components of a pack,
+  /// leading up to (but not including) a particular component index.
+  CleanupHandle
+  enterDestroyPrecedingPackComponentsCleanup(SILValue addr,
+                                             CanPackType formalPackType,
+                                             unsigned componentIndex);
+
   /// Enter a cleanup to destroy the preceding values in a pack-expansion
   /// component of a tuple.
   ///
@@ -2766,7 +2773,8 @@ public:
   void emitDestroyPack(SILLocation loc,
                        SILValue packAddr,
                        CanPackType formalPackType,
-                       unsigned firstComponentIndex = 0);
+                       unsigned beginIndex,
+                       unsigned endIndex);
 
   /// Emit instructions to destroy a suffix of a tuple value.
   ///
