@@ -1595,6 +1595,28 @@ public struct DefineStructWithUnqualifiedLookupMacro: DeclarationMacro {
   }
 }
 
+public struct DefineComparableTypeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["""
+    struct ComparableType: Comparable {
+      static func <(lhs: ComparableType, rhs: ComparableType) -> Bool {
+        return false
+      }
+
+      enum Inner: String, Comparable {
+        case hello = "hello"
+        static func <(lhs: ComparableType.Inner, rhs: ComparableType.Inner) -> Bool {
+          return lhs.rawValue < rhs.rawValue
+        }
+      }
+    }
+    """]
+  }
+}
+
 public struct AddMemberWithFixIt: MemberMacro {
   public static func expansion<
     Declaration: DeclGroupSyntax, Context: MacroExpansionContext
