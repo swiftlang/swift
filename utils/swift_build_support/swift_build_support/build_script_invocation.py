@@ -247,9 +247,6 @@ class BuildScriptInvocation(object):
 
         if args.swift_disable_dead_stripping:
             args.extra_cmake_options.append('-DSWIFT_DISABLE_DEAD_STRIPPING:BOOL=TRUE')
-        if args.build_backdeployconcurrency:
-            args.extra_cmake_options.append(
-                '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
 
         swift_syntax_src = os.path.join(self.workspace.source_root,
                                         "swift-syntax")
@@ -633,8 +630,6 @@ class BuildScriptInvocation(object):
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
 
-        builder.add_product(products.BackDeployConcurrency,
-                            is_enabled=self.args.build_backdeployconcurrency)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
         builder.add_product(products.SwiftSyntax,
