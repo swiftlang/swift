@@ -2719,13 +2719,15 @@ entry:
 // CHECK:         apply [[BORROW]]<@pack_element([[UUID]]) each U_1>([[ELEMENT_ADDR]])
 // CHECK-LABEL: } // end sil function 'test_tuple_pack_extract'
 sil [ossa] @test_tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
-entry(%tuple : @guaranteed $(repeat each T)):
+entry(%tuple_addr : $*(repeat each T)):
+  %tuple = load_borrow %tuple_addr : $*(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %zero of $Pack{repeat each T}
   %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000002"
   %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000002") U_1
   %borrow = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
   apply %borrow<@pack_element("00000000-0000-0000-0000-000000000002") U_1>(%elt) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  end_borrow %tuple : $(repeat each T)
   %retval = tuple ()
   return %retval : $()
 }

@@ -650,15 +650,46 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
-    auto getAddressValue = [&](SILValue entryValue, bool forceCopy) -> SILValue {
-      if (SGM.M.useLoweredAddresses()
-          && SGM.Types
-                 .getTypeLowering(
-                     valueType,
-                     TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                         expansion.getResilienceExpansion()))
-                 .isAddressOnly()
-          && !entryValue->getType().isAddress()) {
+    auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
+                               bool forLValue) -> SILValue {
+      if (!SGM.M.useLoweredAddresses() && !forLValue && !isPack) {
+        // In opaque values mode, addresses aren't used except by lvalues.
+        auto &lowering = getTypeLowering(entryValue->getType());
+        if (entryValue->getType().isAddress()) {
+          // If the value is currently an address, load it, copying if needed.
+          if (lowering.isTrivial()) {
+            SILValue result = lowering.emitLoad(
+                B, loc, entryValue, LoadOwnershipQualifier::Trivial);
+            return result;
+          }
+          if (forceCopy) {
+            SILValue result =
+                lowering.emitLoadOfCopy(B, loc, entryValue, IsNotTake);
+            enterDestroyCleanup(result);
+            return result;
+          } else {
+            auto load = B.createLoadBorrow(
+                             loc, ManagedValue::forBorrowedRValue(entryValue))
+                            .getValue();
+            return load;
+          }
+        } else {
+          // Otherwise, just return it, copying if needed.
+          if (forceCopy && !lowering.isTrivial()) {
+            auto result = B.emitCopyValueOperation(loc, entryValue);
+            // enterDestroyCleanup(result);
+            return result;
+          }
+          return entryValue;
+        }
+      } else if (SGM.M.useLoweredAddresses() &&
+                 SGM.Types
+                     .getTypeLowering(
+                         valueType, TypeExpansionContext::
+                                        noOpaqueTypeArchetypesSubstitution(
+                                            expansion.getResilienceExpansion()))
+                     .isAddressOnly() &&
+                 !entryValue->getType().isAddress()) {
 
         assert(!isPack);
 
@@ -684,7 +715,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (!forceCopy)
           enterDestroyCleanup(addr);
         return addr;
-
       } else if (forceCopy) {
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
@@ -755,26 +785,38 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
         // address of the value.
-        auto addr = getAddressValue(val, /*forceCopy=*/false);
-        capturedArgs.push_back(ManagedValue::forBorrowedRValue(addr));
-      }
-      else if (!silConv.useLoweredAddresses()) {
-        capturedArgs.push_back(B.copyOwnedObjectRValue(
-            loc, val, ManagedValue::ScopeKind::Lexical));
+        auto addr =
+            getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/false);
+        capturedArgs.push_back(
+            addr->getOwnershipKind() == OwnershipKind::Owned
+                ? ManagedValue::forOwnedRValue(addr, CleanupHandle::invalid())
+                : ManagedValue::forBorrowedRValue(addr));
       } else {
-        auto addr = getAddressValue(val, /*forceCopy=*/true);
+        auto addr =
+            getAddressValue(val, /*forceCopy=*/true, /*forLValue=*/false);
+        if (!useLoweredAddresses()) {
+          auto &lowering = getTypeLowering(addr->getType());
+          auto rvalue =
+              lowering.isTrivial()
+                  ? ManagedValue::forObjectRValueWithoutOwnership(addr)
+                  : ManagedValue::forOwnedRValue(addr,
+                                                 CleanupHandle::invalid());
+          capturedArgs.push_back(rvalue);
+          break;
+        }
         // If our address is move only wrapped, unwrap it.
         if (addr->getType().isMoveOnlyWrapped()) {
           addr = B.createMoveOnlyWrapperToCopyableAddr(loc, addr);
         }
-        capturedArgs.push_back(ManagedValue::forLValue(addr));
+        capturedArgs.push_back(ManagedValue::forOwnedAddressRValue(
+            addr, CleanupHandle::invalid()));
       }
       break;
     }
     case CaptureKind::StorageAddress: {
       assert(!isPack);
 
-      auto addr = getAddressValue(val, /*forceCopy=*/false);
+      auto addr = getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/true);
 
       // No-escaping stored declarations are captured as the
       // address of the value.
