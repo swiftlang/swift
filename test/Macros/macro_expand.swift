@@ -566,3 +566,11 @@ struct DeprecatedStructWrapper {
   #deprecatedStringifyAsDeclMacro(1 + 1)
 }
 #endif
+
+
+@freestanding(declaration, names: named(ComparableType))
+macro DefineComparableType() = #externalMacro(module: "MacroDefinition", type: "DefineComparableTypeMacro")
+
+struct HasNestedType {
+  #DefineComparableType
+}
