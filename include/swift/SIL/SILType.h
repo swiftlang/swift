@@ -873,6 +873,9 @@ public:
 
   bool isMarkedAsImmortal() const;
 
+  ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
+                                            ProtocolDecl *protocol) const;
+
   //
   // Accessors for types used in SIL instructions:
   //

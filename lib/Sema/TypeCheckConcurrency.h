@@ -362,10 +362,6 @@ struct SendableCheckContext {
   bool isExplicitSendableConformance() const;
 };
 
-/// Find the original type of a value, looking through various implicit
-/// conversions.
-Type findOriginalValueType(Expr *expr);
-
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
