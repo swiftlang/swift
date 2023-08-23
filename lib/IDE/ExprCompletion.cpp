@@ -77,12 +77,7 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   auto &CS = S.getConstraintSystem();
 
-  Type ExpectedTy;
-  if (auto ContextualType = S.getContextualType(CompletionExpr)) {
-    ExpectedTy = ContextualType;
-  } else {
-    ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-  }
+  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
   bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
 
