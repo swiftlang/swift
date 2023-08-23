@@ -6189,7 +6189,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     }
     optTemp->finishInitialization(SGF);
 
-    if (subType.isLoadable(SGF.F)) {
+    if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
       ManagedValue value = SGF.B.createLoadTake(E, optTemp->getManagedAddress());
       if (value.getType().isTrivial(SGF.F))
         return RValue(SGF, {value}, subType.getASTType());
