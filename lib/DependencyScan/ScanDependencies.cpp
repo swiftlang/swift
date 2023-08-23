@@ -673,7 +673,8 @@ static void discoverCrossImportOverlayDependencies(
                     // secondary module, and add the overlay names to the
                     // dependencies list.
                     for (auto overlayName : overlayMap[Id.first]) {
-                      if (std::find_if(allDependencies.begin(),
+                      if (overlayName.str() != mainModuleName &&
+                          std::find_if(allDependencies.begin(),
                                        allDependencies.end(),
                                        [&](ModuleDependencyID Id) {
                                          return Id.first == overlayName.str();
