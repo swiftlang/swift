@@ -414,4 +414,8 @@ public:
   const int &&operator*() const && { return static_cast<const int &&>(value); }
 };
 
+struct DerivedFromConstIterator : public ConstIterator {};
+
+struct DerivedFromConstIteratorPrivately : private ConstIterator {};
+
 #endif

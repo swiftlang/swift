@@ -372,4 +372,10 @@ OperatorsTestSuite.test("AmbiguousOperatorStar2.pointee") {
   expectEqual(678, res)
 }
 
+OperatorsTestSuite.test("DerivedFromConstIterator.pointee") {
+  let stars = DerivedFromConstIterator()
+  let res = stars.pointee
+  expectEqual(234, res)
+}
+
 runAllTests()
