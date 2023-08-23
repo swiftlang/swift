@@ -302,6 +302,22 @@ struct PrintTypeLowering : UnitTest {
   }
 };
 
+// Arguments:
+// - instruction: the instruction to delete
+// Dumps:
+// - the function
+struct DeleterDeleteIfDeadTest : UnitTest {
+  DeleterDeleteIfDeadTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *inst = arguments.takeInstruction();
+    InstructionDeleter deleter;
+    llvm::dbgs() << "Deleting-if-dead " << *inst;
+    auto deleted = deleter.deleteIfDead(inst);
+    llvm::dbgs() << "deleteIfDead returned " << deleted << "\n";
+    getFunction()->dump();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: OSSA Lifetime Unit Tests
 //===----------------------------------------------------------------------===//
@@ -975,6 +991,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
     ADD_UNIT_TEST_SUBCLASS("has-pointer-escape", OwnershipUtilsHasPointerEscape)
     ADD_UNIT_TEST_SUBCLASS("print-type-lowering", PrintTypeLowering)
+    ADD_UNIT_TEST_SUBCLASS("deleter-delete-if-dead", DeleterDeleteIfDeadTest)
     ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)
