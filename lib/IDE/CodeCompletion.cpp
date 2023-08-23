@@ -284,8 +284,6 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
-  void completeLabeledTrailingClosure(CodeCompletionExpr *E,
-                                      bool isAtStartOfLine) override;
 
   bool canPerformCompleteLabeledTrailingClosure() const override {
     return true;
@@ -574,15 +572,6 @@ void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
       }
     }
   }
-}
-
-void CodeCompletionCallbacksImpl::completeLabeledTrailingClosure(
-    CodeCompletionExpr *E, bool isAtStartOfLine) {
-  CurDeclContext = P.CurDeclContext;
-  CodeCompleteTokenExpr = E;
-  Kind = CompletionKind::LabeledTrailingClosure;
-  IsAtStartOfLine = isAtStartOfLine;
-  ShouldCompleteCallPatternAfterParen = false;
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -973,7 +962,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
-  case CompletionKind::LabeledTrailingClosure:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
   case CompletionKind::PlatformConditon:
@@ -1558,19 +1546,15 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     return true;
   }
   case CompletionKind::PostfixExprParen:
-  case CompletionKind::CallArg:
-  case CompletionKind::LabeledTrailingClosure: {
-    // FIXME: Delete LabeledTrailingClosure
+  case CompletionKind::CallArg: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
     ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
                                                CurDeclContext);
     typeCheckWithLookup(Lookup);
 
-    bool IsLabeledTrailingClosure =
-        (Kind == CompletionKind::LabeledTrailingClosure);
     Lookup.collectResults(ShouldCompleteCallPatternAfterParen,
-                          IsLabeledTrailingClosure, CompletionLoc,
+                          /*IsLabeledTrailingClosure=*/false, CompletionLoc,
                           CurDeclContext, CompletionContext);
     Consumer.handleResults(CompletionContext);
     return true;
@@ -1882,116 +1866,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       Lookup.addSubModuleNames(SubModuleNameVisibilityPairs);
     else
       Lookup.addImportModuleNames();
-    break;
-  }
-  case CompletionKind::LabeledTrailingClosure: {
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-
-    SmallVector<PossibleParamInfo, 2> params;
-    // Only complete function type parameters
-    llvm::copy_if(ContextInfo.getPossibleParams(), std::back_inserter(params),
-                  [](const PossibleParamInfo &P) {
-                    // nullptr indicates out of bounds.
-                    if (!P.Param)
-                      return true;
-                    return P.Param->getPlainType()
-                        ->lookThroughAllOptionalTypes()
-                        ->is<AnyFunctionType>();
-                  });
-
-    bool allRequired = false;
-    if (!params.empty()) {
-      Lookup.addCallArgumentCompletionResults(
-          params, /*isLabeledTrailingClosure=*/true);
-      allRequired = llvm::all_of(
-          params, [](const PossibleParamInfo &P) { return P.IsRequired; });
-    }
-
-    // If there're optional parameters, do global completion or member
-    // completion depending on the completion is happening at the start of line.
-    if (!allRequired) {
-      if (IsAtStartOfLine) {
-        //   foo() {}
-        //   <HERE>
-
-        auto &Sink = CompletionContext.getResultSink();
-        if (isa<Initializer>(CurDeclContext))
-          CurDeclContext = CurDeclContext->getParent();
-
-        if (CurDeclContext->isTypeContext()) {
-          // Override completion (CompletionKind::NominalMemberBeginning).
-          addDeclKeywords(Sink, CurDeclContext,
-                          Context.LangOpts.EnableExperimentalConcurrency);
-          addLetVarKeywords(Sink);
-          SmallVector<StringRef, 0> ParsedKeywords;
-          CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
-                                                  ParsedKeywords, SourceLoc());
-          OverrideLookup.getOverrideCompletions(SourceLoc());
-        } else {
-          // Global completion (CompletionKind::PostfixExprBeginning).
-          addDeclKeywords(Sink, CurDeclContext,
-                          Context.LangOpts.EnableExperimentalConcurrency);
-          addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
-          addSuperKeyword(Sink, CurDeclContext);
-          addLetVarKeywords(Sink);
-          addExprKeywords(Sink, CurDeclContext);
-          addAnyTypeKeyword(Sink, Context.TheAnyType);
-          DoPostfixExprBeginning();
-        }
-      } else {
-        //   foo() {} <HERE>
-        // Member completion.
-        Expr *analyzedExpr = ContextInfo.getAnalyzedExpr();
-        if (!analyzedExpr)
-          break;
-
-        // Only if the completion token is the last token in the call.
-        if (analyzedExpr->getEndLoc() != CodeCompleteTokenExpr->getLoc())
-          break;
-
-        Type resultTy = analyzedExpr->getType();
-        // If the call expression doesn't have a type, fallback to:
-        if (!resultTy || resultTy->is<ErrorType>()) {
-          // 1) Try to type check removing CodeCompletionExpr from the call.
-          Expr *removedExpr = analyzedExpr;
-          removeCodeCompletionExpr(CurDeclContext->getASTContext(),
-                                   removedExpr);
-          ConcreteDeclRef referencedDecl;
-          auto optT = getTypeOfCompletionContextExpr(
-              CurDeclContext->getASTContext(), CurDeclContext,
-              CompletionTypeCheckKind::Normal, removedExpr, referencedDecl);
-          if (optT) {
-            resultTy = *optT;
-            analyzedExpr->setType(resultTy);
-          }
-        }
-        if (!resultTy || resultTy->is<ErrorType>()) {
-          // 2) Infer it from the possible callee info.
-          if (!ContextInfo.getPossibleCallees().empty()) {
-            auto calleeInfo = ContextInfo.getPossibleCallees()[0];
-            resultTy = calleeInfo.Type->getResult();
-            analyzedExpr->setType(resultTy);
-          }
-        }
-        if (!resultTy || resultTy->is<ErrorType>()) {
-          // 3) Give up providing postfix completions.
-          break;
-        }
-
-        auto &SM = CurDeclContext->getASTContext().SourceMgr;
-        auto leadingChar = SM.extractText(
-            {SM.getIDEInspectionTargetLoc().getAdvancedLoc(-1), 1});
-        Lookup.setHaveLeadingSpace(leadingChar.find_first_of(" \t\f\v") !=
-                                   StringRef::npos);
-
-        if (isDynamicLookup(resultTy))
-          Lookup.setIsDynamicLookup();
-        Lookup.getValueExprCompletions(resultTy, /*VD=*/nullptr,
-                                       /*IncludeFunctionCallCompletions=*/true);
-        Lookup.getOperatorCompletions(analyzedExpr, leadingSequenceExprs);
-        Lookup.getPostfixKeywordCompletions(resultTy, analyzedExpr);
-      }
-    }
     break;
   }
 

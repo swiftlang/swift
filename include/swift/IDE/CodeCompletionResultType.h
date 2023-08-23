@@ -81,12 +81,9 @@ public:
   void merge(const ExpectedTypeContext &Other) {
     PossibleTypes.append(Other.PossibleTypes);
 
-    // We can't merge ideal types. Setting to a null type is the best thing we
-    // can do if they differ.
-    if (IdealType.isNull() != Other.IdealType.isNull()) {
-      IdealType = Type();
-    } else if (IdealType && Other.IdealType &&
-               !IdealType->isEqual(Other.IdealType)) {
+    // We can't merge ideal types. If they are different, setting to a null type
+    // is the best thing we can do.
+    if (!IdealType || !Other.IdealType || !IdealType->isEqual(Other.IdealType)) {
       IdealType = Type();
     }
     IsImplicitSingleExpressionReturn |= Other.IsImplicitSingleExpressionReturn;

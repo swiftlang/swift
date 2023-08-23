@@ -230,10 +230,7 @@ public:
     return false;
   }
 
-  virtual void completeLabeledTrailingClosure(CodeCompletionExpr *E,
-                                              bool isAtStartOfLine) {};
-
-  virtual void completeReturnStmt(CodeCompletionExpr *E) {};
+  virtual void completeReturnStmt(CodeCompletionExpr *E){};
 
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
