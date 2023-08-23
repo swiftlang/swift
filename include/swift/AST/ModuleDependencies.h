@@ -690,7 +690,6 @@ public:
     std::string ImportedModuleName = module.front().Item.str().str();
     auto submodulePath = module.getSubmodulePath();
     if (submodulePath.size() > 0 && !submodulePath[0].Item.empty()) {
-      assert(submodulePath.size() == 1 && "Unsupported Clang submodule import");
       auto submoduleComponent = submodulePath[0];
       // Special case: a submodule named "Foo.Private" can be moved to a top-level
       // module named "Foo_Private". ClangImporter has special support for this.
