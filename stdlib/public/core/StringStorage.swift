@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 // Having @objc stuff in an extension creates an ObjC category, which we don't
 // want.
 #if _runtime(_ObjC)

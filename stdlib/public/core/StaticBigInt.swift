@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// An immutable arbitrary-precision signed integer.
 ///
 /// `StaticBigInt` is primarily intended to be used as the associated type of an

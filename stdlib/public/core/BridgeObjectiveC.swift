@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A Swift Array or Dictionary of types conforming to
 /// `_ObjectiveCBridgeable` can be passed to Objective-C as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray

@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given closure over the

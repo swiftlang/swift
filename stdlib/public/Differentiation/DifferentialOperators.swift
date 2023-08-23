@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 
 // Value with differential
 

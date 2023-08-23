@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_continuation_logFailedCheck")

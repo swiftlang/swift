@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 /// An instance of this class has all `Dictionary` data tail-allocated.

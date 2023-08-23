@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A type for propagating an unmanaged object reference.
 ///
 /// When you use this type, you become partially responsible for

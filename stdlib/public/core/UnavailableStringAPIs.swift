@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 extension String {
   /// Subscripting strings with integers is not available.
   ///

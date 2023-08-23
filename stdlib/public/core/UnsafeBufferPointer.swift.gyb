@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 
 % for mutable in (True, False):
 %  Self = 'UnsafeMutableBufferPointer' if mutable else 'UnsafeBufferPointer'

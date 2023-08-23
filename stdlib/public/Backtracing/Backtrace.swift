@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @_implementationOnly import OS.Libc
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

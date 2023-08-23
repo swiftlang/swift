@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 // This file contains compiler intrinsics for optimized string switch
 // implementations. All functions and types declared in this file are not
 // intended to be used by switch source directly.

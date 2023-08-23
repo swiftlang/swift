@@ -13,6 +13,7 @@
 /// Rather all changes should be made to swift-collections and copied back.
 
 #if SWIFT_ENABLE_REFLECTION
+
 import Swift
 
 extension _Deque: CustomReflectable {
@@ -21,4 +22,5 @@ extension _Deque: CustomReflectable {
     Mirror(self, unlabeledChildren: self, displayStyle: .collection)
   }
 }
+
 #endif

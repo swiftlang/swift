@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 @inlinable @inline(__always) // top-level fastest-paths

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 /// Returns 1 if the running OS version is greater than or equal to

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 // Each of the following functions is ordered to match math.h
 
 // These functions have a corresponding LLVM intrinsic.

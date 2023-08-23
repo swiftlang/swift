@@ -1,5 +1,4 @@
 set(swift_swiftprivate_compile_flags
-    "-parse-stdlib"
     "-Xfrontend" "-disable-access-control")
 
 add_swift_target_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB

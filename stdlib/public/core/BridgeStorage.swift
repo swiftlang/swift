@@ -18,6 +18,8 @@
 //  be a tagged pointer, and thus no extra bits may be available.
 //
 //===----------------------------------------------------------------------===//
+
+import Builtin
 import SwiftShims
 
 @frozen

@@ -17,8 +17,6 @@
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 
-import Swift
-
 @_implementationOnly import OS.Libc
 @_implementationOnly import OS.Darwin
 

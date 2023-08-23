@@ -499,6 +499,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-require-explicit-availability=ignore")
   endif()
 
+  if(SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-enable-builtin-module")
+  endif()
+
   if("${SWIFT_SDK_${SWIFTFILE_SDK}_THREADING_PACKAGE}" STREQUAL "none")
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()

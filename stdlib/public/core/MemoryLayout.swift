@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// The memory layout of a type, describing its size, stride, and alignment.
 ///
 /// You can use `MemoryLayout` as a source of information about a type when

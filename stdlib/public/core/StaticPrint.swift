@@ -12,6 +12,7 @@
 
 #if SWIFT_STDLIB_STATIC_PRINT
 
+import Builtin
 import SwiftShims
 
 extension String {

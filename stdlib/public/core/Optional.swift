@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A type that represents either a wrapped value or the absence of a value.
 ///
 /// You use the `Optional` type whenever you use optional values, even if you

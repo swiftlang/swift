@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if _ptrauth(_arm64e)
+import Builtin
+#endif
+
 /// Pseudo-namespace for pointer authentication primitives.
 internal enum _PtrAuth {
   internal struct Key {

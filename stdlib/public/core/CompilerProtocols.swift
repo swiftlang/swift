@@ -12,6 +12,8 @@
 // Intrinsic protocols shared with the compiler
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A type that can be converted to and from an associated raw value.
 ///
 /// With a `RawRepresentable` type, you can switch back and forth between a

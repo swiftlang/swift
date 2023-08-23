@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 internal func _abstract(

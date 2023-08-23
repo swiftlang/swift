@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,

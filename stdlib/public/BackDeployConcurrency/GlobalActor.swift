@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 /// A type that represents a globally-unique actor that can be used to isolate
 /// various declarations anywhere in the program.
 ///

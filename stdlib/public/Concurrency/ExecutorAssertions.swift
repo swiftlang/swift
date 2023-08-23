@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 import SwiftShims
+import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// Performs a traditional C-style assert with an optional message.
 ///
 /// Use this function for internal sanity checks that are active during testing

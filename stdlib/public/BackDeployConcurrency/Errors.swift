@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 @available(SwiftStdlib 5.1, *)

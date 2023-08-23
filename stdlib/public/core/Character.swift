@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A single extended grapheme cluster that approximates a user-perceived
 /// character.
 ///

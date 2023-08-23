@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @_implementationOnly import OS.Libc
 
 /// A backtrace formatting theme.

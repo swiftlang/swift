@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 // Conversions between different Unicode encodings.  Note that UTF-16 and

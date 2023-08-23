@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 
 #if ASYNC_STREAM_STANDALONE
 @_exported import _Concurrency

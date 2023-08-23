@@ -13,6 +13,7 @@
 /// Rather all changes should be made to swift-collections and copied back.
 
 #if !SWIFT_STDLIB_STATIC_PRINT
+
 import Swift
 
 extension _Deque: CustomDebugStringConvertible {
@@ -32,4 +33,5 @@ extension _Deque: CustomDebugStringConvertible {
     return result
   }
 }
+
 #endif

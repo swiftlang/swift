@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 //
 // StringObject abstracts the bit-level interpretation and creation of the
 // String struct.

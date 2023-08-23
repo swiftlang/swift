@@ -12,6 +12,8 @@
 // Unicode.Scalar Type
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 extension Unicode {
   /// A Unicode scalar value.
   ///

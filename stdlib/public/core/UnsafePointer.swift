@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A pointer for accessing  data of a
 /// specific type.
 ///
