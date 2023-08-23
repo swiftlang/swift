@@ -247,8 +247,15 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
+  // dispatch_time(3): Overflow causes DISPATCH_TIME_FOREVER to be returned.
   dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
-  dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+  // dispatch_after(3): The result of passing DISPATCH_TIME_FOREVER as the when
+  // parameter to `dispatch_after_f` is undefined.
+  if (when != DISPATCH_TIME_FOREVER) {
+    dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+  } else {
+    // Leak the job, this is isomorphic to the job getting delayed "forever".
+  }
 }
 
 #define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
