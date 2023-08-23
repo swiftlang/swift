@@ -1398,6 +1398,15 @@ bool swift::accessorMacroIntroducesInitAccessor(
 llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
                                                 CustomAttr *attr,
                                                 MacroDecl *macro) {
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    // Check that the variable is part of a single-variable pattern.
+    auto binding = var->getParentPatternBinding();
+    if (binding && binding->getSingleVar() != var) {
+      var->diagnose(diag::accessor_macro_not_single_var, macro->getName());
+      return llvm::None;
+    }
+  }
+
   // Evaluate the macro.
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, storage, attr,
