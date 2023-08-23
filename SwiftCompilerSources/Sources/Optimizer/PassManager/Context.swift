@@ -640,6 +640,12 @@ extension Operand {
   func set(to value: Value, _ context: some MutatingContext) {
     instruction.setOperand(at: index, to: value, context)
   }
+
+  func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
+  }
 }
 
 extension Instruction {
