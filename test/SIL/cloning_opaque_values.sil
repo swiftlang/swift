@@ -30,25 +30,28 @@ bb0(%instance : @guaranteed $WeakBox<T>):
 }
 
 // CHECK-LABEL: sil [ossa] @tuple_pack_extract_caller : {{.*}} {
-// CHECK:       bb0([[TUPLE:%[^,]+]] :
+// CHECK:       bb0([[TUPLE_ADDR:%[^,]+]] :
+// CHECK:         [[TUPLE:%[^,]+]] = load_borrow [[TUPLE_ADDR]]
 // CHECK:         [[ZERO:%[^,]+]] = integer_literal
 // CHECK:         [[INDEX:%[^,]+]] = dynamic_pack_index [[ZERO]]
 // CHECK:         open_pack_element [[INDEX]] of <each U_1> at <Pack{repeat each T}>, shape $each U_1, uuid [[UUID:"[A-F0-9\-]+"]]
 // CHECK:         tuple_pack_extract [[INDEX]] of [[TUPLE]] : $(repeat each T) as $@pack_element([[UUID]]) each U_1
 // CHECK-LABEL: } // end sil function 'tuple_pack_extract_caller'
 sil [ossa] @tuple_pack_extract_caller : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
-entry(%tuple : @guaranteed $(repeat each T)):
+entry(%tuple_addr : $*(repeat each T)):
   %callee = function_ref @tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> ()
-  %retval = apply %callee<Pack{repeat each T}>(%tuple) : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> ()
+  %retval = apply %callee<Pack{repeat each T}>(%tuple_addr) : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> ()
   return %retval : $()
 }
 
 sil [always_inline] [ossa] @tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
-entry(%tuple : @guaranteed $(repeat each T)):
+entry(%tuple_addr : $*(repeat each T)):
+  %tuple = load_borrow %tuple_addr : $*(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %zero of $Pack{repeat each T}
   %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
   %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  end_borrow %tuple : $(repeat each T)
   %retval = tuple ()
   return %retval : $()
 }

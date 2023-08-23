@@ -1130,12 +1130,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     LLVM_FALLTHROUGH;
 
   case CaptureKind::Immutable: {
+    auto argIndex = SGF.F.begin()->getNumArguments();
     // Non-escaping stored decls are captured as the address of the value.
-    auto argConv = SGF.F.getConventions().getSILArgumentConvention(
-        SGF.F.begin()->getNumArguments());
+    auto argConv = SGF.F.getConventions().getSILArgumentConvention(argIndex);
     bool isInOut = (argConv == SILArgumentConvention::Indirect_Inout ||
                     argConv == SILArgumentConvention::Indirect_InoutAliasable);
-    if (isInOut || SGF.SGM.M.useLoweredAddresses()) {
+    auto param = SGF.F.getConventions().getParamInfoForSILArg(argIndex);
+    if (SGF.F.getConventions().isSILIndirect(param)) {
       ty = ty.getAddressType();
     }
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
