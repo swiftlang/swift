@@ -1555,7 +1555,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::StmtOrExpr: 
-  case CompletionKind::ReturnStmtExpr: {
+  case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr: {
     assert(CurDeclContext);
 
     bool AddUnresolvedMemberCompletions =
@@ -1728,6 +1729,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::PostfixExprParen:
   case CompletionKind::PostfixExpr:
   case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr:
     llvm_unreachable("should be already handled");
     return;
 
@@ -1973,19 +1975,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
         Lookup.getPostfixKeywordCompletions(resultTy, analyzedExpr);
       }
     }
-    break;
-  }
-
-  case CompletionKind::YieldStmtExpr: {
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    if (auto FD = dyn_cast<AccessorDecl>(CurDeclContext)) {
-      if (FD->isCoroutine()) {
-        // TODO: handle multi-value yields.
-        Lookup.setExpectedTypes(FD->getStorage()->getValueInterfaceType(),
-                                /*isImplicitSingleExpressionReturn*/ false);
-      }
-    }
-    Lookup.getValueCompletionsInDeclContext(Loc);
     break;
   }
 

@@ -177,12 +177,12 @@ void PostfixCompletionCallback::sawSolutionImpl(
 
   auto *Locator = CS.getConstraintLocator(SemanticExpr);
   Type ExpectedTy;
-  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (auto ContextualType = CS.getContextualType(CompletionExpr, /*forConstraint=*/false)) {
+  if (auto ContextualType = S.getContextualType(CompletionExpr)) {
     ExpectedTy = ContextualType;
   } else {
     ExpectedTy = getTypeForCompletion(S, CompletionExpr);
   }
+  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
 
   auto *CalleeLocator = S.getCalleeLocator(Locator);
   ValueDecl *ReferencedDecl = nullptr;

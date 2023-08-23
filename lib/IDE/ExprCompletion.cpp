@@ -78,7 +78,7 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
   auto &CS = S.getConstraintSystem();
 
   Type ExpectedTy;
-  if (auto ContextualType = CS.getContextualType(CompletionExpr, /*forConstraint=*/false)) {
+  if (auto ContextualType = S.getContextualType(CompletionExpr)) {
     ExpectedTy = ContextualType;
   } else {
     ExpectedTy = getTypeForCompletion(S, CompletionExpr);
