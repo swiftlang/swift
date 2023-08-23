@@ -5,7 +5,7 @@ public dynamic func dynamicOnMainActor() { }
 
 // property wrapper + main actor
 @propertyWrapper
-public struct IntWrapper {
+public struct IntWrapper: Sendable {
 
   public init(wrappedValue: Int) {
     self.wrappedValue = wrappedValue

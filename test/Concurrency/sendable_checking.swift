@@ -233,7 +233,7 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 
 @available(SwiftStdlib 5.1, *)
 final class NonSendable {
-  // expected-note@-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-note@-1 6 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
   @MainActor
@@ -247,7 +247,16 @@ final class NonSendable {
 
     await self.update()
     // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+
+    _ = await x
+    // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+
+    _ = await self.x
+    // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
   }
+
+  @MainActor
+  var x: Int { 0 }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -255,4 +264,7 @@ func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
   // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+
+  _ = await t.x
+  // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
 }

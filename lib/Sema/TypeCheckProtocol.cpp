@@ -3041,7 +3041,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
   case ActorReferenceResult::ExitsActorToNonisolated:
     diagnoseNonSendableTypesInReference(
-        getDeclRefInContext(witness), DC, loc, SendableCheckReason::Conformance);
+        /*base=*/nullptr, getDeclRefInContext(witness),
+        DC, loc, SendableCheckReason::Conformance);
     return llvm::None;
   case ActorReferenceResult::EntersActor:
     // Handled below.
@@ -3124,13 +3125,14 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
     // Check that the results of the witnessing method are sendable
     diagnoseNonSendableTypesInReference(
-        getDeclRefInContext(witness), DC, loc, SendableCheckReason::Conformance,
+        /*base=*/nullptr, getDeclRefInContext(witness),
+        DC, loc, SendableCheckReason::Conformance,
         getActorIsolation(witness), FunctionCheckKind::Results);
 
     // If this requirement is a function, check that its parameters are Sendable as well
     if (isa<AbstractFunctionDecl>(requirement)) {
       diagnoseNonSendableTypesInReference(
-          getDeclRefInContext(requirement),
+          /*base=*/nullptr, getDeclRefInContext(requirement),
           requirement->getInnermostDeclContext(), requirement->getLoc(),
           SendableCheckReason::Conformance, getActorIsolation(witness),
           FunctionCheckKind::Params, loc);

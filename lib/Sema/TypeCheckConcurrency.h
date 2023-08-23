@@ -265,6 +265,9 @@ enum class FunctionCheckKind {
 /// concurrency domain, whether in/out of an actor or in/or of a concurrent
 /// function or closure.
 ///
+/// \param base The base expression of the reference, which must be 'Sendable'
+/// in order to cross actor isolation boundaries.
+///
 /// \param declRef The declaration being referenced from another concurrency
 /// domain, including the substitutions so that (e.g.) we can consider the
 /// specific types at the use site.
@@ -286,7 +289,8 @@ enum class FunctionCheckKind {
 ///
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
-    ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc refLoc,
+    Expr *base, ConcreteDeclRef declRef,
+    const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind,
     llvm::Optional<ActorIsolation> knownIsolation = llvm::None,
     FunctionCheckKind funcCheckKind = FunctionCheckKind::ParamsResults,
