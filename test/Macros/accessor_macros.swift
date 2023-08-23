@@ -155,3 +155,11 @@ struct HasStoredTests {
   // expected-note@-3 2{{'z' declared here}}
 #endif
 }
+
+
+#if TEST_DIAGNOSTICS
+struct MultipleVars {
+  @AddWillSet var (x, y): (Int, Int) = (0, 0)
+  // expected-error@-1 2{{accessor macro 'AddWillSet()' can only apply to a single variable}}
+}
+#endif
