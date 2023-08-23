@@ -999,7 +999,8 @@ bool swift::diagnoseNonSendableTypes(
 }
 
 bool swift::diagnoseNonSendableTypesInReference(
-    ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc refLoc,
+    Expr *base, ConcreteDeclRef declRef,
+    const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind, llvm::Optional<ActorIsolation> knownIsolation,
     FunctionCheckKind funcCheckKind, SourceLoc diagnoseLoc) {
   // Retrieve the actor isolation to use in diagnostics.
@@ -1009,6 +1010,17 @@ bool swift::diagnoseNonSendableTypesInReference(
 
     return swift::getActorIsolation(declRef.getDecl());
   };
+
+  // Check the 'self' argument.
+  if (base) {
+    if (diagnoseNonSendableTypes(
+            base->getType(),
+            fromDC, base->getStartLoc(),
+            diag::non_sendable_param_type,
+            (unsigned)refKind, declRef.getDecl(),
+            getActorIsolation()))
+      return true;
+  }
 
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
@@ -2664,7 +2676,6 @@ namespace {
       FoundAsync, // successfully marked an implicitly-async operation
       NotFound,  // fail: no valid implicitly-async operation was found
       SyncContext, // fail: a valid implicitly-async op, but in sync context
-      NotSendable,  // fail: valid op and context, but not Sendable
       NotDistributed, // fail: non-distributed declaration in distributed actor
     };
 
@@ -2781,16 +2792,6 @@ namespace {
             result = AsyncMarkingResult::FoundAsync;
           }
         }
-      }
-
-      if (result == AsyncMarkingResult::FoundAsync) {
-        // Check for non-sendable types.
-        bool problemFound =
-            diagnoseNonSendableTypesInReference(
-              concDeclRef, getDeclContext(), declLoc,
-              SendableCheckReason::SynchronousAsAsync);
-        if (problemFound)
-          result = AsyncMarkingResult::NotSendable;
       }
 
       return result;
@@ -3191,7 +3192,7 @@ namespace {
           return true;
 
         return diagnoseNonSendableTypesInReference(
-                   declRef, getDeclContext(), loc,
+                   base, declRef, getDeclContext(), loc,
                    SendableCheckReason::ExitingActor,
                    result.isolation);
 
@@ -3226,7 +3227,7 @@ namespace {
       // Sendable checking and we're done.
       if (!result.options) {
         return diagnoseNonSendableTypesInReference(
-                   declRef, getDeclContext(), loc,
+                   base, declRef, getDeclContext(), loc,
                    SendableCheckReason::CrossActor);
       }
 
@@ -3239,11 +3240,11 @@ namespace {
           loc, declRef, context, result.isolation, isDistributed);
       switch (implicitAsyncResult) {
       case AsyncMarkingResult::FoundAsync:
-        // Success! We're done.
-        return false;
+        return diagnoseNonSendableTypesInReference(
+            base, declRef, getDeclContext(), loc,
+            SendableCheckReason::SynchronousAsAsync);
 
       case AsyncMarkingResult::NotDistributed:
-      case AsyncMarkingResult::NotSendable:
         // Failed, but diagnostics have already been emitted.
         return true;
 
@@ -4493,12 +4494,14 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   case OverrideIsolationResult::Sendable:
     // Check that the results of the overriding method are sendable
     diagnoseNonSendableTypesInReference(
+        /*base=*/nullptr,
         getDeclRefInContext(value), value->getInnermostDeclContext(),
         value->getLoc(), SendableCheckReason::Override,
         getActorIsolation(value), FunctionCheckKind::Results);
 
     // Check that the parameters of the overridden method are sendable
     diagnoseNonSendableTypesInReference(
+        /*base=*/nullptr,
         getDeclRefInContext(overridden), overridden->getInnermostDeclContext(),
         overridden->getLoc(), SendableCheckReason::Override,
         getActorIsolation(value), FunctionCheckKind::Params,
