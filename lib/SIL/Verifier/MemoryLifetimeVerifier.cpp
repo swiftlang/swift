@@ -151,8 +151,6 @@ public:
 
 bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
                                              SILInstruction *atInst) {
-  const Location *rootLoc = locations.getRootLocation(locIdx);
-  SILBasicBlock *rootBlock = rootLoc->representativeValue->getParentBlock();
   SILBasicBlock *startBlock = atInst->getParent();
   
   // Start at atInst an walk up the control flow.
@@ -164,12 +162,9 @@ bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
       // Stop at trivial stores to the enum.
       continue;
     }
-    if (block == rootBlock) {
-      // We reached the block where the memory location is defined. So we cannot
-      // prove that the enum contains a non-payload case.
+    if (block == function->getEntryBlock()) {
       return false;
     }
-    assert(block != function->getEntryBlock());
     for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
       // Stop walking to the predecessor if block is a non-payload successor
       // of a switch_enum/switch_enum_addr.
