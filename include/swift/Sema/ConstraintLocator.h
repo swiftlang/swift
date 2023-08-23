@@ -275,6 +275,9 @@ public:
   /// a key path component.
   bool isForKeyPathComponentResult() const;
 
+  /// Determine whether this locator points to a key path component.
+  bool isForKeyPathComponent() const;
+
   /// Determine whether this locator points to the generic parameter.
   bool isForGenericParameter() const;
 
