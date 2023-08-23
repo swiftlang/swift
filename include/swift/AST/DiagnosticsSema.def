@@ -7290,6 +7290,9 @@ ERROR(macro_expand_circular_reference_unnamed, none,
 NOTE(macro_expand_circular_reference_unnamed_through, none,
      "circular reference expanding %0 macros", (StringRef))
 
+ERROR(accessor_macro_not_single_var, none,
+      "accessor macro %0 can only apply to a single variable", (DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
