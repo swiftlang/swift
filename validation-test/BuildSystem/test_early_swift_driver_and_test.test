@@ -1,4 +1,4 @@
-# REQUIRES: standalone_build
+# REQUIRES: standalone_build, OS=macosx
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
