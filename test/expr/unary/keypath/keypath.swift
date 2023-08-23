@@ -795,7 +795,8 @@ func test_keypath_with_method_refs() {
 
   let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
   // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
-  let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static member 'bar()'}}
+  let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static method 'bar()'}}
+  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
   let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
 
   struct A {
@@ -808,7 +809,7 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<A, Int> = \.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
-  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{key path cannot refer to static member 'faz()'}}
+  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
   let _ = \A.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
   let _ = \A.Type.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
 }
