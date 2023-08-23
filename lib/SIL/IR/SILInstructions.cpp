@@ -1283,6 +1283,12 @@ bool AssignOrInitInst::isPropertyAlreadyInitialized(unsigned propertyIdx) {
   return Assignments.test(propertyIdx);
 }
 
+VarDecl *AssignOrInitInst::getProperty() const {
+  auto *accessor = getReferencedInitAccessor();
+  assert(accessor);
+  return cast<VarDecl>(accessor->getStorage());
+}
+
 StringRef AssignOrInitInst::getPropertyName() const {
   auto *accessor = getReferencedInitAccessor();
   assert(accessor);

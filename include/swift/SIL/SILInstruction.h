@@ -4962,6 +4962,8 @@ public:
   SILValue getInitializer() const { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
 
+  VarDecl *getProperty() const;
+
   Mode getMode() const {
     return Mode(sharedUInt8().AssignOrInitInst.mode);
   }
