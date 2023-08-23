@@ -415,6 +415,7 @@ struct BridgedOperand {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getUser() const;
   BRIDGED_INLINE OperandOwnership getOperandOwnership() const;
+  void changeOwnership(BridgedValue::Ownership from, BridgedValue::Ownership to) const;
 };
 
 struct OptionalBridgedOperand {
