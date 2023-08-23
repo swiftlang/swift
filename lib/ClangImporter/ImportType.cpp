@@ -2609,6 +2609,9 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
+  if (auto elaboratedTy = type->getAs<clang::ElaboratedType>())
+    type = elaboratedTy->desugar();
+
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
     // Nullable trailing closure parameters default to 'nil'.
@@ -2639,42 +2642,31 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
     }
   } else if (const clang::TypedefType *typedefType =
                  type->getAs<clang::TypedefType>()) {
-    // Get the AvailabilityAttr that would be set from CF/NS_OPTIONS
-    if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
-      // If we've taken this branch it means we have an enum type, and it is
-      // likely an integer or NSInteger that is being used by NS/CF_OPTIONS to
-      // behave like a C enum in the presence of C++.
-      auto enumName = typedefType->getDecl()->getName();
-      ArgumentAttrs argumentAttrs(DefaultArgumentKind::None, true, enumName);
-      auto camelCaseWords = camel_case::getWords(enumName);
-      for (auto it = camelCaseWords.rbegin(); it != camelCaseWords.rend();
-           ++it) {
-        auto word = *it;
-        auto next = std::next(it);
-        if (camel_case::sameWordIgnoreFirstCase(word, "options")) {
-          argumentAttrs.argumentKind = DefaultArgumentKind::EmptyArray;
-          return argumentAttrs;
+    clang::TypedefNameDecl *typedefDecl = typedefType->getDecl();
+    // Find the next decl in the same context. If this typedef is a part of an
+    // NS/CF_OPTIONS declaration, the next decl will be an enum.
+    auto declsInContext = typedefDecl->getDeclContext()->decls();
+    auto declIter = llvm::find(declsInContext, typedefDecl);
+    if (declIter != declsInContext.end())
+      declIter++;
+    if (declIter != declsInContext.end()) {
+      if (auto enumDecl = dyn_cast<clang::EnumDecl>(*declIter)) {
+        if (auto cfOptionsTy =
+                nameImporter.getContext()
+                    .getClangModuleLoader()
+                    ->getTypeDefForCXXCFOptionsDefinition(enumDecl)) {
+          if (cfOptionsTy->getDecl() == typedefDecl) {
+            auto enumName = typedefDecl->getName();
+            ArgumentAttrs argumentAttrs(DefaultArgumentKind::None, true,
+                                        enumName);
+            for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
+              if (camel_case::sameWordIgnoreFirstCase(word, "options")) {
+                argumentAttrs.argumentKind = DefaultArgumentKind::EmptyArray;
+              }
+            }
+            return argumentAttrs;
+          }
         }
-        if (camel_case::sameWordIgnoreFirstCase(word, "units"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "domain"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "action"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "events") &&
-            next != camelCaseWords.rend() &&
-            camel_case::sameWordIgnoreFirstCase(*next, "control"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "state"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "unit"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "position") &&
-            next != camelCaseWords.rend() &&
-            camel_case::sameWordIgnoreFirstCase(*next, "scroll"))
-          return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "edge"))
-          return argumentAttrs;
       }
     }
   }
