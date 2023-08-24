@@ -1412,8 +1412,9 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
       return;
     } else if (destTagBytes >= xiTagValues) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
+      auto nestedAddrOffset = addrOffset;
       while (reader.layoutStr < end) {
-        handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
+        handleSingleRefCountDestroy(metadata, reader, nestedAddrOffset, dest);
       }
     } else {
       reader.skip(refCountBytes);
@@ -1448,8 +1449,9 @@ static void singlePayloadEnumFNAssignWithCopy(const Metadata *metadata,
       return;
     } else if (destTag == 0) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
+      auto nestedAddrOffset = addrOffset;
       while (reader.layoutStr < end) {
-        handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
+        handleSingleRefCountDestroy(metadata, reader, nestedAddrOffset, dest);
       }
     } else {
       reader.skip(refCountBytes);
@@ -1484,8 +1486,9 @@ static void singlePayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
       return;
     } else if (destTag == 0) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
+      auto nestedAddrOffset = addrOffset;
       while (reader.layoutStr < end) {
-        handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
+        handleSingleRefCountDestroy(metadata, reader, nestedAddrOffset, dest);
       }
     } else {
       reader.skip(refCountBytes);
@@ -1545,8 +1548,9 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
       return;
     } else if (destTag == 0) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
+      auto nestedAddrOffset = addrOffset;
       while (reader.layoutStr < end) {
-        handleSingleRefCountDestroy(metadata, reader, addrOffset, dest);
+        handleSingleRefCountDestroy(metadata, reader, nestedAddrOffset, dest);
       }
     } else {
       reader.skip(refCountBytes);
