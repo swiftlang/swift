@@ -46,10 +46,10 @@ subst T: /d
 subst T: %BuildRoot% || (exit /b)
 set BuildRoot=T:
 
-:: Identify the PackageRoot
-set PackageRoot=%BuildRoot%\package
+:: Identify the StagePath
+set StagePath=%BuildRoot%\artifacts
 
-md %PackageRoot%
+md %StagePath%
 
 :: Setup temporary directories
 md %BuildRoot%\tmp
@@ -82,7 +82,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SDKs X64 ^
   %SkipPackagingArg% ^
   %TestArg% ^
-  -Stage %PackageRoot%
+  -Stage %StagePath%
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
