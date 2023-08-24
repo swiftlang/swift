@@ -1,5 +1,15 @@
-#include "../../Sema/TypeCheckConcurrency.h"
-#include "../../Sema/TypeChecker.h"
+//===--- SendNonSendable.cpp ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
@@ -256,18 +266,17 @@ private:
     switch (type.getASTType()->getKind()) {
     case TypeKind::BuiltinNativeObject:
     case TypeKind::BuiltinRawPointer:
-      // these are very unsafe... definitely not Sendable
+      // These are very unsafe... definitely not Sendable.
       return true;
     default:
-      // consider caching this if it's a performance bottleneck
-      return TypeChecker::conformsToProtocol(
-                 type.getASTType(), sendableProtocol, function->getParentModule())
+      // Consider caching this if it's a performance bottleneck.
+      return type.conformsToProtocol(function, sendableProtocol)
           .hasMissingConformance(function->getParentModule());
     }
   }
 
-  // used to statefully track the instruction currently being translated,
-  // for insertion into generated PartitionOps
+  // Used to statefully track the instruction currently being translated, for
+  // insertion into generated PartitionOps.
   SILInstruction *currentInstruction;
 
   // ===========================================================================
@@ -1586,12 +1595,13 @@ class PartitionAnalysis {
     if (!argExpr)
       assert(false && "sourceExpr should be populated for ApplyExpr consumptions");
 
-    function->getASTContext().Diags.diagnose(
-        argExpr->getLoc(), diag::call_site_consumption_yields_race,
-        findOriginalValueType(argExpr),
-        isolationCrossing.value().getCallerIsolation(),
-        isolationCrossing.value().getCalleeIsolation(),
-        numDisplayed, numDisplayed != 1, numHidden > 0, numHidden)
+    function->getASTContext()
+        .Diags
+        .diagnose(argExpr->getLoc(), diag::call_site_consumption_yields_race,
+                  argExpr->findOriginalType(),
+                  isolationCrossing.value().getCallerIsolation(),
+                  isolationCrossing.value().getCalleeIsolation(), numDisplayed,
+                  numDisplayed != 1, numHidden > 0, numHidden)
         .highlight(argExpr->getSourceRange());
     return true;
   }

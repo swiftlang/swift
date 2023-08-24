@@ -1849,33 +1849,6 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
   }
 }
 
-/// Find the original type of a value, looking through various implicit
-/// conversions.
-Type swift::findOriginalValueType(Expr *expr) {
-  do {
-    expr = expr->getSemanticsProvidingExpr();
-
-    if (auto inout = dyn_cast<InOutExpr>(expr)) {
-      expr = inout->getSubExpr();
-      continue;
-    }
-
-    if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
-      expr = ice->getSubExpr();
-      continue;
-    }
-
-    if (auto open = dyn_cast<OpenExistentialExpr>(expr)) {
-      expr = open->getSubExpr();
-      continue;
-    }
-
-    break;
-  } while (true);
-
-  return expr->getType()->getRValueType();
-}
-
 bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *declContext) {
   auto isolationCrossing = apply->getIsolationCrossing();
   if (!isolationCrossing.has_value())
@@ -1916,7 +1889,7 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
       // Determine the type of the argument, ignoring any implicit
       // conversions that could have stripped sendability.
       if (Expr *argExpr = arg.getExpr()) {
-          argType = findOriginalValueType(argExpr);
+          argType = argExpr->findOriginalType();
       }
     }
 
