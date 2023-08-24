@@ -919,10 +919,10 @@ namespace {
             field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
 
-      if (fields.size() == 1 && isFixedSize() &&
-          getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && isFixedSize() &&
+      //     getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
       return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
           fields, T, getBestKnownAlignment().getValue(), *this);

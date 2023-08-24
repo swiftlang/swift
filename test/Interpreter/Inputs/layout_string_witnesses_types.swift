@@ -223,6 +223,32 @@ public struct Recursive<T> {
     }
 }
 
+public protocol A {}
+public protocol B {}
+public protocol C {}
+
+public struct MultiProtocolExistentialWrapper {
+    let x: Int = 0
+    let y: any (A&B&C)
+    let z: AnyObject
+
+    public init(y: any (A&B&C), z: AnyObject) {
+        self.y = y
+        self.z = z
+    }
+}
+
+public struct AnyWrapper {
+    let x: Int = 0
+    let y: Any
+    let z: AnyObject
+
+    public init(y: Any, z: AnyObject) {
+        self.y = y
+        self.z = z
+    }
+}
+
 #if os(macOS)
 import Foundation
 
@@ -287,8 +313,8 @@ public struct NestedWrapper<T> {
 }
 
 struct InternalGeneric<T> {
-    let x: T
     let y: Int
+    let x: T
 }
 
 public enum SinglePayloadSimpleClassEnum {
@@ -536,6 +562,11 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 }
 
 @inline(never)
+public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
+    ptr.assign(from: x, count: 1)
+}
+
+@inline(never)
 public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
     ptr.initialize(to: x)
 }
@@ -554,19 +585,19 @@ public func allocateInternalGenericPtr<T>(of tpe: T.Type) -> UnsafeMutableRawPoi
 @inline(never)
 public func testGenericAssign<T>(_ ptr: __owned UnsafeMutableRawPointer, from x: T) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
-    let x = InternalGeneric(x: x, y: 23)
+    let x = InternalGeneric(y: 23, x: x)
     testAssign(ptr, from: x)
 }
 
 @inline(never)
 public func testGenericInit<T>(_ ptr: __owned UnsafeMutableRawPointer, to x: T) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
-    let x = InternalGeneric(x: x, y: 23)
+    let x = InternalGeneric(y: 23, x: x)
     testInit(ptr, to: x)
 }
 
 @inline(never)
 public func testGenericDestroy<T>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
-    let ptr = ptr.assumingMemoryBound(to: tpe)
+    let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     testDestroy(ptr)
 }

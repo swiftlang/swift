@@ -146,7 +146,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
-    case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+    case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
@@ -199,7 +199,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
-    case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::AddressOfBorrowOpaque:
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
       return true;

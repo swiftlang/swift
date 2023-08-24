@@ -17,6 +17,8 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/AST/Types.h"
+
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
@@ -118,15 +120,21 @@ class VJPCloner::Implementation final
     auto pullbackTupleType =
       remapASTType(pullbackInfo.getLinearMapTupleType(returnBB)->getCanonicalType());
     Builder.setInsertionPoint(vjp->getEntryBlock());
-    auto topLevelSubcontextSize = emitMemoryLayoutSize(
-        Builder, original->getLocation(), pullbackTupleType);
+
+    auto pbTupleMetatypeType =
+        CanMetatypeType::get(pullbackTupleType, MetatypeRepresentation::Thick);
+    auto pbTupleMetatypeSILType =
+        SILType::getPrimitiveObjectType(pbTupleMetatypeType);
+    auto pbTupleMetatype =
+        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+
     // Create an context.
     pullbackContextValue = Builder.createBuiltin(
         original->getLocation(),
-        getASTContext().getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
-        SILType::getNativeObjectType(getASTContext()),
-        SubstitutionMap(), {topLevelSubcontextSize});
+        getASTContext().getIdentifier(getBuiltinName(
+            BuiltinValueKind::AutoDiffCreateLinearMapContextWithType)),
+        SILType::getNativeObjectType(getASTContext()), SubstitutionMap(),
+        {pbTupleMetatype});
     borrowedPullbackContextValue = Builder.createBeginBorrow(
         original->getLocation(), pullbackContextValue);
     LLVM_DEBUG(getADDebugStream()
@@ -148,8 +156,8 @@ class VJPCloner::Implementation final
       return builtinAutoDiffAllocateSubcontextGenericSignature;
     auto &ctx = getASTContext();
     auto *decl = cast<FuncDecl>(getBuiltinValueDecl(
-        ctx, ctx.getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext))));
+        ctx, ctx.getIdentifier(getBuiltinName(
+                 BuiltinValueKind::AutoDiffAllocateSubcontextWithType))));
     builtinAutoDiffAllocateSubcontextGenericSignature =
         decl->getGenericSignature();
     assert(builtinAutoDiffAllocateSubcontextGenericSignature);
@@ -1067,14 +1075,21 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     assert(enumEltType == rawPtrType);
     auto pbTupleType =
       remapASTType(pullbackInfo.getLinearMapTupleType(predBB)->getCanonicalType());
-    SILValue pbTupleSize =
-        emitMemoryLayoutSize(Builder, loc, pbTupleType);
+
+    auto pbTupleMetatypeType =
+        CanMetatypeType::get(pbTupleType, MetatypeRepresentation::Thick);
+    auto pbTupleMetatypeSILType =
+        SILType::getPrimitiveObjectType(pbTupleMetatypeType);
+    auto pbTupleMetatype =
+        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+
     auto rawBufferValue = builder.createBuiltin(
         loc,
-        getASTContext().getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+        getASTContext().getIdentifier(getBuiltinName(
+            BuiltinValueKind::AutoDiffAllocateSubcontextWithType)),
         rawPtrType, SubstitutionMap(),
-        {borrowedPullbackContextValue, pbTupleSize});
+        {borrowedPullbackContextValue, pbTupleMetatype});
+
     auto typedBufferValue =
       builder.createPointerToAddress(
         loc, rawBufferValue, pbTupleVal->getType().getAddressType(),

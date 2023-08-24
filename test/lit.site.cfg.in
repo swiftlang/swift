@@ -13,6 +13,7 @@
 import os
 import platform
 import sys
+import lit.util
 
 config.cmake = "@CMAKE_COMMAND@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
@@ -170,6 +171,6 @@ if '@SWIFT_SWIFT_PARSER@' == 'TRUE':
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
-    config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
+    config.test_exec_root = os.path.dirname(lit.util.abs_path_preserve_drive(__file__))
 lit_config.load_config(
     config, os.path.join(config.swift_src_root, "test", "lit.cfg"))
