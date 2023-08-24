@@ -27,9 +27,3 @@ endif()
 add_dependencies(tools complete-test)
 swift_install_in_component(TARGETS complete-test
   RUNTIME DESTINATION bin COMPONENT tools)
-
-swift_install_strip_builder_rpath(
-  TARGETS complete-test
-  DESTINATION bin
-  COMPONENT tools
-)

@@ -2,6 +2,7 @@ add_swift_host_tool(swift-compatibility-symbols
   swift-compatibility-symbols.cpp
   LLVM_LINK_COMPONENTS support
   SWIFT_COMPONENT tools
+  REQUIRED_FOR_MINIMAL_COMPILER
 )
 
 set(syms_file "${CMAKE_BINARY_DIR}/share/swift/compatibility-symbols")

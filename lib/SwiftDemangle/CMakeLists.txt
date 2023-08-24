@@ -17,10 +17,3 @@ swift_install_in_component(TARGETS swiftDemangle
   ARCHIVE
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
     COMPONENT compiler)
-
-
-swift_install_strip_builder_rpath(
-  TARGETS swiftDemangle
-  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-  COMPONENT compiler
-)

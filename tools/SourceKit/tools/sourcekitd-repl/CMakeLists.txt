@@ -29,9 +29,3 @@ endif()
 add_dependencies(tools sourcekitd-repl)
 swift_install_in_component(TARGETS sourcekitd-repl
   RUNTIME DESTINATION bin COMPONENT tools)
-
-swift_install_strip_builder_rpath(
-  TARGETS sourcekitd-repl
-  DESTINATION bin
-  COMPONENT tools
-)
