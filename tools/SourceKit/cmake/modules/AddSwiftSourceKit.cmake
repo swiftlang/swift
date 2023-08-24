@@ -132,10 +132,8 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
 
       file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
-
-      if(ASKD_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-        list(APPEND RPATH_LIST "${host_lib_dir}")
-      endif()
+      # NOTE: SourceKit components are NOT executed before stdlib is built.
+      # So there's no need to add RUNPATH to builder's runtime libraries.
 
     elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       get_bootstrapping_swift_lib_dir(bs_lib_dir "")
