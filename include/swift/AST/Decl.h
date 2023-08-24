@@ -5937,6 +5937,14 @@ public:
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
 
+  /// Visit all auxiliary declarations to this VarDecl.
+  ///
+  /// An auxiliary declaration is a declaration synthesized by the compiler to support
+  /// this VarDecl, such as synthesized property wrapper variables.
+  ///
+  /// \note this function only visits auxiliary decls that are not part of the AST.
+  void visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)>) const;
+
   /// Is this the synthesized storage for a 'lazy' property?
   bool isLazyStorageProperty() const {
     return Bits.VarDecl.IsLazyStorageProperty;
@@ -5944,6 +5952,9 @@ public:
   void setLazyStorageProperty(bool IsLazyStorage) {
     Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
+
+  /// Retrieve the backing storage property for a lazy property.
+  VarDecl *getLazyStorageProperty() const;
 
   /// True if this is a top-level global variable from the main source file.
   bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
@@ -6051,17 +6062,6 @@ public:
   /// Return true if this property either has storage or has an attached property
   /// wrapper that has storage.
   bool hasStorageOrWrapsStorage() const;
-
-  /// Visit all auxiliary declarations to this VarDecl.
-  ///
-  /// An auxiliary declaration is a declaration synthesized by the compiler to support
-  /// this VarDecl, such as synthesized property wrapper variables.
-  ///
-  /// \note this function only visits auxiliary decls that are not part of the AST.
-  void visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)>) const;
-
-  /// Retrieve the backing storage property for a lazy property.
-  VarDecl *getLazyStorageProperty() const;
 
   /// Whether the memberwise initializer parameter for a property with a
   /// property wrapper type uses the wrapped type. This will occur, for example,
