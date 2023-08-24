@@ -32,6 +32,11 @@ enum HasUnavailableCases: Hashable {
   case unavailablePayload(UnavailableStruct)
 }
 
+enum AllUnavailableCases: Hashable {
+  @available(*, unavailable)
+  case nope
+}
+
 var EnumSynthesisTests = TestSuite("EnumSynthesis")
 
 EnumSynthesisTests.test("BasicEquatability/Hashability") {
