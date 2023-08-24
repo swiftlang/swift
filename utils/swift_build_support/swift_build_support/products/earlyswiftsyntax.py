@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import sys
+
 from . import cmake_product
 from .. import toolchain
 
@@ -32,6 +34,11 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         return True
 
     def should_build(self, host_target):
+        # Temporarily disable for non-darwin since this build never works
+        # outside of that case currently.
+        if sys.platform != 'darwin':
+            return False
+
         if self.args.build_early_swiftsyntax:
             if toolchain.host_toolchain().find_tool("swift") is None:
                 warn_msg = 'Host toolchain could not locate a '\
