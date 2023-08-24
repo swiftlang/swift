@@ -985,14 +985,14 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
 
-// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
-BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "", Special)
+// autoDiffCreateLinearMapContextWithType: (T.Type) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContextWithType, "autoDiffCreateLinearMapContextWithType", "", Special)
 
 // autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
 
-// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
-BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
+// autoDiffAllocateSubcontextWithType: (Builtin.NativeObject, T.Type) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontextWithType, "autoDiffAllocateSubcontextWithType", "", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" serial executor
 /// reference.

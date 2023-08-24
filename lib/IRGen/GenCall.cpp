@@ -5483,11 +5483,13 @@ IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
   return fnPtr;
 }
 
-Address irgen::emitAutoDiffCreateLinearMapContext(
-    IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize) {
+Address irgen::emitAutoDiffCreateLinearMapContextWithType(
+    IRGenFunction &IGF, llvm::Value *topLevelSubcontextMetatype) {
+  topLevelSubcontextMetatype = IGF.Builder.CreateBitCast(
+      topLevelSubcontextMetatype, IGF.IGM.TypeMetadataPtrTy);
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getAutoDiffCreateLinearMapContextFunctionPointer(),
-      {topLevelSubcontextSize});
+      IGF.IGM.getAutoDiffCreateLinearMapContextWithTypeFunctionPointer(),
+      {topLevelSubcontextMetatype});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   return Address(call, IGF.IGM.RefCountedStructTy,
@@ -5504,11 +5506,13 @@ Address irgen::emitAutoDiffProjectTopLevelSubcontext(
   return Address(call, IGF.IGM.Int8Ty, IGF.IGM.getPointerAlignment());
 }
 
-Address irgen::emitAutoDiffAllocateSubcontext(
-    IRGenFunction &IGF, Address context, llvm::Value *size) {
+Address irgen::emitAutoDiffAllocateSubcontextWithType(
+    IRGenFunction &IGF, Address context, llvm::Value *subcontextMetatype) {
+  subcontextMetatype =
+      IGF.Builder.CreateBitCast(subcontextMetatype, IGF.IGM.TypeMetadataPtrTy);
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getAutoDiffAllocateSubcontextFunctionPointer(),
-      {context.getAddress(), size});
+      IGF.IGM.getAutoDiffAllocateSubcontextWithTypeFunctionPointer(),
+      {context.getAddress(), subcontextMetatype});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   return Address(call, IGF.IGM.Int8Ty, IGF.IGM.getPointerAlignment());

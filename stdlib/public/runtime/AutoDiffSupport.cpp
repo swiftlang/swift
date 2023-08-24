@@ -13,7 +13,7 @@
 #include "AutoDiffSupport.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
-
+#include "llvm/ADT/SmallVector.h"
 #include <new>
 
 using namespace swift;
@@ -47,6 +47,13 @@ AutoDiffLinearMapContext::AutoDiffLinearMapContext()
     : HeapObject(&linearMapContextHeapMetadata) {
 }
 
+AutoDiffLinearMapContext::AutoDiffLinearMapContext(
+    const Metadata *topLevelLinearMapContextMetadata)
+    : HeapObject(&linearMapContextHeapMetadata) {
+  allocatedContextObjects.push_back(AllocatedContextObjectRecord{
+      topLevelLinearMapContextMetadata, projectTopLevelSubcontext()});
+}
+
 void *AutoDiffLinearMapContext::projectTopLevelSubcontext() const {
   auto offset = alignTo(
       sizeof(AutoDiffLinearMapContext), alignof(AutoDiffLinearMapContext));
@@ -56,6 +63,16 @@ void *AutoDiffLinearMapContext::projectTopLevelSubcontext() const {
 
 void *AutoDiffLinearMapContext::allocate(size_t size) {
   return allocator.Allocate(size, alignof(AutoDiffLinearMapContext));
+}
+
+void *AutoDiffLinearMapContext::allocateSubcontext(
+    const Metadata *contextObjectMetadata) {
+  auto size = contextObjectMetadata->vw_size();
+  auto align = contextObjectMetadata->vw_alignment();
+  auto *contextObjectPtr = allocator.Allocate(size, align);
+  allocatedContextObjects.push_back(
+      AllocatedContextObjectRecord{contextObjectMetadata, contextObjectPtr});
+  return contextObjectPtr;
 }
 
 AutoDiffLinearMapContext *swift::swift_autoDiffCreateLinearMapContext(
@@ -68,11 +85,31 @@ AutoDiffLinearMapContext *swift::swift_autoDiffCreateLinearMapContext(
 }
 
 void *swift::swift_autoDiffProjectTopLevelSubcontext(
-    AutoDiffLinearMapContext *allocator) {
-  return allocator->projectTopLevelSubcontext();
+    AutoDiffLinearMapContext *linearMapContext) {
+  return static_cast<void *>(linearMapContext->projectTopLevelSubcontext());
 }
 
 void *swift::swift_autoDiffAllocateSubcontext(
     AutoDiffLinearMapContext *allocator, size_t size) {
   return allocator->allocate(size);
+}
+
+AutoDiffLinearMapContext *swift::swift_autoDiffCreateLinearMapContextWithType(
+    const Metadata *topLevelLinearMapContextMetadata) {
+  assert(topLevelLinearMapContextMetadata->getValueWitnesses() != nullptr);
+  auto topLevelLinearMapContextSize =
+      topLevelLinearMapContextMetadata->vw_size();
+  auto allocationSize = alignTo(sizeof(AutoDiffLinearMapContext),
+                                alignof(AutoDiffLinearMapContext)) +
+                        topLevelLinearMapContextSize;
+  auto *buffer = (AutoDiffLinearMapContext *)malloc(allocationSize);
+  return ::new (buffer)
+      AutoDiffLinearMapContext(topLevelLinearMapContextMetadata);
+}
+
+void *swift::swift_autoDiffAllocateSubcontextWithType(
+    AutoDiffLinearMapContext *linearMapContext,
+    const Metadata *linearMapSubcontextMetadata) {
+  assert(linearMapSubcontextMetadata->getValueWitnesses() != nullptr);
+  return linearMapContext->allocateSubcontext(linearMapSubcontextMetadata);
 }
