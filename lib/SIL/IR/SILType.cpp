@@ -1211,3 +1211,8 @@ SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
                                     boxTy->getSubstitutions());
   return SILType::getPrimitiveObjectType(newBoxType);
 }
+
+ProtocolConformanceRef
+SILType::conformsToProtocol(SILFunction *fn, ProtocolDecl *protocol) const {
+  return fn->getParentModule()->conformsToProtocol(getASTType(), protocol);
+}

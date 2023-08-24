@@ -2789,3 +2789,28 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
 
+Type Expr::findOriginalType() const {
+  auto *expr = this;
+  do {
+    expr = expr->getSemanticsProvidingExpr();
+
+    if (auto inout = dyn_cast<InOutExpr>(expr)) {
+      expr = inout->getSubExpr();
+      continue;
+    }
+
+    if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
+      expr = ice->getSubExpr();
+      continue;
+    }
+
+    if (auto open = dyn_cast<OpenExistentialExpr>(expr)) {
+      expr = open->getSubExpr();
+      continue;
+    }
+
+    break;
+  } while (true);
+
+  return expr->getType()->getRValueType();
+}
