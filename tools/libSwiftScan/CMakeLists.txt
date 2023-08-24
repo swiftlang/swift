@@ -69,12 +69,6 @@ else()
     LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
     RUNTIME DESTINATION "bin" COMPONENT compiler)
 
-  swift_install_strip_builder_rpath(
-    TARGETS libSwiftScan
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
-    COMPONENT compiler
-  )
-
   # Create a symlink to previously-used path of 'lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}'
   # to the new location under 'lib/swift/host' for clients of the legacy path.
   if(EXISTS ${LLVM_CMAKE_DIR}/LLVMInstallSymlink.cmake)

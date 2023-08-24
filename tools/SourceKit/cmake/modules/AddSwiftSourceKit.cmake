@@ -303,14 +303,6 @@ macro(add_sourcekit_library name)
       DESTINATION "bin"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
 
-  if(SOURCEKITLIB_SHARED)
-    swift_install_strip_builder_rpath(
-      TARGETS ${name}
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-      COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
-    )
-  endif()
-
   swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
                              DESTINATION "include/SourceKit"
                              COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")

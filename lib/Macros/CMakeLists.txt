@@ -67,12 +67,6 @@ function(add_swift_macro_library name)
       DESTINATION "${destination_dir}"
       COMPONENT compiler)
 
-  swift_install_strip_builder_rpath(
-    TARGETS ${name}
-    DESTINATION "${destination_dir}"
-    COMPONENT compiler
-  )
-
   # Export this macro plugin target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_MACRO_PLUGINS ${name})
 endfunction()
