@@ -44,27 +44,38 @@
 // RUN:   %target-swift-frontend -cache-compile-job %s -emit-module -c -emit-dependencies \
 // RUN:   -emit-tbd -emit-tbd-path %t/test.tbd -o %t/test.o -allow-unstable-cache-key-for-testing | %FileCheck %s
 
+/// Test plugin CAS.
+// RUN: %cache-tool -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN:   -cas-plugin-option first-prefix=myfirst- -cache-tool-action print-output-keys -- \
+// RUN:   %target-swift-frontend -cache-compile-job %s -emit-module -c -emit-dependencies \
+// RUN:   -emit-tbd -emit-tbd-path %t/test.tbd -o %t/test.o -allow-unstable-cache-key-for-testing | %FileCheck %s --check-prefix=CHECK --check-prefix=PLUGIN
+
 // CHECK: test.o
 // CHECK-NEXT: "OutputKind": "object"
 // CHECK-NEXT: "Input"
 // CHECK-NEXT: "CacheKey"
+// PLUGIN-SAME: myfirst-llvmcas://
 
 // CHECK: test.swiftmodule
 // CHECK-NEXT: "OutputKind": "swiftmodule"
 // CHECK-NEXT: "Input"
 // CHECK-NEXT: "CacheKey"
+// PLUGIN-SAME: myfirst-llvmcas://
 
 // CHECK: test.d
 // CHECK-NEXT: "OutputKind": "dependencies"
 // CHECK-NEXT: "Input"
 // CHECK-NEXT: "CacheKey"
+// PLUGIN-SAME: myfirst-llvmcas://
 
 // CHECK: test.tbd
 // CHECK-NEXT: "OutputKind": "tbd"
 // CHECK-NEXT: "Input"
 // CHECK-NEXT: "CacheKey"
+// PLUGIN-SAME: myfirst-llvmcas://
 
 // CHECK: <cached-diagnostics>
 // CHECK-NEXT: "OutputKind": "cached-diagnostics"
 // CHECK-NEXT: "Input": "<cached-diagnostics>"
 // CHECK-NEXT: "CacheKey"
+// PLUGIN-SAME: myfirst-llvmcas://

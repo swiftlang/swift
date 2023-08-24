@@ -23,6 +23,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/ParseVersion.h"
+#include "clang/CAS/CASOptions.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/ObjectStore.h"
@@ -87,7 +88,7 @@ private:
   CompilerInvocation Invocation;
   PrintingDiagnosticConsumer PDC;
   std::string MainExecutablePath;
-  std::string CASPath;
+  clang::CASOptions CASOpts;
   std::vector<std::string> Inputs;
   std::vector<std::string> FrontendArgs;
   SwiftCacheToolAction ActionKind = SwiftCacheToolAction::Invalid;
@@ -124,8 +125,19 @@ public:
       return 0;
     }
 
-    CASPath =
-        ParsedArgs.getLastArgValue(OPT_cas_path, getDefaultOnDiskCASPath());
+    if (const Arg* PluginPath = ParsedArgs.getLastArg(OPT_cas_plugin_path))
+      CASOpts.PluginPath = PluginPath->getValue();
+    if (const Arg* OnDiskPath = ParsedArgs.getLastArg(OPT_cas_path))
+      CASOpts.CASPath = OnDiskPath->getValue();
+    for (StringRef Opt : ParsedArgs.getAllArgValues(OPT_cas_plugin_option)) {
+      StringRef Name, Value;
+      std::tie(Name, Value) = Opt.split('=');
+      CASOpts.PluginOptions.emplace_back(std::string(Name), std::string(Value));
+    }
+
+    // Fallback to default path if not set.
+    if (CASOpts.CASPath.empty() && CASOpts.PluginPath.empty())
+      CASOpts.CASPath = getDefaultOnDiskCASPath();
 
     Inputs = ParsedArgs.getAllArgValues(OPT_INPUT);
     FrontendArgs = ParsedArgs.getAllArgValues(OPT__DASH_DASH);
@@ -186,8 +198,20 @@ private:
 
     // Make sure CASPath is the same between invocation and cache-tool by
     // appending the cas-path since the option doesn't affect cache key.
-    Args.emplace_back("-cas-path");
-    Args.emplace_back(CASPath.c_str());
+    if (!CASOpts.CASPath.empty()) {
+      Args.emplace_back("-cas-path");
+      Args.emplace_back(CASOpts.CASPath.c_str());
+    }
+    if (!CASOpts.PluginPath.empty()) {
+      Args.emplace_back("-cas-plugin-path");
+      Args.emplace_back(CASOpts.PluginPath.c_str());
+    }
+    std::vector<std::string> PluginJoinedOpts;
+    for (const auto& Opt: CASOpts.PluginOptions) {
+      PluginJoinedOpts.emplace_back(Opt.first + "=" + Opt.second);
+      Args.emplace_back("-cas-plugin-option");
+      Args.emplace_back(PluginJoinedOpts.back().c_str());
+    }
 
     if (Invocation.parseArgs(Args, Instance.getDiags(),
                              &configurationFileBuffers, workingDirectory,
@@ -336,7 +360,7 @@ readOutputEntriesFromFile(StringRef Path) {
 }
 
 int SwiftCacheToolInvocation::validateOutputs() {
-  auto DB = llvm::cas::createOnDiskUnifiedCASDatabases(CASPath);
+  auto DB = CASOpts.getOrCreateDatabases();
   if (!DB)
     report_fatal_error(DB.takeError());
 
