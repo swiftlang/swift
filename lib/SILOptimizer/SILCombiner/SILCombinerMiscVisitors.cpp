@@ -371,6 +371,18 @@ public:
     // anything other than the init_existential_addr/open_existential_addr
     // container.
 
+    // There is no interesting scenario where a non-copyable type should have
+    // its allocation eliminated. A destroy_addr cannot be removed because it
+    // may run the struct-deinit, and the lifetime cannot be shortened. A
+    // copy_addr [take] [init] cannot be replaced by a destroy_addr because the
+    // destination may hold a 'discard'ed value, which is never destroyed. This
+    // analysis assumes memory is deinitialized on all paths, which is not the
+    // case for discarded values. Eventually copyable types may also be
+    // discarded; to support that, we will leave a drop_deinit_addr in place.
+    if (ASI->getType().isPureMoveOnly()) {
+      LegalUsers = false;
+      return;
+    }
     for (auto *Op : getNonDebugUses(ASI)) {
       visit(Op->getUser());
 

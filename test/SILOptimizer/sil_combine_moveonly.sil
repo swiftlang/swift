@@ -24,6 +24,12 @@ enum MaybeFileDescriptor: ~Copyable {
   deinit
 }
 
+struct Wrapper<T>: ~Copyable {
+  var t: T
+}
+
+sil @getWrappedValue : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> @out T
+
 // Test that a release_value is not removed for a struct-with-deinit.
 // Doing so would forget the deinit.
 //
@@ -68,6 +74,23 @@ bb0:
   %0 = enum $MaybeFileDescriptor, #MaybeFileDescriptor.nothing!enumelt // users: %2, %1
   debug_value %0 : $MaybeFileDescriptor, var, name "maybe" // id: %1
   release_value %0 : $MaybeFileDescriptor
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Test that a move into a discarded value does not result in a destroy_addr
+//
+// CHECK-LABEL: sil @testNoDeinit : $@convention(method) <T> (@in Wrapper<T>) -> @out T {
+// CHECK-NOT: destroy_addr
+// CHECK-LABEL: } // end sil function 'testNoDeinit'
+sil @testNoDeinit : $@convention(method) <T> (@in Wrapper<T>) -> @out T {
+bb0(%0 : $*T, %1 : $*Wrapper<T>):
+  %2 = function_ref @getWrappedValue : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> @out T
+  %3 = apply %2<T>(%0, %1) : $@convention(thin) <τ_0_0> (@in_guaranteed Wrapper<τ_0_0>) -> @out τ_0_0 
+  %4 = alloc_stack $Wrapper<T>
+  copy_addr [take] %1 to [init] %4 : $*Wrapper<T>
+  // discard
+  dealloc_stack %4 : $*Wrapper<T>
   %9 = tuple ()
   return %9 : $()
 }
