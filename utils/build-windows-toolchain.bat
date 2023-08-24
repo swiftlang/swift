@@ -966,6 +966,11 @@ move %PackageRoot%\online\Release\amd64\*.cab %BuildRoot%\artifacts\online\ || (
 move %PackageRoot%\online\Release\amd64\*.exe %BuildRoot%\artifacts\online\ || (exit /b)
 move %PackageRoot%\online\Release\amd64\*.msi %BuildRoot%\artifacts\online\ || (exit /b)
 
+:: Workaround for lack of control over Jenkins ...
+for /F "tokens=*" %%F in ('dir /b %BuildRoot%\artifacts\offline\*') DO (
+  copy %F %BuildRoot%\artifacts\ || (exit /b)
+)
+
 goto :eof
 endlocal
 
