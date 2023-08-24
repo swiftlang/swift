@@ -160,7 +160,7 @@ public:
     RefCounting op;
     op.kind = RefCountingKind::SinglePayloadEnumFN;
     op.singlePayloadEnumFN.tagFn = tagFn;
-    op.singlePayloadEnumSimple.extraTagByteCount = extraTagByteCount;
+    op.singlePayloadEnumFN.extraTagByteCount = extraTagByteCount;
     op.singlePayloadEnumFN.payload = payload;
     refCountings.push_back(op);
   }
