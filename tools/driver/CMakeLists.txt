@@ -26,6 +26,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     HAS_SWIFT_MODULES
     BOOTSTRAPPING 0
     THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
+    REQUIRED_FOR_MINIMAL_COMPILER
   )
   target_link_libraries(swift-frontend-bootstrapping0
                         PRIVATE
@@ -47,6 +48,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     HAS_SWIFT_MODULES
     BOOTSTRAPPING 1
     THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
+    REQUIRED_FOR_MINIMAL_COMPILER
   )
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
@@ -65,6 +67,7 @@ add_swift_host_tool(swift-frontend
   driver.cpp
   SWIFT_COMPONENT compiler
   HAS_SWIFT_MODULES
+  REQUIRED_FOR_MINIMAL_COMPILER
 )
 target_link_libraries(swift-frontend
                       PUBLIC

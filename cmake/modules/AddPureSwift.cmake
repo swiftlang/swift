@@ -80,8 +80,7 @@ function(_set_pure_swift_link_flags name relpath_to_lib_dir)
       APPEND PROPERTY INSTALL_RPATH
         # At runtime, use swiftCore in the current toolchain.
         "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
-        # But before building the stdlib with the tool, use the builder libs. This should be removed in install time.
-        "${host_lib_dir}")
+    )
 
   endif()
 endfunction()
