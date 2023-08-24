@@ -677,7 +677,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           // Otherwise, just return it, copying if needed.
           if (forceCopy && !lowering.isTrivial()) {
             auto result = B.emitCopyValueOperation(loc, entryValue);
-            // enterDestroyCleanup(result);
             return result;
           }
           return entryValue;
