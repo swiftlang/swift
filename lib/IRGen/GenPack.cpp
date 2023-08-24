@@ -388,7 +388,7 @@ static llvm::Value *emitPackExpansionElementMetadata(
 /// dynamicLength) produced by the provided function \p elementForIndex into
 /// the indicated buffer \p pack.
 static void emitPackExpansionPack(
-    IRGenFunction &IGF, Address pack, CanPackExpansionType expansionTy,
+    IRGenFunction &IGF, Address pack,
     llvm::Value *dynamicIndex, llvm::Value *dynamicLength,
     function_ref<llvm::Value *(llvm::Value *)> elementForIndex) {
   auto *prev = IGF.Builder.GetInsertBlock();
@@ -442,7 +442,7 @@ static void emitPackExpansionMetadataPack(IRGenFunction &IGF, Address pack,
                                           llvm::Value *dynamicLength,
                                           DynamicMetadataRequest request) {
   emitPackExpansionPack(
-      IGF, pack, expansionTy, dynamicIndex, dynamicLength, [&](auto *index) {
+      IGF, pack, dynamicIndex, dynamicLength, [&](auto *index) {
         auto context =
             OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
         auto patternTy = expansionTy.getPatternType();
@@ -587,7 +587,7 @@ static void emitPackExpansionWitnessTablePack(
     ProtocolConformanceRef conformance, llvm::Value *dynamicIndex,
     llvm::Value *dynamicLength) {
   emitPackExpansionPack(
-      IGF, pack, expansionTy, dynamicIndex, dynamicLength, [&](auto *index) {
+      IGF, pack, dynamicIndex, dynamicLength, [&](auto *index) {
         llvm::Value *_metadata = nullptr;
         auto context =
             OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
@@ -1379,8 +1379,8 @@ irgen::emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
 
     // If we're looking at a pack expansion, insert the appropriate
     // number of flags fields.
-    if (auto expansionTy = dyn_cast<PackExpansionType>(eltTy)) {
-      emitPackExpansionPack(IGF, array.getAddress(), expansionTy,
+    if (isa<PackExpansionType>(eltTy)) {
+      emitPackExpansionPack(IGF, array.getAddress(),
                             dynamicIndex, dynamicLength,
                             [&](llvm::Value *) -> llvm::Value * {
                               return flagsVal;
