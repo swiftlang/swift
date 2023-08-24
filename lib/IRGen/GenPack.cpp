@@ -1409,3 +1409,46 @@ irgen::emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
 
   return array;
 }
+
+std::pair<StackAddress, llvm::Value *>
+irgen::emitInducedTupleTypeMetadataPack(
+    IRGenFunction &IGF, llvm::Value *tupleMetadata) {
+  auto *shape = emitTupleTypeMetadataLength(IGF, tupleMetadata);
+
+  auto pack = IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
+                                    IGF.IGM.getPointerAlignment(),
+                                    /*allowTaskAlloc=*/true);
+  auto elementForIndex =
+    [&](llvm::Value *index) -> llvm::Value * {
+      return irgen::emitTupleTypeMetadataElementType(IGF, tupleMetadata, index);
+    };
+
+  auto *index = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+  emitPackExpansionPack(IGF, pack.getAddress(), index, shape,
+                        elementForIndex);
+
+  IGF.recordStackPackMetadataAlloc(pack, shape);
+
+  return {pack, shape};
+}
+
+MetadataResponse
+irgen::emitInducedTupleTypeMetadataPackRef(
+    IRGenFunction &IGF, CanPackType packType,
+    llvm::Value *tupleMetadata) {
+  StackAddress pack;
+  llvm::Value *shape;
+  std::tie(pack, shape) = emitInducedTupleTypeMetadataPack(
+      IGF, tupleMetadata);
+
+  auto *metadata = pack.getAddress().getAddress();
+
+  if (!IGF.canStackPromotePackMetadata()) {
+    metadata = IGF.Builder.CreateCall(
+        IGF.IGM.getAllocateMetadataPackFunctionPointer(), {metadata, shape});
+
+    cleanupTypeMetadataPack(IGF, pack, shape);
+  }
+
+  return MetadataResponse::forComplete(metadata);
+}

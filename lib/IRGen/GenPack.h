@@ -126,6 +126,15 @@ emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
                                   CanPackType packType,
                                   llvm::Value *shapeExpression);
 
+std::pair<StackAddress, llvm::Value *>
+emitInducedTupleTypeMetadataPack(
+    IRGenFunction &IGF, llvm::Value *tupleMetadata);
+
+MetadataResponse
+emitInducedTupleTypeMetadataPackRef(
+    IRGenFunction &IGF, CanPackType packType,
+    llvm::Value *tupleMetadata);
+
 } // end namespace irgen
 } // end namespace swift
 
