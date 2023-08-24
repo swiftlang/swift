@@ -94,6 +94,7 @@ struct NativeBox {
   static constexpr size_t isPOD = std::is_pod<T>::value;
   static constexpr bool isBitwiseTakable = isPOD;
   static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr bool hasLayoutString = false;
 
   static void destroy(T *value) {
     value->T::~T();
@@ -142,6 +143,7 @@ template <class Impl, class T> struct RetainableBoxBase {
 #else
   static constexpr bool isAtomic = true;
 #endif
+  static constexpr bool hasLayoutString = false;
 
   static void destroy(T *addr) {
     Impl::release(*addr);
@@ -254,6 +256,7 @@ struct WeakRetainableBoxBase {
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = false;
   static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr bool hasLayoutString = false;
 
   // The implementation must provide implementations of:
   //   static void destroy(T *);
@@ -776,6 +779,8 @@ struct ValueWitnesses
                        .withInlineStorage(Base::isInline && isBitwiseTakable)
                        .withPOD(isPOD)
                        .withBitwiseTakable(isBitwiseTakable);
+
+  static constexpr bool hasLayoutString = Box::hasLayoutString;
 
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value);

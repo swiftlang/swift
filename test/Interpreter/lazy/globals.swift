@@ -1,6 +1,9 @@
 // REQUIRES: OS=macosx
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
 
+// -enable-experimental-feature requires an asserts build
+// REQUIRES: asserts
+
 // Tests that piecewise compilation works with global variables
 
 let x = 1
