@@ -1,5 +1,4 @@
 // RUN: %empty-directory(%t)
-// RUN: echo TTTTTT %t
 // RUN: %sourcekitd-test -req=index-to-store %s -index-store-path %t/idx -index-unit-output-path %t/indexstore_multifile.o -- -c -module-name indexstoremodule -o args_output_path.o %s %S/Inputs/indexstore_multifile_other.swift
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck  --dump-input=always --dump-input-filter=all %s
 

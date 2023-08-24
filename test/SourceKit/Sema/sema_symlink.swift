@@ -1,6 +1,3 @@
-// We can't resolve symlinks on a substituted drive without risking MAX_PATH issues
-// REQUIRES: !windows_substituted_drive
-
 // RUN: %empty-directory(%t.dir)
 // RUN: echo "let foo: Int = goo" > %t.dir/real.swift
 // RUN: %{python} %S/../../Inputs/symlink.py %t.dir/real.swift %t.dir/linked.swift
@@ -8,3 +5,6 @@
 // RUN: %diff -u %s.response %t.link.response
 // RUN: %sourcekitd-test -req=sema %t.dir/real.swift -- %t.dir/linked.swift | %sed_clean > %t.real.response
 // RUN: %diff -u %s.response %t.real.response
+
+// We can't resolve symlinks on a substituted drive without risking MAX_PATH issues
+// REQUIRES: !windows_substituted_drive
