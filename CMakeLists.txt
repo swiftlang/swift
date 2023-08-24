@@ -953,6 +953,10 @@ if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
   else()
     set(SWIFT_SWIFT_PARSER TRUE)
     include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
+
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+      message(FATAL_ERROR "Only BOOTSTRAPPING=HOSTTOOLS is supported in Linux when Swift parser integration is enabled")
+    endif()
   endif()
 endif()
 
