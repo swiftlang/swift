@@ -1,3 +1,6 @@
+// We can't resolve symlinks on a substituted drive without risking MAX_PATH issues
+// REQUIRES: !windows_substituted_drive
+
 // RUN: %empty-directory(%t.dir)
 // RUN: echo "let foo: Int = goo" > %t.dir/real.swift
 // RUN: %{python} %S/../../Inputs/symlink.py %t.dir/real.swift %t.dir/linked.swift

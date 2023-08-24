@@ -27,6 +27,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -1555,8 +1556,7 @@ static SourceFile *retrieveInputFile(StringRef inputBufferName,
     // done that)
     if (haveRealPath)
       return nullptr;
-    std::string realPath =
-        SwiftLangSupport::resolvePathSymlinks(inputBufferName);
+    auto realPath = resolveSymbolicLinks(inputBufferName);
     return retrieveInputFile(realPath, CI, /*haveRealPath=*/true);
   }
 
@@ -2119,8 +2119,7 @@ void SwiftLangSupport::getCursorInfo(
   std::shared_ptr<llvm::MemoryBuffer> InputBuffer;
   if (InputBufferName.empty() && Length == 0) {
     std::string InputFileError;
-    llvm::SmallString<128> RealInputFilePath;
-    fileSystem->getRealPath(PrimaryFilePath, RealInputFilePath);
+    auto RealInputFilePath = resolveSymbolicLinks(PrimaryFilePath);
     InputBuffer =
         std::shared_ptr<llvm::MemoryBuffer>(getASTManager()->getMemoryBuffer(
             RealInputFilePath, fileSystem, InputFileError));

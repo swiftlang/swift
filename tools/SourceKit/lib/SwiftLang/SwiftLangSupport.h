@@ -516,10 +516,6 @@ public:
   printMemberDeclDescription(const swift::ValueDecl *VD, swift::Type baseTy,
                              bool usePlaceholder, llvm::raw_ostream &OS);
 
-  /// Tries to resolve the path to the real file-system path. If it fails it
-  /// returns the original path;
-  static std::string resolvePathSymlinks(StringRef FilePath);
-
   /// The result returned from \c performWithParamsToCompletionLikeOperation.
   struct CompletionLikeOperationParams {
     swift::CompilerInvocation &Invocation;

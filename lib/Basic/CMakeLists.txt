@@ -72,6 +72,7 @@ add_swift_host_library(swiftBasic STATIC
   StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
+  SymbolicLinks.cpp
   TargetInfo.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp

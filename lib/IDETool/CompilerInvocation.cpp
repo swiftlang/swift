@@ -12,6 +12,7 @@
 
 #include "swift/IDETool/CompilerInvocation.h"
 
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "clang/AST/DeclObjC.h"
@@ -83,18 +84,16 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     std::string &Error) {
   assert(FileSystem);
 
-  llvm::SmallString<128> PrimaryFile;
-  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
-    PrimaryFile = UnresolvedPrimaryFile;
+  llvm::SmallString<128> PrimaryFile = resolveSymbolicLinks(
+      UnresolvedPrimaryFile, FileSystem.get());
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    llvm::SmallString<128> newFilename;
-    if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
-      newFilename = input.getFileName();
+    auto newFilename = resolveSymbolicLinks(
+        input.getFileName(), FileSystem.get());
     llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);

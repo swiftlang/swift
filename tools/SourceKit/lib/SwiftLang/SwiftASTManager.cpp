@@ -22,6 +22,7 @@
 
 #include "swift/AST/PluginLoader.h"
 #include "swift/Basic/Cache.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -843,7 +844,7 @@ FileContent SwiftASTManager::Implementation::getFileContent(
     StringRef UnresolvedPath, bool IsPrimary,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) const {
-  std::string FilePath = SwiftLangSupport::resolvePathSymlinks(UnresolvedPath);
+  auto FilePath = resolveSymbolicLinks(UnresolvedPath);
   if (auto EditorDoc = EditorDocs->findByPath(FilePath, /*IsRealpath=*/true))
     return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), IsPrimary,
                                   FilePath);

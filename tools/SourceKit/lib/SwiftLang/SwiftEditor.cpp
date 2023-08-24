@@ -30,6 +30,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -308,7 +309,7 @@ SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
 
   std::string Scratch;
   if (!IsRealpath) {
-    Scratch = SwiftLangSupport::resolvePathSymlinks(FilePath);
+    Scratch = resolveSymbolicLinks(FilePath).str().str();
     FilePath = Scratch;
   }
   Queue.dispatchSync([&]{
@@ -330,12 +331,12 @@ bool SwiftEditorDocumentFileMap::getOrUpdate(
 
   bool found = false;
 
-  std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(FilePath);
+  auto ResolvedPath = resolveSymbolicLinks(FilePath);
   Queue.dispatchBarrierSync([&]{
     DocInfo &Doc = Docs[FilePath];
     if (!Doc.DocRef) {
       Doc.DocRef = EditorDoc;
-      Doc.ResolvedPath = ResolvedPath;
+      Doc.ResolvedPath = ResolvedPath.str();
     } else {
       EditorDoc = Doc.DocRef;
       found = true;

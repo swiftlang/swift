@@ -14,6 +14,7 @@
 
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -2081,10 +2082,7 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                       return ResponseSymbolInfo::read(Entry);
                                     });
 
-  std::string Filename = FilenameIn.str();
-  llvm::SmallString<256> output;
-  if (!llvm::sys::fs::real_path(Filename, output))
-    Filename = std::string(output.str());
+  std::string Filename = swift::resolveSymbolicLinks(FilenameIn.str()).str().str();
 
   SymbolInfo.print(OS, Filename, VFSFiles);
   OS << "ACTIONS BEGIN\n";
