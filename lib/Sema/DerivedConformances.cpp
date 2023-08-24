@@ -946,6 +946,7 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
         TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
         DeclNameRef(elt->getBaseIdentifier()), elt, nullptr, /*DC*/ parentDC);
     eltPattern->setImplicit();
+    eltPattern->setType(enumType);
     return eltPattern;
   };
 
