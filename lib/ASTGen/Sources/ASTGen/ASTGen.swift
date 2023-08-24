@@ -135,6 +135,19 @@ extension ASTGenVisitor {
   }
 }
 
+// Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
+// 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
+extension ASTGenVisitor {
+  @inline(__always)
+  func visit(_ node: GenericParameterClauseSyntax?) -> ASTNode? {
+    guard let node else {
+      return nil
+    }
+
+    return self.visit(node)
+  }
+}
+
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(

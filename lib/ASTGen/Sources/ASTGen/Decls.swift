@@ -9,9 +9,8 @@ extension ASTGenVisitor {
     let aliasLoc = bridgedSourceLoc(for: node.typealiasKeyword)
     let equalLoc = bridgedSourceLoc(for: node.initializer.equal)
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
-    let genericParams = node.genericParameterClause.map { self.visit($0).rawValue }
     let out = TypeAliasDecl_create(
-      self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, genericParams)
+      self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, self.visit(node.genericParameterClause)?.rawValue)
 
     let oldDeclContext = declContext
     declContext = out.declContext
@@ -27,9 +26,7 @@ extension ASTGenVisitor {
     let loc = bridgedSourceLoc(for: node)
     let name = node.name.bridgedIdentifier(in: self)
 
-    let genericParams = node.genericParameterClause
-      .map { self.visit($0).rawValue }
-    let out = StructDecl_create(ctx, loc, name, loc, genericParams, declContext)
+    let out = StructDecl_create(ctx, loc, name, loc, self.visit(node.genericParameterClause)?.rawValue, declContext)
     let oldDeclContext = declContext
     declContext = out.declContext
     defer { declContext = oldDeclContext }
