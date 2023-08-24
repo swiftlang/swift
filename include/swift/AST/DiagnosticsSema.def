@@ -2694,9 +2694,9 @@ NOTE(inherited_protocol_does_not_conform,none,
 NOTE(no_witnesses,none,
      "protocol requires "
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
-     "%select{|; do you want to add a stub?}3",
+     "%select{|; add a stub for conformance}3",
      (RequirementKind, const ValueDecl *, Type, bool))
-NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
+NOTE(missing_witnesses_general,none, "add stubs for conformance",
      ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
@@ -2709,7 +2709,7 @@ NOTE(ambiguous_witnesses_wrong_name,none,
      "subscript operators}0 with type %2",
      (RequirementKind, const ValueDecl *, Type))
 NOTE(no_witnesses_type,none,
-     "protocol requires nested type %0; do you want to add it?",
+     "protocol requires nested type %0; add nested type %0 for conformance",
      (const AssociatedTypeDecl *))
 NOTE(default_associated_type_req_fail,none,
      "default type %0 for associated type %1 (from protocol %2) "
@@ -5248,6 +5248,15 @@ NOTE(actor_mutable_state,none,
 WARNING(shared_mutable_state_access,none,
         "reference to %kind0 is not concurrency-safe because it involves "
         "shared mutable state", (const ValueDecl *))
+WARNING(shared_mutable_state_decl,none,
+        "%kind0 is not concurrency-safe because it is non-isolated global "
+        "shared mutable state", (const ValueDecl *))
+NOTE(shared_mutable_state_decl_note,none,
+     "isolate %0 to a global actor, or convert it to a 'let' constant and "
+     "conform it to 'Sendable'", (const ValueDecl *))
+WARNING(shared_immutable_state_decl,none,
+        "%kind0 is not concurrency-safe because it is not either conforming to "
+        "'Sendable' or isolated to a global actor", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
      "requirement",
@@ -6648,16 +6657,15 @@ WARNING(debug_long_expression, none,
 
 ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' "
-      "block; do you want to add a default case?",())
+      "block; add a default case",())
 ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
 ERROR(possibly_non_exhaustive_switch,none,
       "the compiler is unable to check that this switch is exhaustive in reasonable time",
       ())
 
 NOTE(missing_several_cases,none,
-     "do you want to add "
-     "%select{missing cases|a default clause}0"
-     "?", (bool))
+     "add "
+     "%select{missing cases|a default clause}0", (bool))
 NOTE(missing_unknown_case,none,
      "handle unknown values using \"@unknown default\"", ())
 
@@ -7282,6 +7290,9 @@ ERROR(macro_expand_circular_reference_unnamed, none,
 NOTE(macro_expand_circular_reference_unnamed_through, none,
      "circular reference expanding %0 macros", (StringRef))
 
+ERROR(accessor_macro_not_single_var, none,
+      "accessor macro %0 can only apply to a single variable", (DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
@@ -7389,12 +7400,6 @@ ERROR(init_accessor_can_refer_only_to_properties,none,
       " to stored properties",
       (DescriptiveDeclKind, DeclNameRef))
 
-ERROR(init_accessor_initializes_attribute_on_other_declaration,none,
-      "initalizes(...) attribute could only be used with init accessors",
-      ())
-ERROR(init_accessor_accesses_attribute_on_other_declaration,none,
-      "accesses(...) attribute could only be used with init accessors",
-      ())
 ERROR(storage_restrictions_attribute_not_on_init_accessor,none,
       "@storageRestrictions attribute could only be used with init accessors",
       ())

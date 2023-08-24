@@ -294,8 +294,6 @@ public:
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
-  void visitInitializesAttr(InitializesAttr *attr);
-  void visitAccessesAttr(AccessesAttr *attr);
   void visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
@@ -3369,6 +3367,13 @@ ResolveRawLayoutLikeTypeRequest::evaluate(Evaluator &evaluator,
                                           StructDecl *sd,
                                           RawLayoutAttr *attr) const {
   assert(attr->LikeType);
+
+  // If the attribute has a fixed type representation, then it was likely
+  // deserialized and the type has already been computed.
+  if (auto fixedTy = dyn_cast<FixedTypeRepr>(attr->LikeType)) {
+    return fixedTy->getType();
+  }
+
   // Resolve the like type in the struct's context.
   return TypeResolution::resolveContextualType(
         attr->LikeType, sd, llvm::None,
@@ -3564,44 +3569,6 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
   assert(isa<ProtocolDecl>(D));
   // Invoke the request.
   (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
-}
-
-void AttributeChecker::visitInitializesAttr(InitializesAttr *attr) {
-  auto *accessor = dyn_cast<AccessorDecl>(D);
-  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
-    diagnose(attr->getLocation(),
-             diag::init_accessor_initializes_attribute_on_other_declaration);
-    return;
-  }
-
-  (void)attr->getPropertyDecls(accessor);
-}
-
-void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
-  auto *accessor = dyn_cast<AccessorDecl>(D);
-  if (!accessor || accessor->getAccessorKind() != AccessorKind::Init) {
-    diagnose(attr->getLocation(),
-             diag::init_accessor_accesses_attribute_on_other_declaration);
-    return;
-  }
-
-  // Check whether there are any intersections between initializes(...) and
-  // accesses(...) attributes.
-
-  llvm::Optional<ArrayRef<VarDecl *>> initializedProperties;
-  if (auto *initAttr = D->getAttrs().getAttribute<InitializesAttr>()) {
-    initializedProperties.emplace(initAttr->getPropertyDecls(accessor));
-  }
-
-  if (initializedProperties) {
-    for (auto *property : attr->getPropertyDecls(accessor)) {
-      if (llvm::is_contained(*initializedProperties, property)) {
-        diagnose(attr->getLocation(),
-                 diag::init_accessor_property_both_init_and_accessed,
-                 property->getName());
-      }
-    }
-  }
 }
 
 void AttributeChecker::visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr) {
@@ -4468,11 +4435,9 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // An enum element with an associated value cannot be potentially
     // unavailable.
     if (EED->hasAssociatedValues()) {
-      auto &ctx = DC->getASTContext();
       auto *SF = DC->getParentSourceFile();
 
-      if (SF->Kind == SourceFileKind::Interface ||
-          ctx.LangOpts.WarnOnPotentiallyUnavailableEnumCase) {
+      if (SF->Kind == SourceFileKind::Interface) {
         return diag::availability_enum_element_no_potential_warn;
       } else {
         return diag::availability_enum_element_no_potential;

@@ -86,7 +86,7 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF,
   if (isOwned) {
     return SGF.emitManagedRValueWithCleanup(value);
   } else {
-    return ManagedValue::forUnmanaged(value);
+    return ManagedValue::forBorrowedRValue(value);
   }
 }
 
@@ -1272,7 +1272,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // method.
     if (NeedsBoxForSelf) {
       ManagedValue storedSelf =
-          ManagedValue::forUnmanaged(VarLocs[selfDecl].value);
+          ManagedValue::forBorrowedAddressRValue(VarLocs[selfDecl].value);
       selfArg = B.createLoadCopy(cleanupLoc, storedSelf);
     } else {
       // We have to do a retain because we are returning the pointer +1.
@@ -1504,7 +1504,7 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
                           SILAccessEnforcement::Unknown,
                           /*noNestedConflict=*/false,
                           /*fromBuiltin=*/false);
-    selfRef = ManagedValue::forUnmanaged(accessToSelf);
+    selfRef = ManagedValue::forBorrowedAddressRValue(accessToSelf);
   }
 
   emitAssignOrInit(loc, selfRef, var,

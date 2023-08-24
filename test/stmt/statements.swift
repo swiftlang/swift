@@ -302,7 +302,7 @@ func breakContinue(_ x : Int) -> Int {
 Outer:
   for _ in 0...1000 {
 
-  Switch: // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+  Switch: // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
   switch x {
     case 42: break Outer
     case 97: continue Outer

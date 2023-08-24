@@ -293,22 +293,7 @@ StringTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible(comparisonTests.map { $0.rhs })
 }
 
-// Mark the test cases that are expected to fail in checkHasPrefixHasSuffix
-
-let substringTests = tests.map {
-  (test: ComparisonTest) -> ComparisonTest in
-  switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
-
-  case (.gt, "\r\n", "\n"):
-    return test.replacingPredicate(.objCRuntime(
-      "blocked on rdar://problem/19036555"))
-
-  default:
-    return test
-  }
-}
-
-for test in substringTests {
+for test in tests {
   StringTests.test("hasPrefix,hasSuffix: line \(test.loc.line)")
     .skip(.nativeRuntime(
         "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
@@ -530,6 +515,17 @@ StringTests.test("_isIdentical(to:)") {
   expectFalse(f._isIdentical(to: g)) // Two large, distinct native strings
   expectTrue(f._isIdentical(to: f))
   expectTrue(g._isIdentical(to: g))
+}
+
+StringTests.test("hasPrefix/hasSuffix vs Character boundaries") {
+  // https://github.com/apple/swift/issues/67427
+  let s1 = "\r\n"
+  let s2 = "\r\n" + "cafe" + "\r\n"
+
+  expectFalse(s1.hasPrefix("\r"))
+  expectFalse(s1.hasSuffix("\n"))
+  expectFalse(s2.hasPrefix("\r"))
+  expectFalse(s2.hasSuffix("\n"))
 }
 
 runAllTests()

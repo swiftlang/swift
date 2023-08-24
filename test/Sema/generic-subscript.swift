@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P {
-  subscript<Value>(x: Value) -> Int { // expected-note {{protocol requires subscript with type '<Value> (Value) -> Int'; do you want to add a stub?}}
+  subscript<Value>(x: Value) -> Int { // expected-note {{protocol requires subscript with type '<Value> (Value) -> Int'; add a stub for conformance}}
     get
   }
 }

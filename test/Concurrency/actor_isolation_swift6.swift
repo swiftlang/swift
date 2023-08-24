@@ -60,6 +60,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
+  // expected-warning@-1 {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon

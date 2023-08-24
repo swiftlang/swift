@@ -59,7 +59,7 @@ public:
 };
 
 void printDeclDescription(llvm::raw_ostream &out, const Decl *D,
-                          const ASTContext &Context, bool addNewline = true);
+                          bool addNewline = true);
 
 /// PrettyStackTraceDecl - Observe that we are processing a specific
 /// declaration.

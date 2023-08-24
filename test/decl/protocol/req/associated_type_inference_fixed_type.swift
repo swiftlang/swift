@@ -104,7 +104,7 @@ protocol P11a {
 }
 protocol P11b: P11a where A == Never {}
 protocol Q11 {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 do {
   struct Conformer: Q11, P11b {}
@@ -144,8 +144,8 @@ do {
 }
 
 protocol P15a {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B = Never // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B = Never // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol P15b: P15a where A == B {}
 do {
@@ -155,8 +155,8 @@ do {
 }
 
 protocol P16a where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B = Never // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B = Never // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol P16b: P16a {}
 do {
@@ -165,12 +165,12 @@ do {
 }
 
 protocol P17a where A == Never {
-  associatedtype A = B // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A = B // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol P17b {
-  associatedtype A = B // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A = B // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol P17c where A == Never {
   associatedtype A
@@ -206,9 +206,9 @@ do {
 }
 
 protocol P20 where A == B.Element, B == B.SubSequence, C.Element == B.Element {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
   associatedtype B: Collection
-  associatedtype C: Collection = Array<Character> // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype C: Collection = Array<Character> // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 }
 do {
   struct Conformer: P20 { // expected-error {{type 'Conformer' does not conform to protocol 'P20'}}
@@ -217,9 +217,9 @@ do {
 }
 
 protocol P21 where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B = C // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
-  associatedtype C // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B = C // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype C // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 }
 do {
   struct Conformer<C>: P21 {} // expected-error {{type 'Conformer<C>' does not conform to protocol 'P21'}}
@@ -236,8 +236,8 @@ do {
 }
 
 protocol P23 {
-  associatedtype A: P23 = B.A // expected-note 2 {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B: P23 = A.B // expected-note 2 {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A: P23 = B.A // expected-note 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B: P23 = A.B // expected-note 2 {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 do {
   struct Conformer: P23 {} // expected-error {{type 'Conformer' does not conform to protocol 'P23'}}
@@ -245,8 +245,8 @@ do {
 }
 
 protocol P24 where A == B.A {
-  associatedtype A: P24 // expected-note 2 {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B: P24 = A.B // expected-note 2 {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A: P24 // expected-note 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B: P24 = A.B // expected-note 2 {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 do {
   struct Conformer: P24 {} // expected-error {{type 'Conformer' does not conform to protocol 'P24'}}
@@ -275,15 +275,15 @@ do {
 }
 
 protocol P26 where C == B, F == G {
-  associatedtype A = Int // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B = A // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
-  associatedtype C // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype A = Int // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B = A // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype C // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 
-  associatedtype D // expected-note {{protocol requires nested type 'D'; do you want to add it?}}
-  associatedtype E = D // expected-note {{protocol requires nested type 'E'; do you want to add it?}}
+  associatedtype D // expected-note {{protocol requires nested type 'D'; add nested type 'D' for conformance}}
+  associatedtype E = D // expected-note {{protocol requires nested type 'E'; add nested type 'E' for conformance}}
 
-  associatedtype F // expected-note {{protocol requires nested type 'F'; do you want to add it?}}
-  associatedtype G = [B] // expected-note {{protocol requires nested type 'G'; do you want to add it?}}
+  associatedtype F // expected-note {{protocol requires nested type 'F'; add nested type 'F' for conformance}}
+  associatedtype G = [B] // expected-note {{protocol requires nested type 'G'; add nested type 'G' for conformance}}
 }
 do {
   struct Conformer<D>: P26 {} // expected-error {{type 'Conformer<D>' does not conform to protocol 'P26'}}
@@ -341,8 +341,8 @@ protocol P29b where B == Never {
   associatedtype B
 }
 protocol P29c where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol Q29a: P29a, P29b, P29c {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
@@ -368,8 +368,8 @@ protocol P30b where A == Never {
   associatedtype A
 }
 protocol P30c where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol Q30: P30c, P30a, P30b {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
@@ -387,8 +387,8 @@ protocol P31b where B == Never {
   associatedtype B
 }
 protocol P31c where B == A {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol Q31: P31c, P31a, P31b {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
@@ -412,8 +412,8 @@ protocol P32d where B == Never {
   associatedtype B
 }
 protocol P32e where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 protocol Q32: P32e, P32a, P32b, P32c, P32d {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == ()'}}
@@ -451,7 +451,7 @@ protocol P34b {
 protocol Q34a: P34a, P34b {}
 protocol Q34b: P34b, P34a {}
 protocol Q34c: P34a, P34b {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 do {
   struct Conformer1: Q34a {}
@@ -489,7 +489,7 @@ protocol P37a {
 }
 protocol P37b {
   associatedtype B : P37a
-  associatedtype C where C == B.A // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype C where C == B.A // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 }
 do {
   struct Conformer1<C>: P37b {
@@ -545,8 +545,8 @@ do {
 }
 
 protocol P41 {
-  associatedtype A where A == B.A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B: P41 = Self // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+  associatedtype A where A == B.A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B: P41 = Self // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
 }
 do {
   struct Conformer: P41 {} // expected-error{{type 'Conformer' does not conform to protocol 'P41'}}
@@ -567,7 +567,7 @@ protocol P43a {
   associatedtype B
 }
 protocol P43b: P43a {
-  associatedtype C where C == A.B // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype C where C == A.B // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 }
 do {
   struct Conformer<B: P43a>: P43b { // expected-error {{type 'Conformer<B>' does not conform to protocol 'P43b'}}
@@ -577,8 +577,8 @@ do {
 
 protocol P44 {
   associatedtype A: P44
-  associatedtype B // expected-note 2{{protocol requires nested type 'B'; do you want to add it?}}
-  associatedtype C where C == A.B // expected-note 3{{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype B // expected-note 2{{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype C where C == A.B // expected-note 3{{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 }
 do {
   struct Conformer1<T: P44>: P44 { // expected-error {{type 'Conformer1<T>' does not conform to protocol 'P44'}}
@@ -596,17 +596,17 @@ do {
 }
 
 protocol P45 {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
-  associatedtype B: P45 = Conformer45<D> // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
-  associatedtype C where C == B.A // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
-  associatedtype D = Never // expected-note {{protocol requires nested type 'D'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype B: P45 = Conformer45<D> // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype C where C == B.A // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
+  associatedtype D = Never // expected-note {{protocol requires nested type 'D'; add nested type 'D' for conformance}}
 }
 struct Conformer45<A>: P45 {} // expected-error {{type 'Conformer45<A>' does not conform to protocol 'P45'}}
 
 protocol P46 {
   associatedtype A: P46
-  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
-  associatedtype C where C == A.B // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype C where C == A.B // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
 
   func method(_: B)
 }

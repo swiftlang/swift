@@ -3,7 +3,7 @@
 // https://github.com/apple/swift/issues/49119
 
 protocol P {
-    associatedtype A: P // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+    associatedtype A: P // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 
 struct Type<Param> {}

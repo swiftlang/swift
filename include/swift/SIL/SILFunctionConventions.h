@@ -50,6 +50,10 @@ class SILModuleConventions {
   friend SILResultInfo;
   friend SILFunctionConventions;
 
+  static inline bool
+  isTypeIndirectForIndirectParamConvention(CanType paramTy,
+                                           bool loweredAddresses);
+
   static bool isIndirectSILParam(SILParameterInfo param,
                                  bool loweredAddresses);
 
@@ -96,6 +100,10 @@ public:
   SILModule &getModule() const { return *M; }
 
   bool useLoweredAddresses() const { return loweredAddresses; }
+
+  bool isTypeIndirectForIndirectParamConvention(CanType paramTy) {
+    return isTypeIndirectForIndirectParamConvention(paramTy, loweredAddresses);
+  }
 
   bool isSILIndirect(SILParameterInfo param) const {
     return isIndirectSILParam(param, loweredAddresses);
@@ -522,6 +530,12 @@ SILModuleConventions::getFunctionConventions(CanSILFunctionType funcTy) {
   return SILFunctionConventions(funcTy, *this);
 }
 
+inline bool SILModuleConventions::isTypeIndirectForIndirectParamConvention(
+    CanType paramTy, bool loweredAddresses) {
+  return (loweredAddresses || paramTy->isOpenedExistentialWithError() ||
+          paramTy->hasAnyPack());
+}
+
 inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
                                                      bool loweredAddresses) {
   switch (param.getConvention()) {
@@ -537,8 +551,8 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
 
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
-    return (loweredAddresses ||
-            param.getInterfaceType()->isOpenedExistentialWithError());
+    return isTypeIndirectForIndirectParamConvention(param.getInterfaceType(),
+                                                    loweredAddresses);
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return true;

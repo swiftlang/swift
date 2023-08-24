@@ -4080,8 +4080,8 @@ void IRGenModule::appendLLVMUsedConditionalEntry(
   auto *protocol = getAddrOfProtocolDescriptor(conformance->getProtocol())
                        ->stripPointerCasts();
   auto *type = getAddrOfTypeContextDescriptor(
-                   conformance->getType()->getAnyNominal(), DontRequireMetadata)
-                   ->stripPointerCasts();
+                   conformance->getDeclContext()->getSelfNominalTypeDecl(),
+                   DontRequireMetadata)->stripPointerCasts();
 
   llvm::Metadata *metadata[] = {
       // (1) which variable is being conditionalized, "target"

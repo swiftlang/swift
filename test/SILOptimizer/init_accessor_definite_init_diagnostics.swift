@@ -190,6 +190,17 @@ class TestInitWithGuard {
 }
 
 do {
+  struct TestPropertyInitWithUnreachableBlocks {
+    var _a: Int
+    var a: Int? {
+      @storageRestrictions(initializes: _a)
+      init { _a = newValue ?? 0 } // Ok
+      get { 42 }
+    }
+  }
+}
+
+do {
   class Base<T: Collection> {
     private var _v: T
 
@@ -265,6 +276,76 @@ do {
     init(otherAge: Int) {
       super.init()
       self.age = otherAge // Ok
+    }
+  }
+}
+
+// Test that init accessor without "initializes" is required
+do {
+  struct Test {
+    var a: Int {
+      init {}
+      get { 42 }
+      set {}
+    }
+    var b: Int { // expected-note 2 {{'self' not initialized}}
+      init {}
+      get { 0 }
+      set { }
+    }
+
+    init(a: Int) {
+      self.a = a
+    } // expected-error {{return from initializer without initializing all stored properties}}
+
+    init(a: Int, b: Int) {
+      if a == 0 {
+        self.a = a
+        self.b = b
+      } else {
+        self.a = 0
+      }
+    } // expected-error {{return from initializer without initializing all stored properties}}
+
+    init() { // Ok
+      self.a = 0
+      self.b = 0
+    }
+  }
+
+  struct TestWithStored {
+    var _value: Int = 0
+
+    var a: Int {
+      @storageRestrictions(accesses: _value)
+      init {}
+      get { _value }
+      set { _value = newValue }
+    }
+  }
+
+  _ = TestWithStored(a: 42) // Ok
+  _ = TestWithStored(_value: 1, a: 42) // Ok
+
+  class TestWithStoredExplicit {
+    var _value: Int = 0
+    var _other: String = ""
+
+    var a: Int { // expected-note 2 {{'self' not initialized}}
+      @storageRestrictions(accesses: _value)
+      init {}
+      get { _value }
+      set { _value = newValue }
+    }
+
+    init(data: Int) {
+      self._value = data
+    } // expected-error {{return from initializer without initializing all stored properties}}
+
+    init() {} // expected-error {{return from initializer without initializing all stored properties}}
+
+    init(a: Int) {
+      self.a = a // Ok
     }
   }
 }

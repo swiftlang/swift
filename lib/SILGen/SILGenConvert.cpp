@@ -262,7 +262,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     return ManagedValue::forLValue(result.forward(*this));
   }
 
-  return ManagedValue::forUnmanaged(result.forward(*this));
+  return ManagedValue::forBorrowedRValue(result.forward(*this));
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
@@ -959,7 +959,7 @@ SILGenFunction::emitOpenExistential(
       SILValue archetypeValue =
         B.createOpenExistentialAddr(loc, existentialValue.getValue(),
                                     loweredOpenedType, allowedAccess);
-      return ManagedValue::forUnmanaged(archetypeValue);
+      return ManagedValue::forBorrowedAddressRValue(archetypeValue);
     } else {
       // borrow the existential and return an unmanaged opened value.
       return B.createOpenExistentialValue(

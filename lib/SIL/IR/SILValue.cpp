@@ -287,13 +287,17 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   }
 
   switch (Convention) {
-  case SILArgumentConvention::Indirect_In:
-    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
-                                                    : OwnershipKind::Owned;
-    break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
-    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
-                                                    : OwnershipKind::Guaranteed;
+    value = moduleConventions.isTypeIndirectForIndirectParamConvention(
+                Type.getASTType())
+                ? OwnershipKind::None
+                : OwnershipKind::Guaranteed;
+    break;
+  case SILArgumentConvention::Indirect_In:
+    value = moduleConventions.isTypeIndirectForIndirectParamConvention(
+                Type.getASTType())
+                ? OwnershipKind::None
+                : OwnershipKind::Owned;
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:

@@ -1,7 +1,7 @@
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -Xcc -fmodule-map-file=%S/Inputs/custom-modules/module.map -Xcc -I%S/Inputs/custom-modules/header_subdirectory/ -I%S/Inputs/custom-modules/ -emit-objc-header-path %t/textual-imports.h -emit-clang-header-nonmodular-includes %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -Xcc -fmodule-map-file=%S/Inputs/custom-modules/module.modulemap -Xcc -I%S/Inputs/custom-modules/header_subdirectory/ -I%S/Inputs/custom-modules/ -emit-objc-header-path %t/textual-imports.h -emit-clang-header-nonmodular-includes %s
 // RUN: %FileCheck %s < %t/textual-imports.h
 
 // The module map does not lie in a provided include dir, but we should still include <header-regular.h> and NOT <header_subdirectory/header-regular.h> because

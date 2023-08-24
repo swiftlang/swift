@@ -323,7 +323,8 @@ public:
   CleanupHandle getInitializedCleanup() const { return Cleanup; }
 
   ManagedValue getManagedAddress() const  {
-    return ManagedValue(getAddress(), getInitializedCleanup());
+    return ManagedValue::forOwnedAddressRValue(getAddress(),
+                                               getInitializedCleanup());
   }
 };
 

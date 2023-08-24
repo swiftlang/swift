@@ -1024,8 +1024,17 @@ public:
         Options.TransformContext->isPrintingSynthesizedExtension() &&
         isa<ExtensionDecl>(D);
 
+    SWIFT_DEFER {
+      D->visitAuxiliaryDecls([&](Decl *auxDecl) {
+        visit(auxDecl);
+      });
+    };
+
     if (!shouldPrint(D, true) && !Synthesize)
       return false;
+
+    if (isa<MacroExpansionDecl>(D))
+      return true;
 
     Decl *Old = Current;
     Current = D;
@@ -3036,14 +3045,6 @@ static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
     }
   }
 
-  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-    for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
-      if (Type type = patternBinding->getPattern(idx)->getType())
-        if (typeMatches(type))
-          return true;
-    }
-  }
-
   return false;
 }
 
@@ -3496,6 +3497,8 @@ static bool usesFeatureParameterPacks(Decl *decl) {
 static bool usesFeatureSendNonSendable(Decl *decl) {
   return false;
 }
+
+static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
 
 static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;

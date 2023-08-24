@@ -134,7 +134,7 @@ public:
 
   /// The set of modules on which this module depends, resolved
   /// to Module IDs, qualified by module kind: Swift, Clang, etc.
-  std::vector<ModuleDependencyID> resolvedModuleDependencies;
+  std::vector<ModuleDependencyID> resolvedDirectModuleDependencies;
 
   /// The cache key for the produced module.
   std::string moduleCacheKey;
@@ -531,9 +531,9 @@ public:
   }
 
   /// Retreive the module-level dependencies.
-  const ArrayRef<ModuleDependencyID> getModuleDependencies() const {
+  const ArrayRef<ModuleDependencyID> getDirectModuleDependencies() const {
     assert(storage->resolved);
-    return storage->resolvedModuleDependencies;
+    return storage->resolvedDirectModuleDependencies;
   }
 
   std::string getModuleCacheKey() const {
@@ -546,10 +546,10 @@ public:
   }
 
   /// Resolve a dependency's set of `imports` with qualified Module IDs
-  void resolveDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
+  void resolveDirectDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
     assert(!storage->resolved && "Resolving an already-resolved dependency");
     storage->resolved = true;
-    storage->resolvedModuleDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
+    storage->resolvedDirectModuleDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
   }
 
   /// Set this module's set of Swift Overlay dependencies
@@ -564,6 +564,19 @@ public:
       llvm_unreachable("Unknown kind of dependency module info.");
     }
     textualModuleDetails->swiftOverlayDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
+  }
+
+  const ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
+    CommonSwiftTextualModuleDependencyDetails *textualModuleDetails = nullptr;
+    if (auto sourceDetailsStorage = dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
+      textualModuleDetails = &sourceDetailsStorage->textualModuleDetails;
+    else if (auto interfaceDetailsStorage = dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
+      textualModuleDetails = &interfaceDetailsStorage->textualModuleDetails;
+
+    if (textualModuleDetails)
+      return textualModuleDetails->swiftOverlayDependencies;
+    else
+      return {};
   }
 
   std::vector<std::string> getCommandline() const {
@@ -677,7 +690,6 @@ public:
     std::string ImportedModuleName = module.front().Item.str().str();
     auto submodulePath = module.getSubmodulePath();
     if (submodulePath.size() > 0 && !submodulePath[0].Item.empty()) {
-      assert(submodulePath.size() == 1 && "Unsupported Clang submodule import");
       auto submoduleComponent = submodulePath[0];
       // Special case: a submodule named "Foo.Private" can be moved to a top-level
       // module named "Foo_Private". ClangImporter has special support for this.

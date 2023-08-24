@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 802; // added tuple_pack_extract
+const uint16_t SWIFTMODULE_VERSION_MINOR = 803; // removed initializes and accesses attributes
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2232,16 +2232,6 @@ namespace decls_block {
       BCVBR<4>, // # of type erased parameters
       BCArray<IdentifierIDField> // target function pieces, spi groups, type erased params
       >;
-
-  using InitializesDeclAttrLayout = BCRecordLayout<
-      Initializes_DECL_ATTR,
-      BCArray<IdentifierIDField> // initialized properties
-  >;
-
-  using AccessesDeclAttrLayout = BCRecordLayout<
-      Accesses_DECL_ATTR,
-      BCArray<IdentifierIDField> // initialized properties
-  >;
 
   using StorageRestrictionsDeclAttrLayout = BCRecordLayout<
       StorageRestrictions_DECL_ATTR,

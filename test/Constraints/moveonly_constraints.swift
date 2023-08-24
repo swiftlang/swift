@@ -256,7 +256,7 @@ func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHasha
 // ensure that associated types can't be witnessed by move-only types
 
 protocol HasType<Ty> {
-  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'; do you want to add it?}}
+  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'; add nested type 'Ty' for conformance}}
 }
 
 class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}}

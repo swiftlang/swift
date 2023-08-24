@@ -470,7 +470,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
 
     // FIXME: Substitution map?
     diagnoseNonSendableTypesInReference(
-        const_cast<ValueDecl *>(VD), VD->getDeclContext(),
+        /*base=*/nullptr, const_cast<ValueDecl *>(VD), VD->getDeclContext(),
         VD->getLoc(), SendableCheckReason::ObjC);
     return false;
 

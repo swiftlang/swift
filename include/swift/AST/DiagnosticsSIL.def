@@ -840,6 +840,9 @@ ERROR(sil_movechecking_bug_exclusivity_violation, none,
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
       "'consume' applied to value that the compiler does not support. This is a compiler bug. Please file a bug with a small example of the bug",
       ())
+ERROR(sil_movekillscopyable_move_applied_to_nonlocal_memory, none,
+      "'consume' cannot be applied to %select{globals|escaping captures}0",
+      (unsigned))
 
 
 // Implicit inout-to-UnsafeRawPointer conversions

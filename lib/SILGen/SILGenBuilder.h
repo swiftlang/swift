@@ -64,6 +64,14 @@ public:
   SILGenModule &getSILGenModule() const;
   SILGenFunction &getSILGenFunction() const { return SGF; }
 
+  /// Given a value \p value, create a copy of it and return the relevant
+  /// ManagedValue.
+  ManagedValue copyOwnedObjectRValue(SILLocation loc, SILValue value,
+                                     ManagedValue::ScopeKind kind);
+
+  ManagedValue borrowObjectRValue(SILGenFunction &SGF, SILLocation loc,
+                                  SILValue value, ManagedValue::ScopeKind kind);
+
   SILDebugLocation
   getSILDebugLocation(SILLocation Loc,
                       bool ForMetaInstruction = false) override;
@@ -489,6 +497,11 @@ public:
   void emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
                              SILValue destAddr, IsTake_t isTake,
                              IsInitialization_t isInitialize);
+
+  using SILBuilder::createEndLifetime;
+  void createEndLifetime(SILLocation loc, ManagedValue selfValue) {
+    createEndLifetime(loc, selfValue.forward(SGF));
+  }
 };
 
 } // namespace Lowering

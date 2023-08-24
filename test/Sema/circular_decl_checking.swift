@@ -71,7 +71,7 @@ struct SomeStruct<A> {
 
 // <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias
 protocol rdar27680407Proto {
-  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+  associatedtype T // expected-note {{protocol requires nested type 'T'; add nested type 'T' for conformance}}
 
   init(value: T)
 }

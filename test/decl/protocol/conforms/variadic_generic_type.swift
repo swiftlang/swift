@@ -3,7 +3,7 @@
 // Generic parameter packs cannot witness associated type requirements
 protocol HasAssoc {
   associatedtype A
-  // expected-note@-1 {{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 
 struct HasPack<each A>: HasAssoc {}

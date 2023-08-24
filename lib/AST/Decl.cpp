@@ -4031,7 +4031,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      auto srcFile = resultDC->getParentSourceFile();
+      auto srcFile = resultDC->getOutermostParentSourceFile();
       // Check if the file containing package decls is an interface file; if an
       // interface file contains package decls, they must be usableFromInline or
       // inlinable and are accessed within the defining module, so package-name
@@ -9567,10 +9567,6 @@ ArrayRef<VarDecl *> AccessorDecl::getInitializedProperties() const {
   if (auto *SR = getAttrs().getAttribute<StorageRestrictionsAttr>())
     return SR->getInitializesProperties(const_cast<AccessorDecl *>(this));
 
-  // Fallback to old effect style declaration.
-  if (auto *initAttr = getAttrs().getAttribute<InitializesAttr>())
-    return initAttr->getPropertyDecls(const_cast<AccessorDecl *>(this));
-
   return {};
 }
 
@@ -9579,10 +9575,6 @@ ArrayRef<VarDecl *> AccessorDecl::getAccessedProperties() const {
 
   if (auto *SR = getAttrs().getAttribute<StorageRestrictionsAttr>())
     return SR->getAccessesProperties(const_cast<AccessorDecl *>(this));
-
-  // Fallback to old effect style declaration.
-  if (auto *accessAttr = getAttrs().getAttribute<AccessesAttr>())
-    return accessAttr->getPropertyDecls(const_cast<AccessorDecl *>(this));
 
   return {};
 }

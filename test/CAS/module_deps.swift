@@ -62,10 +62,8 @@ import SubE
 // CHECK-NEXT: module_deps.swift
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
-// CHECK-DAG:     "swift": "A"
 // CHECK-DAG:     "clang": "C"
 // CHECK-DAG:     "swift": "E"
-// CHECK-DAG:     "swift": "F"
 // CHECK-DAG:     "swift": "G"
 // CHECK-DAG:     "swift": "SubE"
 // CHECK-DAG:     "swift": "Swift"
@@ -92,6 +90,10 @@ import SubE
 // CHECK: "moduleDependencies": [
 // CHECK-NEXT: "F"
 // CHECK-NEXT: ]
+
+// CHECK: "swiftOverlayDependencies": [
+// CHECK-DAG:     "swift": "A"
+// CHECK-DAG:     "swift": "F"
 
 /// --------Swift module A
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",

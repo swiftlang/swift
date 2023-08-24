@@ -275,6 +275,9 @@ public:
   /// a key path component.
   bool isForKeyPathComponentResult() const;
 
+  /// Determine whether this locator points to a key path component.
+  bool isForKeyPathComponent() const;
+
   /// Determine whether this locator points to the generic parameter.
   bool isForGenericParameter() const;
 
@@ -1264,11 +1267,11 @@ public:
   template <typename E>
   bool directlyAt() const {
     if (auto *expr = getAnchor().dyn_cast<Expr *>())
-      return isa<E>(expr) && hasEmptyPath();
+      return isa<E>(expr) && !last();
     return false;
   }
 
-  /// Determine whether this builder has an empty path.
+  /// Determine whether this builder has an empty path (no new elements).
   bool hasEmptyPath() const {
     return !element;
   }

@@ -101,7 +101,6 @@ TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 
 // Declaration Attributes and Modifers
-// To add a new entry here, update `utils/gyb_syntax_support/AttributeKinds.py`
 DECL_ATTR(_silgen_name, SILGenName,
   OnAbstractFunction | OnVar | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   0)
@@ -346,12 +345,6 @@ SIMPLE_DECL_ATTR(_marker, Marker,
 SIMPLE_DECL_ATTR(reasync, AtReasync,
   OnProtocol | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
-DECL_ATTR(initializes, Initializes,
-  OnAccessor | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  111)
-DECL_ATTR(accesses, Accesses,
-  OnAccessor | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  113)
 SIMPLE_DECL_ATTR(_unsafeInheritExecutor, UnsafeInheritExecutor,
   OnFunc | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   114)

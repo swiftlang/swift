@@ -312,6 +312,7 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
 
       auto &component = Components[rule.getRHS()];
       assert(!component.ConcreteType);
+      (void) component;
       Components[rule.getRHS()].ConcreteType = concreteType;
     } else {
       Components[rule.getRHS()].Aliases.push_back(name);

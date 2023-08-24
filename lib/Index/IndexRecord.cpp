@@ -233,10 +233,16 @@ public:
   }
 
   void finish() override {
-    for (auto &pair : TrackerByGroup) {
-      StringRef groupName = pair.first();
-      SymbolTracker &tracker = *pair.second;
-      bool cont = onFinish(groupName, tracker);
+    SmallVector<std::pair<StringRef, SymbolTracker *>, 0> SortedGroups;
+    for (auto &entry : TrackerByGroup) {
+      SortedGroups.emplace_back(entry.first(), entry.second.get());
+    }
+    llvm::sort(SortedGroups, llvm::less_first());
+
+    for (auto &pair : SortedGroups) {
+      StringRef groupName = pair.first;
+      SymbolTracker *tracker = pair.second;
+      bool cont = onFinish(groupName, *tracker);
       if (!cont)
         break;
     }

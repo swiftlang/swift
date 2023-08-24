@@ -40,7 +40,7 @@ void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         ASTContext &Context) {
   if (loc.isASTNode()) {
     if (auto decl = loc.getAsASTNode<Decl>()) {
-      printDeclDescription(out, decl, Context);
+      printDeclDescription(out, decl);
     } else if (auto expr = loc.getAsASTNode<Expr>()) {
       printExprDescription(out, expr, Context);
     } else if (auto stmt = loc.getAsASTNode<Stmt>()) {

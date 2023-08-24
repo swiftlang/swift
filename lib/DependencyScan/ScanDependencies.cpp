@@ -165,20 +165,26 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
     return;
 
   auto dependencies = optionalDependencies.value();
-  for (const auto &dep : dependencies->getModuleDependencies()) {
+  for (const auto &dep : dependencies->getDirectModuleDependencies())
     findAllImportedClangModules(ctx, dep.first, cache, allModules, knownModules);
-  }
+  for (const auto &dep : dependencies->getSwiftOverlayDependencies())
+    findAllImportedClangModules(ctx, dep.first, cache, allModules, knownModules);
 }
 
 // Get all dependencies's IDs of this module from its cached
 // ModuleDependencyInfo
-static ArrayRef<ModuleDependencyID>
-getDependencies(const ModuleDependencyID &moduleID,
-                const ModuleDependenciesCache &cache) {
+static std::vector<ModuleDependencyID>
+getAllDependencies(const ModuleDependencyID &moduleID,
+                   const ModuleDependenciesCache &cache) {
   const auto &optionalModuleInfo =
       cache.findDependency(moduleID.first, moduleID.second);
   assert(optionalModuleInfo.has_value());
-  return optionalModuleInfo.value()->getModuleDependencies();
+  auto directDependenciesRef = optionalModuleInfo.value()->getDirectModuleDependencies();
+  auto overlayDependenciesRef = optionalModuleInfo.value()->getSwiftOverlayDependencies();
+  std::vector<ModuleDependencyID> result;
+  result.insert(std::end(result), directDependenciesRef.begin(), directDependenciesRef.end());
+  result.insert(std::end(result), overlayDependenciesRef.begin(), overlayDependenciesRef.end());
+  return result;
 }
 
 /// Implements a topological sort via recursion and reverse postorder DFS.
@@ -200,7 +206,7 @@ computeTopologicalSortOfExplicitDependencies(
       return;
 
     // Otherwise, visit each adjacent node.
-    for (const auto &succID : getDependencies(moduleID, cache)) {
+    for (const auto &succID : getAllDependencies(moduleID, cache)) {
       // We don't worry if successor is already in this current stack,
       // since that would mean we have found a cycle, which should not
       // be possible because we checked for cycles earlier.
@@ -249,7 +255,7 @@ computeTransitiveClosureOfExplicitDependencies(
        it != end; ++it) {
     const auto &modID = *it;
     auto &modReachableSet = result[modID];
-    for (const auto &succID : getDependencies(modID, cache)) {
+    for (const auto &succID : getAllDependencies(modID, cache)) {
       const auto &succReachableSet = result[succID];
       llvm::set_union(modReachableSet, succReachableSet);
     }
@@ -517,10 +523,10 @@ static llvm::Error resolveExplicitModuleInputs(
 
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID>
-resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleID,
-                          ModuleDependenciesCache &cache,
-                          InterfaceSubContextDelegate &ASTDelegate) {
-  PrettyStackTraceStringAction trace("Resolving direct dependencies of: ", moduleID.first);
+resolveDependencies(CompilerInstance &instance, ModuleDependencyID moduleID,
+                    ModuleDependenciesCache &cache,
+                    InterfaceSubContextDelegate &ASTDelegate) {
+  PrettyStackTraceStringAction trace("Resolving dependencies of: ", moduleID.first);
   auto &ctx = instance.getASTContext();
   auto optionalKnownDependencies = cache.findDependency(moduleID.first, moduleID.second);
   assert(optionalKnownDependencies.has_value());
@@ -529,7 +535,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleI
   // If this dependency has already been resolved, return the result.
   if (knownDependencies->isResolved() &&
       knownDependencies->getKind() != ModuleDependencyKind::SwiftSource)
-    return knownDependencies->getModuleDependencies();
+    return getAllDependencies(moduleID, cache);
 
   auto isSwiftInterfaceOrSource = knownDependencies->isSwiftInterfaceModule() ||
                                   knownDependencies->isSwiftSourceModule();
@@ -621,10 +627,6 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleI
               ctx.getSwiftModuleDependencies(clangDep, cache, ASTDelegate)) {
         if (clangDep != moduleID.first) {
           swiftOverlayDependencies.insert({clangDep, found.value()->getKind()});
-          // FIXME: Once all clients know to fetch these dependencies from
-          // `swiftOverlayDependencies`, the goal is to no longer have them in
-          // `directDependencies` so the following will need to go away.
-          directDependencies.insert({clangDep, found.value()->getKind()});
         }
       }
     }
@@ -671,7 +673,8 @@ static void discoverCrossImportOverlayDependencies(
                     // secondary module, and add the overlay names to the
                     // dependencies list.
                     for (auto overlayName : overlayMap[Id.first]) {
-                      if (std::find_if(allDependencies.begin(),
+                      if (overlayName.str() != mainModuleName &&
+                          std::find_if(allDependencies.begin(),
                                        allDependencies.end(),
                                        [&](ModuleDependencyID Id) {
                                          return Id.first == overlayName.str();
@@ -716,7 +719,7 @@ static void discoverCrossImportOverlayDependencies(
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto moduleDependnencyIDs =
-        resolveDirectDependencies(instance, module, cache, ASTDelegate);
+        resolveDependencies(instance, module, cache, ASTDelegate);
     allModules.insert(moduleDependnencyIDs.begin(), moduleDependnencyIDs.end());
   }
 
@@ -1350,7 +1353,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
     auto optionalDepInfo = cache.findDependency(module.first, module.second);
     assert(optionalDepInfo.has_value() && "Missing dependency info during graph generation diagnosis.");
     auto depInfo = optionalDepInfo.value();
-    auto directDependencies = depInfo->getModuleDependencies();
+    auto directDependencies = depInfo->getDirectModuleDependencies();
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
@@ -1490,7 +1493,7 @@ static bool diagnoseCycle(CompilerInstance &instance,
     assert(optionalDepInfo.has_value() && "Missing dependency info during cycle diagnosis.");
     auto depInfo = optionalDepInfo.value();
 
-    for (const auto &dep : depInfo->getModuleDependencies()) {
+    for (const auto &dep : getAllDependencies(lastOpen, cache)) {
       if (closeSet.count(dep))
         continue;
       if (openSet.insert(dep)) {
@@ -2009,7 +2012,14 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(instance, module, cache, ASTDelegate);
+        resolveDependencies(instance, module, cache, ASTDelegate);
+
+    // Do not need to resolve clang modules, those come pre-resolved
+    // from the Clang dependency scanner.
+    for (const auto &moduleID : discoveredModules)
+      if (moduleID.second != ModuleDependencyKind::Clang)
+        allModules.insert(moduleID);
+
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
 
@@ -2161,7 +2171,7 @@ swift::dependencies::performBatchModuleScan(
              currentModuleIdx < allModules.size(); ++currentModuleIdx) {
           auto module = allModules[currentModuleIdx];
           auto discoveredModules =
-              resolveDirectDependencies(instance, module, cache, ASTDelegate);
+              resolveDependencies(instance, module, cache, ASTDelegate);
           allModules.insert(discoveredModules.begin(), discoveredModules.end());
         }
 

@@ -5584,36 +5584,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::Initializes_DECL_ATTR: {
-        ArrayRef<uint64_t> rawPropertyIDs;
-        serialization::decls_block::InitializesDeclAttrLayout::
-            readRecord(scratch, rawPropertyIDs);
-
-        SmallVector<Identifier, 4> properties;
-        for (auto rawID : rawPropertyIDs) {
-          properties.push_back(MF.getIdentifier(rawID));
-        }
-
-        Attr = InitializesAttr::create(ctx, SourceLoc(), SourceRange(),
-                                       properties);
-        break;
-      }
-
-      case decls_block::Accesses_DECL_ATTR: {
-        ArrayRef<uint64_t> rawPropertyIDs;
-        serialization::decls_block::AccessesDeclAttrLayout::
-            readRecord(scratch, rawPropertyIDs);
-
-        SmallVector<Identifier, 4> properties;
-        for (auto rawID : rawPropertyIDs) {
-          properties.push_back(MF.getIdentifier(rawID));
-        }
-
-        Attr = AccessesAttr::create(ctx, SourceLoc(), SourceRange(),
-                                    properties);
-        break;
-      }
-
       case decls_block::StorageRestrictions_DECL_ATTR: {
         unsigned numInitializesProperties;
         ArrayRef<uint64_t> rawPropertyIDs;

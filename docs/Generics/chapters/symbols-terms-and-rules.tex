@@ -8,7 +8,53 @@
 \index{finitely-presented monoid}%
 \lettrine{H}{aving introduced} finitely-presented monoids and rewrite systems, we now move on from theory to practice. Our ultimate goal is to implement generic signature queries and requirement minimization on top of a rewrite system, and in this chapter we will describe the actual rewrite system used by the Swift generics implementation. We begin with the concrete representations of symbols, terms and rules. Then, we show how type parameters and generic requirements translate to terms and rules.
 
-\paragraph{Symbols}
+Type parameters map to terms; we call them type-like terms.
+\begin{quote}
+\begin{tabular}{lll}
+\toprule
+&\textbf{Type parameter}&\textbf{Term}\\
+\midrule
+in protocol \texttt{P}:&\texttt{Self}&$\protosym{P}$\\
+&\texttt{Self.A.B}&$\protosym{P}.\texttt{A}.\texttt{B}$\\
+&\texttt{Self.[P]A.[Q]B}&$\assocsym{P}{A}.\assocsym{Q}{B}$\\
+\midrule
+in generic signature:&\ttgp{0}{1}&$\ttgp{0}{1}$\\
+&\texttt{\ttgp{0}{1}.A}&$\ttgp{0}{1}.\texttt{A}$\\
+&\texttt{\ttgp{0}{1}.[P]A}&$\ttgp{0}{1}.\assocsym{P}{A}$\\
+\bottomrule
+\end{tabular}
+\end{quote}
+
+blah blah blah
+\begin{quote}
+\begin{tabular}{lll}
+\toprule
+&\textbf{Requirement}&\textbf{Rule}\\
+\midrule
+conformance: &$\ConfReq{T}{P}$&$t.\protosym{P}\Rightarrow t$\\
+layout: &$\ConfReq{T}{AnyObject}$&$t.\layoutsym{AnyObject}\Rightarrow t$\\
+superclass: &$\FormalReq{T:\ C}$&$t.\supersym{\texttt{C}}\Rightarrow t$\\
+concrete type: &$\FormalReq{T == C}$&$t.\concretesym{\texttt{C}}\Rightarrow t$\\
+same-type: &$\FormalReq{T == U}$&$u\Rightarrow t$ (if $t<u$)\\
+&&$t\Rightarrow u$ (if $u<t$)\\
+\bottomrule
+\end{tabular}
+\end{quote}
+
+blah blah blah
+\begin{quote}
+\begin{tabular}{lll}
+\toprule
+&\textbf{Declaration}&\textbf{Rule}\\
+\midrule
+identity conformance:&\texttt{protocol P}&$\protosym{P}.\protosym{P}\Rightarrow\protosym{P}$\\
+in protocol \texttt{P}:&\texttt{associatedtype A}&$\protosym{P}.\texttt{A}\Rightarrow\assocsym{P}{A}$\\
+\bottomrule
+\end{tabular}
+\end{quote}
+
+\section{Symbols}
+
 \index{structural components}%
 \IndexDefinition{symbol}%
 \index{rewrite context}%
@@ -65,7 +111,7 @@ The kinds of symbols are further classified into two families, \emph{type-like} 
 \index{protocol declaration}%
 \index{inherited associated type}%
 \index{inherited protocol}%
-Note that an associated type symbol does not directly refer to the declaration of an associated type; instead, it stores a protocol declaration \texttt{P} and the \emph{name} of an associated type \texttt{A}; the invariant is that \texttt{A} must be declared either by \texttt{P} itself, or some base protocol of \texttt{P}. Later, you will see that this allows us to distinguish a requirement imposed by a protocol on one of its inherited associated types, from the same requirement stated on the base protocol itself:
+Note that an associated type symbol does not directly refer to the declaration of an associated type; instead, it stores a protocol declaration \texttt{P} and the \emph{name} of an associated type \texttt{A}; the invariant is that \texttt{A} must be declared either by \texttt{P} itself, or some base protocol of \texttt{P}. This allows us to distinguish a requirement imposed by a protocol on one of its inherited associated types, from the same requirement stated on the base protocol itself:
 \begin{Verbatim}
 protocol Base {
   associatedtype A
@@ -75,7 +121,9 @@ protocol Base {
 protocol Derived: Base where A: Equatable {}
 \end{Verbatim}
 Finally, the last three property symbol kinds---superclass, concrete type, and concrete conformance symbols---are quite special, because they recursively contain terms; their construction and invariants are discussed in the next section.
-\paragraph{Terms}
+
+\section{Terms}\label{building terms}
+
 \IndexDefinition{term!in requirement machine}%
 \IndexDefinition{mutable term}%
 \IndexDefinition{immutable term}%
@@ -86,47 +134,12 @@ A \emph{term} is an array of symbols. There are actually two representations of 
 \index{identity element}%
 When we talked about free monoids in the previous chapter, we allowed for an \index{empty term}empty term, denoted $\varepsilon$, to represent the identity element of our monoid. In turns out that in the rewrite system of a requirement machine, the identity element does not give us anything useful, and no other term will be equivalent to the identity element via a rewrite rule (so in reality, our rewrite system describes a \emph{semigroup}, not a monoid; a semigroup is a generalization of a monoid which does not require the existence of an identity element. However, monoids are a more natural setting for presenting the theory of rewrite paths, since we want to deal with rewrite steps where the whiskers are empty terms). Thus, the immutable term representation does not allow for empty terms. Mutable terms can still be empty, since this is their initial state before any symbols are added.
 
-\paragraph{Rules}
-\IndexDefinition{rewrite rule!in requirement machine}%
-A rewrite rule is represented by a pair of immutable terms---the \emph{left-hand side} and \emph{right-hand side}---together with some flags. The right-hand side term must precede the left-hand side term in the reduction order, as required by the theory. The flags associated with each rule are important for \index{completion}completion and minimization:
-\begin{itemize}
-\IndexDefinition{permanent rule}%
-\item \textbf{Permanent} rules are created from associated type declarations and the implicit conformance of the protocol \texttt{Self} type to the protocol itself. Permanent rules are not subject to minimization. This bit is set by the rule builder (Section~\ref{building rules}).
-\index{left-simplified rule}%
-\index{right-simplified rule}%
-\index{substitution simplified rule}%
-\item \textbf{Left-simplified}, \textbf{Right-simplified} and \textbf{Substitution-simplified} rules have been superseded with new rules (Section~\ref{rule reduction}).
-\index{conflicting rule}%
-\index{recursive rule}%
-\item \textbf{Conflicting} rules and \textbf{Recursive} rules are discovered during property map construction, and indicate a problem with user-written requirements that needs to be diagnosed (Chapter~\ref{propertymap}).
-\IndexDefinition{explicit rule}%
-\item \textbf{Explicit} rules are directly created from user-written requirements, or related to other explicit rules in a very specific way. This bit is set by the rule builder and then propagated to other rules during minimization. Explicit rules have a special behavior with the minimal conformances algorithm (Section~\ref{minimal conformances}).
-\index{redundant rule}%
-\item \textbf{Redundant} rules are discovered during minimization, after which the requirement builder constructs the final list of minimal requirements from all remaining rules not marked as redundant (Chapter~\ref{requirement builder}).
-\index{frozen rule}%
-\item \textbf{Frozen} rules cannot have any of their flags changed. After construction but before a requirement machine is installed in the rewrite context (Chapter~\ref{rqm basic operation}), all rules are marked frozen to establish the invariant that no further updates can be made to any rule flags.
-\end{itemize}
-Once a flag has been set, it cannot be cleared, and the frozen flag prevents any more flags from being set.
-
-\index{local rule}%
-\index{imported rule}%
-A requirement machine stores its rewrite rules in an array. Imported rules appear first, followed by local rules. Often we need to iterate over just the local rules, so we track the index of the first local rule in the array. During rewrite system construction and completion, new rules are appended at the end of the array, but we require that indices into the array remain stable, so rules are never inserted in the middle. Various auxiliary data structures represent references to rules as indices into the rules array:
-\begin{itemize}
-\item Term reduction repeatedly looks for rules whose left-hand side matches a subterm of a given term; these lookups are made efficient with a prefix trie where each entry references a rule (Section~\ref{term reduction}).
-\item Property map entries reference the rules they were constructed from.
-\index{rewrite path}
-\index{rewrite step}
-\item Completion and property map construction both need to derive rewrite paths describing equivalences between terms, and these rewrite paths are comprised of rewrite steps which reference rules.
-\end{itemize}
-
-\section{Building Terms}\label{building terms}
-
 \index{type parameter}%
 Type parameters become terms in our rewrite system. To construct rewrite rules from generic requirements, we must first build terms from the type parameters appearing in those requirements. Later, when the same rewrite system is asked a generic signature query about some type parameter, the implementation begins by building a term from this type parameter.
 
 First of all, requirement machines do not care for type sugar, so we only need to consider canonical type parameters here. From Chapter~\ref{rqm basic operation}, there are four varieties of requirement machine, representing the four combinations of domain (generic signature, protocol component) and purpose (queries, minimization). The details of the type parameter mapping differ slightly in each.
 
-\paragraph{Generic signature}
+\paragraph{Generic signature.}
 \index{sugared type}%
 \index{canonical type}%
 \index{generic parameter type}%
@@ -172,9 +185,9 @@ every fit/.style={rounded corners}]
   \tikzstyle{arrow} = [->,>=stealth]
   
   \node [matrix, column sep=0.5em] {
-    \node (t) [symbol] {\texttt{\vphantom{[PQ]}\ttgp{0}{0}}}; &
-    \node (a) [symbol] {\texttt{\vphantom{[PQ]}[P]A}}; &
-    \node (b) [symbol] {\texttt{\vphantom{[PQ]}[Q]B}}; \\
+    \node (t) [symbol] {\strut \ttgp{0}{0}}; &
+    \node (a) [symbol] {\strut $\assocsym{P}{A}$}; &
+    \node (b) [symbol] {\strut $\assocsym{Q}{B}$}; \\
   };
 
   \begin{scope}[on background layer]
@@ -188,9 +201,9 @@ every fit/.style={rounded corners}]
   \tikzstyle{arrow} = [->,>=stealth]
   
   \node [matrix, column sep=0.5em] {
-    \node (t) [symbol] {\texttt{\vphantom{[PQ]}\ttgp{0}{0}}}; &
-    \node (a) [symbol] {\texttt{\vphantom{[PQ]}A}}; &
-    \node (b) [symbol] {\texttt{\vphantom{[PQ]}B}}; \\
+    \node (t) [symbol] {\strut \ttgp{0}{0}}; &
+    \node (a) [symbol] {\strut \texttt{A}}; &
+    \node (b) [symbol] {\strut \texttt{B}}; \\
   };
 
   \begin{scope}[on background layer]
@@ -201,7 +214,7 @@ every fit/.style={rounded corners}]
 \end{quote}
 Our written notation for terms will join the symbols with ``$.$'', so the above terms are written as $\ttgp{0}{0}.\assocsym{P}{A}.\assocsym{Q}{B}$ and $\ttgp{0}{0}.\texttt{A}.\texttt{B}$, respectively.
 
-\paragraph{Protocol component}
+\paragraph{Protocol component.}
 \index{protocol component}%
 \Index{protocol Self type@protocol \texttt{Self} type}%
 With \textbf{protocol component} and \textbf{protocol component minimization} requirement machines, mapping type parameters to terms becomes more subtle. A type parameter written in a generic requirement of a protocol \texttt{P} is always rooted in the protocol \texttt{Self} type. However, a protocol component might contain more than one protocol, and furthermore other requirement machines must import rewrite rules from protocol component machines. Since \emph{every} protocol's \texttt{Self} type is always just the generic parameter type \ttgp{0}{0} with depth 0 and index 0, we can't map it to the generic parameter symbol \ttgp{0}{0}. Instead, the protocol \texttt{Self} type maps to the protocol symbol $\protosym{P}$ for the original protocol \texttt{P}.
@@ -270,7 +283,7 @@ The \emph{domain} of a type-like or property-like term is a generic parameter or
 \index{protocol dependency set}%
 Terms with a generic parameter domain can only appear in the generic signature or generic signature minimization requirement machines. Terms with a protocol domain can appear in any variety of requirement machine; the protocol will always be an element of the requirement machine's protocol dependency set.
 
-\paragraph{Concrete types}
+\paragraph{Concrete types.}
 \index{concrete type symbol}%
 \index{concrete conformance symbol}%
 \index{superclass symbol}%
@@ -322,7 +335,33 @@ The third condition rules out both ``out of order'' symbols where the type refer
 \end{gather*}
 The substitution terms also satisfy a mutual compatibility condition: either all terms must begin with (possibly different) generic parameter symbols, or all terms must belong to the same protocol domain. These invariants are established by the construction algorithm, and preserved when we manipulate concrete type symbols in Chapter~\ref{concrete conformances}.
 
+\section{Term Reduction}\label{term reduction}
+
+\IndexTwoFlag{debug-requirement-machine}{simplify}
+
+rewrite steps only store the length of each whisker, index of rule, and inverse flag.
+
+\IndexDefinition{trie}
+rule trie. Section~6.3 of \cite{art3}.
+
+\begin{algorithm}[Adding a rule to the rule trie]\label{trie insert algo}
+\end{algorithm}
+
+\begin{algorithm}[Lookup in rule trie]\label{trie lookup algo}
+Hello world.
+\end{algorithm}
+
+\begin{algorithm}[Term reduction using rule trie]\label{term reduction trie algo}
+Hello world.
+\end{algorithm}
+
+Our implementation explicitly stores the source and destination terms in a critical pair, as well as the rewrite path itself. As we will learn in Section~\ref{completion sourceref}, we use a compressed representation for \index{rewrite path!representation}rewrite paths in memory, where a \index{rewrite step!representation}rewrite step $x(u\Rightarrow v)y$ only stores the \emph{length} of each \index{whiskering}whisker $x$ and $y$ and not the actual terms $x$ and $y$. Thus, we must store the source and destination terms separately since they cannot be recovered from the rewrite path alone.
+
 \section{The Reduction Order}\label{reduction order}
+
+\begin{itemize}
+\item reduction order is not ABI, but we need a compatibility condition--reduced types of different equivalence classes order the same
+\end{itemize}
 
 \IndexDefinition{reduction order!in requirement machine}%
 
@@ -493,7 +532,39 @@ However, we know this is impossible since the standard shortlex order $<$ is wel
 \end{proof}
 We can now dispose of the notation $<_w$; the reduction order on terms will simply be denoted as $<$ which will henceforth be the weighted shortlex order of Algorithm~\ref{rqm reduction order}.
 
-\section{Building Rules}\label{building rules}
+\section{Rules}\label{building rules}
+
+\IndexDefinition{rewrite rule!in requirement machine}%
+A rewrite rule is represented by a pair of immutable terms---the \emph{left-hand side} and \emph{right-hand side}---together with some flags. The right-hand side term must precede the left-hand side term in the reduction order, as required by the theory. The flags associated with each rule are important for \index{completion}completion and minimization:
+\begin{itemize}
+\IndexDefinition{permanent rule}%
+\item \textbf{Permanent} rules are created from associated type declarations and the implicit conformance of the protocol \texttt{Self} type to the protocol itself. Permanent rules are not subject to minimization. This bit is set by the rule builder (Section~\ref{building rules}).
+\index{left-simplified rule}%
+\index{right-simplified rule}%
+\index{substitution-simplified rule}%
+\item \textbf{Left-simplified}, \textbf{right-simplified} and \textbf{substitution-simplified} rules were replaced by new rules (Section~\ref{rule reduction}).
+\index{conflicting rule}%
+\index{recursive rule}%
+\item \textbf{Conflicting} rules and \textbf{Recursive} rules are discovered during property map construction, and indicate a problem with user-written requirements that needs to be diagnosed (Chapter~\ref{propertymap}).
+\IndexDefinition{explicit rule}%
+\item \textbf{Explicit} rules are directly created from user-written requirements, or related to other explicit rules in a very specific way. This bit is set by the rule builder and then propagated to other rules during minimization. Explicit rules have a special behavior with the minimal conformances algorithm (Section~\ref{minimal conformances}).
+\index{redundant rule}%
+\item \textbf{Redundant} rules are discovered during minimization, after which the requirement builder constructs the final list of minimal requirements from all remaining rules not marked as redundant (Chapter~\ref{requirement builder}).
+\index{frozen rule}%
+\item \textbf{Frozen} rules cannot have any of their flags changed. After construction but before a requirement machine is installed in the rewrite context (Chapter~\ref{rqm basic operation}), all rules are marked frozen to establish the invariant that no further updates can be made to any rule flags.
+\end{itemize}
+Once a flag has been set, it cannot be cleared, and the frozen flag prevents any more flags from being set.
+
+\index{local rule}%
+\index{imported rule}%
+A requirement machine stores its rewrite rules in an array. Imported rules appear first, followed by local rules. Often we need to iterate over just the local rules, so we track the index of the first local rule in the array. During rewrite system construction and completion, new rules are appended at the end of the array, but we require that indices into the array remain stable, so rules are never inserted in the middle. Various auxiliary data structures represent references to rules as indices into the rules array:
+\begin{itemize}
+\item Term reduction repeatedly looks for rules whose left-hand side matches a subterm of a given term; these lookups are made efficient with a prefix trie where each entry references a rule (Section~\ref{term reduction}).
+\item Property map entries reference the rules they were constructed from.
+\index{rewrite path}
+\index{rewrite step}
+\item Completion and property map construction both need to derive rewrite paths describing equivalences between terms, and these rewrite paths are comprised of rewrite steps which reference rules.
+\end{itemize}
 
 \index{local rule}%
 \index{imported rule}%
@@ -520,7 +591,7 @@ Now, construction of local rules can be understood as follows:
 \item In the first column, we start with minimal requirements. Dependent member types appearing in minimal requirements are bound, and terms built from bound dependent member types will contain associated type symbols.
 
 \index{unbound dependent member type}%
-\index{desugared requirements}%
+\index{desugared requirement}%
 \item In the second column we start with desugared requirements. Dependent member types appearing in desugared requirements are unbound, and terms built from unbound dependent member types will contain name symbols.
 \end{itemize}
 First, let's look at the algorithm for building a rewrite rule from a generic requirement. As usual, when building terms from type parameters in Step~2.a, we use Algorithm~\ref{build term generic} in generic signature machines and Algorithm~\ref{build term protocol} in protocol component machines. Recall that minimal requirements are also desugared requirements. Only the latter invariants are used here; we assume that the subject type of a requirement is always a type parameter, and the constraint type of a conformance requirement is a single protocol declaration.
@@ -549,13 +620,13 @@ Rewrite rules built by this algorithm have a specific structure. The second term
 \item In all other cases, $u$ is a property-like term formed by appending a single property-like symbol to $v$, and thus $|u|=|v|+1$, so the rewrite rule always orients as $u\Rightarrow v$.
 \end{itemize}
 Notice how all property-like symbol kinds are represented above with the exception of concrete conformance symbols. Rules containing concrete conformance symbols do not correspond directly to generic requirements, and are introduced by property map construction from the combination of a conformance requirement and a concrete same-type requirement (Chapter~\ref{concrete conformances}).
-\begin{definition}
+\begin{definition}\label{type like rule}
 Several concepts we defined on symbols and terms generalize to rules:
 \begin{itemize}
 \IndexDefinition{type-like rule}%
 \item A rule $u\Rightarrow v$ is \emph{type-like} if $u$ and $v$ are type-like terms.
 \IndexDefinition{property-like rule}%
-\item A rule $u\Rightarrow v$ is \emph{property-like} if $v$ is a type-like term and $u=v\cdot s$ for some property-like symbol $s$ (so in particular, $u$ is property-like, but it has this special form and cannot just be \emph{any} property-like term).
+\item A rule $u\Rightarrow v$ is \emph{property-like} if $v$ is a type-like term and $u=v\cdot s$ for some property-like \index{symbol}symbol $s$ (so in particular, $u$ is property-like, but it has this special form and cannot just be \emph{any} property-like term).
 \IndexDefinition{domain!of a rule}%
 \item In a rule $u\Rightarrow v$, both $u$ and $v$ must have the same domain. This allows us to talk about \emph{the domain} of the rule.
 \item In a property-like rule $v\cdot s\Rightarrow v$ where $s$ is a superclass or concrete type symbol, each substitution term $\sigma_i$ of $s$ has the same domain as $v$.
@@ -623,27 +694,13 @@ Rule 1 and Rule 2 are lowered conformance requirements of the form $\namesym{T}.
 
 This rewrite system will also need to include the requirements of the $\proto{Collection}$ protocol, as well as $\proto{Sequence}$ and $\proto{IteratorProtocol}$, which are referenced from the requirement signatures of $\proto{Collection}$ and $\proto{Sequence}$.
 
-\section{Term Reduction}\label{term reduction}
-
-\IndexTwoFlag{debug-requirement-machine}{simplify}
-
-rewrite steps only store the length of each whisker, index of rule, and inverse flag.
-
-\IndexDefinition{trie}
-rule trie. Section~6.3 of \cite{art3}.
-
-\begin{algorithm}[Adding a rule to the rule trie]\label{trie insert algo}
-\end{algorithm}
-
-\begin{algorithm}[Lookup in rule trie]\label{trie lookup algo}
-Hello world.
-\end{algorithm}
-
-\begin{algorithm}[Term reduction using rule trie]\label{term reduction trie algo}
-Hello world.
-\end{algorithm}
-
 \section{Correctness}
+
+\begin{itemize}
+\item example before the correctness proof
+\item Derived requirements don’t capture protocol type aliases
+\item we don't handle concrete type requirements -- only conformance requirements, and same-type between type parameters
+\end{itemize}
 
 To recap, we construct a \index{finitely-presented monoid}finitely-presented monoid from a \index{generic signature}generic signature and its protocol dependencies. The \index{explicit requirement}explicit requirements written by the user become relations of our monoid. This mapping from requirements to relations---where the latter are really just pairs of terms---was defined by Algorithm~\ref{build rule}. Now, instead of using this algorithm to \emph{define} our monoid, we can instead apply it to an arbitrary requirement, and consider whether the pair of terms are equivalent in some existing monoid constructed from a generic signature.
 
@@ -679,7 +736,7 @@ $\PhiInv(\texttt{T.U})\sim t\cdot u$, as required.
 \end{proof}
 
 Now we prove that the \index{derived requirement}derived conformance and same-type requirements of $G$ correspond to equivalences of terms in $\AR$. Note that this is a more elaborate version of the same argument as Theorem~\ref{derivation to path}.
-\begin{theorem}
+\begin{theorem}\label{derivation to path swift}
 Suppose that \texttt{T} and \texttt{U} are type parameters of $G$ and \texttt{P} is some protocol.
 \begin{enumerate}
 \item If $G\vDash\ConfReq{T}{P}$, then $\PhiInv(\texttt{T})\cdot\protosym{P}\sim\PhiInv(\texttt{T})$.

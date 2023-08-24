@@ -219,6 +219,9 @@ EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 /// Defer Sendable checking to SIL diagnostic phase.
 EXPERIMENTAL_FEATURE(SendNonSendable, false)
 
+/// Within strict concurrency, narrow global variable isolation requirements.
+EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
+
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
 EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)

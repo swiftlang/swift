@@ -456,9 +456,10 @@ public:
       }
       auto tupleValue = SGF.B.createTuple(loc, tl.getLoweredType(),
                                           elementValues);
-      return canBeGuaranteed
-        ? ManagedValue::forUnmanaged(tupleValue)
-        : SGF.emitManagedRValueWithCleanup(tupleValue);
+      if (tupleValue->getOwnershipKind() == OwnershipKind::None)
+        return ManagedValue::forObjectRValueWithoutOwnership(tupleValue);
+      return canBeGuaranteed ? ManagedValue::forBorrowedObjectRValue(tupleValue)
+                             : SGF.emitManagedRValueWithCleanup(tupleValue);
     } else {
       // If the type is address-only, we need to move or copy the elements into
       // a tuple in memory.
@@ -1068,7 +1069,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
 
-    ManagedValue val = ManagedValue::forUnmanaged(fArg);
+    ManagedValue val = ManagedValue::forBorrowedRValue(fArg);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
@@ -1129,12 +1130,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     LLVM_FALLTHROUGH;
 
   case CaptureKind::Immutable: {
+    auto argIndex = SGF.F.begin()->getNumArguments();
     // Non-escaping stored decls are captured as the address of the value.
-    auto argConv = SGF.F.getConventions().getSILArgumentConvention(
-        SGF.F.begin()->getNumArguments());
+    auto argConv = SGF.F.getConventions().getSILArgumentConvention(argIndex);
     bool isInOut = (argConv == SILArgumentConvention::Indirect_Inout ||
                     argConv == SILArgumentConvention::Indirect_InoutAliasable);
-    if (isInOut || SGF.SGM.M.useLoweredAddresses()) {
+    auto param = SGF.F.getConventions().getParamInfoForSILArg(argIndex);
+    if (SGF.F.getConventions().isSILIndirect(param)) {
       ty = ty.getAddressType();
     }
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
@@ -1220,11 +1222,20 @@ void SILGenFunction::emitProlog(
       auto &lowering = getTypeLowering(type);
       SILType ty = lowering.getLoweredType();
       SILValue val = F.begin()->createFunctionArgument(ty);
-      OpaqueValues[opaqueValue] = ManagedValue::forUnmanaged(val);
 
       // Opaque values are always passed 'owned', so add a clean up if needed.
+      //
+      // TODO: Should this be tied to the mv?
       if (!lowering.isTrivial())
         enterDestroyCleanup(val);
+
+      ManagedValue mv;
+      if (lowering.isTrivial())
+        mv = ManagedValue::forObjectRValueWithoutOwnership(val);
+      else
+        mv = ManagedValue::forUnmanagedOwnedValue(val);
+
+      OpaqueValues[opaqueValue] = mv;
 
       continue;
     }
@@ -1318,7 +1329,14 @@ void SILGenFunction::emitProlog(
           ManagedValue actorArg;
           if (actorIsolation.getActorInstanceParameter() == 0) {
             assert(selfParam && "no self parameter for ActorInstance isolation");
-            auto selfArg = ManagedValue::forUnmanaged(F.getSelfArgument());
+            ManagedValue selfArg;
+            if (F.getSelfArgument()->getOwnershipKind() ==
+                OwnershipKind::Guaranteed) {
+              selfArg = ManagedValue::forBorrowedRValue(F.getSelfArgument());
+            } else {
+              selfArg =
+                  ManagedValue::forUnmanagedOwnedValue(F.getSelfArgument());
+            }
             ExpectedExecutor = emitLoadActorExecutor(loc, selfArg);
           } else {
             unsigned isolatedParamIdx =

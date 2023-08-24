@@ -124,7 +124,7 @@ using ModuleInfoLayout =
                    IdentifierIDField,            // moduleName
                    ContextHashIDField,           // contextHash
                    ImportArrayIDField,           // moduleImports
-                   DependencyIDArrayIDField      // resolvedModuleDependencies
+                   DependencyIDArrayIDField      // resolvedDirectModuleDependencies
                    >;
 
 using SwiftInterfaceModuleDetailsLayout =

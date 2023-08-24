@@ -792,7 +792,7 @@ set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
 set "args=%args% --skip-repository swift-xcode-playground-support"
 
-call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --github-comment "%ghprbCommentBody%"
+call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --reset-to-remote --skip-history --github-comment "%ghprbCommentBody%"
 
 goto :eof
 endlocal

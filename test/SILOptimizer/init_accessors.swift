@@ -73,9 +73,12 @@ struct TestSetter {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors10TestSetterV1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestSetter.Type) -> TestSetter
-  // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors10TestSetterV5pointSi_Sitvs : $@convention(method) (Int, Int, @inout TestSetter) -> ()
-  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, Int, @inout TestSetter) -> ()
-  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (Int, Int) -> ()
+  // CHECK: [[INIT_ACCESSOR:%.*]] = function_ref @$s14init_accessors10TestSetterV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @inout Int) -> ()
+  // CHECK: [[SELF:%.*]] = begin_access [modify] [dynamic] %14 : $*TestSetter
+  // CHECK-NEXT: ([[X:%.*]], [[Y:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
+  // CHECK-NEXT: [[X_REF:%.*]] = struct_element_addr [[SELF]] : $*TestSetter, #TestSetter.x
+  // CHECK-NEXT: [[Y_REF:%.*]] = struct_element_addr [[SELF]] : $*TestSetter, #TestSetter.y
+  // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[X]], [[Y]], [[X_REF]], [[Y_REF]]) : $@convention(thin) (Int, Int, @inout Int, @inout Int) -> ()
   init(x: Int, y: Int) {
     self.x = x
     self.y = y

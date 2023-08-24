@@ -750,3 +750,100 @@ func test_inheritance() {
 test_inheritance()
 // CHECK: test-inheritance-1: Person(firstName: <<unknown>>, age: 0)
 // CHECK-NEXT: test-inheritance-2: Person(firstName: Q, age: 42)
+
+do {
+  class BackingData<T> {
+    var data: [PartialKeyPath<T>: Any] = [:]
+
+    func get<V>(_ key: KeyPath<T, V>) -> V { data[key] as! V }
+    func set<V>(_ key: KeyPath<T, V>, _ value: V) {
+      data[key] = value
+    }
+  }
+
+  class Person : CustomStringConvertible {
+    var description: String {
+      "Person(name: \(name))"
+    }
+
+    private var backingData: BackingData<Person> = BackingData()
+
+    private var _name: Int
+
+    var name: String {
+      @storageRestrictions(accesses: backingData, initializes: _name)
+      init(newValue) {
+        self.backingData.set(\.name, newValue)
+        self._name = 0
+      }
+
+      get { self.backingData.get(\.name) }
+      set { self.backingData.set(\.name, newValue) }
+    }
+
+    init(name: String) {
+      self.name = name
+    }
+
+    init(backingData: BackingData<Person>) {
+      self.backingData = backingData
+      self._name = 0
+    }
+  }
+
+  let person = Person(name: "P")
+  print(person)
+
+  let localData = BackingData<Person>()
+  localData.set(\.name, "O")
+
+  print(Person(backingData: localData))
+}
+// CHECK: Person(name: P)
+// CHECK-NEXT: Person(name: O)
+
+do {
+  struct TestDefaultInitializable : CustomStringConvertible {
+    var description: String {
+      "TestDefaultInitializable(a: \(a))"
+    }
+
+    var _a: Int?
+    var a: Int? {
+      @storageRestrictions(initializes: _a)
+      init { _a = newValue }
+      get { _a }
+    }
+  }
+
+  print(TestDefaultInitializable())
+  print(TestDefaultInitializable(a: 42))
+
+  struct TestMixedDefaultInitalizable : CustomStringConvertible {
+    var description: String {
+      "TestMixedDefaultInitalizable(a: \(a), b: \(b))"
+    }
+
+    var a: Int? {
+      init {}
+      get { nil }
+    }
+
+    var _b: String
+    var b: String? {
+      @storageRestrictions(initializes: _b)
+      init { self._b = (newValue ?? "") }
+      get { _b }
+      set { _b = newValue ?? "" }
+    }
+  }
+
+  print(TestMixedDefaultInitalizable())
+  print(TestMixedDefaultInitalizable(b: "Hello"))
+  print(TestMixedDefaultInitalizable(a: 42))
+}
+// CHECK: TestDefaultInitializable(a: nil)
+// CHECK-NEXT: TestDefaultInitializable(a: Optional(42))
+// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
+// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional("Hello"))
+// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))

@@ -260,13 +260,13 @@ The first step of the conformance path becomes a \textsc{GenSig} derivation step
 \end{gather*}
 If the conformance path has length 1, we're done; we have our primitive derivation. Otherwise, say the second step in the conformance path is $\AssocConf{Self.[$\texttt{P}_0$]$\texttt{A}_1$}{$\texttt{P}_1$}$. We extend the primitive derivation with two additional derivation steps:
 \begin{gather*}
-\vdash\ConfReq{Self.[$\texttt{P}_0$]$\texttt{A}_1$}{$\texttt{P}_1$}\qquad\mbox{(in $\texttt{P}_1$)}\tag{2}\\
+\vdash\ConfReq{Self.[$\texttt{P}_0$]$\texttt{A}_1$}{$\texttt{P}_1$}_{\texttt{P}_1}\tag{2}\\
 (1),\,(2)\vdash\ConfReq{$\texttt{T}_0$.$\texttt{A}_1$}{$\texttt{P}_1$}\tag{3}
 \end{gather*}
 We can repeat this process for each remaining step in the conformance path. If the $i$th element of the conformance path is $\AssocConf{Self.[$\texttt{P}_{i-1}$]$\texttt{A}_i$}{$\texttt{P}_i$}$, we first construct a primitive derivation for the conformance path $s_{i-1}\otimes\cdots\otimes s_0$. This primitive derivation will have $2i-1$ derivation steps. Then, we introduce this associated conformance requirement with a \textsc{ReqSig} derivation step, and combine it with the derivation thus far using a \textsc{Conf} derivation step:
 \begin{gather*}
 \ldots\vdash\ConfReq{$\texttt{T}_0$.$\texttt{A}_1$...$\texttt{A}_{i-1}$}{$\texttt{P}_{i-1}$}\tag{$2i-1$}\\
-\vdash\ConfReq{Self.$\texttt{A}_i$}{$\texttt{P}_i$}\qquad\mbox{(in $\texttt{P}_{i-1}$)}\tag{$2i$}\\
+\vdash\ConfReq{Self.$\texttt{A}_i$}{$\texttt{P}_i$}_{\texttt{P}_{i-1}}\tag{$2i$}\\
 (2i-1),\,(2i)\vdash\ConfReq{$\texttt{T}_0$.$\texttt{A}_1$...$\texttt{A}_{i-1}$.$\texttt{A}_i$}{$\texttt{P}_i$}\tag{$2i+1$}
 \end{gather*}
 The validity of the conformance path ensures the constructed primitive derivation is well-formed. Also, the subject type and conformed protocol of the derived conformance requirement matches the abstract conformance output by Algorithm~\ref{invertconformancepath}. This shows the aforesaid algorithm outputs a valid abstract conformance, as was claimed.
@@ -277,9 +277,9 @@ Now, recall our favorite conformance path:
 We saw this conformance path simplifies to $\ConfReq{T.SubSequence}{Sequence}$. Performing the above construction produces this primitive derivation:
 \begin{gather*}
 \vdash\ConfReq{T}{Collection}\tag{1}\\
-\vdash\ConfReq{Self.SubSequence}{Collection}\qquad\mbox{(in \texttt{Collection})}\tag{2}\\
+\vdash\ConfReq{Self.SubSequence}{Collection}_\texttt{Collection}\tag{2}\\
 (1),\,(2)\vdash\ConfReq{T.SubSequence}{Collection}\tag{3}\\
-\vdash\ConfReq{Self}{Sequence}\qquad\mbox{(in \texttt{Collection})}\tag{4}\\
+\vdash\ConfReq{Self}{Sequence}_\texttt{Collection}\tag{4}\\
 (3),\,(4)\vdash\ConfReq{T.SubSequence}{Sequence}\tag{5}
 \end{gather*}
 We saw that $\ConfReq{T.SubSequence}{Sequence}$ is equivalent to $\ConfReq{U}{Sequence}$ via the same-type requirement $\FormalReq{U == T.SubSequence}$. This means we can extend the above primitive derivation with a \IndexStep{Same}\textsc{Same} derivation step to get a derivation for $\ConfReq{U}{Sequence}$:
@@ -331,7 +331,7 @@ By the \index{inductive step}inductive hypothesis, we can assume the derivation 
 By induction, we again assume the derivation of $\ConfReq{U}{P}$ has been split up into $D_1^\prime$ and $D_2^\prime$ as above. We construct $D_1$ from $D_1^\prime$ by adding a \textsc{Conf} derivation step:
 \begin{gather*}
 \ldots\ConfReq{$\texttt{U}^\prime$}{P}\tag{1}\\
-\vdash\ConfReq{Self.V}{Q}\qquad\mbox{(in \texttt{P})}\tag{2}\\
+\vdash\ConfReq{Self.V}{Q}_\texttt{P}\tag{2}\\
 (1),\,(2)\vdash\ConfReq{$\texttt{U}^\prime$.V}{Q}\tag{3}
 \end{gather*}
 This is a primitive derivation by construction. Now it remains to derive a same-type requirement $\FormalReq{U.V == $\texttt{U}^\prime$.V}$, giving us the desired derivation $D_2$. To do that, first note that since $G$ is valid and $G\vDash\ConfReq{T}{P}$, then $G_\texttt{P}$ is also valid by Proposition~\ref{protocol generic signature valid}.
@@ -360,7 +360,7 @@ The \IndexDefinition{conformance path graph}\emph{conformance path graph} of a g
 That is, if $\ConfReq{T}{P}$ is an abstract conformance and $\AssocConf{Self.V}{Q}$ is an \index{associated conformance requirement}associated conformance requirement of \texttt{P}, we form the abstract conformance $\AssocConf{Self.V}{Q}\otimes \ConfReq{T}{P}=\ConfReq{T.V}{Q}$. If \texttt{U} is the reduced type of \texttt{T.V}, there is an edge with \index{source vertex}source vertex $\ConfReq{T}{P}$ and \index{destination vertex}destination vertex $\ConfReq{U}{Q}$.
 \end{itemize}
 
-Cruicially, a conformance path is actually a path, in the graph theoretical sense, whose source vertex is a root abstract conformance. Theorem~\ref{conformance paths theorem} can be interpreted as a statement about the conformance path graph, namely that every vertex is reachable by a path from a root vertex.
+Crucially, a conformance path is actually a path, in the graph theoretical sense, whose source vertex is a root abstract conformance. Theorem~\ref{conformance paths theorem} can be interpreted as a statement about the conformance path graph, namely that every vertex is reachable by a path from a root vertex.
 \end{definition}
 
 Let's construct the conformance path graph for our running example. We have a single conformance path of length~1:
@@ -971,7 +971,7 @@ The first approach seems less elegant, because it also necessarily rejects \emph
 
 This section will show that the type substitution algebra can express any computable function, and explore the consequences of this fact. First, we will review some standard results in computability theory; details can be found in any book on the subject, such as \cite{cutland}.
 
-In 1937, Alan Turing published a paper where he set out to make precise what is meant by a \index{computable number}``computable number,'' in the intuitive sense that $2+\frac{3}{7}$, $\sqrt{5}$ and $\pi$ as all computable \cite{turing}. In Turing's view, for a number to be computable, one must be able to write down a finite series of steps which give an effective procedure for computing an approximate representation of this number to any arbitrary precision. Turing formalized these computational steps in the form of an abstract machine which reads and writes symbols on an infinite tape---a \index{Turing machine}\emph{Turing machine} (the precise definition can be found in the literature, but it doesn't matter for our purposes).
+In 1937, Alan Turing published a paper where he set out to make precise what is meant by a \index{computable number}``computable number,'' in the intuitive sense that $2+\frac{3}{7}$, $\sqrt{5}$ and $\pi$ are all computable \cite{turing}. In Turing's view, for a number to be computable, one must be able to write down a finite series of steps which give an effective procedure for computing an approximate representation of this number to any arbitrary precision. Turing formalized these computational steps in the form of an abstract machine which reads and writes symbols on an infinite tape---a \index{Turing machine}\emph{Turing machine} (the precise definition can be found in the literature, but it doesn't matter for our purposes).
 
 It suffices to only consider the base-2 representation of numbers, with the two symbols ``0'' and ``1''. Furthermore, an integer is always computable, since the effective procedure there is to list out the finite sequence of binary digits; thus, the problem reduces to defining a notion of computability for real numbers in the interval $[\,0, 1)$. For a rational number, the binary expansion always either terminates, or repeats; we can consider a terminating expansion as one that ends with an infinite repeating sequence of ``0''. With an irrational number, the sequence of digits carries on forever, without repetition.
 
@@ -983,21 +983,21 @@ In order to construct machines to reason about other machines, Turing defined th
 \begin{theorem}
 No circle-free Turing machine can determine if an arbitrary integer is satisfactory.
 \end{theorem}
-Today, we formulate Turing's work in terms of the \index{halting problem}\emph{halting problem}, which asks if the machine reaches some final ``good'' state in a finite number of steps, rather than asking if a machine continues to output digits forever. This generalizes Turing machines to a more general context than the approximation of computable numbers. Each question can be reduced to the other though, showing that both are equivalent:
+Today, we formulate Turing's work in terms of the \IndexDefinition{halting problem}\emph{halting problem}, which asks if the machine reaches some final ``good'' state in a finite number of steps, rather than asking if a machine continues to output digits forever. After all, these Turing machines can perform more varied tasks than approximation of computable numbers. Each question can be reduced to the other though, showing that both are equivalent:
 \begin{itemize}
 \item Suppose we could determine if a Turing machine is circle-free. Then, we could determine if an arbitrary machine halts, if we modify it to output an infinite sequence of ``0'' when it reaches the halting state instead. The modified machine is circle-free if and only if the original machine halts.
 \item Now, suppose we could determine if a Turing machine halts on every possible input. Then, we could determine if an arbitrary machine is circle-free, by constructing a new machine which simulates the execution of the original, taking an arbitrary initial state as input, halting as soon as it outputs a single digit. Then the modified machine always halts if and only if the original machine is circle-free.
 \end{itemize}
 
-Turing's results may seem somewhat narrow, in that they only have applicability to Turing machines that answer questions about other Turing machines. However, at around the same time, Alonzo Church independently invented a formal system called the \index{lambda calculus}\emph{lambda calculus}, and demonstrated a similar undecidability result \cite{church}. Upon hearing of his work, Turing went on to become Church's student; it was later shown that every lambda-computable function can be expressed by Turing machine, and vice versa, so the two formalisms have equal expressive power. Indeed, every other computational formalism discovered so far has been shown to be equivalent to the Turing machine. The \emph{Church-Turing thesis} is the statement that all forms of universal computation are equivalent in this sense.
+Before we look at an informal proof of the undecidability of the halting problem, we make a philosophical remark. Turing's results have value because they are not narrowly just about the Turing machine formalism itself, but any form of computation capable of simulating a Turing machine. Concurrently with Turing's work, Alonzo Church invented a formal system called the \index{lambda calculus}\emph{lambda calculus}, and demonstrated a similar undecidability result \cite{church}; Turing actually went on to become Church's student. It was then shown that every lambda-computable function can be expressed by Turing machine and vice versa, showing the two formalisms have equal expressive power. Indeed, every computational formalism discovered since has been shown to be equivalent to the Turing machine. The \emph{Church-Turing thesis} is the statement that all forms of universal computation are equivalent in this sense.
 
-Here is an informal proof of the insolvability of the halting problem. For simplicity, suppose we're working in a Swift dialect with a facility for introspection of function values: either by giving their source code, syntax tree, machine code, or anything else. This isn't strictly necessary though; with a bit of setup, the function type \texttt{() -> ()} appearing below could be replaced with \texttt{String}, or \texttt{Array<Int>}, or any other possible representation of an arbitrary program. We also require our functions to be deterministic, in the sense that every execution carries out the same series of steps, and they do not depend on any external input or output, other than the arguments given to the function itself.
+We know Swift is Turing-complete, so we can prove the halting problem with an imagined Swift dialect having an introspection facility for function values: either giving their source code, syntax tree, machine code, or anything else. (This is not a real requirement though; with a bit of setup, the function type \texttt{() -> ()} appearing below could be replaced with \texttt{String}, or \texttt{Array<Int>}, or any other possible representation of a computable function.) We also require our functions to be deterministic, in the sense that every execution carries out the same series of steps, and they do not depend on any external input or output, other than the arguments given to the function itself.
 
-Now, we assume we have a magical function, that in a finite number of steps, can determine if some other function always halts---a \emph{termination checker}:
+Now, we assume we have a magical function, that in a finite number of steps, can decide if some other function always halts---a \emph{termination checker}:
 \begin{Verbatim}
 func halts(_ f: () -> ()) -> Bool {...}
 \end{Verbatim}
-In other words, \texttt{halts(f)} returns true if a call to \texttt{f()} eventually returns, or false if \texttt{f()} runs forever. Furthermore, we're assuming that \texttt{halts()} itself computes a result in a finite number of steps; this rules out a trivial implementation of \texttt{halts()} which ``determines'' if \texttt{f()} halts by running it:
+In other words, \texttt{halts(f)} returns true if a call to \texttt{f()} eventually returns, or false if \texttt{f()} runs forever. Furthermore, we're assuming that \texttt{halts()} itself computes a result in a finite number of steps; this rules out a trivial implementation of \texttt{halts()} which ``decides'' if \texttt{f()} halts by running it:
 \begin{Verbatim}
 func halts(_ f: () -> ()) -> Bool {
   f()  // This is cheating and doesn't count!
@@ -1013,9 +1013,9 @@ func naughty() {
 }
 \end{Verbatim}
 
-This function is naughty, because it leads to a contradiction. If \texttt{halts(naughty)} were to return true, then \texttt{naughty()} would run forever, thus \texttt{halts(naughty)} cannot be true. Correspondingly, if \texttt{halts(naughty)} were to return false, then \texttt{naughty()} would terminate, so \texttt{halts(naughty)} cannot be false. The only other possibility is that \texttt{halts(naughty)} runs forever without returning anything. But this cannot happen either, since we assumed that \texttt{halts()} itself makes its determination in a finite number of steps. Thus, as specified, no such function \texttt{halts()} can exist. Thus, the halting problem is \index{undecidable problem}\emph{undecidable}.
+This function is naughty, because it leads to a contradiction. If \texttt{halts(naughty)} were to return true, then \texttt{naughty()} would run forever, thus \texttt{halts(naughty)} cannot be true. Correspondingly, if \texttt{halts(naughty)} were to return false, then \texttt{naughty()} would terminate, so \texttt{halts(naughty)} cannot be false. The only other possibility is that \texttt{halts(naughty)} runs forever without returning anything. But this cannot happen either, since we assumed that \texttt{halts()} itself makes its determination in a finite number of steps. Thus, no function \texttt{halts()} can exist with the behavior we specified---we say the halting problem is \index{undecidable problem}\emph{undecidable}.
 
-To make this argument precise, some care must be taken in the formal construction of the ``fixed point'' \texttt{naughty()} function, on whose existence the whole argument hinges. The intuition here, though, is that in any sufficiently expressive formal system, we can always ``outwit'' any purported termination checking algorithm, no matter how sophisticated it may appear to be, by encoding the termination checker itself within our formalism.
+To make this argument precise, some care must be taken in the formal construction of the ``fixed point'' \texttt{naughty()} function, on whose existence the whole argument hinges. The intuition here, though, is that in any sufficiently expressive formal system, we can always ``outwit'' any purported termination checking algorithm, no matter how sophisticated it may appear to be, by encoding the termination checker itself within our formalism, and acting on what it might do.
 
 Note that while termination checking is undecidable in full generality, we can still solve restricted forms of the problem:
 \begin{enumerate}

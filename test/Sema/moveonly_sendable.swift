@@ -125,7 +125,7 @@ func tryToCastIt(_ fd: borrowing FileDescriptor) {
 }
 
 protocol GiveSendable<T> {
-  associatedtype T: Sendable // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+  associatedtype T: Sendable // expected-note {{protocol requires nested type 'T'; add nested type 'T' for conformance}}
   func give() -> T
 }
 

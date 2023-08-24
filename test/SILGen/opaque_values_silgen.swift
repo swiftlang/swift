@@ -14,6 +14,11 @@ func genericInout<T>(_: inout T) {}
 
 func hasVarArg(_ args: Any...) {}
 
+@_silgen_name("sink")
+func sink<T>(_ t: consuming T) {}
+@_silgen_name("source")
+func source<T>(_ t: T.Type) -> T
+
 // Test array initialization - we are still (somewhat) using addresses
 // ---
 // CHECK-LABEL: sil [ossa] @$s20opaque_values_silgen10callVarArgyyF : $@convention(thin) () -> () {
@@ -672,7 +677,7 @@ func set<Container, Field>(into container: inout Container, at keyPath: Writable
 // CHECK-SAME:      [[CONTAINER:%[^,]+]] :
 // CHECK:         [[CONTAINER_COPY:%[^,]+]] = copy_value [[CONTAINER]]
 // CHECK:         [[SETTER:%[^,]+]] = class_method [[CONTAINER_COPY]]
-// CHECK:         [[REGISTER_4:%[^,]+]] = apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
+// CHECK:         apply [[SETTER]]([[VALUE]], [[CONTAINER_COPY]])
 // CHECK:         destroy_value [[CONTAINER_COPY]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen16FormClassKeyPathyyF1QL_C1qSivpADTk'
 @_silgen_name("FormClassKeyPath")
@@ -781,4 +786,40 @@ func intIntoAnyHashableVar() {
 @_silgen_name("intIntoAnyHashableLet")
 func intIntoAnyHashableLet() {
   let anyHashable: AnyHashable = 0
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfOwnedAddrOnlyValue : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[T_LIFETIME:%[^,]+]] = begin_borrow [[T]]
+// CHECK:         [[T_COPY:%[^,]+]] = copy_value [[T_LIFETIME]]
+// CHECK:         [[T_MOVE:%[^,]+]] = move_value [allows_diagnostics] [[T_COPY]]
+// CHECK:         [[SINK:%[^,]+]] = function_ref @sink
+// CHECK:         apply [[SINK]]<T>([[T_MOVE]])
+// CHECK:         end_borrow [[T_LIFETIME]]
+// CHECK:         destroy_value [[T]]
+// CHECK-LABEL: } // end sil function 'consumeExprOfOwnedAddrOnlyValue'
+@_silgen_name("consumeExprOfOwnedAddrOnlyValue")
+func consumeExprOfOwnedAddrOnlyValue<T>(_ t: __owned T) {
+  sink(consume t)
+}
+
+// CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfLoadExprOfOwnedAddrOnlyLValue : {{.*}} {
+// CHECK:         [[VAR:%[^,]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VAR]]
+// CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
+// CHECK:         store {{%[^,]+}} to [init] [[VAR_ADDR]]
+// CHECK:         [[VAR_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[VAR_ADDR]]
+// CHECK:         [[TEMPORARY_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         mark_unresolved_move_addr [[VAR_ACCESS]] to [[TEMPORARY_ADDR]]
+// CHECK:         [[TEMPORARY:%[^,]+]] = load [take] [[TEMPORARY_ADDR]]
+// CHECK:         end_access [[VAR_ACCESS]]
+// CHECK:         [[SINK:%[^,]+]] = function_ref @sink
+// CHECK:         apply [[SINK]]<T>([[TEMPORARY]])
+// CHECK:         dealloc_stack [[TEMPORARY_ADDR]]
+// CHECK:         destroy_value [[VAR]]
+// CHECK-LABEL: } // end sil function 'consumeExprOfLoadExprOfOwnedAddrOnlyLValue'
+@_silgen_name("consumeExprOfLoadExprOfOwnedAddrOnlyLValue")
+func consumeExprOfLoadExprOfOwnedAddrOnlyLValue<T>(_ ty: T.Type) {
+  var t = source(ty)
+  sink(consume t)
 }

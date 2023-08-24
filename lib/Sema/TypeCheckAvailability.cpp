@@ -2367,7 +2367,8 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
         // renaming fix-it doesn't need do be produced.
         if ((parsed.ContextName.empty() ||
              parsed.ContextName == callContextName) &&
-            CE->getCalledValue()->getBaseName() == parsed.BaseName) {
+            CE->getCalledValue(/*skipFunctionConversions=*/true)
+                    ->getBaseName() == parsed.BaseName) {
           shouldEmitRenameFixit = false;
         }
       }

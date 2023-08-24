@@ -147,7 +147,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     ///
     /// The only difference between the ranking kind and the kind is
     /// that implied conformances originating from a synthesized
-    /// conformance are considered to be synthesized (which has a
+    /// or pre-macro-expansion conformance are considered to be synthesized (which has a
     /// lower ranking).
     ConformanceEntryKind getRankingKind() const {
       switch (auto kind = getKind()) {
@@ -157,11 +157,22 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       case ConformanceEntryKind::PreMacroExpansion:
         return kind;
 
-      case ConformanceEntryKind::Implied:
-        return (getImpliedSource()->getDeclaredConformance()->getKind()
-                  == ConformanceEntryKind::Synthesized)
-                 ? ConformanceEntryKind::Synthesized
-                 : ConformanceEntryKind::Implied;
+      case ConformanceEntryKind::Implied: {
+        auto impliedSourceKind =
+        getImpliedSource()->getDeclaredConformance()->getKind();
+        switch (impliedSourceKind) {
+          case ConformanceEntryKind::Synthesized:
+          case ConformanceEntryKind::PreMacroExpansion:
+            return impliedSourceKind;
+
+          case ConformanceEntryKind::Explicit:
+          case ConformanceEntryKind::Inherited:
+            return ConformanceEntryKind::Implied;
+
+          case ConformanceEntryKind::Implied:
+            return getImpliedSource()->getRankingKind();
+        }
+      }
       }
 
       llvm_unreachable("Unhandled ConformanceEntryKind in switch.");

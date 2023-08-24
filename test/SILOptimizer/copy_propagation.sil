@@ -16,6 +16,10 @@ class C {
   var a: Builtin.Int64
 }
 
+struct MOS : ~Copyable {
+  deinit {}
+}
+
 sil [ossa] @dummy : $@convention(thin) () -> ()
 sil [ossa] @barrier : $@convention(thin) () -> ()
 sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
@@ -26,6 +30,7 @@ sil [ossa] @takeOwnedCAndGuaranteedC : $@convention(thin) (@owned C, @guaranteed
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @borrowB : $@convention(thin) (@guaranteed B) -> ()
 sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+sil [ossa] @getMOS : $() -> (@owned MOS)
 
 // -O hoists the destroy
 //
@@ -1044,6 +1049,26 @@ entry(%instance : @owned $C):
   %consumeAndBorrow = function_ref @takeOwnedCAndGuaranteedC : $@convention(thin) (@owned C, @guaranteed C) -> ()
   apply %consumeAndBorrow(%copy, %instance) : $@convention(thin) (@owned C, @guaranteed C) -> ()
   destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dontShortenDeadMoveOnlyLifetime : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getMOS
+// CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
+// CHECK:         [[MOS:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[MOV:%[^,]+]] = move_value [lexical] [[MOS]]
+// CHECK:         apply [[BARRIER]]()
+// CHECK:         destroy_value [[MOV]]
+// CHECK-LABEL: } // end sil function 'dontShortenDeadMoveOnlyLifetime'
+sil [ossa] @dontShortenDeadMoveOnlyLifetime : $@convention(thin) () -> () {
+  %get = function_ref @getMOS : $@convention(thin) () -> (@owned MOS)
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  %mos = apply %get() : $@convention(thin) () -> (@owned MOS)
+  // Note: This must be lexical so that it doesn't get eliminated as redundant.
+  %mov = move_value [lexical] %mos : $MOS
+  apply %barrier() : $@convention(thin) () -> ()
+  destroy_value %mov : $MOS
   %retval = tuple ()
   return %retval : $()
 }

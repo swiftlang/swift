@@ -686,12 +686,22 @@ static void explodeTuple(SILGenFunction &SGF, SILLocation loc,
   }
 
   for (auto element : elements) {
-    if (!isPlusOne)
-      out.push_back(ManagedValue::forUnmanaged(element));
-    else if (element->getType().isAddress())
+    if (element->getType().isTrivial(SGF.F)) {
+      out.push_back(ManagedValue::forRValueWithoutOwnership(element));
+      continue;
+    }
+
+    if (!isPlusOne) {
+      out.push_back(ManagedValue::forBorrowedRValue(element));
+      continue;
+    }
+
+    if (element->getType().isAddress()) {
       out.push_back(SGF.emitManagedBufferWithCleanup(element));
-    else
-      out.push_back(SGF.emitManagedRValueWithCleanup(element));
+      continue;
+    }
+
+    out.push_back(SGF.emitManagedRValueWithCleanup(element));
   }
 }
 
@@ -1491,8 +1501,9 @@ private:
     auto tuple = SGF.B.createTuple(Loc, loweredInnerTy, forwarded);
     if (tuple->getOwnershipKind() == OwnershipKind::Owned)
       return SGF.emitManagedRValueWithCleanup(tuple);
-
-    return ManagedValue::forUnmanaged(tuple);
+    if (tuple->getType().isTrivial(SGF.F))
+      return ManagedValue::forRValueWithoutOwnership(tuple);
+    return ManagedValue::forBorrowedRValue(tuple);
   }
 
 
@@ -1537,7 +1548,9 @@ private:
         payload.forward(SGF);
         return SGF.emitManagedBufferWithCleanup(optionalBuf);
       }
-      return ManagedValue::forUnmanaged(optionalBuf);
+      if (optionalBuf->getType().isTrivial(SGF.F))
+        return ManagedValue::forTrivialAddressRValue(optionalBuf);
+      return ManagedValue::forBorrowedAddressRValue(optionalBuf);
     }
   }
 
@@ -1756,7 +1769,7 @@ private:
     // initially owned.
     if (inner.getOwnershipKind() == OwnershipKind::Unowned) {
       assert(!inner.hasCleanup());
-      inner = SGF.emitManagedRetain(Loc, inner.getValue());
+      inner = SGF.emitManagedCopy(Loc, inner.getValue());
     }
 
     // If the inner is unowned or owned, create a borrow.
@@ -4366,7 +4379,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
                        "reabstraction of returns_inner_pointer function");
       LLVM_FALLTHROUGH;
     case ResultConvention::Unowned:
-      return SGF.emitManagedRetain(Loc, resultValue, resultTL);
+      return SGF.emitManagedCopy(Loc, resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
   };

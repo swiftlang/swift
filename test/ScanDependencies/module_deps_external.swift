@@ -44,7 +44,7 @@ import SomeExternalModule
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-DAG: "swift": "F"
+// CHECK-DAG: "clang": "F"
 // CHECK-DAG: "swiftPlaceholder": "SomeExternalModule"
 // CHECK-DAG: "swift": "Swift"
 // CHECK-DAG: "swift": "SwiftOnoneSupport"
@@ -52,12 +52,6 @@ import SomeExternalModule
 // CHECK-DAG: "swift": "_StringProcessing"
 // CHECK-DAG: "clang": "_SwiftConcurrencyShims"
 // CHECK: ],
-
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
 
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -67,9 +61,21 @@ import SomeExternalModule
 // CHECK-NEXT: Bridging.h
 // CHECK-NEXT: BridgingOther.h
 
-// CHECK: "moduleDependencies": [
-// CHECK-NEXT: "F"
-// CHECK-NEXT: ]
+// CHECK:       "moduleDependencies": [
+// CHECK-NEXT:     "F"
+// CHECK-NEXT:  ],
+
+// CHECK:       "swiftOverlayDependencies": [
+// CHECK-NEXT:    {
+// CHECK-NEXT:      "swift": "F"
+// CHECK-NEXT:    }
+// CHECK-NEXT:  ]
+
+// CHECK:      "extraPcmArgs": [
+// CHECK-NEXT:    "-Xcc",
+// CHECK-NEXT:    "-target",
+// CHECK-NEXT:    "-Xcc",
+// CHECK:         "-fapinotes-swift-version=4"
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",

@@ -56,7 +56,7 @@ The Swift frontend implements a classic multi-stage compiler pipeline, shown in 
 \begin{itemize}
 \item \IndexDefinition{parser}\textbf{Parse:} First, all source files are parsed to form the \IndexDefinition{abstract syntax tree}\index{AST|see{abstract syntax tree}}\index{syntax tree|see{abstract syntax tree}}abstract syntax \index{tree}tree.
 \item \IndexDefinition{Sema}\textbf{Sema:} Semantic analysis type-checks and validates the abstract syntax tree.
-\item \IndexDefinition{SILGen}\textbf{SILGen:} The type-checked syntax tree is lowered to \IndexDefinition{raw SIL}``raw SIL.'' SIL is the Swift Intermediate Language, described in \cite{sil}.
+\item \IndexDefinition{SILGen}\textbf{SILGen:} The type-checked syntax tree is lowered to \IndexDefinition{raw SIL}``raw SIL.'' SIL is the Swift Intermediate Language, described in \cite{sil} and \cite{siltalk}.
 \item \IndexDefinition{SIL optimizer}\textbf{SILOptimizer:} The raw SIL is transformed into \IndexDefinition{canonical SIL}``canonical SIL'' by a series of \IndexDefinition{SIL mandatory pass}\emph{mandatory passes}, which analyze the control flow graph and emit diagnostics; for example, \IndexDefinition{definite initialization}\emph{definite initialization} ensures that all storage locations are initialized.
 
 When the \IndexFlag{O}\texttt{-O} command line flag is specified, the canonical SIL is further optimized by a series of \IndexDefinition{SIL performance pass}\emph{performance passes} with the goal of improving run-time performance and reducing code size.
@@ -500,7 +500,7 @@ Imported function declarations generally do not have bodies if the entry point w
 \IndexFlag{import-objc-header}
 Invoking the compiler with the \texttt{-import-objc-header} flag followed by a header file name specifies a \emph{bridging header}. This is a shortcut for making C declarations in the bridging header visible to all other source files in the main module, without having to define a separate Clang module first. This is implemented by adding a Clang file unit corresponding to the bridging header to the main module. For this reason, compiler code should not assume that all file units in the main module are necessarily source files.
 
-\paragraph{Textual interfaces} \IndexFlag{emit-module-interface}The Swift serialized module format depends on compiler internals and no attempt is made to preserve compatibility across compiler releases. When building a shared library for distribution, it is better to generate a \IndexDefinition{textual interface}\emph{textual interface}:
+\paragraph{Textual interfaces} \IndexFlag{emit-module-interface}The Swift serialized module format depends on compiler internals and no attempt is made to preserve compatibility across compiler releases. When building a shared library for distribution, it is better to generate a \IndexDefinition{textual interface}\emph{textual interface}:\index{horse}
 \begin{Verbatim}
 $ swiftc Horse.swift -enable-library-evolution -emit-module-interface
 \end{Verbatim}

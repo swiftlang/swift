@@ -10,7 +10,6 @@
 #
 # ----------------------------------------------------------------------------
 
-from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .curl import LibCurl
@@ -44,7 +43,6 @@ from .xctest import XCTest
 from .zlib import Zlib
 
 __all__ = [
-    'BackDeployConcurrency',
     'CMark',
     'Foundation',
     'LibCXX',

@@ -1343,6 +1343,25 @@ public struct EquatableViaMembersMacro: ExtensionMacro {
   }
 }
 
+public struct FooExtensionMacro: ExtensionMacro {
+  public static func expansion(of node: AttributeSyntax, attachedTo declaration: some DeclGroupSyntax, providingExtensionsOf type: some TypeSyntaxProtocol, conformingTo protocols: [TypeSyntax], in context: some MacroExpansionContext) throws -> [ExtensionDeclSyntax] {
+    let decl: DeclSyntax =
+    """
+    extension Foo {
+      var foo: String { "foo" }
+      func printFoo() {
+        print(foo)
+      }
+    }
+    """
+    guard let extensionDecl = decl.as(ExtensionDeclSyntax.self) else {
+      return []
+    }
+
+    return [extensionDecl]
+  }
+}
+
 public struct ConformanceViaExtensionMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -1376,6 +1395,19 @@ public struct HashableMacro: ExtensionMacro {
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
     let ext: DeclSyntax = "extension \(type.trimmed): Hashable {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
+public struct ImpliesHashableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type.trimmed): ImpliesHashable {}"
     return [ext.cast(ExtensionDeclSyntax.self)]
   }
 }
@@ -1557,6 +1589,28 @@ public struct DefineStructWithUnqualifiedLookupMacro: DeclarationMacro {
 
       func foo() -> Int {
         hello + world // looks up "world" in the parent scope
+      }
+    }
+    """]
+  }
+}
+
+public struct DefineComparableTypeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["""
+    struct ComparableType: Comparable {
+      static func <(lhs: ComparableType, rhs: ComparableType) -> Bool {
+        return false
+      }
+
+      enum Inner: String, Comparable {
+        case hello = "hello"
+        static func <(lhs: ComparableType.Inner, rhs: ComparableType.Inner) -> Bool {
+          return lhs.rawValue < rhs.rawValue
+        }
       }
     }
     """]
@@ -1913,5 +1967,26 @@ public struct NestedMagicLiteralMacro: ExpressionMacro {
         print(#MagicLine)
       }()
       """
+  }
+}
+
+public struct InitWithProjectedValueWrapperMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      private var _value: Wrapper
+      var _$value: Wrapper {
+        @storageRestrictions(initializes: _value)
+        init {
+          self._value = newValue
+        }
+        get { _value }
+      }
+      """
+    ]
   }
 }
