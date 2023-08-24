@@ -1826,12 +1826,12 @@ private:
                              AbstractionPattern outerOrigType,
                              CanType outerSubstType,
                              ManagedValue outer,
-                             SILParameterInfo result) {
-    auto resultTy = SGF.getSILType(result, InnerTypesFuncTy);
+                             SILParameterInfo innerParam) {
+    auto innerTy = SGF.getSILType(innerParam, InnerTypesFuncTy);
 
     return processSingle(innerOrigType, innerSubstType,
                          outerOrigType, outerSubstType,
-                         outer, resultTy, result.getConvention());
+                         outer, innerTy, innerParam.getConvention());
   }
 
   ManagedValue processSingle(AbstractionPattern innerOrigType,
@@ -1839,47 +1839,47 @@ private:
                              AbstractionPattern outerOrigType,
                              CanType outerSubstType,
                              ManagedValue outer,
-                             SILType resultTy,
-                             ParameterConvention resultConvention) {
+                             SILType innerTy,
+                             ParameterConvention innerConvention) {
     // Easy case: we want to pass exactly this value.
-    if (outer.getType() == resultTy) {
-      if (isConsumedParameter(resultConvention) && !outer.isPlusOne(SGF)) {
+    if (outer.getType() == innerTy) {
+      if (isConsumedParameter(innerConvention) && !outer.isPlusOne(SGF)) {
         outer = outer.copyUnmanaged(SGF, Loc);
       }
 
       return outer;
     }
 
-    switch (resultConvention) {
+    switch (innerConvention) {
     // Direct translation is relatively easy.
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
       return processIntoOwned(innerOrigType, innerSubstType,
                               outerOrigType, outerSubstType,
-                              outer, resultTy);
+                              outer, innerTy);
     case ParameterConvention::Direct_Guaranteed:
       return processIntoGuaranteed(innerOrigType, innerSubstType,
                                    outerOrigType, outerSubstType,
-                                   outer, resultTy);
+                                   outer, innerTy);
     case ParameterConvention::Indirect_In: {
       if (SGF.silConv.useLoweredAddresses()) {
         return processIndirect(innerOrigType, innerSubstType,
                                outerOrigType, outerSubstType,
-                               outer, resultTy);
+                               outer, innerTy);
       }
       return processIntoOwned(innerOrigType, innerSubstType,
                               outerOrigType, outerSubstType,
-                              outer, resultTy);
+                              outer, innerTy);
     }
     case ParameterConvention::Indirect_In_Guaranteed: {
       if (SGF.silConv.useLoweredAddresses()) {
         return processIndirect(innerOrigType, innerSubstType,
                                outerOrigType, outerSubstType,
-                               outer, resultTy);
+                               outer, innerTy);
       }
       return processIntoGuaranteed(innerOrigType, innerSubstType,
                                    outerOrigType, outerSubstType,
-                                   outer, resultTy);
+                                   outer, innerTy);
     }
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
