@@ -129,6 +129,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", tru
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
 
+// Whether to compile scripts lazily in immediate mode
+EXPERIMENTAL_FEATURE(LazyImmediate, false)
+
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those
 // tests in non-asserts builds too.

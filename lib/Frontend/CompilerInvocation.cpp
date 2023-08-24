@@ -1424,6 +1424,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
 
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
+    Opts.DeferToRuntime = true;
+
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   return HadError;
