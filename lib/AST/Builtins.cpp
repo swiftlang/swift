@@ -1609,7 +1609,8 @@ static ValueDecl *getBuildComplexEqualitySerialExecutorRef(ASTContext &ctx,
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
-      id, {BuiltinIntegerType::getWordType(ctx)}, ctx.TheNativeObjectType);
+    ctx, id, _thin, _generics(_unrestricted), 
+    _parameters(_metatype(_typeparam(0))), _nativeObject);
 }
 
 static ValueDecl *getAutoDiffProjectTopLevelSubcontext(ASTContext &ctx,
@@ -1621,8 +1622,8 @@ static ValueDecl *getAutoDiffProjectTopLevelSubcontext(ASTContext &ctx,
 static ValueDecl *getAutoDiffAllocateSubcontext(ASTContext &ctx,
                                                 Identifier id) {
   return getBuiltinFunction(
-      id, {ctx.TheNativeObjectType, BuiltinIntegerType::getWordType(ctx)},
-      ctx.TheRawPointerType);
+      ctx, id, _thin, _generics(_unrestricted),
+      _parameters(_nativeObject, _metatype(_typeparam(0))), _rawPointer);
 }
 
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
@@ -2966,13 +2967,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
 
-  case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+  case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     return getAutoDiffCreateLinearMapContext(Context, Id);
 
   case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     return getAutoDiffProjectTopLevelSubcontext(Context, Id);
 
-  case BuiltinValueKind::AutoDiffAllocateSubcontext:
+  case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     return getAutoDiffAllocateSubcontext(Context, Id);
   }
 
