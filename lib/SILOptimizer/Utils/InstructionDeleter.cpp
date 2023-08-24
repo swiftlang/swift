@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
@@ -60,6 +60,21 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
   if (!hasOnlyEndOfScopeOrEndOfLifetimeUses(inst)) {
     return false;
   }
+
+  // If inst has any owned move-only value as a result, deleting it may shorten
+  // that value's lifetime which is illegal according to language rules.
+  //
+  // In particular, this check is needed before returning true when
+  // getSingleValueCopyOrCast returns true.  That function returns true for
+  // move_value instructions.  And `move_value %moveOnlyValue` must not be
+  // deleted.
+  for (auto result : inst->getResults()) {
+    if (result->getType().isPureMoveOnly() &&
+        result->getOwnershipKind() == OwnershipKind::Owned) {
+      return false;
+    }
+  }
+
   // If inst is a copy or beginning of scope, inst is dead, since we know that
   // it is used only in a destroy_value or end-of-scope instruction.
   if (getSingleValueCopyOrCast(inst))
