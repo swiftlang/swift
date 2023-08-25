@@ -1627,11 +1627,18 @@ public:
   }
 };
 
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//                         MARK: Top Level Entrypoint
+//===----------------------------------------------------------------------===//
+
+namespace {
+
 // this class is the entry point to the region-based Sendable analysis,
 // after certain checks are performed to ensure the analysis can be completed
 // a PartitionAnalysis object is created and used to run the analysis.
 class SendNonSendable : public SILFunctionTransform {
-
   // find any ApplyExprs in this function, and check if any of them make an
   // unsatisfied isolation jump, emitting appropriate diagnostics if so
   void run() override {
@@ -1651,19 +1658,20 @@ class SendNonSendable : public SILFunctionTransform {
             Feature::SendNonSendable))
       return;
 
-    // if the Sendable protocol is not available, don't perform this checking
-    // because we'd have to conservatively treat every value as non-Sendable
-    // which would be very expensive
+    // The sendable protocol should /always/ be available if SendNonSendable is
+    // enabled. If not, there is a major bug in the compiler and we should fail
+    // loudly.
     if (!function->getASTContext().getProtocol(KnownProtocolKind::Sendable))
-      return;
+      llvm::report_fatal_error("Sendable protocol not available!");
 
     PartitionAnalysis::performForFunction(function);
   }
 };
-}
+
+} // end anonymous namespace
 
 /// This pass is known to depend on the following passes having run before it:
-/// none so far
+/// none so far.
 SILTransform *swift::createSendNonSendable() {
   return new SendNonSendable();
 }
