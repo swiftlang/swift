@@ -320,9 +320,9 @@ function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
   }
 }
 
-function Append-FlagsDefine([hashtable]$Defines, [string]$Name, [string]$Value) {
+function Append-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value) {
   if ($Defines.Contains($Name)) {
-    $Defines[$name] += " $Value" 
+    $Defines[$name] = @($Defines[$name]) + $Value
   } else {
     $Defines.Add($Name, $Value)
   }
@@ -354,7 +354,7 @@ function Build-CMakeProject {
     [string[]] $UseMSVCCompilers = @(), # C,CXX
     [string[]] $UseBuiltCompilers = @(), # ASM,C,CXX,Swift
     [string] $SwiftSDK = "",
-    [hashtable] $Defines = @{},
+    [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
   )
 
@@ -374,14 +374,16 @@ function Build-CMakeProject {
 
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
+
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE $BuildType
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
     $GenerateDebugInfo = $Defines["CMAKE_BUILD_TYPE"] -ne "Release"
-    $Zi = if ($GenerateDebugInfo) { "/Zi" } else { "" }
 
-    $CFlags = "/GS- /Gw /Gy /Oi /Oy $Zi /Zc:inline"
-    $CXXFlags = "/GS- /Gw /Gy /Oi /Oy $Zi /Zc:inline /Zc:__cplusplus"
+    $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+    if ($GenerateDebugInfo) { $CFlags += "/Zi" }
+    $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
+
     if ($UseMSVCCompilers.Contains("C")) {
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
@@ -430,34 +432,32 @@ function Build-CMakeProject {
       $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
       $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
-      $SwiftArgs = [System.Collections.ArrayList]@()
+      $SwiftArgs = @()
 
       if ($SwiftSDK -ne "") {
-        $SwiftArgs.Add("-sdk $SwiftSDK") | Out-Null
+        $SwiftArgs += @("-sdk", $SwiftSDK)
       } else {
-        $SwiftArgs.Add("-resource-dir $SwiftResourceDir") | Out-Null
-        $SwiftArgs.Add("-L $SwiftResourceDir\windows") | Out-Null
-        $SwiftArgs.Add("-vfsoverlay $RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml") | Out-Null
+        $SwiftArgs += @("-resource-dir", "$SwiftResourceDir")
+        $SwiftArgs += @("-L", "$SwiftResourceDir\windows")
+        $SwiftArgs += @("-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml")
       }
 
       # Debug Information
       if ($GenerateDebugInfo) {
         if ($SwiftDebugFormat -eq "dwarf") {
-          $SwiftArgs.Add("-g -Xlinker /DEBUG:DWARF -use-ld=lld-link") | Out-Null
+          $SwiftArgs += @("-g", "-Xlinker", "/DEBUG:DWARF", "-use-ld=lld-link")
         } else {
-          $SwiftArgs.Add("-g -debug-info-format=codeview -Xlinker -debug") | Out-Null
+          $SwiftArgs += @("-g", "-debug-info-format=codeview", "-Xlinker", "-debug")
         }
       } else {
-        $SwiftArgs.Add("-gnone") | Out-Null
+        $SwiftArgs += "-gnone"
       }
-      $SwiftArgs.Add("-Xlinker /INCREMENTAL:NO") | Out-Null
+      $SwiftArgs += @("-Xlinker", "/INCREMENTAL:NO")
 
       # Swift Requries COMDAT folding and de-duplication
-      $SwiftArgs.Add("-Xlinker /OPT:REF") | Out-Null
-      $SwiftArgs.Add("-Xlinker /OPT:ICF") | Out-Null
-
-      $SwiftcFlags = $SwiftArgs.ToArray() -Join " "
-      Append-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftcFlags
+      $SwiftArgs += @("-Xlinker", "/OPT:REF")
+      $SwiftArgs += @("-Xlinker", "/OPT:ICF")
+      Append-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftArgs
 
       # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
       Append-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELEASE "-O"
@@ -473,15 +473,32 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-C", $CacheScript)
     }
     foreach ($Define in ($Defines.GetEnumerator() | Sort-Object Name)) {
-      # Avoid backslashes in defines since they are going into CMakeCache.txt,
-      # where they are interpreted as escapes. Assume all backslashes
-      # are path separators and can be turned into forward slashes.
-      $ValueWithPlaceholder = if ($SwiftSDK -ne "") { $Define.Value.Replace("$SwiftSDK", "<SDK>") } else { $Define.Value }
-      $ValueWithForwardSlashes = $ValueWithPlaceholder.Replace("\", "/")
-      if ($SwiftSDK -ne "") {
-        $ValueWithForwardSlashes = $ValueWithForwardSlashes.Replace("<SDK>", "\`"$SwiftSDK\`"")
+      # The quoting gets tricky to support defines containing compiler flags args,
+      # some of which can contain spaces, for example `-D` `Flags=-flag "C:/Program Files"`
+      # Avoid backslashes since they are going into CMakeCache.txt,
+      # where they are interpreted as escapes.
+      if ($Define.Value -is [string]) {
+        # Single token value, no need to quote spaces, the splat operator does the right thing.
+        $Value = $Define.Value.Replace("\", "/")
+      } else {
+        # Flags array, multiple tokens, quoting needed for tokens containing spaces
+        $Value = ""
+        foreach ($Arg in $Define.Value) {
+          if ($Value.Length -gt 0) {
+            $Value += " "
+          }
+
+          $ArgWithForwardSlashes = $Arg.Replace("\", "/")
+          if ($ArgWithForwardSlashes.Contains(" ")) {
+            # Quote and escape the quote so it makes it through
+            $Value += "\""$ArgWithForwardSlashes\"""
+          } else {
+            $Value += $ArgWithForwardSlashes
+          }
+        }
       }
-      $cmakeGenerateArgs += @("-D", "$($Define.Key)=$ValueWithForwardSlashes")
+
+      $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
     Invoke-Program cmake.exe @cmakeGenerateArgs
@@ -839,7 +856,7 @@ function Build-Runtime($Arch) {
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
       SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
       SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
-      CMAKE_SHARED_LINKER_FLAGS = "/INCREMENTAL:NO /OPT:REF /OPT:ICF";
+      CMAKE_SHARED_LINKER_FLAGS = @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF");
     }
 
   Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
@@ -897,7 +914,7 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
         # Turn off safeseh for lld as it has safeseh enabled by default
         # and fails with an ICU data object file icudt69l_dat.obj. This
         # matters to X86 only.
-        CMAKE_Swift_FLAGS = if ($Arch -eq $ArchX86) { "-Xlinker /SAFESEH:NO" } else { "" };
+        CMAKE_Swift_FLAGS = if ($Arch -eq $ArchX86) { @("-Xlinker", "/SAFESEH:NO") } else { "" };
         CURL_DIR = "$LibraryRoot\curl-7.77.0\usr\lib\$ShortArch\cmake\CURL";
         ICU_DATA_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicudt69.lib";
         ICU_I18N_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicuin69.lib";
@@ -1267,7 +1284,7 @@ function Build-PackageManager($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      CMAKE_Swift_FLAGS = "-DCRYPTO_v2";
+      CMAKE_Swift_FLAGS = @("-DCRYPTO_v2");
       SwiftSystem_DIR = "$BinaryCache\2\cmake\modules";
       TSC_DIR = "$BinaryCache\3\cmake\modules";
       LLBuild_DIR = "$BinaryCache\4\cmake\modules";
@@ -1292,8 +1309,8 @@ function Build-IndexStoreDB($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
-      CMAKE_C_FLAGS = "-Xclang -fno-split-cold-code -I$SDKInstallRoot\usr\include -I$SDKInstallRoot\usr\include\Block";
-      CMAKE_CXX_FLAGS = "-Xclang -fno-split-cold-code -I$SDKInstallRoot\usr\include -I$SDKInstallRoot\usr\include\Block";
+      CMAKE_C_FLAGS = @("-Xclang", "-fno-split-cold-code", "-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
+      CMAKE_CXX_FLAGS = @("-Xclang", "-fno-split-cold-code", "-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
     }
 }
 
@@ -1513,6 +1530,6 @@ if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
 if (-not $SkipPackaging -and $Stage -ne "") {
   $Stage += "\" # Interpret as target directory
 
-  Copy-File "$($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\*.msi" $Stage
-  Copy-File "$($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\installer.exe" $Stage
+  Copy-File "$($HostArch.BinaryCache)\msi\*.msi" $Stage
+  Copy-File "$($HostArch.BinaryCache)\installer.exe" $Stage
 }
