@@ -390,13 +390,22 @@ internal func _merge<Element>(
     // moved from either `bufferLow` or `srcLow`, with those pointers
     // incrementing as elements are moved.
     while bufferLow < bufferHigh && srcLow < high {
-      if try areInIncreasingOrder(srcLow.pointee, bufferLow.pointee) {
-        destLow.moveInitialize(from: srcLow, count: 1)
-        srcLow += 1
-      } else {
-        destLow.moveInitialize(from: bufferLow, count: 1)
-        bufferLow += 1
-      }
+      // Branchless algorithm, equivalent to:
+      //     if try areInIncreasingOrder(srcLow.pointee, bufferLow.pointee) {
+      //       destLow.moveInitialize(from: srcLow, count: 1)
+      //       srcLow += 1
+      //     } else {
+      //       destLow.moveInitialize(from: bufferLow, count: 1)
+      //       bufferLow += 1
+      //     }
+      //     destLow += 1
+      let (moveSource, srcOffset) =
+        try areInIncreasingOrder(srcLow.pointee, bufferLow.pointee)
+          ? (srcLow, 1)
+          : (bufferLow, 0)
+      destLow.moveInitialize(from: moveSource, count: 1)
+      srcLow += srcOffset
+      bufferLow += (1 &- srcOffset)
       destLow += 1
     }
   } else {
@@ -428,20 +437,31 @@ internal func _merge<Element>(
     // Note: At the start of each iteration, each `...High` pointer points one
     // past the element they're referring to.
     while bufferHigh > bufferLow && srcHigh > low {
+      // Branchless algorithm, equivalent to:
+      //     destHigh -= 1
+      //     if try areInIncreasingOrder(
+      //       (bufferHigh - 1).pointee, (srcHigh - 1).pointee
+      //     ) {
+      //       srcHigh -= 1
+      //       destHigh.moveInitialize(from: srcHigh, count: 1)
+      //
+      //       // Moved an element from the lower initialized portion to the upper,
+      //       // sorted, initialized portion, so `destLow` moves down one.
+      //       destLow -= 1
+      //     } else {
+      //       bufferHigh -= 1
+      //       destHigh.moveInitialize(from: bufferHigh, count: 1)
+      //     }
+      let (moveFromSource, srcOffset) =
+        try areInIncreasingOrder((bufferHigh - 1).pointee, (srcHigh - 1).pointee)
+          ? (true, 1)
+          : (false, 0)
+
+      srcHigh -= srcOffset
+      destLow -= srcOffset
+      bufferHigh -= (1 &- srcOffset)
       destHigh -= 1
-      if try areInIncreasingOrder(
-        (bufferHigh - 1).pointee, (srcHigh - 1).pointee
-      ) {
-        srcHigh -= 1
-        destHigh.moveInitialize(from: srcHigh, count: 1)
-        
-        // Moved an element from the lower initialized portion to the upper,
-        // sorted, initialized portion, so `destLow` moves down one.
-        destLow -= 1
-      } else {
-        bufferHigh -= 1
-        destHigh.moveInitialize(from: bufferHigh, count: 1)
-      }
+      destHigh.moveInitialize(from: moveFromSource ? srcHigh : bufferHigh, count: 1)
     }
   }
 
