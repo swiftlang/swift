@@ -72,6 +72,7 @@
 #include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
+#include "GenTuple.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
@@ -3184,6 +3185,38 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     return MetadataResponse::forComplete(capturedWTable);
   }
 
+  case Component::Kind::TuplePack: {
+    assert(component.getPrimaryIndex() == 0);
+
+    auto tupleType = cast<TupleType>(sourceKey.Type);
+    auto packType = tupleType.getInducedPackType();
+
+    sourceKey.Kind = LocalTypeDataKind::forFormalTypeMetadata();
+    sourceKey.Type = packType;
+
+    if (!source) return MetadataResponse();
+
+    auto sourceMetadata = source.getMetadata();
+    return emitInducedTupleTypeMetadataPackRef(IGF, packType,
+                                               sourceMetadata);
+  }
+
+  case Component::Kind::TupleShape: {
+    assert(component.getPrimaryIndex() == 0);
+
+    auto tupleType = cast<TupleType>(sourceKey.Type);
+
+    sourceKey.Kind = LocalTypeDataKind::forPackShapeExpression();
+    sourceKey.Type = tupleType.getInducedPackType();
+
+    if (!source) return MetadataResponse();
+
+    auto sourceMetadata = source.getMetadata();
+    auto count = irgen::emitTupleTypeMetadataLength(IGF, sourceMetadata);
+
+    return MetadataResponse::forComplete(count);
+  }
+
   case Component::Kind::Impossible:
     llvm_unreachable("following an impossible path!");
 
@@ -3222,10 +3255,16 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
       out << "pack_expansion_count[" << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::PackExpansionPattern:
-      out << "pack_expansion_patttern[" << component.getPrimaryIndex() << "]";
+      out << "pack_expansion_pattern[" << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::ConditionalConformance:
       out << "conditional_conformance[" << component.getPrimaryIndex() << "]";
+      break;
+    case Component::Kind::TuplePack:
+      out << "tuple_pack";
+      break;
+    case Component::Kind::TupleShape:
+      out << "tuple_shape";
       break;
     case Component::Kind::Impossible:
       out << "impossible";
