@@ -1616,6 +1616,74 @@ public:
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
   }
 
+  void visitInjectEnumAddrInst(InjectEnumAddrInst *inject) {
+    SILBasicBlock *bb = inject->getParent();
+    SILValue origEnum = inject->getOperand();
+    bool unsupported = false;
+
+    // Only `Optional`-typed operands are supported for now. Diagnose all other
+    // enum operand types.
+    //
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+    if (origEnum->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Unsupported enum type in PullbackCloner: " << *inject);
+      unsupported = true;
+    }
+
+    InitEnumDataAddrInst *origData = nullptr;
+    for (auto use : origEnum->getUses()) {
+      if (auto *init = dyn_cast<InitEnumDataAddrInst>(use->getUser())) {
+        // We need a more complicated analysis when init_enum_data_addr and
+        // inject_enum_addr are in different blocks, or there is more than one
+        // such instruction. Bail out for now.
+        //
+        if (origData || init->getParent() != bb) {
+          LLVM_DEBUG(getADDebugStream()
+                     << "Could not find a matching init_enum_data_addr for: "
+                     << *inject);
+          unsupported = true;
+          break;
+        }
+
+        origData = init;
+      }
+    }
+
+    if (unsupported) {
+      getContext().emitNondifferentiabilityError(
+          inject, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+
+    auto adjEnum = getAdjointBuffer(bb, origEnum);
+    EnumDecl *adjEnumDecl = adjEnum->getType().getEnumOrBoundGenericEnum();
+    EnumElementDecl *adjEnumElemDecl =
+        adjEnumDecl ? adjEnumDecl->getUniqueElement(/*hasVal*/ true) : nullptr;
+    if (!adjEnumElemDecl)
+      llvm_unreachable("Unexpected type of Optional.TangentVector");
+
+    UncheckedTakeEnumDataAddrInst *adjData =
+        builder.createUncheckedTakeEnumDataAddr(origData->getLoc(), adjEnum,
+                                                adjEnumElemDecl);
+
+    setAdjointBuffer(bb, origData, adjData);
+
+    // The Optional buffer is now invalidated, do not attempt to destroy it at
+    // the end of the pullback.
+    destroyedLocalAllocations.insert(adjEnum);
+  }
+
+  void visitInitEnumDataAddrInst(InitEnumDataAddrInst *init) {
+    auto bufIt = bufferMap.find({init->getParent(), SILValue(init)});
+    if (bufIt == bufferMap.end())
+      return;
+    SILValue dataAddr = bufIt->second;
+    builder.emitDestroyAddr(init->getLoc(), dataAddr);
+  }
+
   /// Handle `unchecked_ref_cast` instruction.
   ///   Original: y = unchecked_ref_cast x
   ///    Adjoint: adj[x] += adj[y]

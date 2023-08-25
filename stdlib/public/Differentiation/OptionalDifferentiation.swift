@@ -13,13 +13,19 @@
 import Swift
 
 extension Optional: Differentiable where Wrapped: Differentiable {
-  public struct TangentVector: Differentiable, AdditiveArithmetic {
+  public enum TangentVector: Differentiable, AdditiveArithmetic {
+    case none
+    case some(Wrapped.TangentVector)
+
     public typealias TangentVector = Self
 
-    public var value: Wrapped.TangentVector?
-
     public init(_ value: Wrapped.TangentVector?) {
-      self.value = value
+      switch value {
+      case .some(let y):
+	self = .some(y)
+      case .none:
+	self = .none
+      }
     }
 
     public static var zero: Self {
@@ -27,39 +33,54 @@ extension Optional: Differentiable where Wrapped: Differentiable {
     }
 
     public static func + (lhs: Self, rhs: Self) -> Self {
-      switch (lhs.value, rhs.value) {
-      case (nil, nil): return Self(nil)
-      case let (x?, nil): return Self(x)
-      case let (nil, y?): return Self(y)
-      case let (x?, y?): return Self(x + y)
+      switch (lhs, rhs) {
+      case let (.some(x), .some(y)): return Self(x + y)
+      case let (.some(x), .none): return Self(x)
+      case let (.none, .some(y)): return Self(y)
+      case (.none, .none): return .none
       }
     }
 
     public static func - (lhs: Self, rhs: Self) -> Self {
-      switch (lhs.value, rhs.value) {
-      case (nil, nil): return Self(nil)
-      case let (x?, nil): return Self(x)
-      case let (nil, y?): return Self(.zero - y)
-      case let (x?, y?): return Self(x - y)
+      switch (lhs, rhs) {
+      case let (.some(x), .some(y)): return .some(x - y)
+      case let (.some(x), .none): return .some(x)
+      case let (.none, .some(y)): return .some(.zero - y)
+      case (.none, .none): return .none
       }
     }
 
     public mutating func move(by offset: TangentVector) {
-      if let value = offset.value {
-        self.value?.move(by: value)
+      switch (self, offset) {
+      case let (.some(s), .some(o)): {
+	  var res = s
+	  res.move(by: o)
+	  self = .some(res)
+	}()
+      default: ()
       }
     }
   }
 
   public mutating func move(by offset: TangentVector) {
-    if let value = offset.value {
-      self?.move(by: value)
+    switch (offset) {
+    case let .some(o): self?.move(by: o)
+    default: ()
     }
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Optional.TangentVector: CustomReflectable {
   public var customMirror: Mirror {
-    return value.customMirror
+    switch self {
+    case .some(let value):
+      return Mirror(
+        self,
+        children: [ "some": value ])
+    case .none:
+      return Mirror(self, children: [:])
+    }
   }
 }
+#endif
