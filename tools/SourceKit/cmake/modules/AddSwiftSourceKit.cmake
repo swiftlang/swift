@@ -151,15 +151,15 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
     else()
       message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
     endif()
-  endif()
 
-  if(SWIFT_SWIFT_PARSER)
-    # Add rpath to the host Swift libraries.
-    if (NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    if(SWIFT_SWIFT_PARSER)
+      # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_hostlib_path}")
     endif()
+  endif()
 
+  if(SWIFT_SWIFT_PARSER)
     # For the "end step" of bootstrapping configurations on Darwin, need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
