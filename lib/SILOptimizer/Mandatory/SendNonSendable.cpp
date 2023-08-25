@@ -56,6 +56,36 @@ static bool isApplyInst(SILInstruction &inst) {
   return ApplySite::isa(&inst) || isa<BuiltinInst>(inst);
 }
 
+static AccessStorage getAccessStorageFromAddr(SILValue value) {
+  assert(isAddress(value));
+  auto accessStorage = AccessStorage::compute(value);
+  if (accessStorage && accessStorage.getRoot()) {
+    if (auto definingInst = accessStorage.getRoot().getDefiningInstruction()) {
+      if (isa<InitExistentialAddrInst, CopyValueInst>(definingInst))
+        // look through these because AccessStorage does not
+        return getAccessStorageFromAddr(definingInst->getOperand(0));
+    }
+  }
+
+  return accessStorage;
+}
+
+static SILValue getUnderlyingTrackedValue(SILValue value) {
+  if (!isAddress(value)) {
+    return getUnderlyingObject(value);
+  }
+
+  if (auto accessStorage = getAccessStorageFromAddr(value)) {
+    if (accessStorage.getKind() == AccessRepresentation::Kind::Global)
+      // globals don't reduce
+      return value;
+    assert(accessStorage.getRoot());
+    return accessStorage.getRoot();
+  }
+
+  return value;
+}
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Main Computation
 //===----------------------------------------------------------------------===//
@@ -66,6 +96,41 @@ static const char *SEP_STR = "╾───────────────�
 
 using TrackableValueID = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
+
+class TrackableSILValue {
+  SILValue value;
+  bool aliased;
+  bool sendable;
+
+public:
+  TrackableSILValue(SILValue inputValue, bool aliased, bool sendable)
+      : value(inputValue), aliased(aliased), sendable(sendable) {}
+
+  bool isAliased() const { return aliased; }
+
+  bool isUnaliased() const { return !aliased; }
+
+  bool isSendable() const { return sendable; }
+
+  bool isNonSendable() const { return !sendable; }
+
+  SILValue getValue() const { return value; }
+
+  // comparison operates lookthrough to the underlying SILValue
+  bool operator==(const TrackableSILValue &other) const {
+    return value == other.value;
+  }
+
+  bool operator<(const TrackableSILValue &other) const {
+    return value < other.value;
+  }
+
+  void dump() const {
+    llvm::dbgs() << "TrackableSILValue[aliased=" << aliased
+                 << "][sendable=" << sendable << "]: ";
+    value->dump();
+  }
+};
 
 // PartitionOpTranslator is responsible for performing the translation from
 // SILInstructions to PartitionOps. Not all SILInstructions have an effect on
@@ -87,100 +152,8 @@ class PartitionOpTranslator {
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
 
-  class TrackableSILValue {
-    bool aliased = true;
-    bool sendable = false;
-    SILValue value;
-
-    AccessStorage getAccessStorageFromAddr(SILValue val) {
-      assert(isAddress(val));
-      auto accessStorage = AccessStorage::compute(val);
-      if (accessStorage && accessStorage.getRoot()) {
-        auto definingInst = accessStorage.getRoot().getDefiningInstruction();
-        if (definingInst &&
-            isa<InitExistentialAddrInst, CopyValueInst>(definingInst))
-          // look through these because AccessStorage does not
-          return getAccessStorageFromAddr(definingInst->getOperand(0));
-      }
-      return accessStorage;
-    }
-
-    // simplifyVal reduces an address-typed SILValue to the root SILValue
-    // that it was derived from, reducing the set of values that must be
-    // reasoned about by rendering two values that are projections/aliases the
-    // same.
-    SILValue simplifyVal(SILValue val) {
-      if (!isAddress(val))
-        //TODO: consider adding more reduction for non-address values
-        return getUnderlyingObject(val);
-      if (auto accessStorage = getAccessStorageFromAddr(val)) {
-        if (accessStorage.getKind() == AccessRepresentation::Kind::Global)
-          // globals don't reduce
-          return val;
-        assert(accessStorage.getRoot());
-        return accessStorage.getRoot();
-      }
-      return val;
-    }
-
-  public:
-    TrackableSILValue(const PartitionOpTranslator *translator,
-                      SILValue value_in) :
-        value(simplifyVal(value_in)) {
-
-      // set `aliased` appropriately
-      if (isAddress(value))
-        if (auto accessStorage = AccessStorage::compute(value))
-          aliased = !accessStorage.isUniquelyIdentified() ||
-                    translator->capturedUIValues.count(*this);
-
-      // set `sendable` appropriately
-      SILInstruction *defInst = value.getDefiningInstruction();
-      if (defInst && isa<ClassMethodInst, FunctionRefInst>(defInst)) {
-        // though these values are technically non-Sendable, we can safely
-        // and consistently treat them as Sendable
-        sendable = true;
-      } else {
-        sendable = !translator->isNonSendableType(value->getType());
-      }
-    }
-    inline bool isAliased() const {
-      return aliased;
-    }
-
-    inline bool isUnaliased() const {
-      return !aliased;
-    }
-
-    inline bool isSendable() const {
-      return sendable;
-    }
-
-    inline bool isNonSendable() const {
-      return !sendable;
-    }
-
-    SILValue getValue() const {
-      return value;
-    }
-
-    // comparison operates lookthrough to the underlying SILValue
-    bool operator==(const TrackableSILValue &other) const {
-      return value == other.value;
-    }
-    bool operator<(const TrackableSILValue &other) const {
-        return value < other.value;
-    }
-
-    void dump() const {
-        llvm::dbgs() << "TrackableSILValue[aliased="
-                     << aliased << "][sendable=" << sendable << "]: ";
-        value->dump();
-    }
-  };
-
   llvm::Optional<TrackableSILValue> trackIfNonSendable(SILValue value) const {
-    auto trackedVal = TrackableSILValue(this, value);
+    auto trackedVal = getTrackableSILValue(value);
     if (trackedVal.isNonSendable()) {
         return trackedVal;
     }
@@ -202,7 +175,32 @@ class PartitionOpTranslator {
   //       but at what points in function flow they do, this would be more
   //       permissive, but I'm avoiding implementing it in case existing
   //       utilities would make it easier than handrolling
-  std::set<TrackableSILValue> capturedUIValues;
+  std::set<SILValue> capturedUIValues;
+
+  TrackableSILValue getTrackableSILValue(SILValue value) const {
+    value = getUnderlyingTrackedValue(value);
+
+    bool isAliased = true;
+
+    if (isAddress(value)) {
+        if (auto accessStorage = AccessStorage::compute(value))
+          isAliased = !accessStorage.isUniquelyIdentified() ||
+                      capturedUIValues.count(value);
+    }
+
+    // set `sendable` appropriately
+    if (auto *defInst = value.getDefiningInstruction()) {
+        // Though these values are technically non-Sendable, we can safely and
+        // consistently treat them as Sendable.
+        if (isa<ClassMethodInst, FunctionRefInst>(defInst)) {
+          return TrackableSILValue(value, isAliased, true /*is sendable*/);
+        }
+    }
+
+    // Otherwise refer to the oracle.
+    return TrackableSILValue(value, isAliased,
+                             !isNonSendableType(value->getType()));
+  }
 
   void initCapturedUIValues() {
     for (auto &block : *function) {
@@ -211,9 +209,9 @@ class PartitionOpTranslator {
           // add all nonsendable, uniquely identified arguments to applications
           // to capturedUIValues, because applications capture them
           for (SILValue val : inst.getOperandValues()) {
-            auto trackVal = TrackableSILValue(this, val);
+            auto trackVal = getTrackableSILValue(val);
             if (trackVal.isNonSendable() && trackVal.isUnaliased())
-              capturedUIValues.insert(trackVal);
+              capturedUIValues.insert(val);
           }
         }
       }
@@ -231,12 +229,10 @@ public:
                                "in contexts in which the availability of the "
                                "Sendable protocol has already been checked.");
     initCapturedUIValues();
-    LLVM_DEBUG(
-      llvm::dbgs() << "Captured Uniquely Identified addresses for "
-                     << function->getName() << ":\n";
-      for (TrackableSILValue val : capturedUIValues)
-            val.getValue()->dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "Captured Uniquely Identified addresses for "
+                            << function->getName() << ":\n";
+               for (SILValue val
+                    : capturedUIValues) val->dump(););
   }
 
 private:
