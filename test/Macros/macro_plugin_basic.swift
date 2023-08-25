@@ -21,6 +21,19 @@
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
+// RUN: not %swift-target-frontend \
+// RUN:   -typecheck \
+// RUN:   -swift-version 5 \
+// RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
+// RUN:   -Rmacro-loading \
+// RUN:   -module-name MyApp \
+// RUN:   %t/test.swift \
+// RUN:   2>&1 | tee %t/macro-loading.txt
+
+// RUN: %FileCheck -check-prefix=DIAGS %s < %t/macro-loading.txt
+
+// DIAGS: loaded macro implementation module 'TestPlugin' from executable
+
 // CHECK: ->(plugin:[[#PID:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK: <-(plugin:[[#PID]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
 // CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"testString","typeName":"TestStringMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"BUILD_DIR{{.+}}test.swift","line":5,"offset":301},"source":"#testString(123)"}}}

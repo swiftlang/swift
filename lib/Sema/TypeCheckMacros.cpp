@@ -359,12 +359,23 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   if (!entry.executablePath.empty()) {
     if (LoadedExecutablePlugin *executablePlugin =
             loader.loadExecutablePlugin(entry.executablePath)) {
+      if (ctx->LangOpts.EnableMacroLoadingRemarks) {
+        unsigned tag = entry.libraryPath.empty() ? 1 : 2;
+        ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, tag,
+                            entry.executablePath, entry.libraryPath);
+      }
+
       return initializeExecutablePlugin(*ctx, executablePlugin,
                                         entry.libraryPath, moduleName);
     }
   } else if (!entry.libraryPath.empty()) {
     if (LoadedLibraryPlugin *libraryPlugin =
             loader.loadLibraryPlugin(entry.libraryPath)) {
+      if (ctx->LangOpts.EnableMacroLoadingRemarks) {
+        ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, 0,
+                            entry.libraryPath, StringRef());
+      }
+
       return libraryPlugin;
     }
   }

@@ -389,6 +389,10 @@ def remark_module_recovery : Flag<["-"], "Rmodule-recovery">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about contextual inconsistencies in loaded modules">;
 
+def remark_macro_loading : Flag<["-"], "Rmacro-loading">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about loaded macro implementations">;
+
 def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark when indexing a system module">;
