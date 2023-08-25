@@ -175,7 +175,7 @@ class PartitionOpTranslator {
   //       but at what points in function flow they do, this would be more
   //       permissive, but I'm avoiding implementing it in case existing
   //       utilities would make it easier than handrolling
-  std::set<SILValue> capturedUIValues;
+  llvm::DenseSet<SILValue> capturedUIValues;
 
   TrackableSILValue getTrackableSILValue(SILValue value) const {
     value = getUnderlyingTrackedValue(value);
