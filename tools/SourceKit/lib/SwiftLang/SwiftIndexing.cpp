@@ -395,6 +395,7 @@ static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
                                Opts.IndexIgnoreStdlib,
                                Opts.IndexIncludeLocals,
                                isDebugCompilation,
+                               Opts.DisableImplicitModules,
                                Invocation.getTargetTriple(),
                                *Instance.getDependencyTracker(),
                                Invocation.getIRGenOptions().FilePrefixMap);
