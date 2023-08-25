@@ -11,7 +11,7 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   list(APPEND SWIFT_CXX_DEPS copy-legacy-layouts)
 endif()
 
-add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
+add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
     CxxPair.swift
