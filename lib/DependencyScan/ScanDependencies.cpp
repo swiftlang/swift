@@ -1490,8 +1490,8 @@ static bool diagnoseCycle(CompilerInstance &instance,
     auto beforeSize = openSet.size();
 
     auto optionalDepInfo = cache.findDependency(lastOpen.first, lastOpen.second);
-    assert(optionalDepInfo.has_value() && "Missing dependency info during cycle diagnosis.");
-    auto depInfo = optionalDepInfo.value();
+    assert(optionalDepInfo.has_value() &&
+           "Missing dependency info during cycle diagnosis.");
 
     for (const auto &dep : getAllDependencies(lastOpen, cache)) {
       if (closeSet.count(dep))
