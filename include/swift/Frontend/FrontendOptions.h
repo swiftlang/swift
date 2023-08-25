@@ -155,7 +155,6 @@ public:
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
     ResolveImports,    ///< Parse and resolve imports only
-    LazyTypecheck,     ///< Parse and then do minimal type-checking for outputs
     Typecheck,         ///< Parse and type-check only
     DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.

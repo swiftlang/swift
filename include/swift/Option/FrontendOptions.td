@@ -406,6 +406,9 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def experimental_lazy_typecheck : Flag<["-"], "experimental-lazy-typecheck">,
+  HelpText<"Type-check lazily as needed to produce requested outputs">;
+
 def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
   HelpText<"Write an invalid declaration into swiftinterface files">;
 

@@ -1395,6 +1395,11 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
 void CompilerInstance::performSema() {
   performParseAndResolveImportsOnly();
 
+  // Skip eager type checking. Instead, let later stages of compilation drive
+  // type checking as needed through request evaluation.
+  if (getASTContext().TypeCheckerOpts.EnableLazyTypecheck)
+    return;
+
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   forEachFileToTypeCheck([&](SourceFile &SF) {

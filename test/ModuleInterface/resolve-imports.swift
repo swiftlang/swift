@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -resolve-imports %s -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution
-// RUN: %target-swift-frontend -experimental-lazy-typecheck %s -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution
-// RUN: %FileCheck %s < %t/main.swiftinterface
+// RUN: %target-swift-frontend -swift-version 5 -parse-as-library -enable-library-evolution -module-name resolve_imports -resolve-imports %s -emit-module-interface-path %t/resolve_imports.swiftinterface
+// RUN: %FileCheck %s < %t/resolve_imports.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/resolve_imports.swiftinterface)
 
 // CHECK: import Swift
 
@@ -21,6 +21,3 @@ public class C {}
 // CHECK: public class C {
 // CHECK: deinit
 // CHECK: }
-
-// Globals
-public var year = 2023
