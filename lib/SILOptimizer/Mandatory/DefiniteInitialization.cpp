@@ -658,16 +658,16 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
       }))
     return false;
 
-  // Ignore loads used only by an assign_by_wrapper setter. This
-  // is safe to ignore because assign_by_wrapper will only be
-  // re-written to use the setter if the value is fully initialized.
+  // Ignore loads used only by an assign_by_wrapper or assign_or_init setter.
+  // This is safe to ignore because assign_by_wrapper/assign_or_init will
+  // only be re-written to use the setter if the value is fully initialized.
   if (auto *load = dyn_cast<SingleValueInstruction>(Inst)) {
     if (auto Op = load->getSingleUse()) {
       if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
-        if (std::find_if(PAI->use_begin(), PAI->use_end(),
-                         [](auto PAIUse) {
-                           return isa<AssignByWrapperInst>(PAIUse->getUser());
-                         }) != PAI->use_end()) {
+        if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
+              return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
+                     isa<AssignOrInitInst>(PAIUse->getUser());
+            }) != PAI->use_end()) {
           return false;
         }
       }
