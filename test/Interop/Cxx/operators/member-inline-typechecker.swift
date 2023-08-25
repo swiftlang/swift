@@ -67,3 +67,6 @@ let voidReturnType = HasPreIncrementOperatorWithVoidReturnType()
 let voidReturnTypeResult: HasPreIncrementOperatorWithVoidReturnType = voidReturnType.successor()
 
 let immortalIncrement = myCounter.successor() // expected-error {{value of type 'ImmortalCounter' has no member 'successor'}}
+
+let derivedConstIter = DerivedFromConstIteratorPrivately()
+derivedConstIter.pointee // expected-error {{value of type 'DerivedFromConstIteratorPrivately' has no member 'pointee'}}
