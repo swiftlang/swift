@@ -66,7 +66,7 @@ if (Impl.isCxxInteropCompatVersionAtLeast(version::getUpcomingCxxInteropCompatVe
 }
 ```
 
-Elsewhere, this method can be called on the `LangOptoins` themselves:
+Elsewhere, this method can be called on the `LangOptions` themselves:
 
 ```
 if (SwiftContext.LangOpts.isCxxInteropCompatVersionAtLeast(version::getUpcomingCxxInteropCompatVersion())) {
