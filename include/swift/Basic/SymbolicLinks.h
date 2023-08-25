@@ -14,20 +14,15 @@
 #define SWIFT_BASIC_SYMBOLICLINKS_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <string>
 
 namespace swift {
 
 /// Tries to resolve symbolic links in a given path, but preserves
 /// substitute drives on Windows to avoid MAX_PATH issues.
 /// On failure, returns the original path.
-llvm::SmallString<128> resolveSymbolicLinks(llvm::StringRef InputPath);
-
-/// Tries to resolve symbolic links in a given path, but preserves
-/// substitute drives on Windows to avoid MAX_PATH issues.
-/// On failure, returns the original path.
-llvm::SmallString<128> resolveSymbolicLinks(llvm::StringRef InputPath,
+std::string resolveSymbolicLinks(llvm::StringRef InputPath,
     llvm::vfs::FileSystem *FileSystem);
 
 } // namespace swift

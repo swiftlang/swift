@@ -309,7 +309,8 @@ SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
 
   std::string Scratch;
   if (!IsRealpath) {
-    Scratch = resolveSymbolicLinks(FilePath).str().str();
+    Scratch = resolveSymbolicLinks(FilePath,
+        llvm::vfs::getRealFileSystem().get());
     FilePath = Scratch;
   }
   Queue.dispatchSync([&]{
@@ -331,12 +332,13 @@ bool SwiftEditorDocumentFileMap::getOrUpdate(
 
   bool found = false;
 
-  auto ResolvedPath = resolveSymbolicLinks(FilePath);
+  std::string ResolvedPath = resolveSymbolicLinks(FilePath,
+      llvm::vfs::getRealFileSystem().get());
   Queue.dispatchBarrierSync([&]{
     DocInfo &Doc = Docs[FilePath];
     if (!Doc.DocRef) {
       Doc.DocRef = EditorDoc;
-      Doc.ResolvedPath = ResolvedPath.str();
+      Doc.ResolvedPath = ResolvedPath;
     } else {
       EditorDoc = Doc.DocRef;
       found = true;

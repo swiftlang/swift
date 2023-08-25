@@ -844,7 +844,8 @@ FileContent SwiftASTManager::Implementation::getFileContent(
     StringRef UnresolvedPath, bool IsPrimary,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) const {
-  auto FilePath = resolveSymbolicLinks(UnresolvedPath);
+  std::string FilePath = resolveSymbolicLinks(UnresolvedPath,
+      FileSystem.get());
   if (auto EditorDoc = EditorDocs->findByPath(FilePath, /*IsRealpath=*/true))
     return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), IsPrimary,
                                   FilePath);

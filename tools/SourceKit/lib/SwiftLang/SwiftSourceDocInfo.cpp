@@ -1556,7 +1556,8 @@ static SourceFile *retrieveInputFile(StringRef inputBufferName,
     // done that)
     if (haveRealPath)
       return nullptr;
-    auto realPath = resolveSymbolicLinks(inputBufferName);
+    std::string realPath = resolveSymbolicLinks(inputBufferName,
+        llvm::vfs::getRealFileSystem().get());
     return retrieveInputFile(realPath, CI, /*haveRealPath=*/true);
   }
 
@@ -2119,7 +2120,8 @@ void SwiftLangSupport::getCursorInfo(
   std::shared_ptr<llvm::MemoryBuffer> InputBuffer;
   if (InputBufferName.empty() && Length == 0) {
     std::string InputFileError;
-    auto RealInputFilePath = resolveSymbolicLinks(PrimaryFilePath);
+    std::string RealInputFilePath = resolveSymbolicLinks(PrimaryFilePath,
+        fileSystem.get());
     InputBuffer =
         std::shared_ptr<llvm::MemoryBuffer>(getASTManager()->getMemoryBuffer(
             RealInputFilePath, fileSystem, InputFileError));

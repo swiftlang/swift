@@ -2082,7 +2082,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                       return ResponseSymbolInfo::read(Entry);
                                     });
 
-  std::string Filename = swift::resolveSymbolicLinks(FilenameIn.str()).str().str();
+  std::string Filename = swift::resolveSymbolicLinks(FilenameIn.str(),
+      llvm::vfs::getRealFileSystem().get());
 
   SymbolInfo.print(OS, Filename, VFSFiles);
   OS << "ACTIONS BEGIN\n";

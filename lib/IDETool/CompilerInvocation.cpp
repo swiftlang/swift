@@ -84,7 +84,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     std::string &Error) {
   assert(FileSystem);
 
-  llvm::SmallString<128> PrimaryFile = resolveSymbolicLinks(
+  std::string PrimaryFile = resolveSymbolicLinks(
       UnresolvedPrimaryFile, FileSystem.get());
 
   unsigned primaryCount = 0;
@@ -92,8 +92,8 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    auto newFilename = resolveSymbolicLinks(
-        input.getFileName(), FileSystem.get());
+    llvm::SmallString<128> newFilename = StringRef(resolveSymbolicLinks(
+        input.getFileName(), FileSystem.get()));
     llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
