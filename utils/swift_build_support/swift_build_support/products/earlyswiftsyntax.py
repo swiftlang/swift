@@ -79,4 +79,4 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
 
     def install(self, host_target):
         # No-op.
-        None
+        pass

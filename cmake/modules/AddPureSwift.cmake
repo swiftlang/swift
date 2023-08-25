@@ -67,21 +67,20 @@ endfunction()
 
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
-    # Don't add builder's stdlib RPATH automatically, because we want to *de-prioritize* it.
+    # Don't add builder's stdlib RPATH automatically.
     target_compile_options(${name} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-no-toolchain-stdlib-rpath>
     )
 
-    get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
-    get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-    set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
     set_property(TARGET ${name}
       APPEND PROPERTY INSTALL_RPATH
-        # At runtime, use swiftCore in the current toolchain.
+        # At runtime, use swiftCore in the current just-built toolchain.
+        # NOTE: This relies on the ABI being the same as the builder.
         "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
     )
-
+    # NOTE: At this point we don't have any pure swift executables/shared
+    # libraries required for building runtime/stdlib. So we don't need to add
+    # RPATH to the builder's runtime.
   endif()
 endfunction()
 
