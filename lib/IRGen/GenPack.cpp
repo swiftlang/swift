@@ -388,7 +388,7 @@ static llvm::Value *emitPackExpansionElementMetadata(
 /// dynamicLength) produced by the provided function \p elementForIndex into
 /// the indicated buffer \p pack.
 static void emitPackExpansionPack(
-    IRGenFunction &IGF, Address pack, CanPackExpansionType expansionTy,
+    IRGenFunction &IGF, Address pack,
     llvm::Value *dynamicIndex, llvm::Value *dynamicLength,
     function_ref<llvm::Value *(llvm::Value *)> elementForIndex) {
   auto *prev = IGF.Builder.GetInsertBlock();
@@ -442,7 +442,7 @@ static void emitPackExpansionMetadataPack(IRGenFunction &IGF, Address pack,
                                           llvm::Value *dynamicLength,
                                           DynamicMetadataRequest request) {
   emitPackExpansionPack(
-      IGF, pack, expansionTy, dynamicIndex, dynamicLength, [&](auto *index) {
+      IGF, pack, dynamicIndex, dynamicLength, [&](auto *index) {
         auto context =
             OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
         auto patternTy = expansionTy.getPatternType();
@@ -587,7 +587,7 @@ static void emitPackExpansionWitnessTablePack(
     ProtocolConformanceRef conformance, llvm::Value *dynamicIndex,
     llvm::Value *dynamicLength) {
   emitPackExpansionPack(
-      IGF, pack, expansionTy, dynamicIndex, dynamicLength, [&](auto *index) {
+      IGF, pack, dynamicIndex, dynamicLength, [&](auto *index) {
         llvm::Value *_metadata = nullptr;
         auto context =
             OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
@@ -1379,8 +1379,8 @@ irgen::emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
 
     // If we're looking at a pack expansion, insert the appropriate
     // number of flags fields.
-    if (auto expansionTy = dyn_cast<PackExpansionType>(eltTy)) {
-      emitPackExpansionPack(IGF, array.getAddress(), expansionTy,
+    if (isa<PackExpansionType>(eltTy)) {
+      emitPackExpansionPack(IGF, array.getAddress(),
                             dynamicIndex, dynamicLength,
                             [&](llvm::Value *) -> llvm::Value * {
                               return flagsVal;
@@ -1408,4 +1408,47 @@ irgen::emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
   (void) visitPackExplosion(IGF, packType, visitFn);
 
   return array;
+}
+
+std::pair<StackAddress, llvm::Value *>
+irgen::emitInducedTupleTypeMetadataPack(
+    IRGenFunction &IGF, llvm::Value *tupleMetadata) {
+  auto *shape = emitTupleTypeMetadataLength(IGF, tupleMetadata);
+
+  auto pack = IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
+                                    IGF.IGM.getPointerAlignment(),
+                                    /*allowTaskAlloc=*/true);
+  auto elementForIndex =
+    [&](llvm::Value *index) -> llvm::Value * {
+      return irgen::emitTupleTypeMetadataElementType(IGF, tupleMetadata, index);
+    };
+
+  auto *index = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+  emitPackExpansionPack(IGF, pack.getAddress(), index, shape,
+                        elementForIndex);
+
+  IGF.recordStackPackMetadataAlloc(pack, shape);
+
+  return {pack, shape};
+}
+
+MetadataResponse
+irgen::emitInducedTupleTypeMetadataPackRef(
+    IRGenFunction &IGF, CanPackType packType,
+    llvm::Value *tupleMetadata) {
+  StackAddress pack;
+  llvm::Value *shape;
+  std::tie(pack, shape) = emitInducedTupleTypeMetadataPack(
+      IGF, tupleMetadata);
+
+  auto *metadata = pack.getAddress().getAddress();
+
+  if (!IGF.canStackPromotePackMetadata()) {
+    metadata = IGF.Builder.CreateCall(
+        IGF.IGM.getAllocateMetadataPackFunctionPointer(), {metadata, shape});
+
+    cleanupTypeMetadataPack(IGF, pack, shape);
+  }
+
+  return MetadataResponse::forComplete(metadata);
 }

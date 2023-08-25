@@ -73,7 +73,13 @@ class MetadataPath {
       /// The count type of a pack expansion at index P in a pack.
       PackExpansionCount,
 
-      LastWithPrimaryIndex = PackExpansionCount,
+      /// Materialize tuple as a pack.
+      TuplePack,
+
+      /// Materialize length of tuple as a pack shape expression.
+      TupleShape,
+
+      LastWithPrimaryIndex = TupleShape,
 
       // Everything past this point has no index.
 
@@ -117,8 +123,10 @@ class MetadataPath {
       case Kind::NominalTypeArgumentShape:
       case Kind::NominalTypeArgument:
       case Kind::ConditionalConformance:
+      case Kind::TupleShape:
         return OperationCost::Load;
 
+      case Kind::TuplePack:
       case Kind::AssociatedConformance:
         return OperationCost::Call;
 
@@ -208,6 +216,14 @@ public:
 
   void addPackExpansionCountComponent(unsigned index) {
     Path.push_back(Component(Component::Kind::PackExpansionCount, index));
+  }
+
+  void addTuplePackComponent() {
+    Path.push_back(Component(Component::Kind::TuplePack, /*index=*/0));
+  }
+
+  void addTupleShapeComponent() {
+    Path.push_back(Component(Component::Kind::TupleShape, /*index=*/0));
   }
 
   /// Return an abstract measurement of the cost of this path.

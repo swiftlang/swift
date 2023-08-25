@@ -668,3 +668,32 @@ llvm::Constant *irgen::getTupleLabelsString(IRGenModule &IGM,
   // This method implicitly adds a null terminator.
   return IGM.getAddrOfGlobalString(buffer);
 }
+
+llvm::Value *irgen::emitTupleTypeMetadataLength(IRGenFunction &IGF,
+                                                llvm::Value *metadata) {
+  llvm::Value *indices[] = {
+      IGF.IGM.getSize(Size(0)),                   // (*tupleType)
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //   .NumElements
+  };
+  auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
+                                            metadata, indices);
+
+  return IGF.Builder.CreateLoad(slot, IGF.IGM.SizeTy,
+                                IGF.IGM.getPointerAlignment());
+}
+
+llvm::Value *irgen::emitTupleTypeMetadataElementType(IRGenFunction &IGF,
+                                                     llvm::Value *metadata,
+                                                     llvm::Value *index) {
+  llvm::Value *indices[] = {
+      IGF.IGM.getSize(Size(0)),                   // (*tupleType)
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 3), //   .Elements
+      index,                                      //     [index]
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0)  //       .Metadata
+  };
+  auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
+                                            metadata, indices);
+
+  return IGF.Builder.CreateLoad(slot, IGF.IGM.SizeTy,
+                                IGF.IGM.getPointerAlignment());
+}

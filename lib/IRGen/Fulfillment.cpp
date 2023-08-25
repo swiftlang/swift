@@ -173,7 +173,33 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                      source, std::move(path), keys);
   }
 
-  // TODO: tuples
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (tupleType->getNumElements() == 1 &&
+        isa<PackExpansionType>(tupleType.getElementType(0))) {
+
+      bool hadFulfillment = false;
+      auto packType = tupleType.getInducedPackType();
+
+      {
+        auto argPath = path;
+        argPath.addTuplePackComponent();
+        hadFulfillment |= searchTypeMetadataPack(IGM, packType,
+                                                 isExact, metadataState, source,
+                                                 std::move(argPath), keys);
+      }
+
+      {
+        auto argPath = path;
+        argPath.addTupleShapeComponent();
+        hadFulfillment |= searchShapeRequirement(IGM, packType, source,
+                                                 std::move(argPath));
+
+      }
+
+      return hadFulfillment;
+    }
+  }
+
   // TODO: functions
   // TODO: metatypes
 
