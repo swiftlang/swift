@@ -88,6 +88,9 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
 /// a set of alloc_stack instructions that can be assigned a single stack
 /// location.
 namespace {
+
+using InstructionIndices = llvm::SmallDenseMap<SILInstruction *, int>;
+
 class Partition {
 public:
   SmallVector<AllocStackInst *, 4> Elts;
@@ -235,7 +238,8 @@ public:
   /// If they are in the same basic block we scan the basic block to determine
   /// whether one dealloc_stack dominates the other alloc_stack. If this is the
   /// case the live ranges can't overlap.
-  bool mayOverlap(AllocStackInst *A, AllocStackInst *B) {
+  bool mayOverlap(AllocStackInst *A, AllocStackInst *B,
+                  const InstructionIndices &stackInstructionIndices) {
     assert(A != B);
 
     // Check that we have a single dealloc_stack user in the same block.
@@ -251,23 +255,15 @@ public:
     // Different basic blocks.
     if (A->getParent() != B->getParent())
       return false;
-    bool ALive = false;
-    bool BLive = false;
-    for (auto &Inst : *A->getParent()) {
-      if (A == &Inst) {
-        ALive = true;
-      } else if (singleDeallocA == &Inst) {
-        ALive = false;
-      } else if (B == &Inst) {
-        BLive = true;
-      } else if (singleDeallocB == &Inst) {
-        BLive = false;
-      }
 
-      if (ALive && BLive)
-        return true;
-    }
-    return false;
+    // Within the same basic block we can use the consecutive instruction indices
+    // to check for overlapping.
+    if (stackInstructionIndices.lookup(A) > stackInstructionIndices.lookup(singleDeallocB))
+      return false;
+    if (stackInstructionIndices.lookup(B) > stackInstructionIndices.lookup(singleDeallocA))
+      return false;
+
+    return true;
   }
 };
 } // end anonymous namespace
@@ -285,6 +281,11 @@ class MergeStackSlots {
   SmallVector<Partition, 2> PartitionByType;
   /// The function exits.
   SmallVectorImpl<SILInstruction *> &FunctionExits;
+
+  /// Consecutive indices for all `alloc_stack` and `dealloc_stack`
+  /// instructions in the function.
+  const InstructionIndices &stackInstructionIndices;
+
   /// If we are merging any alloc_stack that were moved, to work around a bug in
   /// SelectionDAG that sinks to llvm.dbg.addr, we need to break blocks right
   /// after each llvm.dbg.addr.
@@ -295,7 +296,8 @@ class MergeStackSlots {
 
 public:
   MergeStackSlots(SmallVectorImpl<AllocStackInst *> &AllocStacks,
-                  SmallVectorImpl<SILInstruction *> &FuncExits);
+                  SmallVectorImpl<SILInstruction *> &FuncExits,
+                  const InstructionIndices &stackInstructionIndices);
 
   /// Merge alloc_stack instructions if possible and hoist them to the entry
   /// block.
@@ -304,8 +306,9 @@ public:
 } // end anonymous namespace
 
 MergeStackSlots::MergeStackSlots(SmallVectorImpl<AllocStackInst *> &AllocStacks,
-                                 SmallVectorImpl<SILInstruction *> &FuncExits)
-    : FunctionExits(FuncExits) {
+                                 SmallVectorImpl<SILInstruction *> &FuncExits,
+                                 const InstructionIndices &stackInstructionIndices)
+    : FunctionExits(FuncExits), stackInstructionIndices(stackInstructionIndices) {
   // Build initial partitions based on the type.
   llvm::DenseMap<SILType, unsigned> TypeToPartitionMap;
   for (auto *AS : AllocStacks) {
@@ -350,7 +353,7 @@ MergeStackSlots::mergeSlots(DominanceInfo *DomToUpdate) {
         // candidate partition.
         bool InterferesWithCandidateP = false;
         for (auto *AllocStackInPartition : CandidateP.Elts) {
-          if (Live.mayOverlap(AllocStackInPartition, CurAllocStack)) {
+          if (Live.mayOverlap(AllocStackInPartition, CurAllocStack, stackInstructionIndices)) {
             InterferesWithCandidateP = true;
             break;
           }
@@ -405,6 +408,10 @@ class HoistAllocStack {
   SmallVector<AllocStackInst *, 16> AllocStackToHoist;
   SmallVector<SILInstruction *, 8> FunctionExits;
 
+  /// Consecutive indices for all `alloc_stack` and `dealloc_stack`
+  /// instructions in the function.
+  InstructionIndices stackInstructionIndices;
+
   llvm::Optional<SILAnalysis::InvalidationKind> InvalidationKind = llvm::None;
 
   DominanceInfo *DomInfoToUpdate = nullptr;
@@ -450,6 +457,8 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
 /// A generic alloc_stack could reference an opened archetype that was not
 /// opened in the entry block.
 void HoistAllocStack::collectHoistableInstructions() {
+  int stackInstructionIndex = 0;
+
   for (auto &BB : *F) {
     for (auto &Inst : BB) {
       // Terminators that are function exits are our dealloc_stack
@@ -466,10 +475,15 @@ void HoistAllocStack::collectHoistableInstructions() {
         AllocStackToHoist.clear();
         return;
       }
+      if (isa<DeallocStackInst>(&Inst))
+        stackInstructionIndices[&Inst] = stackInstructionIndex++;
+
       auto *ASI = dyn_cast<AllocStackInst>(&Inst);
       if (!ASI) {
         continue;
       }
+      stackInstructionIndices[ASI] = stackInstructionIndex++;
+
       if (isHoistable(ASI, IRGenMod)) {
         LLVM_DEBUG(llvm::dbgs() << "Hoisting     " << Inst);
         AllocStackToHoist.push_back(ASI);
@@ -484,7 +498,7 @@ void HoistAllocStack::collectHoistableInstructions() {
 /// dealloc_stack instructions to the function exists.
 void HoistAllocStack::hoist() {
   if (SILUseStackSlotMerging) {
-    MergeStackSlots Merger(AllocStackToHoist, FunctionExits);
+    MergeStackSlots Merger(AllocStackToHoist, FunctionExits, stackInstructionIndices);
     InvalidationKind = Merger.mergeSlots(DomInfoToUpdate);
     return;
   }
