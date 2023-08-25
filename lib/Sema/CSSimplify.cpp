@@ -4879,12 +4879,13 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
   if (!argument)
     return false;
 
-  auto currArgIdx =
-      locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>().getArgIdx();
+  auto argLoc = locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+  auto currArgIdx = argLoc.getArgIdx();
+  auto currParamIdx = argLoc.getParamIdx();
 
   // Argument is extraneous and has been re-ordered to match one
   // of two parameter types.
-  if (currArgIdx >= 2)
+  if (currArgIdx >= 2 || currArgIdx != currParamIdx)
     return false;
 
   auto otherArgIdx = currArgIdx == 0 ? 1 : 0;
@@ -4901,29 +4902,54 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
       return false;
   }
 
-  auto matchArgToParam = [&](Type argType, Type paramType, ASTNode anchor) {
-    auto *loc = cs.getConstraintLocator(anchor);
+  auto getReorderedArgumentLocator = [&](unsigned argIdx) {
+    auto paramIdx = argIdx == 0 ? 1 : 0;
+    return cs.getConstraintLocator(
+        parentLoc, LocatorPathElt::ApplyArgToParam(
+                       argIdx, paramIdx,
+                       fnType->getParams()[paramIdx].getParameterFlags()));
+  };
+
+  auto matchArgToParam = [&](Type argType, Type paramType, unsigned argIdx) {
+    auto *loc = getReorderedArgumentLocator(argIdx);
     // If argument (and/or parameter) is a generic type let's not even try this
     // fix because it would be impossible to match given types  without delaying
     // until more context becomes available.
     if (argType->hasTypeVariable() || paramType->hasTypeVariable())
       return cs.getTypeMatchFailure(loc);
 
+    // FIXME: There is currently no easy way to avoid attempting
+    // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
+    llvm::SaveAndRestore<ConstraintSystemOptions> options(
+        cs.Options, cs.Options - ConstraintSystemFlags::AllowFixes);
+
+    // Check optionality, if argument is more optional than parameter
+    // they are not going to match. This saves us one disjunction because
+    // optionals are matched as deep-equality and optional-to-optional.
+    {
+      unsigned numArgUnwraps;
+      unsigned numParamUnwraps;
+
+      std::tie(argType, numArgUnwraps) = getObjectTypeAndNumUnwraps(argType);
+      std::tie(paramType, numParamUnwraps) =
+          getObjectTypeAndNumUnwraps(paramType);
+
+      if (numArgUnwraps > numParamUnwraps)
+        return cs.getTypeMatchFailure(loc);
+    }
+
     return cs.matchTypes(
-        argType->lookThroughAllOptionalTypes(),
-        paramType->lookThroughAllOptionalTypes(),
+        argType, paramType,
         isOperatorRef ? ConstraintKind::OperatorArgumentConversion
                       : ConstraintKind::ArgumentConversion,
         ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, loc);
   };
 
-  auto result = matchArgToParam(argType, paramType, argument);
+  auto result = matchArgToParam(argType, paramType, currArgIdx);
   if (result.isSuccess()) {
     // Let's check whether other argument matches current parameter type,
     // if it does - it's definitely out-of-order arguments issue.
-    auto *otherArgLoc = cs.getConstraintLocator(
-        parentLoc, LocatorPathElt::ApplyArgToParam(otherArgIdx, otherArgIdx,
-                                                   ParameterTypeFlags()));
+    auto *otherArgLoc = getReorderedArgumentLocator(otherArgIdx);
     auto otherArg = simplifyLocatorToAnchor(otherArgLoc);
     // Argument could be synthesized.
     if (!otherArg)
@@ -4932,7 +4958,7 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
     argType = cs.getType(otherArg);
     paramType = fnType->getParams()[currArgIdx].getOldType();
 
-    result = matchArgToParam(argType, paramType, otherArg);
+    result = matchArgToParam(argType, paramType, otherArgIdx);
     if (result.isSuccess()) {
       conversionsOrFixes.push_back(MoveOutOfOrderArgument::create(
           cs, otherArgIdx, currArgIdx, {{0}, {1}}, parentLoc));
