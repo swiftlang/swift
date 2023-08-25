@@ -29,36 +29,40 @@
 
 using namespace swift;
 
-namespace {
+//===----------------------------------------------------------------------===//
+//                              MARK: Utilities
+//===----------------------------------------------------------------------===//
 
-static const char *SEP_STR = "╾──────────────────────────────╼\n";
-
-// SILApplyCrossesIsolation determines if a SIL instruction is an isolation
-// crossing apply expression. This is done by checking its correspondence
-// to an ApplyExpr AST node, and then checking the internal flags of that
-// AST node to see if the ActorIsolationChecker determined it crossed isolation.
-// It's possible this is brittle and a more nuanced check is needed, but this
-// suffices for all cases tested so far.
+/// SILApplyCrossesIsolation determines if a SIL instruction is an isolation
+/// crossing apply expression. This is done by checking its correspondence to an
+/// ApplyExpr AST node, and then checking the internal flags of that AST node to
+/// see if the ActorIsolationChecker determined it crossed isolation.  It's
+/// possible this is brittle and a more nuanced check is needed, but this
+/// suffices for all cases tested so far.
 static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
     return apply->getIsolationCrossing().has_value();
 
-  // if the instruction doesn't correspond to an ApplyExpr, then it can't
-  // cross an isolation domain
+  // We assume that any instruction that does not correspond to an ApplyExpr
+  // cannot cross an isolation domain.
   return false;
 }
 
-inline bool isAddress(SILValue val) {
+static bool isAddress(SILValue val) {
   return val->getType() && val->getType().isAddress();
 }
 
-inline bool isApplyInst(const SILInstruction &inst) {
-  return isa<ApplyInst,
-             BeginApplyInst,
-             BuiltinInst,
-             PartialApplyInst,
-             TryApplyInst>(inst);
+static bool isApplyInst(SILInstruction &inst) {
+  return ApplySite::isa(&inst) || isa<BuiltinInst>(inst);
 }
+
+//===----------------------------------------------------------------------===//
+//                           MARK: Main Computation
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+static const char *SEP_STR = "╾──────────────────────────────╼\n";
 
 using TrackableValueID = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
@@ -201,8 +205,8 @@ class PartitionOpTranslator {
   std::set<TrackableSILValue> capturedUIValues;
 
   void initCapturedUIValues() {
-    for (const SILBasicBlock &block: *function) {
-      for (const SILInstruction &inst: block) {
+    for (auto &block : *function) {
+      for (auto &inst : block) {
         if (isApplyInst(inst)) {
           // add all nonsendable, uniquely identified arguments to applications
           // to capturedUIValues, because applications capture them
