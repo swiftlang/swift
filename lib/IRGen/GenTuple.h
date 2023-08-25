@@ -72,6 +72,13 @@ namespace irgen {
   llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
                                        CanTupleType type);
 
+  /// Load the NumElements of a tuple type metadata.
+  llvm::Value *emitTupleTypeMetadataLength(IRGenFunction &IGF,
+                                           llvm::Value *metadata);
+
+  llvm::Value *emitTupleTypeMetadataElementType(IRGenFunction &IGF,
+                                                llvm::Value *metadata,
+                                                llvm::Value *index);
 } // end namespace irgen
 } // end namespace swift
 
