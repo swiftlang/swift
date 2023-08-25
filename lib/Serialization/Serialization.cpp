@@ -960,7 +960,7 @@ void Serializer::writeBlockInfoBlock() {
 #undef BLOCK_RECORD
 }
 
-void Serializer::writeHeader(const SerializationOptions &options) {
+void Serializer::writeHeader() {
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 4);
     control_block::ModuleNameLayout ModuleName(Out);
@@ -984,17 +984,17 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     size_t compatibilityVersionStringLength =
         versionString.tell() - shortVersionStringLength - 1;
     versionString << ")/" << version::getSwiftFullVersion();
-    auto userModuleMajor = options.UserModuleVersion.getMajor();
+    auto userModuleMajor = Options.UserModuleVersion.getMajor();
     auto userModuleMinor = 0;
-    if (auto minor = options.UserModuleVersion.getMinor()) {
+    if (auto minor = Options.UserModuleVersion.getMinor()) {
       userModuleMinor = *minor;
     }
     auto userModuleSubminor = 0;
-    if (auto subMinor = options.UserModuleVersion.getSubminor()) {
+    if (auto subMinor = Options.UserModuleVersion.getSubminor()) {
       userModuleSubminor = *subMinor;
     }
     auto userModuleBuild = 0;
-    if (auto build = options.UserModuleVersion.getBuild()) {
+    if (auto build = Options.UserModuleVersion.getBuild()) {
       userModuleBuild = *build;
     }
     Metadata.emit(ScratchRecord,
@@ -1005,10 +1005,10 @@ void Serializer::writeHeader(const SerializationOptions &options) {
                   userModuleSubminor, userModuleBuild,
                   versionString.str());
 
-    if (!options.SDKName.empty())
-      SDKName.emit(ScratchRecord, options.SDKName);
+    if (!Options.SDKName.empty())
+      SDKName.emit(ScratchRecord, Options.SDKName);
 
-    for (auto &name: options.AllowableClients) {
+    for (auto &name : Options.AllowableClients) {
       Allowable.emit(ScratchRecord, name);
     }
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
@@ -1020,20 +1020,20 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       forcedDebugRevision : version::getCurrentCompilerSerializationTag();
     Revision.emit(ScratchRecord, revision);
 
-    IsOSSA.emit(ScratchRecord, options.IsOSSA);
+    IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
 
       options_block::IsSIBLayout IsSIB(Out);
-      IsSIB.emit(ScratchRecord, options.IsSIB);
+      IsSIB.emit(ScratchRecord, Options.IsSIB);
 
-      if (options.StaticLibrary) {
+      if (Options.StaticLibrary) {
         options_block::IsStaticLibraryLayout IsStaticLibrary(Out);
         IsStaticLibrary.emit(ScratchRecord);
       }
 
-      if (options.HermeticSealAtLink) {
+      if (Options.HermeticSealAtLink) {
         options_block::HasHermeticSealAtLinkLayout HasHermeticSealAtLink(Out);
         HasHermeticSealAtLink.emit(ScratchRecord);
       }
@@ -1095,17 +1095,17 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         CxxInteroperabilityEnabled.emit(ScratchRecord);
       }
 
-      if (options.SerializeOptionsForDebugging) {
+      if (Options.SerializeOptionsForDebugging) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
 
-        const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
-        const auto &PathObfuscator = options.PathObfuscator;
+        const auto &PathRemapper = Options.DebuggingOptionsPrefixMap;
+        const auto &PathObfuscator = Options.PathObfuscator;
         auto sdkPath = M->getASTContext().SearchPathOpts.getSDKPath();
         SDKPath.emit(
             ScratchRecord,
             PathObfuscator.obfuscate(PathRemapper.remapPath(sdkPath)));
-        auto &Opts = options.ExtraClangOptions;
+        auto &Opts = Options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
           if (arg.startswith("-ivfsoverlay")) {
@@ -1137,7 +1137,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
         // Macro plugins
         options_block::PluginSearchOptionLayout PluginSearchOpt(Out);
-        for (auto &elem : options.PluginSearchOptions) {
+        for (auto &elem : Options.PluginSearchOptions) {
           switch (elem.getKind()) {
           case PluginSearchOption::Kind::PluginPath: {
             auto &opt = elem.get<PluginSearchOption::PluginPath>();
@@ -1213,7 +1213,7 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
   return importSet;
 }
 
-void Serializer::writeInputBlock(const SerializationOptions &options) {
+void Serializer::writeInputBlock() {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout importedModule(Out);
   input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
@@ -1225,9 +1225,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ModuleInterfaceLayout ModuleInterface(Out);
 
-  if (options.SerializeOptionsForDebugging) {
-    const auto &PathObfuscator = options.PathObfuscator;
-    const auto &PathMapper = options.DebuggingOptionsPrefixMap;
+  if (Options.SerializeOptionsForDebugging) {
+    const auto &PathObfuscator = Options.PathObfuscator;
+    const auto &PathMapper = Options.DebuggingOptionsPrefixMap;
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
@@ -1242,7 +1242,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   // Note: We're not using StringMap here because we don't need to own the
   // strings.
   llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
-  for (auto const &dep : options.Dependencies) {
+  for (auto const &dep : Options.Dependencies) {
     StringRef directoryName = llvm::sys::path::parent_path(dep.getPath());
     unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
     if (!dependencyDirectoryIndex) {
@@ -1259,8 +1259,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         llvm::sys::path::filename(dep.getPath()));
   }
 
-  if (!options.ModuleInterface.empty())
-    ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
+  if (!Options.ModuleInterface.empty())
+    ModuleInterface.emit(ScratchRecord, Options.ModuleInterface);
 
   SmallVector<ImportedModule, 8> allLocalImports;
   M->getImportedModules(allLocalImports, ModuleDecl::getImportFilterLocal());
@@ -1291,15 +1291,15 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     off_t importedHeaderSize = 0;
     time_t importedHeaderModTime = 0;
     std::string contents;
-    if (!options.ImportedHeader.empty()) {
+    if (!Options.ImportedHeader.empty()) {
       contents = clangImporter->getBridgingHeaderContents(
-          options.ImportedHeader, importedHeaderSize, importedHeaderModTime);
+          Options.ImportedHeader, importedHeaderSize, importedHeaderModTime);
     }
     assert(publicImportSet.count(bridgingHeaderImport));
     ImportedHeader.emit(ScratchRecord,
                         publicImportSet.count(bridgingHeaderImport),
                         importedHeaderSize, importedHeaderModTime,
-                        options.ImportedHeader);
+                        Options.ImportedHeader);
     if (!contents.empty()) {
       contents.push_back('\0');
       ImportedHeaderContents.emit(ScratchRecord, contents);
@@ -1348,13 +1348,13 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     }
   }
 
-  if (!options.ModuleLinkName.empty()) {
+  if (!Options.ModuleLinkName.empty()) {
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     options.AutolinkForceLoad, options.ModuleLinkName);
+                     Options.AutolinkForceLoad, Options.ModuleLinkName);
   }
-  for (auto dependentLib : options.PublicDependentLibraries) {
+  for (auto dependentLib : Options.PublicDependentLibraries) {
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     options.AutolinkForceLoad, dependentLib);
+                     Options.AutolinkForceLoad, dependentLib);
   }
 }
 
@@ -6568,15 +6568,15 @@ void Serializer::writeToStream(
     const SILModule *SILMod,
     const SerializationOptions &options,
     const fine_grained_dependencies::SourceFileDepGraph *DepGraph) {
-  Serializer S{SWIFTMODULE_SIGNATURE, DC};
+  Serializer S{SWIFTMODULE_SIGNATURE, DC, options};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeBlockInfoBlock();
 
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
-    S.writeHeader(options);
-    S.writeInputBlock(options);
+    S.writeHeader();
+    S.writeInputBlock();
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
     if (!options.DisableCrossModuleIncrementalInfo && DepGraph) {

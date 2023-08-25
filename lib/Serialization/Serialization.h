@@ -83,6 +83,8 @@ class Serializer : public SerializerBase {
   class TypeSerializer;
   friend class TypeSerializer;
 
+  const SerializationOptions &Options;
+
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
   /// Since we never remove items from this map, we can use a BumpPtrAllocator
@@ -321,11 +323,11 @@ private:
 
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
-  void writeHeader(const SerializationOptions &options = {});
+  void writeHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputBlock(const SerializationOptions &options);
+  void writeInputBlock();
 
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;
@@ -424,6 +426,10 @@ private:
   using SerializerBase::writeToStream;
 
 public:
+  Serializer(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC,
+             const SerializationOptions &options)
+      : SerializerBase(signature, DC), Options(options) {}
+
   /// Serialize a module to the given stream.
   static void
   writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
