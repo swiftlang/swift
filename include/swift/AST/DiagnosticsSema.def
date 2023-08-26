@@ -1120,6 +1120,12 @@ REMARK(module_loaded,none,
        "; source: '%2', loaded: '%3'",
        (Identifier, unsigned, StringRef, StringRef))
 
+REMARK(macro_loaded,none,
+       "loaded macro implementation module %0 from "
+       "%select{shared library '%2'|executable '%2'|"
+       "compiler plugin server '%2' with shared library '%3'}1",
+       (Identifier, unsigned, StringRef, StringRef))
+
 REMARK(transitive_dependency_behavior,none,
        "%1 has %select{a required|an optional|an ignored}2 "
        "transitive dependency on '%0'",

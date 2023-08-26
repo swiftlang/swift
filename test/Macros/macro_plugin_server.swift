@@ -25,11 +25,25 @@
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
+// RUN:   -Rmacro-loading -verify-ignore-unknown \
 // RUN:   -module-name MyApp \
 // RUN:   %s \
 // RUN:   2>&1 | tee %t/macro-expansions.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
+
+// RUN: not %swift-target-frontend \
+// RUN:   -typecheck \
+// RUN:   -swift-version 5 \
+// RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
+// RUN:   -Rmacro-loading \
+// RUN:   -module-name MyApp \
+// RUN:   %s \
+// RUN:   2>&1 | tee %t/macro-loading.txt
+
+// RUN: %FileCheck -check-prefix=CHECK-DIAGS %s < %t/macro-loading.txt
+
+// CHECK-DIAGS: loaded macro implementation module 'MacroDefinition' from compiler plugin server
 
 // CHECK: ->(plugin:[[#PID1:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
