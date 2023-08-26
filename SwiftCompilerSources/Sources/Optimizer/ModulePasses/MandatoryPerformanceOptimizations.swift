@@ -123,10 +123,17 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   if callee.isTransparent {
     return true
   }
+
+  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
+    // Cannot inline a non-ossa function into an ossa function
+    return false
+  }
+
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true
   }
+
   if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
     // Some arithmetic operations, like integer conversions, are not transparent but `inline(__always)`.
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
