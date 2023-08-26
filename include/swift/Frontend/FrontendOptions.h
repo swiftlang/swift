@@ -267,7 +267,6 @@ public:
   /// \see ModuleDecl::arePrivateImportsEnabled
   bool EnablePrivateImports = false;
 
-
   /// Indicates whether we add implicit dynamic.
   ///
   /// \see ModuleDecl::isImplicitDynamicEnabled
@@ -321,6 +320,10 @@ public:
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
+
+  /// Should we only serialize decls that may be referenced externally in the
+  /// binary module?
+  bool SerializeExternalDeclsOnly = false;
 
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
