@@ -29,6 +29,7 @@ private extension Target {
         swiftSettings: [
           .interoperabilityMode(.Cxx),
           .unsafeFlags([
+            "-static",
             "-Xcc", "-I../include",
             "-Xcc", "-I../../llvm-project/llvm/include",
             "-Xcc", "-I../../llvm-project/clang/include",
