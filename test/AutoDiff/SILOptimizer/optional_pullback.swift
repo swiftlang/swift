@@ -13,7 +13,8 @@ import _Differentiation
 //
 // CHECK: %[[OPT_TAN_BUF:.+]] = alloc_stack $Optional<τ_0_0>.TangentVector
 // CHECK: copy_addr %[[OPT_TAN]] to [init] %[[OPT_TAN_BUF]] : $*Optional<τ_0_0>.TangentVector
-// CHECK: %[[OPT_TAN_PTR:.+]] = unchecked_take_enum_data_addr %[[OPT_TAN_BUF]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.some!enumelt
+// CHECK: %[[OPT_TAN_VALUE_PTR:.+]] = struct_element_addr %[[OPT_TAN_BUF]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
+// CHECK: %[[OPT_TAN_PTR:.+]] = unchecked_take_enum_data_addr %[[OPT_TAN_VALUE_PTR]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
 // CHECK: %[[PLUS_EQUAL:.+]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
 // CHECK: apply %[[PLUS_EQUAL]]<τ_0_0.TangentVector>(%[[RET_TAN_BUF]], %[[OPT_TAN_PTR]], %{{.*}})
 //

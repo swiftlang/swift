@@ -672,14 +672,22 @@ private:
   // Optional differentiation
   //--------------------------------------------------------------------------//
 
-  /// Given a `wrappedAdjoint` value of type `T.TangentVector`, creates an
-  /// `Optional<T>.TangentVector` value from it and adds it to the adjoint value
-  /// of `optionalValue`.
+  /// Given a `wrappedAdjoint` value of type `T.TangentVector` and `Optional<T>`
+  /// type, creates an `Optional<T>.TangentVector` buffer from it.
   ///
   /// `wrappedAdjoint` may be an object or address value, both cases are
   /// handled.
+  AllocStackInst *createOptionalAdjoint(SILBasicBlock *bb,
+                                        SILValue wrappedAdjoint,
+                                        SILType optionalTy);
+
+  /// Accumulate SILValueCategory::Address optional value from `wrappedAdjoint`.
   void accumulateAdjointForOptional(SILBasicBlock *bb, SILValue optionalValue,
                                     SILValue wrappedAdjoint);
+
+  /// Set SILValueCategory::Object optional value from `wrappedAdjoint`.
+  void setAdjointValueForOptional(SILBasicBlock *bb, SILValue optionalValue,
+                                  SILValue wrappedAdjoint);
 
   //--------------------------------------------------------------------------//
   // Array literal initialization differentiation
@@ -1654,30 +1662,51 @@ public:
       }
     }
 
-    auto adjEnum = getAdjointBuffer(bb, origEnum);
-    EnumDecl *adjEnumDecl = adjEnum->getType().getEnumOrBoundGenericEnum();
-    EnumElementDecl *adjEnumElemDecl =
-        adjEnumDecl ? adjEnumDecl->getUniqueElement(/*hasVal*/ true) : nullptr;
-    if (!adjEnumElemDecl)
+    SILValue adjStruct = getAdjointBuffer(bb, origEnum);
+    StructDecl *adjStructDecl =
+        adjStruct->getType().getStructOrBoundGenericStruct();
+
+    VarDecl *adjOptVar = nullptr;
+    if (adjStructDecl) {
+      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
+      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
+    }
+
+    EnumDecl *adjOptDecl =
+        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
+                  : nullptr;
+
+    // Optional<T>.TangentVector should be a struct with a single
+    // Optional<T.TangentVector> property. This is an implementation detail of
+    // OptionalDifferentiation.swift
+    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
       llvm_unreachable("Unexpected type of Optional.TangentVector");
 
+    StructElementAddrInst *adjOpt = builder.createStructElementAddr(
+        origData->getLoc(), adjStruct, adjOptVar);
+
+    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
+
     UncheckedTakeEnumDataAddrInst *adjData =
-        builder.createUncheckedTakeEnumDataAddr(origData->getLoc(), adjEnum,
-                                                adjEnumElemDecl);
+        builder.createUncheckedTakeEnumDataAddr(origData->getLoc(), adjOpt,
+                                                someElemDecl);
 
     setAdjointBuffer(bb, origData, adjData);
 
     // The Optional buffer is now invalidated, do not attempt to destroy it at
     // the end of the pullback.
-    destroyedLocalAllocations.insert(adjEnum);
+    //
+    // FIXME: what to do with a partially destroyed struct?
+    //
+    destroyedLocalAllocations.insert(adjStruct);
   }
 
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *init) {
     auto bufIt = bufferMap.find({init->getParent(), SILValue(init)});
     if (bufIt == bufferMap.end())
       return;
-    SILValue dataAddr = bufIt->second;
-    builder.emitDestroyAddr(init->getLoc(), dataAddr);
+    SILValue adjData = bufIt->second;
+    builder.emitDestroyAddr(init->getLoc(), adjData);
   }
 
   /// Handle `unchecked_ref_cast` instruction.
@@ -2335,12 +2364,11 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
              << pullback);
 }
 
-void PullbackCloner::Implementation::accumulateAdjointForOptional(
-    SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
+AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
+    SILBasicBlock *bb, SILValue wrappedAdjoint, SILType optionalTy) {
   auto pbLoc = getPullback().getLocation();
-  // Handle `switch_enum` on `Optional`.
   // `Optional<T>`
-  auto optionalTy = remapType(optionalValue->getType());
+  optionalTy = remapType(optionalTy);
   assert(optionalTy.getASTType()->isOptional());
   // `T`
   auto wrappedType = optionalTy.getOptionalObjectType();
@@ -2422,11 +2450,43 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
   builder.createApply(pbLoc, initFnRef, subMap,
                       {optTanAdjBuf, optArgBuf, metatype});
   builder.createDeallocStack(pbLoc, optArgBuf);
+  return optTanAdjBuf;
+}
 
-  // Accumulate adjoint for the incoming `Optional` value.
+// Accumulate adjoint for the incoming `Optional` value.
+void PullbackCloner::Implementation::accumulateAdjointForOptional(
+    SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
+  assert(getTangentValueCategory(optionalValue) == SILValueCategory::Address);
+  auto pbLoc = getPullback().getLocation();
+
+  // Allocate and initialize Optional<Wrapped>.TangentVector from
+  // Wrapped.TangentVector
+  AllocStackInst *optTanAdjBuf =
+      createOptionalAdjoint(bb, wrappedAdjoint, optionalValue->getType());
+
+  // Accumulate into optionalValue
   addToAdjointBuffer(bb, optionalValue, optTanAdjBuf, pbLoc);
   builder.emitDestroyAddr(pbLoc, optTanAdjBuf);
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
+}
+
+// Set the adjoint value for the incoming `Optional` value.
+void PullbackCloner::Implementation::setAdjointValueForOptional(
+    SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
+  assert(getTangentValueCategory(optionalValue) == SILValueCategory::Object);
+  auto pbLoc = getPullback().getLocation();
+
+  // Allocate and initialize Optional<Wrapped>.TangentVector from
+  // Wrapped.TangentVector
+  AllocStackInst *optTanAdjBuf =
+      createOptionalAdjoint(bb, wrappedAdjoint, optionalValue->getType());
+
+  auto optTanAdjVal = builder.emitLoadValueOperation(
+      pbLoc, optTanAdjBuf, LoadOwnershipQualifier::Take);
+  recordTemporary(optTanAdjVal);
+  builder.createDeallocStack(pbLoc, optTanAdjBuf);
+
+  setAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal));
 }
 
 SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
@@ -2616,7 +2676,7 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           // Handle `switch_enum` on `Optional`.
           auto termInst = bbArg->getSingleTerminator();
           if (isSwitchEnumInstOnOptional(termInst)) {
-            accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
+            setAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
           } else {
             blockTemporaries[getPullbackBlock(predBB)].insert(
               concreteBBArgAdjCopy);

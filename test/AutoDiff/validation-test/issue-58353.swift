@@ -47,12 +47,14 @@ extension Dictionary where Value: Differentiable {
     func vjpSubscriptGet(key: Key) -> (value: Value?, pullback: (Optional<Value>.TangentVector) -> Dictionary<Key, Value>.TangentVector) {
         // When adding two dictionaries, nil values are equivalent to zeroes, so there is no need to manually zero-out
         // every key's value. Instead, it is faster to create a dictionary with the single non-zero entry.
-    return (self[key], { v in
-	switch (v) {
-	case .some(let value): [key: value]
-	default: .zero
-	}
-      })
+        return (self[key], { v in
+            if let value = v.value {
+                return [key: value]
+            }
+            else {
+                return .zero
+            }
+        })
     }
  }
 

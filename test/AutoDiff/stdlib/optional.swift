@@ -24,44 +24,19 @@ OptionalDifferentiationTests.test("Optional.TangentVector operations") {
   do {
     var some: Optional<Float>.TangentVector = .init(2)
     some.move(by: .init(3))
-    expectEqual(.init(5), some)
-    switch (some) {
-    case .some(let v): expectEqual(5, v)
-    default: fatalError();
-    }
+    expectEqual(5, some.value)
 
     var none: Optional<Float>.TangentVector = .init(nil)
     none.move(by: .init(3))
-    expectEqual(.none, none)
-    switch (none) {
-    case .none: ()
-    default:
-      fatalError();
-    }
+    expectEqual(nil, none.value)
 
     var nestedSome: Optional<Optional<Float>>.TangentVector = .init(.init(2))
     nestedSome.move(by: .init(.init(3)))
-    expectEqual(.init(.init(5)), nestedSome)
-    switch (nestedSome) {
-    case .some(let v1):
-      switch (v1) {
-      case .some(let v2): expectEqual(5, v2)
-      default: fatalError();
-      }
-    default: fatalError();
-    }
+    expectEqual(.init(5), nestedSome.value)
 
     var nestedNone: Optional<Optional<Float>>.TangentVector = .init(.init(nil))
     nestedNone.move(by: .init(.init(3)))
-    expectEqual(.init(.init(nil)), nestedNone)
-    switch (nestedNone) {
-    case .some (let v):
-      switch (v) {
-      case .none: ()
-      default: fatalError();
-      }
-    default: fatalError();
-    }
+    expectEqual(.init(nil), nestedNone.value)
   }
 
   // AdditiveArithmetic.zero
