@@ -1,17 +1,12 @@
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../../cmake/modules)
 include(StdlibOptions)
 
-set(SWIFT_CXX_LIBRARY_KIND STATIC)
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-  set(SWIFT_CXX_LIBRARY_KIND SHARED)
-endif()
-
 set(SWIFT_CXX_DEPS symlink_clang_headers)
 if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   list(APPEND SWIFT_CXX_DEPS copy-legacy-layouts)
 endif()
 
-add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
+add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
     CxxPair.swift
