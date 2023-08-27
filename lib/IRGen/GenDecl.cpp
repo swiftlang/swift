@@ -488,8 +488,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
 
     // Do not try to link Cxx with itself.
-    if (!getSwiftModule()->getName().is("Cxx"))
-      this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
+    if (!getSwiftModule()->getName().is("Cxx")) {
+      bool isStatic = false;
+      if (const auto *M = Context.getModuleByName("Cxx"))
+        isStatic = M->isStaticLibrary();
+      this->addLinkLibrary(LinkLibrary(target.isOSWindows() && isStatic
+                                          ? "libswiftCxx"
+                                          : "swiftCxx",
+                                       LibraryKind::Library));
+    }
 
     // Do not try to link CxxStdlib with the C++ standard library, Cxx or
     // itself.
