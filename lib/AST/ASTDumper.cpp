@@ -133,8 +133,7 @@ static void printSourceRange(raw_ostream &OS, const SourceRange R,
           /*PrintText=*/false);
 }
 
-static StringRef
-getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
+static StringRef getDumpString(SILFunctionType::Representation value) {
   switch (value) {
   case SILFunctionType::Representation::Thick: return "thick";
   case SILFunctionType::Representation::Block: return "block";
@@ -151,7 +150,7 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-StringRef swift::getReadImplKindName(ReadImplKind kind) {
+static StringRef getDumpString(ReadImplKind kind) {
   switch (kind) {
   case ReadImplKind::Stored:
     return "stored";
@@ -167,7 +166,7 @@ StringRef swift::getReadImplKindName(ReadImplKind kind) {
   llvm_unreachable("bad kind");
 }
 
-StringRef swift::getWriteImplKindName(WriteImplKind kind) {
+static StringRef getDumpString(WriteImplKind kind) {
   switch (kind) {
   case WriteImplKind::Immutable:
     return "immutable";
@@ -187,7 +186,7 @@ StringRef swift::getWriteImplKindName(WriteImplKind kind) {
   llvm_unreachable("bad kind");
 }
 
-StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
+static StringRef getDumpString(ReadWriteImplKind kind) {
   switch (kind) {
   case ReadWriteImplKind::Immutable:
     return "immutable";
@@ -207,7 +206,7 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
   llvm_unreachable("bad kind");
 }
 
-static StringRef getImportKindString(ImportKind value) {
+static StringRef getDumpString(ImportKind value) {
   switch (value) {
   case ImportKind::Module: return "module";
   case ImportKind::Type: return "type";
@@ -222,8 +221,7 @@ static StringRef getImportKindString(ImportKind value) {
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
-static StringRef
-getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
+static StringRef getDumpString(ForeignErrorConvention::Kind value) {
   switch (value) {
   case ForeignErrorConvention::ZeroResult: return "ZeroResult";
   case ForeignErrorConvention::NonZeroResult: return "NonZeroResult";
@@ -234,7 +232,7 @@ getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
 
   llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
-static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
+static StringRef getDumpString(DefaultArgumentKind value) {
   switch (value) {
     case DefaultArgumentKind::None: return "none";
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -250,8 +248,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
-static StringRef
-getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
+static StringRef getDumpString(ObjCSelectorExpr::ObjCSelectorKind value) {
   switch (value) {
     case ObjCSelectorExpr::Method: return "method";
     case ObjCSelectorExpr::Getter: return "getter";
@@ -260,7 +257,7 @@ getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
 
   llvm_unreachable("Unhandled ObjCSelectorExpr in switch.");
 }
-static StringRef getAccessSemanticsString(AccessSemantics value) {
+static StringRef getDumpString(AccessSemantics value) {
   switch (value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
@@ -270,7 +267,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
 
   llvm_unreachable("Unhandled AccessSemantics in switch.");
 }
-static StringRef getMetatypeRepresentationString(MetatypeRepresentation value) {
+static StringRef getDumpString(MetatypeRepresentation value) {
   switch (value) {
     case MetatypeRepresentation::Thin: return "thin";
     case MetatypeRepresentation::Thick: return "thick";
@@ -279,8 +276,7 @@ static StringRef getMetatypeRepresentationString(MetatypeRepresentation value) {
 
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
-static StringRef
-getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
+static StringRef getDumpString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
@@ -288,7 +284,7 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
 
   llvm_unreachable("Unhandled StringLiteral in switch.");
 }
-static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
+static StringRef getDumpString(CtorInitializerKind value) {
   switch (value) {
     case CtorInitializerKind::Designated: return "designated";
     case CtorInitializerKind::Convenience: return "convenience";
@@ -298,7 +294,7 @@ static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
 
   llvm_unreachable("Unhandled CtorInitializerKind in switch.");
 }
-static StringRef getAssociativityString(Associativity value) {
+static StringRef getDumpString(Associativity value) {
   switch (value) {
     case Associativity::None: return "none";
     case Associativity::Left: return "left";
@@ -586,7 +582,7 @@ namespace {
         OS << " exported";
 
       if (ID->getImportKind() != ImportKind::Module)
-        OS << " kind=" << getImportKindString(ID->getImportKind());
+        OS << " kind=" << getDumpString(ID->getImportKind());
 
       OS << " '";
       // Check if module aliasing was used for the given imported module; for
@@ -835,17 +831,17 @@ namespace {
         auto impl = D->getImplInfo();
         PrintWithColorRAII(OS, DeclModifierColor)
           << " readImpl="
-          << getReadImplKindName(impl.getReadImpl());
+          << getDumpString(impl.getReadImpl());
         if (!impl.supportsMutation()) {
           PrintWithColorRAII(OS, DeclModifierColor)
             << " immutable";
         } else {
           PrintWithColorRAII(OS, DeclModifierColor)
             << " writeImpl="
-            << getWriteImplKindName(impl.getWriteImpl());
+            << getDumpString(impl.getWriteImpl());
           PrintWithColorRAII(OS, DeclModifierColor)
             << " readWriteImpl="
-            << getReadWriteImplKindName(impl.getReadWriteImpl());
+            << getDumpString(impl.getReadWriteImpl());
         }
       }
     }
@@ -966,7 +962,7 @@ namespace {
 
       if (auto fec = D->getForeignErrorConvention()) {
         OS << " foreign_error=";
-        OS << getForeignErrorConventionKindString(fec->getKind());
+        OS << getDumpString(fec->getKind());
         bool wantResultType = (
           fec->getKind() == ForeignErrorConvention::ZeroResult ||
           fec->getKind() == ForeignErrorConvention::NonZeroResult);
@@ -1032,7 +1028,7 @@ namespace {
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
-                   getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+                   getDumpString(P->getDefaultArgumentKind()));
       }
 
       if (P->hasDefaultExpr() &&
@@ -1147,7 +1143,7 @@ namespace {
       if (CD->isRequired())
         PrintWithColorRAII(OS, DeclModifierColor) << " required";
       PrintWithColorRAII(OS, DeclModifierColor) << " "
-        << getCtorInitializerKindString(CD->getInitKind());
+        << getDumpString(CD->getInitKind());
       if (CD->isFailable())
         PrintWithColorRAII(OS, DeclModifierColor) << " failable="
           << (CD->isImplicitlyUnwrappedOptional()
@@ -1228,7 +1224,7 @@ namespace {
 
       OS.indent(Indent+2);
       OS << "associativity "
-         << getAssociativityString(PGD->getAssociativity()) << "\n";
+         << getDumpString(PGD->getAssociativity()) << "\n";
 
       OS.indent(Indent+2);
       OS << "assignment " << (PGD->isAssignment() ? "true" : "false");
@@ -2007,7 +2003,7 @@ public:
   void visitStringLiteralExpr(StringLiteralExpr *E) {
     printCommon(E, "string_literal_expr");
     PrintWithColorRAII(OS, LiteralValueColor) << " encoding="
-      << getStringLiteralExprEncodingString(E->getEncoding())
+      << getDumpString(E->getEncoding())
       << " value=" << QuotedString(E->getValue())
       << " builtin_initializer=";
     E->getBuiltinInitializer().dump(
@@ -2047,7 +2043,7 @@ public:
 
     if (E->isString()) {
       OS << " encoding="
-         << getStringLiteralExprEncodingString(E->getStringEncoding());
+         << getDumpString(E->getStringEncoding());
     }
     OS << " builtin_initializer=";
     E->getBuiltinInitializer().dump(OS);
@@ -2085,7 +2081,7 @@ public:
     printDeclRef(E->getDeclRef());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getAccessSemanticsString(E->getAccessSemantics());
+        << " " << getDumpString(E->getAccessSemantics());
     PrintWithColorRAII(OS, ExprModifierColor)
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -2155,7 +2151,7 @@ public:
     printDeclRef(E->getMember());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getAccessSemanticsString(E->getAccessSemantics());
+        << " " << getDumpString(E->getAccessSemantics());
     if (E->isSuper())
       OS << " super";
 
@@ -2267,7 +2263,7 @@ public:
     printCommon(E, "subscript_expr");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getAccessSemanticsString(E->getAccessSemantics());
+        << " " << getDumpString(E->getAccessSemantics());
     if (E->isSuper())
       OS << " super";
     if (E->hasDecl()) {
@@ -2897,7 +2893,7 @@ public:
   }
   void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
     printCommon(E, "objc_selector_expr");
-    OS << " kind=" << getObjCSelectorExprKindString(E->getSelectorKind());
+    OS << " kind=" << getDumpString(E->getSelectorKind());
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMethod());
     OS << '\n';
@@ -3989,7 +3985,7 @@ namespace {
     void visitMetatypeType(MetatypeType *T, StringRef label) {
       printCommon(label, "metatype_type");
       if (T->hasRepresentation())
-        OS << " " << getMetatypeRepresentationString(T->getRepresentation());
+        OS << " " << getDumpString(T->getRepresentation());
       printRec(T->getInstanceType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3998,7 +3994,7 @@ namespace {
                                       StringRef label) {
       printCommon(label, "existential_metatype_type");
       if (T->hasRepresentation())
-        OS << " " << getMetatypeRepresentationString(T->getRepresentation());
+        OS << " " << getDumpString(T->getRepresentation());
       printRec(T->getInstanceType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -4123,7 +4119,7 @@ namespace {
 
         if (representation != SILFunctionType::Representation::Thick) {
           printField("representation",
-                     getSILFunctionTypeRepresentationString(representation));
+                     getDumpString(representation));
         }
         printFlag(!T->isNoEscape(), "escaping");
         printFlag(T->isSendable(), "Sendable");
