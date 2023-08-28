@@ -1,35 +1,8 @@
 import CASTBridging
 import CBasicBridging
-
-// Needed to use SyntaxTransformVisitor's visit method.
-@_spi(SyntaxTransformVisitor)
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func visit(_ node: MemberBlockItemSyntax) -> ASTNode {
-    visit(Syntax(node.decl))
-  }
-
-  public func visit(_ node: LabeledExprSyntax) -> ASTNode {
-    visit(node.expression)
-  }
-
-  public func visit(_ node: InitializerClauseSyntax) -> ASTNode {
-    visit(node.value)
-  }
-
-  public func visit(_ node: ConditionElementSyntax) -> ASTNode {
-    visit(node.condition)
-  }
-
-  public func visit(_ node: CodeBlockItemSyntax) -> ASTNode {
-    visit(node.item)
-  }
-
-  public func visit(_ node: ArrayElementSyntax) -> ASTNode {
-    visit(node.expression)
-  }
-
   /// Form a source location at the given absolute position in the current
   /// file.
   public func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {

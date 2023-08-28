@@ -111,6 +111,30 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
   }
 }
 
+// Misc visits.
+// TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
+extension ASTGenVisitor {
+  public func visit(_ node: MemberBlockItemSyntax) -> ASTNode {
+    visit(Syntax(node.decl))
+  }
+
+  public func visit(_ node: InitializerClauseSyntax) -> ASTNode {
+    visit(node.value)
+  }
+
+  public func visit(_ node: ConditionElementSyntax) -> ASTNode {
+    visit(node.condition)
+  }
+
+  public func visit(_ node: CodeBlockItemSyntax) -> ASTNode {
+    visit(node.item)
+  }
+
+  public func visit(_ node: ArrayElementSyntax) -> ASTNode {
+    visit(node.expression)
+  }
+}
+
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
