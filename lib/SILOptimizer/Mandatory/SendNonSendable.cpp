@@ -97,39 +97,93 @@ static const char *SEP_STR = "╾───────────────�
 using TrackableValueID = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
-class TrackableSILValue {
-  SILValue value;
-  bool aliased;
-  bool sendable;
+enum class TrackableValueFlag {
+  None = 0x0,
+  isMayAlias = 0x1,
+  isSendable = 0x2,
+};
+
+using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
+
+class TrackableValueState {
+  unsigned id;
+  TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
 
 public:
-  TrackableSILValue(SILValue inputValue, bool aliased, bool sendable)
-      : value(inputValue), aliased(aliased), sendable(sendable) {}
+  TrackableValueState(unsigned newID) : id(newID) {}
 
-  bool isAliased() const { return aliased; }
-
-  bool isUnaliased() const { return !aliased; }
-
-  bool isSendable() const { return sendable; }
-
-  bool isNonSendable() const { return !sendable; }
-
-  SILValue getValue() const { return value; }
-
-  // comparison operates lookthrough to the underlying SILValue
-  bool operator==(const TrackableSILValue &other) const {
-    return value == other.value;
+  bool isMayAlias() const {
+    return flagSet.contains(TrackableValueFlag::isMayAlias);
   }
 
-  bool operator<(const TrackableSILValue &other) const {
-    return value < other.value;
+  bool isNoAlias() const { return !isMayAlias(); }
+
+  bool isSendable() const {
+    return flagSet.contains(TrackableValueFlag::isSendable);
   }
 
-  void dump() const {
-    llvm::dbgs() << "TrackableSILValue[aliased=" << aliased
-                 << "][sendable=" << sendable << "]: ";
-    value->dump();
+  bool isNonSendable() const { return !isSendable(); }
+
+  TrackableValueID getID() const { return TrackableValueID(id); }
+
+  void addFlag(TrackableValueFlag flag) { flagSet |= flag; }
+
+  void removeFlag(TrackableValueFlag flag) { flagSet -= flag; }
+
+  void print(llvm::raw_ostream &os) const {
+    os << "TrackableValueState[id: " << id
+       << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
+       << "][is_sendable: " << (isSendable() ? "yes" : "no") << "].";
   }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+};
+
+/// A tuple consisting of a base value and its value state.
+///
+/// DISCUSSION: We are computing regions among equivalence classes of values
+/// with GEPs like struct_element_addr being considered equivalent from a value
+/// perspective to their underlying base value.
+///
+/// Example:
+///
+/// ```
+/// %0 = alloc_stack $Struct
+/// %1 = struct_element_addr %0 : $Struct.childField
+/// %2 = struct_element_addr %1 : $ChildField.grandchildField
+/// ```
+///
+/// In the above example, %2 will be mapped to %0 by our value mapping.
+class TrackableValue {
+  SILValue representativeValue;
+  TrackableValueState valueState;
+
+public:
+  TrackableValue(SILValue representativeValue, TrackableValueState valueState)
+      : representativeValue(representativeValue), valueState(valueState) {}
+
+  bool isMayAlias() const { return valueState.isMayAlias(); }
+
+  bool isNoAlias() const { return !isMayAlias(); }
+
+  bool isSendable() const { return valueState.isSendable(); }
+
+  bool isNonSendable() const { return !isSendable(); }
+
+  TrackableValueID getID() const {
+    return TrackableValueID(valueState.getID());
+  }
+
+  /// Return the representative value of this equivalence class of values.
+  SILValue getRepresentative() const { return representativeValue; }
+
+  void print(llvm::raw_ostream &os) const {
+    os << "TrackableValue. State: ";
+    valueState.print(os);
+    os << "\n    Rep Value: " << *getRepresentative();
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
 // PartitionOpTranslator is responsible for performing the translation from
@@ -152,19 +206,23 @@ class PartitionOpTranslator {
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
 
-  llvm::Optional<TrackableSILValue> trackIfNonSendable(SILValue value) const {
-    auto trackedVal = getTrackableSILValue(value);
-    if (trackedVal.isNonSendable()) {
-        return trackedVal;
+  llvm::Optional<TrackableValue> trackIfNonSendable(SILValue value) const {
+    auto state = getTrackableValue(value);
+    if (state.isNonSendable()) {
+      return state;
     }
     return {};
   }
 
-  // nodeIDMap stores unique IDs for all SILNodes corresponding to
-  // non-Sendable values. Implicit conversion from SILValue used pervasively.
-  // ensure simplifyVal is called on SILValues before entering into this map
-  std::map<TrackableSILValue, TrackableValueID> trackableValueIDs;
-  unsigned nextID = 0;
+  /// A map from the representative of an equivalence class of values to their
+  /// TrackableValueState. The state contains both the unique value id for the
+  /// equivalence class of values as well as whether we determined if they are
+  /// uniquely identified and sendable.
+  ///
+  /// nodeIDMap stores unique IDs for all SILNodes corresponding to
+  /// non-Sendable values. Implicit conversion from SILValue used pervasively.
+  /// ensure simplifyVal is called on SILValues before entering into this map
+  llvm::DenseMap<SILValue, TrackableValueState> equivalenceClassValuesToState;
 
   // some values that AccessStorage claims are uniquely identified are still
   // captured (e.g. in a closure). This set is initialized upon
@@ -177,41 +235,61 @@ class PartitionOpTranslator {
   //       utilities would make it easier than handrolling
   llvm::DenseSet<SILValue> capturedUIValues;
 
-  TrackableSILValue getTrackableSILValue(SILValue value) const {
+  TrackableValue getTrackableValue(SILValue value) const {
     value = getUnderlyingTrackedValue(value);
 
-    bool isAliased = true;
+    auto *self = const_cast<PartitionOpTranslator *>(this);
+    auto iter = self->equivalenceClassValuesToState.try_emplace(
+        value, TrackableValueState(equivalenceClassValuesToState.size()));
 
-    if (isAddress(value)) {
-        if (auto accessStorage = AccessStorage::compute(value))
-          isAliased = !accessStorage.isUniquelyIdentified() ||
-                      capturedUIValues.count(value);
+    // If we did not insert, just return the already stored value.
+    if (!iter.second) {
+      return {value, iter.first->second};
     }
 
-    // set `sendable` appropriately
+    // Otherwise, we need to compute our true aliased and sendable values. Begi
+    // by seeing if we have a value that we can prove is not aliased.
+    if (isAddress(value)) {
+      if (auto accessStorage = AccessStorage::compute(value))
+        if (accessStorage.isUniquelyIdentified() &&
+            !capturedUIValues.count(value))
+          iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
+    }
+
+    // Then see if we have a sendable value. By default we assume values are not
+    // sendable.
     if (auto *defInst = value.getDefiningInstruction()) {
-        // Though these values are technically non-Sendable, we can safely and
-        // consistently treat them as Sendable.
-        if (isa<ClassMethodInst, FunctionRefInst>(defInst)) {
-          return TrackableSILValue(value, isAliased, true /*is sendable*/);
-        }
+      // Though these values are technically non-Sendable, we can safely and
+      // consistently treat them as Sendable.
+      if (isa<ClassMethodInst, FunctionRefInst>(defInst)) {
+        iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+        return {iter.first->first, iter.first->second};
+      }
     }
 
     // Otherwise refer to the oracle.
-    return TrackableSILValue(value, isAliased,
-                             !isNonSendableType(value->getType()));
+    if (!isNonSendableType(value->getType()))
+      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+
+    return {iter.first->first, iter.first->second};
   }
 
   void initCapturedUIValues() {
+    LLVM_DEBUG(llvm::dbgs()
+               << ">>> Begin Captured Uniquely Identified addresses for "
+               << function->getName() << ":\n");
+
     for (auto &block : *function) {
       for (auto &inst : block) {
         if (isApplyInst(inst)) {
           // add all nonsendable, uniquely identified arguments to applications
           // to capturedUIValues, because applications capture them
           for (SILValue val : inst.getOperandValues()) {
-            auto trackVal = getTrackableSILValue(val);
-            if (trackVal.isNonSendable() && trackVal.isUnaliased())
-              capturedUIValues.insert(val);
+            auto trackVal = getTrackableValue(val);
+            if (trackVal.isNonSendable() && trackVal.isNoAlias()) {
+              LLVM_DEBUG(trackVal.print(llvm::dbgs()));
+              capturedUIValues.insert(trackVal.getRepresentative());
+            }
           }
         }
       }
@@ -229,34 +307,27 @@ public:
                                "in contexts in which the availability of the "
                                "Sendable protocol has already been checked.");
     initCapturedUIValues();
-    LLVM_DEBUG(llvm::dbgs() << "Captured Uniquely Identified addresses for "
-                            << function->getName() << ":\n";
-               for (SILValue val
-                    : capturedUIValues) val->dump(););
   }
 
 private:
-  bool valueHasID(TrackableSILValue value,
-                  bool dumpIfHasNoID = false) {
-    assert(value.isNonSendable() &&
+  bool valueHasID(SILValue value, bool dumpIfHasNoID = false) {
+    assert(getTrackableValue(value).isNonSendable() &&
            "only non-Sendable values should be entered in the map");
-    bool hasID = trackableValueIDs.count(value);
+    bool hasID = equivalenceClassValuesToState.count(value);
     if (!hasID && dumpIfHasNoID) {
-      llvm::dbgs() << "FAILURE: valueHasID of ";
-      value.dump();
+      llvm::errs() << "FAILURE: valueHasID of ";
+      value->print(llvm::errs());
+      llvm::report_fatal_error("standard compiler error");
     }
     return hasID;
   }
 
   // lookup the internally assigned unique ID of a SILValue, or create one
-  TrackableValueID lookupValueID(TrackableSILValue value) {
-    assert(value.isNonSendable() &&
+  TrackableValueID lookupValueID(SILValue value) {
+    auto state = getTrackableValue(value);
+    assert(state.isNonSendable() &&
            "only non-Sendable values should be entered in the map");
-    if (trackableValueIDs.count(value)) {
-      return trackableValueIDs.at(value);
-    }
-    trackableValueIDs.insert({value, TrackableValueID(nextID)});
-    return TrackableValueID(nextID++);
+    return state.getID();
   }
 
   // check the passed type for sendability, special casing the type used for
@@ -283,13 +354,13 @@ private:
   // The following section of functions create fresh PartitionOps referencing
   // the current value of currentInstruction for ease of programming.
 
-  std::vector<PartitionOp> AssignFresh(TrackableSILValue value) {
+  std::vector<PartitionOp> AssignFresh(SILValue value) {
     return {PartitionOp::AssignFresh(
         lookupValueID(value),
         currentInstruction)};
   }
 
-  std::vector<PartitionOp> Assign(TrackableSILValue tgt, TrackableSILValue src) {
+  std::vector<PartitionOp> Assign(SILValue tgt, SILValue src) {
     assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
@@ -302,9 +373,7 @@ private:
         currentInstruction)};
   }
 
-  std::vector<PartitionOp> Consume(
-      TrackableSILValue value,
-      Expr *sourceExpr = nullptr) {
+  std::vector<PartitionOp> Consume(SILValue value, Expr *sourceExpr = nullptr) {
     assert(valueHasID(value) &&
            "consumed value should already have been encountered");
 
@@ -314,7 +383,7 @@ private:
         sourceExpr)};
   }
 
-  std::vector<PartitionOp> Merge(TrackableSILValue fst, TrackableSILValue snd) {
+  std::vector<PartitionOp> Merge(SILValue fst, SILValue snd) {
     assert(valueHasID(fst, /*dumpIfHasNoID=*/true) && valueHasID(snd, /*dumpIfHasNoID=*/true) &&
            "merged values should already have been encountered");
 
@@ -325,7 +394,7 @@ private:
                               currentInstruction)};
   }
 
-  std::vector<PartitionOp> Require(TrackableSILValue value) {
+  std::vector<PartitionOp> Require(SILValue value) {
     assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
            "required value should already have been encountered");
     return {PartitionOp::Require(
@@ -340,12 +409,14 @@ private:
     std::vector<TrackableValueID> argIDs;
 
     for (SILArgument *arg : function->getArguments())
-      if (auto trackArg = trackIfNonSendable(arg))
-        argIDs.push_back(lookupValueID(trackArg.value()));
+      if (auto state = trackIfNonSendable(arg))
+        argIDs.push_back(state->getID());
 
-    if (function->hasSelfParam())
-      if (auto trackSelf = trackIfNonSendable(function->getSelfArgument()))
-          argIDs.push_back(lookupValueID(trackSelf.value()));
+    if (auto *selfArg = function->maybeGetSelfArgument()) {
+      if (auto state = trackIfNonSendable(selfArg)) {
+        argIDs.push_back(state->getID());
+      }
+    }
 
     return argIDs;
   }
@@ -393,16 +464,16 @@ public:
   std::vector<PartitionOp> translateSILMultiAssign(
       std::vector<SILValue> tgts, std::vector<SILValue> srcs) {
 
-    std::vector<TrackableSILValue> nonSendableSrcs;
-    std::vector<TrackableSILValue> nonSendableTgts;
+    std::vector<SILValue> nonSendableSrcs;
+    std::vector<SILValue> nonSendableTgts;
 
     for (SILValue src : srcs)
-      if (auto trackSrc = trackIfNonSendable(src))
-          nonSendableSrcs.push_back(trackSrc.value());
+      if (auto value = trackIfNonSendable(src))
+        nonSendableSrcs.push_back(value->getRepresentative());
 
     for (SILValue tgt : tgts)
-      if (auto trackTgt = trackIfNonSendable(tgt))
-          nonSendableTgts.push_back(trackTgt.value());
+      if (auto value = trackIfNonSendable(tgt))
+        nonSendableTgts.push_back(value->getRepresentative());
 
     std::vector<PartitionOp> translated;
     auto add_to_translation = [&](std::vector<PartitionOp> ops) {
@@ -470,8 +541,8 @@ public:
 
     // require all operands
     for (auto op : applySite->getOperandValues())
-      if (auto trackOp = trackIfNonSendable(op))
-        translated.push_back(Require(trackOp.value()).front());
+      if (auto value = trackIfNonSendable(op))
+        translated.push_back(Require(value->getRepresentative()).front());
 
     auto getSourceArg = [&](unsigned i) {
       if (i < sourceApply->getArgs()->size())
@@ -489,17 +560,18 @@ public:
     auto handleSILOperands = [&](OperandValueArrayRef ops) {
       int argNum = 0;
       for (auto arg : ops) {
-        if (auto trackArg = trackIfNonSendable(arg))
+        if (auto value = trackIfNonSendable(arg))
           translated.push_back(
-              Consume(trackArg.value(), getSourceArg(argNum)).front());
+              Consume(value->getRepresentative(), getSourceArg(argNum))
+                  .front());
         argNum++;
       }
     };
 
     auto handleSILSelf = [&](SILValue self) {
-      if (auto trackSelf = trackIfNonSendable(self))
+      if (auto value = trackIfNonSendable(self))
         translated.push_back(
-            Consume(trackSelf.value(), getSourceSelf()).front());
+            Consume(value->getRepresentative(), getSourceSelf()).front());
     };
 
     if (applySite.hasSelfArgument()) {
@@ -513,8 +585,8 @@ public:
     // a diagnostic emitted elsewhere. Here, give them a fresh value for better
     // diagnostics hereafter
     for (auto result : getApplyResults(*applySite))
-      if (auto trackResult = trackIfNonSendable(result))
-        translated.push_back(AssignFresh(trackResult.value()).front());
+      if (auto value = trackIfNonSendable(result))
+        translated.push_back(AssignFresh(value->getRepresentative()).front());
 
     return translated;
   }
@@ -533,7 +605,8 @@ public:
     auto nonSendableFst = trackIfNonSendable(fst);
     auto nonSendableSnd = trackIfNonSendable(snd);
     if (nonSendableFst && nonSendableSnd)
-      return Merge(nonSendableFst.value(), nonSendableSnd.value());
+      return Merge(nonSendableFst->getRepresentative(),
+                   nonSendableSnd->getRepresentative());
     return {};
   }
 
@@ -546,7 +619,7 @@ public:
     if (auto nonSendableTgt = trackIfNonSendable(tgt)) {
 
       // stores to unaliased storage can be treated as assignments, not merges
-      if (nonSendableTgt.value().isUnaliased())
+      if (nonSendableTgt.value().isNoAlias())
         return translateSILAssign(tgt, src);
 
       // stores to possibly aliased storage must be treated as merges
@@ -559,7 +632,7 @@ public:
 
   std::vector<PartitionOp> translateSILRequire(SILValue val) {
     if (auto nonSendableVal = trackIfNonSendable(val))
-      return Require(nonSendableVal.value());
+      return Require(nonSendableVal->getRepresentative());
     return {};
   }
 
@@ -1643,20 +1716,21 @@ class SendNonSendable : public SILFunctionTransform {
   // unsatisfied isolation jump, emitting appropriate diagnostics if so
   void run() override {
     SILFunction *function = getFunction();
-    DeclContext *declContext = function->getDeclContext();
 
-    // if this function does not correspond to a syntactic declContext, don't
-    // check it
-    // TODO: revisit this assumption, in particular perhaps verify no isolation
-    // crossing applies occurs within these
-    if (!declContext)
-      return;
-
-    // if the experimental feature SendNonSendable is not provided,
-    // do not perform this pass
     if (!function->getASTContext().LangOpts.hasFeature(
             Feature::SendNonSendable))
       return;
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "===> PROCESSING: " << function->getName() << '\n');
+
+    // If this function does not correspond to a syntactic declContext and it
+    // doesn't have a parent module, don't check it since we cannot check if a
+    // type is sendable.
+    if (!function->getDeclContext() && !function->getParentModule()) {
+      LLVM_DEBUG(llvm::dbgs() << "No Decl Context! Skipping!\n");
+      return;
+    }
 
     // The sendable protocol should /always/ be available if SendNonSendable is
     // enabled. If not, there is a major bug in the compiler and we should fail

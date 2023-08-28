@@ -1422,6 +1422,14 @@ public:
     return getArguments().back();
   }
 
+  /// Like getSelfArgument() except it returns a nullptr if we do not have a
+  /// selfparam.
+  const SILArgument *maybeGetSelfArgument() const {
+    if (!hasSelfParam())
+      return nullptr;
+    return getArguments().back();
+  }
+
   const SILArgument *getDynamicSelfMetadata() const {
     assert(hasDynamicSelfMetadata() && "This method can only be called if the "
            "SILFunction has a self-metadata parameter");
