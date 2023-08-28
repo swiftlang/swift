@@ -1,4 +1,5 @@
 // REQUIRES: OS=macosx
+// REQUIRES: swift_interpreter
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
 
 // -enable-experimental-feature requires an asserts build
