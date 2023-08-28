@@ -58,16 +58,11 @@ if (SWIFT_SWIFT_PARSER)
   foreach (sharedlib ${SWIFT_SYNTAX_SHARED_LIBRARIES})
     set(add_origin_rpath)
     if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
-      get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
       # At runtime, use swiftCore in the current toolchain.
-      
       swift_get_set_rpath_script_file(setrpath_command)
       set(add_origin_rpath COMMAND ${CMAKE_COMMAND}
         "-DSWIFT_SET_RPATH_FILE=${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
-        "-DSWIFT_SET_RPATH_NEW_RPATH='$$ORIGIN:$$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}:${host_lib_dir}'"
+        "-DSWIFT_SET_RPATH_NEW_RPATH='$$ORIGIN:$$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}'"
         -P "${setrpath_command}"
       )
     endif()
@@ -88,12 +83,6 @@ if (SWIFT_SWIFT_PARSER)
       FILES "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
       COMPONENT compiler
-    )
-
-    swift_install_file_set_rpath(
-      "lib${LLVM_LIBDIR_SUFFIX}/swift/host/${sharedlib}"
-      "$ORIGIN:$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
-      compiler
     )
 
     add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxLibrary_${sharedlib})
