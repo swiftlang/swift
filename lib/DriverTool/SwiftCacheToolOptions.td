@@ -15,3 +15,9 @@ def cache_tool_action: JoinedOrSeparate<["-"], "cache-tool-action">,
 
 def cas_path: Separate<["-"], "cas-path">,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;
+
+def cas_plugin_path: Separate<["-"], "cas-plugin-path">,
+  HelpText<"Path to CAS Plugin">, MetaVarName<"<path>">;
+
+def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
+  HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
