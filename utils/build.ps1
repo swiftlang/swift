@@ -374,7 +374,7 @@ function Build-CMakeProject {
 
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
-
+  
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE $BuildType
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
@@ -407,7 +407,7 @@ function Build-CMakeProject {
       }
 
       if ($GenerateDebugInfo -and $CDebugFormat -eq "dwarf") {
-        Append-FlagsDefine $Defines CMAKE_C_FLAGS -gdwarf
+        Append-FlagsDefine $Defines CMAKE_C_FLAGS "-gdwarf"
       }
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
@@ -421,7 +421,7 @@ function Build-CMakeProject {
       }
 
       if ($GenerateDebugInfo -and $CDebugFormat -eq "dwarf") {
-        Append-FlagsDefine $Defines CMAKE_CXX_FLAGS -gdwarf
+        Append-FlagsDefine $Defines CMAKE_CXX_FLAGS "-gdwarf"
       }
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
@@ -1406,23 +1406,26 @@ function Build-DocC() {
 }
 
 function Build-Installer() {
-  Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Properties @{
+  $Properties = @{
     DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-    PLATFORM_ROOT = "$($HostArch.PlatformInstallRoot)\";
-    # Pending support for building other architectures
-    SDK_ROOT = "$($HostArch.SDKInstallRoot)\";
     INCLUDE_SWIFT_FORMAT = "true";
     SWIFT_FORMAT_BUILD = "$($HostArch.BinaryCache)\swift-format\release";
     INCLUDE_SWIFT_INSPECT = "true";
     SWIFT_INSPECT_BUILD = "$($HostArch.BinaryCache)\swift-inspect\release";
   }
 
-  if (($Stage -ne "") -and (-not $ToBatch)) {
-    $Stage += "\" # Interpret as target directory
+  foreach ($Arch in $SDKArchs) {
+    $Properties["INCLUDE_$($Arch.VSName.ToUpperInvariant())"] = "true"
+    $Properties["PLATFORM_ROOT_$($Arch.VSName.ToUpperInvariant())"] = "$($Arch.PlatformInstallRoot)\"
+    $Properties["SDK_ROOT_$($Arch.VSName.ToUpperInvariant())"] = "$($Arch.SDKInstallRoot)\"
+  }
 
-    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msi" $Stage
-    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" $Stage
+  Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Properties $Properties
+
+  if ($Stage -and (-not $ToBatch)) {
+    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msi" "$Stage\"
+    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" "$Stage\"
   }
 }
 
