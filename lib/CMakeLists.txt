@@ -80,7 +80,7 @@ if (SWIFT_SWIFT_PARSER)
     )
 
     swift_install_in_component(
-      FILES "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+      PROGRAMS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
       COMPONENT compiler
     )
