@@ -593,8 +593,8 @@ const ModuleDependencyInfo *SwiftDependencyScanningService::recordDependency(
 const ModuleDependencyInfo *SwiftDependencyScanningService::updateDependency(
     ModuleDependencyID moduleID, ModuleDependencyInfo dependencies,
     StringRef scanningContextHash) {
-  auto &map = getDependenciesMap(moduleID.second, scanningContextHash);
-  auto known = map.find(moduleID.first);
+  auto &map = getDependenciesMap(moduleID.Kind, scanningContextHash);
+  auto known = map.find(moduleID.ModuleName);
   assert(known != map.end() && "Not yet added to map");
   known->second = std::move(dependencies);
   return &(known->second);
@@ -623,15 +623,18 @@ ModuleDependenciesCache::ModuleDependenciesCache(
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
-      moduleOutputPath(moduleOutputPath),
-      clangScanningTool(*globalScanningService.ClangScanningService,
-                        globalScanningService.getClangScanningFS()) {
+      moduleOutputPath(moduleOutputPath) {
   globalScanningService.configureForContextHash(scannerContextHash);
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind) {
     ModuleDependenciesMap.insert(
         {kind, llvm::StringMap<const ModuleDependencyInfo *>()});
   }
+}
+
+llvm::Optional<const ModuleDependencyInfo *>
+ModuleDependenciesCache::findDependency(const ModuleDependencyID moduleID) const {
+  return findDependency(moduleID.ModuleName, moduleID.Kind);
 }
 
 llvm::Optional<const ModuleDependencyInfo *>
@@ -669,21 +672,33 @@ void ModuleDependenciesCache::recordDependency(
   map.insert({moduleName, recordedDependencies});
 }
 
+void ModuleDependenciesCache::recordDependencies(
+    ModuleDependencyVector moduleDependencies) {
+  for (const auto &dep : moduleDependencies) {
+    recordDependency(dep.first.ModuleName, dep.second);
+    if (dep.second.getKind() == ModuleDependencyKind::Clang) {
+      auto clangModuleDetails = dep.second.getAsClangModule();
+      addSeenClangModule(clang::tooling::dependencies::ModuleID{
+          dep.first.ModuleName, clangModuleDetails->contextHash});
+    }
+  }
+}
+
 void ModuleDependenciesCache::updateDependency(
     ModuleDependencyID moduleID, ModuleDependencyInfo dependencyInfo) {
   const ModuleDependencyInfo *updatedDependencies =
     globalScanningService.updateDependency(moduleID, dependencyInfo,
                                            scannerContextHash);
-  auto &map = getDependencyReferencesMap(moduleID.second);
-  auto known = map.find(moduleID.first);
+  auto &map = getDependencyReferencesMap(moduleID.Kind);
+  auto known = map.find(moduleID.ModuleName);
   if (known != map.end())
     map.erase(known);
-  map.insert({moduleID.first, updatedDependencies});
+  map.insert({moduleID.ModuleName, updatedDependencies});
 }
 
 void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID moduleID,
                                                        const ArrayRef<ModuleDependencyID> dependencyIDs) {
-  auto optionalDependencyInfo = findDependency(moduleID.first, moduleID.second);
+  auto optionalDependencyInfo = findDependency(moduleID);
   assert(optionalDependencyInfo.has_value() && "Resolving unknown dependency");
   // Copy the existing info to a mutable one we can then replace it with, after resolving its dependencies.
   auto dependencyInfo = *(optionalDependencyInfo.value());
@@ -693,10 +708,26 @@ void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID module
 
 void ModuleDependenciesCache::setSwiftOverlayDependencues(ModuleDependencyID moduleID,
                                                           const ArrayRef<ModuleDependencyID> dependencyIDs) {
-  auto optionalDependencyInfo = findDependency(moduleID.first, moduleID.second);
+  auto optionalDependencyInfo = findDependency(moduleID);
   assert(optionalDependencyInfo.has_value() && "Resolving unknown dependency");
   // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
   auto dependencyInfo = *(optionalDependencyInfo.value());
   dependencyInfo.setOverlayDependencies(dependencyIDs);
   updateDependency(moduleID, dependencyInfo);
+}
+
+std::vector<ModuleDependencyID>
+ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) const {
+  const auto &optionalModuleInfo = findDependency(moduleID);
+  assert(optionalModuleInfo.has_value());
+  auto directDependenciesRef =
+      optionalModuleInfo.value()->getDirectModuleDependencies();
+  auto overlayDependenciesRef =
+      optionalModuleInfo.value()->getSwiftOverlayDependencies();
+  std::vector<ModuleDependencyID> result;
+  result.insert(std::end(result), directDependenciesRef.begin(),
+                directDependenciesRef.end());
+  result.insert(std::end(result), overlayDependenciesRef.begin(),
+                overlayDependenciesRef.end());
+  return result;
 }

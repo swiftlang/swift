@@ -55,19 +55,20 @@ bool prescanDependencies(CompilerInstance &instance);
 bool batchScanDependencies(CompilerInstance &instance,
                            llvm::StringRef batchInputFile);
 
-/// Batch prescan the imports of modules specified in \c batchInputFile.
-bool batchPrescanDependencies(CompilerInstance &instance,
-                              llvm::StringRef batchInputFile);
-
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 performModuleScan(CompilerInstance &instance,
                   ModuleDependenciesCache &cache);
 
+llvm::ErrorOr<swiftscan_dependency_graph_t>
+performParallelModuleScan(CompilerInstance &instance,
+                          ModuleDependenciesCache &cache);
+
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
-performModulePrescan(CompilerInstance &instance);
+performModulePrescan(CompilerInstance &instance,
+                     ModuleDependenciesCache &cache);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
@@ -76,14 +77,6 @@ performBatchModuleScan(CompilerInstance &invocationInstance,
                        CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
                        llvm::StringSaver &saver,
                        const std::vector<BatchScanInput> &BatchInput);
-
-/// Batch prescan the imports of modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<swiftscan_import_set_t>>
-performBatchModulePrescan(CompilerInstance &invocationInstance,
-                          ModuleDependenciesCache &cache,
-                          llvm::StringSaver &saver,
-                          const std::vector<BatchScanInput> &BatchInput);
-
 } // end namespace dependencies
 } // end namespace swift
 
