@@ -833,7 +833,7 @@ endmacro()
 #
 # Usage:
 #   add_swift_host_tool(name
-#     [HAS_SWIFT_MODULES]
+#     [HAS_SWIFT_MODULES | DOES_NOT_USE_SWIFT]
 #     [THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY]
 #
 #     [BOOTSTRAPPING 0|1]
@@ -846,6 +846,9 @@ endmacro()
 #
 # HAS_SWIFT_MODULES
 #   Whether to link with SwiftCompilerSources library
+#
+# DOES_NOT_USE_SWIFT
+#   Do not link with swift runtime
 #
 # THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
 #   Opt-out of LLVM IR optimizations when linking ThinLTO with ld64
@@ -862,7 +865,7 @@ endmacro()
 # source1 ...
 #   Sources to add into this executable.
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
+  set(options HAS_SWIFT_MODULES DOES_NOT_USE_SWIFT THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -918,7 +921,7 @@ function(add_swift_host_tool executable)
   endif()
 
   # Once the new Swift parser is linked in, every host tool has Swift modules.
-  if (SWIFT_SWIFT_PARSER)
+  if (SWIFT_SWIFT_PARSER AND NOT ASHT_DOES_NOT_USE_SWIFT)
     set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
