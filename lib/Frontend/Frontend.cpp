@@ -31,10 +31,10 @@
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -758,7 +758,7 @@ bool CompilerInstance::setUpModuleLoaders() {
 
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
 
-  // When scanning for dependencies, we must add the scanner loaders in order to
+  // When scanning for dependencies, we must add the scanner placeholder loader in order to
   // handle ASTContext operations such as canImportModule
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::ScanDependencies) {

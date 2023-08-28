@@ -39,6 +39,7 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace swift {
@@ -86,10 +87,19 @@ enum class ModuleDependencyKind : int8_t {
   LastKind = SwiftPlaceholder + 1
 };
 
-using ModuleDependencyID = std::pair<std::string, ModuleDependencyKind>;
-using ModuleDependencyIDSetVector =
-    llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                    std::set<ModuleDependencyID>>;
+/// This is used to identify a specific module.
+struct ModuleDependencyID {
+  std::string ModuleName;
+  ModuleDependencyKind Kind;
+  bool operator==(const ModuleDependencyID &Other) const {
+    return std::tie(ModuleName, Kind) ==
+           std::tie(Other.ModuleName, Other.Kind);
+  }
+  bool operator<(const ModuleDependencyID& Other) const {
+    return std::tie(ModuleName, Kind) <
+           std::tie(Other.ModuleName, Other.Kind);
+  }
+};
 
 struct ModuleDependencyKindHash {
   std::size_t operator()(ModuleDependencyKind k) const {
@@ -97,6 +107,18 @@ struct ModuleDependencyKindHash {
     return std::hash<UnderlyingType>{}(static_cast<UnderlyingType>(k));
   }
 };
+struct ModuleDependencyIDHash {
+  std::size_t operator()(ModuleDependencyID id) const {
+    return llvm::hash_combine(id.ModuleName, id.Kind);
+  }
+};
+
+using ModuleDependencyIDSet =
+    std::unordered_set<ModuleDependencyID,
+                       ModuleDependencyIDHash>;
+using ModuleDependencyIDSetVector =
+    llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                    std::set<ModuleDependencyID>>;
 
 namespace dependencies {
   std::string createEncodedModuleKindAndName(ModuleDependencyID id);
@@ -750,6 +772,7 @@ public:
   collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName) const;
 };
 
+using ModuleDependencyVector = llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>;
 using ModuleNameToDependencyMap = llvm::StringMap<ModuleDependencyInfo>;
 using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependencyKind,
@@ -861,6 +884,7 @@ public:
   }
 
   bool usingCachingFS() const { return !UseClangIncludeTree && (bool)CacheFS; }
+  llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> getCachingFS() const { return CacheFS; }
 
   llvm::cas::CachingOnDiskFileSystem &getSharedCachingFS() const {
     assert(CacheFS && "Expect CachingOnDiskFileSystem");
@@ -895,9 +919,10 @@ private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
   friend class ModuleDependenciesCache;
+  friend class ModuleDependencyScanner;
+  friend class ModuleDependencyScanningWorker;
   friend class ModuleDependenciesCacheDeserializer;
   friend class ModuleDependenciesCacheSerializer;
-  friend class DependencyScanningTool;
 
   /// Configure the current state of the cache to respond to queries
   /// for the specified scanning context hash.
@@ -964,8 +989,6 @@ private:
   std::string scannerContextHash;
   /// The location of where the built modules will be output to
   std::string moduleOutputPath;
-  /// The Clang dependency scanner tool
-  clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -987,22 +1010,28 @@ public:
   bool hasDependency(StringRef moduleName,
                      llvm::Optional<ModuleDependencyKind> kind) const;
 
-  /// Produce a reference to the Clang scanner tool associated with this cache
-  clang::tooling::dependencies::DependencyScanningTool& getClangScannerTool() {
-    return clangScanningTool;
-  }
   SwiftDependencyScanningService &getScanService() {
     return globalScanningService;
   }
-  llvm::DenseSet<clang::tooling::dependencies::ModuleID>& getAlreadySeenClangModules() {
+  const llvm::DenseSet<clang::tooling::dependencies::ModuleID>& getAlreadySeenClangModules() const {
     return alreadySeenClangModules;
   }
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  std::string getModuleOutputPath() {
+  std::string getModuleOutputPath() const {
     return moduleOutputPath;
   }
+
+  /// Query all dependencies, direct and Swift overlay.
+  std::vector<ModuleDependencyID>
+  getAllDependencies(const ModuleDependencyID &moduleID) const;
+
+  /// Look for module dependencies for a module with the given ID
+  ///
+  /// \returns the cached result, or \c None if there is no cached entry.
+  llvm::Optional<const ModuleDependencyInfo *>
+  findDependency(const ModuleDependencyID moduleID) const;
 
   /// Look for module dependencies for a module with the given name
   ///
@@ -1014,6 +1043,9 @@ public:
   /// Record dependencies for the given module.
   void recordDependency(StringRef moduleName,
                         ModuleDependencyInfo dependencies);
+
+  /// Record dependencies for the given module collection.
+  void recordDependencies(ModuleDependencyVector moduleDependencies);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
@@ -1039,12 +1071,8 @@ public:
 namespace std {
 template <>
 struct hash<swift::ModuleDependencyID> {
-  using UnderlyingKindType = std::underlying_type<swift::ModuleDependencyKind>::type;
   std::size_t operator()(const swift::ModuleDependencyID &id) const {
-    auto underlyingKindValue = static_cast<UnderlyingKindType>(id.second);
-
-    return (hash<string>()(id.first) ^
-            (hash<UnderlyingKindType>()(underlyingKindValue)));
+    return llvm::hash_combine(id.ModuleName, id.Kind);
   }
 };
 } // namespace std

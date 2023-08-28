@@ -97,8 +97,11 @@ public:
     // Parsing populates the Objective-C method tables.
   }
 
-  llvm::Optional<const ModuleDependencyInfo *>
-  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
+                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
+                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
                         bool isTestableImport) override;
 };
