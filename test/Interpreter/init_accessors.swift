@@ -847,3 +847,77 @@ do {
 // CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
 // CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional("Hello"))
 // CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
+
+do {
+  struct TestNonMutatingSetDefault {
+    var _count: Int
+
+    var count: Int = 42 {
+      @storageRestrictions(initializes: _count)
+      init {
+        _count = newValue
+      }
+
+      get { _count }
+      nonmutating set {}
+    }
+  }
+
+  struct TestNonMutatingSetNoDefault {
+    var _count: Int
+
+    var count: Int {
+      @storageRestrictions(initializes: _count)
+      init {
+        print("init accessor is called: \(newValue)")
+        _count = newValue
+      }
+
+      get { _count }
+
+      nonmutating set {
+        print("nonmutating set called: \(newValue)")
+      }
+    }
+
+    init(value: Int) {
+      self.count = value
+      self.count = value + 1
+    }
+  }
+
+  struct TestNonMutatingSetCustom {
+    var _count: Int
+
+    var count: Int = 42 {
+      @storageRestrictions(initializes: _count)
+      init {
+        print("init accessor is called: \(newValue)")
+        _count = newValue
+      }
+
+      get { _count }
+
+      nonmutating set {
+        print("nonmutating set called: \(newValue)")
+      }
+    }
+
+    init(custom: Int) {
+      count = custom
+    }
+  }
+
+  print("test-nonmutating-set-1: \(TestNonMutatingSetDefault())")
+  print("test-nonmutating-set-2: \(TestNonMutatingSetDefault(count: 0))")
+  print("test-nonmutating-set-3: \(TestNonMutatingSetNoDefault(value: -1))")
+  print("test-nonmutating-set-4: \(TestNonMutatingSetCustom(custom: 0))")
+}
+// CHECK: test-nonmutating-set-1: TestNonMutatingSetDefault(_count: 42)
+// CHECK-NEXT: test-nonmutating-set-2: TestNonMutatingSetDefault(_count: 0)
+// CHECK-NEXT: init accessor is called: -1
+// CHECK-NEXT: nonmutating set called: 0
+// CHECK-NEXT: test-nonmutating-set-3: TestNonMutatingSetNoDefault(_count: -1)
+// CHECK-NEXT: init accessor is called: 42
+// CHECK-NEXT: nonmutating set called: 0
+// CHECK-NEXT: test-nonmutating-set-4: TestNonMutatingSetCustom(_count: 42)
