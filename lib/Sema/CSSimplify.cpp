@@ -12230,10 +12230,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
             auto *componentLoc =
                 getConstraintLocator(locator->getAnchor(), path.drop_back());
 
-            if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse) ||
-                hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
-                hasFixFor(componentLoc,
-                          FixKind::UnwrapOptionalBaseWithOptionalResult))
+            if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
               return true;
           }
 
