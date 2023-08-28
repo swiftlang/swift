@@ -395,6 +395,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool explicitModulebuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -598,6 +599,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   bool indexSystemModules,
                                   bool skipStdlib,
                                   bool includeLocals,
+                                  bool explicitModuleBuild,
                                   StringRef targetTriple,
                                   const clang::CompilerInstance &clangCI,
                                   DiagnosticEngine &diags,
@@ -674,7 +676,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             emitDataForSwiftSerializedModule(mod, indexStorePath,
                                              indexClangModules,
                                              indexSystemModules, skipStdlib,
-                                             includeLocals, targetTriple,
+                                             includeLocals,
+                                             explicitModuleBuild,
+                                             targetTriple,
                                              clangCI, diags,
                                              unitWriter,
                                              pathRemapper,
@@ -719,6 +723,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool explicitModuleBuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -747,7 +752,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // Reload resilient modules from swiftinterface to avoid indexing
   // internal details.
   bool skipIndexingModule = false;
-  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+  // Note, we are unable to reload from interface on an explicit module build
+  if (!explicitModuleBuild &&
+      module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
       !module->isBuiltFromInterface() &&
       !module->isStdlibModule()) {
     module->getASTContext().setIgnoreAdjacentModules(true);
@@ -867,6 +874,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
                         indexSystemModules, skipStdlib, includeLocals,
+                        explicitModuleBuild,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, pathRemapper, initialFile);
 
@@ -883,7 +891,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexClangModules,
                      bool indexSystemModules, bool skipStdlib,
                      bool includeLocals, bool isDebugCompilation,
-                     StringRef targetTriple,
+                     bool isExplicitModuleBuild, StringRef targetTriple,
                      ArrayRef<const clang::FileEntry *> fileDependencies,
                      const clang::CompilerInstance &clangCI,
                      const PathRemapper &pathRemapper,
@@ -909,8 +917,9 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
                         indexSystemModules, skipStdlib, includeLocals,
-                        targetTriple, clangCI, diags, unitWriter,
-                        moduleNameScratch, pathRemapper, primarySourceFile);
+                        isExplicitModuleBuild, targetTriple, clangCI, diags,
+                        unitWriter, moduleNameScratch, pathRemapper,
+                        primarySourceFile);
 
   // File dependencies.
   for (auto *F : fileDependencies)
@@ -965,6 +974,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool skipStdlib,
                            bool includeLocals,
                            bool isDebugCompilation,
+                           bool isExplicitModuleBuild,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker,
                            const PathRemapper &pathRemapper) {
@@ -994,8 +1004,8 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
                               indexSystemModules, skipStdlib, includeLocals,
-                              isDebugCompilation, targetTriple,
-                              fileDependencies.getArrayRef(),
+                              isDebugCompilation, isExplicitModuleBuild,
+                              targetTriple, fileDependencies.getArrayRef(),
                               clangCI, pathRemapper, diags);
 }
 
@@ -1008,6 +1018,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            bool skipStdlib,
                            bool includeLocals,
                            bool isDebugCompilation,
+                           bool isExplicitModuleBuild,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker,
                            const PathRemapper &pathRemapper) {
@@ -1045,8 +1056,8 @@ bool index::indexAndRecord(ModuleDecl *module,
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
                                indexStorePath, indexClangModules,
                                indexSystemModules, skipStdlib, includeLocals,
-                               isDebugCompilation, targetTriple,
-                               fileDependencies.getArrayRef(),
+                               isDebugCompilation, isExplicitModuleBuild,
+                               targetTriple, fileDependencies.getArrayRef(),
                                clangCI, pathRemapper, diags))
         return true;
       unitIndex += 1;
