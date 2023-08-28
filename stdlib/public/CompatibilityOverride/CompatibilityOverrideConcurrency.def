@@ -108,12 +108,12 @@
 
 OVERRIDE_ACTOR(task_enqueue, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (class Job *job, ExecutorRef executor),
+               swift::, (Job *job, ExecutorRef executor),
                (job, executor))
 
 OVERRIDE_ACTOR(job_run, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (class Job *job, ExecutorRef executor),
+               swift::, (Job *job, ExecutorRef executor),
                (job, executor))
 
 OVERRIDE_ACTOR(task_getCurrentExecutor, ExecutorRef,
