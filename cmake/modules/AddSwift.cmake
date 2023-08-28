@@ -440,7 +440,7 @@ function(_add_host_variant_link_flags target)
   endif()
 endfunction()
 
-function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping required_for_minimal_compiler)
+function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   if(NOT BOOTSTRAPPING_MODE)
     if (SWIFT_SWIFT_PARSER)
       set(ASRLF_BOOTSTRAPPING_MODE "HOSTTOOLS")
@@ -550,13 +550,9 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping r
       target_link_directories(${target} PRIVATE ${host_lib_dir})
 
       # At runtime, use swiftCore in the current toolchain.
+      # For building stdlib, LD_LIBRARY_PATH will be set to builder's stdlib
       # FIXME: This assumes the ABI hasn't changed since the builder.
       set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-      if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND required_for_minimal_compiler)
-        # But before building the stdlib with the tool, use the builder libs. This should be removed in install time.
-        list(APPEND swift_runtime_rpath "${host_lib_dir}")
-      endif()
 
     elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       # At build time link against the built swift libraries from the
@@ -745,7 +741,7 @@ function(add_swift_host_library name)
   _set_target_prefix_and_suffix(${name} "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
   if (ASHL_SHARED AND ASHL_HAS_SWIFT_MODULES)
-      _add_swift_runtime_link_flags(${name} "." "" FALSE)
+      _add_swift_runtime_link_flags(${name} "." "")
   endif()
 
   # Set compilation and link flags.
@@ -839,7 +835,6 @@ endmacro()
 #   add_swift_host_tool(name
 #     [HAS_SWIFT_MODULES]
 #     [THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY]
-#     [REQUIRED_FOR_MINIMAL_COMPILER]
 #
 #     [BOOTSTRAPPING 0|1]
 #     [SWIFT_COMPONENT component]
@@ -855,9 +850,6 @@ endmacro()
 # THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
 #   Opt-out of LLVM IR optimizations when linking ThinLTO with ld64
 #
-# REQUIRED_FOR_MINIMAL_COMPILER
-#   Required for building standard libraries.
-#
 # BOOTSTRAPPING
 #   Bootstrapping stage.
 #
@@ -870,7 +862,7 @@ endmacro()
 # source1 ...
 #   Sources to add into this executable.
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY REQUIRED_FOR_MINIMAL_COMPILER)
+  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -931,7 +923,7 @@ function(add_swift_host_tool executable)
   endif()
 
   if (ASHT_HAS_SWIFT_MODULES)
-    _add_swift_runtime_link_flags(${executable} "../lib" "${ASHT_BOOTSTRAPPING}" "${ASHT_REQUIRED_FOR_MINIMAL_COMPILER}")
+    _add_swift_runtime_link_flags(${executable} "../lib" "${ASHT_BOOTSTRAPPING}")
   endif()
 
   llvm_update_compile_flags(${executable})
@@ -1006,14 +998,6 @@ function(add_swift_host_tool executable)
                                  DESTINATION bin
                                  COMPONENT ${ASHT_SWIFT_COMPONENT}
     )
-
-    if (ASHT_REQUIRED_FOR_MINIMAL_COMPILER)
-      swift_install_strip_builder_rpath(
-        TARGETS ${executable}
-        DESTINATION bin
-        COMPONENT ${ASHT_SWIFT_COMPONENT}
-      )
-    endif()
 
     swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
   endif()

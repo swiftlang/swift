@@ -65,7 +65,6 @@ add_swift_host_tool(swift-frontend
   driver.cpp
   SWIFT_COMPONENT compiler
   HAS_SWIFT_MODULES
-  REQUIRED_FOR_MINIMAL_COMPILER
 )
 target_link_libraries(swift-frontend
                       PUBLIC
