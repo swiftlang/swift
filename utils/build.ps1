@@ -597,13 +597,14 @@ function Build-WiXProject() {
 
   $Properties = $Properties.Clone()
   TryAdd-KeyValue $Properties Configuration Release
-  TryAdd-KeyValue $Properties BaseOutputPath "$($Arch.BinaryCache)\msi\"
+  TryAdd-KeyValue $Properties BaseOutputPath "$($Arch.BinaryCache)\installer\"
   TryAdd-KeyValue $Properties ProductArchitecture $ArchName
   TryAdd-KeyValue $Properties ProductVersion $ProductVersionArg
 
   $MSBuildArgs = @("$SourceCache\swift-installer-scripts\platforms\Windows\$FileName")
   $MSBuildArgs += "-noLogo"
   $MSBuildArgs += "-restore"
+  $MSBuildArgs += "-maxCpuCount"
   foreach ($Property in $Properties.GetEnumerator()) {
     if ($Property.Value.Contains(" ")) {
       $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
@@ -611,8 +612,8 @@ function Build-WiXProject() {
       $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
     }
   }
-  $MSBuildArgs += "-bl:$($Arch.BinaryCache)\msi\$ArchName-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
-  $MSBuildArgs += "-ds:False"
+  $MSBuildArgs += "-binaryLogger:$($Arch.BinaryCache)\msi\$ArchName-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
+  $MSBuildArgs += "-detailedSummary:False"
 
   Invoke-Program $msbuild @MSBuildArgs
 }
@@ -1405,53 +1406,23 @@ function Build-DocC() {
 }
 
 function Build-Installer() {
-  Build-WiXProject bld\bld.wixproj -Arch $HostArch -Properties @{
+  Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Properties @{
     DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-  }
-
-  Build-WiXProject cli\cli.wixproj -Arch $HostArch -Properties @{
-    DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-    TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
+    PLATFORM_ROOT = "$($HostArch.PlatformInstallRoot)\";
+    # Pending support for building other architectures
+    SDK_ROOT = "$($HostArch.SDKInstallRoot)\";
     INCLUDE_SWIFT_FORMAT = "true";
     SWIFT_FORMAT_BUILD = "$($HostArch.BinaryCache)\swift-format\release";
-  }
-
-  Build-WiXProject dbg\dbg.wixproj -Arch $HostArch -Properties @{
-    DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-    TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     INCLUDE_SWIFT_INSPECT = "true";
     SWIFT_INSPECT_BUILD = "$($HostArch.BinaryCache)\swift-inspect\release";
   }
 
-  Build-WiXProject ide\ide.wixproj -Arch $HostArch -Properties @{
-    DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-    TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-  }
+  if (($Stage -ne "") -and (-not $ToBatch)) {
+    $Stage += "\" # Interpret as target directory
 
-  foreach ($Arch in $SDKArchs) {
-    Build-WiXProject runtimemsi\runtimemsi.wixproj -Arch $Arch -Properties @{
-      SDK_ROOT = "$($Arch.SDKInstallRoot)\";
-    }
-
-    Build-WiXProject sdk\sdk.wixproj -Arch $Arch -Properties @{
-      InstallerPlatform = $HostArch.ShortName;
-      PLATFORM_ROOT = "$($Arch.PlatformInstallRoot)\";
-      SDK_ROOT = "$($Arch.SDKInstallRoot)\";
-      SWIFT_SOURCE_DIR = "$SourceCache\swift\";
-    }
-  }
-
-  foreach ($MSI in ("bld", "cli", "dbg", "ide", "sdk", "runtime")) {
-    if ($ToBatch) {
-      Write-Output "Move-Item $($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\$MSI.msi $($HostArch.BinaryCache)\msi\";
-    } else {
-      Move-Item -Force "$($HostArch.BinaryCache)\msi\Release\$($HostArch.VSName)\$MSI.msi" "$($HostArch.BinaryCache)\msi\";
-    }
-  }
-
-  Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Bundle -Properties @{
-    MSI_LOCATION = "$($HostArch.BinaryCache)\msi\";
+    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msi" $Stage
+    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" $Stage
   }
 }
 
@@ -1461,7 +1432,6 @@ if (-not $SkipBuild) {
   Build-BuildTools $HostArch
   Build-Compilers $HostArch
 }
-
 
 foreach ($Arch in $SDKArchs) {
   if (-not $SkipBuild) {
@@ -1526,10 +1496,3 @@ if ($Test -contains "dispatch") { Build-Dispatch $HostArch -Test }
 if ($Test -contains "foundation") { Build-Foundation $HostArch -Test }
 if ($Test -contains "xctest") { Build-XCTest $HostArch -Test }
 if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
-
-if (-not $SkipPackaging -and $Stage -ne "") {
-  $Stage += "\" # Interpret as target directory
-
-  Copy-File "$($HostArch.BinaryCache)\msi\*.msi" $Stage
-  Copy-File "$($HostArch.BinaryCache)\installer.exe" $Stage
-}
