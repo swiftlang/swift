@@ -156,7 +156,6 @@ public:
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
     ResolveImports,    ///< Parse and resolve imports only
-    LazyTypecheck,     ///< Parse and then do minimal type-checking for outputs
     Typecheck,         ///< Parse and type-check only
     DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
@@ -269,7 +268,6 @@ public:
   /// \see ModuleDecl::arePrivateImportsEnabled
   bool EnablePrivateImports = false;
 
-
   /// Indicates whether we add implicit dynamic.
   ///
   /// \see ModuleDecl::isImplicitDynamicEnabled
@@ -323,6 +321,10 @@ public:
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
+
+  /// Should we only serialize decls that may be referenced externally in the
+  /// binary module?
+  bool SerializeExternalDeclsOnly = false;
 
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?

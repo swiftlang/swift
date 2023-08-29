@@ -3259,6 +3259,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
   }
 
+public:
   /// Determine if \p decl is safe to deserialize when it's public
   /// or otherwise needed by the client in normal builds, this should usually
   /// correspond to logic in type-checking ensuring these safe decls don't
@@ -3337,6 +3338,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     return false;
   }
 
+private:
   /// Write a \c DeserializationSafetyLayout record only when \p decl is unsafe
   /// to deserialize.
   ///
@@ -3511,6 +3513,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     SmallVector<DeclID, 16> memberIDs;
     for (auto member : members) {
+      if (S.shouldSkipDecl(member))
+        continue;
+
       if (!shouldSerializeMember(member))
         continue;
 
@@ -4891,6 +4896,14 @@ static bool canSkipWhenInvalid(const Decl *D) {
     if (!isa<ClassDecl>(D->getDeclContext()))
       return true;
   }
+  return false;
+}
+
+bool Serializer::shouldSkipDecl(const Decl *D) const {
+  if (Options.SerializeExternalDeclsOnly &&
+      !DeclSerializer::isDeserializationSafe(D))
+    return true;
+
   return false;
 }
 
@@ -6364,6 +6377,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         continue;
       }
 
+      if (shouldSkipDecl(D))
+        continue;
+
       if (auto VD = dyn_cast<ValueDecl>(D)) {
         if (!VD->hasName())
           continue;
@@ -6412,6 +6428,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     nextFile->getOpaqueReturnTypeDecls(opaqueReturnTypeDecls);
 
     for (auto TD : localTypeDecls) {
+      if (shouldSkipDecl(TD))
+        continue;
 
       // FIXME: We should delay parsing function bodies so these type decls
       //        don't even get added to the file.
@@ -6442,6 +6460,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     }
 
     for (auto OTD : opaqueReturnTypeDecls) {
+      if (shouldSkipDecl(OTD))
+        continue;
+
       // FIXME: We should delay parsing function bodies so these type decls
       //        don't even get added to the file.
       if (OTD->getDeclContext()->getInnermostSkippedFunctionContext())
