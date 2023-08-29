@@ -1859,6 +1859,19 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     setterFRef = SILUndef::get(initFRef->getType(), F);
   }
 
-  B.createAssignOrInit(loc, selfValue.getValue(), newValue.forward(*this),
+  auto isValueSelf = !selfValue.getType().getASTType()->mayHaveSuperclass();
+  // If we are emitting `assign_or_init` instruction for a value
+  // type, we need to make sure that "self" is always a l-value
+  // reference to "rootself" because `nonmutating set` loads "self"
+  // and referencing `selfValue` in such case is incorrect because
+  // it's a copy which is going to be skipped by DI.
+  auto selfRef = selfValue;
+  if (isValueSelf && !selfRef.isLValue()) {
+    auto *ctor = cast<ConstructorDecl>(FunctionDC->getAsDecl());
+    selfRef = maybeEmitValueOfLocalVarDecl(ctor->getImplicitSelfDecl(),
+                                           AccessKind::ReadWrite);
+  }
+
+  B.createAssignOrInit(loc, selfRef.getValue(), newValue.forward(*this),
                        initFRef, setterFRef, AssignOrInitInst::Unknown);
 }
