@@ -14,8 +14,10 @@
 #define SWIFT_BASIC_SYMBOLICLINKS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <string>
+#include <optional>
 
 namespace swift {
 
@@ -23,7 +25,8 @@ namespace swift {
 /// substitute drives on Windows to avoid MAX_PATH issues.
 /// On failure, returns the original path.
 std::string resolveSymbolicLinks(llvm::StringRef InputPath,
-    llvm::vfs::FileSystem *FileSystem);
+    llvm::vfs::FileSystem *FileSystem,
+    std::optional<llvm::sys::path::Style> Style = std::nullopt);
 
 } // namespace swift
 

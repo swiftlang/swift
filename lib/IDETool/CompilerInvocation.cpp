@@ -92,9 +92,10 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    llvm::SmallString<128> newFilename = StringRef(resolveSymbolicLinks(
-        input.getFileName(), FileSystem.get()));
-    llvm::sys::path::native(newFilename);
+    std::string newFilename = resolveSymbolicLinks(
+        input.getFileName(),
+        FileSystem.get(),
+        llvm::sys::path::Style::native);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
@@ -103,7 +104,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     assert(primaryCount < 2 && "cannot handle multiple primaries");
 
     replacementInputsAndOutputs.addInput(
-        InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
+        InputFile(newFilename, newIsPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {

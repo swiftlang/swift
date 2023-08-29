@@ -11,40 +11,59 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/SymbolicLinks.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Path.h"
 
 using namespace llvm;
 
-// Resolves symbolic links in a given file path, stopping short
-// of resolving across substitute drives on Windows since
-// those are used to avoid running into MAX_PATH issues.
-std::string swift::resolveSymbolicLinks(
-  StringRef InputPath,
-  llvm::vfs::FileSystem *FileSystem) {
+static std::error_code resolveSymbolicLinks(
+    StringRef InputPath,
+    llvm::vfs::FileSystem *FileSystem,
+    SmallVectorImpl<char> &Result) {
 
-  llvm::SmallString<128> RealPathBuf;
-  if (FileSystem->getRealPath(InputPath, RealPathBuf)) {
-    return InputPath.str();
+  if (auto ErrorCode = FileSystem->getRealPath(InputPath, Result)) {
+    return ErrorCode;
   }
 
   if (!is_style_windows(llvm::sys::path::Style::native)) {
-    return RealPathBuf.str().str();
+    return std::error_code();
   }
 
   // For Windows paths, make sure we didn't resolve across drives.
   SmallString<128> AbsPathBuf = InputPath;
-  if (FileSystem->makeAbsolute(AbsPathBuf)) {
-    return InputPath.str();
+  if (auto ErrorCode = FileSystem->makeAbsolute(AbsPathBuf)) {
+    // We can't guarantee that the real path preserves the drive
+    return ErrorCode;
   }
 
-  if (llvm::sys::path::root_name(RealPathBuf) ==
+  if (llvm::sys::path::root_name(StringRef(Result.data(), Result.size())) ==
       llvm::sys::path::root_name(AbsPathBuf)) {
-    return RealPathBuf.str().str();
+    // Success, the real path preserves the drive
+    return std::error_code();
   }
 
   // Fallback to using the absolute path.
   // Simplifying /../ is semantically valid on Windows even in the
   // presence of symbolic links.
   llvm::sys::path::remove_dots(AbsPathBuf, /*remove_dot_dot=*/ true);
-  return AbsPathBuf.str().str();
+  Result.assign(AbsPathBuf);
+  return std::error_code();
+}
+
+std::string swift::resolveSymbolicLinks(
+  StringRef InputPath,
+  llvm::vfs::FileSystem *FileSystem,
+  std::optional<llvm::sys::path::Style> Style) {
+
+  llvm::SmallString<128> OutputPathBuf;
+  if (::resolveSymbolicLinks(InputPath, FileSystem, OutputPathBuf)) {
+    // Error, fallback on input path
+    OutputPathBuf = InputPath;
+  }
+
+  if (Style) {
+    llvm::sys::path::native(OutputPathBuf, *Style);
+  }
+
+  return std::string(OutputPathBuf);
 }
