@@ -799,7 +799,10 @@ function(_compile_swift_files
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
   endif()
 
-  if(SWIFTFILE_IS_STDLIB)
+  if(SWIFTFILE_IS_STDLIB OR
+     # Linux "hosttools" build require builder's runtime before building the runtime.
+     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+  )
     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
     if(bs_lib_dir)
       # When building the stdlib with bootstrapping, the compiler needs
