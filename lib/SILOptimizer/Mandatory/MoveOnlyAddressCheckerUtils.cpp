@@ -280,8 +280,6 @@
 using namespace swift;
 using namespace swift::siloptimizer;
 
-#pragma clang optimize off
-
 llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
     "move-only-address-checker-disable-lifetime-extension",
     llvm::cl::init(false),
