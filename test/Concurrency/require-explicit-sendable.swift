@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -require-explicit-sendable -warn-concurrency
+// RUN: %target-swift-frontend -require-explicit-sendable -warn-concurrency %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -require-explicit-sendable -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 public protocol P { }
 

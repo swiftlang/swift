@@ -1,6 +1,12 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/ShadowsConcur.swiftmodule -module-name ShadowsConcur %S/Inputs/ShadowsConcur.swift
-// RUN: %target-typecheck-verify-swift -I %t  -disable-availability-checking
+
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 
 

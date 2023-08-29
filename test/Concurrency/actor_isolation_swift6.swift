@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-concurrency -swift-version 6
+// RUN: %target-swift-frontend -disable-availability-checking -warn-concurrency -swift-version 6 -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -warn-concurrency -swift-version 6 -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable %s
+
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
