@@ -2,6 +2,11 @@
 // REQUIRES: executable_test
 // REQUIRES: reflection
 
+// These tests verify fixes in >5.9 Swift, and will
+// fail if run against earlier standard library versions.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 //
 // Tests for the non-Foundation API of String
 //
