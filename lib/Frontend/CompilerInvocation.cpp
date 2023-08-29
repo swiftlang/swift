@@ -1795,6 +1795,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   for (Arg *A : Args.filtered(OPT_verify_additional_file))
     Opts.AdditionalVerifierFiles.push_back(A->getValue());
+  for (Arg *A : Args.filtered(OPT_verify_additional_prefix))
+    Opts.AdditionalDiagnosticVerifierPrefixes.push_back(A->getValue());
 
   Opts.UseColor |=
       Args.hasFlag(OPT_color_diagnostics,

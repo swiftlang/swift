@@ -26,13 +26,81 @@
 
 using namespace swift;
 
+namespace {
+
+struct ExpectedCheckMatchStartParser {
+  StringRef MatchStart;
+  const char *ClassificationStartLoc = nullptr;
+  std::optional<DiagnosticKind> ExpectedClassification;
+
+  ExpectedCheckMatchStartParser(StringRef MatchStart)
+      : MatchStart(MatchStart) {}
+
+  bool tryParseClassification() {
+    if (MatchStart.startswith("note")) {
+      ClassificationStartLoc = MatchStart.data();
+      ExpectedClassification = DiagnosticKind::Note;
+      MatchStart = MatchStart.substr(strlen("note"));
+      return true;
+    }
+
+    if (MatchStart.startswith("warning")) {
+      ClassificationStartLoc = MatchStart.data();
+      ExpectedClassification = DiagnosticKind::Warning;
+      MatchStart = MatchStart.substr(strlen("warning"));
+      return true;
+    }
+
+    if (MatchStart.startswith("error")) {
+      ClassificationStartLoc = MatchStart.data();
+      ExpectedClassification = DiagnosticKind::Error;
+      MatchStart = MatchStart.substr(strlen("error"));
+      return true;
+    }
+
+    if (MatchStart.startswith("remark")) {
+      ClassificationStartLoc = MatchStart.data();
+      ExpectedClassification = DiagnosticKind::Remark;
+      MatchStart = MatchStart.substr(strlen("remark"));
+      return true;
+    }
+
+    return false;
+  }
+
+  bool parse(ArrayRef<std::string> prefixes) {
+    // First try to parse as if we did not have a prefix. We always parse at
+    // least expected-*.
+    if (tryParseClassification())
+      return true;
+
+    // Otherwise, walk our prefixes until we find one that matches and attempt
+    // to check for a note, warning, error, or remark.
+    //
+    // TODO: We could make this more flexible, but this should work in the
+    // short term.
+    for (auto &p : prefixes) {
+      if (MatchStart.starts_with(p)) {
+        MatchStart = MatchStart.substr(p.size());
+        return tryParseClassification();
+      }
+    }
+
+    return false;
+  }
+};
+
+} // anonymous namespace
+
 namespace swift {
+
 struct ExpectedFixIt {
   const char *StartLoc, *EndLoc; // The loc of the {{ and }}'s.
   LineColumnRange Range;
 
   std::string Text;
 };
+
 } // end namespace swift
 
 const LineColumnRange &
@@ -460,6 +528,28 @@ static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
   return Range;
 }
 
+/// Before we do anything, check if any of our prefixes are prefixes of later
+/// prefixes. In such a case, we will never actually pattern match the later
+/// prefix. In such a case, crash with a nice error message.
+static void validatePrefixList(ArrayRef<std::string> prefixes) {
+  // Work backwards through the prefix list.
+  while (!prefixes.empty()) {
+    auto target = StringRef(prefixes.front());
+    prefixes = prefixes.drop_front();
+
+    for (auto &p : prefixes) {
+      if (StringRef(p).starts_with(target)) {
+        llvm::errs() << "Error! Found a verifier diagnostic additional prefix "
+                        "that is a prefix of a later prefix. The later prefix "
+                        "will never be pattern matched!\n"
+                     << "First Prefix: " << target << '\n'
+                     << "Second Prefix: " << p << '\n';
+        llvm::report_fatal_error("Standard compiler error!\n");
+      }
+    }
+  }
+}
+
 /// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
@@ -486,6 +576,10 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     Errors.push_back(diag);
   };
 
+  // Validate that earlier prefixes are not prefixes of alter
+  // prefixes... otherwise, we will never pattern match the later prefix.
+  validatePrefixList(AdditionalExpectedPrefixes);
+
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
@@ -494,23 +588,21 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     StringRef MatchStart = InputFile.substr(Match);
     const char *DiagnosticLoc = MatchStart.data();
     MatchStart = MatchStart.substr(strlen("expected-"));
-    const char *ClassificationStartLoc = MatchStart.data();
 
-    DiagnosticKind ExpectedClassification;
-    if (MatchStart.startswith("note")) {
-      ExpectedClassification = DiagnosticKind::Note;
-      MatchStart = MatchStart.substr(strlen("note"));
-    } else if (MatchStart.startswith("warning")) {
-      ExpectedClassification = DiagnosticKind::Warning;
-      MatchStart = MatchStart.substr(strlen("warning"));
-    } else if (MatchStart.startswith("error")) {
-      ExpectedClassification = DiagnosticKind::Error;
-      MatchStart = MatchStart.substr(strlen("error"));
-    } else if (MatchStart.startswith("remark")) {
-      ExpectedClassification = DiagnosticKind::Remark;
-      MatchStart = MatchStart.substr(strlen("remark"));
-    } else
-      continue;
+    const char *ClassificationStartLoc = nullptr;
+    std::optional<DiagnosticKind> ExpectedClassification;
+    {
+      ExpectedCheckMatchStartParser parser(MatchStart);
+      // If we fail to parse... continue.
+      if (!parser.parse(AdditionalExpectedPrefixes)) {
+        continue;
+      }
+      MatchStart = parser.MatchStart;
+      ClassificationStartLoc = parser.ClassificationStartLoc;
+      ExpectedClassification = parser.ExpectedClassification;
+    }
+    assert(ClassificationStartLoc);
+    assert(bool(ExpectedClassification));
 
     // Skip any whitespace before the {{.
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
@@ -525,7 +617,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     ExpectedDiagnosticInfo Expected(DiagnosticLoc, ClassificationStartLoc,
                                     /*ClassificationEndLoc=*/MatchStart.data(),
-                                    ExpectedClassification);
+                                    *ExpectedClassification);
     int LineOffset = 0;
 
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
