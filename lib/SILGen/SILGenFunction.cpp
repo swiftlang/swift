@@ -1834,14 +1834,14 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   // Emit the init accessor function partially applied to the base.
   SILValue initFRef = emitGlobalFunctionRef(
       loc, getAccessorDeclRef(field->getOpaqueAccessor(AccessorKind::Init)));
+
+  auto initTy = initFRef->getType().castTo<SILFunctionType>();
+
   if (!substitutions.empty()) {
     // If there are substitutions we need to emit partial apply to
     // apply substitutions to the init accessor reference type.
-    auto initTy =
-        initFRef->getType().castTo<SILFunctionType>()->substGenericArgs(
-            SGM.M, substitutions, getTypeExpansionContext());
-
-    SILFunctionConventions setterConv(initTy, SGM.M);
+    initTy = initTy->substGenericArgs(SGM.M, substitutions,
+                                      getTypeExpansionContext());
 
     // Emit partial apply without argument to produce a substituted
     // init accessor reference.
@@ -1849,6 +1849,20 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
         B.createPartialApply(loc, initFRef, substitutions, ArrayRef<SILValue>(),
                              ParameterConvention::Direct_Guaranteed);
     initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
+  }
+
+  // Check whether value is supposed to be passed indirectly and
+  // materialize if required.
+  {
+    SILFunctionConventions initConv(initTy, SGM.M);
+
+    auto newValueArgIdx = initConv.getSILArgIndexOfFirstParam();
+    // If we need the argument in memory, materialize an address.
+    if (initConv.getSILArgumentConvention(newValueArgIdx)
+            .isIndirectConvention() &&
+        !newValue.getType().isAddress()) {
+      newValue = newValue.materialize(*this, loc);
+    }
   }
 
   SILValue setterFRef;
