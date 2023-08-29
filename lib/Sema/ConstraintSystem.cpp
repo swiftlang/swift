@@ -5725,6 +5725,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::ConstructorMember:
+      // Look through specialization first, because it doesn't play a
+      // functional role here.
+      if (auto *USE = getAsExpr<UnresolvedSpecializeExpr>(anchor)) {
+        anchor = USE->getSubExpr();
+        range = anchor.getSourceRange();
+      }
+
       // - This is really an implicit 'init' MemberRef, so point at the base,
       //   i.e. the TypeExpr.
       // - For re-declarations we'd get an overloaded reference
