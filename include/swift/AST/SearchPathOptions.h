@@ -461,6 +461,9 @@ public:
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 
+  /// Scanner Prefix Mapper.
+  std::vector<std::string> ScannerPrefixMapper;
+
   /// When set, don't validate module system dependencies.
   ///
   /// If a system header is modified and this is not set, the compiler will

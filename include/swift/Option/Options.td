@@ -1853,6 +1853,18 @@ def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cach
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
 
+def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
+
+def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Remap paths within SDK reported by dependency scanner">, MetaVarName<"<path>">;
+
+def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Remap paths within toolchain directory reported by dependency scanner">, MetaVarName<"<path>">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 
