@@ -1012,6 +1012,46 @@ public:
                            ManagedValue outerAddr);
 };
 
+class ParamInfo {
+  IndirectSlot slot;
+  ParameterConvention convention;
+
+public:
+  ParamInfo(IndirectSlot slot, ParameterConvention convention)
+    : slot(slot), convention(convention) {}
+
+  SILValue allocate(SILGenFunction &SGF, SILLocation loc) const {
+    return slot.allocate(SGF, loc);
+  }
+
+  std::unique_ptr<TemporaryInitialization>
+  allocateForInitialization(SILGenFunction &SGF, SILLocation loc) const {
+    auto addr = slot.allocate(SGF, loc);
+    auto &addrTL = SGF.getTypeLowering(addr->getType());
+    return SGF.useBufferAsTemporary(addr, addrTL);
+  }
+
+  SILType getType() const {
+    return slot.getType();
+  }
+
+  ParameterConvention getConvention() const {
+    return convention;
+  }
+
+  /// Are we expected to generate into a fixed address?
+  bool hasAddress() const {
+    return slot.hasAddress();
+  }
+
+  /// Are we expected to produce an address?
+  bool shouldProduceAddress(SILGenFunction &SGF) const {
+    return hasAddress() ||
+           (isIndirectFormalParameter(convention) &&
+            SGF.silConv.useLoweredAddresses());
+  }
+};
+
 /// Given a list of inputs that are suited to the parameters of one
 /// function, translate them into a list of outputs that are suited
 /// for the parameters of another function, given that the two
@@ -1269,12 +1309,12 @@ private:
     if (innerSubstType.isInOut()) {
       assert(outerSubstType.isInOut());
       auto outerValue = claimNextOuterArg();
-      auto innerLoweredTy = claimNextInnerParam();
+      auto innerParam = claimNextInnerParam();
 
       ManagedValue inner =
         processInOut(innerOrigType, innerSubstType.getParameterType(),
                      outerOrigType, outerSubstType.getParameterType(),
-                     outerValue, innerLoweredTy);
+                     outerValue, innerParam);
       InnerArgs.push_back(inner);
     } else {
       process(innerOrigType, innerSubstType.getParameterType(),
@@ -1336,10 +1376,10 @@ private:
     // Okay, we are now working with a single value turning into a
     // single value.
     auto outerArg = claimNextOuterArg();
-    auto innerParamType = claimNextInnerParam();
+    auto innerParam = claimNextInnerParam();
     auto innerArg = processSingle(innerOrigType, innerSubstType,
                                   outerOrigType, outerSubstType,
-                                  outerArg, innerParamType);
+                                  outerArg, innerParam);
     InnerArgs.push_back(innerArg);
   }
 
@@ -1350,14 +1390,14 @@ private:
   ManagedValue processToPackParam(
                        AbstractionPattern innerOrigExpansionType,
                        AnyFunctionType::CanParamArrayRef innerSubstParams,
-                       SILParameterInfo innerParam,
+                       ParamInfo innerParam,
                        FunctionInputGenerator &outerParams);
 
   ManagedValue processIntoSingle(AbstractionPattern innerOrigType,
                                  CanType innerSubstType,
                                  AbstractionPattern outerOrigType,
                                  CanType outerSubstType,
-                                 SILParameterInfo innerParam) {
+                                 ParamInfo innerParam) {
     if (outerOrigType.isTuple()) {
       return processTupleIntoSingle(innerOrigType,
                                     innerSubstType,
@@ -1377,7 +1417,7 @@ private:
                          CanType innerSubstType,
                          AbstractionPattern outerOrigType,
                          CanTupleType outerSubstType,
-                         SILParameterInfo innerParam) {
+                         ParamInfo innerParam) {
     // Tuple types are subtypes of their optionals
     if (auto innerObjectType = innerSubstType.getOptionalObjectType()) {
       auto innerOrigObjectType = innerOrigType.getOptionalObjectType();
@@ -1400,11 +1440,14 @@ private:
       assert(innerObjectType->isAny());
 
       // First, construct the existential.
+      ParamInfo innerAnyParam = getInnerParamInfo(
+          SILParameterInfo(innerObjectType, ParameterConvention::Indirect_In));
       auto innerAny =
           processAndImplodeIntoAny(innerOrigObjectType,
                                    innerObjectType,
                                    outerOrigType,
-                                   outerSubstType);
+                                   outerSubstType,
+                                   innerAnyParam);
 
       // Now, convert it to an optional, using the object type as
       // the new outer type.
@@ -1414,12 +1457,11 @@ private:
     }
 
     if (innerSubstType->isAny()) {
-      // We don't need innerParam on this path.
-
       return processAndImplodeIntoAny(innerOrigType,
                                       innerSubstType,
                                       outerOrigType,
-                                      outerSubstType);
+                                      outerSubstType,
+                                      innerParam);
     }
 
     if (auto innerTupleType = dyn_cast<TupleType>(innerSubstType)) {
@@ -1428,20 +1470,27 @@ private:
       assert(innerOrigType.isTypeParameter() &&
              "inner is not a tuple and is not opaque?");
 
-      auto innerTy = SGF.getSILType(innerParam, InnerTypesFuncTy);
-      auto &innerTL = SGF.getTypeLowering(innerTy);
-      if (SGF.silConv.useLoweredAddresses()) {
-        auto innerTemp = SGF.emitTemporary(Loc, innerTL);
+      // As usual, we need to allocate if we're emitting into a fixed
+      // address or if the parameter convention requires an address.
+      // We also need to use this pattern if the substituted tuple type
+      // contains a pack expansion because we can't use the scalar
+      // instruction to produce such a tuple.
+      bool produceAddress = innerParam.shouldProduceAddress(SGF);
+      if (produceAddress || innerTupleType->containsPackExpansionType()) {
+        auto innerTemp = innerParam.allocateForInitialization(SGF, Loc);
         processAndImplodeInto(innerOrigType, innerTupleType,
                               outerOrigType, outerSubstType,
                               *innerTemp);
 
-        return innerTemp->getManagedAddress();
+        ManagedValue innerArg = innerTemp->getManagedAddress();
+        if (!produceAddress)
+          innerArg = SGF.B.createLoadTake(Loc, innerArg);
+        return innerArg;
       } else {
         auto innerArg = processAndImplodeIntoValue(
             innerOrigType, innerTupleType,
             outerOrigType, outerSubstType, 
-            innerTL.getLoweredType());
+            innerParam.getType());
         return innerArg;
       }
     }
@@ -1487,6 +1536,8 @@ private:
                                           AbstractionPattern innerOrigType,
                                           CanTupleType innerSubstType,
                                           SILType loweredInnerTy) {
+    // FIXME: tuple indexing
+
     assert(loweredInnerTy.is<TupleType>());
 
     SmallVector<ManagedValue, 4> elements;
@@ -1554,28 +1605,28 @@ private:
                                 CanTupleType innerSubstType,
                                 AbstractionPattern outerOrigType,
                                 CanTupleType outerSubstType,
-                                SILParameterInfo innerParam) {
+                                ParamInfo innerParam) {
     assert(innerSubstType->getNumElements() ==
            outerSubstType->getNumElements());
 
     // Collect the tuple elements.
-    auto &innerLoweredTL = SGF.getTypeLowering(innerOrigType, innerSubstType);
-    auto innerLoweredTy = innerLoweredTL.getLoweredType();
-    auto innerOptionalTy = SGF.getSILType(innerParam, InnerTypesFuncTy);
+    auto innerOptionalTy = innerParam.getType();
+    auto innerTupleTy = innerOptionalTy.getOptionalObjectType();
     auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
-    if (innerLoweredTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+    bool produceAddress = innerParam.shouldProduceAddress(SGF);
+    if (!produceAddress && !innerSubstType->containsPackExpansionType()) {
       auto payload =
         processAndImplodeIntoValue(innerOrigType, innerSubstType,
                                    outerOrigType, outerSubstType,
-                                   innerLoweredTy);
+                                   innerTupleTy);
 
       return SGF.B.createEnum(Loc, payload, someDecl, innerOptionalTy);
     } else {
-      auto optionalBuf = SGF.emitTemporaryAllocation(Loc, innerOptionalTy);
-      auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
-                                                   innerLoweredTy);
-      
-      auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, innerLoweredTL);
+      auto optionalBuf = innerParam.allocate(SGF, Loc);
+      auto tupleBuf =
+        SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl, innerTupleTy);
+      auto tupleTemp =
+        SGF.useBufferAsTemporary(tupleBuf, SGF.getTypeLowering(innerTupleTy));
 
       processAndImplodeInto(innerOrigType, innerSubstType,
                             outerOrigType, outerSubstType,
@@ -1583,14 +1634,21 @@ private:
 
       SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
 
-      auto payload = tupleTemp->getManagedAddress();
-      if (payload.hasCleanup()) {
-        payload.forward(SGF);
-        return SGF.emitManagedBufferWithCleanup(optionalBuf);
+      auto innerPayload = tupleTemp->getManagedAddress();
+      if (innerPayload.hasCleanup()) {
+        innerPayload.forward(SGF);
+        auto optionalAddr = SGF.emitManagedBufferWithCleanup(optionalBuf);
+        if (produceAddress) return optionalAddr;
+        return SGF.B.createLoadTake(Loc, optionalAddr);
+      } else if (optionalBuf->getType().isTrivial(SGF.F)) {
+        auto optionalAddr = ManagedValue::forTrivialAddressRValue(optionalBuf);
+        if (produceAddress) return optionalAddr;
+        return SGF.B.createLoadTrivial(Loc, optionalAddr);
+      } else {
+        auto optionalAddr = ManagedValue::forBorrowedAddressRValue(optionalBuf);
+        if (produceAddress) return optionalAddr;
+        return SGF.B.createLoadBorrow(Loc, optionalAddr);
       }
-      if (optionalBuf->getType().isTrivial(SGF.F))
-        return ManagedValue::forTrivialAddressRValue(optionalBuf);
-      return ManagedValue::forBorrowedAddressRValue(optionalBuf);
     }
   }
 
@@ -1600,9 +1658,9 @@ private:
   processAndImplodeIntoAny(AbstractionPattern innerOrigType,
                            CanType innerSubstType,
                            AbstractionPattern outerOrigType,
-                           CanTupleType outerSubstType) {
-    auto existentialTy = SGF.getLoweredType(innerOrigType, innerSubstType);
-    auto existentialBuf = SGF.emitTemporaryAllocation(Loc, existentialTy);
+                           CanTupleType outerSubstType,
+                           ParamInfo innerParam) {
+    auto existentialBuf = innerParam.allocate(SGF, Loc);
 
     auto opaque = AbstractionPattern::getOpaque();
     auto &concreteTL = SGF.getTypeLowering(opaque, outerSubstType);
@@ -1646,6 +1704,8 @@ private:
     assert(innerOrigType.matchesTuple(innerSubstType));
     assert(outerSubstType->getNumElements() ==
            innerSubstType->getNumElements());
+
+    // FIXME: tuple indexing
 
     for (auto index : indices(innerSubstType.getElementTypes())) {
       process(innerOrigType.getTupleElementType(index),
@@ -1826,31 +1886,28 @@ private:
                              AbstractionPattern outerOrigType,
                              CanType outerSubstType,
                              ManagedValue outer,
-                             SILParameterInfo innerParam) {
-    auto innerTy = SGF.getSILType(innerParam, InnerTypesFuncTy);
+                             ParamInfo innerParam) {
+    if (innerParam.hasAddress()) {
+      auto innerTemp = innerParam.allocateForInitialization(SGF, Loc);
+      processSingleInto(innerOrigType, innerSubstType,
+                        outerOrigType, outerSubstType,
+                        outer, innerParam.getType(), *innerTemp);
+      return innerTemp->getManagedAddress();
+    }
 
-    return processSingle(innerOrigType, innerSubstType,
-                         outerOrigType, outerSubstType,
-                         outer, innerTy, innerParam.getConvention());
-  }
+    auto innerTy = innerParam.getType();
 
-  ManagedValue processSingle(AbstractionPattern innerOrigType,
-                             CanType innerSubstType,
-                             AbstractionPattern outerOrigType,
-                             CanType outerSubstType,
-                             ManagedValue outer,
-                             SILType innerTy,
-                             ParameterConvention innerConvention) {
     // Easy case: we want to pass exactly this value.
-    if (outer.getType() == innerTy) {
-      if (isConsumedParameter(innerConvention) && !outer.isPlusOne(SGF)) {
+    if (outer.getType() == innerParam.getType()) {
+      if (isConsumedParameter(innerParam.getConvention()) &&
+          !outer.isPlusOne(SGF)) {
         outer = outer.copyUnmanaged(SGF, Loc);
       }
 
       return outer;
     }
 
-    switch (innerConvention) {
+    switch (innerParam.getConvention()) {
     // Direct translation is relatively easy.
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
@@ -1885,7 +1942,7 @@ private:
     case ParameterConvention::Pack_Owned:
       SGF.SGM.diagnose(Loc, diag::not_implemented,
                        "reabstraction of pack values");
-      return SGF.emitUndef(resultTy);
+      return SGF.emitUndef(innerTy);
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Pack_Inout:
       llvm_unreachable("inout reabstraction handled elsewhere");
@@ -1902,8 +1959,8 @@ private:
                             AbstractionPattern outerOrigType,
                             CanType outerSubstType,
                             ManagedValue outer,
-                            SILParameterInfo result) {
-    auto resultTy = SGF.getSILType(result, InnerTypesFuncTy);
+                            ParamInfo innerParam) {
+    auto resultTy = innerParam.getType();
     assert(outer.isLValue());
     if (outer.getType() == resultTy) {
       return outer;
@@ -1992,8 +2049,13 @@ private:
   /// is also responsible for adding the inner to inners.  This allows
   /// readers to easily verify that this is done on all paths.  (It'd
   /// sure be nice if we had better language mode for that, though.)
-  SILParameterInfo claimNextInnerParam() {
-    return claimNext(InnerTypes);
+  ParamInfo claimNextInnerParam() {
+    return getInnerParamInfo(claimNext(InnerTypes));
+  }
+
+  ParamInfo getInnerParamInfo(SILParameterInfo innerParam) {
+    auto innerTy = SGF.getSILType(innerParam, InnerTypesFuncTy);
+    return ParamInfo(IndirectSlot(innerTy), innerParam.getConvention());
   }
 };
 
@@ -2243,10 +2305,11 @@ getScalarConventionForPackConvention(ParameterConvention conv) {
 ManagedValue TranslateArguments::processToPackParam(
                        AbstractionPattern innerOrigExpansionType,
                        AnyFunctionType::CanParamArrayRef innerSubstParams,
-                       SILParameterInfo innerPackParam,
+                       ParamInfo innerPackParam,
                        FunctionInputGenerator &outerParam) {
-  assert(innerPackParam.isPack());
-  auto innerTy = SGF.getSILType(innerPackParam, InnerTypesFuncTy);
+  assert(isPackParameter(innerPackParam.getConvention()));
+  assert(!innerPackParam.hasAddress());
+  auto innerTy = innerPackParam.getType();
   auto innerPackTy = innerTy.castTo<SILPackType>();
   assert(innerPackTy->getNumElements() == innerSubstParams.size());
 
@@ -2287,7 +2350,7 @@ ManagedValue TranslateArguments::processToPackParam(
     if (!outerParam.isOrigPackExpansion()) {
       // Fake up a lowered parameter as if we could pass just this
       // component.
-      SILParameterInfo innerComponentParam(innerComponentTy.getASTType(),
+      ParamInfo innerComponentParam(IndirectSlot(innerComponentTy),
         getScalarConventionForPackConvention(innerPackParam.getConvention()));
 
       ManagedValue innerArg = processIntoSingle(innerOrigPatternType,
@@ -2366,7 +2429,7 @@ ManagedValue TranslateArguments::processToPackParam(
 
       // Otherwise, claim the next pack component and process it.
       } else {
-        SILParameterInfo innerComponentParam(innerComponentTy.getASTType(),
+        ParamInfo innerComponentParam(IndirectSlot(innerComponentTy),
           getScalarConventionForPackConvention(innerPackParam.getConvention()));
 
         ManagedValue outer = outerParam.projectPackComponent(SGF, Loc);
