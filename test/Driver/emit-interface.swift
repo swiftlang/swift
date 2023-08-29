@@ -26,9 +26,3 @@
 // CHECK-FILELIST: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 // CHECK-FILELIST-SAME: -supplementary-output-file-map
 // CHECK-FILELIST-NOT: emit-interface.swift{{ }}
-
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -experimental-lazy-typecheck %s -emit-module-interface -o %t/foo 2>&1 | %FileCheck -check-prefix=CHECK-LAZY-TYPECHECK %s
-
-// CHECK-LAZY-TYPECHECK: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
-// CHECK-LAZY-TYPECHECK-SAME: -experimental-lazy-typecheck
-// CHECK-LAZY-TYPECHECK-SAME: emit-interface.swift

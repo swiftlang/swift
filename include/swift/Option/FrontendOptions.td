@@ -166,6 +166,10 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 
+def experimental_serialize_external_decls_only
+  : Flag<["-"], "experimental-serialize-external-decls-only">,
+  HelpText<"Only serialize decls that should be exposed to clients">;
+
 def empty_abi_descriptor : Flag<["-"], "empty-abi-descriptor">,
   HelpText<"Avoid printing actual module content into ABI descriptor file">;
 
@@ -405,6 +409,9 @@ def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
+
+def experimental_lazy_typecheck : Flag<["-"], "experimental-lazy-typecheck">,
+  HelpText<"Type-check lazily as needed to produce requested outputs">;
 
 def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
   HelpText<"Write an invalid declaration into swiftinterface files">;

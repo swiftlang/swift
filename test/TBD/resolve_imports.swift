@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -resolve-imports -emit-tbd -emit-tbd-path %t/resolve_imports.tbd %s -disable-availability-checking
-// RUN: %target-swift-frontend -experimental-lazy-typecheck -emit-tbd -emit-tbd-path %t/lazy_typecheck.tbd %s -disable-availability-checking
 // RUN: %FileCheck %s < %t/resolve_imports.tbd
-// RUN: %FileCheck %s < %t/lazy_typecheck.tbd
 
 // REQUIRES: OS=macosx 
 
@@ -30,16 +28,16 @@ extension PrivateProto {
 public struct S: PrivateProto {}
 
 // CHECK: symbols: [
-// CHECK: '_$s14lazy_typecheck1CCMa',
-// CHECK: '_$s14lazy_typecheck1CCMm',
-// CHECK: '_$s14lazy_typecheck1CCMn',
-// CHECK: '_$s14lazy_typecheck1CCN',
-// CHECK: '_$s14lazy_typecheck1CCfD',
-// CHECK: '_$s14lazy_typecheck1CCfd',
-// CHECK: '_$s14lazy_typecheck1SVMa',
-// CHECK: '_$s14lazy_typecheck1SVMn',
-// CHECK: '_$s14lazy_typecheck1SVN',
-// CHECK: '_$s14lazy_typecheck1SVSQAAMc',
-// CHECK: '_$s14lazy_typecheck1SVSQAASQ2eeoiySbx_xtFZTW',
+// CHECK: '_$s15resolve_imports1CCMa',
+// CHECK: '_$s15resolve_imports1CCMm',
+// CHECK: '_$s15resolve_imports1CCMn',
+// CHECK: '_$s15resolve_imports1CCN',
+// CHECK: '_$s15resolve_imports1CCfD',
+// CHECK: '_$s15resolve_imports1CCfd',
+// CHECK: '_$s15resolve_imports1SVMa',
+// CHECK: '_$s15resolve_imports1SVMn',
+// CHECK: '_$s15resolve_imports1SVN',
+// CHECK: '_$s15resolve_imports1SVSQAAMc',
+// CHECK: '_$s15resolve_imports1SVSQAASQ2eeoiySbx_xtFZTW',
 // CHECK: _main
 // CHECK: ]

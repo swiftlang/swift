@@ -318,6 +318,8 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
+  Opts.SerializeExternalDeclsOnly |=
+      Args.hasArg(OPT_experimental_serialize_external_decls_only);
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
@@ -552,8 +554,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))
     return FrontendOptions::ActionType::ResolveImports;
-  if (Opt.matches(OPT_experimental_lazy_typecheck))
-    return FrontendOptions::ActionType::LazyTypecheck;
   if (Opt.matches(OPT_typecheck))
     return FrontendOptions::ActionType::Typecheck;
   if (Opt.matches(OPT_dump_parse))

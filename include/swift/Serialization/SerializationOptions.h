@@ -156,6 +156,7 @@ namespace swift {
     bool StaticLibrary = false;
     bool HermeticSealAtLink = false;
     bool IsOSSA = false;
+    bool SerializeExternalDeclsOnly = false;
   };
 
 } // end namespace swift
