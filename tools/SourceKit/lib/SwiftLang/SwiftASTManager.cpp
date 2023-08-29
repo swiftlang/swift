@@ -846,7 +846,7 @@ FileContent SwiftASTManager::Implementation::getFileContent(
     std::string &Error) const {
   std::string FilePath = resolveSymbolicLinks(UnresolvedPath,
       FileSystem.get());
-  if (auto EditorDoc = EditorDocs->findByPath(FilePath, /*IsRealpath=*/true))
+  if (auto EditorDoc = EditorDocs->findByPath(FilePath))
     return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), IsPrimary,
                                   FilePath);
 
@@ -865,7 +865,7 @@ BufferStamp SwiftASTManager::Implementation::getBufferStamp(
   assert(FileSystem);
 
   if (CheckEditorDocs) {
-    if (auto EditorDoc = EditorDocs->findByPath(FilePath)) {
+    if (auto EditorDoc = EditorDocs->findByPath(FilePath, FileSystem.get())) {
       return EditorDoc->getLatestSnapshot()->getStamp();
     }
   }

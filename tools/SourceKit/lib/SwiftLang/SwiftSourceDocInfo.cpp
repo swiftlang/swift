@@ -641,8 +641,7 @@ mapOffsetToNewerSnapshot(unsigned Offset,
 static void mapLocToLatestSnapshot(
     SwiftLangSupport &Lang, LocationInfo &Location,
     ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
-  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename,
-                                                         /*IsRealpath=*/true);
+  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename);
   if (!EditorDoc)
     return;
 
@@ -1497,7 +1496,7 @@ public:
 
     ImmutableTextSnapshotRef InputSnap;
     if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(
-            PrimaryFilePath, /*IsRealpath=*/true))
+            PrimaryFilePath))
       InputSnap = EditorDoc->getLatestSnapshot();
     if (!InputSnap)
       return false;
@@ -1557,7 +1556,7 @@ static SourceFile *retrieveInputFile(StringRef inputBufferName,
     if (haveRealPath)
       return nullptr;
     std::string realPath = resolveSymbolicLinks(inputBufferName,
-        llvm::vfs::getRealFileSystem().get());
+        &CI.getFileSystem());
     return retrieveInputFile(realPath, CI, /*haveRealPath=*/true);
   }
 

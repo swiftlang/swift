@@ -304,13 +304,13 @@ SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
 }
 
 SwiftEditorDocumentRef
-SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
+SwiftEditorDocumentFileMap::findByPath(StringRef FilePath,
+    llvm::vfs::FileSystem *FileSystem) {
   SwiftEditorDocumentRef EditorDoc;
 
   std::string Scratch;
-  if (!IsRealpath) {
-    Scratch = resolveSymbolicLinks(FilePath,
-        llvm::vfs::getRealFileSystem().get());
+  if (FileSystem) {
+    Scratch = resolveSymbolicLinks(FilePath, FileSystem);
     FilePath = Scratch;
   }
   Queue.dispatchSync([&]{
