@@ -1,26 +1,32 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -resolve-imports %s -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution
-// RUN: %target-swift-frontend -experimental-lazy-typecheck %s -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution
-// RUN: %FileCheck %s < %t/main.swiftinterface
+// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -emit-module -emit-module-path /dev/null -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-serialize-external-decls-only
+// RUN: %FileCheck %s < %t/lazy_typecheck.swiftinterface
 
 // CHECK: import Swift
 
-// CHECK: public func f() -> Swift.Int
-public func f() -> Int {}
+// CHECK:       public func publicFunc() -> Swift.Int
+// CHECK:       publicFuncWithDefaultArg(_ x: Swift.Int = 1) -> Swift.Int
+// CHECK:       @inlinable internal func inlinableFunc() -> Swift.Int {
+// CHECK-NEXT:    return true // expected-error {{[{][{]}}cannot convert return expression of type 'Bool' to return type 'Int'{{[}][}]}}
+// CHECK-NEXT:  }
+// CHECK:       public func constrainedGenericPublicFunction<T>(_ t: T) where T : lazy_typecheck.PublicProto
+// CHECK:       @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+// CHECK-NEXT:  public func publicFuncWithOpaqueReturnType() -> some lazy_typecheck.PublicProto
 
-// Deliberate semantic errors to ensure private and internal declarations don't
-// get type checked.
-private func bad1(_: NotAThing) -> DoesNotExist {}
+// CHECK:       @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+// CHECK-NEXT:  @_alwaysEmitIntoClient public func publicAEICFuncWithOpaqueReturnType() -> some Any {
+// CHECK-NEXT:    if #available(macOS 20, *) {
+// CHECK-NEXT:      return 3
+// CHECK-NEXT:    } else {
+// CHECK-NEXT:      return "hi"
+// CHECK-NEXT:    }
+// CHECK-NEXT:  }
 
-internal typealias Bad1 = NotEvenReal.DefinitelyNot
+// CHECK:       public protocol PublicProto {
+// CHECK:         func req() -> Swift.Int
+// CHECK:       }
 
-// Destructors
-public class C {}
-
-// CHECK: public class C {
-// CHECK: deinit
-// CHECK: }
-
-// Globals
-public var year = 2023
+// CHECK:       public struct PublicStruct {
+// CHECK:         public func publicMethod() -> Swift.Int
+// CHECK:       }

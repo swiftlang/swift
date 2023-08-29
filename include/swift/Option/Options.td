@@ -1164,9 +1164,6 @@ def resolve_imports : Flag<["-"], "resolve-imports">,
 def typecheck : Flag<["-"], "typecheck">,
   HelpText<"Parse and type-check input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def experimental_lazy_typecheck : Flag<["-"], "experimental-lazy-typecheck">,
-  HelpText<"Parse input file(s), then type-check lazily as needed to produce requested outputs">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>;
 def dump_parse : Flag<["-"], "dump-parse">,
   HelpText<"Parse input file(s) and dump AST(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

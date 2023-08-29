@@ -802,6 +802,10 @@ namespace swift {
 
     /// Defer typechecking of declarations to their use at runtime
     bool DeferToRuntime = false;
+
+    /// Allow request evalutation to perform type checking lazily, instead of
+    /// eagerly typechecking source files after parsing.
+    bool EnableLazyTypecheck = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
