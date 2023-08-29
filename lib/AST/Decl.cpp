@@ -4062,6 +4062,16 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     resultDC = resultDC->getParent();
   }
 
+  auto localImportRestriction = VD->getImportAccessFrom(useDC);
+  if (localImportRestriction.has_value()) {
+    AccessLevel importAccessLevel =
+      localImportRestriction.value().accessLevel;
+    if (access > importAccessLevel) {
+      access = std::min(access, importAccessLevel);
+      resultDC = useDC->getParentSourceFile();
+    }
+  }
+
   switch (access) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
