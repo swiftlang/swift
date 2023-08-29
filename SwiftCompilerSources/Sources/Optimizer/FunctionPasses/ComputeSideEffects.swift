@@ -153,10 +153,10 @@ private struct CollectedEffects {
       // handleApply above is sufficient. And, if they are not applied
       // in this function, then they are never applied.
       if !pa.isOnStack {
-        // the callee and its arguments are all captured...
-        for operand in pa.operands {
-          if operand.value.type.isAddress {
-            addEffects(.read, to: operand.value)
+        // callee is never an address.
+        for argument in pa.arguments {
+          if argument.type.isAddress {
+            addEffects(.read, to: argument)
           }
         }
       }
