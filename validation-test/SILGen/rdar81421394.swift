@@ -10,6 +10,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+import Foundation
+
 protocol RangeFinder {
     var range: NSRange { get set }
 }
