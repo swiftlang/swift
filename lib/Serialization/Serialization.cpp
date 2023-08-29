@@ -3258,6 +3258,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
   }
 
+  size_t addConformances(const IterableDeclContext *declContext,
+                         ConformanceLookupKind lookupKind,
+                         SmallVectorImpl<TypeID> &data) {
+    size_t count = 0;
+    for (auto conformance : declContext->getLocalConformances(lookupKind)) {
+      data.push_back(S.addConformanceRef(conformance));
+      count++;
+    }
+
+    return count;
+  }
+
 public:
   /// Determine if \p decl is safe to deserialize when it's public
   /// or otherwise needed by the client in normal builds, this should usually
@@ -3787,8 +3799,8 @@ public:
   /// Add all of the inherited entries to the result vector.
   ///
   /// \returns the number of entries added.
-  unsigned addInherited(ArrayRef<InheritedEntry> inheritedEntries,
-                        SmallVectorImpl<TypeID> &result) {
+  size_t addInherited(ArrayRef<InheritedEntry> inheritedEntries,
+                      SmallVectorImpl<TypeID> &result) {
     for (const auto &inherited : inheritedEntries) {
       assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       TypeID typeRef = S.addTypeRef(inherited.getType());
@@ -3821,13 +3833,9 @@ public:
     // simpler user model to just always desugar extension types.
     extendedType = extendedType->getCanonicalType();
 
-    auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All);
-
     SmallVector<TypeID, 8> data;
-    for (auto conformance : conformances)
-      data.push_back(S.addConformanceRef(conformance));
-
+    size_t numConformances =
+        addConformances(extension, ConformanceLookupKind::All, data);
     size_t numInherited = addInherited(
         extension->getInherited(), data);
 
@@ -3850,7 +3858,7 @@ public:
                                 extension->isImplicit(),
                                 S.addGenericSignatureRef(
                                            extension->getGenericSignature()),
-                                conformances.size(),
+                                numConformances,
                                 numInherited,
                                 data);
 
@@ -4054,14 +4062,10 @@ public:
 
     auto contextID = S.addDeclContextRef(theStruct->getDeclContext());
 
-    auto conformances = theStruct->getLocalConformances(
-                          ConformanceLookupKind::All);
-
     SmallVector<TypeID, 4> data;
-    for (auto conformance : conformances)
-      data.push_back(S.addConformanceRef(conformance));
-
-    unsigned numInherited = addInherited(theStruct->getInherited(), data);
+    size_t numConformances =
+        addConformances(theStruct, ConformanceLookupKind::All, data);
+    size_t numInherited = addInherited(theStruct->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
@@ -4083,7 +4087,7 @@ public:
                              S.addGenericSignatureRef(
                                             theStruct->getGenericSignature()),
                              rawAccessLevel,
-                             conformances.size(),
+                             numConformances,
                              numInherited,
                              data);
 
@@ -4098,14 +4102,10 @@ public:
 
     auto contextID = S.addDeclContextRef(theEnum->getDeclContext());
 
-    auto conformances = theEnum->getLocalConformances(
-                          ConformanceLookupKind::All);
-
     SmallVector<TypeID, 4> data;
-    for (auto conformance : conformances)
-      data.push_back(S.addConformanceRef(conformance));
-
-    unsigned numInherited = addInherited(theEnum->getInherited(), data);
+    size_t numConformances =
+        addConformances(theEnum, ConformanceLookupKind::All, data);
+    size_t numInherited = addInherited(theEnum->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -4140,7 +4140,7 @@ public:
                                              theEnum->getGenericSignature()),
                             S.addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
-                            conformances.size(),
+                            numConformances,
                             numInherited,
                             data);
 
@@ -4155,14 +4155,10 @@ public:
 
     auto contextID = S.addDeclContextRef(theClass->getDeclContext());
 
-    auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::NonInherited);
-
     SmallVector<TypeID, 4> data;
-    for (auto conformance : conformances)
-      data.push_back(S.addConformanceRef(conformance));
-
-    unsigned numInherited = addInherited(theClass->getInherited(), data);
+    size_t numConformances =
+        addConformances(theClass, ConformanceLookupKind::NonInherited, data);
+    size_t numInherited = addInherited(theClass->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
@@ -4199,7 +4195,7 @@ public:
                                              theClass->getGenericSignature()),
                             S.addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
-                            conformances.size(),
+                            numConformances,
                             numInherited,
                             data);
 
