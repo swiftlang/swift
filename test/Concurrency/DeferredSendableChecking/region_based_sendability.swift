@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature SendNonSendable -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -emit-sil -strict-concurrency=complete -enable-experimental-feature SendNonSendable -disable-availability-checking -o /dev/null
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
