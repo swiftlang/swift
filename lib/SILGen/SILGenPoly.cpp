@@ -991,7 +991,7 @@ public:
 
 /// A CRTP helper class for classes that supervise a translation between
 /// inner and outer signatures.
-template <class Impl>
+template <class Impl, class InnerSlotType>
 class ExpanderBase {
 protected:
   Impl &asImpl() { return static_cast<Impl&>(*this); }
@@ -1037,7 +1037,7 @@ public:
                                     CanTupleType innerSubstType,
                                     AbstractionPattern outerOrigType,
                                     CanTupleType outerSubstType,
-                                    IndirectSlot innerAddr);
+                                    InnerSlotType innerAddr);
   void expandParallelTuplesOuterIndirect(AbstractionPattern innerOrigType,
                                          CanTupleType innerSubstType,
                                          AbstractionPattern outerOrigType,
@@ -1048,7 +1048,7 @@ public:
                                    CanType innerSubstType,
                                    AbstractionPattern outerOrigType,
                                    CanType outerSubstType,
-                                   IndirectSlot innerSlot);
+                                   InnerSlotType innerSlot);
 
   void expandOuterIndirect(AbstractionPattern innerOrigType,
                            CanType innerSubstType,
@@ -1214,7 +1214,8 @@ public:
 /// we are emitting the body of that closure, and therefore the inputs
 /// we receive are the parameters of that closure, matching the lowered
 /// signature of the second function type.)
-class TranslateArguments : public ExpanderBase<TranslateArguments> {
+class TranslateArguments :
+    public ExpanderBase<TranslateArguments, ParamInfo> {
   SmallVectorImpl<ManagedValue> &InnerArgs;
   CanSILFunctionType InnerTypesFuncTy;
   ArrayRef<SILParameterInfo> InnerTypes;
@@ -2735,7 +2736,7 @@ namespace {
 ///   - building a list of SILValues for each of the inner indirect results
 ///   - building a list of Operations to perform which will reabstract
 ///     the inner results to match the outer.
-class ResultPlanner : public ExpanderBase<ResultPlanner> {
+class ResultPlanner : public ExpanderBase<ResultPlanner, IndirectSlot> {
   /// A single result-translation operation.
   struct Operation {
     enum Kind {
@@ -3264,11 +3265,12 @@ private:
 
 /// The general case of translation, where we may need to
 /// expand tuples.
-template <class Impl>
-void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
-                                CanType innerSubstType,
-                                AbstractionPattern outerOrigType,
-                                CanType outerSubstType) {
+template <class Impl, class InnerSlotType>
+void ExpanderBase<Impl, InnerSlotType>::expand(
+                                        AbstractionPattern innerOrigType,
+                                        CanType innerSubstType,
+                                        AbstractionPattern outerOrigType,
+                                        CanType outerSubstType) {
   // The substituted types must match up in tuple-ness and arity.
   assert(
       isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
@@ -3337,8 +3339,8 @@ void ExpanderBase<Impl>::expand(AbstractionPattern innerOrigType,
   }
 }
 
-template <class Impl>
-void ExpanderBase<Impl>::expandOuterVanishingTuple(
+template <class Impl, class InnerSlotType>
+void ExpanderBase<Impl, InnerSlotType>::expandOuterVanishingTuple(
                           AbstractionPattern outerOrigType,
                           CanType outerSubstType,
     llvm::function_ref<void(AbstractionPattern outerOrigEltType,
@@ -3372,8 +3374,8 @@ void ExpanderBase<Impl>::expandOuterVanishingTuple(
   assert(foundSurvivor && "vanishing tuple had no surviving element?");
 }
 
-template <class Impl>
-void ExpanderBase<Impl>::expandInnerVanishingTuple(
+template <class Impl, class InnerSlotType>
+void ExpanderBase<Impl, InnerSlotType>::expandInnerVanishingTuple(
                           AbstractionPattern innerOrigType,
                           CanType innerSubstType,
     llvm::function_ref<void(AbstractionPattern innerOrigEltType,
@@ -3409,8 +3411,8 @@ void ExpanderBase<Impl>::expandInnerVanishingTuple(
   assert(foundSurvivor && "vanishing tuple had no surviving element?");
 }
 
-template <class Impl>
-void ExpanderBase<Impl>::expandParallelTuples(
+template <class Impl, class InnerSlotType>
+void ExpanderBase<Impl, InnerSlotType>::expandParallelTuples(
                                          AbstractionPattern innerOrigType,
                                          CanType innerSubstType,
                                          AbstractionPattern outerOrigType,
@@ -3796,8 +3798,8 @@ void ResultPlanner::planSingle(AbstractionPattern innerOrigType,
 }
 
 /// Plan the emission of a call result into an outer result address.
-template <class Impl>
-void ExpanderBase<Impl>::expandOuterIndirect(
+template <class Impl, class InnerSlotType>
+void ExpanderBase<Impl, InnerSlotType>::expandOuterIndirect(
                                         AbstractionPattern innerOrigType,
                                         CanType innerSubstType,
                                         AbstractionPattern outerOrigType,
@@ -3920,8 +3922,8 @@ ResultPlanner::expandInnerTupleOuterIndirect(AbstractionPattern innerOrigType,
                                     outerResultAddrMV);
 }
 
-template <class Impl>
-void ExpanderBase<Impl>::expandParallelTuplesOuterIndirect(
+template <class Impl, class InnerSlotType>
+void ExpanderBase<Impl, InnerSlotType>::expandParallelTuplesOuterIndirect(
                                              AbstractionPattern innerOrigType,
                                              CanTupleType innerSubstType,
                                              AbstractionPattern outerOrigType,
@@ -4228,13 +4230,13 @@ ResultPlanner::planSingleIntoIndirect(AbstractionPattern innerOrigType,
 }
 
 /// Plan the emission of a call result from an inner result address.
-template <class Impl>
-ManagedValue
-ExpanderBase<Impl>::expandInnerIndirect(AbstractionPattern innerOrigType,
+template <class Impl, class InnerSlotType>
+ManagedValue ExpanderBase<Impl, InnerSlotType>::expandInnerIndirect(
+                                        AbstractionPattern innerOrigType,
                                         CanType innerSubstType,
                                         AbstractionPattern outerOrigType,
                                         CanType outerSubstType,
-                                        IndirectSlot innerSlot) {
+                                        InnerSlotType innerSlot) {
   assert(!innerOrigType.isTuple());
 
   // If the outer pattern is scalar, stop expansion and delegate to the
@@ -4293,14 +4295,14 @@ ManagedValue ResultPlanner::expandOuterTupleInnerIndirect(
 
 /// Expand outer tuple structure, given that the inner substituted type
 /// is a tuple with parallel structured that's passed indirectly.
-template <class Impl>
+template <class Impl, class InnerSlotType>
 ManagedValue
-ExpanderBase<Impl>::expandParallelTuplesInnerIndirect(
+ExpanderBase<Impl, InnerSlotType>::expandParallelTuplesInnerIndirect(
                                              AbstractionPattern innerOrigType,
                                              CanTupleType innerSubstType,
                                              AbstractionPattern outerOrigType,
                                              CanTupleType outerSubstType,
-                                             IndirectSlot innerTupleSlot) {
+                                             InnerSlotType innerTupleSlot) {
   assert(innerSubstType->getNumElements() == outerSubstType->getNumElements());
   assert(outerOrigType.isTuple());
   assert(!outerOrigType.doesTupleVanish());
