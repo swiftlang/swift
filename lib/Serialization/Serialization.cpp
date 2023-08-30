@@ -3289,9 +3289,10 @@ public:
 
       // We can mark the extension unsafe only if it has no public
       // conformances.
-      auto protocols = ext->getLocalProtocols(
-                                        ConformanceLookupKind::OnlyExplicit);
-      if (!protocols.empty())
+      auto protocols = ext->getLocalProtocols(ConformanceLookupKind::All);
+      bool hasSafeConformances = std::any_of(protocols.begin(), protocols.end(),
+                                             isDeserializationSafe);
+      if (hasSafeConformances)
         return true;
 
       // Truly empty extensions are safe, it may happen in swiftinterfaces.
@@ -3300,9 +3301,6 @@ public:
 
       return false;
     }
-
-    if (isa<ProtocolDecl>(decl))
-      return true;
 
     auto value = cast<ValueDecl>(decl);
 
