@@ -1,0 +1,8 @@
+func foo(num newParamName: Int, out: Int) {
+	print(newParamName)
+}
+
+foo(num: 1, out: 2)
+
+
+

@@ -1,0 +1,13 @@
+enum Foo {
+  case first(newParamName: Int)
+  case second
+}
+
+func test() {
+  let _ = Foo.first(newParamName: 1)
+  let _ = Foo.first
+  let _ = Foo.second
+}
+
+
+

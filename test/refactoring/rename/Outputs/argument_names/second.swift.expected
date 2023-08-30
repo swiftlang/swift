@@ -1,0 +1,8 @@
+func foo(num internalName: Int, newOut: Int) {
+	print(internalName)
+}
+
+foo(num: 1, newOut: 2)
+
+
+

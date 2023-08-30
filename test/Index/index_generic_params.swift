@@ -124,30 +124,35 @@ enum B { // CHECK: [[@LINE]]:6 | enum/Swift | B | [[B_USR:.*]] | Def | rel: 0
   }
 }
 
-// CHECK: [[@LINE+3]]:5 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
-// CHECK: [[@LINE+2]]:7 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
-// CHECK: [[@LINE+1]]:7 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
+// CHECK: [[@LINE+4]]:5 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
+// CHECK: [[@LINE+3]]:7 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK: [[@LINE+2]]:7 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
+// CHECK: [[@LINE+1]]:14 | param/Swift | value | s:14swift_ide_test1BO6NestedV5valueAEy_xGx_tcfcAFL_xvp | Ref | rel: 0
 _ = B.Nested(value: 1)
-// CHECK-NEXT: [[@LINE+4]]:5 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+3]]:7 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+2]]:7 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
-// CHECK-NEXT: [[@LINE+1]]:14 | struct/Swift | Int | s:Si | Ref | rel: 0
-_ = B.Nested<Int>(value: 1)
-// CHECK-NEXT: [[@LINE+4]]:5 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+3]]:7 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+5]]:5 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+4]]:7 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+3]]:7 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
 // CHECK-NEXT: [[@LINE+2]]:14 | struct/Swift | Int | s:Si | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+1]]:19 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
+// CHECK-NEXT: [[@LINE+1]]:19 | param/Swift | value | s:14swift_ide_test1BO6NestedV5valueAEy_xGx_tcfcAFL_xvp | Ref | rel: 0
+_ = B.Nested<Int>(value: 1)
+// CHECK-NEXT: [[@LINE+5]]:5 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+4]]:7 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+3]]:14 | struct/Swift | Int | s:Si | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+2]]:19 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
+// CHECK-NEXT: [[@LINE+1]]:24 | param/Swift | value | s:14swift_ide_test1BO6NestedV5valueAEy_xGx_tcfcAFL_xvp | Ref | rel: 0
 _ = B.Nested<Int>.init(value: 1)
 
-// CHECK-NEXT: [[@LINE+4]]:7 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+3]]:9 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+2]]:9 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
-// CHECK-NEXT: [[@LINE+1]]:16 | struct/Swift | Int | s:Si | Ref | rel: 0
-_ = ((B.Nested<Int>))(value: 1)
-// CHECK-NEXT: [[@LINE+4]]:7 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+3]]:9 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+5]]:7 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+4]]:9 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+3]]:9 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
 // CHECK-NEXT: [[@LINE+2]]:16 | struct/Swift | Int | s:Si | Ref | rel: 0
-// CHECK-NEXT: [[@LINE+1]]:23 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
+// CHECK-NEXT: [[@LINE+1]]:23 | param/Swift | value | s:14swift_ide_test1BO6NestedV5valueAEy_xGx_tcfcAFL_xvp | Ref | rel: 0
+_ = ((B.Nested<Int>))(value: 1)
+// CHECK-NEXT: [[@LINE+5]]:7 | enum/Swift | B | [[B_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+4]]:9 | struct/Swift | Nested | [[B_Nested_USR]] | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+3]]:16 | struct/Swift | Int | s:Si | Ref | rel: 0
+// CHECK-NEXT: [[@LINE+2]]:23 | constructor/Swift | init(value:) | [[B_Nested_init_USR]] | Ref,Call | rel: 0
+// CHECK-NEXT: [[@LINE+1]]:28 | param/Swift | value | s:14swift_ide_test1BO6NestedV5valueAEy_xGx_tcfcAFL_xvp | Ref | rel: 0
 _ = ((B.Nested<Int>)).init(value: 1)
 
 enum C { // CHECK: [[@LINE]]:6 | enum/Swift | C | [[C_USR:.*]] | Def | rel: 0
