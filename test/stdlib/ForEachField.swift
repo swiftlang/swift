@@ -15,6 +15,10 @@
 // REQUIRES: executable_test
 // REQUIRES: reflection
 
+// Only run these tests with a just-built stdlib.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 @_spi(Reflection) import Swift
 import StdlibUnittest
 
