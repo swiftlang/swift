@@ -395,6 +395,14 @@ public:
   GetTypeOfTypeRepr(getTypeOfTypeRepr),
   GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
 
+  template <typename Fn>
+  void printRecRaw(Fn Body, StringRef label = "") {
+    Indent += 2;
+    OS << '\n';
+    Body(label);
+    Indent -= 2;
+  }
+
   void printRec(Decl *D, StringRef label = "");
   void printRec(Expr *E, StringRef label = "");
   void printRec(Stmt *S, const ASTContext *Ctx, StringRef label = "");
@@ -418,68 +426,66 @@ public:
     case StmtConditionElement::CK_Boolean:
       return printRec(C.getBoolean());
     case StmtConditionElement::CK_PatternBinding:
-      Indent += 2;
-      printHead("pattern", PatternColor, Label);
-      printRec(C.getPattern());
-      printRec(C.getInitializer());
-      printFoot();
-      Indent -= 2;
+        printRecRaw([&](StringRef Label) {
+          printHead("pattern", PatternColor, Label);
+          printRec(C.getPattern());
+          printRec(C.getInitializer());
+          printFoot();
+        }, Label);
       break;
     case StmtConditionElement::CK_Availability:
-      Indent += 2;
-      printHead("#available", PatternColor, Label);
-      for (auto *Query : C.getAvailability()->getQueries()) {
-        OS << '\n';
-        switch (Query->getKind()) {
-        case AvailabilitySpecKind::PlatformVersionConstraint:
-          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        case AvailabilitySpecKind::LanguageVersionConstraint:
-        case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        case AvailabilitySpecKind::OtherPlatform:
-          cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
+      printRecRaw([&](StringRef Label) {
+        printHead("#available", PatternColor, Label);
+        for (auto *Query : C.getAvailability()->getQueries()) {
+          OS << '\n';
+          switch (Query->getKind()) {
+          case AvailabilitySpecKind::PlatformVersionConstraint:
+            cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+            break;
+          case AvailabilitySpecKind::LanguageVersionConstraint:
+          case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+            cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+            break;
+          case AvailabilitySpecKind::OtherPlatform:
+            cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
+            break;
+          }
         }
-      }
-      printFoot();
-      Indent -= 2;
+        printFoot();
+      }, Label);
       break;
     case StmtConditionElement::CK_HasSymbol:
-      Indent += 2;
-      printHead("#_hasSymbol", PatternColor, Label);
-      if (Ctx)
-        printSourceRange(OS, C.getSourceRange(), *Ctx);
-      printRec(C.getHasSymbolInfo()->getSymbolExpr());
-      printFoot();
-      Indent -= 2;
+      printRecRaw([&](StringRef Label) {
+        printHead("#_hasSymbol", PatternColor, Label);
+        if (Ctx)
+          printSourceRange(OS, C.getSourceRange(), *Ctx);
+        printRec(C.getHasSymbolInfo()->getSymbolExpr());
+        printFoot();
+      }, Label);
       break;
     }
   }
 
   template <typename NodeRange>
   void printRecRange(const NodeRange &range, StringRef topLabel) {
-    Indent += 2;
-    OS << '\n';
-    printHead("array", ASTNodeColor, topLabel);
-    for (auto node : range) {
-      printRec(node, "");
-    }
-    printFoot();
-    Indent -= 2;
+    printRecRaw([&](StringRef topLabel) {
+      printHead("array", ASTNodeColor, topLabel);
+      for (auto node : range) {
+        printRec(node, "");
+      }
+      printFoot();
+    }, topLabel);
   }
 
   template <typename NodeRange>
   void printRecRange(const NodeRange &range, const ASTContext *Ctx, StringRef topLabel) {
-    Indent += 2;
-    OS << '\n';
-    printHead("array", ASTNodeColor, topLabel);
-    for (auto node : range) {
-      printRec(node, Ctx, "");
-    }
-    printFoot();
-    Indent -= 2;
+    printRecRaw([&](StringRef topLabel) {
+      printHead("array", ASTNodeColor, topLabel);
+      for (auto node : range) {
+        printRec(node, Ctx, "");
+      }
+      printFoot();
+    }, topLabel);
   }
 
     raw_ostream &printHead(StringRef Name, TerminalColor Color,
@@ -500,27 +506,27 @@ public:
       return OS;
     }
 
-  void visitArgument(const Argument &arg) {
-    OS << '\n';
-    printHead("argument", ExprColor);
+  void printRec(const Argument &arg) {
+    printRecRaw([&](StringRef L) {
+      printHead("argument", ExprColor, L);
 
-    auto label = arg.getLabel();
-    if (!label.empty()) {
-      PrintWithColorRAII(OS, ArgumentsColor) << " label=";
-      PrintWithColorRAII(OS, ArgumentsColor) << label.str();
-    }
-    if (arg.isInOut())
-      PrintWithColorRAII(OS, ArgModifierColor) << " inout";
+      auto label = arg.getLabel();
+      if (!label.empty()) {
+        PrintWithColorRAII(OS, ArgumentsColor) << " label=";
+        PrintWithColorRAII(OS, ArgumentsColor) << label.str();
+      }
+      if (arg.isInOut())
+        PrintWithColorRAII(OS, ArgModifierColor) << " inout";
 
-    printRec(arg.getExpr());
-    printFoot();
+      printRec(arg.getExpr());
+      printFoot();
+    }, "");
   }
 
   void printRec(const ArgumentList *argList, StringRef label = "") {
-    OS << '\n';
-    Indent += 2;
-    visitArgumentList(argList, label);
-    Indent -= 2;
+    printRecRaw([&](StringRef label) {
+      visitArgumentList(argList, label);
+    }, label);
   }
 
   void visitArgumentList(const ArgumentList *argList, StringRef label = "") {
@@ -538,17 +544,17 @@ public:
       }
     }
 
-    Indent += 2;
     for (auto arg : *argList) {
-      visitArgument(arg);
+      printRec(arg);
     }
-    Indent -= 2;
 
     printFoot();
   }
 
-  void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
-    printHead("parameter_list", ParameterColor);
+  void printParameterList(const ParameterList *params,
+                          const ASTContext *ctx = nullptr,
+                          StringRef label = "") {
+    printHead("parameter_list", ParameterColor, label);
 
     if (!ctx && params->size() != 0 && params->get(0))
       ctx = &params->get(0)->getASTContext();
@@ -564,11 +570,27 @@ public:
     printFoot();
   }
 
-  void printRec(const ParameterList *params, const ASTContext *ctx = nullptr) {
-    Indent += 2;
-    OS << '\n';
-    printParameterList(params, ctx);
-    Indent -= 2;
+  void printRec(const ParameterList *params, const ASTContext *ctx = nullptr,
+                StringRef label = "") {
+    printRecRaw([&](StringRef label) {
+      printParameterList(params, ctx, label);
+    }, label);
+  }
+
+  void printRec(const IfConfigClause &Clause, const ASTContext *Ctx = nullptr,
+                StringRef Label = "") {
+    printRecRaw([&](StringRef Label) {
+      printHead((Clause.Cond ? "#if:" : "#else:"), StmtColor, Label);
+
+      if (Clause.isActive)
+        PrintWithColorRAII(OS, DeclModifierColor) << " active";
+      if (Clause.Cond) {
+        printRec(Clause.Cond);
+      }
+      printRecRange(Clause.Elements, Ctx, "elements");
+
+      printFoot();
+    }, Label);
   }
 
   };
@@ -1252,26 +1274,10 @@ public:
       }
       printFoot();
     }
-    
+
     void visitIfConfigDecl(IfConfigDecl *ICD, StringRef label) {
       printCommon(ICD, "if_config_decl", label);
-      Indent += 2;
-      for (auto &Clause : ICD->getClauses()) {
-        OS << '\n';
-        OS.indent(Indent);
-        PrintWithColorRAII(OS, StmtColor) << (Clause.Cond ? "#if:" : "#else:");
-        if (Clause.isActive)
-          PrintWithColorRAII(OS, DeclModifierColor) << " active";
-        if (Clause.Cond) {
-          printRec(Clause.Cond);
-        }
-
-        Indent += 2;
-        printRecRange(Clause.Elements, &ICD->getASTContext(), "elements");
-        Indent -= 2;
-      }
-
-      Indent -= 2;
+      printRecRange(ICD->getClauses(), &ICD->getASTContext(), "");
       printFoot();
     }
 
@@ -1290,13 +1296,14 @@ public:
       OS << " assignment=" << getDumpString(PGD->isAssignment());
 
       auto printRelations =
-          [&](StringRef label, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
+          [&](StringRef name, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
         if (rels.empty()) return;
-        OS << '\n';
-        printHead(label, FieldLabelColor);
-        for (auto &rel : rels)
-          OS << ' ' << rel.Name;
-        printFoot();
+        printRecRaw([&](StringRef label) {
+          printHead(name, FieldLabelColor, label);
+          for (auto &rel : rels)
+            OS << ' ' << rel.Name;
+          printFoot();
+        }, "");
       };
       printRelations("higherThan", PGD->getHigherThan());
       printRelations("lowerThan", PGD->getLowerThan());
@@ -1704,25 +1711,24 @@ public:
     if (S->hasUnknownAttr())
       OS << " @unknown";
 
-    Indent += 2;
     if (S->hasCaseBodyVariables()) {
       printRecRange(S->getCaseBodyVariables(), "case_body_variables");
     }
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
-      OS << '\n';
-      printHead("case_label_item", StmtColor);
-      if (LabelItem.isDefault())
-        OS << " default";
-      if (auto *CasePattern = LabelItem.getPattern()) {
-        printRec(CasePattern);
-      }
-      if (auto *Guard = LabelItem.getGuardExpr()) {
-        printRec(const_cast<Expr *>(Guard));
-      }
-      printFoot();
+      printRecRaw([&](StringRef label) {
+        printHead("case_label_item", StmtColor, label);
+        if (LabelItem.isDefault())
+          OS << " default";
+        if (auto *CasePattern = LabelItem.getPattern()) {
+          printRec(CasePattern);
+        }
+        if (auto *Guard = LabelItem.getGuardExpr()) {
+          printRec(const_cast<Expr *>(Guard));
+        }
+        printFoot();
+      }, "");
     }
-    Indent -= 2;
 
     printRec(S->getBody());
     printFoot();
@@ -1754,16 +1760,14 @@ public:
   void visitDoCatchStmt(DoCatchStmt *S, StringRef label) {
     printCommon(S, "do_catch_stmt", label);
     printRec(S->getBody());
-    OS << '\n';
-    Indent += 2;
     visitCatches(S->getCatches());
-    Indent -= 2;
     printFoot();
   }
   void visitCatches(ArrayRef<CaseStmt *> clauses) {
     for (auto clause : clauses) {
-      OS << '\n';
-      visitCaseStmt(clause, "");
+      printRecRaw([&](StringRef label) {
+        visitCaseStmt(clause, label);
+      }, "");
     }
   }
 };
@@ -2743,79 +2747,79 @@ public:
     if (E->isObjC())
       OS << " objc";
 
-    OS << '\n';
-    Indent += 2;
-    printHead("components", ExprColor);
-    for (unsigned i : indices(E->getComponents())) {
-      auto &component = E->getComponents()[i];
-      OS << '\n';
-      switch (component.getKind()) {
-      case KeyPathExpr::Component::Kind::Invalid:
-        printHead("invalid", ASTNodeColor);
-        break;
+    printRecRaw([&](StringRef label) {
+      printHead("components", ExprColor, label);
+      for (unsigned i : indices(E->getComponents())) {
+        auto &component = E->getComponents()[i];
+        printRecRaw([&](StringRef label) {
+          switch (component.getKind()) {
+          case KeyPathExpr::Component::Kind::Invalid:
+            printHead("invalid", ASTNodeColor);
+            break;
 
-      case KeyPathExpr::Component::Kind::OptionalChain:
-        printHead("optional_chain", ASTNodeColor);
-        break;
-        
-      case KeyPathExpr::Component::Kind::OptionalForce:
-        printHead("optional_force", ASTNodeColor);
-        break;
-        
-      case KeyPathExpr::Component::Kind::OptionalWrap:
-        printHead("optional_wrap", ASTNodeColor);
-        break;
-        
-      case KeyPathExpr::Component::Kind::Property:
-        printHead("property", ASTNodeColor);
-        PrintWithColorRAII(OS, DeclColor) << " decl=";
-        printDeclRef(component.getDeclRef());
-        break;
-      
-      case KeyPathExpr::Component::Kind::Subscript:
-        printHead("subscript", ASTNodeColor);
-        PrintWithColorRAII(OS, DeclColor) << " decl='";
-        printDeclRef(component.getDeclRef());
-        PrintWithColorRAII(OS, DeclColor) << "'";
-        break;
-      
-      case KeyPathExpr::Component::Kind::UnresolvedProperty:
-        printHead("unresolved_property", ASTNodeColor);
-        PrintWithColorRAII(OS, IdentifierColor)
-          << " decl_name='" << component.getUnresolvedDeclName() << "'";
-        break;
-        
-      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-        printHead("unresolved_subscript", ASTNodeColor);
-        break;
-      case KeyPathExpr::Component::Kind::Identity:
-        printHead("identity", ASTNodeColor);
-        break;
+          case KeyPathExpr::Component::Kind::OptionalChain:
+            printHead("optional_chain", ASTNodeColor);
+            break;
 
-      case KeyPathExpr::Component::Kind::TupleElement:
-        printHead("tuple_element", ASTNodeColor) << ' ';
-        PrintWithColorRAII(OS, DiscriminatorColor)
-          << "#" << component.getTupleIndex();
-        break;
-      case KeyPathExpr::Component::Kind::DictionaryKey:
-        printHead("dict_key", ASTNodeColor);
-        PrintWithColorRAII(OS, IdentifierColor)
-          << " key='" << component.getUnresolvedDeclName() << "'";
-        break;
-      case KeyPathExpr::Component::Kind::CodeCompletion:
-        printHead("completion", ASTNodeColor);
-        break;
+          case KeyPathExpr::Component::Kind::OptionalForce:
+            printHead("optional_force", ASTNodeColor);
+            break;
+
+          case KeyPathExpr::Component::Kind::OptionalWrap:
+            printHead("optional_wrap", ASTNodeColor);
+            break;
+
+          case KeyPathExpr::Component::Kind::Property:
+            printHead("property", ASTNodeColor);
+            PrintWithColorRAII(OS, DeclColor) << " decl=";
+            printDeclRef(component.getDeclRef());
+            break;
+
+          case KeyPathExpr::Component::Kind::Subscript:
+            printHead("subscript", ASTNodeColor);
+            PrintWithColorRAII(OS, DeclColor) << " decl='";
+            printDeclRef(component.getDeclRef());
+            PrintWithColorRAII(OS, DeclColor) << "'";
+            break;
+
+          case KeyPathExpr::Component::Kind::UnresolvedProperty:
+            printHead("unresolved_property", ASTNodeColor);
+            PrintWithColorRAII(OS, IdentifierColor)
+              << " decl_name='" << component.getUnresolvedDeclName() << "'";
+            break;
+
+          case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+            printHead("unresolved_subscript", ASTNodeColor);
+            break;
+          case KeyPathExpr::Component::Kind::Identity:
+            printHead("identity", ASTNodeColor);
+            break;
+
+          case KeyPathExpr::Component::Kind::TupleElement:
+            printHead("tuple_element", ASTNodeColor) << ' ';
+            PrintWithColorRAII(OS, DiscriminatorColor)
+              << "#" << component.getTupleIndex();
+            break;
+          case KeyPathExpr::Component::Kind::DictionaryKey:
+            printHead("dict_key", ASTNodeColor);
+            PrintWithColorRAII(OS, IdentifierColor)
+              << " key='" << component.getUnresolvedDeclName() << "'";
+            break;
+          case KeyPathExpr::Component::Kind::CodeCompletion:
+            printHead("completion", ASTNodeColor);
+            break;
+          }
+          PrintWithColorRAII(OS, TypeColor)
+            << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
+          if (auto *args = component.getSubscriptArgs()) {
+            printRec(args);
+          }
+          printFoot();
+        }, "");
       }
-      PrintWithColorRAII(OS, TypeColor)
-        << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
-      if (auto *args = component.getSubscriptArgs()) {
-        printRec(args);
-      }
+
       printFoot();
-    }
-
-    printFoot();
-    Indent -= 2;
+    }, "");
 
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
       printRec(stringLiteral, "objc_string_literal");
@@ -3160,17 +3164,17 @@ public:
 
   void visitSILBoxTypeRepr(SILBoxTypeRepr *T, StringRef label) {
     printCommon("sil_box", label);
-    Indent += 2;
 
     ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
     for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
-      OS << '\n';
-      printCommon("sil_box_field", label);
-      if (Fields[i].isMutable()) {
-        OS << " mutable";
-      }
-      printRec(Fields[i].getFieldType());
-      printFoot();
+      printRecRaw([&](StringRef label) {
+        printCommon("sil_box_field", label);
+        if (Fields[i].isMutable()) {
+          OS << " mutable";
+        }
+        printRec(Fields[i].getFieldType());
+        printFoot();
+      }, "");
     }
 
     for (auto genArg : T->getGenericArguments()) {
@@ -3178,50 +3182,64 @@ public:
     }
 
     printFoot();
-    Indent -= 2;
   }
 };
 
 void PrintBase::printRec(Decl *D, StringRef label) {
-  OS << '\n';
-  if (!D)
-    OS.indent(Indent + 2) << "(<null decl>)";
-  else
-    PrintDecl(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
-              GetTypeOfKeyPathComponent).visit(D, label);
+  printRecRaw([&](StringRef label) {
+    if (!D) {
+      printHead("<null decl>", DeclColor, label);
+      printFoot();
+    } else {
+      PrintDecl(OS, Indent, GetTypeOfExpr, GetTypeOfTypeRepr,
+                GetTypeOfKeyPathComponent).visit(D, label);
+    }
+  }, label);
 }
 void PrintBase::printRec(Expr *E, StringRef label) {
-  OS << '\n';
-  if (!E)
-    OS.indent(Indent + 2) << "(<null expr>)";
-  else
-    PrintExpr(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
-              GetTypeOfKeyPathComponent).visit(E, label);
+  printRecRaw([&](StringRef label) {
+    if (!E) {
+      printHead("<null expr>", ExprColor, label);
+      printFoot();
+    } else {
+      PrintExpr(OS, Indent, GetTypeOfExpr, GetTypeOfTypeRepr,
+                GetTypeOfKeyPathComponent).visit(E, label);
+    }
+  }, label);
 }
 void PrintBase::printRec(Stmt *S, const ASTContext *Ctx, StringRef label) {
-  OS << '\n';
-  if (!S)
-    OS.indent(Indent + 2) << "(<null stmt>)";
-  else
-    PrintStmt(OS, Ctx, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
-              GetTypeOfKeyPathComponent).visit(S, label);
+  printRecRaw([&](StringRef label) {
+    if (!S) {
+      printHead("<null stmt>", ExprColor, label);
+      printFoot();
+    } else {
+      PrintStmt(OS, Ctx, Indent, GetTypeOfExpr, GetTypeOfTypeRepr,
+                GetTypeOfKeyPathComponent).visit(S, label);
+    }
+  }, label);
 }
 void PrintBase::printRec(TypeRepr *T, StringRef label) {
-  OS << '\n';
-  if (!T)
-    OS.indent(Indent + 2) << "(<null typerepr>)";
-  else
-    PrintTypeRepr(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
-                  GetTypeOfKeyPathComponent).visit(T, label);
+  printRecRaw([&](StringRef label) {
+    if (!T) {
+      printHead("<null typerepr>", TypeReprColor, label);
+      printFoot();
+    } else {
+      PrintTypeRepr(OS, Indent, GetTypeOfExpr, GetTypeOfTypeRepr,
+                    GetTypeOfKeyPathComponent).visit(T, label);
+    }
+  }, label);
 }
 void PrintBase::printRec(const Pattern *P, StringRef label) {
-  OS << '\n';
-  if (!P)
-    OS.indent(Indent + 2) << "(<null pattern>)";
-  else
-    PrintPattern(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
-                 GetTypeOfKeyPathComponent).visit(const_cast<Pattern *>(P),
-                                                  label);
+  printRecRaw([&](StringRef label) {
+    if (!P) {
+      printHead("<null pattern>", PatternColor, label);
+      printFoot();
+    } else {
+      PrintPattern(OS, Indent, GetTypeOfExpr, GetTypeOfTypeRepr,
+                   GetTypeOfKeyPathComponent).visit(const_cast<Pattern *>(P),
+                                                    label);
+    }
+  }, label);
 }
 
 
@@ -3664,11 +3682,9 @@ namespace {
     void visitPackType(PackType *T, StringRef label) {
       printCommon(label, "pack_type");
       printField("num_elements", T->getNumElements());
-      Indent += 2;
       for (Type elt : T->getElementTypes()) {
         printRec(elt);
       }
-      Indent -= 2;
       printFoot();
     }
 
@@ -3676,11 +3692,9 @@ namespace {
       printCommon(label, "sil_pack_type");
       printField("element_is_address", T->isElementAddress());
       printField("num_elements", T->getNumElements());
-      Indent += 2;
       for (Type elt : T->getElementTypes()) {
         printRec(elt);
       }
-      Indent -= 2;
       printFoot();
     }
 
@@ -3707,16 +3721,15 @@ namespace {
     void visitTupleType(TupleType *T, StringRef label) {
       printCommon(label, "tuple_type");
       printField("num_elements", T->getNumElements());
-      Indent += 2;
       for (const auto &elt : T->getElements()) {
-        OS << "\n";
-        printHead("tuple_type_elt", FieldLabelColor);
-        if (elt.hasName())
-          printField("name", elt.getName().str());
-        printRec(elt.getType());
-        OS << ")";
+        printRecRaw([&](StringRef label) {
+          printHead("tuple_type_elt", FieldLabelColor, label);
+          if (elt.hasName())
+            printField("name", elt.getName().str());
+          printRec(elt.getType());
+          printFoot();
+        }, "");
       }
-      Indent -= 2;
       printFoot();
     }
 
@@ -3871,22 +3884,23 @@ namespace {
 
     void printAnyFunctionParams(ArrayRef<AnyFunctionType::Param> params,
                                 StringRef label) {
-      printCommon(label, "function_params");
-      printField("num_params", params.size());
-      Indent += 2;
-      for (const auto &param : params) {
-        OS << "\n";
-        printHead("param", FieldLabelColor);
-        if (param.hasLabel())
-          printField("name", param.getLabel().str());
-        if (param.hasInternalLabel())
-          printField("internal_name", param.getInternalLabel().str());
-        dumpParameterFlags(param.getParameterFlags());
-        printRec(param.getPlainType());
+      printRecRaw([&](StringRef label) {
+        printCommon(label, "function_params");
+        printField("num_params", params.size());
+        for (const auto &param : params) {
+          printRecRaw([&](StringRef label) {
+            printHead("param", FieldLabelColor);
+            if (param.hasLabel())
+              printField("name", param.getLabel().str());
+            if (param.hasInternalLabel())
+              printField("internal_name", param.getInternalLabel().str());
+            dumpParameterFlags(param.getParameterFlags());
+            printRec(param.getPlainType());
+            printFoot();
+          }, "");
+        }
         printFoot();
-      }
-      Indent -= 2;
-      printFoot();
+      }, label);
     }
 
     void printAnyFunctionTypeCommon(AnyFunctionType *T, StringRef label,
@@ -3910,20 +3924,22 @@ namespace {
         printField("global_actor", globalActor.getString());
       }
 
-      OS << "\n";
-      Indent += 2;
       // [TODO: Improve-Clang-type-printing]
       if (!T->getClangTypeInfo().empty()) {
-        std::string s;
-        llvm::raw_string_ostream os(s);
-        auto &ctx = T->getASTContext().getClangModuleLoader()
-          ->getClangASTContext();
-        T->getClangTypeInfo().dump(os, ctx);
-        printField("clang_type", os.str());
+        printRecRaw([&](StringRef label) {
+          std::string s;
+          llvm::raw_string_ostream os(s);
+          auto &ctx = T->getASTContext().getClangModuleLoader()
+            ->getClangASTContext();
+          T->getClangTypeInfo().dump(os, ctx);
+
+          printHead("clang_type", ASTNodeColor, label);
+          OS << ' ' << QuotedString(os.str());
+          printFoot();
+        }, "");
       }
 
       printAnyFunctionParams(T->getParams(), "input");
-      Indent -=2;
       printRec(T->getResult(), "output");
     }
 
@@ -4109,14 +4125,15 @@ namespace {
   };
 
   void PrintBase::printRec(Type type, StringRef label) {
-    OS << '\n';
-
-    if (type.isNull())
-      OS.indent(Indent + 2) << "(<null type>)";
-    else {
-      PrintType(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
-                GetTypeOfKeyPathComponent).visit(type, label);
-    }
+    printRecRaw([&](StringRef label) {
+      if (type.isNull()) {
+        printHead("<null type>", DeclColor, label);
+        printFoot();
+      } else {
+        PrintType(OS, Indent, GetTypeOfExpr, GetTypeOfTypeRepr,
+                  GetTypeOfKeyPathComponent).visit(type, label);
+      }
+    }, label);
   }
 } // end anonymous namespace
 
