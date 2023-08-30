@@ -7858,16 +7858,7 @@ ParamDecl *ParamDecl::createImplicit(ASTContext &Context,
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
-  assert(isTypeContext());
-
-  // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl()) {
-    auto selfType = getProtocolSelfType();
-    if (!selfType)
-      return ErrorType::get(getASTContext());
-    return mapTypeIntoContext(selfType);
-  }
-  return getDeclaredTypeInContext();
+  return mapTypeIntoContext(getSelfInterfaceType());
 }
 
 TupleType *BuiltinTupleDecl::getTupleSelfType() const {
