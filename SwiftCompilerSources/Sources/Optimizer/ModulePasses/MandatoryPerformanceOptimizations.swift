@@ -300,6 +300,15 @@ fileprivate struct FunctionWorklist {
   }
 
   mutating func addAllPerformanceAnnotatedFunctions(of moduleContext: ModulePassContext) {
+    // For embedded Swift, optimize all the functions (there cannot be any
+    // generics, type metadata, etc.)
+    if moduleContext.options.enableEmbeddedSwift {
+      for f in moduleContext.functions {
+        pushIfNotVisited(f)
+      }
+      return
+    }
+
     for f in moduleContext.functions where f.performanceConstraints != .none {
       pushIfNotVisited(f)
     }

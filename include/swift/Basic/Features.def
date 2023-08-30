@@ -232,6 +232,9 @@ EXPERIMENTAL_FEATURE(ThenStatements, false)
 /// Enable the `@_rawLayout` attribute.
 EXPERIMENTAL_FEATURE(RawLayout, true)
 
+/// Enables the "embedded" swift mode (no runtime).
+EXPERIMENTAL_FEATURE(Embedded, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
