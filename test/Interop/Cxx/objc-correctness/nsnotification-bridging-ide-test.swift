@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=NSNofiticationBridging -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NSNotificationBridging -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-objc-interop | %FileCheck %s
 
 // REQUIRES: objc_interop
 
