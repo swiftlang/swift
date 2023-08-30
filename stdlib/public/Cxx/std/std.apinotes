@@ -1,0 +1,8 @@
+Name: std
+Functions:
+- Name: abs
+  Availability: nonswift
+  AvailabilityMsg: Use the C standard library function
+- Name: div
+  Availability: nonswift
+  AvailabilityMsg: Use the C standard library function
