@@ -5,10 +5,32 @@ add_custom_target(SwiftUnitTests)
 
 set_target_properties(SwiftUnitTests PROPERTIES FOLDER "Tests")
 
+# Add a new Swift unit test executable.
+#
+# Usage:
+#   add_swift_unittest(name
+#     [IS_TARGET_TEST]
+#     source1 [source2 source3 ...])
+#
+# name
+#   Name of the test (e.g., SwiftASTTest).
+#
+# IS_TARGET_TEST
+#   Indicates this is a test for target libraries. Not host library.
+#   This avoids linking with toolchains stdlib.
+#
+# source1 ...
+#   Sources to add into this executable.
 function(add_swift_unittest test_dirname)
+  cmake_parse_arguments(ASU
+                        "IS_TARGET_TEST"
+                        ""
+                        ""
+                        ${ARGN})
+
   # *NOTE* Even though "add_unittest" does not have llvm in its name, it is a
   # function defined by AddLLVM.cmake.
-  add_unittest(SwiftUnitTests ${test_dirname} ${ARGN})
+  add_unittest(SwiftUnitTests ${test_dirname} ${ASU_UNPARSED_ARGUMENTS})
 
   set_target_properties(${test_dirname} PROPERTIES LINKER_LANGUAGE CXX)
 
@@ -89,7 +111,8 @@ function(add_swift_unittest test_dirname)
     endif()
   endif()
 
-  if (SWIFT_SWIFT_PARSER)
+  if (SWIFT_SWIFT_PARSER AND NOT ASU_IS_TARGET_TEST)
+    # Link to stdlib the compiler uses.
     _add_swift_runtime_link_flags(${test_dirname} "../../lib" "")
     set_property(TARGET ${test_dirname} PROPERTY BUILD_WITH_INSTALL_RPATH OFF)
   endif()
