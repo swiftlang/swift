@@ -38,6 +38,7 @@ public protocol CxxDictionary where Key: Hashable {
   /// Do not implement this function manually in Swift.
   @discardableResult
   mutating func erase(_ key: Key) -> Size
+  func __beginUnsafe() -> RawIterator
 
   /// Do not implement this function manually in Swift.
   func __endUnsafe() -> RawIterator
@@ -62,7 +63,7 @@ extension CxxDictionary {
     _ isIncluded: (_ key: Key, _ value: Value) throws -> Bool
 ) rethrows -> [Key: Value] {
     var filteredDictionary: [Key: Value] = [:]
-    var iterator = __findUnsafe(Key) 
+    var iterator = __beginUnsafe(Key) 
     let endIterator = __endUnsafe()
 
     while iterator != endIterator {
