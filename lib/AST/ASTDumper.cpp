@@ -433,30 +433,110 @@ static Type defaultGetTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
 }
 
 namespace {
-  class PrintBase {
-  public:
-    raw_ostream &OS;
-    unsigned Indent;
-    llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-    llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
-    llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-        GetTypeOfKeyPathComponent;
+class PrintBase {
+public:
+  raw_ostream &OS;
+  unsigned Indent;
+  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
+  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
+  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+  GetTypeOfKeyPathComponent;
 
-    explicit PrintBase(raw_ostream &os, unsigned indent = 0,
-                       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
-                       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
-                       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-                           getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-      : OS(os), Indent(indent), GetTypeOfExpr(getTypeOfExpr),
-        GetTypeOfTypeRepr(getTypeOfTypeRepr),
-        GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
+  explicit PrintBase(raw_ostream &os, unsigned indent = 0,
+                     llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
+                     llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
+                     llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                     getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
+  : OS(os), Indent(indent), GetTypeOfExpr(getTypeOfExpr),
+  GetTypeOfTypeRepr(getTypeOfTypeRepr),
+  GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
 
-    void printRec(Decl *D, StringRef label = "");
-    void printRec(Expr *E, StringRef label = "");
-    void printRec(Stmt *S, const ASTContext *Ctx, StringRef label = "");
-    void printRec(TypeRepr *T, StringRef label = "");
-    void printRec(const Pattern *P, StringRef label = "");
-    void printRec(Type ty, StringRef label = "");
+  void printRec(Decl *D, StringRef label = "");
+  void printRec(Expr *E, StringRef label = "");
+  void printRec(Stmt *S, const ASTContext *Ctx, StringRef label = "");
+  void printRec(TypeRepr *T, StringRef label = "");
+  void printRec(const Pattern *P, StringRef label = "");
+  void printRec(Type ty, StringRef label = "");
+
+  void printRec(const ASTNode &Elt, const ASTContext *Ctx,
+                StringRef label = "") {
+    if (auto *SubExpr = Elt.dyn_cast<Expr*>())
+      printRec(SubExpr, label);
+    else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
+      printRec(SubStmt, Ctx, label);
+    else
+      printRec(Elt.get<Decl*>(), label);
+  }
+
+  void printRec(StmtConditionElement C, const ASTContext *Ctx,
+                StringRef Label = "") {
+    switch (C.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+      return printRec(C.getBoolean());
+    case StmtConditionElement::CK_PatternBinding:
+      Indent += 2;
+      printHead("pattern", PatternColor, Label);
+      printRec(C.getPattern());
+      printRec(C.getInitializer());
+      printFoot();
+      Indent -= 2;
+      break;
+    case StmtConditionElement::CK_Availability:
+      Indent += 2;
+      printHead("#available", PatternColor, Label);
+      for (auto *Query : C.getAvailability()->getQueries()) {
+        OS << '\n';
+        switch (Query->getKind()) {
+        case AvailabilitySpecKind::PlatformVersionConstraint:
+          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        case AvailabilitySpecKind::LanguageVersionConstraint:
+        case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        case AvailabilitySpecKind::OtherPlatform:
+          cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        }
+      }
+      printFoot();
+      Indent -= 2;
+      break;
+    case StmtConditionElement::CK_HasSymbol:
+      Indent += 2;
+      printHead("#_hasSymbol", PatternColor, Label);
+      if (Ctx)
+        printSourceRange(OS, C.getSourceRange(), *Ctx);
+      printRec(C.getHasSymbolInfo()->getSymbolExpr());
+      printFoot();
+      Indent -= 2;
+      break;
+    }
+  }
+
+  template <typename NodeRange>
+  void printRecRange(const NodeRange &range, StringRef topLabel) {
+    Indent += 2;
+    OS << '\n';
+    printHead("array", ASTNodeColor, topLabel);
+    for (auto node : range) {
+      printRec(node, "");
+    }
+    printFoot();
+    Indent -= 2;
+  }
+
+  template <typename NodeRange>
+  void printRecRange(const NodeRange &range, const ASTContext *Ctx, StringRef topLabel) {
+    Indent += 2;
+    OS << '\n';
+    printHead("array", ASTNodeColor, topLabel);
+    for (auto node : range) {
+      printRec(node, Ctx, "");
+    }
+    printFoot();
+    Indent -= 2;
+  }
 
     raw_ostream &printHead(StringRef Name, TerminalColor Color,
                            StringRef Label = "") {
@@ -1189,19 +1269,6 @@ namespace {
       printFoot();
     }
     
-    void printASTNodes(const ArrayRef<ASTNode> &Elements, const ASTContext &Ctx, StringRef Name) {
-      printHead(Name, ASTNodeColor);
-      for (auto Elt : Elements) {
-        if (auto *SubExpr = Elt.dyn_cast<Expr*>())
-          printRec(SubExpr);
-        else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-          printRec(SubStmt, &Ctx);
-        else
-          printRec(Elt.get<Decl*>());
-      }
-      printFoot();
-    }
-
     void visitIfConfigDecl(IfConfigDecl *ICD, StringRef label) {
       printCommon(ICD, "if_config_decl", label);
       Indent += 2;
@@ -1215,9 +1282,8 @@ namespace {
           printRec(Clause.Cond);
         }
 
-        OS << '\n';
         Indent += 2;
-        printASTNodes(Clause.Elements, ICD->getASTContext(), "elements");
+        printRecRange(Clause.Elements, &ICD->getASTContext(), "elements");
         Indent -= 2;
       }
 
@@ -1519,51 +1585,6 @@ public:
     PrintBase::printRec(S, Ctx, Label);
   }
 
-  void printRec(StmtConditionElement C, StringRef Label = "") {
-    switch (C.getKind()) {
-    case StmtConditionElement::CK_Boolean:
-      return printRec(C.getBoolean());
-    case StmtConditionElement::CK_PatternBinding:
-      Indent += 2;
-      printHead("pattern", PatternColor, Label);
-      printRec(C.getPattern());
-      printRec(C.getInitializer());
-      printFoot();
-      Indent -= 2;
-      break;
-    case StmtConditionElement::CK_Availability:
-      Indent += 2;
-      printHead("#available", PatternColor, Label);
-      for (auto *Query : C.getAvailability()->getQueries()) {
-        OS << '\n';
-        switch (Query->getKind()) {
-        case AvailabilitySpecKind::PlatformVersionConstraint:
-          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        case AvailabilitySpecKind::LanguageVersionConstraint:
-        case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        case AvailabilitySpecKind::OtherPlatform:
-          cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        }
-      }
-      printFoot();
-      Indent -= 2;
-      break;
-    case StmtConditionElement::CK_HasSymbol:
-      Indent += 2;
-      printHead("#_hasSymbol", PatternColor, Label);
-      if (Ctx)
-        printSourceRange(OS, C.getSourceRange(), *Ctx);
-      printRec(C.getHasSymbolInfo()->getSymbolExpr());
-      printFoot();
-      Indent -= 2;
-      break;
-    }
-  }
-
   raw_ostream &printCommon(Stmt *S, const char *Name, StringRef Label) {
     printHead(Name, StmtColor, Label);
 
@@ -1581,19 +1602,9 @@ public:
 
   void visitBraceStmt(BraceStmt *S, StringRef label) {
     printCommon(S, "brace_stmt", label);
-    printASTNodes(S->getElements());
+    for (auto &Elt : S->getElements())
+      printRec(Elt, Ctx);
     printFoot();
-  }
-
-  void printASTNodes(const ArrayRef<ASTNode> &Elements) {
-    for (auto Elt : Elements) {
-      if (auto *SubExpr = Elt.dyn_cast<Expr*>())
-        printRec(SubExpr);
-      else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-        printRec(SubStmt);
-      else
-        printRec(Elt.get<Decl*>());
-    }
   }
 
   void visitReturnStmt(ReturnStmt *S, StringRef label) {
@@ -1627,9 +1638,7 @@ public:
 
   void visitIfStmt(IfStmt *S, StringRef label) {
     printCommon(S, "if_stmt", label);
-    for (auto elt : S->getCond()) {
-      printRec(elt);
-    }
+    printRecRange(S->getCond(), Ctx, "conditions");
     printRec(S->getThenStmt());
     if (S->getElseStmt()) {
       printRec(S->getElseStmt());
@@ -1639,8 +1648,7 @@ public:
 
   void visitGuardStmt(GuardStmt *S, StringRef label) {
     printCommon(S, "guard_stmt", label);
-    for (auto elt : S->getCond())
-      printRec(elt);
+    printRecRange(S->getCond(), Ctx, "conditions");
     printRec(S->getBody());
     printFoot();
   }
@@ -1653,9 +1661,7 @@ public:
 
   void visitWhileStmt(WhileStmt *S, StringRef label) {
     printCommon(S, "while_stmt", label);
-    for (auto elt : S->getCond())
-      printRec(elt);
-    OS << '\n';
+    printRecRange(S->getCond(), Ctx, "conditions");
     printRec(S->getBody());
     printFoot();
   }
@@ -1718,12 +1724,7 @@ public:
 
     Indent += 2;
     if (S->hasCaseBodyVariables()) {
-      OS << '\n';
-      printHead("case_body_variables", StmtColor);
-      for (auto *vd : S->getCaseBodyVariables()) {
-        printRec(vd);
-      }
-      printFoot();
+      printRecRange(S->getCaseBodyVariables(), "case_body_variables");
     }
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
@@ -2221,15 +2222,7 @@ public:
   void visitDestructureTupleExpr(DestructureTupleExpr *E, StringRef label) {
     printCommon(E, "destructure_tuple_expr", label);
 
-    OS << "\n";
-    Indent += 2;
-    printHead("destructured", ASTNodeColor);
-    for (auto *elt : E->getDestructuredElements()) {
-      printRec(elt);
-    }
-    printFoot();
-    Indent -= 2;
-
+    printRecRange(E->getDestructuredElements(), "destructured");
     printRec(E->getSubExpr());
     printRec(E->getResultExpr());
     printFoot();
