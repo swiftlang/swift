@@ -235,7 +235,7 @@ else()
   #
   # step 1: generate a dummy source file, which just includes all headers
   # defined in include/swift/module.modulemap
-  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
        "
 #include \"Basic/BridgedSwiftObject.h\"
 #include \"Basic/BasicBridging.h\"
@@ -251,6 +251,12 @@ else()
 
 #include \"Parse/RegexParserBridging.h\"
 ")
+  add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
+      "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+  )
 
   # step 2: build a library containing that source file. This library depends on all the included header files.
   #         The swift modules can now depend on that target.
