@@ -456,6 +456,7 @@ namespace {
     void printRec(Stmt *S, const ASTContext *Ctx);
     void printRec(TypeRepr *T);
     void printRec(const Pattern *P);
+    void printRec(Type ty, StringRef label = "");
 
     template <typename NodeTy>
     void printRecLabeled(NodeTy *Node, StringRef label) {
@@ -3636,23 +3637,7 @@ namespace {
     }
 
   public:
-    PrintType(raw_ostream &os, unsigned indent) : PrintBase(os, indent) { }
-
-    void printRec(Type type) {
-      printRec("", type);
-    }
-
-    void printRec(StringRef label, Type type) {
-      OS << "\n";
-
-      if (type.isNull())
-        OS << "<<null>>";
-      else {
-        Indent += 2;
-        visit(type, label);
-        Indent -=2;
-      }
-    }
+    using PrintBase::PrintBase;
 
 #define TRIVIAL_TYPE_PRINTER(Class,Name)                        \
     void visit##Class##Type(Class##Type *T, StringRef label) {  \
@@ -3662,7 +3647,7 @@ namespace {
     void visitErrorType(ErrorType *T, StringRef label) {
       printCommon(label, "error_type");
       if (auto originalType = T->getOriginalType())
-        printRec("original_type", originalType);
+        printRec(originalType, "original_type");
       printFoot();
     }
 
@@ -3672,13 +3657,13 @@ namespace {
       printCommon(label, "placeholder_type");
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
-        printRec("type_variable", typeVar);
+        printRec(typeVar, "type_variable");
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         VD->dumpRef(PrintWithColorRAII(OS, DeclColor).getOS());
       } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
-        printRec("dependent_member_type", DMT);
+        printRec(DMT, "dependent_member_type");
       } else if (originator.is<PlaceholderTypeRepr *>()) {
         printFlag("placeholder_type_repr");
       } else {
@@ -3733,7 +3718,7 @@ namespace {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
 
       for (const auto &arg : T->getDirectGenericArgs())
         printRec(arg);
@@ -3765,15 +3750,15 @@ namespace {
 
     void visitPackExpansionType(PackExpansionType *T, StringRef label) {
       printCommon(label, "pack_expansion_type");
-      printRec("pattern", T->getPatternType());
-      printRec("count", T->getCountType());
+      printRec(T->getPatternType(), "pattern");
+      printRec(T->getCountType(), "count");
       printFoot();
     }
 
     void visitPackElementType(PackElementType *T, StringRef label) {
       printCommon(label, "element_type");
       printField("level", T->getLevel());
-      printRec("pack", T->getPackType());
+      printRec(T->getPackType(), "pack");
       printFoot();
     }
 
@@ -3811,7 +3796,7 @@ namespace {
       printCommon(label, "enum_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       printFoot();
     }
 
@@ -3819,7 +3804,7 @@ namespace {
       printCommon(label, "struct_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       printFoot();
     }
 
@@ -3827,7 +3812,7 @@ namespace {
       printCommon(label, "class_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       printFoot();
     }
 
@@ -3835,7 +3820,7 @@ namespace {
       printCommon(label, "protocol_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       printFoot();
     }
 
@@ -3879,7 +3864,7 @@ namespace {
                               StringRef label) {
       printCommon(label, className);
       printField("address", static_cast<void *>(T));
-      printRec("interface_type", T->getInterfaceType());
+      printRec(T->getInterfaceType(), "interface_type");
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         OS << " layout=";
@@ -3888,7 +3873,7 @@ namespace {
       for (auto proto : T->getConformsTo())
         printField("conforms_to", proto->printRef());
       if (auto superclass = T->getSuperclass())
-        printRec("superclass", superclass);
+        printRec(superclass, "superclass");
 
     }
     
@@ -3899,8 +3884,7 @@ namespace {
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
-      printRec("opened_existential",
-               T->getGenericEnvironment()->getOpenedExistentialType());
+      printRec(               T->getGenericEnvironment()->getOpenedExistentialType(), "opened_existential");
       printField("opened_existential_id", T->getOpenedExistentialID());
       printFoot();
     }
@@ -3945,7 +3929,7 @@ namespace {
       } else {
         printField("name", T->getName());
       }
-      printRec("base", T->getBase());
+      printRec(T->getBase(), "base");
       printFoot();
     }
 
@@ -4004,7 +3988,7 @@ namespace {
 
       printAnyFunctionParams(T->getParams(), "input");
       Indent -=2;
-      printRec("output", T->getResult());
+      printRec(T->getResult(), "output");
     }
 
     void visitFunctionType(FunctionType *T, StringRef label) {
@@ -4026,16 +4010,16 @@ namespace {
       printField("type", T->getString());
 
       for (auto param : T->getParameters()) {
-        printRec("input", param.getInterfaceType());
+        printRec(param.getInterfaceType(), "input");
       }
       for (auto yield : T->getYields()) {
-        printRec("yield", yield.getInterfaceType());
+        printRec(yield.getInterfaceType(), "yield");
       }
       for (auto result : T->getResults()) {
-        printRec("result", result.getInterfaceType());
+        printRec(result.getInterfaceType(), "result");
       }
       if (auto error  = T->getOptionalErrorResult()) {
-        printRec("error", error->getInterfaceType());
+        printRec(error->getInterfaceType(), "error");
       }
       OS << '\n';
       T->getPatternSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
@@ -4089,8 +4073,8 @@ namespace {
 
     void visitDictionaryType(DictionaryType *T, StringRef label) {
       printCommon(label, "dictionary_type");
-      printRec("key", T->getKeyType());
-      printRec("value", T->getValueType());
+      printRec(T->getKeyType(), "key");
+      printRec(T->getValueType(), "value");
       printFoot();
     }
 
@@ -4114,7 +4098,7 @@ namespace {
     void visitParameterizedProtocolType(ParameterizedProtocolType *T,
                                         StringRef label) {
       printCommon(label, "parameterized_protocol_type");
-      printRec("base", T->getBaseType());
+      printRec(T->getBaseType(), "base");
       for (auto arg : T->getArgs()) {
         printRec(arg);
       }
@@ -4144,7 +4128,7 @@ namespace {
       printCommon(label, "unbound_generic_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       printFoot();
     }
 
@@ -4152,7 +4136,7 @@ namespace {
       printCommon(label, "bound_generic_class_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
         printRec(arg);
       printFoot();
@@ -4163,7 +4147,7 @@ namespace {
       printCommon(label, "bound_generic_struct_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
         printRec(arg);
       printFoot();
@@ -4173,7 +4157,7 @@ namespace {
       printCommon(label, "bound_generic_enum_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
-        printRec("parent", T->getParent());
+        printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
         printRec(arg);
       printFoot();
@@ -4187,6 +4171,17 @@ namespace {
 
 #undef TRIVIAL_TYPE_PRINTER
   };
+
+  void PrintBase::printRec(Type type, StringRef label) {
+    OS << '\n';
+
+    if (type.isNull())
+      OS.indent(Indent + 2) << "(<null type>)";
+    else {
+      PrintType(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
+                GetTypeOfKeyPathComponent).visit(type, label);
+    }
+  }
 } // end anonymous namespace
 
 void Type::dump() const {
