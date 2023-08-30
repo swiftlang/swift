@@ -20,6 +20,7 @@
 
 namespace swift {
 
+class Argument;
 class ArgumentList;
 class Decl;
 class Expr;
@@ -641,6 +642,27 @@ public:
   virtual PostWalkResult<ArgumentList *>
   walkToArgumentListPost(ArgumentList *ArgList) {
     return Action::Continue(ArgList);
+  }
+
+  /// This method is called when first visiting an argument in an argument list,
+  /// before walking into its expression.
+  ///
+  /// \param Arg The argument to walk.
+  ///
+  /// \returns The walking action to perform.
+  ///
+  /// The default implementation returns \c Action::Continue().
+  virtual PreWalkAction walkToArgumentPre(const Argument &Arg) {
+    return Action::Continue();
+  }
+
+  /// This method is called after visiting an argument in an argument list.
+  ///
+  /// \returns The walking action to perform.
+  ///
+  /// The default implementation returns \c Action::Continue().
+  virtual PostWalkAction walkToArgumentPost(const Argument &Arg) {
+    return Action::Continue();
   }
 
 protected:
