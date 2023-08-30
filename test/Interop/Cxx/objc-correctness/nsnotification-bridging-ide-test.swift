@@ -5,3 +5,4 @@
 // CHECK: import Foundation
 
 // CHECK: let SpaceShipNotification: String
+// CHECK: let CExternNotification: String
