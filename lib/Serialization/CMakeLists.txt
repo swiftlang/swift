@@ -4,7 +4,7 @@ add_swift_host_library(swiftSerialization STATIC
   DeserializeSIL.cpp
   ModuleFile.cpp
   ModuleFileSharedCore.cpp
-  ModuleDependencyScanner.cpp  
+  ScanningLoaders.cpp
   Serialization.cpp
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
@@ -17,6 +17,7 @@ add_swift_host_library(swiftSerialization STATIC
 target_link_libraries(swiftSerialization PRIVATE
   swiftClangImporter
   swiftOption
+  swiftAST
   swiftSIL)
 
 set_swift_llvm_is_available(swiftSerialization)

@@ -366,7 +366,8 @@ public:
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
 
-  /// Whether the dependency scanner invocation should use multiple threads.
+  /// Whether the dependency scanner invocation should resolve imports
+  /// to filesystem modules in parallel.
   bool ParallelDependencyScan = false;
 
   /// When performing an incremental build, ensure that cross-module incremental

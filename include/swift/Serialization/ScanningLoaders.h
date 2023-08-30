@@ -1,9 +1,7 @@
-//===--- ModuleDependencyScanner.h - Import Swift modules --------*- C++
-//-*-===//
-//
+//===--- ScanningLoaders.h - Swift module scanning --------------*- C++ -*-===//
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,111 +9,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SCANNINGLOADERS_H
+#define SWIFT_SCANNINGLOADERS_H
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace swift {
-class DependencyTracker;
-}
-
-namespace swift {
-
-class ModuleDependencyScanningWorker {
-private:
-  ModuleDependencyScanningWorker(SwiftDependencyScanningService &globalScanningService,
-                                 const CompilerInvocation &ScanCompilerInvocation,
-                                 const SILOptions &SILOptions,
-                                 ASTContext &ScanASTContext,
-                                 DependencyTracker &DependencyTracker,
-                                 DiagnosticEngine &diags);
-
-  /// Retrieve the module dependencies for the module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *> scanForModuleDependency(
-      StringRef moduleName, ModuleDependenciesCache &cache,
-      bool optionalDependencyLookup = false, bool isTestableImport = false,
-      llvm::Optional<ModuleDependencyID> dependencyOf = llvm::None);
-
-  /// Retrieve the module dependencies for the Clang module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *>
-  scanForClangModuleDependency(StringRef moduleName,
-                               ModuleDependenciesCache &cache);
-
-  /// Retrieve the module dependencies for the Swift module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *>
-  scanForSwiftModuleDependency(StringRef moduleName,
-                               ModuleDependenciesCache &cache);
-
-
-private:
-  DiagnosticEngine &Diagnostics;
-
-  // An AST delegate for interface scanning
-  std::unique_ptr<InterfaceSubContextDelegateImpl> ScanningASTDelegate;
-  // Clang scanner tool
-  clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
-
-  // Swift and Clang module loaders acting as the corresponding
-  // scanners.
-  std::unique_ptr<ModuleInterfaceLoader> swiftScannerModuleLoader;
-  std::unique_ptr<ClangImporter> clangScannerModuleLoader;
-
-  // Only the parent scanner can use this 
-  friend class ModuleDependencyScanner;
-};
-
-class ModuleDependencyScanner {
-public:
-  ModuleDependencyScanner(SwiftDependencyScanningService &ScanningService,
-                          const CompilerInvocation &ScanCompilerInvocation,
-                          const SILOptions &SILOptions,
-                          ASTContext &ScanASTContext,
-                          DependencyTracker &DependencyTracker,
-                          DiagnosticEngine &diags);
-
-  /// Identify the scanner invocation's main module's dependencies
-  llvm::ErrorOr<ModuleDependencyInfo> getMainModuleDependencyInfo(
-      ModuleDecl *mainModule,
-      llvm::Optional<SwiftDependencyTracker> tracker = llvm::None);
-
-  /// Resolve module dependencies of the given module, direct and transitive.
-  std::vector<ModuleDependencyID>
-  resolveDependencies(ModuleDependencyID moduleID,
-                      ModuleDependenciesCache &cache);
-
-  /// Retrieve the module dependencies for the Clang module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *>
-  scanForClangModuleDependency(StringRef moduleName,
-                               ModuleDependenciesCache &cache);
-
-  /// Retrieve the module dependencies for the Swift module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *>
-  scanForSwiftModuleDependency(StringRef moduleName,
-                               ModuleDependenciesCache &cache);
-
-private:
-  /// Resolve the direct dependencies of the given module.
-  std::vector<ModuleDependencyID>
-  resolveModuleImports(ModuleDependencyID moduleID,
-                       ModuleDependenciesCache &cache);
-
-  /// Identify all cross-import overlay modules of the specified
-  /// dependency set and apply an action for each.
-  void discoverCrossImportOverlayDependencies(
-      StringRef mainModuleName, ArrayRef<ModuleDependencyID> allDependencies,
-      ModuleDependenciesCache &cache,
-      llvm::function_ref<void(ModuleDependencyID)> action);
-
-private:
-  const CompilerInvocation &ScanCompilerInvocation;
-  ASTContext &ScanASTContext;
-  DiagnosticEngine &Diagnostics;
-
-  // For now, the sole worker doing the scanning
-  ModuleDependencyScanningWorker ScanningWorker;
-};
-
 /// A module "loader" that looks for .swiftinterface and .swiftmodule files
 /// for the purpose of determining dependencies, but does not attempt to
 /// load the module files.
@@ -220,3 +122,5 @@ public:
   }
 };
 } // namespace swift
+
+#endif // SWIFT_SCANNINGLOADERS_H

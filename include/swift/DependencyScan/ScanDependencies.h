@@ -61,10 +61,6 @@ llvm::ErrorOr<swiftscan_dependency_graph_t>
 performModuleScan(CompilerInstance &instance,
                   ModuleDependenciesCache &cache);
 
-llvm::ErrorOr<swiftscan_dependency_graph_t>
-performParallelModuleScan(CompilerInstance &instance,
-                          ModuleDependenciesCache &cache);
-
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
 performModulePrescan(CompilerInstance &instance,

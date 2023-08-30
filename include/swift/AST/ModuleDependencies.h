@@ -667,6 +667,9 @@ public:
   /// Whether the dependencies are for a Swift module: either Textual, Source, Binary, or Placeholder.
   bool isSwiftModule() const;
 
+  /// Whether the dependencies are for a textual interface Swift module or a Source Swift module.
+  bool isTextualSwiftModule() const;
+
   /// Whether the dependencies are for a textual Swift module.
   bool isSwiftInterfaceModule() const;
 
@@ -1007,10 +1010,17 @@ public:
 
 public:
   /// Whether we have cached dependency information for the given module.
+  bool hasDependency(const ModuleDependencyID &moduleID) const;
+  /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
                      llvm::Optional<ModuleDependencyKind> kind) const;
+  /// Whether we have cached dependency information for the given module Name.
+  bool hasDependency(StringRef moduleName) const;
 
   SwiftDependencyScanningService &getScanService() {
+    return globalScanningService;
+  }
+  const SwiftDependencyScanningService &getScanService() const {
     return globalScanningService;
   }
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID>& getAlreadySeenClangModules() const {
@@ -1039,6 +1049,12 @@ public:
   llvm::Optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName,
                  llvm::Optional<ModuleDependencyKind> kind) const;
+
+  /// Look for module dependencies for a module with the given name
+  ///
+  /// \returns the cached result, or \c None if there is no cached entry.
+  llvm::Optional<const ModuleDependencyInfo *>
+  findDependency(StringRef moduleName) const;
 
   /// Record dependencies for the given module.
   void recordDependency(StringRef moduleName,
