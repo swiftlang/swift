@@ -156,34 +156,19 @@ public:
     raw_ostream &os = llvm::errs();
     switch (OpKind) {
     case PartitionOpKind::Assign:
-      os.changeColor(llvm::raw_ostream::CYAN, true);
-      os << "assign";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
+      os << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::AssignFresh:
-      os.changeColor(llvm::raw_ostream::GREEN, true);
-      os << "assign_fresh";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << "\n";
+      os << "assign_fresh %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Consume:
-      os.changeColor(llvm::raw_ostream::RED, true);
-      os << "consume";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << "\n";
+      os << "consume %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Merge:
-      os.changeColor(llvm::raw_ostream::BLUE, true);
-      os << "merge";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
+      os << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::Require:
-      os.changeColor(llvm::raw_ostream::YELLOW, true);
-      os << "require";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << "\n";
+      os << "require %%" << OpArgs[0] << "\n";
       break;
     }
   }

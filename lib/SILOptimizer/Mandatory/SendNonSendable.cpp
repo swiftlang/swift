@@ -885,14 +885,10 @@ public:
       //ignored instructions
       return {};
 
-    LLVM_DEBUG(
-        llvm::errs().changeColor(llvm::raw_ostream::MAGENTA, true);
-        llvm::errs() << "warning: ";
-        llvm::errs().resetColor();
-        llvm::errs() << "unhandled instruction kind "
-                     << getSILInstructionName(instruction->getKind())
-                     << "\n";
-    );
+    LLVM_DEBUG(llvm::errs() << "warning: ";
+               llvm::errs()
+               << "unhandled instruction kind "
+               << getSILInstructionName(instruction->getKind()) << "\n";);
 
     return {};
   }
@@ -1427,9 +1423,7 @@ class RaceTracer {
           working.apply(op);
           llvm::dbgs() << "│ ";
           if (working.isConsumed(consumedVal)) {
-            llvm::errs().changeColor(llvm::raw_ostream::RED, true);
             llvm::errs() << "(" << consumedVal << " CONSUMED) ";
-            llvm::errs().resetColor();
           }
           working.dump();
           return true;
