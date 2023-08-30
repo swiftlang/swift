@@ -1239,6 +1239,13 @@ void IRGenModule::emitGlobalLists() {
 // Eagerly emit functions that are externally visible. Functions that are
 // dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
+  // Embedded Swift only emits specialized function, so don't emit genreic
+  // functions, even if they're externally visible.
+  if (f.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      f.getLoweredFunctionType()->getSubstGenericSignature()) {
+    return true;
+  }
+  
   if (f.isPossiblyUsedExternally())
     return false;
 
@@ -1403,6 +1410,18 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    // In embedded Swift, the compiler cannot emit any metadata, etc.
+    assert(LazyTypeMetadata.empty() &&
+           LazySpecializedTypeMetadataRecords.empty() &&
+           LazyTypeContextDescriptors.empty() &&
+           LazyOpaqueTypeDescriptors.empty() &&
+           LazyFunctionDefinitions.empty() &&
+           LazyCanonicalSpecializedMetadataAccessors.empty() &&
+           LazyMetadataAccessors.empty() &&
+           LazyWitnessTables.empty());
+  }
+
   while (!LazyTypeMetadata.empty() ||
          !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
