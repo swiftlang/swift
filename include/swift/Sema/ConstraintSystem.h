@@ -1459,11 +1459,11 @@ public:
 
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
-  llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  std::vector<ConstraintFix *> Fixes;
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
-  llvm::SmallMapVector<ConstraintLocator *, MatchCallArgumentResult, 4>
+  llvm::MapVector<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
 
   /// The set of disjunction choices used to arrive at this solution,
@@ -1486,14 +1486,14 @@ public:
       PackExpansionEnvironments;
 
   /// The pack expansion environment that can open a given pack element.
-  llvm::SmallMapVector<PackElementExpr *, PackExpansionExpr *, 2>
+  llvm::MapVector<PackElementExpr *, PackExpansionExpr *>
       PackEnvironments;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
-  llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
+  llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
 
   /// Implicit value conversions applied for a given locator.
-  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+  std::vector<std::pair<ConstraintLocator *, ConversionRestrictionKind>>
       ImplicitValueConversions;
 
   /// The node -> type mappings introduced by this solution.
@@ -1518,19 +1518,19 @@ public:
 
   /// Maps case label items to information tracked about them as they are
   /// being solved.
-  llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
+  llvm::MapVector<const CaseLabelItem *, CaseLabelItemInfo>
       caseLabelItems;
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
-  llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
+  llvm::MapVector<Expr *, ExprPattern *> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
-  llvm::SmallVector<ParamDecl *, 2> isolatedParams;
+  std::vector<ParamDecl *> isolatedParams;
 
   /// The set of closures that have been inferred to be "isolated by
   /// preconcurrency".
-  llvm::SmallVector<const ClosureExpr *, 2> preconcurrencyClosures;
+  std::vector<const ClosureExpr *> preconcurrencyClosures;
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
