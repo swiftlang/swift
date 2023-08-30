@@ -20,7 +20,7 @@ func function() {
   _ = x
 }
 
-// CHECK-LABEL: (closure_expr
+// CHECK-LABEL: (processed_init=closure_expr
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+3]]
 // CHECK: captures=(x<direct>)
 // CHECK: (var_decl{{.*}}"closure"
@@ -28,7 +28,7 @@ let closure: () -> Void = {
   _ = x
 }
 
-// CHECK-LABEL: (capture_list
+// CHECK-LABEL: (processed_init=capture_list
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+5]]
 // CHECK: (closure_expr
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+3]]

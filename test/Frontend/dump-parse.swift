@@ -58,7 +58,7 @@ enum TrailingSemi {
 // CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" <T : Hashable> interface type='<T where T : Hashable> (T) -> ()' access=internal captures=(<generic> )
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
-// CHECK-AST:         (declref_expr type='(Int) -> ()' location={{.*}} range={{.*}} decl=main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> (substitution T -> Int))] function_ref=unapplied))
+// CHECK-AST:         (processed_init=declref_expr type='(Int) -> ()' location={{.*}} range={{.*}} decl=main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> (substitution T -> Int))] function_ref=unapplied))
 let _: (Int) -> () = generic
 
 // Closures should be marked as escaping or not.
@@ -113,9 +113,8 @@ struct SelfParam {
   // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
   // CHECK-NEXT:    (parameter "self")
   // CHECK-NEXT:    (parameter_list range=[{{.+}}])
-  // CHECK-NEXT:    (result
-  // CHECK-NEXT:      (type_optional
-  // CHECK-NEXT:        (type_ident id='SelfParam' bind=none)))
+  // CHECK-NEXT:    (result=type_optional
+  // CHECK-NEXT:      (type_ident id='SelfParam' bind=none))
   static func createOptional() -> SelfParam? {
 
     // CHECK-LABEL: (call_expr type='<null>'
@@ -127,9 +126,8 @@ struct SelfParam {
 
 // CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
 // CHECK-NEXT:    (parameter_list range=[{{.+}}])
-// CHECK-NEXT:    (result
-// CHECK-NEXT:      (type_member
-// CHECK-NEXT:        (type_ident id='Array' bind=none)
-// CHECK-NEXT:          (type_ident id='Bool' bind=none)
-// CHECK-NEXT:        (type_ident id='Element' bind=none)))
+// CHECK-NEXT:    (result=type_member
+// CHECK-NEXT:      (type_ident id='Array' bind=none)
+// CHECK-NEXT:        (type_ident id='Bool' bind=none)
+// CHECK-NEXT:      (type_ident id='Element' bind=none))
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }

@@ -458,16 +458,6 @@ namespace {
     void printRec(const Pattern *P, StringRef label = "");
     void printRec(Type ty, StringRef label = "");
 
-    template <typename NodeTy>
-    void printRecLabeled(NodeTy *Node, StringRef label) {
-      OS << '\n';
-      Indent += 2;
-      printHead(label, ASTNodeColor);
-      printRec(Node);
-      printFoot();
-      Indent -= 2;
-    }
-
     raw_ostream &printHead(StringRef Name, TerminalColor Color,
                            StringRef Label = "") {
       OS.indent(Indent);
@@ -852,7 +842,7 @@ namespace {
     }
 
     void visitSourceFile(const SourceFile &SF) {
-     printHead("source_file", ASTNodeColor);
+      printHead("source_file", ASTNodeColor);
       PrintWithColorRAII(OS, LocationColor) << " \"" << SF.getFilename() << '\"';
 
       if (auto items = SF.getCachedTopLevelItems()) {
@@ -972,7 +962,7 @@ namespace {
       }
 
       if (auto init = PD->getStructuralDefaultExpr()) {
-        printRecLabeled(init, "expression");
+        printRec(init, "expression");
       }
 
       printFoot();
@@ -1030,16 +1020,10 @@ namespace {
       for (auto idx : range(PBD->getNumPatternEntries())) {
         printRec(PBD->getPattern(idx));
         if (PBD->getOriginalInit(idx)) {
-          OS << '\n';
-          OS.indent(Indent + 2);
-          OS << "Original init:";
-          printRec(PBD->getOriginalInit(idx));
+          printRec(PBD->getOriginalInit(idx), "original_init");
         }
         if (PBD->getInit(idx)) {
-          OS << '\n';
-          OS.indent(Indent + 2);
-          OS << "Processed init:";
-          printRec(PBD->getInit(idx));
+          printRec(PBD->getInit(idx), "processed_init");
         }
       }
       printFoot();
@@ -1132,16 +1116,9 @@ namespace {
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getResultTypeRepr()) {
-          OS << '\n';
-          Indent += 2;
-          printHead("result", DeclColor);
-          printRec(FD->getResultTypeRepr());
-          printFoot();
+          printRec(FD->getResultTypeRepr(), "result");
           if (auto opaque = FD->getOpaqueResultTypeDecl()) {
-            OS << '\n';
-            printHead("opaque_result_decl", DeclColor) << '\n';
-            printRec(opaque);
-            printFoot();
+            printRec(opaque, "opaque_result_decl");
           }
           Indent -= 2;
         }
@@ -1693,12 +1670,7 @@ public:
     printCommon(S, "for_each_stmt", label);
     printRec(S->getPattern());
     if (S->getWhere()) {
-      OS << '\n';
-      Indent += 2;
-      printHead("where", ASTNodeColor);
-      printRec(S->getWhere());
-      printFoot();
-      Indent -= 2;
+      printRec(S->getWhere(), "where");
     }
     printRec(S->getParsedSequence());
     if (S->getIteratorVar()) {
@@ -1882,7 +1854,7 @@ public:
       return;
     }
     
-    printRecLabeled(semanticExpr, "semantic_expr");
+    printRec(semanticExpr, "semantic_expr");
   }
 
   void visitErrorExpr(ErrorExpr *E, StringRef label) {
@@ -2336,10 +2308,10 @@ public:
     printCommon(E, "collection_upcast_expr", label);
     printRec(E->getSubExpr());
     if (auto keyConversion = E->getKeyConversion()) {
-      printRecLabeled(keyConversion.Conversion, "key_conversion");
+      printRec(keyConversion.Conversion, "key_conversion");
     }
     if (auto valueConversion = E->getValueConversion()) {
-      printRecLabeled(valueConversion.Conversion, "value_conversion");
+      printRec(valueConversion.Conversion, "value_conversion");
     }
     printFoot();
   }
@@ -2883,14 +2855,14 @@ public:
     Indent -= 2;
 
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
-      printRecLabeled(stringLiteral, "objc_string_literal");
+      printRec(stringLiteral, "objc_string_literal");
     }
     if (!E->isObjC()) {
       if (auto root = E->getParsedRoot()) {
-        printRecLabeled(root, "parsed_root");
+        printRec(root, "parsed_root");
       }
       if (auto path = E->getParsedPath()) {
-        printRecLabeled(path, "parsed_path");
+        printRec(path, "parsed_path");
       }
     }
     printFoot();
@@ -2926,11 +2898,11 @@ public:
     printCommon(E, "type_join_expr", label);
 
     if (auto *var = E->getVar()) {
-      printRecLabeled(var, "var");
+      printRec(var, "var");
     }
 
     if (auto *SVE = E->getSingleValueStmtExpr()) {
-      printRecLabeled(SVE, "single_value_stmt_expr");
+      printRec(SVE, "single_value_stmt_expr");
     }
 
     for (auto *member : E->getElements()) {
@@ -2950,7 +2922,7 @@ public:
       printArgumentList(E->getArgs());
     }
     if (auto rewritten = E->getRewritten()) {
-      printRecLabeled(rewritten, "rewritten");
+      printRec(rewritten, "rewritten");
     }
     printFoot();
   }
