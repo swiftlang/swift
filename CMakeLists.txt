@@ -800,6 +800,7 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
 include(AddPureSwift)
+include(SetRPATH)
 
 # Configure swift include, install, build components.
 swift_configure_components()
@@ -958,6 +959,12 @@ if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
   else()
     set(SWIFT_SWIFT_PARSER TRUE)
     include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
+
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+      # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
+      message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
+      set(BOOTSTRAPPING_MODE "HOSTTOOLS")
+    endif()
   endif()
 endif()
 
