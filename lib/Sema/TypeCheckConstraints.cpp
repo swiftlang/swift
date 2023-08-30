@@ -307,7 +307,11 @@ public:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
+    // We skip out-of-place expr checking here since we've already performed it.
+    performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ llvm::None,
+                                    /*isExprStmt=*/false,
+                                    /*disableAvailabilityChecking*/ false,
+                                    /*disableOutOfPlaceExprChecking*/ true);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
@@ -354,8 +358,9 @@ void constraints::performSyntacticDiagnosticsForTarget(
   switch (target.kind) {
   case SyntacticElementTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
-    performSyntacticExprDiagnostics(target.getAsExpr(), dc,
-                                    isExprStmt, disableExprAvailabilityChecking);
+    performSyntacticExprDiagnostics(
+        target.getAsExpr(), dc, target.getExprContextualTypePurpose(),
+        isExprStmt, disableExprAvailabilityChecking);
     return;
   }
 
@@ -364,17 +369,25 @@ void constraints::performSyntacticDiagnosticsForTarget(
 
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
-                                    isExprStmt,
+                                    CTP_ForEachSequence, isExprStmt,
                                     disableExprAvailabilityChecking);
 
     if (auto *whereExpr = stmt->getWhere())
-      performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
+      performSyntacticExprDiagnostics(whereExpr, dc, CTP_Condition,
+                                      /*isExprStmt*/ false);
     return;
   }
 
   case SyntacticElementTarget::Kind::function: {
+    // Check for out of place expressions. This needs to be done on the entire
+    // function body rather than on individual expressions since we need the
+    // context of the parent nodes.
+    auto *body = target.getFunctionBody();
+    diagnoseOutOfPlaceExprs(dc->getASTContext(), body,
+                            /*contextualPurpose*/ llvm::None);
+
     FunctionSyntacticDiagnosticWalker walker(dc);
-    target.getFunctionBody()->walk(walker);
+    body->walk(walker);
     return;
   }
   case SyntacticElementTarget::Kind::closure:
