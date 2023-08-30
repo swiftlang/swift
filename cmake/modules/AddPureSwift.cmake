@@ -66,7 +66,7 @@ function(_add_host_swift_compile_options name)
 endfunction()
 
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     # Don't add builder's stdlib RPATH automatically.
     target_compile_options(${name} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-no-toolchain-stdlib-rpath>
@@ -291,7 +291,7 @@ function(add_pure_swift_host_tool name)
     set_property(TARGET ${name}
       APPEND PROPERTY INSTALL_RPATH
         "@executable_path/../lib/swift/host")
-  else()
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     set_property(TARGET ${name}
       APPEND PROPERTY INSTALL_RPATH
         "$ORIGIN/../lib/swift/host")

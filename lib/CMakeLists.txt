@@ -57,7 +57,7 @@ if (SWIFT_SWIFT_PARSER)
   # be found via RPATH.
   foreach (sharedlib ${SWIFT_SYNTAX_SHARED_LIBRARIES})
     set(add_origin_rpath)
-    if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
       # At runtime, use swiftCore in the current toolchain.
       swift_get_set_rpath_script_file(setrpath_command)
       set(add_origin_rpath COMMAND ${CMAKE_COMMAND}
