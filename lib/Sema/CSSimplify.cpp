@@ -8577,7 +8577,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
           if (auto *protocolDecl =
                   memberRef->getDeclContext()->getSelfProtocolDecl()) {
-            auto selfTy = protocolDecl->getProtocolSelfType();
+            auto selfTy = protocolDecl->getSelfInterfaceType();
             if (selfTy->isEqual(requirement.getFirstType())) {
               auto *fix = AllowInvalidStaticMemberRefOnProtocolMetatype::create(
                 *this, memberLoc);

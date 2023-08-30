@@ -1444,7 +1444,7 @@ struct RequirementPrintLocation {
 /// callers check if the location is the ATD.
 static RequirementPrintLocation
 bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
-  auto protoSelf = proto->getProtocolSelfType();
+  auto protoSelf = proto->getSelfInterfaceType();
   // Returns the most relevant decl within proto connected to outerType (or null
   // if one doesn't exist), and whether the type is an "direct use",
   // i.e. outerType itself is Self or Self.T, but not, say, Self.T.U, or
@@ -1535,14 +1535,13 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
                                                       Decl *attachingTo) {
   printGenericSignature(
-      GenericSignature::get({proto->getProtocolSelfType()} ,
-                            proto->getRequirementSignature().getRequirements()),
+      proto->getRequirementSignatureAsGenericSignature(),
       PrintInherited,
       [&](const Requirement &req) {
         // Skip the inferred 'Self : AnyObject' constraint if this is an
         // @objc protocol.
         if ((req.getKind() == RequirementKind::Layout) &&
-            req.getFirstType()->isEqual(proto->getProtocolSelfType()) &&
+            req.getFirstType()->isEqual(proto->getSelfInterfaceType()) &&
             req.getLayoutConstraint()->getKind() ==
                 LayoutConstraintKind::Class &&
             proto->isObjC()) {
@@ -1560,8 +1559,7 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
   if (isa<AssociatedTypeDecl>(attachingTo))
     flags |= SwapSelfAndDependentMemberType;
   printGenericSignature(
-      GenericSignature::get({proto->getProtocolSelfType()} ,
-                            proto->getRequirementSignature().getRequirements()),
+      proto->getRequirementSignatureAsGenericSignature(),
       flags,
       [&](const Requirement &req) {
         auto location = bestRequirementPrintLocation(proto, req);

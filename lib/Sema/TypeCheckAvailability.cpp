@@ -4044,7 +4044,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     if (!depTy && !replacementTy)
       return;
 
-    Type selfTy = rootConf->getProtocol()->getProtocolSelfType();
+    Type selfTy = rootConf->getProtocol()->getSelfInterfaceType();
     if (!depTy->isEqual(selfTy)) {
       auto &ctx = DC->getASTContext();
       ctx.Diags.diagnose(

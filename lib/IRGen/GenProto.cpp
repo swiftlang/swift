@@ -1832,7 +1832,7 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
       const auto &witness = entry.getBaseProtocolWitness();
       auto baseProto = witness.Requirement;
       auto proto = SILWT->getProtocol();
-      CanType selfType = proto->getProtocolSelfType()->getCanonicalType();
+      CanType selfType = proto->getSelfInterfaceType()->getCanonicalType();
       AssociatedConformance requirement(proto, selfType, baseProto);
       ProtocolConformanceRef inheritedConformance =
         ConformanceInContext.getAssociatedConformance(selfType, baseProto);
