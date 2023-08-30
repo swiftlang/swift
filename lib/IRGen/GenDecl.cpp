@@ -1412,14 +1412,14 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
-    assert(LazyTypeMetadata.empty() &&
-           LazySpecializedTypeMetadataRecords.empty() &&
-           LazyTypeContextDescriptors.empty() &&
-           LazyOpaqueTypeDescriptors.empty() &&
-           LazyFunctionDefinitions.empty() &&
-           LazyCanonicalSpecializedMetadataAccessors.empty() &&
-           LazyMetadataAccessors.empty() &&
-           LazyWitnessTables.empty());
+    LazyTypeMetadata.clear();
+    LazySpecializedTypeMetadataRecords.clear();
+    LazyTypeContextDescriptors.clear();
+    LazyOpaqueTypeDescriptors.clear();
+    LazyFunctionDefinitions.clear();
+    LazyCanonicalSpecializedMetadataAccessors.clear();
+    LazyMetadataAccessors.clear();
+    LazyWitnessTables.clear();
   }
 
   while (!LazyTypeMetadata.empty() ||
