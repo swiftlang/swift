@@ -1035,7 +1035,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // in the arguments as well.
   // FIXME: We need the Swift equivalent of Clang's FileEntry.
   std::string bufferIdentifier = resolveSymbolicLinks(
-      UnresolvedInputFile->getBufferIdentifier(), FileSystem.get());
+      UnresolvedInputFile->getBufferIdentifier(), *FileSystem);
 
   // Create a buffer for code completion. This contains '\0' at 'Offset'
   // position of 'UnresolvedInputFile' buffer.

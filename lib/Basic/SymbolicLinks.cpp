@@ -18,10 +18,10 @@ using namespace llvm;
 
 static std::error_code resolveSymbolicLinks(
     StringRef InputPath,
-    llvm::vfs::FileSystem *FileSystem,
+    llvm::vfs::FileSystem &FileSystem,
     SmallVectorImpl<char> &Result) {
 
-  if (auto ErrorCode = FileSystem->getRealPath(InputPath, Result)) {
+  if (auto ErrorCode = FileSystem.getRealPath(InputPath, Result)) {
     return ErrorCode;
   }
 
@@ -31,7 +31,7 @@ static std::error_code resolveSymbolicLinks(
 
   // For Windows paths, make sure we didn't resolve across drives.
   SmallString<128> AbsPathBuf = InputPath;
-  if (auto ErrorCode = FileSystem->makeAbsolute(AbsPathBuf)) {
+  if (auto ErrorCode = FileSystem.makeAbsolute(AbsPathBuf)) {
     // We can't guarantee that the real path preserves the drive
     return ErrorCode;
   }
@@ -52,8 +52,8 @@ static std::error_code resolveSymbolicLinks(
 
 std::string swift::resolveSymbolicLinks(
   StringRef InputPath,
-  llvm::vfs::FileSystem *FileSystem,
-  std::optional<llvm::sys::path::Style> Style) {
+  llvm::vfs::FileSystem &FileSystem,
+  llvm::Optional<llvm::sys::path::Style> Style) {
 
   llvm::SmallString<128> OutputPathBuf;
   if (::resolveSymbolicLinks(InputPath, FileSystem, OutputPathBuf)) {

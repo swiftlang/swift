@@ -143,15 +143,19 @@ class SwiftEditorDocumentFileMap {
 
 public:
   bool getOrUpdate(StringRef FilePath,
+                   llvm::vfs::FileSystem &FileSystem,
                    SwiftLangSupport &LangSupport,
                    SwiftEditorDocumentRef &EditorDoc);
+
   /// Looks up the document only by the path name that was given initially.
   SwiftEditorDocumentRef getByUnresolvedName(StringRef FilePath);
+
   /// Looks up the document, resolving symlinks in paths if a filesystem
-  /// is provided, and otherwise assuming prior canonicalization.
+  /// is provided, and otherwise assumes prior canonicalization.
   SwiftEditorDocumentRef
   findByPath(StringRef FilePath,
              llvm::vfs::FileSystem *FileSystem = nullptr);
+
   SwiftEditorDocumentRef remove(StringRef FilePath);
 };
 

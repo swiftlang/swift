@@ -310,7 +310,7 @@ SwiftEditorDocumentFileMap::findByPath(StringRef FilePath,
 
   std::string Scratch;
   if (FileSystem) {
-    Scratch = resolveSymbolicLinks(FilePath, FileSystem);
+    Scratch = resolveSymbolicLinks(FilePath, *FileSystem);
     FilePath = Scratch;
   }
   Queue.dispatchSync([&]{
@@ -327,13 +327,12 @@ SwiftEditorDocumentFileMap::findByPath(StringRef FilePath,
 }
 
 bool SwiftEditorDocumentFileMap::getOrUpdate(
-    StringRef FilePath, SwiftLangSupport &LangSupport,
-    SwiftEditorDocumentRef &EditorDoc) {
+    StringRef FilePath, llvm::vfs::FileSystem &FileSystem,
+    SwiftLangSupport &LangSupport, SwiftEditorDocumentRef &EditorDoc) {
 
   bool found = false;
 
-  std::string ResolvedPath = resolveSymbolicLinks(FilePath,
-      llvm::vfs::getRealFileSystem().get());
+  std::string ResolvedPath = resolveSymbolicLinks(FilePath, FileSystem);
   Queue.dispatchBarrierSync([&]{
     DocInfo &Doc = Docs[FilePath];
     if (!Doc.DocRef) {
@@ -2398,7 +2397,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
     Snapshot = EditorDoc->initializeText(
         Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->resetSyntaxInfo(Snapshot, *this);
-    if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
+    if (EditorDocuments->getOrUpdate(Name, *fileSystem, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);

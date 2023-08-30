@@ -1495,8 +1495,7 @@ public:
     // blocked waiting on the AST to be fully typechecked.
 
     ImmutableTextSnapshotRef InputSnap;
-    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(
-            PrimaryFilePath))
+    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(PrimaryFilePath))
       InputSnap = EditorDoc->getLatestSnapshot();
     if (!InputSnap)
       return false;
@@ -1556,7 +1555,7 @@ static SourceFile *retrieveInputFile(StringRef inputBufferName,
     if (haveRealPath)
       return nullptr;
     std::string realPath = resolveSymbolicLinks(inputBufferName,
-        &CI.getFileSystem());
+        CI.getFileSystem());
     return retrieveInputFile(realPath, CI, /*haveRealPath=*/true);
   }
 
@@ -2120,7 +2119,7 @@ void SwiftLangSupport::getCursorInfo(
   if (InputBufferName.empty() && Length == 0) {
     std::string InputFileError;
     std::string RealInputFilePath = resolveSymbolicLinks(PrimaryFilePath,
-        fileSystem.get());
+        *fileSystem);
     InputBuffer =
         std::shared_ptr<llvm::MemoryBuffer>(getASTManager()->getMemoryBuffer(
             RealInputFilePath, fileSystem, InputFileError));

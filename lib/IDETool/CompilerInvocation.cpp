@@ -79,23 +79,22 @@ static std::string adjustClangTriple(StringRef TripleStr) {
 }
 
 static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
-    FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
+    FrontendInputsAndOutputs &inputsAndOutputs,
+    StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
   assert(FileSystem);
 
   std::string PrimaryFile = resolveSymbolicLinks(
-      UnresolvedPrimaryFile, FileSystem.get());
+      UnresolvedPrimaryFile, *FileSystem);
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    std::string newFilename = resolveSymbolicLinks(
-        input.getFileName(),
-        FileSystem.get(),
-        llvm::sys::path::Style::native);
+    std::string newFilename = resolveSymbolicLinks(input.getFileName(),
+        *FileSystem, llvm::sys::path::Style::native);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {

@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_SYMBOLICLINKS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <string>
@@ -23,10 +24,13 @@ namespace swift {
 
 /// Tries to resolve symbolic links in a given path, but preserves
 /// substitute drives on Windows to avoid MAX_PATH issues.
-/// On failure, returns the original path.
+/// \param InputPath The path to be resolved.
+/// \param FileSystem The FileSystem for resolving the path.
+/// \param Style An optional path style to honor in the return value.
+/// \returns The resolved path, or the original path on failure. 
 std::string resolveSymbolicLinks(llvm::StringRef InputPath,
-    llvm::vfs::FileSystem *FileSystem,
-    std::optional<llvm::sys::path::Style> Style = std::nullopt);
+    llvm::vfs::FileSystem &FileSystem,
+    llvm::Optional<llvm::sys::path::Style> Style = llvm::None);
 
 } // namespace swift
 
