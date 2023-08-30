@@ -47,6 +47,10 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
 
 Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
                                       ASTNode Node) {
+  if (auto ContextualType = S.getContextualType(Node)) {
+    return ContextualType;
+  }
+
   if (!S.hasType(Node)) {
     assert(false && "Expression wasn't type checked?");
     return nullptr;
@@ -59,9 +63,6 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
   } else {
     Result = S.getResolvedType(Node);
   }
-
-  if (!Result || Result->is<UnresolvedType>())
-    Result = S.getContextualType(Node);
 
   if (Result && Result->is<UnresolvedType>()) {
     Result = Type();

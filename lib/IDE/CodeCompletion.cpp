@@ -890,6 +890,25 @@ static void addObserverKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "didSet", CodeCompletionKeywordKind::None);
 }
 
+static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *DC) {
+  // `return nil` is not actually represented as a `ReturnExpr` in the AST but
+  // gets translated to a `FailStmt`. We thus can't produce the 'nil' completion
+  // using the solver-based implementation. Add the result manually.
+  if (auto ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl())) {
+    if (ctor->isFailable()) {
+      CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
+                                          SemanticContextKind::None);
+      Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
+      Builder.addKeyword("nil");
+      Builder.addTypeAnnotation(ctor->getResultInterfaceType(), {});
+      Builder.setResultTypes(ctor->getResultInterfaceType());
+      ExpectedTypeContext TypeContext;
+      TypeContext.setPossibleTypes({ctor->getResultInterfaceType()});
+      Builder.setTypeContext(TypeContext, DC);
+    }
+  }
+}
+
 void swift::ide::addExprKeywords(CodeCompletionResultSink &Sink,
                                  DeclContext *DC) {
   // Expression is invalid at top-level of non-script files.
@@ -1026,6 +1045,8 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
 
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
+    addKeywordsAfterReturn(Sink, CurDeclContext);
+    LLVM_FALLTHROUGH;
   case CompletionKind::YieldStmtExpr:
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink, CurDeclContext);
@@ -1533,7 +1554,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning:
-  case CompletionKind::StmtOrExpr: {
+  case CompletionKind::StmtOrExpr: 
+  case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr: {
     assert(CurDeclContext);
 
     bool AddUnresolvedMemberCompletions =
@@ -1705,6 +1728,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::PostfixExprParen:
   case CompletionKind::PostfixExpr:
+  case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr:
     llvm_unreachable("should be already handled");
     return;
 
@@ -1950,29 +1975,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
         Lookup.getPostfixKeywordCompletions(resultTy, analyzedExpr);
       }
     }
-    break;
-  }
-
-  case CompletionKind::ReturnStmtExpr : {
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    SmallVector<Type, 2> possibleReturnTypes;
-    collectPossibleReturnTypesFromContext(CurDeclContext, possibleReturnTypes);
-    Lookup.setExpectedTypes(possibleReturnTypes,
-                            /*isImplicitSingleExpressionReturn*/ false);
-    Lookup.getValueCompletionsInDeclContext(Loc);
-    break;
-  }
-
-  case CompletionKind::YieldStmtExpr: {
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    if (auto FD = dyn_cast<AccessorDecl>(CurDeclContext)) {
-      if (FD->isCoroutine()) {
-        // TODO: handle multi-value yields.
-        Lookup.setExpectedTypes(FD->getStorage()->getValueInterfaceType(),
-                                /*isImplicitSingleExpressionReturn*/ false);
-      }
-    }
-    Lookup.getValueCompletionsInDeclContext(Loc);
     break;
   }
 
