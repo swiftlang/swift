@@ -1407,6 +1407,7 @@ function Build-DocC() {
 
 function Build-Installer() {
   $Properties = @{
+    BundleFlavor = "offline";
     DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
     INCLUDE_SWIFT_FORMAT = "true";
