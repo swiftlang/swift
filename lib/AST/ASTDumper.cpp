@@ -354,62 +354,6 @@ static StringRef getDumpString(ValueOwnership ownership) {
   llvm_unreachable("Unhandled ValueOwnership in switch.");
 }
 
-static void printArgument(raw_ostream &OS, const Argument &arg,
-                          unsigned indentLevel,
-                          std::function<void(Expr *)> printRec) {
-  OS.indent(indentLevel);
-  PrintWithColorRAII(OS, ParenthesisColor) << '(';
-  PrintWithColorRAII(OS, ExprColor) << "argument";
-
-  auto label = arg.getLabel();
-  if (!label.empty()) {
-    PrintWithColorRAII(OS, ArgumentsColor) << " label=";
-    PrintWithColorRAII(OS, ArgumentsColor) << label.str();
-  }
-  if (arg.isInOut())
-    PrintWithColorRAII(OS, ArgModifierColor) << " inout";
-
-  printRec(arg.getExpr());
-  PrintWithColorRAII(OS, ParenthesisColor) << ')';
-}
-
-static void printArgumentList(raw_ostream &OS,
-                              const ArgumentList *argList,
-                              unsigned &indentLevel,
-                              std::function<void(Expr *)> printRec,
-                              bool indent = true) {
-  if (indent)
-    indentLevel += 2;
-
-  OS.indent(indentLevel);
-  PrintWithColorRAII(OS, ParenthesisColor) << '(';
-  PrintWithColorRAII(OS, ExprColor) << "argument_list";
-
-  if (argList->isImplicit())
-    PrintWithColorRAII(OS, ArgModifierColor) << " implicit";
-
-  if (argList->hasAnyArgumentLabels()) {
-    PrintWithColorRAII(OS, ArgumentsColor) << " labels=";
-    for (auto arg : *argList) {
-      auto label = arg.getLabel();
-      PrintWithColorRAII(OS, ArgumentsColor)
-      << (label.empty() ? "_" : label.str()) << ":";
-    }
-  }
-
-  indentLevel += 2;
-  for (auto arg : *argList) {
-    OS << '\n';
-    printArgument(OS, arg, indentLevel, printRec);
-  }
-  indentLevel -= 2;
-
-  PrintWithColorRAII(OS, ParenthesisColor) << ')';
-
-  if (indent)
-    indentLevel -= 2;
-}
-
 //===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//
@@ -555,6 +499,78 @@ public:
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
       return OS;
     }
+
+  void visitArgument(const Argument &arg) {
+    OS << '\n';
+    printHead("argument", ExprColor);
+
+    auto label = arg.getLabel();
+    if (!label.empty()) {
+      PrintWithColorRAII(OS, ArgumentsColor) << " label=";
+      PrintWithColorRAII(OS, ArgumentsColor) << label.str();
+    }
+    if (arg.isInOut())
+      PrintWithColorRAII(OS, ArgModifierColor) << " inout";
+
+    printRec(arg.getExpr());
+    printFoot();
+  }
+
+  void printRec(const ArgumentList *argList, StringRef label = "") {
+    OS << '\n';
+    Indent += 2;
+    visitArgumentList(argList, label);
+    Indent -= 2;
+  }
+
+  void visitArgumentList(const ArgumentList *argList, StringRef label = "") {
+    printHead("argument_list", ExprColor, label);
+
+    if (argList->isImplicit())
+      PrintWithColorRAII(OS, ArgModifierColor) << " implicit";
+
+    if (argList->hasAnyArgumentLabels()) {
+      PrintWithColorRAII(OS, ArgumentsColor) << " labels=";
+      for (auto arg : *argList) {
+        auto label = arg.getLabel();
+        PrintWithColorRAII(OS, ArgumentsColor)
+            << (label.empty() ? "_" : label.str()) << ":";
+      }
+    }
+
+    Indent += 2;
+    for (auto arg : *argList) {
+      visitArgument(arg);
+    }
+    Indent -= 2;
+
+    printFoot();
+  }
+
+  void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
+    printHead("parameter_list", ParameterColor);
+
+    if (!ctx && params->size() != 0 && params->get(0))
+      ctx = &params->get(0)->getASTContext();
+
+    if (ctx) {
+      printSourceRange(OS, params->getSourceRange(), *ctx);
+    }
+
+    for (auto P : *params) {
+      printRec(const_cast<ParamDecl *>(P));
+    }
+
+    printFoot();
+  }
+
+  void printRec(const ParameterList *params, const ASTContext *ctx = nullptr) {
+    Indent += 2;
+    OS << '\n';
+    printParameterList(params, ctx);
+    Indent -= 2;
+  }
+
   };
 
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef>,
@@ -1064,10 +1080,7 @@ public:
     void visitEnumElementDecl(EnumElementDecl *EED, StringRef label) {
       printCommon(EED, "enum_element_decl", label);
       if (auto *paramList = EED->getParameterList()) {
-        Indent += 2;
-        OS << "\n";
-        printParameterList(paramList);
-        Indent -= 2;
+        printRec(paramList);
       }
       printFoot();
     }
@@ -1160,39 +1173,11 @@ public:
       }
     }
 
-    void printParameter(const ParamDecl *P) {
-      OS << '\n';
-      visitParamDecl(const_cast<ParamDecl *>(P), "");
-    }
-
-    void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
-      printHead("parameter_list", ParameterColor);
-
-      if (!ctx && params->size() != 0 && params->get(0))
-        ctx = &params->get(0)->getASTContext();
-
-      if (ctx) {
-        printSourceRange(OS, params->getSourceRange(), *ctx);
-      }
-
-      Indent += 2;
-      for (auto P : *params) {
-        printParameter(P);
-      }
-      Indent -= 2;
-
-      printFoot();
-    }
-
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
-      Indent += 2;
       if (auto *P = D->getImplicitSelfDecl()) {
-        printParameter(P);
+        printRec(P);
       }
-
-      OS << '\n';
-      printParameterList(D->getParameters(), &D->getASTContext());
-      Indent -= 2;
+      printRec(D->getParameters(), &D->getASTContext());
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getResultTypeRepr()) {
@@ -1200,7 +1185,6 @@ public:
           if (auto opaque = FD->getOpaqueResultTypeDecl()) {
             printRec(opaque, "opaque_result_decl");
           }
-          Indent -= 2;
         }
       }
 
@@ -1370,9 +1354,7 @@ public:
     void visitMacroExpansionDecl(MacroExpansionDecl *MED, StringRef label) {
       printCommon(MED, "macro_expansion_decl ", label);
       OS << MED->getMacroName();
-      OS << '\n';
-      printArgumentList(OS, MED->getArgs(), Indent,
-                        [&](Expr *E) { printRec(E); });
+      printRec(MED->getArgs());
       printFoot();
     }
   };
@@ -1380,11 +1362,11 @@ public:
 
 void ParameterList::dump() const {
   dump(llvm::errs(), 0);
+  llvm::errs() << '\n';
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
   PrintDecl(OS, Indent).printParameterList(this);
-  llvm::errs() << '\n';
 }
 
 void Decl::dump() const {
@@ -1989,8 +1971,7 @@ public:
       << " kind='" << getDumpString(E->getLiteralKind()) << "'";
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
     E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    OS << "\n";
-    printArgumentList(E->getArgs());
+    printRec(E->getArgs());
     printFoot();
   }
 
@@ -2185,8 +2166,7 @@ public:
       printDeclRef(E->getDecl());
     }
     printRec(E->getBase());
-    OS << '\n';
-    printArgumentList(E->getArgs());
+    printRec(E->getArgs());
     printFoot();
   }
   void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, StringRef label) {
@@ -2200,8 +2180,7 @@ public:
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMember());
     printRec(E->getBase());
-    OS << '\n';
-    printArgumentList(E->getArgs());
+    printRec(E->getArgs());
     printFoot();
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E, StringRef label) {
@@ -2519,8 +2498,7 @@ public:
       PrintWithColorRAII(OS, ClosureModifierColor) << " inherits-actor-context";
 
     if (E->getParameters()) {
-      OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
+      printRec(E->getParameters(), &E->getASTContext());
     }
 
     printRec(E->getBody(), &E->getASTContext());
@@ -2530,8 +2508,7 @@ public:
     printClosure(E, "autoclosure_expr", label);
 
     if (E->getParameters()) {
-      OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
+      printRec(E->getParameters(), &E->getASTContext());
     }
 
     printRec(E->getSingleExpressionBody());
@@ -2573,11 +2550,6 @@ public:
     printFoot();
   }
 
-  void printArgumentList(const ArgumentList *argList, bool indent = true) {
-    ::printArgumentList(OS, argList, Indent, [&](Expr *E) { printRec(E); },
-                        indent);
-  }
-
   void printApplyExpr(ApplyExpr *E, const char *NodeName, StringRef label) {
     printCommon(E, NodeName, label);
     if (E->isThrowsSet()) {
@@ -2604,8 +2576,7 @@ public:
           << "none";
     }
     printRec(E->getFn());
-    OS << '\n';
-    printArgumentList(E->getArgs());
+    printRec(E->getArgs());
     printFoot();
   }
 
@@ -2838,8 +2809,7 @@ public:
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
       if (auto *args = component.getSubscriptArgs()) {
-        OS << '\n';
-        printArgumentList(args);
+        printRec(args);
       }
       printFoot();
     }
@@ -2911,8 +2881,7 @@ public:
     PrintWithColorRAII(OS, DiscriminatorColor)
       << " discriminator=" << E->getRawDiscriminator();
     if (E->getArgs()) {
-      OS << '\n';
-      printArgumentList(E->getArgs());
+      printRec(E->getArgs());
     }
     if (auto rewritten = E->getRewritten()) {
       printRec(rewritten, "rewritten");
@@ -2953,17 +2922,11 @@ void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 
 void ArgumentList::dump() const {
   dump(llvm::errs(), 0);
+  llvm::errs() << '\n';
 }
 
 void ArgumentList::dump(raw_ostream &OS, unsigned Indent) const {
-  auto getTypeOfExpr = [](Expr *E) -> Type { return E->getType(); };
-  auto getTypeOfKeyPathComponent = [](KeyPathExpr *E, unsigned index) -> Type {
-    return E->getComponents()[index].getComponentType();
-  };
-  PrintExpr printer(OS, Indent, getTypeOfExpr, /*getTypeOfTypeRepr*/ nullptr,
-                    getTypeOfKeyPathComponent);
-  printer.printArgumentList(this, /*indent*/ false);
-  llvm::errs() << '\n';
+  PrintBase(OS, Indent).visitArgumentList(this);
 }
 
 //===----------------------------------------------------------------------===//
