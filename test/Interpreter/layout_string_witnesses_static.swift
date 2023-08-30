@@ -12,6 +12,8 @@
 
 // REQUIRES: executable_test
 
+// Requires runtime functions added in Swift 5.9.
+// UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
 import Swift
