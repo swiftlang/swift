@@ -27,6 +27,43 @@
 namespace swift {
 namespace Lowering {
 
+/// A reference to a generator suitable for handling pack inputs.
+/// Has the same basic liveness characteristics as SimpleGeneratorRef.
+class PackGeneratorRef {
+  struct VTable {
+    ManagedValue (*claimNext)(void *impl);
+    void (*finishCurrent)(void *impl, ManagedValue packAddr);
+  };
+
+  template <class Impl>
+  struct VTableImpl {
+    static constexpr VTable vtable = {
+      [](void *impl) {
+        return static_cast<Impl*>(impl)->claimNext();
+      },
+      [](void *impl, ManagedValue packAddr) {
+        static_cast<Impl*>(impl)->finishCurrent(packAddr);
+      }
+    };
+  };
+
+  void *pointer;
+  const VTable *vtable;
+public:
+  template <class G>
+  PackGeneratorRef(G &generator,
+    std::enable_if_t<!std::is_same_v<std::remove_const_t<G>, PackGeneratorRef>,
+                     bool> = false)
+    : pointer(&generator), vtable(&VTableImpl<G>::vtable) {}
+
+  ManagedValue claimNext() {
+    return vtable->claimNext(pointer);
+  }
+  void finishCurrent(ManagedValue packAddr) {
+    vtable->finishCurrent(pointer, packAddr);
+  }
+};
+
 /// A generator for destructuring a tuple type that is recursively
 /// expanded in some sequence.  In SIL, this sort of expansion
 /// happens in both function parameters and function results.
@@ -48,7 +85,7 @@ namespace Lowering {
 /// reaches them.
 class ExpandedTupleInputGenerator {
   const ASTContext &ctx;
-  SimpleGeneratorRef<ManagedValue> packInputs;
+  PackGeneratorRef packInputs;
   TupleElementGenerator origElt;
 
   /// If origElt.isPackExpansion(), this is the pack currently
@@ -82,10 +119,22 @@ class ExpandedTupleInputGenerator {
       if (substEltIndex != origElt.getSubstTypes().size())
         return;
 
-      // Otherwise, advance, and ready the next orig element if we
-      // didn't finish.
+      // Otherwise, we need to advance and ready the next orig element.
+
+      // If the current orig element is a pack expansion, tell the
+      // pack generator about the completed pack value.
+      if (origElt.isOrigPackExpansion()) {
+        assert(packValue.isValid());
+        packInputs.finishCurrent(packValue);
+      }
+
+      // Advance to the next orig element.  If we're out of elements,
+      // we're done.
       origElt.advance();
       if (origElt.isFinished()) return;
+
+      // Ready the next orig element, which may include generating a pack
+      // value.
       readyOrigElement();
     }
   }
@@ -110,12 +159,14 @@ class ExpandedTupleInputGenerator {
 
   void updatePackValue(ManagedValue newPackValue) {
     assert(isOrigPackExpansion());
+    assert(packValue.isValid());
+    assert(newPackValue.isValid());
     packValue = newPackValue;
   }
 
 public:
   ExpandedTupleInputGenerator(const ASTContext &ctx,
-                              SimpleGeneratorRef<ManagedValue> inputs,
+                              PackGeneratorRef inputs,
                               AbstractionPattern origTupleType,
                               CanType substType)
     : ctx(ctx), packInputs(inputs), origElt(origTupleType, substType) {
@@ -174,6 +225,11 @@ public:
     return formalPackType;
   }
 
+  SILType getPackComponentType() const {
+    assert(isOrigPackExpansion());
+    return packValue.getType().getPackElementType(getPackComponentIndex());
+  }
+
   /// Given that we just processed an input, advance to the next,
   /// if there is on.
   ///
@@ -210,6 +266,17 @@ public:
   /// be used for *inner* types.  If the pack is an input you've
   /// received, you should call projectPackComponent.
   ManagedValue createPackComponentTemporary(SILGenFunction &SGF, SILLocation loc);
+
+  /// Set the current pack component.  Do not call this multiple times
+  /// for the same component.
+  ///
+  /// You should only call this when the pack not yet initialized,
+  /// which generally means when it corresponds to an output you're
+  /// generating.  In the reabstraction code, this means it should only
+  /// be used for *inner* types.  If the pack is an input you've
+  /// received, you should call projectPackComponent.
+  void setPackComponent(SILGenFunction &SGF, SILLocation loc,
+                        ManagedValue elt);
 };
 
 /// A generator for visiting the addresses of the elements of

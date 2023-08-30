@@ -140,10 +140,10 @@ func test8() {
 // CHECK-LABEL: sil shared {{.*}} @$sSS_Sit_QSiIegk_SSSiIegod_TR :
 // CHECK:         [[PACK:%.*]] = alloc_pack $Pack{(String, Int)}
 // CHECK-NEXT:    [[TUPLE_TEMP:%.*]] = alloc_stack $(String, Int)
-// CHECK-NEXT:    [[TUPLE_INDEX:%.*]] = scalar_pack_index 0 of $Pack{(String, Int)}
-// CHECK-NEXT:    pack_element_set [[TUPLE_TEMP]] : $*(String, Int) into [[TUPLE_INDEX]] of [[PACK]] : $*Pack{(String, Int)}
 // CHECK-NEXT:    [[STRING_ADDR:%.*]] = tuple_element_addr [[TUPLE_TEMP]] : $*(String, Int), 0
 // CHECK-NEXT:    [[INT_ADDR:%.*]] = tuple_element_addr [[TUPLE_TEMP]] : $*(String, Int), 1
+// CHECK-NEXT:    [[TUPLE_INDEX:%.*]] = scalar_pack_index 0 of $Pack{(String, Int)}
+// CHECK-NEXT:    pack_element_set [[TUPLE_TEMP]] : $*(String, Int) into [[TUPLE_INDEX]] of [[PACK]] : $*Pack{(String, Int)}
 // CHECK-NEXT:    apply %0([[PACK]])
 // CHECK-NEXT:    [[STRING:%.*]] = load [take] [[STRING_ADDR]] : $*String
 // CHECK-NEXT:    [[INT:%.*]] = load [trivial] [[INT_ADDR]] : $*Int
@@ -206,17 +206,18 @@ func test10<each T>() -> Use<repeat each T> {
 // CHECK-LABEL: sil {{.*}} @$s4main6test10AA3UseVyxxQp_QPGyRvzlF :
 // CHECK:         function_ref @$sSS_xxQpSit_QSiIegk_SSxxQp_QSiSiIegokd_RvzlTR : $@convention(thin) <each τ_0_0> (@guaranteed @callee_guaranteed () -> @pack_out Pack{(String, repeat each τ_0_0, Int)}) -> (@owned String, @pack_out Pack{repeat each τ_0_0}, Int)
 // CHECK-LABEL: sil shared {{.*}} @$sSS_xxQpSit_QSiIegk_SSxxQp_QSiSiIegokd_RvzlTR :
-//   Set up the inner pack argument with a tuple temporary.
+//   Create a tuple temporary.
 // CHECK:         [[PACK:%.*]] = alloc_pack $Pack{(String, repeat each T, Int)}
 // CHECK-NEXT:    [[TUPLE_TEMP:%.*]] = alloc_stack $(String, repeat each T, Int)
-// CHECK-NEXT:    [[TUPLE_INDEX:%.*]] = scalar_pack_index 0 of $Pack{(String, repeat each T, Int)}
-// CHECK-NEXT:    pack_element_set [[TUPLE_TEMP]] : $*(String, repeat each T, Int) into [[TUPLE_INDEX]] of [[PACK]] : $*Pack{(String, repeat each T, Int)}
 //   Project out the tuple elements for the non-expansion elements;
 //   we'll use these after the call.
 // CHECK-NEXT:    [[STRING_INDEX:%.*]] = scalar_pack_index 0 of $Pack{String, repeat each T, Int}
 // CHECK-NEXT:    [[STRING_ADDR:%.*]] = tuple_pack_element_addr [[STRING_INDEX]] of [[TUPLE_TEMP]] : $*(String, repeat each T, Int) as $*String
 // CHECK-NEXT:    [[INT_INDEX:%.*]] = scalar_pack_index 2 of $Pack{String, repeat each T, Int}
 // CHECK-NEXT:    [[INT_ADDR:%.*]] = tuple_pack_element_addr [[INT_INDEX]] of [[TUPLE_TEMP]] : $*(String, repeat each T, Int) as $*Int
+//   Write the tuple temporary's address into the inner argument pack.
+// CHECK-NEXT:    [[TUPLE_INDEX:%.*]] = scalar_pack_index 0 of $Pack{(String, repeat each T, Int)}
+// CHECK-NEXT:    pack_element_set [[TUPLE_TEMP]] : $*(String, repeat each T, Int) into [[TUPLE_INDEX]] of [[PACK]] : $*Pack{(String, repeat each T, Int)}
 //   Call the reabstracted function.
 // CHECK-NEXT:    apply %1([[PACK]])
 //   Load the first component of the tuple (the string).
