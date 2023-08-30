@@ -486,6 +486,20 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
+ManagedValue SILGenBuilder::createLoadTrivial(SILLocation loc,
+                                              ManagedValue addr) {
+#ifndef NDEBUG
+  auto &lowering = SGF.getTypeLowering(addr.getType());
+  assert(lowering.isTrivial());
+  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+         "cannot load an unloadable type");
+  assert(!addr.hasCleanup());
+#endif
+  auto value = createLoad(loc, addr.getValue(),
+                          LoadOwnershipQualifier::Trivial);
+  return ManagedValue::forObjectRValueWithoutOwnership(value);
+}
+
 ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v) {
   auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadCopy(loc, v, lowering);
