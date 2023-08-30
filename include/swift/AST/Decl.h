@@ -5178,13 +5178,11 @@ public:
 /// and conformances for tuple types.
 ///
 /// - The declared interface type is the special TheTupleType singleton.
-/// - The generic parameter list has one pack generic parameter, <Elements...>
-/// - The generic signature has no requirements, <Elements...>
+/// - The generic parameter list has one pack generic parameter, <each Element>
+/// - The generic signature has no requirements, <each Element>
 /// - The self interface type is the tuple type containing a single pack
-///   expansion, (Elements...).
+///   expansion, (repeat each Element).
 class BuiltinTupleDecl final : public NominalTypeDecl {
-  TupleType *TupleSelfType = nullptr;
-
 public:
   BuiltinTupleDecl(Identifier Name, DeclContext *Parent);
 
@@ -5192,7 +5190,7 @@ public:
     return SourceRange();
   }
 
-  TupleType *getTupleSelfType() const;
+  TupleType *getTupleSelfType(const ExtensionDecl *owner) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

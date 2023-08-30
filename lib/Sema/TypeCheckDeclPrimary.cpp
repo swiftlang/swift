@@ -3493,9 +3493,17 @@ public:
     auto *nominal = ED->getExtendedNominal();
 
     // Diagnose experimental tuple extensions.
-    if (nominal && isa<BuiltinTupleDecl>(nominal) &&
-        !getASTContext().LangOpts.hasFeature(Feature::TupleConformances)) {
-      ED->diagnose(diag::experimental_tuple_extension);
+    if (nominal && isa<BuiltinTupleDecl>(nominal)) {
+      if (!getASTContext().LangOpts.hasFeature(Feature::TupleConformances)) {
+        ED->diagnose(diag::experimental_tuple_extension);
+      }
+
+      if (extType->is<TupleType>()) {
+        auto selfType = ED->getSelfInterfaceType();
+        if (!extType->isEqual(selfType)) {
+          ED->diagnose(diag::tuple_extension_wrong_type, selfType);
+        }
+      }
     }
 
     if (nominal == nullptr) {

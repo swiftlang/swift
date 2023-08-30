@@ -2353,6 +2353,8 @@ ERROR(extension_access_with_conformances,none,
 ERROR(experimental_tuple_extension,none,
       "tuple extensions are experimental",
       ())
+ERROR(tuple_extension_wrong_type,none,
+      "tuple extension must be written as extension of %0", (Type))
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_placeholder,none,

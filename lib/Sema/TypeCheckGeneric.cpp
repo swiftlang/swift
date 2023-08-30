@@ -571,6 +571,10 @@ static void collectAdditionalExtensionRequirements(
   if (type->is<ErrorType>())
     return;
 
+  // Tuple extensions cannot introduce requirements via this mechanism.
+  if (type->is<TupleType>())
+    return;
+
   // Find the nominal type declaration and its parent type.
   if (type->is<ProtocolCompositionType>())
     type = type->getCanonicalType();
@@ -775,7 +779,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     collectAdditionalExtensionRequirements(ext->getExtendedType(), sameTypeReqs);
 
     // Re-use the signature of the type being extended by default.
-    if (sameTypeReqs.empty() && !ext->getTrailingWhereClause()) {
+    // For tuple extensions, always build a new signature to get
+    // the right sugared types, since we don't want to expose the
+    // name of the generic parameter of BuiltinTupleDecl itself.
+    if (sameTypeReqs.empty() && !ext->getTrailingWhereClause() &&
+        !isa<BuiltinTupleDecl>(ext->getExtendedNominal())) {
       return parentSig;
     }
 

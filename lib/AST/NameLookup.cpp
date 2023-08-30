@@ -3279,10 +3279,10 @@ bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc){
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
                              ExtensionDecl *ext,
-                             NominalTypeDecl *nominal) {
+                             DeclContext *source) {
   // Collect generic parameters from all outer contexts.
   SmallVector<GenericParamList *, 2> allGenericParams;
-  nominal->forEachGenericContext([&](GenericParamList *gpList) {
+  source->forEachGenericContext([&](GenericParamList *gpList) {
     allGenericParams.push_back(gpList->clone(ext));
   });
 
@@ -3293,6 +3293,28 @@ createExtensionGenericParams(ASTContext &ctx,
   }
 
   return toParams;
+}
+
+/// If the extended type is a generic typealias whose underlying type is
+/// a tuple, the extension inherits the generic paramter list from the
+/// typealias.
+static GenericParamList *
+createTupleExtensionGenericParams(ASTContext &ctx,
+                                  ExtensionDecl *ext,
+                                  TypeRepr *extendedTypeRepr) {
+  DirectlyReferencedTypeDecls referenced =
+    directReferencesForTypeRepr(ctx.evaluator, ctx,
+                                extendedTypeRepr,
+                                ext->getParent());
+
+  if (referenced.size() != 1 || !isa<TypeAliasDecl>(referenced[0]))
+    return nullptr;
+
+  auto *typeAlias = cast<TypeAliasDecl>(referenced[0]);
+  if (!typeAlias->isGeneric())
+    return nullptr;
+
+  return createExtensionGenericParams(ctx, ext, typeAlias);
 }
 
 CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
@@ -3416,9 +3438,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
   if (auto *tupleDecl = dyn_cast<BuiltinTupleDecl>(value)) {
     auto &ctx = value->getASTContext();
 
-    // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
+    // Builtin.TheTupleType has a single pack generic parameter: <each Element>
     auto *genericParam = GenericTypeParamDecl::createImplicit(
-        tupleDecl->getDeclContext(), ctx.Id_Elements, /*depth*/ 0, /*index*/ 0,
+        tupleDecl->getDeclContext(), ctx.Id_Element, /*depth*/ 0, /*index*/ 0,
         /*isParameterPack*/ true);
 
     return GenericParamList::create(ctx, SourceLoc(), genericParam,
@@ -3433,6 +3455,21 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     if (!nominal) {
       return nullptr;
     }
+
+    // For a tuple extension, the generic parameter list comes from the
+    // extended type alias.
+    if (isa<BuiltinTupleDecl>(nominal)) {
+      if (auto *extendedTypeRepr = ext->getExtendedTypeRepr()) {
+        auto *genericParams = createTupleExtensionGenericParams(
+            ctx, ext, extendedTypeRepr);
+        if (genericParams)
+          return genericParams;
+
+        // Otherwise, just clone the generic parameter list of the
+        // Builtin.TheTupleType. We'll diagnose later.
+      }
+    }
+
     auto *genericParams = createExtensionGenericParams(ctx, ext, nominal);
 
     // Protocol extensions need an inheritance clause due to how name lookup

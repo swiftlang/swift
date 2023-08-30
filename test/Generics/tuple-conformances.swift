@@ -1,8 +1,7 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances -parse-stdlib
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
+// Because of -enable-experimental-feature TupleConformances
 // REQUIRES: asserts
-
-import Swift
 
 protocol P {
   associatedtype A
@@ -11,8 +10,14 @@ protocol P {
   func f()
 }
 
-extension Builtin.TheTupleType: P where repeat each Elements: P {
-  typealias A = (repeat (each Elements).A)
+extension () {}
+// expected-error@-1 {{tuple extension must be written as extension of '(repeat each Element)'}}
+// FIXME: Inaccurate
+
+typealias Tuple<each Element> = (repeat each Element)
+
+extension Tuple: P where repeat each Element: P {
+  typealias A = (repeat (each Element).A)
   typealias B = Float
   func f() {}
 }
@@ -37,7 +42,7 @@ func useConformance() {
 
 ////
 
-extension Builtin.TheTupleType: Equatable where repeat each Elements: Equatable {
+extension Tuple: Equatable where repeat each Element: Equatable {
   // FIXME: Hack
   @_disfavoredOverload
   public static func ==(lhs: Self, rhs: Self) -> Bool {
@@ -51,7 +56,7 @@ extension Builtin.TheTupleType: Equatable where repeat each Elements: Equatable 
   }
 }
 
-extension Builtin.TheTupleType: Hashable where repeat each Elements: Hashable {
+extension Tuple: Hashable where repeat each Element: Hashable {
   public func hash(into hasher: inout Hasher) {
     repeat (each self).hash(into: &hasher)
   }
