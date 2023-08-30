@@ -91,7 +91,7 @@ static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
-  auto *moduleDecl = this->getSourceFile()->getParentModule();
+  auto *moduleDecl = const_cast<ASTScopeImpl *>(this)->getParentModule();
   auto *locSourceFile = moduleDecl->getSourceFileContainingLocation(loc);
 
   // Use binary search to find the child that contains this location.

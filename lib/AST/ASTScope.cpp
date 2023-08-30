@@ -182,6 +182,17 @@ const SourceFile *ASTScopeImpl::getSourceFile() const {
   return getParent().get()->getSourceFile();
 }
 
+ModuleDecl *ASTScopeImpl::getParentModule() {
+  if (ParentModule)
+    return ParentModule.get();
+
+  auto *SF = getSourceFile();
+  auto *module = SF->getParentModule();
+  ParentModule = module;
+
+  return module;
+}
+
 const SourceFile *ASTSourceFileScope::getSourceFile() const { return SF; }
 
 ASTContext &ASTSourceFileScope::getASTContext() const {

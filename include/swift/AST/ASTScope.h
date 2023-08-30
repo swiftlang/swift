@@ -155,6 +155,10 @@ private:
 
   mutable llvm::Optional<CharSourceRange> cachedCharSourceRange;
 
+  /// Stores the result of a lazy lookup for a parent module performed via
+  /// \c getParentModule.
+  NullablePtr<ModuleDecl> ParentModule;
+
 #pragma mark - constructor / destructor
 public:
   ASTScopeImpl(){};
@@ -222,6 +226,8 @@ public:
   virtual NullablePtr<MacroExpansionDecl> getFreestandingMacro() const {
     return nullptr;
   }
+
+  ModuleDecl *getParentModule();
 
 #pragma mark - debugging and printing
 
