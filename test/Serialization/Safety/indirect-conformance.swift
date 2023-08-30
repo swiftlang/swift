@@ -12,8 +12,8 @@
 
 // RUN: cat %t/Lib.swiftinterface | %FileCheck %t/Lib.swift
 
-public protocol PublicProtocol : AnyObject {}
-// CHECK: public protocol PublicProtocol : AnyObject
+public protocol PublicProtocol {}
+// CHECK: public protocol PublicProtocol
 
 protocol InternalProtocol: PublicProtocol {}
 // CHECK-NOT: InternalProtocol
@@ -21,8 +21,12 @@ protocol InternalProtocol: PublicProtocol {}
 public class IndirectConformant {
     public init() {}
 }
+
 extension IndirectConformant: InternalProtocol {}
 // CHECK: extension Lib.IndirectConformant : Lib.PublicProtocol {}
+
+extension String: InternalProtocol {}
+// CHECK: extension Swift.String : Lib.PublicProtocol {}
 
 //--- Client.swift
 
@@ -43,10 +47,8 @@ import Lib
 
 func requireConformanceToPublicProtocol(_ a: PublicProtocol) {}
 requireConformanceToPublicProtocol(IndirectConformant())
+requireConformanceToPublicProtocol("string")
 
-/// Deserialization safety should keep the original chain. We're mostly
-/// documenting the current safety implementation details here, if we can get
-/// without deserializing 'InternalProtocol' it would be even better.
 // CHECK: Deserialized: 'IndirectConformant'
 // CHECK: Deserialized: 'PublicProtocol'
-// CHECK: Deserialized: 'InternalProtocol'
+// CHECK-NOT: Deserialized: 'InternalProtocol'
