@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// REQUIRES: OS=windows-msvc
+// REQUIRES: OS=windows-msvc && CPU=x86_64
 
 import vcruntime
 typealias JumpBuffer = _JBTYPE
