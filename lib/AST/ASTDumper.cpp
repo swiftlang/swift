@@ -369,7 +369,6 @@ static void printArgument(raw_ostream &OS, const Argument &arg,
   if (arg.isInOut())
     PrintWithColorRAII(OS, ArgModifierColor) << " inout";
 
-  OS << '\n';
   printRec(arg.getExpr());
   PrintWithColorRAII(OS, ParenthesisColor) << ')';
 }
@@ -458,6 +457,16 @@ namespace {
     void printRec(TypeRepr *T);
     void printRec(const Pattern *P);
 
+    template <typename NodeTy>
+    void printRecLabeled(NodeTy *Node, StringRef label) {
+      OS << '\n';
+      Indent += 2;
+      printHead("", label, ASTNodeColor);
+      printRec(Node);
+      printFoot();
+      Indent -= 2;
+    }
+
     raw_ostream &printHead(StringRef Label, StringRef Name,
                            TerminalColor Color) {
       OS.indent(Indent);
@@ -496,7 +505,7 @@ namespace {
     }
 
     void visitParenPattern(ParenPattern *P) {
-      printCommon(P, "pattern_paren") << '\n';
+      printCommon(P, "pattern_paren");
       printRec(P->getSubPattern());
       printFoot();
     }
@@ -512,7 +521,6 @@ namespace {
                  [&] { OS << ","; });
 
       for (auto &elt : P->getElements()) {
-        OS << '\n';
         printRec(elt.getPattern());
       }
       printFoot();
@@ -530,10 +538,9 @@ namespace {
       printFoot();
     }
     void visitTypedPattern(TypedPattern *P) {
-      printCommon(P, "pattern_typed") << '\n';
+      printCommon(P, "pattern_typed");
       printRec(P->getSubPattern());
       if (auto *repr = P->getTypeRepr()) {
-        OS << '\n';
         printRec(repr);
       }
       printFoot();
@@ -544,14 +551,12 @@ namespace {
         << ' ' << getDumpString(P->getCastKind()) << ' ';
       P->getCastType().print(OS);
       if (auto sub = P->getSubPattern()) {
-        OS << '\n';
         printRec(sub);
       }
       printFoot();
     }
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
-      OS << '\n';
       if (auto m = P->getCachedMatchExpr())
         printRec(m);
       else
@@ -560,7 +565,6 @@ namespace {
     }
     void visitBindingPattern(BindingPattern *P) {
       printCommon(P, P->isLet() ? "pattern_let" : "pattern_var");
-      OS << '\n';
       printRec(P->getSubPattern());
       printFoot();
     }
@@ -570,14 +574,12 @@ namespace {
       P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
       PrintWithColorRAII(OS, IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
-        OS << '\n';
         printRec(P->getSubPattern());
       }
       printFoot();
     }
     void visitOptionalSomePattern(OptionalSomePattern *P) {
       printCommon(P, "pattern_optional_some");
-      OS << '\n';
       printRec(P->getSubPattern());
       printFoot();
     }
@@ -841,7 +843,6 @@ namespace {
       }
 
       for (Decl *D : IDC->getMembers()) {
-        OS << '\n';
         printRec(D);
       }
       printFoot();
@@ -856,15 +857,13 @@ namespace {
           if (item.isImplicit())
             continue;
 
-          OS << '\n';
-
           if (auto decl = item.dyn_cast<Decl *>()) {
             printRec(decl);
           } else if (auto stmt = item.dyn_cast<Stmt *>()) {
-            stmt->dump(OS, &SF.getASTContext(), Indent + 2);
+            printRec(stmt, &SF.getASTContext());
           } else {
             auto expr = item.get<Expr *>();
-            expr->dump(OS, Indent + 2);
+            printRec(expr);
           }
         }
       }
@@ -912,19 +911,73 @@ namespace {
 
     void printAccessors(AbstractStorageDecl *D) {
       for (auto accessor : D->getAllAccessors()) {
-        OS << "\n";
         printRec(accessor);
       }
     }
 
     void visitParamDecl(ParamDecl *PD) {
-      printParameter(PD);
+      printHead("", "parameter", ParameterColor) << ' ';
+      if (PD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        OS << "known-to-be-local ";
+      }
+      printDeclName(PD);
+      if (!PD->getArgumentName().empty())
+        PrintWithColorRAII(OS, IdentifierColor)
+          << " apiName=" << PD->getArgumentName();
+
+      if (PD->hasInterfaceType()) {
+        PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
+        PD->getInterfaceType().print(
+            PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
+        PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
+      }
+
+      if (auto specifier = PD->getCachedSpecifier()) {
+        if (*specifier != ParamDecl::Specifier::Default) {
+          OS << ' ' << ParamDecl::getSpecifierSpelling(*specifier);
+        }
+      }
+
+      if (PD->hasInterfaceType())
+        if (PD->isVariadic())
+          OS << " variadic";
+
+      if (PD->isAutoClosure())
+        OS << " autoclosure";
+
+      if (PD->getAttrs().hasAttribute<NonEphemeralAttr>())
+        OS << " nonEphemeral";
+
+      auto lifetimeString =
+          getDumpString(PD->getLifetimeAnnotationFromAttributes());
+      if (!lifetimeString.empty())
+        OS << " " << lifetimeString;
+
+      if (PD->isNoImplicitCopy())
+        OS << " noImplicitCopy";
+
+      if (PD->getDefaultArgumentKind() != DefaultArgumentKind::None) {
+        printField("default_arg",
+                   getDumpString(PD->getDefaultArgumentKind()));
+      }
+
+      if (PD->hasDefaultExpr() &&
+          !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
+        OS << " ";
+        PD->getDefaultArgumentCaptureInfo().print(
+          PrintWithColorRAII(OS, CapturesColor).getOS());
+      }
+
+      if (auto init = PD->getStructuralDefaultExpr()) {
+        printRecLabeled(init, "expression");
+      }
+
+      printFoot();
     }
 
     void visitEnumCaseDecl(EnumCaseDecl *ECD) {
       printCommon(ECD, "enum_case_decl");
       for (EnumElementDecl *D : ECD->getElements()) {
-        OS << '\n';
         printRec(D);
       }
       printFoot();
@@ -972,18 +1025,17 @@ namespace {
       printCommon(PBD, "pattern_binding_decl");
 
       for (auto idx : range(PBD->getNumPatternEntries())) {
-        OS << '\n';
         printRec(PBD->getPattern(idx));
         if (PBD->getOriginalInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
-          OS << "Original init:\n";
+          OS << "Original init:";
           printRec(PBD->getOriginalInit(idx));
         }
         if (PBD->getInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
-          OS << "Processed init:\n";
+          OS << "Processed init:";
           printRec(PBD->getInit(idx));
         }
       }
@@ -1042,64 +1094,8 @@ namespace {
     }
 
     void printParameter(const ParamDecl *P) {
-      printHead("", "parameter", ParameterColor) << ' ';
-      if (P->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        OS << "known-to-be-local ";
-      }
-      printDeclName(P);
-      if (!P->getArgumentName().empty())
-        PrintWithColorRAII(OS, IdentifierColor)
-          << " apiName=" << P->getArgumentName();
-
-      if (P->hasInterfaceType()) {
-        PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
-        P->getInterfaceType().print(
-            PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
-        PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
-      }
-
-      if (auto specifier = P->getCachedSpecifier()) {
-        if (*specifier != ParamDecl::Specifier::Default) {
-          OS << ' ' << ParamDecl::getSpecifierSpelling(*specifier);
-        }
-      }
-
-      if (P->hasInterfaceType())
-        if (P->isVariadic())
-          OS << " variadic";
-
-      if (P->isAutoClosure())
-        OS << " autoclosure";
-
-      if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
-        OS << " nonEphemeral";
-
-      auto lifetimeString =
-          getDumpString(P->getLifetimeAnnotationFromAttributes());
-      if (!lifetimeString.empty())
-        OS << " " << lifetimeString;
-
-      if (P->isNoImplicitCopy())
-        OS << " noImplicitCopy";
-
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
-        printField("default_arg",
-                   getDumpString(P->getDefaultArgumentKind()));
-      }
-
-      if (P->hasDefaultExpr() &&
-          !P->getDefaultArgumentCaptureInfo().isTrivial()) {
-        OS << " ";
-        P->getDefaultArgumentCaptureInfo().print(
-          PrintWithColorRAII(OS, CapturesColor).getOS());
-      }
-
-      if (auto init = P->getStructuralDefaultExpr()) {
-        OS << " expression=\n";
-        printRec(init);
-      }
-
-      printFoot();
+      OS << '\n';
+      visitParamDecl(const_cast<ParamDecl *>(P));
     }
 
     void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
@@ -1114,7 +1110,6 @@ namespace {
 
       Indent += 2;
       for (auto P : *params) {
-        OS << '\n';
         printParameter(P);
       }
       Indent -= 2;
@@ -1125,7 +1120,6 @@ namespace {
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
       Indent += 2;
       if (auto *P = D->getImplicitSelfDecl()) {
-        OS << '\n';
         printParameter(P);
       }
 
@@ -1137,7 +1131,7 @@ namespace {
         if (FD->getResultTypeRepr()) {
           OS << '\n';
           Indent += 2;
-          printHead("", "result", DeclColor) << '\n';
+          printHead("", "result", DeclColor);
           printRec(FD->getResultTypeRepr());
           printFoot();
           if (auto opaque = FD->getOpaqueResultTypeDecl()) {
@@ -1155,7 +1149,6 @@ namespace {
         // originally spelled "init?(...) { nil }", because "nil" is modeled
         // via FailStmt in this context.
         if (auto *Body = D->getSingleExpressionBody()) {
-          OS << '\n';
           printRec(Body);
 
           return;
@@ -1163,7 +1156,6 @@ namespace {
       }
 
       if (auto Body = D->getBody(/*canSynthesize=*/false)) {
-        OS << '\n';
         printRec(Body, &D->getASTContext());
       }
     }
@@ -1212,7 +1204,6 @@ namespace {
     void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
       printCommon(TLCD, "top_level_code_decl");
       if (TLCD->getBody()) {
-        OS << "\n";
         printRec(TLCD->getBody(), &static_cast<Decl *>(TLCD)->getASTContext());
       }
       printFoot();
@@ -1221,7 +1212,6 @@ namespace {
     void printASTNodes(const ArrayRef<ASTNode> &Elements, const ASTContext &Ctx, StringRef Name) {
       printHead("", Name, ASTNodeColor);
       for (auto Elt : Elements) {
-        OS << '\n';
         if (auto *SubExpr = Elt.dyn_cast<Expr*>())
           printRec(SubExpr);
         else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
@@ -1242,7 +1232,6 @@ namespace {
         if (Clause.isActive)
           PrintWithColorRAII(OS, DeclModifierColor) << " active";
         if (Clause.Cond) {
-          OS << "\n";
           printRec(Clause.Cond);
         }
 
@@ -1259,10 +1248,8 @@ namespace {
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
       printCommon(PDD, "pound_diagnostic_decl");
       auto kind = PDD->isError() ? "error" : "warning";
-      OS << " kind=" << kind << "\n";
-      Indent += 2;
+      OS << " kind=" << kind;
       printRec(PDD->getMessage());
-      Indent -= 2;
       printFoot();
     }
 
@@ -1557,16 +1544,15 @@ public:
       return printRec(C.getBoolean());
     case StmtConditionElement::CK_PatternBinding:
       Indent += 2;
-      printHead("", "pattern", PatternColor) << '\n';
+      printHead("", "pattern", PatternColor);
       printRec(C.getPattern());
-      OS << "\n";
       printRec(C.getInitializer());
       printFoot();
       Indent -= 2;
       break;
     case StmtConditionElement::CK_Availability:
       Indent += 2;
-      printHead("", "#available", PatternColor) << '\n';
+      printHead("", "#available", PatternColor);
       for (auto *Query : C.getAvailability()->getQueries()) {
         OS << '\n';
         switch (Query->getKind()) {
@@ -1590,7 +1576,6 @@ public:
       printHead("", "#_hasSymbol", PatternColor);
       if (Ctx)
         printSourceRange(OS, C.getSourceRange(), *Ctx);
-      OS << "\n";
       printRec(C.getHasSymbolInfo()->getSymbolExpr());
       printFoot();
       Indent -= 2;
@@ -1621,7 +1606,6 @@ public:
 
   void printASTNodes(const ArrayRef<ASTNode> &Elements) {
     for (auto Elt : Elements) {
-      OS << '\n';
       if (auto *SubExpr = Elt.dyn_cast<Expr*>())
         printRec(SubExpr);
       else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
@@ -1634,7 +1618,6 @@ public:
   void visitReturnStmt(ReturnStmt *S) {
     printCommon(S, "return_stmt");
     if (S->hasResult()) {
-      OS << '\n';
       printRec(S->getResult());
     }
     printFoot();
@@ -1643,7 +1626,6 @@ public:
   void visitYieldStmt(YieldStmt *S) {
     printCommon(S, "yield_stmt");
     for (auto yield : S->getYields()) {
-      OS << '\n';
       printRec(yield);
     }
     printFoot();
@@ -1657,44 +1639,40 @@ public:
   }
 
   void visitDeferStmt(DeferStmt *S) {
-    printCommon(S, "defer_stmt") << '\n';
+    printCommon(S, "defer_stmt");
     printRec(S->getTempDecl());
-    OS << '\n';
     printRec(S->getCallExpr());
     printFoot();
   }
 
   void visitIfStmt(IfStmt *S) {
-    printCommon(S, "if_stmt") << '\n';
+    printCommon(S, "if_stmt");
     for (auto elt : S->getCond()) {
       printRec(elt);
-      OS << "\n";
     }
     printRec(S->getThenStmt());
     if (S->getElseStmt()) {
-      OS << '\n';
       printRec(S->getElseStmt());
     }
     printFoot();
   }
 
   void visitGuardStmt(GuardStmt *S) {
-    printCommon(S, "guard_stmt") << '\n';
+    printCommon(S, "guard_stmt");
     for (auto elt : S->getCond())
       printRec(elt);
-    OS << '\n';
     printRec(S->getBody());
     printFoot();
   }
 
   void visitDoStmt(DoStmt *S) {
-    printCommon(S, "do_stmt") << '\n';
+    printCommon(S, "do_stmt");
     printRec(S->getBody());
     printFoot();
   }
 
   void visitWhileStmt(WhileStmt *S) {
-    printCommon(S, "while_stmt") << '\n';
+    printCommon(S, "while_stmt");
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';
@@ -1703,41 +1681,34 @@ public:
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *S) {
-    printCommon(S, "repeat_while_stmt") << '\n';
+    printCommon(S, "repeat_while_stmt");
     printRec(S->getBody());
-    OS << '\n';
     printRec(S->getCond());
     printFoot();
   }
   void visitForEachStmt(ForEachStmt *S) {
     printCommon(S, "for_each_stmt");
-    OS << '\n';
     printRec(S->getPattern());
-    OS << '\n';
     if (S->getWhere()) {
+      OS << '\n';
       Indent += 2;
-      printHead("", "where", ASTNodeColor) << '\n';
+      printHead("", "where", ASTNodeColor);
       printRec(S->getWhere());
-      OS << ")\n";
+      printFoot();
       Indent -= 2;
     }
     printRec(S->getParsedSequence());
-    OS << '\n';
     if (S->getIteratorVar()) {
       printRec(S->getIteratorVar());
-      OS << '\n';
     }
     if (S->getNextCall()) {
       printRec(S->getNextCall());
-      OS << '\n';
     }
     if (S->getConvertElementExpr()) {
       printRec(S->getConvertElementExpr());
-      OS << '\n';
     }
     if (S->getElementExpr()) {
       printRec(S->getElementExpr());
-      OS << '\n';
     }
     printRec(S->getBody());
     printFoot();
@@ -1755,10 +1726,9 @@ public:
     printFoot();
   }
   void visitSwitchStmt(SwitchStmt *S) {
-    printCommon(S, "switch_stmt") << '\n';
+    printCommon(S, "switch_stmt");
     printRec(S->getSubjectExpr());
     for (auto N : S->getRawCases()) {
-      OS << '\n';
       if (N.is<Stmt*>())
         printRec(N.get<Stmt*>());
       else
@@ -1776,7 +1746,6 @@ public:
       OS << '\n';
       printHead("", "case_body_variables", StmtColor);
       for (auto *vd : S->getCaseBodyVariables()) {
-        OS << '\n';
         printRec(vd);
       }
       printFoot();
@@ -1788,18 +1757,15 @@ public:
       if (LabelItem.isDefault())
         OS << " default";
       if (auto *CasePattern = LabelItem.getPattern()) {
-        OS << '\n';
         printRec(CasePattern);
       }
       if (auto *Guard = LabelItem.getGuardExpr()) {
-        OS << '\n';
         printRec(const_cast<Expr *>(Guard));
       }
       printFoot();
     }
     Indent -= 2;
 
-    OS << '\n';
     printRec(S->getBody());
     printFoot();
   }
@@ -1809,26 +1775,26 @@ public:
   }
 
   void visitThrowStmt(ThrowStmt *S) {
-    printCommon(S, "throw_stmt") << '\n';
+    printCommon(S, "throw_stmt");
     printRec(S->getSubExpr());
     printFoot();
   }
 
   void visitDiscardStmt(DiscardStmt *S) {
-    printCommon(S, "discard_stmt") << '\n';
+    printCommon(S, "discard_stmt");
     printRec(S->getSubExpr());
     printFoot();
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *S) {
     printCommon(S, "pound_assert");
-    OS << " message=" << QuotedString(S->getMessage()) << "\n";
+    OS << " message=" << QuotedString(S->getMessage());
     printRec(S->getCondition());
     printFoot();
   }
 
   void visitDoCatchStmt(DoCatchStmt *S) {
-    printCommon(S, "do_catch_stmt") << '\n';
+    printCommon(S, "do_catch_stmt");
     printRec(S->getBody());
     OS << '\n';
     Indent += 2;
@@ -1838,6 +1804,7 @@ public:
   }
   void visitCatches(ArrayRef<CaseStmt *> clauses) {
     for (auto clause : clauses) {
+      OS << '\n';
       visitCaseStmt(clause);
     }
   }
@@ -1864,19 +1831,12 @@ class PrintExpr : public ExprVisitor<PrintExpr>, public PrintBase {
 public:
   using PrintBase::PrintBase;
 
-  void printRecLabeled(Expr *E, StringRef label) {
-    Indent += 2;
-    printHead("", label, ExprColor) << '\n';
-    printRec(E);
-    printFoot();
-    Indent -= 2;
-  }
-
   /// FIXME: This should use ExprWalker to print children.
 
   using PrintBase::printRec;
 
   void printRec(ProtocolConformanceRef conf) {
+    OS << '\n';
     conf.dump(OS, Indent + 2);
   }
 
@@ -1918,7 +1878,6 @@ public:
       return;
     }
     
-    OS << '\n';
     printRecLabeled(semanticExpr, "semantic_expr");
   }
 
@@ -1930,7 +1889,6 @@ public:
   void visitCodeCompletionExpr(CodeCompletionExpr *E) {
     printCommon(E, "code_completion_expr");
     if (E->getBase()) {
-      OS << '\n';
       printRec(E->getBase());
     }
     printFoot();
@@ -2024,7 +1982,6 @@ public:
     E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
     E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    OS << "\n";
     printRec(E->getAppendingExpr());
     printFoot();
   }
@@ -2126,10 +2083,9 @@ public:
     printFoot();
   }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
-    printCommon(E, "unresolved_specialize_expr") << '\n';
+    printCommon(E, "unresolved_specialize_expr");
     printRec(E->getSubExpr());
     for (TypeLoc T : E->getUnresolvedParams()) {
-      OS << '\n';
       printRec(T.getTypeRepr());
     }
     printFoot();
@@ -2145,7 +2101,6 @@ public:
     if (E->isSuper())
       OS << " super";
 
-    OS << '\n';
     printRec(E->getBase());
     printFoot();
   }
@@ -2153,7 +2108,6 @@ public:
     printCommon(E, "dynamic_member_ref_expr");
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     E->getMember().dump(OS);
-    OS << '\n';
     printRec(E->getBase());
     printFoot();
   }
@@ -2166,43 +2120,36 @@ public:
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
     printCommon(E, "dot_self_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitParenExpr(ParenExpr *E) {
     printCommon(E, "paren_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitAwaitExpr(AwaitExpr *E) {
     printCommon(E, "await_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitConsumeExpr(ConsumeExpr *E) {
     printCommon(E, "consume_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitCopyExpr(CopyExpr *E) {
     printCommon(E, "copy_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitBorrowExpr(BorrowExpr *E) {
     printCommon(E, "borrow_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E){
     printCommon(E, "unresolved_member_chain_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2221,11 +2168,13 @@ public:
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      OS << '\n';
       if (E->getElement(i))
         printRec(E->getElement(i));
-      else
-        OS.indent(Indent+2) << "<<tuple element default value>>";
+      else {
+        OS << '\n';
+        printHead("", "<tuple element default value>", ExprColor);
+        printFoot();
+      }
     }
     printFoot();
   }
@@ -2234,7 +2183,6 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
     E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
-      OS << '\n';
       printRec(elt);
     }
     printFoot();
@@ -2244,7 +2192,6 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
     E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
-      OS << '\n';
       printRec(elt);
     }
     printFoot();
@@ -2260,7 +2207,6 @@ public:
       PrintWithColorRAII(OS, DeclColor) << " decl=";
       printDeclRef(E->getDecl());
     }
-    OS << '\n';
     printRec(E->getBase());
     OS << '\n';
     printArgumentList(E->getArgs());
@@ -2268,9 +2214,7 @@ public:
   }
   void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
     printCommon(E, "keypath_application_expr");
-    OS << '\n';
     printRec(E->getBase());
-    OS << '\n';
     printRec(E->getKeyPath());
     printFoot();
   }
@@ -2278,7 +2222,6 @@ public:
     printCommon(E, "dynamic_subscript_expr");
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMember());
-    OS << '\n';
     printRec(E->getBase());
     OS << '\n';
     printArgumentList(E->getArgs());
@@ -2290,258 +2233,247 @@ public:
     PrintWithColorRAII(OS, ExprModifierColor)
       << " function_ref=" << getDumpString(E->getFunctionRefKind());
     if (E->getBase()) {
-      OS << '\n';
       printRec(E->getBase());
     }
     printFoot();
   }
   void visitTupleElementExpr(TupleElementExpr *E) {
-    printCommon(E, "tuple_element_expr")
-      << " field #" << E->getFieldNumber() << '\n';
+    printCommon(E, "tuple_element_expr") << " field #" << E->getFieldNumber();
     printRec(E->getBase());
     printFoot();
   }
   void visitDestructureTupleExpr(DestructureTupleExpr *E) {
     printCommon(E, "destructure_tuple_expr");
-    OS << " destructured=";
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+
+    OS << "\n";
     Indent += 2;
+    printHead("", "destructured", ASTNodeColor);
     for (auto *elt : E->getDestructuredElements()) {
-      OS << "\n";
       printRec(elt);
     }
+    printFoot();
     Indent -= 2;
-    PrintWithColorRAII(OS, ParenthesisColor) << ")\n";
+
     printRec(E->getSubExpr());
-    OS << "\n";
     printRec(E->getResultExpr());
     printFoot();
   }
   void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E) {
-    printCommon(E, "unresolvedtype_conversion_expr") << '\n';
+    printCommon(E, "unresolvedtype_conversion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *E) {
-    printCommon(E, "function_conversion_expr") << '\n';
+    printCommon(E, "function_conversion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitCovariantFunctionConversionExpr(CovariantFunctionConversionExpr *E){
-    printCommon(E, "covariant_function_conversion_expr") << '\n';
+    printCommon(E, "covariant_function_conversion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *E){
-    printCommon(E, "covariant_return_conversion_expr") << '\n';
+    printCommon(E, "covariant_return_conversion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E){
-    printCommon(E, "underlying_to_opaque_expr") << '\n';
+    printCommon(E, "underlying_to_opaque_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitErasureExpr(ErasureExpr *E) {
-    printCommon(E, "erasure_expr") << '\n';
+    printCommon(E, "erasure_expr");
     for (auto conf : E->getConformances()) {
       printRec(conf);
-      OS << '\n';
     }
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitAnyHashableErasureExpr(AnyHashableErasureExpr *E) {
-    printCommon(E, "any_hashable_erasure_expr") << '\n';
+    printCommon(E, "any_hashable_erasure_expr");
     printRec(E->getConformance());
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E) {
     printCommon(E, "conditional_bridge_from_objc_expr") << " conversion=";
     printDeclRef(E->getConversion());
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitBridgeFromObjCExpr(BridgeFromObjCExpr *E) {
-    printCommon(E, "bridge_from_objc_expr") << '\n';
+    printCommon(E, "bridge_from_objc_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitBridgeToObjCExpr(BridgeToObjCExpr *E) {
-    printCommon(E, "bridge_to_objc_expr") << '\n';
+    printCommon(E, "bridge_to_objc_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitLoadExpr(LoadExpr *E) {
-    printCommon(E, "load_expr") << '\n';
+    printCommon(E, "load_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitABISafeConversionExpr(ABISafeConversionExpr *E) {
-    printCommon(E, "abi_safe_conversion_expr") << '\n';
+    printCommon(E, "abi_safe_conversion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
-    printCommon(E, "metatype_conversion_expr") << '\n';
+    printCommon(E, "metatype_conversion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
     printCommon(E, "collection_upcast_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     if (auto keyConversion = E->getKeyConversion()) {
-      OS << '\n';
       printRecLabeled(keyConversion.Conversion, "key_conversion");
     }
     if (auto valueConversion = E->getValueConversion()) {
-      OS << '\n';
       printRecLabeled(valueConversion.Conversion, "value_conversion");
     }
     printFoot();
   }
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
-    printCommon(E, "derived_to_base_expr") << '\n';
+    printCommon(E, "derived_to_base_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
-    printCommon(E, "archetype_to_super_expr") << '\n';
+    printCommon(E, "archetype_to_super_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
-    printCommon(E, "inject_into_optional") << '\n';
+    printCommon(E, "inject_into_optional");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E) {
-    printCommon(E, "class_metatype_to_object") << '\n';
+    printCommon(E, "class_metatype_to_object");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *E) {
-    printCommon(E, "existential_metatype_to_object") << '\n';
+    printCommon(E, "existential_metatype_to_object");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E) {
-    printCommon(E, "protocol_metatype_to_object") << '\n';
+    printCommon(E, "protocol_metatype_to_object");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitInOutToPointerExpr(InOutToPointerExpr *E) {
     printCommon(E, "inout_to_pointer")
-      << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
+      << (E->isNonAccessing() ? " nonaccessing" : "");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitArrayToPointerExpr(ArrayToPointerExpr *E) {
     printCommon(E, "array_to_pointer")
-      << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
+      << (E->isNonAccessing() ? " nonaccessing" : "");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitStringToPointerExpr(StringToPointerExpr *E) {
-    printCommon(E, "string_to_pointer") << '\n';
+    printCommon(E, "string_to_pointer");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitPointerToPointerExpr(PointerToPointerExpr *E) {
-    printCommon(E, "pointer_to_pointer") << '\n';
+    printCommon(E, "pointer_to_pointer");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E) {
-    printCommon(E, "foreign_object_conversion") << '\n';
+    printCommon(E, "foreign_object_conversion");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E) {
-    printCommon(E, "unevaluated_instance") << '\n';
+    printCommon(E, "unevaluated_instance");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
-    printCommon(E, "differentiable_function") << '\n';
+    printCommon(E, "differentiable_function");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitLinearFunctionExpr(LinearFunctionExpr *E) {
-    printCommon(E, "linear_function") << '\n';
+    printCommon(E, "linear_function");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitDifferentiableFunctionExtractOriginalExpr(
       DifferentiableFunctionExtractOriginalExpr *E) {
-    printCommon(E, "differentiable_function_extract_original") << '\n';
+    printCommon(E, "differentiable_function_extract_original");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitLinearFunctionExtractOriginalExpr(
       LinearFunctionExtractOriginalExpr *E) {
-    printCommon(E, "linear_function_extract_original") << '\n';
+    printCommon(E, "linear_function_extract_original");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitLinearToDifferentiableFunctionExpr(
       LinearToDifferentiableFunctionExpr *E) {
-    printCommon(E, "linear_to_differentiable_function") << '\n';
+    printCommon(E, "linear_to_differentiable_function");
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitInOutExpr(InOutExpr *E) {
-    printCommon(E, "inout_expr") << '\n';
+    printCommon(E, "inout_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitVarargExpansionExpr(VarargExpansionExpr *E) {
-    printCommon(E, "vararg_expansion_expr") << '\n';
+    printCommon(E, "vararg_expansion_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitPackExpansionExpr(PackExpansionExpr *E) {
-    printCommon(E, "pack_expansion_expr") << "\n";
+    printCommon(E, "pack_expansion_expr");
     printRec(E->getPatternExpr());
     printFoot();
   }
 
   void visitPackElementExpr(PackElementExpr *E) {
-    printCommon(E, "pack_element_expr") << "\n";
+    printCommon(E, "pack_element_expr");
     printRec(E->getPackRefExpr());
     printFoot();
   }
 
   void visitMaterializePackExpr(MaterializePackExpr *E) {
-    printCommon(E, "materialize_pack_expr") << "\n";
+    printCommon(E, "materialize_pack_expr");
     printRec(E->getFromExpr());
     printFoot();
   }
 
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitOptionalTryExpr(OptionalTryExpr *E) {
     printCommon(E, "optional_try_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitTryExpr(TryExpr *E) {
     printCommon(E, "try_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2549,7 +2481,6 @@ public:
   void visitSequenceExpr(SequenceExpr *E) {
     printCommon(E, "sequence_expr");
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      OS << '\n';
       printRec(E->getElement(i));
     }
     printFoot();
@@ -2558,10 +2489,7 @@ public:
   void visitCaptureListExpr(CaptureListExpr *E) {
     printCommon(E, "capture_list");
     for (auto capture : E->getCaptureList()) {
-      OS << '\n';
-      Indent += 2;
       printRec(capture.PBD);
-      Indent -= 2;
     }
     printRec(E->getClosureBody());
     printFoot();
@@ -2625,7 +2553,6 @@ public:
       PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
     }
 
-    OS << '\n';
     printRec(E->getBody(), &E->getASTContext());
     printFoot();
   }
@@ -2637,14 +2564,12 @@ public:
       PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
     }
 
-    OS << '\n';
     printRec(E->getSingleExpressionBody());
     printFoot();
   }
 
   void visitDynamicTypeExpr(DynamicTypeExpr *E) {
     printCommon(E, "metatype_expr");
-    OS << '\n';
     printRec(E->getBase());
     printFoot();
   }
@@ -2657,10 +2582,8 @@ public:
   void visitPropertyWrapperValuePlaceholderExpr(
       PropertyWrapperValuePlaceholderExpr *E) {
     printCommon(E, "property_wrapper_value_placeholder_expr");
-    OS << '\n';
     printRec(E->getOpaqueValuePlaceholder());
     if (auto *value = E->getOriginalWrappedValue()) {
-      OS << '\n';
       printRec(value);
     }
     printFoot();
@@ -2668,7 +2591,6 @@ public:
 
   void visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E) {
     printCommon(E, "applied_property_wrapper_expr");
-    OS << '\n';
     printRec(E->getValue());
     printFoot();
   }
@@ -2711,7 +2633,6 @@ public:
       PrintWithColorRAII(OS, ExprModifierColor)
           << "none";
     }
-    OS << '\n';
     printRec(E->getFn());
     OS << '\n';
     printArgumentList(E->getArgs());
@@ -2737,9 +2658,8 @@ public:
     printApplyExpr(E, "constructor_ref_call_expr");
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
-    printCommon(E, "dot_syntax_base_ignored") << '\n';
+    printCommon(E, "dot_syntax_base_ignored");
     printRec(E->getLHS());
-    OS << '\n';
     printRec(E->getRHS());
     printFoot();
   }
@@ -2753,7 +2673,7 @@ public:
       GetTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
     else
       E->getCastType().print(OS);
-    OS << "'\n";
+    OS << "'";
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2775,52 +2695,46 @@ public:
       OS << " async";
     if (E->getThrowsLoc().isValid())
       OS << " throws";
-    OS << '\n';
     printRec(E->getArgsExpr());
-    OS << '\n';
     printRec(E->getResultExpr());
     printFoot();
   }
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
-    printCommon(E, "rebind_self_in_constructor_expr") << '\n';
+    printCommon(E, "rebind_self_in_constructor_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitTernaryExpr(TernaryExpr *E) {
-    printCommon(E, "ternary_expr") << '\n';
+    printCommon(E, "ternary_expr");
     printRec(E->getCondExpr());
-    OS << '\n';
     printRec(E->getThenExpr());
-    OS << '\n';
     printRec(E->getElseExpr());
     printFoot();
   }
   void visitAssignExpr(AssignExpr *E) {
-    printCommon(E, "assign_expr") << '\n';
+    printCommon(E, "assign_expr");
     printRec(E->getDest());
-    OS << '\n';
     printRec(E->getSrc());
     printFoot();
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     printCommon(E, "enum_is_case_expr") << ' ' <<
-      E->getEnumElement()->getBaseIdentifier() << "\n";
+      E->getEnumElement()->getBaseIdentifier();
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
-    printCommon(E, "unresolved_pattern_expr") << '\n';
+    printCommon(E, "unresolved_pattern_expr");
     printRec(E->getSubPattern());
     printFoot();
   }
   void visitBindOptionalExpr(BindOptionalExpr *E) {
-    printCommon(E, "bind_optional_expr")
-      << " depth=" << E->getDepth() << '\n';
+    printCommon(E, "bind_optional_expr") << " depth=" << E->getDepth();
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
-    printCommon(E, "optional_evaluation_expr") << '\n';
+    printCommon(E, "optional_evaluation_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2828,26 +2742,21 @@ public:
     printCommon(E, "force_value_expr");
     if (E->isForceOfImplicitlyUnwrappedOptional())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit_iuo_unwrap";
-    OS << '\n';
 
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitOpenExistentialExpr(OpenExistentialExpr *E) {
-    printCommon(E, "open_existential_expr") << '\n';
+    printCommon(E, "open_existential_expr");
     printRec(E->getOpaqueValue());
-    OS << '\n';
     printRec(E->getExistentialValue());
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
   void visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *E) {
-    printCommon(E, "make_temporarily_escapable_expr") << '\n';
+    printCommon(E, "make_temporarily_escapable_expr");
     printRec(E->getOpaqueValue());
-    OS << '\n';
     printRec(E->getNonescapingClosureValue());
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2859,25 +2768,23 @@ public:
       auto &Ctx = Ty->getASTContext();
       auto TABL = E->getTrailingAngleBracketLoc();
       if (TABL.isValid()) {
-        PrintWithColorRAII(OS, LocationColor) << " trailing_angle_bracket_loc=";
+        PrintWithColorRAII(OS, LocationColor) << "trailing_angle_bracket_loc=";
         TABL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
                    Ctx.SourceMgr);
       }
     }
-    OS << '\n';
     auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
       printRec(TyR);
     if (ExpTyR && ExpTyR != TyR) {
-      OS << '\n';
       printRec(ExpTyR);
     }
     printSemanticExpr(E->getSemanticExpr());
     printFoot();
   }
   void visitLazyInitializerExpr(LazyInitializerExpr *E) {
-    printCommon(E, "lazy_initializer_expr") << '\n';
+    printCommon(E, "lazy_initializer_expr");
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2886,7 +2793,6 @@ public:
     OS << " kind=" << getDumpString(E->getSelectorKind());
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMethod());
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2972,16 +2878,13 @@ public:
     Indent -= 2;
 
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
-      OS << '\n';
       printRecLabeled(stringLiteral, "objc_string_literal");
     }
     if (!E->isObjC()) {
       if (auto root = E->getParsedRoot()) {
-        OS << "\n";
         printRecLabeled(root, "parsed_root");
       }
       if (auto path = E->getParsedPath()) {
-        OS << "\n";
         printRecLabeled(path, "parsed_path");
       }
     }
@@ -2995,14 +2898,12 @@ public:
 
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
     printCommon(E, "single_value_stmt_expr");
-    OS << '\n';
     printRec(E->getStmt(), &E->getDeclContext()->getASTContext());
     printFoot();
   }
 
   void visitOneWayExpr(OneWayExpr *E) {
     printCommon(E, "one_way_expr");
-    OS << '\n';
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -3011,11 +2912,7 @@ public:
     printCommon(E, "tap_expr");
     PrintWithColorRAII(OS, DeclColor) << " var=";
     printDeclRef(E->getVar());
-    OS << '\n';
-
     printRec(E->getSubExpr());
-    OS << '\n';
-
     printRec(E->getBody(), &E->getVar()->getDeclContext()->getASTContext());
     printFoot();
   }
@@ -3024,22 +2921,15 @@ public:
     printCommon(E, "type_join_expr");
 
     if (auto *var = E->getVar()) {
-      PrintWithColorRAII(OS, DeclColor) << " var=";
-      printRec(var);
-      OS << '\n';
+      printRecLabeled(var, "var");
     }
 
     if (auto *SVE = E->getSingleValueStmtExpr()) {
-      PrintWithColorRAII(OS, ExprColor) << "single_value_stmt_expr=";
-      printRec(SVE);
-      OS << '\n';
+      printRecLabeled(SVE, "single_value_stmt_expr");
     }
-
-    OS << '\n';
 
     for (auto *member : E->getElements()) {
       printRec(member);
-      OS << '\n';
     }
 
     printFoot();
@@ -3055,8 +2945,7 @@ public:
       printArgumentList(E->getArgs());
     }
     if (auto rewritten = E->getRewritten()) {
-      OS << " rewritten=\n";
-      printRec(rewritten);
+      printRecLabeled(rewritten, "rewritten");
     }
     printFoot();
   }
@@ -3127,7 +3016,6 @@ public:
   void visitAttributedTypeRepr(AttributedTypeRepr *T) {
     printCommon("type_attributed") << " attrs=";
     T->printAttrs(OS);
-    OS << '\n';
     printRec(T->getTypeRepr());
   }
 
@@ -3144,7 +3032,6 @@ public:
     printFoot();
     if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
       for (auto genArg : GenIdT->getGenericArgs()) {
-        OS << '\n';
         printRec(genArg);
       }
     }
@@ -3153,10 +3040,8 @@ public:
   void visitMemberTypeRepr(MemberTypeRepr *T) {
     printCommon("type_member");
 
-    OS << '\n';
     printRec(T->getBaseComponent());
     for (auto *comp : T->getMemberComponents()) {
-      OS << '\n';
       printRec(comp);
     }
     printFoot();
@@ -3164,44 +3049,43 @@ public:
 
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
-    OS << '\n'; printRec(T->getArgsTypeRepr());
     if (T->isAsync())
       OS << " async";
     if (T->isThrowing())
       OS << " throws";
-    OS << '\n'; printRec(T->getResultTypeRepr());
+    printRec(T->getArgsTypeRepr());
+    printRec(T->getResultTypeRepr());
     printFoot();
   }
 
   void visitArrayTypeRepr(ArrayTypeRepr *T) {
-    printCommon("type_array") << '\n';
+    printCommon("type_array");
     printRec(T->getBase());
     printFoot();
   }
 
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
-    printCommon("type_dictionary") << '\n';
+    printCommon("type_dictionary");
     printRec(T->getKey());
-    OS << '\n';
     printRec(T->getValue());
     printFoot();
   }
 
   void visitVarargTypeRepr(VarargTypeRepr *T) {
-    printCommon("vararg") << '\n';
+    printCommon("vararg");
     printRec(T->getElementType());
     printFoot();
   }
 
   void visitPackTypeRepr(PackTypeRepr *T) {
-    printCommon("pack") << '\n';
+    printCommon("pack");
     for (auto elt : T->getElements())
       printRec(elt);
     printFoot();
   }
 
   void visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
-    printCommon("pack_expansion") << '\n';
+    printCommon("pack_expansion");
     printRec(T->getPatternType());
     printFoot();
   }
@@ -3228,7 +3112,6 @@ public:
     }
 
     for (auto elem : T->getElements()) {
-      OS << '\n';
       printRec(elem.Type);
     }
     printFoot();
@@ -3237,52 +3120,50 @@ public:
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {
     printCommon("type_composite");
     for (auto elem : T->getTypes()) {
-      OS << '\n';
       printRec(elem);
     }
     printFoot();
   }
 
   void visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
-    printCommon("type_metatype") << '\n';
+    printCommon("type_metatype");
     printRec(T->getBase());
     printFoot();
   }
 
   void visitProtocolTypeRepr(ProtocolTypeRepr *T) {
-    printCommon("type_protocol") << '\n';
+    printCommon("type_protocol");
     printRec(T->getBase());
     printFoot();
   }
 
   void visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
-    printCommon("type_ownership")
-      << ' ' << getDumpString(T->getSpecifier()) << '\n';
+    printCommon("type_ownership") << ' ' << getDumpString(T->getSpecifier());
     printRec(T->getBase());
     printFoot();
   }
   
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
-    printCommon("isolated") << '\n';
+    printCommon("isolated");
     printRec(T->getBase());
     printFoot();
   }
 
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
-    printCommon("_const") << '\n';
+    printCommon("_const");
     printRec(T->getBase());
     printFoot();
   }
 
   void visitOptionalTypeRepr(OptionalTypeRepr *T) {
-    printCommon("type_optional") << '\n';
+    printCommon("type_optional");
     printRec(T->getBase());
     printFoot();
   }
 
   void visitImplicitlyUnwrappedOptionalTypeRepr(
       ImplicitlyUnwrappedOptionalTypeRepr *T) {
-    printCommon("type_implicitly_unwrapped_optional") << '\n';
+    printCommon("type_implicitly_unwrapped_optional");
     printRec(T->getBase());
     printFoot();
   }
@@ -3294,7 +3175,7 @@ public:
   }
 
   void visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
-    printCommon("type_named_opaque_return") << '\n';
+    printCommon("type_named_opaque_return");
     printRec(T->getBase());
     printFoot();
   }
@@ -3319,7 +3200,7 @@ public:
         OS << " location=@";
         T->getLoc().print(OS, srcMgr);
       } else {
-        OS << " location=<<invalid>>";
+        OS << " location=<invalid>";
       }
     }
     OS << " type="; Ty.dump(OS);
@@ -3335,7 +3216,7 @@ public:
         OS << " location=@";
         T->getLoc().print(OS, srcMgr);
       } else {
-        OS << " location=<<invalid>>";
+        OS << " location=<invalid>";
       }
     }
     OS << " type="; Ty.dump(OS);
@@ -3353,13 +3234,11 @@ public:
       if (Fields[i].isMutable()) {
         OS << " mutable";
       }
-      OS << '\n';
       printRec(Fields[i].getFieldType());
       printFoot();
     }
 
     for (auto genArg : T->getGenericArguments()) {
-      OS << '\n';
       printRec(genArg);
     }
 
@@ -3369,6 +3248,7 @@ public:
 };
 
 void PrintBase::printRec(Decl *D) {
+  OS << '\n';
   if (!D)
     OS.indent(Indent + 2) << "(<null decl>)";
   else
@@ -3376,6 +3256,7 @@ void PrintBase::printRec(Decl *D) {
               GetTypeOfKeyPathComponent).visit(D);
 }
 void PrintBase::printRec(Expr *E) {
+  OS << '\n';
   if (!E)
     OS.indent(Indent + 2) << "(<null expr>)";
   else
@@ -3383,6 +3264,7 @@ void PrintBase::printRec(Expr *E) {
               GetTypeOfKeyPathComponent).visit(E);
 }
 void PrintBase::printRec(Stmt *S, const ASTContext *Ctx) {
+  OS << '\n';
   if (!S)
     OS.indent(Indent + 2) << "(<null stmt>)";
   else
@@ -3390,6 +3272,7 @@ void PrintBase::printRec(Stmt *S, const ASTContext *Ctx) {
               GetTypeOfKeyPathComponent).visit(S);
 }
 void PrintBase::printRec(TypeRepr *T) {
+  OS << '\n';
   if (!T)
     OS.indent(Indent + 2) << "(<null typerepr>)";
   else
@@ -3397,6 +3280,7 @@ void PrintBase::printRec(TypeRepr *T) {
                   GetTypeOfKeyPathComponent).visit(T);
 }
 void PrintBase::printRec(const Pattern *P) {
+  OS << '\n';
   if (!P)
     OS.indent(Indent + 2) << "(<null pattern>)";
   else
@@ -4011,7 +3895,6 @@ namespace {
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
-      OS << "\n";
       printFoot();
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
@@ -4037,7 +3920,6 @@ namespace {
     void visitPackArchetypeType(PackArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "pack_archetype_type", label);
       printField("name", T->getFullName());
-      OS << "\n";
       printFoot();
     }
     void visitElementArchetypeType(ElementArchetypeType *T, StringRef label) {
