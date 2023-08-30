@@ -173,7 +173,11 @@ public:
     return combine_many(arg.first, arg.second);
   }
 
-  template <typename T> void combine(const std::basic_string<T> &arg) {
+  void combine(const std::basic_string<char> &arg) {
+    return combine_range(arg.begin(), arg.end());
+  }
+
+  void combine(const std::basic_string<wchar_t> &arg) {
     return combine_range(arg.begin(), arg.end());
   }
 
