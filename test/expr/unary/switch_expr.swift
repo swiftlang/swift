@@ -1288,3 +1288,16 @@ func tryAwaitSwitch2() async throws -> Int {
   // expected-error@-1 {{'try' may not be used on 'switch' expression}}
   // expected-error@-2 {{'await' may not be used on 'switch' expression}}
 }
+
+struct AnyEraserP: EraserP {
+  init<T: EraserP>(erasing: T) {}
+}
+
+@_typeEraser(AnyEraserP)
+protocol EraserP {}
+struct SomeEraserP: EraserP {}
+
+// rdar://113435870 - Make sure we allow an implicit init(erasing:) call.
+dynamic func testDynamicOpaqueErase() -> some EraserP {
+  switch Bool.random() { default: SomeEraserP() }
+}

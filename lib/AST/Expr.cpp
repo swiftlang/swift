@@ -2519,30 +2519,47 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
 
 SingleValueStmtExpr *
 SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
-  while (true) {
-    // Look through implicit conversions.
-    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
-      E = ICE->getSubExpr();
-      continue;
+  class SVEFinder final : public ASTWalker {
+  public:
+    SingleValueStmtExpr *FoundSVE = nullptr;
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
+        FoundSVE = SVE;
+        return Action::Stop();
+      }
+
+      // Look through implicit exprs.
+      if (E->isImplicit())
+        return Action::Continue(E);
+
+      // Look through coercions.
+      if (isa<CoerceExpr>(E))
+        return Action::Continue(E);
+
+      // Look through try/await (this is invalid, but we'll error on it in
+      // effect checking).
+      if (isa<AnyTryExpr>(E) || isa<AwaitExpr>(E))
+        return Action::Continue(E);
+
+      return Action::Stop();
     }
-    // Look through coercions.
-    if (auto *CE = dyn_cast<CoerceExpr>(E)) {
-      E = CE->getSubExpr();
-      continue;
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::Stop();
     }
-    // Look through try/await (this is invalid, but we'll error on it in
-    // effect checking).
-    if (auto *TE = dyn_cast<AnyTryExpr>(E)) {
-      E = TE->getSubExpr();
-      continue;
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::Stop();
     }
-    if (auto *AE = dyn_cast<AwaitExpr>(E)) {
-      E = AE->getSubExpr();
-      continue;
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::Stop();
     }
-    break;
-  }
-  return dyn_cast<SingleValueStmtExpr>(E);
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::Stop();
+    }
+  };
+  SVEFinder finder;
+  E->walk(finder);
+  return finder.FoundSVE;
 }
 
 SourceRange SingleValueStmtExpr::getSourceRange() const {

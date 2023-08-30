@@ -1016,3 +1016,16 @@ func tryAwaitIf2() async throws -> Int {
   // expected-error@-1 {{'try' may not be used on 'if' expression}}
   // expected-error@-2 {{'await' may not be used on 'if' expression}}
 }
+
+struct AnyEraserP: EraserP {
+  init<T: EraserP>(erasing: T) {}
+}
+
+@_typeEraser(AnyEraserP)
+protocol EraserP {}
+struct SomeEraserP: EraserP {}
+
+// rdar://113435870 - Make sure we allow an implicit init(erasing:) call.
+dynamic func testDynamicOpaqueErase() -> some EraserP {
+  if .random() { SomeEraserP() } else { SomeEraserP() }
+}
