@@ -67,14 +67,16 @@ using namespace swift::siloptimizer;
 //                Mark Must Check Candidate Search for Objects
 //===----------------------------------------------------------------------===//
 
-bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
-    SILFunction *fn,
-    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
-    DiagnosticEmitter &emitter) {
+bool swift::siloptimizer::
+    searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
+        SILFunction *fn,
+        SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+            &moveIntroducersToProcess,
+        DiagnosticEmitter &emitter) {
   bool localChanged = false;
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
+      auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&*ii);
       ++ii;
 
       if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isObject())
@@ -86,20 +88,21 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //
       // bb0(%0 : @guaranteed $T):
       //   %1 = copy_value %0
-      //   %2 = mark_must_check [no_consume_or_assign] %1
+      //   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
       // bb0(%0 : @owned $T):
-      //   %1 = mark_must_check [no_consume_or_assign] %2
+      //   %1 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
       //
       // This is forming a let or an argument.
       // bb0:
       //   %1 = move_value [lexical] %0
-      //   %2 = mark_must_check [consumable_and_assignable] %1
+      //   %2 = mark_unresolved_non_copyable_value [consumable_and_assignable]
+      //   %1
       //
       // This occurs when SILGen materializes a temporary move only value?
       // bb0:
       //   %1 = begin_borrow [lexical] %0
       //   %2 = copy_value %1
-      //   %3 = mark_must_check [no_consume_or_assign] %2
+      //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
       if (mmci->getOperand()->getType().isMoveOnly() &&
           !mmci->getOperand()->getType().isMoveOnlyWrapped()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
@@ -110,12 +113,13 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
             }
           }
 
-          // In the case we have a resilient argument, we may have the following pattern:
+          // In the case we have a resilient argument, we may have the following
+          // pattern:
           //
           // bb0(%0 : $*Type): // in_guaranteed
           //   %1 = load_borrow %0
           //   %2 = copy_value
-          //   %3 = mark_must_check [no_copy_or_assign]
+          //   %3 = mark_unresolved_non_copyable_value [no_copy_or_assign]
           if (auto *lbi = dyn_cast<LoadBorrowInst>(cvi->getOperand())) {
             if (auto *arg = dyn_cast<SILFunctionArgument>(lbi->getOperand())) {
               if (arg->getKnownParameterInfo().isIndirectInGuaranteed()) {
@@ -154,14 +158,15 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : @guaranteed $T):
       //   %1 = copyable_to_moveonlywrapper [guaranteed] %0
       //   %2 = copy_value %1
-      //   %3 = mark_must_check [no_consume_or_assign] %2
+      //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
       //
       // NOTE: Unlike with owned arguments, we do not need to insert a
       // begin_borrow lexical since the lexical value comes from the guaranteed
       // argument itself.
       //
       // NOTE: When we are done checking, we will eliminate the copy_value,
-      // mark_must_check inst to leave the IR in a guaranteed state.
+      // mark_unresolved_non_copyable_value inst to leave the IR in a guaranteed
+      // state.
       if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
         if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
                 cvi->getOperand())) {
@@ -182,14 +187,14 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : $Trivial):
       //  %1 = copyable_to_moveonlywrapper [owned] %0
       //  %2 = move_value [lexical] %1
-      //  %3 = mark_must_check [consumable_and_assignable] %2
+      //  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2
       //
       // *OR*
       //
       // bb0(%0 : $Trivial):
       //  %1 = copyable_to_moveonlywrapper [owned] %0
       //  %2 = move_value [lexical] %1
-      //  %3 = mark_must_check [no_consume_or_assign] %2
+      //  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
       //
       // We are relying on a structural SIL requirement that %0 has only one
       // use, %1. This is validated by the SIL verifier. In this case, we need
@@ -214,7 +219,8 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : @owned $T):
       //   %1 = copyable_to_moveonlywrapper [owned] %0
       //   %2 = move_value [lexical] %1
-      //   %3 = mark_must_check [consumable_and_assignable_owned] %2
+      //   %3 = mark_unresolved_non_copyable_value
+      //   [consumable_and_assignable_owned] %2
       if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
         if (mvi->isLexical()) {
           if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
@@ -236,7 +242,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //  %1 = begin_borrow [lexical] %0
       //  %2 = copy_value %1
       //  %3 = copyable_to_moveonlywrapper [owned] %2
-      //  %4 = mark_must_check [consumable_and_assignable]
+      //  %4 = mark_unresolved_non_copyable_value [consumable_and_assignable]
       //
       // Or for a move only type, we look for a move_value [lexical].
       if (auto *mvi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
@@ -257,7 +263,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //
       // %1 = copyable_to_moveonlywrapper [owned] %0
       // %2 = move_value [lexical] %1
-      // %3 = mark_must_check [consumable_and_assignable] %2
+      // %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2
       if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mmci->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
           if (bbi->isLexical()) {
@@ -282,15 +288,15 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
         }
       }
 
-
-      // If we see a mark_must_check that is marked no implicit copy that we
-      // don't understand, emit a diagnostic to fail the compilation. This
-      // ensures that if someone marks something no implicit copy and we fail to
-      // check it, we fail the compilation.
+      // If we see a mark_unresolved_non_copyable_value that is marked no
+      // implicit copy that we don't understand, emit a diagnostic to fail the
+      // compilation. This ensures that if someone marks something no implicit
+      // copy and we fail to check it, we fail the compilation.
       //
-      // We then RAUW the mark_must_check once we have emitted the error since
-      // later passes expect that mark_must_check has been eliminated by
-      // us. Since we are failing already, this is ok to do.
+      // We then RAUW the mark_unresolved_non_copyable_value once we have
+      // emitted the error since later passes expect that
+      // mark_unresolved_non_copyable_value has been eliminated by us. Since we
+      // are failing already, this is ok to do.
       emitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
       mmci->replaceAllUsesWith(mmci->getOperand());
       mmci->eraseFromParent();
@@ -371,31 +377,36 @@ struct MoveOnlyObjectCheckerPImpl {
   borrowtodestructure::IntervalMapAllocator &allocator;
   DiagnosticEmitter &diagnosticEmitter;
 
-  /// A set of mark_must_check that we are actually going to process.
-  llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess;
+  /// A set of mark_unresolved_non_copyable_value that we are actually going to
+  /// process.
+  llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+      &moveIntroducersToProcess;
 
   bool changed = false;
 
   MoveOnlyObjectCheckerPImpl(
       SILFunction *fn, borrowtodestructure::IntervalMapAllocator &allocator,
       DiagnosticEmitter &diagnosticEmitter,
-      llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess)
+      llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+          &moveIntroducersToProcess)
       : fn(fn), allocator(allocator), diagnosticEmitter(diagnosticEmitter),
         moveIntroducersToProcess(moveIntroducersToProcess) {}
 
   void check(DominanceInfo *domTree, PostOrderAnalysis *poa);
 
-  bool convertBorrowExtractsToOwnedDestructures(MarkMustCheckInst *mmci,
-                                                DominanceInfo *domTree,
-                                                PostOrderAnalysis *poa);
+  bool convertBorrowExtractsToOwnedDestructures(
+      MarkUnresolvedNonCopyableValueInst *mmci, DominanceInfo *domTree,
+      PostOrderAnalysis *poa);
 
-  bool checkForSameInstMultipleUseErrors(MarkMustCheckInst *base);
+  bool
+  checkForSameInstMultipleUseErrors(MarkUnresolvedNonCopyableValueInst *base);
 };
 
 } // namespace
 
 bool MoveOnlyObjectCheckerPImpl::convertBorrowExtractsToOwnedDestructures(
-    MarkMustCheckInst *mmci, DominanceInfo *domTree, PostOrderAnalysis *poa) {
+    MarkUnresolvedNonCopyableValueInst *mmci, DominanceInfo *domTree,
+    PostOrderAnalysis *poa) {
   BorrowToDestructureTransform transform(allocator, mmci, mmci,
                                          diagnosticEmitter, poa);
   if (!transform.transform()) {
@@ -408,7 +419,7 @@ bool MoveOnlyObjectCheckerPImpl::convertBorrowExtractsToOwnedDestructures(
 }
 
 bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
-    MarkMustCheckInst *mmci) {
+    MarkUnresolvedNonCopyableValueInst *mmci) {
   LLVM_DEBUG(llvm::dbgs() << "Checking for same inst multiple use error!\n");
 
   SmallFrozenMultiMap<SILInstruction *, Operand *, 8> instToOperandsMap;
@@ -541,7 +552,8 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
                                        PostOrderAnalysis *poa) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
-        if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
+        if (auto *mvi =
+                dyn_cast<MarkUnresolvedNonCopyableValueInst>(instToDelete))
           moveIntroducersToProcess.remove(mvi);
         instToDelete->eraseFromParent();
       });
@@ -554,7 +566,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
   while (!moveIntroducers.empty()) {
-    MarkMustCheckInst *markedValue = moveIntroducers.front();
+    MarkUnresolvedNonCopyableValueInst *markedValue = moveIntroducers.front();
 
     OSSACanonicalizer::LivenessState livenessState(canonicalizer, markedValue);
 
@@ -630,7 +642,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
     // /any/ consuming boundary uses or uses that need copies and then rewrite
     // lifetimes.
     if (markedValue->getCheckKind() ==
-        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
       if (canonicalizer.foundAnyConsumingUses()) {
         diagnosticEmitter.emitObjectGuaranteedDiagnostic(markedValue);
       }
@@ -663,8 +675,9 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
   // perform some small cleanups for guaranteed values if we emitted a
   // diagnostic on them.
   //
-  // NOTE: This is enforced in the verifier by only allowing MarkMustCheckInst
-  // in Raw SIL. This ensures we do not miss any.
+  // NOTE: This is enforced in the verifier by only allowing
+  // MarkUnresolvedNonCopyableValueInst in Raw SIL. This ensures we do not
+  // miss any.
   //
   // NOTE: destroys is a separate array that we use to avoid iterator
   // invalidation when cleaning up destroy_value of guaranteed checked values.
@@ -673,10 +686,11 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
     auto *markedInst = moveIntroducersToProcess.pop_back_val();
 
     // If we didn't emit a diagnostic on a non-trivial guaranteed argument,
-    // eliminate the copy_value, destroy_values, and the mark_must_check.
+    // eliminate the copy_value, destroy_values, and the
+    // mark_unresolved_non_copyable_value.
     if (!diagnosticEmitter.emittedDiagnosticForValue(markedInst)) {
       if (markedInst->getCheckKind() ==
-          MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
         if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
           SingleValueInstruction *i = cvi;
           if (auto *copyToMoveOnly =
@@ -689,7 +703,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
           //
           // bb0(%0 : @guaranteed $Type):
           //   %1 = copy_value %0
-          //   %2 = mark_must_check [no_consume_or_assign] %1
+          //   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
           if (auto *arg = dyn_cast<SILFunctionArgument>(i->getOperand(0))) {
             if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
               for (auto *use : markedInst->getConsumingUses()) {
@@ -709,7 +723,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
           // bb0(%0 : $*Type): // in_guaranteed
           //   %1 = load_borrow %0
           //   %2 = copy_value %1
-          //   %3 = mark_must_check [no_consume_or_assign] %2
+          //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
           if (auto *lbi = dyn_cast<LoadBorrowInst>(i->getOperand(0))) {
             if (auto *arg = dyn_cast<SILFunctionArgument>(lbi->getOperand())) {
               if (arg->getKnownParameterInfo().isIndirectInGuaranteed()) {
@@ -740,7 +754,8 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
 //===----------------------------------------------------------------------===//
 
 bool MoveOnlyObjectChecker::check(
-    llvm::SmallSetVector<MarkMustCheckInst *, 32> &instsToCheck) {
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        &instsToCheck) {
   assert(instsToCheck.size() &&
          "Should only call this with actual insts to check?!");
   MoveOnlyObjectCheckerPImpl checker(instsToCheck[0]->getFunction(), allocator,

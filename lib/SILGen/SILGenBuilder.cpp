@@ -1068,14 +1068,14 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
   return ManagedValue::forBorrowedObjectRValue(mdi);
 }
 
-ManagedValue
-SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
-                                       MarkMustCheckInst::CheckKind kind) {
+ManagedValue SILGenBuilder::createMarkUnresolvedNonCopyableValueInst(
+    SILLocation loc, ManagedValue value,
+    MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
   assert((value.isPlusOne(SGF) || value.isLValue() ||
           value.getType().isAddress()) &&
          "Argument must be at +1 or be an address!");
   CleanupCloner cloner(*this, value);
-  auto *mdi = SILBuilder::createMarkMustCheckInst(
+  auto *mdi = SILBuilder::createMarkUnresolvedNonCopyableValueInst(
       loc, value.forward(getSILGenFunction()), kind);
   return cloner.clone(mdi);
 }

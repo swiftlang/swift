@@ -295,7 +295,7 @@ void SelectEnforcement::analyzeProjection(SingleValueInstruction *projection) {
     auto user = use->getUser();
 
     // Look through mark must check.
-    if (auto *mmi = dyn_cast<MarkMustCheckInst>(user)) {
+    if (auto *mmi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user)) {
       analyzeProjection(mmi);
       continue;
     }
@@ -704,7 +704,7 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
     return getSourceAccess(mui->getOperand());
 
   // Recurse through mark must check.
-  if (auto *mmci = dyn_cast<MarkMustCheckInst>(address))
+  if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(address))
     return getSourceAccess(mmci->getOperand());
 
   // Recurse through moveonlywrapper_to_copyable_addr.

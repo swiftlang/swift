@@ -350,7 +350,7 @@ extension ValueDefUseWalker {
       }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
+      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
     case let mdi as MarkDependenceInst:
       if operand.index == 0 {
@@ -492,7 +492,7 @@ extension AddressDefUseWalker {
         return walkDownUses(ofAddress: ia, path: subPath.push(.anyIndexedElement, index: 0))
       }
       return walkDownUses(ofAddress: ia, path: path)
-    case let mmc as MarkMustCheckInst:
+    case let mmc as MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofAddress: mmc, path: path)
     case let ba as BeginAccessInst:
       // Don't treat `end_access` as leaf-use. Just ignore it.
@@ -656,7 +656,7 @@ extension ValueUseDefWalker {
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
+      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let arg as BlockArgument:
       if arg.isPhiArgument {
@@ -743,7 +743,7 @@ extension AddressUseDefWalker {
                     path: path.push(.enumCase, index: (def as! EnumInstruction).caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
-    case is BeginAccessInst, is MarkMustCheckInst:
+    case is BeginAccessInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)
     case let ia as IndexAddrInst:
       if let idx = ia.constantSmallIndex {

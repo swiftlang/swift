@@ -487,9 +487,10 @@ public:
   createGuaranteedCopyableToMoveOnlyWrapperValue(SILLocation loc,
                                                  ManagedValue value);
 
-  using SILBuilder::createMarkMustCheckInst;
-  ManagedValue createMarkMustCheckInst(SILLocation loc, ManagedValue value,
-                                       MarkMustCheckInst::CheckKind kind);
+  using SILBuilder::createMarkUnresolvedNonCopyableValueInst;
+  ManagedValue createMarkUnresolvedNonCopyableValueInst(
+      SILLocation loc, ManagedValue value,
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind);
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);

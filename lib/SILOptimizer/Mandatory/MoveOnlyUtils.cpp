@@ -163,7 +163,7 @@ bool swift::siloptimizer::cleanupNonCopyableCopiesAfterEmittingDiagnostic(
         continue;
       }
 
-      if (auto *mmci = dyn_cast<MarkMustCheckInst>(inst)) {
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(inst)) {
         mmci->replaceAllUsesWith(mmci->getOperand());
         mmci->eraseFromParent();
         changed = true;
@@ -320,7 +320,7 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
 //                  Simple Temporary AllocStack Elimination
 //===----------------------------------------------------------------------===//
 
-static bool isLetAllocation(MarkMustCheckInst *mmci) {
+static bool isLetAllocation(MarkUnresolvedNonCopyableValueInst *mmci) {
   if (auto *pbi = dyn_cast<ProjectBoxInst>(mmci)) {
     auto *box = cast<AllocBoxInst>(stripBorrow(pbi->getOperand()));
     return !box->getBoxType()->getLayout()->isMutable();
@@ -551,7 +551,7 @@ struct SimpleTemporaryAllocStackElimVisitor
 /// Returns false if we saw something we did not understand and the copy_addr
 /// should be inserted into UseState::copyInst to be conservative.
 bool siloptimizer::eliminateTemporaryAllocationsFromLet(
-    MarkMustCheckInst *markedInst) {
+    MarkUnresolvedNonCopyableValueInst *markedInst) {
   if (!isLetAllocation(markedInst))
     return false;
 

@@ -95,9 +95,10 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     auto *poa = getAnalysis<PostOrderAnalysis>();
 
     DiagnosticEmitter diagnosticEmitter(fn);
-    SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-    searchForCandidateAddressMarkMustChecks(fn, moveIntroducersToProcess,
-                                            diagnosticEmitter);
+    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        moveIntroducersToProcess;
+    searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
+        fn, moveIntroducersToProcess, diagnosticEmitter);
 
     LLVM_DEBUG(llvm::dbgs()
                << "Emitting diagnostic when checking for mark must check inst: "

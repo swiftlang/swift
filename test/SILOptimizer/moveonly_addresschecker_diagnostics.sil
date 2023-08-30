@@ -91,7 +91,7 @@ sil @addressOnlyGenericUse : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_g
 sil hidden [ossa] @initWithSplitStores : $@convention(thin) (Int) -> @owned AggStruct {
 bb0(%0 : $Int):
   %2 = alloc_stack [lexical] $AggStruct, var, name "self", implicit
-  %3 = mark_must_check [consumable_and_assignable] %2 : $*AggStruct // expected-error {{'self' consumed more than once}}
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*AggStruct // expected-error {{'self' consumed more than once}}
   debug_value %0 : $Int, let, name "myInit3", argno 1
   %5 = function_ref @get_aggstruct : $@convention(thin) () -> @owned AggStruct
   %6 = apply %5() : $@convention(thin) () -> @owned AggStruct
@@ -105,7 +105,7 @@ bb0(%0 : $Int):
   %14 = load [copy] %13 : $*Klass // expected-note {{consumed here}}
   end_access %12 : $*AggStruct
   %16 = move_value [lexical] %14 : $Klass
-  %17 = mark_must_check [consumable_and_assignable] %16 : $Klass
+  %17 = mark_unresolved_non_copyable_value [consumable_and_assignable] %16 : $Klass
   debug_value %17 : $Klass, let, name "x"
   %19 = copy_value %17 : $Klass
   %20 = move_value %19 : $Klass
@@ -120,7 +120,7 @@ bb0(%0 : $Int):
 sil [ossa] @aggStructConsumeGrandField : $@convention(thin) (@owned AggStruct) -> () {
 bb0(%arg : @owned $AggStruct):
   %0 = alloc_stack [lexical] $AggStruct, var, name "x2"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*AggStruct
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*AggStruct
   // expected-error @-1 {{'x2' consumed more than once}}
   // expected-error @-2 {{'x2' consumed in a loop}}
   %9 = begin_access [modify] [static] %1 : $*AggStruct
@@ -160,7 +160,7 @@ bb3:
 sil hidden [ossa] @copyableKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
 bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*NonTrivialStruct
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*NonTrivialStruct
   store %arg to [init] %1 : $*NonTrivialStruct
   %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
   store %arg1 to [assign] %9 : $*NonTrivialStruct
@@ -193,7 +193,7 @@ bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
 sil [ossa] @moveOnlyKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
 bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
   store %arg to [init] %1 : $*NonTrivialStruct
   %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
   store %arg1 to [assign] %9 : $*NonTrivialStruct
@@ -253,7 +253,7 @@ bb0(%0 : @owned $NonTrivialStruct):
   %1 = move_value [lexical] %0 : $NonTrivialStruct
   debug_value %1 : $NonTrivialStruct, let, name "x", argno 1
   %3 = alloc_stack $NonTrivialStruct, let, name "x2"
-  %4 = mark_must_check [consumable_and_assignable] %3 : $*NonTrivialStruct // expected-error {{'x2' consumed more than once}}
+  %4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %3 : $*NonTrivialStruct // expected-error {{'x2' consumed more than once}}
   store %1 to [init] %4 : $*NonTrivialStruct
   %6 = function_ref @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %7 = load [copy] %4 : $*NonTrivialStruct // expected-note {{consumed here}}
@@ -264,7 +264,7 @@ bb0(%0 : @owned $NonTrivialStruct):
   %12 = apply %11() : $@callee_guaranteed () -> ()
   destroy_value %11 : $@callee_guaranteed () -> ()
   %14 = alloc_stack $NonTrivialStruct, let, name "x3"
-  %15 = mark_must_check [consumable_and_assignable] %14 : $*NonTrivialStruct
+  %15 = mark_unresolved_non_copyable_value [consumable_and_assignable] %14 : $*NonTrivialStruct
   %16 = load [copy] %4 : $*NonTrivialStruct // expected-note {{consumed again here}}
   store %16 to [init] %15 : $*NonTrivialStruct
   %18 = load [copy] %15 : $*NonTrivialStruct
@@ -285,7 +285,7 @@ sil @borrow_and_consume : $@convention(thin) (@guaranteed NonTrivialStruct, @own
 sil hidden [ossa] @$s4test1d1xyAA1NonTrivialStructVn_tF : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct, let, name "x", argno 1
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'x' used after consume}}
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'x' used after consume}}
   store %0 to [init] %2 : $*NonTrivialStruct
   %4 = load_borrow %2 : $*NonTrivialStruct
   %5 = load [copy] %2 : $*NonTrivialStruct // expected-note {{consumed here}}
@@ -301,12 +301,12 @@ bb0(%0 : @owned $NonTrivialStruct):
 
 sil [ossa] @classSimpleChainArgTest : $@convention(thin) (@inout Klass) -> () {
 bb0(%0 : $*Klass):
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*Klass
   // expected-error @-1 {{'x2' consumed more than once}}
   // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
   debug_value %1 : $*Klass, var, name "x2", argno 1, expr op_deref
   %3 = alloc_stack [lexical] $Klass, var, name "y2"
-  %4 = mark_must_check [consumable_and_assignable] %3 : $*Klass
+  %4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %3 : $*Klass
   %5 = begin_access [read] [static] %1 : $*Klass
   copy_addr %5 to [init] %4 : $*Klass // expected-note {{consumed here}}
   end_access %5 : $*Klass
@@ -319,7 +319,7 @@ bb0(%0 : $*Klass):
   store %9 to [assign] %11 : $*Klass
   end_access %11 : $*Klass
   %14 = alloc_stack [lexical] $Klass, let, name "k2"
-  %15 = mark_must_check [consumable_and_assignable] %14 : $*Klass
+  %15 = mark_unresolved_non_copyable_value [consumable_and_assignable] %14 : $*Klass
   %16 = begin_access [read] [static] %4 : $*Klass
   copy_addr %16 to [init] %15 : $*Klass
   end_access %16 : $*Klass
@@ -347,17 +347,17 @@ bb0(%0 : @closureCapture @guaranteed $<τ_0_0 where τ_0_0 : P> { var AddressOnl
   %5 = function_ref @getAddressOnlyGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out AddressOnlyGeneric<τ_0_0>
   %6 = apply %5<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out AddressOnlyGeneric<τ_0_0>
   %7 = begin_access [modify] [dynamic] %1 : $*AddressOnlyGeneric<T>
-  %8 = mark_must_check [assignable_but_not_consumable] %7 : $*AddressOnlyGeneric<T>
+  %8 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %7 : $*AddressOnlyGeneric<T>
   copy_addr [take] %3 to %8 : $*AddressOnlyGeneric<T>
   end_access %7 : $*AddressOnlyGeneric<T>
   dealloc_stack %3 : $*AddressOnlyGeneric<T>
   %12 = begin_access [modify] [dynamic] %1 : $*AddressOnlyGeneric<T>
-  %13 = mark_must_check [assignable_but_not_consumable] %12 : $*AddressOnlyGeneric<T>
+  %13 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %12 : $*AddressOnlyGeneric<T>
   %14 = function_ref @addressOnlyGenericInOutUse : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@inout AddressOnlyGeneric<τ_0_0>) -> ()
   %15 = apply %14<T>(%13) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@inout AddressOnlyGeneric<τ_0_0>) -> ()
   end_access %12 : $*AddressOnlyGeneric<T>
   %17 = begin_access [deinit] [dynamic] %1 : $*AddressOnlyGeneric<T>
-  %18 = mark_must_check [assignable_but_not_consumable] %17 : $*AddressOnlyGeneric<T>
+  %18 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %17 : $*AddressOnlyGeneric<T>
   // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
   %19 = function_ref @addressOnlyGenericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
   %20 = apply %19<T>(%18) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
@@ -384,7 +384,7 @@ bb2:
 
 sil private [ossa] @$s23coroutine_partial_applyTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> () {
 bb0(%0 : @closureCapture $*NonTrivialStruct):
-  %1 = mark_must_check [no_consume_or_assign] %0 : $*NonTrivialStruct
+  %1 = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NonTrivialStruct
   debug_value %1 : $*NonTrivialStruct, let, name "e", argno 1, expr op_deref
   %3 = load_borrow %1 : $*NonTrivialStruct
   end_borrow %3 : $NonTrivialStruct
@@ -395,7 +395,7 @@ bb0(%0 : @closureCapture $*NonTrivialStruct):
 sil [ossa] @coroutine_caller_uses_partial_apply : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct, let, name "e"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'e' used after consume}}
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'e' used after consume}}
   store %0 to [init] %2 : $*NonTrivialStruct
   mark_function_escape %2 : $*NonTrivialStruct
 
@@ -419,7 +419,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @coroutine_caller_uses_partial_apply2 : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct, let, name "e"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'e' used after consume}}
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'e' used after consume}}
   store %0 to [init] %2 : $*NonTrivialStruct
   mark_function_escape %2 : $*NonTrivialStruct
 
@@ -447,10 +447,10 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @coroutine_caller_uses_partial_apply_reinit : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = copy_value %0 : $NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
-  %2 = mark_must_check [no_consume_or_assign] %1 : $NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NonTrivialStruct
   debug_value %2 : $NonTrivialStruct, let, name "x", argno 1
   %4 = alloc_stack $NonTrivialStruct, let, name "e"
-  %5 = mark_must_check [consumable_and_assignable] %4 : $*NonTrivialStruct
+  %5 = mark_unresolved_non_copyable_value [consumable_and_assignable] %4 : $*NonTrivialStruct
   %6 = copy_value %2 : $NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
   store %6 to [init] %5 : $*NonTrivialStruct
   mark_function_escape %5 : $*NonTrivialStruct
@@ -475,7 +475,7 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 sil [ossa] @coroutine_caller_uses_partial_apply_different_cfg : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct, let, name "e"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   // expected-error @-1 {{'e' used after consume}}
   // expected-error @-2 {{'e' used after consume}}
   store %0 to [init] %2 : $*NonTrivialStruct
@@ -514,7 +514,7 @@ bb3:
 sil [ossa] @load_take_as_load_copy : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct, let, name "foo"
-  %1a = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   // expected-error @-1 {{'foo' consumed more than once}}
   store %0 to [init] %1a : $*NonTrivialStruct
   %2 = load [take] %1a : $*NonTrivialStruct
@@ -542,7 +542,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @testSupportStoreBorrow1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   %borrow = store_borrow %0 to %1a : $*NonTrivialStruct
   %f = function_ref @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %l = load_borrow %borrow : $*NonTrivialStruct
@@ -567,7 +567,7 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 sil [ossa] @testSupportStoreBorrow2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   %borrow = store_borrow %0 to %1a : $*NonTrivialStruct
   %f = function_ref @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %l = load [copy] %borrow : $*NonTrivialStruct
@@ -592,7 +592,7 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 sil [ossa] @testSupportStoreBorrow3 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   %borrow = store_borrow %0 to %1a : $*NonTrivialStruct
   %f = function_ref @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %l = load_borrow %borrow : $*NonTrivialStruct
@@ -609,7 +609,7 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 sil [ossa] @testSupportStoreBorrow4 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   // expected-error @-1 {{noncopyable 'unknown' cannot be consumed when captured by an escaping closure}}
   %borrow = store_borrow %0 to %1a : $*NonTrivialStruct
   %f = function_ref @consumingUseNonTrivialStruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
@@ -626,7 +626,7 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 sil [ossa] @testSupportStoreBorrow5 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   // expected-error @-1 {{'unknown' is borrowed and cannot be consumed}}
   %borrow = store_borrow %0 to %1a : $*NonTrivialStruct
   %f = function_ref @consumingUseNonTrivialStruct : $@convention(thin) (@owned NonTrivialStruct) -> ()

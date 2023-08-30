@@ -58,7 +58,7 @@ class BorrowToDestructureTransform {
   using IntervalMapAllocator = borrowtodestructure::IntervalMapAllocator;
 
   IntervalMapAllocator &allocator;
-  MarkMustCheckInst *mmci;
+  MarkUnresolvedNonCopyableValueInst *mmci;
   SILValue rootValue;
   DiagnosticEmitter &diagnosticEmitter;
   PostOrderAnalysis *poa;
@@ -68,7 +68,8 @@ class BorrowToDestructureTransform {
 
 public:
   BorrowToDestructureTransform(IntervalMapAllocator &allocator,
-                               MarkMustCheckInst *mmci, SILValue rootValue,
+                               MarkUnresolvedNonCopyableValueInst *mmci,
+                               SILValue rootValue,
                                DiagnosticEmitter &diagnosticEmitter,
                                PostOrderAnalysis *poa)
       : allocator(allocator), mmci(mmci), rootValue(rootValue),

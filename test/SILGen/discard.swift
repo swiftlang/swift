@@ -26,7 +26,7 @@ func invokedDeinit() {}
   // CHECK:    [[SELF_BOX:%.*]] = alloc_box ${ let MaybeFile }, let, name "self", argno 1
   // CHECK:    [[SELF_REF:%.*]] = project_box [[SELF_BOX]] : ${ let MaybeFile }, 0
   // CHECK:    store {{.*}} to [init]
-  // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*MaybeFile
+  // CHECK:    [[SELF_MMC:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_REF]] : $*MaybeFile
   // CHECK:    [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*MaybeFile
   // CHECK:    [[DD:%.*]] = drop_deinit [[SELF_VAL]] : $MaybeFile
   // CHECK:    destroy_value [[DD]] : $MaybeFile
@@ -61,7 +61,7 @@ func invokedDeinit() {}
   // CHECK:  [[SELF_REF:%.*]] = project_box [[SELF_BOX]] : ${ let File }, 0
   // CHECK:  store {{.*}} to [init]
   // CHECK:  load_borrow {{.*}} : $*File
-  // CHECK:  [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*File
+  // CHECK:  [[SELF_MMC:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_REF]] : $*File
   // CHECK:  [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*File
   // CHECK:  [[DD:%.*]] = drop_deinit [[SELF_VAL]] : $File
   // CHECK:  destroy_value [[DD]] : $File
@@ -97,7 +97,7 @@ func invokedDeinit() {}
 //
 // CHECK:   bb1:
 // CHECK:     [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF_PTR]] : $*PointerTree
-// CHECK:     [[MMC:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]] : $*PointerTree
+// CHECK:     [[MMC:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]] : $*PointerTree
 // CHECK:     [[COPIED_SELF:%.*]] = load [copy] [[MMC]] : $*PointerTree
 // CHECK:     end_access [[ACCESS]] : $*PointerTree
 // CHECK:     [[DD:%.*]] = drop_deinit [[COPIED_SELF]]
@@ -165,7 +165,7 @@ final class Wallet {
   // >> now we begin the destruction sequence, which involves pattern matching on self to destroy its innards
   // CHECK:  [[NO_WALLET_BB]]
   // CHECK:    [[SELF_ACCESS:%.*]] = begin_access [read] [unknown] {{%.*}} : $*Ticket
-  // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_ACCESS]]
+  // CHECK:    [[SELF_MMC:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_ACCESS]]
   // CHECK:    [[SELF_COPY:%.*]] = load [copy] [[SELF_MMC]] : $*Ticket
   // CHECK:    end_access [[SELF_ACCESS:%.*]] : $*Ticket
   // CHECK:    [[DD:%.*]] = drop_deinit [[SELF_COPY]] : $Ticket

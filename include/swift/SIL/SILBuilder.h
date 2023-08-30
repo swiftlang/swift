@@ -1439,11 +1439,11 @@ public:
         getSILDebugLocation(loc), srcAddr, takeAddr));
   }
 
-  MarkMustCheckInst *
-  createMarkMustCheckInst(SILLocation loc, SILValue src,
-                          MarkMustCheckInst::CheckKind kind) {
-    return insert(new (getModule())
-                      MarkMustCheckInst(getSILDebugLocation(loc), src, kind));
+  MarkUnresolvedNonCopyableValueInst *createMarkUnresolvedNonCopyableValueInst(
+      SILLocation loc, SILValue src,
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
+    return insert(new (getModule()) MarkUnresolvedNonCopyableValueInst(
+        getSILDebugLocation(loc), src, kind));
   }
 
   MarkUnresolvedReferenceBindingInst *createMarkUnresolvedReferenceBindingInst(

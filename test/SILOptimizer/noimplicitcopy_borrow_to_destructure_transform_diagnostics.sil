@@ -26,7 +26,7 @@ bb0(%0 : @guaranteed $AggStruct):
   %3 = begin_borrow [lexical] %2 : $AggStruct
   %4 = copy_value %3 : $AggStruct
   %5 = copyable_to_moveonlywrapper [owned] %4 : $AggStruct
-  %6 = mark_must_check [consumable_and_assignable] %5 : $@moveOnly AggStruct
+  %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $@moveOnly AggStruct
   debug_value %6 : $@moveOnly AggStruct, let, name "x2"
   %8 = begin_borrow %6 : $@moveOnly AggStruct
   %9 = struct_extract %8 : $@moveOnly AggStruct, #AggStruct.lhs

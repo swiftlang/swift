@@ -17,13 +17,13 @@ func foo(y: consuming String, z: String) -> () -> String {
 
     // CHECK:   [[ZCOPY:%.*]] = copy_value %1
     // CHECK:   [[YACCESS:%.*]] = begin_access [modify] [unknown] [[Y]]
-    // CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[YACCESS]]
+    // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[YACCESS]]
     // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
     // CHECK:   assign [[ZCOPY]] to [[UNWRAP]]
     y = z
 
     // CHECK:   [[YACCESS:%.*]] = begin_access [read] [unknown] [[Y]]
-    // CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[YACCESS]]
+    // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[YACCESS]]
     // CHECK:   [[YVAL:%.*]] = load [copy] [[MARK]]
     // CHECK:   [[BORROW:%.*]] = begin_borrow [[YVAL]]
     // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROW]]
@@ -53,13 +53,13 @@ struct Butt {
 
         // CHECK:   [[OCOPY:%.*]] = copy_value %0
         // CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
-        // CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[SELFACCESS]]
+        // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[SELFACCESS]]
         // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[MARK]]
         // CHECK:   assign [[OCOPY]] to [[UNWRAP]]
         self = other
 
         // CHECK:   [[SELFACCESS:%.*]] = begin_access [read] [unknown] [[SELF]]
-        // CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[SELFACCESS]]
+        // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELFACCESS]]
         // CHECK:   [[SELFVAL:%.*]] = load [copy] [[MARK]]
         // CHECK:   [[BORROW:%.*]] = begin_borrow [[SELFVAL]]
         // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROW]]

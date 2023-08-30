@@ -89,9 +89,9 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     }
 
     switch (user->getKind()) {
-    case SILInstructionKind::MarkMustCheckInst: {
+    case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
       // Pass through to the address being checked.
-      auto inst = cast<MarkMustCheckInst>(user);
+      auto inst = cast<MarkUnresolvedNonCopyableValueInst>(user);
       worklist.append(inst->use_begin(), inst->use_end());
       break;
     }

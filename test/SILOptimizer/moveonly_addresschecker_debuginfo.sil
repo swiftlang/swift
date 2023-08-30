@@ -26,7 +26,7 @@ sil [ossa] @non_lifetime_ending_use_test_inst : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = apply %f() : $@convention(thin) () -> @owned NonTrivialStruct
   %1 = alloc_stack $NonTrivialStruct, let, name "v"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   br bb1
 
@@ -62,7 +62,7 @@ sil [ossa] @non_lifetime_ending_use_test_boundary_edge : $@convention(thin) () -
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = apply %f() : $@convention(thin) () -> @owned NonTrivialStruct
   %1 = alloc_stack $NonTrivialStruct, let, name "v"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -109,7 +109,7 @@ sil [ossa] @lifetime_ending_use : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = apply %f() : $@convention(thin) () -> @owned NonTrivialStruct
   %1 = alloc_stack $NonTrivialStruct, let, name "v"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -147,7 +147,7 @@ sil [ossa] @lifetime_ending_use_addr : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = apply %f() : $@convention(thin) () -> @owned NonTrivialStruct
   %1 = alloc_stack $NonTrivialStruct, let, name "v"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -192,7 +192,7 @@ sil [ossa] @dead_def_test_inst : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = apply %f() : $@convention(thin) () -> @owned NonTrivialStruct
   %1 = alloc_stack $NonTrivialStruct, let, name "v"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
