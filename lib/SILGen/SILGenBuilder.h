@@ -267,6 +267,8 @@ public:
   ManagedValue createLoadCopy(SILLocation loc, ManagedValue addr,
                               const TypeLowering &lowering);
 
+  ManagedValue createLoadTrivial(SILLocation loc, ManagedValue addr);
+
   /// Create a SILArgument for an input parameter. Asserts if used to create a
   /// function argument for an out parameter.
   ManagedValue createInputFunctionArgument(

@@ -11,6 +11,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Requires runtime functions added in Swift 5.9.
+// UNSUPPORTED: use_os_stdlib
+
 import Swift
 import layout_string_witnesses_types
 import ObjCClasses
