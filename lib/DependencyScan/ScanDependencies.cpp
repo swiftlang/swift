@@ -28,6 +28,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/DependencyScan/StringUtils.h"
@@ -36,7 +37,6 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
-#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
@@ -831,10 +831,8 @@ static void writeJSON(llvm::raw_ostream &out,
                              /*trailingComma=*/false);
     } else if (swiftBinaryDeps) {
       out << "\"swiftPrebuiltExternal\": {\n";
-      bool hasCompiledModulePath =
-          swiftBinaryDeps->compiled_module_path.data &&
-          get_C_string(swiftBinaryDeps->compiled_module_path)[0] != '\0';
-      assert(hasCompiledModulePath &&
+      assert(swiftBinaryDeps->compiled_module_path.data &&
+             get_C_string(swiftBinaryDeps->compiled_module_path)[0] != '\0' &&
              "Expected .swiftmodule for a Binary Swift Module Dependency.");
 
       writeJSONSingleField(out, "compiledModulePath",
@@ -1231,9 +1229,7 @@ static bool diagnoseCycle(CompilerInstance &instance,
   while (!openSet.empty()) {
     auto &lastOpen = openSet.back();
     auto beforeSize = openSet.size();
-
-    auto optionalDepInfo = cache.findDependency(lastOpen);
-    assert(optionalDepInfo.has_value() &&
+    assert(cache.findDependency(lastOpen).has_value() &&
            "Missing dependency info during cycle diagnosis.");
 
     for (const auto &dep : cache.getAllDependencies(lastOpen)) {
@@ -1617,7 +1613,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   auto scanner = ModuleDependencyScanner(
       cache.getScanService(), instance.getInvocation(),
       instance.getSILOptions(), instance.getASTContext(),
-      *instance.getDependencyTracker(), instance.getDiags());
+      *instance.getDependencyTracker(), instance.getDiags(),
+      instance.getInvocation().getFrontendOptions().ParallelDependencyScan);
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1637,7 +1634,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
     cache.recordDependency(mainModuleName, std::move(*mainModuleDepInfo));
 
   // Perform the full module scan starting at the main module.
-  auto allModules = scanner.resolveDependencies(mainModuleID, cache);
+  auto allModules = scanner.getModuleDependencies(mainModuleID, cache);
 
 #ifndef NDEBUG
   // Verify that all collected dependencies have had their
@@ -1668,7 +1665,8 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance,
   auto scanner = ModuleDependencyScanner(
       cache.getScanService(), instance.getInvocation(),
       instance.getSILOptions(), instance.getASTContext(),
-      *instance.getDependencyTracker(), instance.getDiags());
+      *instance.getDependencyTracker(), instance.getDiags(),
+      instance.getInvocation().getFrontendOptions().ParallelDependencyScan);
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies =
       scanner.getMainModuleDependencyInfo(instance.getMainModule());
@@ -1697,7 +1695,8 @@ swift::dependencies::performBatchModuleScan(
         auto scanner = ModuleDependencyScanner(
             cache.getScanService(), instance.getInvocation(),
             instance.getSILOptions(), instance.getASTContext(),
-            *instance.getDependencyTracker(), instance.getDiags());
+            *instance.getDependencyTracker(), instance.getDiags(),
+            instance.getInvocation().getFrontendOptions().ParallelDependencyScan);
 
         StringRef moduleName = entry.moduleName;
         bool isClang = !entry.isSwift;
@@ -1706,9 +1705,9 @@ swift::dependencies::performBatchModuleScan(
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's
           // dependencies.
-          rootDeps = scanner.scanForClangModuleDependency(moduleName, cache);
+          rootDeps = scanner.getNamedClangModuleDependencyInfo(moduleName, cache);
         } else {
-          rootDeps = scanner.scanForSwiftModuleDependency(moduleName, cache);
+          rootDeps = scanner.getNamedSwiftModuleDependencyInfo(moduleName, cache);
         }
         if (!rootDeps.has_value()) {
           // We cannot find the clang module, abort.
@@ -1721,7 +1720,7 @@ swift::dependencies::performBatchModuleScan(
         ModuleDependencyID moduleID{
             moduleName.str(), isClang ? ModuleDependencyKind::Clang
                                       : ModuleDependencyKind::SwiftInterface};
-        auto allDependencies = scanner.resolveDependencies(moduleID, cache);
+        auto allDependencies = scanner.getModuleDependencies(moduleID, cache);
         batchScanResult.push_back(
             generateFullDependencyGraph(instance, cache, allDependencies));
       });

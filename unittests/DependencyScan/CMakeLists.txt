@@ -6,6 +6,7 @@ add_swift_unittest(swiftScanTests
 
 target_link_libraries(swiftScanTests
   PRIVATE
+    swiftFrontend
     swiftDependencyScan
     libSwiftScan)
 

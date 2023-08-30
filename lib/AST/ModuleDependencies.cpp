@@ -32,6 +32,10 @@ bool ModuleDependencyInfo::isSwiftModule() const {
          isSwiftBinaryModule() || isSwiftPlaceholderModule();
 }
 
+bool ModuleDependencyInfo::isTextualSwiftModule() const {
+  return isSwiftInterfaceModule() || isSwiftSourceModule();
+}
+
 ModuleDependencyKind &operator++(ModuleDependencyKind &e) {
   if (e == ModuleDependencyKind::LastKind) {
     llvm_unreachable(
@@ -656,9 +660,32 @@ ModuleDependenciesCache::findDependency(
   return optionalDep;
 }
 
+llvm::Optional<const ModuleDependencyInfo *>
+ModuleDependenciesCache::findDependency(StringRef moduleName) const {
+  for (auto kind = ModuleDependencyKind::FirstKind;
+       kind != ModuleDependencyKind::LastKind; ++kind) {
+    if (auto found = findDependency(moduleName, kind))
+      return found;
+  }
+  return llvm::None;
+}
+
+bool ModuleDependenciesCache::hasDependency(const ModuleDependencyID &moduleID) const {
+  return hasDependency(moduleID.ModuleName, moduleID.Kind);
+}
+
 bool ModuleDependenciesCache::hasDependency(
     StringRef moduleName, llvm::Optional<ModuleDependencyKind> kind) const {
   return findDependency(moduleName, kind).has_value();
+}
+
+bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
+  for (auto kind = ModuleDependencyKind::FirstKind;
+       kind != ModuleDependencyKind::LastKind; ++kind) {
+    if (findDependency(moduleName, kind).has_value())
+      return true;
+  }
+  return false;
 }
 
 void ModuleDependenciesCache::recordDependency(
@@ -675,7 +702,8 @@ void ModuleDependenciesCache::recordDependency(
 void ModuleDependenciesCache::recordDependencies(
     ModuleDependencyVector moduleDependencies) {
   for (const auto &dep : moduleDependencies) {
-    recordDependency(dep.first.ModuleName, dep.second);
+    if (!hasDependency(dep.first))
+      recordDependency(dep.first.ModuleName, dep.second);
     if (dep.second.getKind() == ModuleDependencyKind::Clang) {
       auto clangModuleDetails = dep.second.getAsClangModule();
       addSeenClangModule(clang::tooling::dependencies::ModuleID{
